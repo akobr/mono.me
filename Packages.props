@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+
+    <!-- Please create any group of dependencies if you need -->
+    <!-- <PackageReference Update="package-name" Version="package-version" /> -->
+
+    <!-- abstractions for .NET libraries -->
+    <PackageReference Update="Microsoft.Extensions.Caching.Abstractions" Version="5.0.0" />
+    <PackageReference Update="Microsoft.Extensions.Configuration.Abstractions" Version="5.0.0" />
+    <PackageReference Update="Microsoft.Extensions.DependencyInjection.Abstractions" Version="5.0.0" />
+    <PackageReference Update="Microsoft.Extensions.Hosting.Abstractions" Version="5.0.0" />
+    <PackageReference Update="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0" />
+
+    <!-- .NET libraries -->
+    <PackageReference Update="Microsoft.Extensions.Configuration" Version="5.0.0" />
+    <PackageReference Update="Microsoft.Extensions.Configuration.Binder" Version="5.0.0" />
+    <PackageReference Update="Microsoft.Extensions.DependencyInjection" Version="5.0.2" />
+    <PackageReference Update="Microsoft.Extensions.Http" Version="5.0.0" />
+    <PackageReference Update="Microsoft.Extensions.Options" Version="5.0.0" />
+    <PackageReference Update="System.ComponentModel.Annotations" Version="5.0.0" />
+    <PackageReference Update="System.Text.Json" Version="5.0.2" />
+
+    <!-- unit testing -->
+    <PackageReference Update="Bogus" Version="33.1.1" />
+    <PackageReference Update="coverlet.collector" Version="3.1.0" />
+    <PackageReference Update="FluentAssertions" Version="6.1.0" />
+    <PackageReference Update="Microsoft.NET.Test.Sdk" Version="16.11.0" />
+    <PackageReference Update="Moq" Version="4.16.1" />
+    <PackageReference Update="NBuilder" Version="6.1.0" />
+    <PackageReference Update="xunit" Version="2.4.1" />
+    <PackageReference Update="xunit.runner.visualstudio" Version="2.4.3" />
+
+  </ItemGroup>
+
+  <!-- global dependencies -->
+  <ItemGroup>
+    <!-- versioning -->
+    <GlobalPackageReference Include="Nerdbank.GitVersioning" Version="3.4.231" Condition=" '$(EnableGitVersioning)' != 'false' " />
+  </ItemGroup>
+
+  <!-- code standards -->
+  <ItemGroup Condition=" '$(EnableStyleCop)' != 'false' ">
+    <GlobalPackageReference Include="StyleCop.Analyzers" Version="1.2.0-beta.354" />
+    <Compile Include="$(RepoRoot)\src\GlobalStylecopSuppressions.cs" Visible="False" />
+    <AdditionalFiles Include="$(RepoRoot)\stylecop.json" Visible="False" />
+  </ItemGroup>
+</Project>

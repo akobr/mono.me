@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "current-repo": {
+      "commandName": "Project",
+      "commandLineArgs": "info"
+    },
+    "mono-playground": {
+      "commandName": "Project",
+      "commandLineArgs": "",
+      "workingDirectory": "C:\\dev\\mono-playground"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "mono.me",
+  "description": "My personal mono-repository with most of my projects.",
+  "prefix": "42",
+  "worksteads": [
+    {
+      "name": "Monorepo",
+      "description": "Tooling around mono-repository."
+    },
+    {
+      "name": "Texo",
+      "description": "Powerful text base UI framework."
+    },
+    {
+      "name": "StrongBeaver",
+      "description": "Universal layered application toolkit for .NET platform."
+    },
+    {
+      "name": "Widgetised.Blazor"
+    },
+    {
+      "name": "Cetris",
+      "description": "The intersection of the legendary game Tetris + Command line = Cetris."
+    }
+  ]
+}

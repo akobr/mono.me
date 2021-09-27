@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Ales Kobr",
+  "classifications": ["Common/Library"],
+  "identity": "42.Monorepo.Library.Template.CSharp",
+  "name": "Mono-repository library",
+  "shortName": "mlib",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "MyProject",
+  "preferNameDirectory": false
+}

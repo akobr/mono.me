@@ -1,0 +1,5 @@
+{
+  "name": "mono-repo",
+  "prefix": "42",
+  "worksteads": [ /* your worksteads configuration is going to be here */ ]
+}
