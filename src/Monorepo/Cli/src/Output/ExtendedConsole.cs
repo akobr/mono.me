@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Alba.CsConsoleFormat;
+using Alba.CsConsoleFormat.Fluent;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 using ShellProgressBar;
@@ -52,13 +54,19 @@ namespace _42.Monorepo.Cli.Output
 
             Document document = new();
             document.Children.Add(elements);
-            document.Children.Add(new Br());
             Write(document);
+            Console.WriteLine();
         }
 
         public void WriteTree<T>(IComposition<T> root, Func<T, string> nodeRenderFunction)
         {
             Console.Write(treeBuilder.BuildTree(root, nodeRenderFunction, 1));
+        }
+
+        public void WriteTree<T>(IComposition<T> root, Func<T, IConsoleOutput> nodeRenderFunction)
+        {
+            TreeOutputConsoleRenderer renderer = new(this);
+            renderer.RenderTree(root, nodeRenderFunction, 1);
         }
 
         public void WriteTable<T>(
@@ -69,6 +77,8 @@ namespace _42.Monorepo.Cli.Output
             var grid = new Grid
             {
                 Stroke = LineThickness.None,
+                Color = Theme.ForegroundColor,
+                Margin = new Thickness(1, 0),
             };
 
             var noHeaders = true;
@@ -82,7 +92,7 @@ namespace _42.Monorepo.Cli.Output
                     noHeaders = false;
 
                     var headerCells = headerList
-                        .Select(header => new Cell(header.Content) { Stroke = LineThickness.None })
+                        .Select(header => new Cell(header.Content) { Stroke = LineThickness.None, Margin = new Thickness(1, 0) })
                         .ToList();
 
                     grid.Columns.Add(headerList
@@ -119,7 +129,7 @@ namespace _42.Monorepo.Cli.Output
                     .ToArray());
             }
 
-            Write(new Document(grid));
+            WriteExactDocument(new Document(grid));
         }
 
         public void Write(Document document)

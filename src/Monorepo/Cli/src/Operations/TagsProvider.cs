@@ -20,7 +20,7 @@ namespace _42.Monorepo.Cli.Operations
 
         private IReadOnlyCollection<Tag> LoadTags()
         {
-            using LibGit2Sharp.Repository repo = gitRepositoryFactory.BuildRepository();
+            using Repository repo = gitRepositoryFactory.BuildRepository();
             return repo.Tags.ToList();
         }
     }

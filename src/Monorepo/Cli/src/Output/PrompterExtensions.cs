@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using _42.Monorepo.Cli.Extensions;
 using Sharprompt;
 
 namespace _42.Monorepo.Cli.Output
@@ -12,5 +16,22 @@ namespace _42.Monorepo.Cli.Output
                 DefaultValue = defaultValue,
             });
         }
+
+        public static TValue Input<TValue>(
+            this IPrompter prompter,
+            string message,
+            object defaultValue = null,
+            IList<Func<object, ValidationResult>> validators = null)
+        {
+            InputOptions options = new()
+            {
+                Message = message,
+                DefaultValue = defaultValue,
+            };
+
+            options.Validators.Merge(validators);
+            return prompter.Input<TValue>(options);
+        }
+
     }
 }

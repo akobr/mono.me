@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace _42.Monorepo.Cli.Model.Records
 {
-    public class RepositoryRecord : ItemRecord, IRepositoryRecord
+    public class RepositoryRecord : Record, IRepositoryRecord
     {
         private readonly Lazy<IReadOnlyCollection<IWorksteadRecord>> worksteads;
 
@@ -23,6 +23,9 @@ namespace _42.Monorepo.Cli.Model.Records
                 .Any();
 
         public IReadOnlyCollection<IWorksteadRecord> GetWorksteads() => worksteads.Value;
+
+        public IEnumerable<IProjectRecord> GetAllProjects()
+            => GetWorksteads().SelectMany(w => w.GetAllProjects());
 
         private IReadOnlyCollection<IWorksteadRecord> CalculateWorksteads()
         {

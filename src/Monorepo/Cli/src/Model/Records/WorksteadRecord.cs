@@ -5,12 +5,12 @@ using System.Linq;
 
 namespace _42.Monorepo.Cli.Model.Records
 {
-    public class WorksteadRecord : ItemRecord, IWorksteadRecord
+    public class WorksteadRecord : Record, IWorksteadRecord
     {
         private readonly Lazy<IReadOnlyCollection<IWorksteadRecord>> worksteads;
         private readonly Lazy<IReadOnlyCollection<IProjectRecord>> projects;
 
-        public WorksteadRecord(string path, IItemRecord parent)
+        public WorksteadRecord(string path, IRecord parent)
             : base(path, parent)
         {
             worksteads = new(CalculateSubWorksteads);
@@ -24,6 +24,9 @@ namespace _42.Monorepo.Cli.Model.Records
         public IReadOnlyCollection<IWorksteadRecord> GetSubWorksteads() => worksteads.Value;
 
         public IReadOnlyCollection<IProjectRecord> GetProjects() => projects.Value;
+
+        public IEnumerable<IProjectRecord> GetAllProjects()
+            => GetSubWorksteads().SelectMany(w => w.GetAllProjects()).Concat(GetProjects());
 
         private IReadOnlyCollection<IWorksteadRecord> CalculateSubWorksteads()
         {

@@ -4,6 +4,8 @@ namespace _42.Monorepo.Cli.Model
 {
     public interface IIdentifier : IEquatable<IIdentifier>
     {
+        public string Name { get; }
+
         public string Normalized { get; }
 
         public string Humanized { get; }

@@ -1,6 +1,6 @@
 namespace _42.Monorepo.Cli.Model.Records
 {
-    public interface IProjectRecord : IItemRecord
+    public interface IProjectRecord : IRecord
     {
         // no member
     }

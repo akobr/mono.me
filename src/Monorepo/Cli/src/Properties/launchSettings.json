@@ -6,7 +6,7 @@
     },
     "mono-playground": {
       "commandName": "Project",
-      "commandLineArgs": "",
+      "commandLineArgs": "info",
       "workingDirectory": "C:\\dev\\mono-playground"
     }
   }

@@ -35,7 +35,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
             if (string.IsNullOrWhiteSpace(name))
             {
-                name = Prompt.GetString("Please give me a name for the project:");
+                name = Console.Input<string>("Please give me a name for the project");
 
                 if (string.IsNullOrWhiteSpace(name))
                 {
@@ -73,9 +73,10 @@ namespace _42.Monorepo.Cli.Commands.New
             }
 #endif
 
-            Console.WriteLine($"The project '{name}' has been created.", Color.Magenta);
-            Console.WriteLine($"Directory: {path}");
-            Console.WriteLine($"Project: {Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME, $"{name}.csproj")}");
+            Console.WriteLine();
+            Console.WriteImportant("The project '", name.ThemedHighlight(Console.Theme), "' has been created.");
+            Console.WriteLine($"Directory: {path}".ThemedLowlight(Console.Theme));
+            Console.WriteLine($"Project: {Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME, $"{name}.csproj")}".ThemedLowlight(Console.Theme));
             return Task.CompletedTask;
         }
     }

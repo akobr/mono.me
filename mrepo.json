@@ -1,26 +1,85 @@
 {
-  "name": "mono.me",
-  "description": "My personal mono-repository with most of my projects.",
-  "prefix": "42",
-  "worksteads": [
+  "repo": {
+    "name": "mono.me",
+    "description": "My personal mono-repository with most of my projects.",
+    "prefix": "42",
+    "features": [ "version", "nuget-packages" ],
+    "siblings": [ "doc", ".azure" ],
+    "scripts": {
+      /* add any global scripts here */
+        }
+  },
+  "release": {
+    "branches": [
+      "^refs/heads/main$"
+    ],
+    "changes": {
+      "major": [ /* custom major commit message types */ ],
+      "minor": [ "feat" ],
+      "patch": [ "fix", "perf", "refactor" ],
+      "harmless": [ "style", "test", "build", "ci", "docs" ]
+    },
+    "createReleaseBranch": true
+  },
+  "worksteadTypes": {
+    /* add custom workstead types here */
+  },
+  "projectTypes": {
+    "dotnet": {
+      "filePattern": "*.*?proj",
+      "useFullProjectNames": false,
+      "scripts": {
+        "build": "dotnet build",
+        "clean": "dotnet clean",
+        "pack": "dotnet pack",
+        "restore": "dotnet restore",
+        "run": "dotnet run",
+        "test": "dotnet test",
+        "custom": "mrepo --version"
+      }
+    },
+    "nodejs": {
+      "scripts": {
+        /* add any project related scripts here */
+      }
+    }
+  },
+  "items": [
+    /* your worksteads/projects configuration is going to be here */
     {
+      "path": "src/Monorepo",
       "name": "Monorepo",
       "description": "Tooling around mono-repository."
     },
     {
+      "path": "src/Texo",
       "name": "Texo",
       "description": "Powerful text base UI framework."
     },
     {
+      "path": "src/StrongBeaver",
       "name": "StrongBeaver",
       "description": "Universal layered application toolkit for .NET platform."
     },
     {
+      "path": "src/Widgetised.Blazor",
       "name": "Widgetised.Blazor"
     },
     {
+      "path": "src/Cetris",
       "name": "Cetris",
       "description": "The intersection of the legendary game Tetris + Command line = Cetris."
+    },
+    {
+      "path": "src/Monorepo/Dotnet.Project.Templates",
+      "projectType": "dotnet",
+      "dependencies": [
+        "src/Cetris/Cetris.Game"
+      ],
+      "exclude": [
+        "release",
+        "version"
+      ]
     }
   ]
 }

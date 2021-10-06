@@ -12,9 +12,9 @@ namespace _42.Monorepo.Cli.Operations
             repositoryPath = new Lazy<string>(MonorepoDirectoryFunctions.GetMonorepoRootDirectory);
         }
 
-        public LibGit2Sharp.Repository BuildRepository()
+        public Repository BuildRepository()
         {
-            return new LibGit2Sharp.Repository(repositoryPath.Value);
+            return new Repository(repositoryPath.Value);
         }
     }
 }

@@ -5,15 +5,11 @@ namespace _42.Monorepo.Cli.ConventionalCommits
         public ConventionalCommitMessage(
             string type,
             string description,
-            bool isBreakingChange = false,
-            string? scope = null,
-            string? issueLink = null)
+            bool isBreakingChange = false)
         {
             Type = type;
             Description = description;
             IsBreakingChange = isBreakingChange;
-            Scope = scope;
-            IssueLink = issueLink;
         }
 
         public string Type { get; init; }

@@ -12,7 +12,7 @@ namespace _42.Monorepo.Cli.Model
     {
         private readonly List<IRelease> subReleases;
 
-        public Release(SemVersion version, Tag tag, IItemRecord target)
+        public Release(SemVersion version, Tag tag, IRecord target)
         {
             Tag = tag;
             Target = target;
@@ -22,7 +22,7 @@ namespace _42.Monorepo.Cli.Model
 
         public Tag Tag { get; }
 
-        public IItemRecord Target { get; }
+        public IRecord Target { get; }
 
         public SemVersion Version { get; }
 
@@ -38,7 +38,7 @@ namespace _42.Monorepo.Cli.Model
             subReleases.AddRange(releases);
         }
 
-        public static bool TryParse(Tag tag, RepositoryRecord record, out Release release)
+        public static bool TryParse(Tag tag, IRecord repository, out Release release)
         {
             string tagName = tag.FriendlyName;
 
@@ -48,18 +48,18 @@ namespace _42.Monorepo.Cli.Model
                 return false;
             }
 
-            if (!TryParseReleaseName(tagName, record, out var target, out var version))
+            if (!TryParseReleaseName(tagName, repository, out var target, out var version))
             {
                 release = CreateEmpty(tag);
                 return false;
             }
 
             release = new Release(version, tag, target);
-            TryParseAnnotation(release, record);
+            TryParseAnnotation(release, repository);
             return true;
         }
 
-        private static void TryParseAnnotation(Release release, IItemRecord rootItem)
+        private static void TryParseAnnotation(Release release, IRecord root)
         {
             var annotation = release.Tag.Annotation;
 
@@ -73,29 +73,27 @@ namespace _42.Monorepo.Cli.Model
             release.AddSubReleases(
                 lines.Select(l =>
                     {
-                        var isValid = TryParseReleaseName(l, rootItem, out var subTarget, out var subVersion);
+                        var isValid = TryParseReleaseName(l, root, out var subTarget, out var subVersion);
                         return new { Release = new Release(subVersion, release.Tag, subTarget), IsValid = isValid };
                     })
                     .Where(pr => pr.IsValid)
                     .Select(pr => pr.Release));
         }
 
-        private static bool TryParseReleaseName(string releaseName, IItemRecord rootName, out IItemRecord target, out SemVersion version)
+        private static bool TryParseReleaseName(string releaseName, IRecord rootRecord, out IRecord target, out SemVersion version)
         {
             string[] segments = releaseName.Split('/', 256, StringSplitOptions.RemoveEmptyEntries);
 
             if (segments.Length == 1)
             {
-                target = rootName;
+                target = rootRecord;
                 return TryParseVersionSegment(segments[^1], out version);
             }
-            else
-            {
-                string path = Path.Combine(rootName.Path, Path.Combine(segments[Range.EndAt(^2)]));
-                target = MonorepoDirectoryFunctions.GetItem(path);
-                return TryParseVersionSegment(segments[^1], out version)
-                       && target is not InvalidItemRecord;
-            }
+
+            string path = Path.Combine(rootRecord.Path, Path.Combine(segments[Range.EndAt(^2)]));
+            target = MonorepoDirectoryFunctions.GetRecord(path);
+            return TryParseVersionSegment(segments[^1], out version)
+                   && target is not InvalidRecord;
         }
 
         private static bool TryParseVersionSegment(string segment, out SemVersion version)
@@ -111,7 +109,7 @@ namespace _42.Monorepo.Cli.Model
 
         private static Release CreateEmpty(Tag tag)
         {
-            return new Release(new SemVersion(0), tag, new InvalidItemRecord(string.Empty));
+            return new Release(new SemVersion(0), tag, new InvalidRecord(string.Empty));
         }
     }
 }

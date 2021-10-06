@@ -30,10 +30,18 @@
     <PackageReference Include="LibGit2Sharp" />
     <PackageReference Include="McMaster.Extensions.CommandLineUtils" />
     <PackageReference Include="McMaster.Extensions.Hosting.CommandLine" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="semver" />
     <PackageReference Include="Sharprompt" />
     <PackageReference Include="ShellProgressBar" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Commands\Fix\" />
   </ItemGroup>
 
 </Project>

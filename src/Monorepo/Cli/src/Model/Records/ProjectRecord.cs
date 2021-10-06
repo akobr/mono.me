@@ -1,8 +1,8 @@
 namespace _42.Monorepo.Cli.Model.Records
 {
-    public class ProjectRecord : ItemRecord, IProjectRecord
+    public class ProjectRecord : Record, IProjectRecord
     {
-        public ProjectRecord(string path, IItemRecord parent)
+        public ProjectRecord(string path, IRecord parent)
             : base(path, parent)
         {
             // no operation

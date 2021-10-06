@@ -7,25 +7,26 @@ namespace _42.Monorepo.Cli.Model
 {
     public class ItemsFactory : IItemsFactory
     {
-        private readonly IOperationsCache cache;
+        private readonly IOpsExecutor executor;
 
-        public ItemsFactory(IOperationsCache cache)
+        public ItemsFactory(IOpsExecutor executor)
         {
-            this.cache = cache;
+            this.executor = executor;
         }
 
-        public IItem BuildItem(IItemRecord record)
+        public IItem BuildItem(IRecord record)
         {
             return record switch
             {
-                RepositoryRecord repository => new Item(repository, cache, BuildItem),
-                WorksteadRecord workstead => new Item(workstead, cache, BuildItem),
-                ProjectRecord project => new Project(project, cache, BuildItem),
-                _ => throw new ArgumentOutOfRangeException(nameof(record), "Invalid item or unsupported type of item."),
+                RepositoryRecord repository => new Repository(repository, executor, BuildItem),
+                WorksteadRecord workstead => new Workstead(workstead, executor, BuildItem),
+                ProjectRecord project => new Project(project, executor, BuildItem),
+                InvalidRecord invalid => new InvalidItem(invalid),
+                _ => throw new ArgumentOutOfRangeException(nameof(record), record, "An unsupported type of item."),
             };
         }
 
-        public TPoweredItem BuildItem<TPoweredItem>(IItemRecord record)
+        public TPoweredItem BuildItem<TPoweredItem>(IRecord record)
             where TPoweredItem : IItem
         {
             return (TPoweredItem)BuildItem(record);

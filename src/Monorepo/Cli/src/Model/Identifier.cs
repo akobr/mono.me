@@ -1,5 +1,8 @@
+using System;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Model.Records;
 
@@ -8,21 +11,19 @@ namespace _42.Monorepo.Cli.Model
     [DebuggerDisplay("{Humanized}")]
     public class Identifier : IIdentifier
     {
-        public Identifier(string path, IItemRecord? parent)
+        public Identifier(string path, IRecord? parent)
         {
-            if (parent is null)
-            {
-                Normalized = Humanized = Constants.SOURCE_DIRECTORY_NAME;
-            }
-            else
-            {
-                var name = Path.GetFileNameWithoutExtension(path);
-                Humanized = $"{parent.Identifier.Humanized}/{name}";
-                Normalized = Humanized.ToLowerInvariant();
-            }
+            Name = Path.GetFileNameWithoutExtension(path);
+            Humanized = parent is null
+                ? Constants.SOURCE_DIRECTORY_NAME
+                : $"{parent.Identifier.Humanized}/{Name}";
+            Normalized = Humanized.ToLowerInvariant();
 
-            Hash = Normalized; // TODO: create Murmur hash here
+            // TODO: murmur hash
+            Hash = Convert.ToBase64String(SHA1.HashData(Encoding.UTF8.GetBytes(Normalized)));
         }
+
+        public string Name { get; }
 
         public string Normalized { get; }
 

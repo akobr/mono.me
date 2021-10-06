@@ -14,6 +14,8 @@ namespace _42.Monorepo.Cli.Output
 
         void WriteTree<T>(IComposition<T> root, Func<T, string> nodeRenderFunction);
 
+        void WriteTree<T>(IComposition<T> root, Func<T, IConsoleOutput> nodeRenderFunction);
+
         void WriteTable<T>(IEnumerable<T> rows, Func<T, IEnumerable<Cell>> rowRenderFunction, IEnumerable<IHeaderColumn>? headers = null);
 
         void Write(Document document);

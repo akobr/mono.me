@@ -42,7 +42,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
             if (string.IsNullOrWhiteSpace(name))
             {
-                name = Prompt.Input<string>("Please give me a name for the new workstead");
+                name = Console.Input<string>("Please give me a name for the workstead");
 
                 if (string.IsNullOrWhiteSpace(name))
                 {
@@ -60,8 +60,9 @@ namespace _42.Monorepo.Cli.Commands.New
 #if !DEBUG
             Directory.CreateDirectory(path);
 #endif
-            Console.WriteLine("The workstead '", name.Magenta(), "' has been created.");
-            Console.WriteLine($"Path: {path}".DarkGray());
+            Console.WriteLine();
+            Console.WriteImportant("The workstead '", name.ThemedHighlight(Console.Theme), "' has been created.");
+            Console.WriteLine($"Path: {path}".ThemedLowlight(Console.Theme));
             return Task.CompletedTask;
         }
     }

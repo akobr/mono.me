@@ -2,36 +2,36 @@ using System;
 
 namespace _42.Monorepo.Cli.Model.Records
 {
-    public abstract class ItemRecord : IItemRecord
+    public abstract class Record : IRecord
     {
-        protected ItemRecord(string path, IItemRecord? parent)
+        protected Record(string path, IRecord? parent)
         {
             Identifier = new Identifier(path, parent);
             Path = path;
             Parent = parent;
         }
 
-        public string Name => System.IO.Path.GetFileNameWithoutExtension(Path);
-
         public IIdentifier Identifier { get; }
+
+        public string Name => Identifier.Name;
 
         public string Path { get; }
 
         public abstract ItemType Type { get; }
 
-        public IItemRecord? Parent { get; }
+        public IRecord? Parent { get; }
 
-        public static bool operator ==(ItemRecord? left, IItemRecord? right)
+        public static bool operator ==(Record? left, IRecord? right)
         {
             return Equals(left, right);
         }
 
-        public static bool operator !=(ItemRecord? left, IItemRecord? right)
+        public static bool operator !=(Record? left, IRecord? right)
         {
             return !Equals(left, right);
         }
 
-        public bool Equals(IItemRecord? other)
+        public bool Equals(IRecord? other)
         {
             if (ReferenceEquals(null, other))
             {
@@ -59,7 +59,7 @@ namespace _42.Monorepo.Cli.Model.Records
                 return true;
             }
 
-            return obj is IItemRecord item && Equals(item);
+            return obj is IRecord item && Equals(item);
         }
 
         public override int GetHashCode()

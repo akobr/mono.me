@@ -4,11 +4,12 @@ using System.Linq;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Output;
 using Alba.CsConsoleFormat;
-using Alba.CsConsoleFormat.Fluent;
+using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 
 namespace _42.Monorepo.Cli.Commands.Init
 {
+    [Command("init", Description = "Initialise a new mono-repository.")]
     public class InitCommand : BaseCommand
     {
         public InitCommand(IExtendedConsole console, ICommandContext context)
@@ -26,7 +27,7 @@ namespace _42.Monorepo.Cli.Commands.Init
         {
             if (Context.IsValid)
             {
-                Console.WriteLine("You are already in ", "mono-repository".Magenta(), ", hurray!");
+                Console.WriteImportant("You are already in ", "mono-repository".ThemedHighlight(Console.Theme), ", hurray!");
                 return Task.CompletedTask;
             }
 
@@ -38,9 +39,9 @@ namespace _42.Monorepo.Cli.Commands.Init
             Console.WriteLine();
             Console.WriteLine(
                 "We are recommending to use a couple of ",
-                "independent tools to simplify versioning and management of the mono-repository".Magenta(),
+                "independent tools to simplify versioning and management of the mono-repository".ThemedHighlight(Console.Theme),
                 ". Please pick which one you want to use. ",
-                "(All of them can be added any time.)".DarkGray());
+                "(All of them can be added any time.)".ThemedLowlight(Console.Theme));
             Console.WriteLine();
             Console.WriteLine();
 
@@ -91,6 +92,7 @@ namespace _42.Monorepo.Cli.Commands.Init
                 .Select(f => f.Id)
                 .ToList();
 
+            Console.WriteImportant("This command is still under development...");
             return Task.CompletedTask;
         }
     }

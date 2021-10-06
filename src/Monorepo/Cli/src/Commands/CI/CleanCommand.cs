@@ -1,9 +1,9 @@
 using System;
 using System.Threading.Tasks;
 
-namespace _42.Monorepo.Cli.Commands.Build
+namespace _42.Monorepo.Cli.Commands.CI
 {
-    public class PackCommand : IAsyncCommand
+    public class CleanCommand : IAsyncCommand
     {
         public Task OnExecuteAsync()
         {

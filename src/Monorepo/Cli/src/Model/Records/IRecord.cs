@@ -2,7 +2,7 @@ using System;
 
 namespace _42.Monorepo.Cli.Model.Records
 {
-    public interface IItemRecord : IEquatable<IItemRecord>
+    public interface IRecord : IEquatable<IRecord>
     {
         public IIdentifier Identifier { get; }
 
@@ -12,6 +12,6 @@ namespace _42.Monorepo.Cli.Model.Records
 
         ItemType Type { get; }
 
-        IItemRecord? Parent { get; }
+        IRecord? Parent { get; }
     }
 }

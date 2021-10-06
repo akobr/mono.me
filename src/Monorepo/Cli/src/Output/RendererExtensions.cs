@@ -15,6 +15,30 @@ namespace _42.Monorepo.Cli.Output
             };
         }
 
+        public static Span ThemedHeader(this string @this, IConsoleTheme theme)
+        {
+            return new(@this)
+            {
+                Color = new ConsoleColor?(theme.HeaderColor),
+            };
+        }
+
+        public static Span ThemedHighlight(this string @this, IConsoleTheme theme)
+        {
+            return new(@this)
+            {
+                Color = new ConsoleColor?(theme.HighlightColor),
+            };
+        }
+
+        public static Span ThemedLowlight(this string @this, IConsoleTheme theme)
+        {
+            return new(@this)
+            {
+                Color = new ConsoleColor?(theme.LowlightColor),
+            };
+        }
+
         public static void WriteHeader(this IRenderer renderer, params object[] elements)
         {
             Document document = new()
@@ -24,11 +48,11 @@ namespace _42.Monorepo.Cli.Output
                 {
                     new Span("# "),
                     elements,
-                    new Br(),
                 },
             };
 
             renderer.WriteExactDocument(document);
+            renderer.WriteLine();
         }
 
         public static void WriteImportant(this IRenderer renderer, params object[] elements)
@@ -39,11 +63,11 @@ namespace _42.Monorepo.Cli.Output
                 {
                     "! ".Colored(renderer.Theme.HighlightColor),
                     elements,
-                    new Br(),
                 },
             };
 
             renderer.WriteExactDocument(document);
+            renderer.WriteLine();
         }
 
         public static void WriteTable<T>(
@@ -54,7 +78,7 @@ namespace _42.Monorepo.Cli.Output
         {
             renderer.WriteTable(
                 rows,
-                r => rowRenderFunction(r).Select(c => new Cell(c) { Stroke = LineThickness.None }),
+                r => rowRenderFunction(r).Select(c => new Cell(c) { Stroke = LineThickness.None, Margin = new Thickness(1, 0) }),
                 headers);
         }
 
@@ -66,31 +90,7 @@ namespace _42.Monorepo.Cli.Output
         {
             renderer.WriteTable(
                 rows,
-                r => rowRenderFunction(r).Select(c => new Cell(c) { Stroke = LineThickness.None }),
-                headers?.Select(text => new HeaderColumn(text)));
-        }
-
-        public static void WriteTable<T>(
-            this IRenderer renderer,
-            IEnumerable<T> rows,
-            Func<T, IEnumerable<object>> rowRenderFunction,
-            IEnumerable<IHeaderColumn>? headers = null)
-        {
-            renderer.WriteTable(
-                rows,
-                r => rowRenderFunction(r).Select(c => new Cell(c.ToString()) { Stroke = LineThickness.None }),
-                headers);
-        }
-
-        public static void WriteTable<T>(
-            this IRenderer renderer,
-            IEnumerable<T> rows,
-            Func<T, IEnumerable<object>> rowRenderFunction,
-            IEnumerable<string>? headers = null)
-        {
-            renderer.WriteTable(
-                rows,
-                r => rowRenderFunction(r).Select(c => new Cell(c.ToString()) { Stroke = LineThickness.None }),
+                r => rowRenderFunction(r).Select(c => new Cell(c) { Stroke = LineThickness.None, Margin = new Thickness(1, 0) }),
                 headers?.Select(text => new HeaderColumn(text)));
         }
 
@@ -101,7 +101,7 @@ namespace _42.Monorepo.Cli.Output
         {
             renderer.WriteTable(
                 rows,
-                r => r.Select(c => new Cell(c) { Stroke = LineThickness.None }),
+                r => r.Select(c => new Cell(c) { Stroke = LineThickness.None, Margin = new Thickness(1, 0) }),
                 headers);
         }
 
@@ -112,7 +112,7 @@ namespace _42.Monorepo.Cli.Output
         {
             renderer.WriteTable(
                 rows,
-                r => r.Select(c => new Cell(c) { Stroke = LineThickness.None }),
+                r => r.Select(c => new Cell(c) { Stroke = LineThickness.None, Margin = new Thickness(1, 0) }),
                 headers?.Select(text => new HeaderColumn(text)));
         }
     }

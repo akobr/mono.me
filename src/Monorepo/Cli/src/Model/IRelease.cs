@@ -9,7 +9,7 @@ namespace _42.Monorepo.Cli.Model
     {
         Tag Tag { get; }
 
-        IItemRecord Target { get; }
+        IRecord Target { get; }
 
         SemVersion Version { get; }
 

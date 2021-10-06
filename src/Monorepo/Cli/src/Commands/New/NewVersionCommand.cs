@@ -59,7 +59,7 @@ namespace _42.Monorepo.Cli.Commands.New
             }
 
             List<IConventionalCommitMessage> changes = new(affectingCommits.Count);
-            Parser parser = new();
+            ConventionalCommitMessageParser parser = new();
 
             while (affectingCommits.Count > 0)
             {

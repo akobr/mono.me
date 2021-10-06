@@ -5,9 +5,9 @@ namespace _42.Monorepo.Cli.Model
 {
     public interface IItemsFactory
     {
-        IItem BuildItem(IItemRecord record);
+        IItem BuildItem(IRecord record);
 
-        TPoweredItem BuildItem<TPoweredItem>(IItemRecord record)
+        TPoweredItem BuildItem<TPoweredItem>(IRecord record)
             where TPoweredItem : IItem;
     }
 }

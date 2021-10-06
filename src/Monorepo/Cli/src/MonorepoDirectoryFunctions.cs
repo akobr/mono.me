@@ -58,23 +58,23 @@ namespace _42.Monorepo.Cli
             return new RepositoryRecord(GetMonorepoRootDirectory());
         }
 
-        public static IItemRecord GetCurrentItem()
+        public static IRecord GetCurrentItem()
         {
-            return GetItem(Directory.GetCurrentDirectory());
+            return GetRecord(Directory.GetCurrentDirectory());
         }
 
-        public static IItemRecord GetItem(string directoryPath)
+        public static IRecord GetRecord(string directoryPath)
         {
             if (!Directory.Exists(directoryPath))
             {
-                return new InvalidItemRecord(directoryPath);
+                return new InvalidRecord(directoryPath);
             }
 
             RepositoryRecord repo = new(GetMonorepoRootDirectory(directoryPath));
 
             if (!repo.IsValid)
             {
-                return new InvalidItemRecord(directoryPath);
+                return new InvalidRecord(directoryPath);
             }
 
             string relativePath = directoryPath.GetRelativePath(repo.Path);
@@ -95,7 +95,7 @@ namespace _42.Monorepo.Cli
                 return workstead;
             }
 
-            IItemRecord record = workstead;
+            IRecord record = workstead;
             for (var i = 2; i < segments.Length; i++)
             {
                 string directory = Path.Combine(record.Path, segments[i]);
@@ -114,12 +114,13 @@ namespace _42.Monorepo.Cli
         public static bool IsExcludedDirectory(string directory)
         {
             string name = Path.GetFileName(directory);
-            return name[0] == '.' || name[0] == '_';
+            return name[0] == '.';
         }
 
         public static bool IsProjectDirectory(string directory)
         {
-            return Directory.GetDirectories(directory, Constants.SOURCE_DIRECTORY_NAME).Any();
+            return Directory.GetDirectories(directory, Constants.SOURCE_DIRECTORY_NAME).Any()
+                   || Directory.GetFiles(directory, "*.*?proj", SearchOption.TopDirectoryOnly).Any();
         }
 
         private static bool IsMonorepoRootDirectory(DirectoryInfo directory)

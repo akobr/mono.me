@@ -10,5 +10,9 @@ namespace _42.Monorepo.Cli.Model.Items
         new IProjectRecord Record { get; }
 
         Task<IReadOnlyCollection<IInternalDependency>> GetInternalDependenciesAsync(CancellationToken cancellationToken = default);
+
+        Task<bool> GetIsPackableAsync(CancellationToken cancellationToken = default);
+
+        Task<string> GetPackageNameAsync(CancellationToken cancellationToken = default);
     }
 }
