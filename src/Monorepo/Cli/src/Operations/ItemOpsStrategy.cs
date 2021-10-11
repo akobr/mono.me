@@ -86,7 +86,7 @@ namespace _42.Monorepo.Cli.Operations
 
         public Task<IExactVersions> CalculateExactVersionsAsync(IItem item, CancellationToken cancellationToken)
         {
-            var options = optionsProvider.TryGetOptions(item.Record.Path);
+            var options = optionsProvider.GetOptions(item.Record.Path);
 
             if (options.IsVersioned())
             {

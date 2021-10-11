@@ -13,7 +13,7 @@ namespace _42.Monorepo.Cli.Model
     {
         public Identifier(string path, IRecord? parent)
         {
-            Name = Path.GetFileNameWithoutExtension(path);
+            Name = Path.GetFileName(path);
             Humanized = parent is null
                 ? Constants.SOURCE_DIRECTORY_NAME
                 : $"{parent.Identifier.Humanized}/{Name}";

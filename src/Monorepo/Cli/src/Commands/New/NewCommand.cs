@@ -1,19 +1,22 @@
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Commands.Init;
+using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Output;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.New
 {
-    [Command("new", Description = "Create a new workstead or project.")]
+    [Command(CommandNames.NEW, Description = "Create a new workstead or project.")]
     [Subcommand(typeof(NewWorksteadCommand), typeof(NewProjectCommand), typeof(NewVersionCommand))]
     public class NewCommand : BaseCommand
     {
-        public NewCommand(IExtendedConsole console, ICommandContext context)
+        private readonly CommandLineApplication application;
+
+        public NewCommand(IExtendedConsole console, ICommandContext context, CommandLineApplication application)
             : base(console, context)
         {
-            // no operation
+            this.application = application;
         }
 
         protected override Task ExecutePreconditionsAsync()
@@ -21,7 +24,7 @@ namespace _42.Monorepo.Cli.Commands.New
             return Task.CompletedTask;
         }
 
-        protected override Task ExecuteAsync()
+        protected override Task<int> ExecuteAsync()
         {
             if (!Context.IsValid)
             {
@@ -32,14 +35,14 @@ namespace _42.Monorepo.Cli.Commands.New
             {
                 case ItemType.Repository:
                 case ItemType.Project:
-                    return new NewWorksteadCommand(Console, Context).OnExecuteAsync();
+                    return application.Commands.ExecuteByNameAsync(CommandNames.WORKSTEAD);
 
                 case ItemType.TopWorkstead:
                 case ItemType.Workstead:
-                    return new NewProjectCommand(Console, Context).OnExecuteAsync();
+                    return application.Commands.ExecuteByNameAsync(CommandNames.PROJECT);
 
                 default:
-                    return Task.CompletedTask;
+                    return Task.FromResult(ExitCodes.ERROR_WRONG_PLACE);
             }
         }
     }

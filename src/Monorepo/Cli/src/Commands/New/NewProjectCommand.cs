@@ -1,5 +1,4 @@
 using System;
-using System.Drawing;
 using System.IO;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Extensions;
@@ -9,7 +8,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.New
 {
-    [Command("project")]
+    [Command(CommandNames.PROJECT, "Create new .net project.")]
     public class NewProjectCommand : BaseCommand
     {
         public NewProjectCommand(IExtendedConsole console, ICommandContext context)
@@ -19,9 +18,9 @@ namespace _42.Monorepo.Cli.Commands.New
         }
 
         [Argument(0, Description = "Name of the project.")]
-        public string? Name { get; } = string.Empty;
+        public string? Name { get; set; } = string.Empty;
 
-        protected override Task ExecuteAsync()
+        protected override Task<int> ExecuteAsync()
         {
             var workstead = Context.Item.TryGetConcreteItem(ItemType.Workstead);
 
@@ -77,7 +76,7 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteImportant("The project '", name.ThemedHighlight(Console.Theme), "' has been created.");
             Console.WriteLine($"Directory: {path}".ThemedLowlight(Console.Theme));
             Console.WriteLine($"Project: {Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME, $"{name}.csproj")}".ThemedLowlight(Console.Theme));
-            return Task.CompletedTask;
+            return Task.FromResult(ExitCodes.SUCCESS);
         }
     }
 }

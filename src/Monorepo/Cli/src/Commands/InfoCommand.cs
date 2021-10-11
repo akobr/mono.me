@@ -9,7 +9,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command("info", Description = "Display info of a location in the mono-repository.")]
+    [Command(CommandNames.INFO, Description = "Display info of a location in the mono-repository.")]
     public class InfoCommand : BaseCommand
     {
         private readonly IItemOptionsProvider optionsProvider;
@@ -23,12 +23,12 @@ namespace _42.Monorepo.Cli.Commands
             this.optionsProvider = optionsProvider;
         }
 
-        protected override async Task ExecuteAsync()
+        protected override async Task<int> ExecuteAsync()
         {
             var item = Context.Item;
             var record = item.Record;
             var exactVersions = await item.GetExactVersionsAsync();
-            var options = optionsProvider.TryGetOptions(record.Path);
+            var options = optionsProvider.GetOptions(record.Path);
 
             Console.WriteHeader(
                 $"{record.GetTypeAsString()}: ",
@@ -40,19 +40,19 @@ namespace _42.Monorepo.Cli.Commands
             Console.WriteLine(
                 $"Version: {exactVersions.PackageVersion}".ThemedLowlight(Console.Theme));
 
-            if (options.Exclude.Contains(Excludes.Version))
+            if (options.Exclude.Contains(Excludes.VERSION))
             {
                 Console.WriteLine("The versioning is disabled.".ThemedLowlight(Console.Theme));
                 Console.WriteLine("Not releasable by the tool.");
             }
-            else if (options.Exclude.Contains(Excludes.Release))
+            else if (options.Exclude.Contains(Excludes.RELEASE))
             {
                 Console.WriteLine("Not releasable by the tool.");
             }
 
             var files = await GetFilesAsync(item, Context.Repository);
 
-            if (!options.Exclude.Contains(Excludes.Version))
+            if (!options.Exclude.Contains(Excludes.VERSION))
             {
                 Console.WriteLine();
                 Console.WriteHeader("Version definition");
@@ -103,6 +103,8 @@ namespace _42.Monorepo.Cli.Commands
                     d => new[] { $"> {d.Name}", d.Version.ToString() },
                     new[] { "Package", "Version" });
             }
+
+            return ExitCodes.SUCCESS;
         }
 
         private static async Task<(IEnumerable<string> versionFiles, IEnumerable<string> packageFiles)> GetFilesAsync(IItem item, IRepository repository)

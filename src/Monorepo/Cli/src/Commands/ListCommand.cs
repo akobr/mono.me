@@ -9,7 +9,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command("list", Description = "List items in current position of the mono-repository.")]
+    [Command(CommandNames.LIST, Description = "List items in current position of the mono-repository.")]
     public class ListCommand : BaseCommand
     {
         public ListCommand(IExtendedConsole console, ICommandContext context)
@@ -19,9 +19,9 @@ namespace _42.Monorepo.Cli.Commands
         }
 
         [Option("-w|--worksteads", CommandOptionType.NoValue, Description = "Display the list of top-level worksteads.")]
-        public bool DisplayWorksteads { get; }
+        public bool DisplayWorksteads { get; set; }
 
-        protected override async Task ExecuteAsync()
+        protected override async Task<int> ExecuteAsync()
         {
             var item = Context.Item;
             var record = item.Record;
@@ -31,7 +31,7 @@ namespace _42.Monorepo.Cli.Commands
                 item = Context.Repository;
                 await ShowItemHeader(item);
                 await ShowListOfItems(Context.Repository.GetWorksteads(), "Workstead");
-                return;
+                return ExitCodes.SUCCESS;
             }
 
             if (record.Type > ItemType.Workstead)
@@ -47,6 +47,7 @@ namespace _42.Monorepo.Cli.Commands
             await ShowItemHeader(item);
             await ShowListOfItems(workstead.GetSubWorksteads(), "Workstead");
             await ShowListOfItems(workstead.GetProjects(), "Project");
+            return ExitCodes.SUCCESS;
         }
 
         private async Task ShowItemHeader(IItem item)

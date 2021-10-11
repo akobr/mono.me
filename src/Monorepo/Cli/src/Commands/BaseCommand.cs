@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Output;
 
-namespace _42.Monorepo.Cli
+namespace _42.Monorepo.Cli.Commands
 {
     public abstract class BaseCommand : IAsyncCommand
     {
@@ -15,14 +15,15 @@ namespace _42.Monorepo.Cli
 
         protected ICommandContext Context { get; }
 
-        public async Task OnExecuteAsync()
+        public async Task<int> OnExecuteAsync()
         {
             await ExecutePreconditionsAsync();
-            await ExecuteAsync();
+            var exitCode = await ExecuteAsync();
             await ExecutePostconditionsAsync();
+            return exitCode;
         }
 
-        protected abstract Task ExecuteAsync();
+        protected abstract Task<int> ExecuteAsync();
 
         protected virtual Task ExecutePreconditionsAsync()
         {

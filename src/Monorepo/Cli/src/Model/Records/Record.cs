@@ -17,6 +17,8 @@ namespace _42.Monorepo.Cli.Model.Records
 
         public string Path { get; }
 
+        public virtual string RepoRelativePath => Identifier.Humanized;
+
         public abstract ItemType Type { get; }
 
         public IRecord? Parent { get; }

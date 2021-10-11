@@ -1,15 +1,16 @@
-using System.Collections.Generic;
 using System.IO;
 using _42.Monorepo.Cli.Cache;
 using _42.Monorepo.Cli.Configuration;
+using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Operations;
 using _42.Monorepo.Cli.Operations.Strategies;
 using _42.Monorepo.Cli.Output;
+using _42.Monorepo.Cli.Scripting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Semver;
+using Microsoft.Extensions.Logging;
 
 namespace _42.Monorepo.Cli
 {
@@ -22,7 +23,53 @@ namespace _42.Monorepo.Cli
 
         public IHostEnvironment Environment { get; }
 
-        public static void ConfigureOpStrategies(IOpStrategiesRegister register)
+        public void ConfigureServices(IServiceCollection services)
+        {
+            services.AddLogging(ConfigureLogging);
+            services.AddOpStrategies(ConfigureOpStrategies);
+
+            services.AddSingleton<ICommandContext, CommandContext>();
+            services.AddSingleton<IFileContentCache, FileContentCache>();
+            services.AddSingleton<IItemsFactory, ItemsFactory>();
+            services.AddSingleton<IExtendedConsole, ExtendedConsole>();
+            services.AddSingleton<IGitRepositoryFactory, GitRepositoryFactory>();
+            services.AddSingleton<ITagsProvider, TagsProvider>();
+
+            services.AddSingleton<IScriptingService, ScriptingService>();
+        }
+
+        public void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
+        {
+            services.AddSingleton<IItemOptionsProvider, ItemOptionsProvider>();
+            services.AddSingleton<ITypeOptionsProvider, TypeOptionsProvider>();
+
+            services.Configure<MonoRepoOptions>(configuration.GetSection(ConfigurationSections.REPO));
+            services.Configure<ReleaseOptions>(configuration.GetSection(ConfigurationSections.RELEASE));
+        }
+
+        public void ConfigureApplication(IConfigurationBuilder builder)
+        {
+            var repoRootPath = MonorepoDirectoryFunctions.GetMonorepoRootDirectory();
+            var repoConfigFilePath = Path.Combine(repoRootPath, Constants.MONOREPO_CONFIG_JSON);
+
+            if (!File.Exists(repoConfigFilePath))
+            {
+                return;
+            }
+
+            // TODO: load logging settings
+            builder.AddJsonFile(repoConfigFilePath, true, true);
+        }
+
+        private void ConfigureLogging(ILoggingBuilder builder)
+        {
+            // TODO: add sentry and serilog
+#if DEBUG
+            builder.AddDebug();
+#endif
+        }
+
+        private static void ConfigureOpStrategies(IOpStrategiesRegister register)
         {
             register.RegisterFuncStrategy<VersionFilePathOpStrategy>(OperationNames.VERSION_FILE_PATH);
             register.RegisterFuncStrategy<PackagesFilePathOpStrategy>(OperationNames.PACKAGES_FILE_PATH);
@@ -32,47 +79,8 @@ namespace _42.Monorepo.Cli
             register.RegisterFuncStrategy<LastReleaseOpStrategy>(OperationNames.LAST_RELEASE);
             register.RegisterFuncStrategy<ExternalDependenciesOpStrategy>(OperationNames.EXTERNAL_DEPENDENCIES);
             register.RegisterFuncStrategy<InternalDependenciesOpStrategy>(OperationNames.INTERNAL_DEPENDENCIES);
-        }
-
-        public void ConfigureServices(IServiceCollection services)
-        {
-            services.AddSingleton<OpStrategiesFactory>();
-            services.AddSingleton<IOpStrategiesRegister>(sp => sp.GetRequiredService<OpStrategiesFactory>());
-            services.AddSingleton<IOpStrategiesFactory>(sp =>
-            {
-                var factory = sp.GetRequiredService<OpStrategiesFactory>();
-                ConfigureOpStrategies(factory);
-                return factory;
-            });
-
-            services.AddSingleton<ICommandContext, CommandContext>();
-            services.AddSingleton<IFileContentCache, FileContentCache>();
-            services.AddSingleton<IGenericOpsCache, GenericOpsCache>();
-            services.AddSingleton<IOpsExecutor, OpsExecutor>();
-            services.AddSingleton<IItemsFactory, ItemsFactory>();
-            services.AddSingleton<IItemOptionsProvider, ItemOptionsProvider>();
-            services.AddSingleton<IExtendedConsole, ExtendedConsole>();
-
-            services.AddSingleton<IGitRepositoryFactory, GitRepositoryFactory>();
-            services.AddSingleton<ITagsProvider, TagsProvider>();
-        }
-
-        public void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
-        {
-            services.Configure<ReleaseOptions>(configuration.GetSection(ConfigurationSections.Release));
-        }
-
-        public void ConfigureApplication(IConfigurationBuilder builder)
-        {
-            string repoRootPath = MonorepoDirectoryFunctions.GetMonorepoRootDirectory();
-            string repoConfigFilePath = Path.Combine(repoRootPath, Constants.MONOREPO_CONFIG_JSON);
-
-            if (!File.Exists(repoConfigFilePath))
-            {
-                return;
-            }
-
-            builder.AddJsonFile(repoConfigFilePath, true, true);
+            register.RegisterFuncStrategy<PackageNameProjectOpStrategy>(OperationNames.PACKAGE_NAME);
+            register.RegisterFuncStrategy<IsPackableProjectOpStrategy>(OperationNames.IS_PACKABLE);
         }
     }
 }

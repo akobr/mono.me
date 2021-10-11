@@ -5,7 +5,7 @@ namespace _42.Monorepo.Cli.Commands.CI
 {
     public class PackCommand : IAsyncCommand
     {
-        public Task OnExecuteAsync()
+        public Task<int> OnExecuteAsync()
         {
             throw new NotImplementedException();
         }

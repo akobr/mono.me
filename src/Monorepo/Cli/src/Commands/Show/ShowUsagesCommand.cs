@@ -13,7 +13,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.Show
 {
-    [Command("usages", Description = "Show usages of current project/workstead.")]
+    [Command(CommandNames.USAGES, Description = "Show usages of current project/workstead.")]
     public class ShowUsagesCommand : BaseCommand
     {
         public ShowUsagesCommand(IExtendedConsole console, ICommandContext context)
@@ -25,18 +25,18 @@ namespace _42.Monorepo.Cli.Commands.Show
         [Option("-s|--search", CommandOptionType.SingleValue, Description = "Will try to search any directory/repository for usages.")]
         public string? SearchPath { get; }
 
-        protected override async Task ExecuteAsync()
+        protected override async Task<int> ExecuteAsync()
         {
             if (Context.Item is not IProject targetProject)
             {
                 Console.WriteImportant("This command can be called only on project.");
-                return;
+                return ExitCodes.ERROR_WRONG_PLACE;
             }
 
             if (!string.IsNullOrWhiteSpace(SearchPath))
             {
                 await ExternalSearchAsync(targetProject);
-                return;
+                return ExitCodes.SUCCESS;
             }
 
             var record = targetProject.Record;
@@ -66,6 +66,8 @@ namespace _42.Monorepo.Cli.Commands.Show
                 var tree = BuildTree(Context.Repository, projectMap);
                 Console.WriteTree(tree, n => n);
             }
+
+            return ExitCodes.SUCCESS;
         }
 
         private static Composition BuildTree(IRepository repository, IReadOnlySet<IIdentifier> projectMap)
@@ -126,28 +128,28 @@ namespace _42.Monorepo.Cli.Commands.Show
                 return;
             }
 
-            var packageName = project.GetPackageNameAsync();
+            var packageName = await project.GetPackageNameAsync();
 
-            // Project files
-            foreach (var filePath in Directory.GetFiles(path, "*.*proj", SearchOption.AllDirectories))
-            {
-                
-            }
+            Console.WriteHeader(".NET project files");
+            await SearchUsagesAsync(
+                path,
+                "*.*proj",
+                (content, filePath) => SearchProjectFile(content, filePath, packageName));
 
-            // props files
-            foreach (string filePath in Directory.GetFiles(path, "*.props", SearchOption.AllDirectories))
-            {
+            Console.WriteHeader("MsBuild properties files");
+            await SearchUsagesAsync(
+                path,
+                "*.props",
+                (content, filePath) => SearchPackagesProps(content, filePath, packageName));
 
-            }
-
-            // packages.json
-            foreach (string filePath in Directory.GetFiles(path, "packages.config", SearchOption.AllDirectories))
-            {
-
-            }
+            Console.WriteHeader("NuGet packages config files");
+            await SearchUsagesAsync(
+                path,
+                "packages.config",
+                (content, filePath) => SearchPackagesConfig(content, filePath, packageName));
         }
 
-        private async Task<ExternalUsage?> SearchProject(Stream content, string filePath, string targetPackageName)
+        private static async Task<ExternalUsage?> SearchProjectFile(Stream content, string filePath, string targetPackageName)
         {
             var document = await XDocument.LoadAsync(content, LoadOptions.None, default);
             var root = document.Root;
@@ -167,14 +169,15 @@ namespace _42.Monorepo.Cli.Commands.Show
                     continue;
                 }
 
-                var version = xReference.Attribute("Version")?.Value ?? xReference.Attribute("UpdatedVersion")?.Value;
+                var version = xReference.Attribute("Version")?.Value // Default versioning inside project file
+                              ?? xReference.Attribute("UpdatedVersion")?.Value; // Microsoft.Build.CentralPackageVersions
                 return new ExternalUsage(filePath, version);
             }
 
             return null;
         }
 
-        private async Task<ExternalUsage?> SearchPackagesConfig(Stream content, string filePath, string targetPackageName)
+        private static async Task<ExternalUsage?> SearchPackagesConfig(Stream content, string filePath, string targetPackageName)
         {
             var document = await XDocument.LoadAsync(content, LoadOptions.None, default);
             var root = document.Root;
@@ -201,7 +204,7 @@ namespace _42.Monorepo.Cli.Commands.Show
             return null;
         }
 
-        private async Task<ExternalUsage?> SearchPackagesProps(Stream content, string filePath, string targetPackageName)
+        private static async Task<ExternalUsage?> SearchPackagesProps(Stream content, string filePath, string targetPackageName)
         {
             var document = await XDocument.LoadAsync(content, LoadOptions.None, default);
             var root = document.Root;
@@ -211,9 +214,16 @@ namespace _42.Monorepo.Cli.Commands.Show
                 return null;
             }
 
-            foreach (var xReference in document.Descendants(root.GetDefaultNamespace() + "PackageReference"))
+            // Microsoft.Build.CentralPackageVersions
+            var allReferences = document.Descendants(root.GetDefaultNamespace() + "PackageReference");
+
+            // .NET core SDK 3.1.300 Directory.Packages.props
+            allReferences = allReferences.Concat(document.Descendants(root.GetDefaultNamespace() + "PackageVersion"));
+
+            foreach (var xReference in allReferences)
             {
-                var packageName = xReference.Attribute("Update")?.Value ?? xReference.Attribute("Include")?.Value;
+                var packageName = xReference.Attribute("Include")?.Value // Standard package reference
+                                  ?? xReference.Attribute("Update")?.Value; // Microsoft.Build.CentralPackageVersions
 
                 if (string.IsNullOrEmpty(packageName)
                     || !packageName.EqualsOrdinalIgnoreCase(targetPackageName))
@@ -221,7 +231,9 @@ namespace _42.Monorepo.Cli.Commands.Show
                     continue;
                 }
 
-                var version = xReference.Attribute("Version")?.Value;
+                var version = xReference.Attribute("Version")?.Value // Default versioning
+                              ?? xReference.Attribute("VersionOverride")?.Value; // Microsoft.Build.CentralPackageVersions
+
                 return new ExternalUsage(filePath, version);
             }
 
@@ -232,6 +244,8 @@ namespace _42.Monorepo.Cli.Commands.Show
         {
             try
             {
+                var hasResult = false;
+
                 await foreach (var usage in GetExternalUsagesAsync(directoryPath, fileFilter, processingFunction))
                 {
                     Console.WriteLine(
@@ -239,12 +253,20 @@ namespace _42.Monorepo.Cli.Commands.Show
                         usage.Version is not null
                             ? $" [{usage.Version}]".ThemedLowlight(Console.Theme)
                             : new Span());
+                    hasResult = true;
+                }
+
+                if (!hasResult)
+                {
+                    Console.WriteLine("Nothing has been found.".ThemedLowlight(Console.Theme));
                 }
             }
             catch (Exception e)
             {
                 Console.WriteLine($"Error during search of '{directoryPath}/{fileFilter}': ".ThemedLowlight(Console.Theme), e.Message);
             }
+
+            Console.WriteLine();
         }
 
         private async IAsyncEnumerable<ExternalUsage> GetExternalUsagesAsync(string directoryPath, string fileFilter, Func<Stream, string, Task<ExternalUsage?>> processingFunction)

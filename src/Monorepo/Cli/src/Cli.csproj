@@ -40,8 +40,4 @@
     <PackageReference Include="ShellProgressBar" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Commands\Fix\" />
-  </ItemGroup>
-
 </Project>

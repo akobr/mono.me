@@ -5,7 +5,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command("explain", Description = "Display explanation of any item inside the mono-repository.")]
+    [Command(CommandNames.EXPLAIN, Description = "Display explanation of any item inside the mono-repository.")]
     public class ExplainCommand : BaseCommand
     {
         public ExplainCommand(IExtendedConsole console, ICommandContext context)
@@ -14,10 +14,10 @@ namespace _42.Monorepo.Cli.Commands
             // no operation
         }
 
-        [Argument(0, Description = "Path to a file/directory in the mono-repository.")]
-        public string? Path { get; } = string.Empty;
+        [Argument(0, "path", Description = "Path to a file/directory in the mono-repository.")]
+        public string? Path { get; set; } = string.Empty;
 
-        protected override Task ExecuteAsync()
+        protected override Task<int> ExecuteAsync()
         {
             if (string.IsNullOrWhiteSpace(Path)
                 || Path.EqualsOrdinalIgnoreCase("/")
@@ -41,7 +41,7 @@ namespace _42.Monorepo.Cli.Commands
                     break;
             }
 
-            return Task.CompletedTask;
+            return Task.FromResult(ExitCodes.SUCCESS);
         }
     }
 }

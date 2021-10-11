@@ -25,7 +25,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
         public Task<IExactVersions> OperateAsync(IItem item, CancellationToken cancellationToken = default)
         {
-            var options = optionsProvider.TryGetOptions(item.Record.Path);
+            var options = optionsProvider.GetOptions(item.Record.Path);
 
             if (options.IsVersioned())
             {

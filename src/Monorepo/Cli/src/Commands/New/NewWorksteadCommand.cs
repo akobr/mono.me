@@ -6,11 +6,9 @@ using _42.Monorepo.Cli.Output;
 using Alba.CsConsoleFormat.Fluent;
 using McMaster.Extensions.CommandLineUtils;
 
-using Prompt = Sharprompt.Prompt;
-
 namespace _42.Monorepo.Cli.Commands.New
 {
-    [Command("workstead")]
+    [Command(CommandNames.WORKSTEAD, Description = "Create new workstead.")]
     public class NewWorksteadCommand : BaseCommand
     {
         public NewWorksteadCommand(IExtendedConsole console, ICommandContext context)
@@ -22,7 +20,7 @@ namespace _42.Monorepo.Cli.Commands.New
         [Argument(0, Description = "Name of the workstead.")]
         public string? Name { get; } = string.Empty;
 
-        protected override Task ExecuteAsync()
+        protected override Task<int> ExecuteAsync()
         {
             var targetItem = Context.Item;
 
@@ -32,7 +30,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
                 if (!Console.Confirm("Do you want to create a new top level workstead, instead"))
                 {
-                    return Task.CompletedTask;
+                    return Task.FromResult(ExitCodes.WARNING_ABORTED);
                 }
 
                 targetItem = Context.Repository;
@@ -63,7 +61,7 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteLine();
             Console.WriteImportant("The workstead '", name.ThemedHighlight(Console.Theme), "' has been created.");
             Console.WriteLine($"Path: {path}".ThemedLowlight(Console.Theme));
-            return Task.CompletedTask;
+            return Task.FromResult(ExitCodes.SUCCESS);
         }
     }
 }

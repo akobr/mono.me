@@ -24,7 +24,7 @@ namespace _42.Monorepo.Cli.Commands.New
         [Argument(0, Description = "A custom version to set.")]
         public string? Version { get; } = string.Empty;
 
-        protected override async Task ExecuteAsync()
+        protected override async Task<int> ExecuteAsync()
         {
 
             using var repo = new Repository(Context.Repository.Record.Path);
@@ -99,6 +99,8 @@ namespace _42.Monorepo.Cli.Commands.New
             {
                 Console.WriteLine($" > {change.Type}: {change.Description}");
             }
+
+            return ExitCodes.SUCCESS;
         }
     }
 }

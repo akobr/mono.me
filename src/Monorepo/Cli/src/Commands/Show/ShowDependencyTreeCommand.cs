@@ -7,7 +7,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.Show
 {
-    [Command("dependency-tree", Description = "Show dependency tree for current project/workstead.")]
+    [Command(CommandNames.DEPENDENCY_TREE, Description = "Show dependency tree for current project/workstead.")]
     public class ShowDependencyTreeCommand : BaseCommand
     {
         public ShowDependencyTreeCommand(IExtendedConsole console, ICommandContext context)
@@ -16,7 +16,7 @@ namespace _42.Monorepo.Cli.Commands.Show
             // no operation
         }
 
-        protected override async Task ExecuteAsync()
+        protected override async Task<int> ExecuteAsync()
         {
             Console.WriteHeader("Internal dependency tree of ", Context.Item.Record.Identifier.Humanized.ThemedHighlight(Console.Theme));
             var tree = await BuildTreeAsync(Context.Item);
@@ -29,6 +29,8 @@ namespace _42.Monorepo.Cli.Commands.Show
             {
                 Console.WriteTree(tree, n => n);
             }
+
+            return ExitCodes.SUCCESS;
         }
 
         private async Task<Composition> BuildTreeAsync(IItem item)

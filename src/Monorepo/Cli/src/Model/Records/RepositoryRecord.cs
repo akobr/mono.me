@@ -17,6 +17,8 @@ namespace _42.Monorepo.Cli.Model.Records
 
         public override ItemType Type => ItemType.Repository;
 
+        public override string RepoRelativePath => ".";
+
         public bool IsValid
             => Directory
                 .GetFiles(Path, Constants.MONOREPO_CONFIG_JSON, SearchOption.TopDirectoryOnly)

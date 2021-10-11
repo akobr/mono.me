@@ -10,6 +10,8 @@ namespace _42.Monorepo.Cli.Model.Records
 
         string Path { get; }
 
+        string RepoRelativePath { get; }
+
         ItemType Type { get; }
 
         IRecord? Parent { get; }

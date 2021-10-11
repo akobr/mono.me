@@ -9,7 +9,7 @@ using Sharprompt;
 
 namespace _42.Monorepo.Cli.Commands.Init
 {
-    [Command("init", Description = "Initialise a new mono-repository.")]
+    [Command(CommandNames.INIT, Description = "Initialise a new mono-repository.")]
     public class InitCommand : BaseCommand
     {
         public InitCommand(IExtendedConsole console, ICommandContext context)
@@ -23,17 +23,17 @@ namespace _42.Monorepo.Cli.Commands.Init
             return Task.CompletedTask;
         }
 
-        protected override Task ExecuteAsync()
+        protected override Task<int> ExecuteAsync()
         {
             if (Context.IsValid)
             {
                 Console.WriteImportant("You are already in ", "mono-repository".ThemedHighlight(Console.Theme), ", hurray!");
-                return Task.CompletedTask;
+                return Task.FromResult(ExitCodes.WARNING_NO_WORK_NEEDED);
             }
 
             if (!Console.Confirm("Do you want to create a new mono-repository in current folder"))
             {
-                return Task.CompletedTask;
+                return Task.FromResult(ExitCodes.WARNING_ABORTED);
             }
 
             Console.WriteLine();
@@ -57,7 +57,7 @@ namespace _42.Monorepo.Cli.Commands.Init
                         "Use Microsoft.Build.CentralPackageVersions msbuild SDK to simplify management of NuGet package dependencies. It allow you to store and manage package versions in centralised place."),
                     new("msbuild-sdk-traversal",
                         "traversal SDK",
-                        "The Microsoft.Build.Traversal msbuild SDK is used to have two different views of repository projects. The first one is a human point of view with solution and filter files per each workstead. Second one is used for machines/tooling defined by Directory.Build.proj, which allow to build any point/directory of the mono-repository."),
+                        "The Microsoft.Build.Traversal msbuild SDK is used to have two different views of repository projects. The first one is a human/developer point of view with solution and their filter files per each workstead. Second one is used for machines/tooling defined by Directory.Build.proj, which allow to have custom build per any point/directory of the mono-repository."),
                 },
                 Message = "Please pickup which features you want to add",
                 TextSelector = f => f.Name,
@@ -93,7 +93,7 @@ namespace _42.Monorepo.Cli.Commands.Init
                 .ToList();
 
             Console.WriteImportant("This command is still under development...");
-            return Task.CompletedTask;
+            return Task.FromResult(ExitCodes.SUCCESS);
         }
     }
 }
