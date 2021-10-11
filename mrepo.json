@@ -3,11 +3,13 @@
     "name": "mono.me",
     "description": "My personal mono-repository with most of my projects.",
     "prefix": "42",
-    "features": [ "version", "nuget-packages" ],
-    "siblings": [ "doc", ".azure" ],
+    "features": [ "git-version", "packages", "packages-sdk", "packages-paket" ],
+    "srcSiblings": [ "docs", ".azure" ],
     "scripts": {
       /* add any global scripts here */
-        }
+	    "hello": "echo 'Hello world!'",
+	    "ls": "dir"
+    }
   },
   "release": {
     "branches": [
@@ -21,24 +23,23 @@
     },
     "createReleaseBranch": true
   },
-  "worksteadTypes": {
-    /* add custom workstead types here */
-  },
-  "projectTypes": {
-    "dotnet": {
-      "filePattern": "*.*?proj",
-      "useFullProjectNames": false,
+  "types": {
+    /* add custom types of items here (workstead, project) */
+    "dotnet-project": {
+      "custom": {
+        "filePattern": "*.*?proj",
+        "useFullProjectNames": false
+      },
       "scripts": {
-        "build": "dotnet build",
-        "clean": "dotnet clean",
-        "pack": "dotnet pack",
-        "restore": "dotnet restore",
-        "run": "dotnet run",
-        "test": "dotnet test",
-        "custom": "mrepo --version"
+        "build": "dotnet build src",
+        "clean": "dotnet clean src",
+        "pack": "dotnet pack src",
+        "restore": "dotnet restore src",
+        "run": "dotnet run src",
+        "test": "dotnet test test"
       }
     },
-    "nodejs": {
+    "nodejs-project": {
       "scripts": {
         /* add any project related scripts here */
       }
@@ -72,7 +73,7 @@
     },
     {
       "path": "src/Monorepo/Dotnet.Project.Templates",
-      "projectType": "dotnet",
+      "type": "dotnet-project",
       "dependencies": [
         "src/Cetris/Cetris.Game"
       ],
