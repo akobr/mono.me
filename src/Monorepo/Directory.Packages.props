@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$([MSBuild]::GetPathOfFileAbove('Packages.props', '$(MSBuildThisFileDirectory)..\'))" />
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)..\'))" />
   <ItemGroup>
 
     <PackageReference Update="42.Monorepo.GitVersioning.Core" Version="3.5.32-alpha-g2cfac6e984" />

@@ -2,6 +2,7 @@
   <PropertyGroup>
     <!-- $(RepoRoot) is normally set globally and Arcade overrides it to ensure a trailing slash. -->
     <RepoRoot Condition=" '$(RepoRoot)' == '' OR !HasTrailingSlash('$(RepoRoot)') ">$(MSBuildThisFileDirectory)</RepoRoot>
-    <PackageOutputPath>$(RepoRoot)artifacts</PackageOutputPath>
+    <PackageOutputPath>$(RepoRoot).artifacts</PackageOutputPath>
+	<CentralPackagesFile>Directory.Packages.props</CentralPackagesFile>
   </PropertyGroup>
 </Project>
