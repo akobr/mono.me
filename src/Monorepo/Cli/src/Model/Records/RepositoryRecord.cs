@@ -2,20 +2,26 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using _42.Monorepo.Cli.Extensions;
 
 namespace _42.Monorepo.Cli.Model.Records
 {
     public class RepositoryRecord : Record, IRepositoryRecord
     {
-        private readonly Lazy<IReadOnlyCollection<IWorksteadRecord>> worksteads;
+        private readonly IRootDirectoryRecord sourceDirectory;
+        private readonly HashSet<IRootDirectoryRecord> rootDirectories;
 
         public RepositoryRecord(string path)
             : base(path, null)
         {
-            worksteads = new(CalculateWorksteads);
+            sourceDirectory = new RootDirectoryRecord(
+                System.IO.Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME),
+                this);
+
+            rootDirectories = new HashSet<IRootDirectoryRecord> { sourceDirectory };
         }
 
-        public override ItemType Type => ItemType.Repository;
+        public override RecordType Type => RecordType.Repository;
 
         public override string RepoRelativePath => ".";
 
@@ -24,18 +30,25 @@ namespace _42.Monorepo.Cli.Model.Records
                 .GetFiles(Path, Constants.MONOREPO_CONFIG_JSON, SearchOption.TopDirectoryOnly)
                 .Any();
 
-        public IReadOnlyCollection<IWorksteadRecord> GetWorksteads() => worksteads.Value;
+        public IReadOnlyCollection<IRootDirectoryRecord> GetDirectories()
+            => rootDirectories;
+
+        public IReadOnlyCollection<IWorksteadRecord> GetWorksteads()
+            => sourceDirectory.GetWorksteads();
 
         public IEnumerable<IProjectRecord> GetAllProjects()
-            => GetWorksteads().SelectMany(w => w.GetAllProjects());
+            => sourceDirectory.GetAllProjects();
 
-        private IReadOnlyCollection<IWorksteadRecord> CalculateWorksteads()
+        public void AddRootDirectory(string path)
         {
-            return Directory
-                .GetDirectories(System.IO.Path.Combine(Path, Constants.SOURCE_DIRECTORY_NAME))
-                .Where(dir => !MonorepoDirectoryFunctions.IsExcludedDirectory(dir))
-                .Select(dir => new WorksteadRecord(dir, this))
-                .ToList();
+            var fullPath = System.IO.Path.GetFullPath(path);
+
+            if (!fullPath.StartsWith(Path, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            rootDirectories.Add(new RootDirectoryRecord(fullPath, this));
         }
     }
 }

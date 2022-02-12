@@ -62,7 +62,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
         private async Task<IExactVersions> TryCalculateVersionFromProjectFileAsync(IItem item, CancellationToken cancellationToken)
         {
-            if (item.Record.Type != ItemType.Project)
+            if (item.Record.Type != RecordType.Project)
             {
                 return new ExactVersions(new Version(1, 0));
             }

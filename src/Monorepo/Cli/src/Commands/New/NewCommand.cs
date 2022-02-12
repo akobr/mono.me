@@ -33,12 +33,12 @@ namespace _42.Monorepo.Cli.Commands.New
 
             switch (Context.Item.Record.Type)
             {
-                case ItemType.Repository:
-                case ItemType.Project:
+                case RecordType.Repository:
+                case RecordType.Project:
                     return application.Commands.ExecuteByNameAsync(CommandNames.WORKSTEAD);
 
-                case ItemType.TopWorkstead:
-                case ItemType.Workstead:
+                case RecordType.TopWorkstead:
+                case RecordType.Workstead:
                     return application.Commands.ExecuteByNameAsync(CommandNames.PROJECT);
 
                 default:

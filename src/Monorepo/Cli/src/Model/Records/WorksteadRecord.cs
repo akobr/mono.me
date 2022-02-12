@@ -17,9 +17,9 @@ namespace _42.Monorepo.Cli.Model.Records
             projects = new(CalculateProjects);
         }
 
-        public override ItemType Type => IsTopLevel ? ItemType.TopWorkstead : ItemType.Workstead;
+        public override RecordType Type => IsTopLevel ? RecordType.TopWorkstead : RecordType.Workstead;
 
-        public bool IsTopLevel => Parent is null || Parent.Type == ItemType.Repository;
+        public bool IsTopLevel => Parent is null || Parent.Type == RecordType.Repository;
 
         public IReadOnlyCollection<IWorksteadRecord> GetSubWorksteads() => worksteads.Value;
 

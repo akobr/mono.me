@@ -3,7 +3,7 @@ using LibGit2Sharp;
 
 namespace _42.Monorepo.Cli.Operations
 {
-    public interface ITagsProvider
+    public interface IGitTagsService
     {
         IReadOnlyCollection<Tag> GetTags();
     }

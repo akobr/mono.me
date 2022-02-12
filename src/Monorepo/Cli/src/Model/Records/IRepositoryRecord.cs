@@ -6,6 +6,8 @@ namespace _42.Monorepo.Cli.Model.Records
     {
         public bool IsValid { get; }
 
+        IReadOnlyCollection<IRootDirectoryRecord> GetDirectories();
+
         IReadOnlyCollection<IWorksteadRecord> GetWorksteads();
     }
 }

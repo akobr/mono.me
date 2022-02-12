@@ -23,7 +23,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
         public Task<IReadOnlyCollection<IExternalDependency>> OperateAsync(IItem item, CancellationToken cancellationToken = default)
         {
-            return item.Record.Type != ItemType.Project
+            return item.Record.Type != RecordType.Project
                 ? CalculateGlobalExternalDependenciesAsync(item, cancellationToken)
                 : CalculateExternalDependenciesForProjectAsync(item, cancellationToken);
         }

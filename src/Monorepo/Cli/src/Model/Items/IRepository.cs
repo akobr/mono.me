@@ -7,6 +7,8 @@ namespace _42.Monorepo.Cli.Model.Items
     {
         new IRepositoryRecord Record { get; }
 
+        IReadOnlyCollection<IRootDirectory> GetDirectories();
+
         IReadOnlyCollection<IWorkstead> GetWorksteads();
     }
 }

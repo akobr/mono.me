@@ -1,6 +1,6 @@
 namespace _42.Monorepo.Cli.ConventionalCommits
 {
-    public interface IConventionalCommitMessage
+    public interface IConventionalMessage
     {
         string Type { get; }
 

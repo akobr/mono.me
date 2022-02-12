@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Packages.props', '$(MSBuildThisFileDirectory)..\'))" />
+  <ItemGroup>
+
+    <PackageReference Update="42.Monorepo.GitVersioning.Core" Version="3.5.32-alpha-g2cfac6e984" />
+
+    <!-- CLI libraries -->
+    <PackageReference Update="Alba.CsConsoleFormat-NoXaml" Version="1.0.0" />
+    <PackageReference Update="Colorful.Console" Version="1.2.15" />
+    <PackageReference Update="ConsoleTableExt" Version="3.1.9" />
+    <PackageReference Update="McMaster.Extensions.CommandLineUtils" Version="3.1.0" />
+    <PackageReference Update="McMaster.Extensions.Hosting.CommandLine" Version="3.1.0" />
+    <PackageReference Update="Sharprompt" Version="2.3.3" />
+    <PackageReference Update="ShellProgressBar" Version="5.1.0" />
+
+    <!-- Versioning -->
+    <PackageReference Update="semver" Version="2.0.6" />
+
+    <!-- Git -->
+    <PackageReference Update="LibGit2Sharp" Version="0.27.0-preview-0119" />
+
+  </ItemGroup>
+</Project>

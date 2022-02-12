@@ -24,7 +24,7 @@ namespace _42.Monorepo.Cli.Commands.New
         {
             var targetItem = Context.Item;
 
-            if (Context.Item.Record.Type > ItemType.Workstead)
+            if (Context.Item.Record.Type > RecordType.Workstead)
             {
                 Console.WriteLine("A workstead should not be created under a project.".DarkGray());
 

@@ -50,9 +50,9 @@ namespace _42.Monorepo.Cli.Operations
             strategies[key] = typeof(T);
         }
 
-        private static int CalculateKey(ItemType itemType, string operationKey)
+        private static int CalculateKey(RecordType recordType, string operationKey)
         {
-            return HashCode.Combine(itemType, operationKey);
+            return HashCode.Combine(recordType, operationKey);
         }
     }
 }

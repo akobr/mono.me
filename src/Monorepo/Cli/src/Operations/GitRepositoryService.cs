@@ -3,11 +3,11 @@ using LibGit2Sharp;
 
 namespace _42.Monorepo.Cli.Operations
 {
-    public class GitRepositoryFactory : IGitRepositoryFactory
+    public class GitRepositoryService : IGitRepositoryService
     {
         private readonly Lazy<string> repositoryPath;
 
-        public GitRepositoryFactory()
+        public GitRepositoryService()
         {
             repositoryPath = new Lazy<string>(MonorepoDirectoryFunctions.GetMonorepoRootDirectory);
         }

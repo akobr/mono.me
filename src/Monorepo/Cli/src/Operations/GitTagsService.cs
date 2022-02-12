@@ -5,14 +5,14 @@ using LibGit2Sharp;
 
 namespace _42.Monorepo.Cli.Operations
 {
-    public class TagsProvider : ITagsProvider
+    public class GitTagsService : IGitTagsService
     {
-        private readonly IGitRepositoryFactory gitRepositoryFactory;
+        private readonly IGitRepositoryService gitRepositoryService;
         private readonly Lazy<IReadOnlyCollection<Tag>> tags;
 
-        public TagsProvider(IGitRepositoryFactory gitRepositoryFactory)
+        public GitTagsService(IGitRepositoryService gitRepositoryService)
         {
-            this.gitRepositoryFactory = gitRepositoryFactory;
+            this.gitRepositoryService = gitRepositoryService;
             tags = new Lazy<IReadOnlyCollection<Tag>>(LoadTags);
         }
 
@@ -20,7 +20,7 @@ namespace _42.Monorepo.Cli.Operations
 
         private IReadOnlyCollection<Tag> LoadTags()
         {
-            using Repository repo = gitRepositoryFactory.BuildRepository();
+            using Repository repo = gitRepositoryService.BuildRepository();
             return repo.Tags.ToList();
         }
     }

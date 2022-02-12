@@ -11,11 +11,11 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 {
     public class AllReleasesOpStrategy : IOpStrategy<IReadOnlyList<IRelease>>
     {
-        private readonly ITagsProvider tagsProvider;
+        private readonly IGitTagsService gitTagsService;
 
-        public AllReleasesOpStrategy(ITagsProvider tagsProvider)
+        public AllReleasesOpStrategy(IGitTagsService gitTagsService)
         {
-            this.tagsProvider = tagsProvider;
+            this.gitTagsService = gitTagsService;
         }
 
         public async Task<IReadOnlyList<IRelease>> OperateAsync(IItem item, CancellationToken cancellationToken = default)
@@ -37,11 +37,11 @@ namespace _42.Monorepo.Cli.Operations.Strategies
         private List<IRelease> GetExactReleases(IItem item, CancellationToken cancellationToken)
         {
             string releasePrefix = $"{item.Record.Identifier.Humanized}/v.";
-            var repository = item.Record.TryGetConcreteItem(ItemType.Repository) ?? MonorepoDirectoryFunctions.GetMonoRepository();
+            var repository = item.Record.TryGetConcreteItem(RecordType.Repository) ?? MonorepoDirectoryFunctions.GetMonoRepository();
 
             List<IRelease> exactReleases = new();
 
-            foreach (var tag in tagsProvider.GetTags())
+            foreach (var tag in gitTagsService.GetTags())
             {
                 if (tag.FriendlyName.StartsWith(releasePrefix, StringComparison.OrdinalIgnoreCase)
                     && Release.TryParse(tag, repository, out var release))

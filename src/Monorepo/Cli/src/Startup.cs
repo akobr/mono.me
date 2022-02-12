@@ -7,6 +7,7 @@ using _42.Monorepo.Cli.Operations;
 using _42.Monorepo.Cli.Operations.Strategies;
 using _42.Monorepo.Cli.Output;
 using _42.Monorepo.Cli.Scripting;
+using _42.Monorepo.Texo.Core.Markdown;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -32,10 +33,11 @@ namespace _42.Monorepo.Cli
             services.AddSingleton<IFileContentCache, FileContentCache>();
             services.AddSingleton<IItemsFactory, ItemsFactory>();
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
-            services.AddSingleton<IGitRepositoryFactory, GitRepositoryFactory>();
-            services.AddSingleton<ITagsProvider, TagsProvider>();
 
+            services.AddSingleton<IGitRepositoryService, GitRepositoryService>();
+            services.AddSingleton<IGitTagsService, GitTagsService>();
             services.AddSingleton<IScriptingService, ScriptingService>();
+            services.AddSingleton<IMarkdownService, MarkdownService>();
         }
 
         public void ConfigureOptions(IConfiguration configuration, IServiceCollection services)

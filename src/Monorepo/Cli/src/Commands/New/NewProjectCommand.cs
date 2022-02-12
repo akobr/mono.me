@@ -22,7 +22,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
         protected override Task<int> ExecuteAsync()
         {
-            var workstead = Context.Item.TryGetConcreteItem(ItemType.Workstead);
+            var workstead = Context.Item.TryGetConcreteItem(RecordType.Workstead);
 
             if (workstead == null)
             {

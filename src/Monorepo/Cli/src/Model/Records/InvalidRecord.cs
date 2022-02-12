@@ -10,7 +10,7 @@ namespace _42.Monorepo.Cli.Model.Records
             // no operation
         }
 
-        public override ItemType Type
+        public override RecordType Type
             => throw new InvalidOperationException("An invalid record has been used.");
     }
 }

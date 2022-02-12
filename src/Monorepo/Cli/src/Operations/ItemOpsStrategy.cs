@@ -18,16 +18,16 @@ namespace _42.Monorepo.Cli.Operations
 {
     public class ItemOpsStrategy : IItemOpsStrategy
     {
-        private readonly ITagsProvider tagsProvider;
+        private readonly IGitTagsService gitTagsService;
         private readonly IItemOptionsProvider optionsProvider;
         private readonly IFileContentCache fileCache;
 
         public ItemOpsStrategy(
-            ITagsProvider tagsProvider,
+            IGitTagsService gitTagsService,
             IItemOptionsProvider optionsProvider,
             IFileContentCache fileCache)
         {
-            this.tagsProvider = tagsProvider;
+            this.gitTagsService = gitTagsService;
             this.optionsProvider = optionsProvider;
             this.fileCache = fileCache;
         }
@@ -132,7 +132,7 @@ namespace _42.Monorepo.Cli.Operations
 
         public Task<IReadOnlyCollection<IExternalDependency>> CalculateExternalDependenciesAsync(IItem item, CancellationToken cancellationToken)
         {
-            return item.Record.Type != ItemType.Project
+            return item.Record.Type != RecordType.Project
                 ? CalculateGlobalExternalDependenciesAsync(item, cancellationToken)
                 : CalculateExternalDependenciesForProjectAsync(item, cancellationToken);
         }
@@ -140,7 +140,7 @@ namespace _42.Monorepo.Cli.Operations
         // TODO: [P3] refactor this method
         public async Task<IReadOnlyCollection<IInternalDependency>> CalculateInternalDependenciesAsync(IItem item, CancellationToken cancellationToken)
         {
-            if (item.Record.Type != ItemType.Project)
+            if (item.Record.Type != RecordType.Project)
             {
                 return Array.Empty<IInternalDependency>();
             }
@@ -159,7 +159,7 @@ namespace _42.Monorepo.Cli.Operations
                 return Array.Empty<IInternalDependency>();
             }
 
-            var repository = item.Record.TryGetConcreteItem(ItemType.Repository);
+            var repository = item.Record.TryGetConcreteItem(RecordType.Repository);
             List<IInternalDependency> references = new();
 
             if (repository is null)
@@ -187,7 +187,7 @@ namespace _42.Monorepo.Cli.Operations
 
         private async Task<IExactVersions> TryCalculateVersionFromProjectFileAsync(IItem item, CancellationToken cancellationToken)
         {
-            if (item.Record.Type != ItemType.Project)
+            if (item.Record.Type != RecordType.Project)
             {
                 return new ExactVersions(new Version(1, 0));
             }
@@ -291,11 +291,11 @@ namespace _42.Monorepo.Cli.Operations
         private List<IRelease> GetExactReleases(IItem item, CancellationToken cancellationToken)
         {
             string releasePrefix = $"{item.Record.Identifier.Humanized}/v.";
-            var repository = item.Record.TryGetConcreteItem(ItemType.Repository) ?? MonorepoDirectoryFunctions.GetMonoRepository();
+            var repository = item.Record.TryGetConcreteItem(RecordType.Repository) ?? MonorepoDirectoryFunctions.GetMonoRepository();
 
             List<IRelease> exactReleases = new();
 
-            foreach (var tag in tagsProvider.GetTags())
+            foreach (var tag in gitTagsService.GetTags())
             {
                 if (tag.FriendlyName.StartsWith(releasePrefix, StringComparison.OrdinalIgnoreCase)
                     && Release.TryParse(tag, repository, out var release))

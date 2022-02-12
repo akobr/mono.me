@@ -58,8 +58,8 @@ namespace _42.Monorepo.Cli.Commands.New
                 throw new InvalidOperationException($"There are no changes in current version '{currentVersion}'.");
             }
 
-            List<IConventionalCommitMessage> changes = new(affectingCommits.Count);
-            ConventionalCommitMessageParser parser = new();
+            List<IConventionalMessage> changes = new(affectingCommits.Count);
+            StrictConventionalParser parser = new();
 
             while (affectingCommits.Count > 0)
             {

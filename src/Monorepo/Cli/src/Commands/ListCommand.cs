@@ -26,7 +26,7 @@ namespace _42.Monorepo.Cli.Commands
             var item = Context.Item;
             var record = item.Record;
 
-            if (DisplayWorksteads || record.Type == ItemType.Repository)
+            if (DisplayWorksteads || record.Type == RecordType.Repository)
             {
                 item = Context.Repository;
                 await ShowItemHeader(item);
@@ -34,9 +34,9 @@ namespace _42.Monorepo.Cli.Commands
                 return ExitCodes.SUCCESS;
             }
 
-            if (record.Type > ItemType.Workstead)
+            if (record.Type > RecordType.Workstead)
             {
-                item = item.TryGetConcreteItem(ItemType.Workstead);
+                item = item.TryGetConcreteItem(RecordType.Workstead);
             }
 
             if (item is not IWorkstead workstead)

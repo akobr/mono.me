@@ -24,16 +24,29 @@ namespace _42.Monorepo.Cli.Model.Items
             return GetWorksteads();
         }
 
+        public IReadOnlyCollection<IRootDirectory> GetDirectories()
+        {
+            return Record.GetDirectories()
+                .Select(d => (IRootDirectory)ItemFactory(d))
+                .ToList();
+        }
+
         public IReadOnlyCollection<IWorkstead> GetWorksteads()
             => worksteads.Value;
 
         public IEnumerable<IProject> GetAllProjects()
             => GetWorksteads().SelectMany(w => w.GetAllProjects());
 
+        public void AddRootDirectory(string path)
+        {
+            (Record as RepositoryRecord)?.AddRootDirectory(path);
+        }
+
         private IReadOnlyCollection<IWorkstead> CalculateWorksteads()
         {
             return Record.GetWorksteads()
-                .Select(w => (IWorkstead)ItemFactory(w)).ToList();
+                .Select(w => (IWorkstead)ItemFactory(w))
+                .ToList();
         }
     }
 }

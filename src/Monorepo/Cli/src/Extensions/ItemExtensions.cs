@@ -9,7 +9,7 @@ namespace _42.Monorepo.Cli.Extensions
 {
     public static class ItemExtensions
     {
-        public static IItem? TryGetConcreteItem(this IItem item, ItemType type)
+        public static IItem? TryGetConcreteItem(this IItem item, RecordType type)
         {
             var target = item;
 
@@ -19,12 +19,12 @@ namespace _42.Monorepo.Cli.Extensions
             }
 
             return target?.Record.Type == type
-                   || (type == ItemType.Workstead && target?.Record.Type == ItemType.TopWorkstead)
+                   || (type == RecordType.Workstead && target?.Record.Type == RecordType.TopWorkstead)
                 ? target
                 : null;
         }
 
-        public static IRecord? TryGetConcreteItem(this IRecord record, ItemType type)
+        public static IRecord? TryGetConcreteItem(this IRecord record, RecordType type)
         {
             var target = record;
 
@@ -34,7 +34,7 @@ namespace _42.Monorepo.Cli.Extensions
             }
 
             return target?.Type == type
-                   || (type == ItemType.Workstead && target?.Type == ItemType.TopWorkstead)
+                   || (type == RecordType.Workstead && target?.Type == RecordType.TopWorkstead)
                 ? target
                 : null;
         }
@@ -67,16 +67,16 @@ namespace _42.Monorepo.Cli.Extensions
 
         public static string GetTypeAsString(this IRecord record)
         {
-            var type = record.Type == ItemType.TopWorkstead
-                ? ItemType.Workstead
+            var type = record.Type == RecordType.TopWorkstead
+                ? RecordType.Workstead
                 : record.Type;
 
             return Enum.GetName(type) ?? string.Empty;
         }
 
-        public static bool IsWorkstead(this ItemType type)
+        public static bool IsWorkstead(this RecordType type)
         {
-            return type is ItemType.TopWorkstead or ItemType.Workstead;
+            return type is RecordType.TopWorkstead or RecordType.Workstead;
         }
     }
 }

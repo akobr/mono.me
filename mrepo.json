@@ -4,7 +4,7 @@
     "description": "My personal mono-repository with most of my projects.",
     "prefix": "42",
     "features": [ "git-version", "packages", "packages-sdk", "packages-paket" ],
-    "srcSiblings": [ "docs", ".azure" ],
+    "srcSiblings": [ "doc", ".azure/pipelines" ],
     "scripts": {
       /* add any global scripts here */
 	    "hello": "echo 'Hello world!'",
@@ -17,9 +17,9 @@
     ],
     "changes": {
       "major": [ /* custom major commit message types */ ],
-      "minor": [ "feat" ],
-      "patch": [ "fix", "perf", "refactor" ],
-      "harmless": [ "style", "test", "build", "ci", "docs" ]
+      "minor": [ "feat" ], /* [ ":sparkles:" ] */
+      "patch": [ "fix", "perf", "refactor" ], /* [ ":bug:", ":zap:", ":recycle:" ] */
+      "harmless": [ "style", "test", "build", "ci", "docs" ] /* [ ":art:", ":test_tube:", ":hammer:", ":construction_worker:", ":memo:" ] */
     },
     "createReleaseBranch": true
   },

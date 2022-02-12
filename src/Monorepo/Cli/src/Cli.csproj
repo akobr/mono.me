@@ -1,5 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <Sdk Name="Microsoft.Build.CentralPackageVersions" />
 
   <PropertyGroup>
     <AssemblyName>42.Monorepo.Cli</AssemblyName>
@@ -38,6 +37,10 @@
     <PackageReference Include="semver" />
     <PackageReference Include="Sharprompt" />
     <PackageReference Include="ShellProgressBar" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Texo\Core.Markdown\src\Core.Markdown.csproj" />
   </ItemGroup>
 
 </Project>

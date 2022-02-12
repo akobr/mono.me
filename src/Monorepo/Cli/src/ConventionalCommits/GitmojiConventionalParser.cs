@@ -2,29 +2,29 @@ using System.Text.RegularExpressions;
 
 namespace _42.Monorepo.Cli.ConventionalCommits
 {
-    public class ConventionalCommitMessageParser
+    public class GitmojiConventionalParser
     {
         private const string TEMPLATE =
-            @"^(?<type>[\w]+)(\((?<scope>[\w\-]+)\))?(?<breaking>!)?: ?((?<issue>([A-Z]+-|#)[\d]+) )?(?<description>.*)";
+            @"^(?<type>:[\w]+:) ?(\((?<scope>[\w\-]+)\))?(?<breaking>!)? ?((?<issue>([A-Z]+-|#)[\d]+) )?(?<description>.*)";
 
         private readonly Regex regex;
 
-        public ConventionalCommitMessageParser()
+        public GitmojiConventionalParser()
         {
             regex = new Regex(TEMPLATE, RegexOptions.Compiled);
         }
 
-        public bool TryParseCommitMessage(string message, out IConventionalCommitMessage conventionalMessage)
+        public bool TryParseCommitMessage(string message, out IConventionalMessage conventionalMessage)
         {
             var match = regex.Match(message);
 
             if (!match.Success)
             {
-                conventionalMessage = new ConventionalCommitMessage(string.Empty, string.Empty, false);
+                conventionalMessage = new ConventionalMessage(string.Empty, string.Empty, false);
                 return false;
             }
 
-            conventionalMessage = new ConventionalCommitMessage(
+            conventionalMessage = new ConventionalMessage(
                 match.Groups["type"].Value,
                 match.Groups["description"].Value,
                 match.Groups.ContainsKey("breaking"))

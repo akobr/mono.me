@@ -20,7 +20,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
         public async Task<string> OperateAsync(IItem item, CancellationToken cancellationToken = default)
         {
-            if (item.Record.Type != ItemType.Project)
+            if (item.Record.Type != RecordType.Project)
             {
                 return item.Record.Name;
             }

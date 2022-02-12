@@ -21,7 +21,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
         public async Task<IReadOnlyCollection<IInternalDependency>> OperateAsync(IItem item, CancellationToken cancellationToken = default)
         {
-            if (item.Record.Type != ItemType.Project)
+            if (item.Record.Type != RecordType.Project)
             {
                 return Array.Empty<IInternalDependency>();
             }
@@ -40,7 +40,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 return Array.Empty<IInternalDependency>();
             }
 
-            var repository = item.Record.TryGetConcreteItem(ItemType.Repository);
+            var repository = item.Record.TryGetConcreteItem(RecordType.Repository);
             List<IInternalDependency> references = new();
 
             if (repository is null)

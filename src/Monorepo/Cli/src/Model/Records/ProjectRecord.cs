@@ -8,6 +8,6 @@ namespace _42.Monorepo.Cli.Model.Records
             // no operation
         }
 
-        public override ItemType Type => ItemType.Project;
+        public override RecordType Type => RecordType.Project;
     }
 }
