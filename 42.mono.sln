@@ -9,6 +9,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Cli", "src\Monorepo\Cli\src
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dotnet.Project.Templates", "src\Monorepo\Dotnet.Project.Templates\src\Dotnet.Project.Templates.csproj", "{A03A630F-988E-49F2-AADF-2D89A8EB4C4A}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Texo", "Texo", "{C33DA913-97E9-4EEC-B68A-388D8158DE32}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Core.Markdown", "src\Texo\Core.Markdown\src\Core.Markdown.csproj", "{164B0E1D-97A8-4722-9744-05836B14A924}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -23,6 +27,10 @@ Global
 		{A03A630F-988E-49F2-AADF-2D89A8EB4C4A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A03A630F-988E-49F2-AADF-2D89A8EB4C4A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A03A630F-988E-49F2-AADF-2D89A8EB4C4A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{164B0E1D-97A8-4722-9744-05836B14A924}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{164B0E1D-97A8-4722-9744-05836B14A924}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{164B0E1D-97A8-4722-9744-05836B14A924}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{164B0E1D-97A8-4722-9744-05836B14A924}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -30,6 +38,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{1BFAEE7E-93D6-483E-B28A-775A80EAD238} = {704E92B3-CC6A-4242-8FE8-7E2F27CCCDB8}
 		{A03A630F-988E-49F2-AADF-2D89A8EB4C4A} = {704E92B3-CC6A-4242-8FE8-7E2F27CCCDB8}
+		{164B0E1D-97A8-4722-9744-05836B14A924} = {C33DA913-97E9-4EEC-B68A-388D8158DE32}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F82BF58F-3E50-4150-BD21-CA489E5CCF93}
