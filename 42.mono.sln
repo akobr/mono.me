@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31613.86
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.32014.148
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Monorepo", "Monorepo", "{704E92B3-CC6A-4242-8FE8-7E2F27CCCDB8}"
 EndProject
@@ -12,6 +12,16 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Texo", "Texo", "{C33DA913-97E9-4EEC-B68A-388D8158DE32}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Core.Markdown", "src\Texo\Core.Markdown\src\Core.Markdown.csproj", "{164B0E1D-97A8-4722-9744-05836B14A924}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".configuration", ".configuration", "{DCCB6061-6B5B-4B32-84ED-7CDD4A9E7132}"
+	ProjectSection(SolutionItems) = preProject
+		Directory.Build.props = Directory.Build.props
+		Directory.Packages.props = Directory.Packages.props
+		global.json = global.json
+		mrepo.json = mrepo.json
+		Packages.props = Packages.props
+		version.json = version.json
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
