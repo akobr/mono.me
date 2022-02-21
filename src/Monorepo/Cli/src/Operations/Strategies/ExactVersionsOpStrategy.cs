@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Cache;
@@ -50,11 +51,12 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             var packageVersion = SemVersion.TryParse(oracle.SemVer2, out var parsedVersion)
                 ? parsedVersion
                 : new SemVersion(oracle.Version);
-
+ 
             return new ExactVersions
             {
-                Version = oracle.Version,
+                Version = new SemVersion(oracle.Version),
                 AssemblyVersion = oracle.AssemblyVersion,
+                AssemblyFileVersion = oracle.AssemblyFileVersion,
                 AssemblyInformationalVersion = oracle.AssemblyInformationalVersion,
                 PackageVersion = packageVersion,
             };
@@ -83,57 +85,87 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
             var @namespace = xContent.Root.GetDefaultNamespace();
             var versionElement = xContent.Descendants(@namespace + "Version").FirstOrDefault();
+            var versionPrefix = xContent.Descendants(@namespace + "VersionPrefix").FirstOrDefault();
+            var versinSuffix = xContent.Descendants(@namespace + "VersionSuffix").FirstOrDefault();
             var assemblyVersionElement = xContent.Descendants(@namespace + "AssemblyVersion").FirstOrDefault();
+            var fileVersionElement = xContent.Descendants(@namespace + "FileVersion").FirstOrDefault();
             var informationalVersionElement = xContent.Descendants(@namespace + "InformationalVersion").FirstOrDefault()
                                               ?? xContent.Descendants(@namespace + "AssemblyInformationalVersion").FirstOrDefault();
             var packageVersionElement = xContent.Descendants(@namespace + "PackageVersion").FirstOrDefault();
 
-            Version version = new(1, 0);
+            SemVersion version = new(1, 0);
             Version assemblyVersion;
-            SemVersion informationalVersion;
+            Version fileVersion;
+            string informationalVersion;
             SemVersion packageVersion;
 
             if (versionElement is not null
-                && Version.TryParse(versionElement.Value, out var parsedVersion))
+                && SemVersion.TryParse(versionElement.Value, out var parsedSemVersion))
             {
-                version = parsedVersion;
+                // TODO: [P2] should support format major.minor.patch[.build][-prerelease]
+                version = parsedSemVersion;
+            }
+            else if (versionPrefix is not null
+                     && Version.TryParse(versionPrefix.Value, out var parsedPrefix))
+            {
+                version = new SemVersion(parsedPrefix);
+
+                if (versinSuffix is not null
+                    && Regex.IsMatch(versinSuffix.Value, "[0-9A-Za-z-]*"))
+                {
+                    version = version.Change(prerelease: versinSuffix.Value);
+                }
             }
 
             if (assemblyVersionElement is not null
-                && Version.TryParse(assemblyVersionElement.Value, out parsedVersion))
+                && Version.TryParse(assemblyVersionElement.Value, out var parsedVersion))
             {
                 assemblyVersion = parsedVersion;
             }
             else
             {
-                assemblyVersion = version;
+                assemblyVersion = new Version(version.Major, version.Minor, version.Patch, int.TryParse(version.Build, out var parsedBuild) ? parsedBuild : 0);
             }
 
-            if (informationalVersionElement is not null
-                && SemVersion.TryParse(informationalVersionElement.Value, out var parsedSemVersion))
+            if (fileVersionElement is not null
+                && Version.TryParse(fileVersionElement.Value, out parsedVersion))
             {
-                informationalVersion = parsedSemVersion;
+                fileVersion = parsedVersion;
             }
             else
             {
-                informationalVersion = new SemVersion(version);
+                fileVersion = (Version)assemblyVersion.Clone();
+            }
+
+            if (informationalVersionElement is not null
+                && !string.IsNullOrWhiteSpace(informationalVersionElement.Value))
+            {
+                informationalVersion = informationalVersionElement.Value;
+            }
+            else
+            {
+                // TODO: [P3] should be in format major.minor.patch[.build][-prerelease]
+                // but semantic version is major.minor.patch[-prerelease][+build]
+                informationalVersion = version.ToString();
             }
 
             if (packageVersionElement is not null
                 && SemVersion.TryParse(packageVersionElement.Value, out parsedSemVersion))
             {
+                // TODO: [P2] should support format major.minor.patch[.build][-prerelease]
                 packageVersion = parsedSemVersion;
             }
             else
             {
-                packageVersion = new SemVersion(version);
+                packageVersion = version.Change();
             }
 
             return new ExactVersions
             {
                 Version = version,
                 AssemblyVersion = assemblyVersion,
-                AssemblyInformationalVersion = informationalVersion.ToString(),
+                AssemblyFileVersion = fileVersion,
+                AssemblyInformationalVersion = informationalVersion,
                 PackageVersion = packageVersion,
             };
         }
