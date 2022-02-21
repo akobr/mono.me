@@ -26,7 +26,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
             if (Context.Item.Record.Type > RecordType.Workstead)
             {
-                Console.WriteLine("A workstead should not be created under a project.".DarkGray());
+                Console.WriteLine("A workstead can not be created under a project.".DarkGray());
 
                 if (!Console.Confirm("Do you want to create a new top level workstead, instead"))
                 {

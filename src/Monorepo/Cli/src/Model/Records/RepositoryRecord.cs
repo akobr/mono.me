@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using _42.Monorepo.Cli.Extensions;
 
 namespace _42.Monorepo.Cli.Model.Records
 {

@@ -130,6 +130,7 @@ namespace _42.Monorepo.Cli.Output
             }
 
             WriteExactDocument(new Document(grid));
+            Console.WriteLine();
         }
 
         public void Write(Document document)

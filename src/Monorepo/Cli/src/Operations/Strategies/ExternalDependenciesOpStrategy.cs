@@ -44,7 +44,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
             var parentDependencies = await parentTask;
             var map = parentDependencies
-                .ToDictionary(d => d.Name, d => d.Version);
+                .ToDictionary(d => d.Name, d => new ExternalDependency(d.Name, d.Version, false));
 
             XDocument xContent = await fileCache.GetOrLoadXmlContentAsync(filePath, cancellationToken);
 
@@ -53,20 +53,21 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 return await parentTask;
             }
 
-            foreach (var xReference in xContent.Descendants(xContent.Root.GetDefaultNamespace() + "PackageReference"))
+            // TODO: [P2] PackageVersion.Include or PackageReference.Update
+            foreach (var xReference in xContent.Descendants(xContent.Root.GetDefaultNamespace() + "PackageVersion"))
             {
-                var name = xReference.Attribute("Update")?.Value;
+                var name = xReference.Attribute("Include")?.Value;
                 var stringVersion = xReference.Attribute("Version")?.Value;
 
                 if (name is not null && stringVersion is not null
                                      && SemVersion.TryParse(stringVersion, out var version))
                 {
-                    map[name] = version;
+                    map[name] = new ExternalDependency(name, version, true);
                 }
             }
 
             return map
-                .Select(i => new ExternalDependency(i.Key, i.Value))
+                .Select(i => i.Value)
                 .ToList();
         }
 
@@ -103,7 +104,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             }
 
             return localMap
-                .Select(i => new ExternalDependency(i.Key, i.Value))
+                .Select(i => new ExternalDependency(i.Key, i.Value, true))
                 .ToList();
         }
     }

@@ -82,7 +82,7 @@ namespace _42.Monorepo.Cli.Commands.Show
 
             foreach (var dependency in dependencies)
             {
-                var projectRecord = MonorepoDirectoryFunctions.GetRecord(dependency.Path);
+                var projectRecord = MonorepoDirectoryFunctions.GetRecord(dependency.FullPath);
                 var projectItem = repository.TryGetDescendant(projectRecord);
 
                 if (projectItem is IProject subProject)

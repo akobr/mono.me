@@ -7,21 +7,23 @@ namespace _42.Monorepo.Cli.Model
     {
         public ExactVersions()
         {
-            Version = AssemblyVersion = new Version(0, 0);
+            Version = PackageVersion = new SemVersion(0);
+            AssemblyVersion = AssemblyFileVersion = new Version(0, 0);
             AssemblyInformationalVersion = "0.0.0";
-            PackageVersion = new SemVersion(0);
         }
 
         public ExactVersions(Version version)
         {
-            Version = AssemblyVersion = version;
+            Version = PackageVersion = new SemVersion(version);
+            AssemblyVersion = AssemblyFileVersion = version;
             AssemblyInformationalVersion = version.ToString();
-            PackageVersion = new SemVersion(version);
         }
 
-        public Version Version { get; init; }
+        public SemVersion Version { get; init; }
 
         public Version AssemblyVersion { get; init; }
+
+        public Version AssemblyFileVersion { get; init; }
 
         public string AssemblyInformationalVersion { get; init; }
 

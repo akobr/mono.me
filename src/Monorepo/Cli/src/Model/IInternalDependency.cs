@@ -4,6 +4,8 @@ namespace _42.Monorepo.Cli.Model
     {
         string Name { get; }
 
-        string Path { get; }
+        string FullPath { get; }
+
+        string RepoRelativePath { get; }
     }
 }

@@ -45,7 +45,7 @@ namespace _42.Monorepo.Cli.Commands.Show
             foreach (var project in Context.Repository.GetAllProjects())
             {
                 var dependencies = await project.GetInternalDependenciesAsync();
-                if (dependencies.Any(d => record == MonorepoDirectoryFunctions.GetRecord(d.Path)))
+                if (dependencies.Any(d => record == MonorepoDirectoryFunctions.GetRecord(d.FullPath)))
                 {
                     projectMap.Add(project.Record.Identifier);
                 }

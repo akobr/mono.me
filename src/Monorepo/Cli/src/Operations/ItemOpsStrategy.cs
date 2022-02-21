@@ -152,6 +152,7 @@ namespace _42.Monorepo.Cli.Operations
                 return Array.Empty<IInternalDependency>();
             }
 
+            string projectDirectory = Path.GetDirectoryName(projectFilePath)!;
             var xContent = await fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
 
             if (xContent.Root is null)
@@ -176,10 +177,10 @@ namespace _42.Monorepo.Cli.Operations
                     continue;
                 }
 
-                string fullPath = Path.Combine(item.Record.Path, relativePath);
+                string fullPath = Path.GetFullPath(Path.Combine(projectDirectory, relativePath));
                 string projectRepoPath = fullPath.GetRelativePath(repository.Path);
                 string projectName = Path.GetFileName(projectRepoPath);
-                references.Add(new InternalDependency(projectName, projectRepoPath));
+                references.Add(new InternalDependency(projectName, projectRepoPath, fullPath));
             }
 
             return references;
@@ -256,7 +257,7 @@ namespace _42.Monorepo.Cli.Operations
 
             return new ExactVersions
             {
-                Version = version,
+                Version = new SemVersion(version),
                 AssemblyVersion = assemblyVersion,
                 AssemblyInformationalVersion = informationalVersion.ToString(),
                 PackageVersion = packageVersion,
@@ -281,7 +282,7 @@ namespace _42.Monorepo.Cli.Operations
 
             return new ExactVersions
             {
-                Version = oracle.Version,
+                Version = new SemVersion(oracle.Version),
                 AssemblyVersion = oracle.AssemblyVersion,
                 AssemblyInformationalVersion = oracle.AssemblyInformationalVersion,
                 PackageVersion = packageVersion,
@@ -325,7 +326,7 @@ namespace _42.Monorepo.Cli.Operations
 
             var parentDependencies = await parentTask;
             var map = parentDependencies
-                .ToDictionary(d => d.Name, d => d.Version);
+                .ToDictionary(d => d.Name, d => new ExternalDependency(d.Name, d.Version, false));
 
             XDocument xContent = await fileCache.GetOrLoadXmlContentAsync(filePath, cancellationToken);
 
@@ -342,12 +343,12 @@ namespace _42.Monorepo.Cli.Operations
                 if (name is not null && stringVersion is not null
                                      && SemVersion.TryParse(stringVersion, out var version))
                 {
-                    map[name] = version;
+                    map[name] = new ExternalDependency(name, version, true);
                 }
             }
 
             return map
-                .Select(i => new ExternalDependency(i.Key, i.Value))
+                .Select(i => i.Value)
                 .ToList();
         }
 
@@ -384,7 +385,7 @@ namespace _42.Monorepo.Cli.Operations
             }
 
             return localMap
-                .Select(i => new ExternalDependency(i.Key, i.Value))
+                .Select(i => new ExternalDependency(i.Key, i.Value, true))
                 .ToList();
         }
 

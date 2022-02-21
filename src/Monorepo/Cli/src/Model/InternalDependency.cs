@@ -2,14 +2,17 @@ namespace _42.Monorepo.Cli.Model
 {
     public class InternalDependency : IInternalDependency
     {
-        public InternalDependency(string name, string path)
+        public InternalDependency(string name, string repoRelativePath, string fullPath)
         {
             Name = name;
-            Path = path;
+            FullPath = fullPath;
+            RepoRelativePath = repoRelativePath;
         }
 
         public string Name { get; }
 
-        public string Path { get; }
+        public string FullPath { get; }
+
+        public string RepoRelativePath { get; }
     }
 }

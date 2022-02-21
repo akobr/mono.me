@@ -5,7 +5,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command(CommandNames.EXPLAIN, Description = "Display explanation of any item inside the mono-repository.")]
+    [Command(CommandNames.EXPLAIN, Description = "Display explanation of an item inside the mono-repository.")]
     public class ExplainCommand : BaseCommand
     {
         public ExplainCommand(IExtendedConsole console, ICommandContext context)
@@ -24,14 +24,36 @@ namespace _42.Monorepo.Cli.Commands
                 || Path.EqualsOrdinalIgnoreCase("repo")
                 || Path.EqualsOrdinalIgnoreCase("mrepo"))
             {
-                Console.WriteLine("Under construction (:");
+                Console.WriteLine("Welcome in a mono-repository!");
+
+                if (Context.IsValid)
+                {
+                    switch (Context.Item.Record.Type)
+                    {
+                        case Model.RecordType.Repository:
+                            Console.WriteLine("If you want to know more about some unknown item please execute:");
+                            Console.WriteLine();
+                            Console.WriteLine("    mrepo explain <path-to-file-or-directory>");
+                            break;
+
+                        default:
+                            Console.WriteLine($"Currently you are in {Context.Item.Record.GetTypeAsString()}: {Context.Item.Record.RepoRelativePath}");
+                            break;
+                    }
+                }
             }
 
             string name = (System.IO.Path.GetFileName(Path) ?? Path ?? string.Empty).ToLowerInvariant();
 
             switch (name)
             {
-                case "packages.props":
+                case "directory.build.props":
+                    break;
+
+                case "directory.packages.props":
+                    break;
+
+                case "global.json":
                     break;
 
                 case "mrepo.json":

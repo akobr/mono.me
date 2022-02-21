@@ -33,6 +33,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 return Array.Empty<IInternalDependency>();
             }
 
+            string projectDirectory = Path.GetDirectoryName(projectFilePath)!;
             var xContent = await fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
 
             if (xContent.Root is null)
@@ -57,10 +58,10 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                     continue;
                 }
 
-                string fullPath = Path.Combine(item.Record.Path, relativePath);
+                string fullPath = Path.GetFullPath(Path.Combine(projectDirectory, relativePath));
                 string projectRepoPath = fullPath.GetRelativePath(repository.Path);
                 string projectName = Path.GetFileName(projectRepoPath);
-                references.Add(new InternalDependency(projectName, projectRepoPath));
+                references.Add(new InternalDependency(projectName, projectRepoPath, fullPath));
             }
 
             return references;

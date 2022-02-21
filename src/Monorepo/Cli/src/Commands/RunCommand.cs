@@ -9,14 +9,14 @@ namespace _42.Monorepo.Cli.Commands
     [Command(CommandNames.RUN, "x", Description = "Run any preconfigured command.", UnrecognizedArgumentHandling = UnrecognizedArgumentHandling.StopParsingAndCollect)]
     public class RunCommand : BaseCommand
     {
-        private readonly IScriptingService scripting;
-        private readonly CommandLineApplication application;
+        private readonly IScriptingService _scripting;
+        private readonly CommandLineApplication _application;
 
         public RunCommand(IExtendedConsole console, ICommandContext context, IScriptingService scripting, CommandLineApplication application)
             : base(console, context)
         {
-            this.scripting = scripting;
-            this.application = application;
+            _scripting = scripting;
+            _application = application;
         }
 
         [Argument(0, "script-name", "Name of a script to execute.")]
@@ -31,16 +31,16 @@ namespace _42.Monorepo.Cli.Commands
                 return Task.FromResult(ExitCodes.ERROR_WRONG_INPUT);
             }
 
-            var scriptContext = new ScriptContext(ScriptName, Context.Item) { Args = application.RemainingArguments };
+            var scriptContext = new ScriptContext(ScriptName, Context.Item) { Args = _application.RemainingArguments };
 
-            if (!scripting.HasScript(scriptContext))
+            if (!_scripting.HasScript(scriptContext))
             {
                 Console.WriteImportant($"Unrecognized script '{scriptContext.ScriptName}'.");
                 WriteAvailableScripts();
                 return Task.FromResult(ExitCodes.ERROR_WRONG_INPUT);
             }
 
-            return scripting.ExecuteScriptAsync(scriptContext);
+            return _scripting.ExecuteScriptAsync(scriptContext);
         }
 
         private void WriteAvailableScripts()
@@ -48,7 +48,7 @@ namespace _42.Monorepo.Cli.Commands
             Console.WriteLine();
             Console.WriteLine("Available scripts for current position are");
 
-            foreach (var script in scripting.GetAvailableScriptNames(Context.Item).OrderBy(s => s))
+            foreach (var script in _scripting.GetAvailableScriptNames(Context.Item).OrderBy(s => s))
             {
                 Console.WriteLine("  > ", script.ThemedHighlight(Console.Theme));
             }
