@@ -1,0 +1,25 @@
+<#@ template language="C#" #>
+<Project>
+  <PropertyGroup>
+    <!-- $(RepoRoot) is normally set globally and this override just makes sure about a trailing slash. -->
+    <RepoRoot Condition=" '$(RepoRoot)' == '' OR !HasTrailingSlash('$(RepoRoot)') ">$(MSBuildThisFileDirectory)</RepoRoot>
+    <PackageOutputPath>$(RepoRoot).artifacts</PackageOutputPath>
+<# if (_featureProvider.IsEnabled("packages")) { #>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+<# } #>
+  </PropertyGroup>
+  
+  <!-- global references -->
+<# if (_featureProvider.IsEnabled("git-version")) { #>
+  <ItemGroup Condition=" '$(EnableGitVersioning)' != 'false' ">
+    <PackageReference Include="Nerdbank.GitVersioning" PrivateAssets="all" />
+  </ItemGroup>
+<# } #>
+<# if (_featureProvider.IsEnabled("stylecop")) { #>
+  <ItemGroup Condition=" '$(EnableStyleCop)' != 'false' ">
+    <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" />
+    <Compile Include="$(RepoRoot)\src\.stylecop\GlobalStylecopSuppressions.cs" Visible="False" />
+    <AdditionalFiles Include="$(RepoRoot)\stylecop.json" Visible="False" />
+  </ItemGroup>
+<# } #>
+</Project>

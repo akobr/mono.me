@@ -5,7 +5,7 @@
     <RootNamespace>_42.Monorepo.Cli</RootNamespace>
 
     <OutputType>Exe</OutputType>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net6.0</TargetFramework>
     <Nullable>enable</Nullable>
 
     <PackAsTool>true</PackAsTool>
@@ -15,11 +15,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     <DefineConstants>DEBUG;TRACE</DefineConstants>
   </PropertyGroup>
-
-  <ItemGroup>
-    <EmbeddedResource Include="Templates\projects\Library.csproj" />
-    <EmbeddedResource Include="Templates\projects\Library.Test.csproj" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="42.Monorepo.GitVersioning.Core" />
@@ -37,10 +32,111 @@
     <PackageReference Include="semver" />
     <PackageReference Include="Sharprompt" />
     <PackageReference Include="ShellProgressBar" />
+    <PackageReference Include="System.CodeDom" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Texo\Core.Markdown\src\Core.Markdown.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Templates\DirectoryBuildProjT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>DirectoryBuildProjT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\DirectoryBuildPropsT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>DirectoryBuildPropsT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\DirectoryPackagesPropsT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>DirectoryPackagesPropsT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\GlobalJsonT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>GlobalJsonT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\MrepoJsonT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>MrepoJsonT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\NugetConfigT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>NugetConfigT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\ProjectCsprojT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>ProjectCsprojT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\ProjectTestCsprojT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>ProjectTestCsprojT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\MainVersionJsonT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>MainVersionJsonT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\WorksteadVersionJsonT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>WorksteadVersionJsonT4.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Templates\DirectoryBuildProjT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>DirectoryBuildProjT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\DirectoryBuildPropsT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>DirectoryBuildPropsT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\DirectoryPackagesPropsT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>DirectoryPackagesPropsT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\GlobalJsonT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>GlobalJsonT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\MainVersionJsonT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>MainVersionJsonT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\MrepoJsonT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>MrepoJsonT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\NugetConfigT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>NugetConfigT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\ProjectCsprojT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>ProjectCsprojT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\ProjectTestCsprojT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>ProjectTestCsprojT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\WorksteadVersionJsonT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>WorksteadVersionJsonT4.tt</DependentUpon>
+    </Compile>
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,19 @@
+<#@ template language="C#" #>
+{
+  "$schema": "https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/main/monorepo/src/NerdBank.GitVersioning/version.schema.json",
+  "version": "0.8.0-alpha",
+  "publicReleaseRefSpec": [
+    "^refs/heads/main$" // we release only out of main
+  ],
+  "cloudBuild": {
+    "setVersionVariables": true,
+    "buildNumber": {
+      "enabled": true,
+      "includeCommitId": {
+        "when": "nonPublicReleaseOnly",
+        "where": "buildMetadata"
+      }
+    }
+  }
+}
+

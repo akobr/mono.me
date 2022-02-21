@@ -1,0 +1,8 @@
+<#@ template language="C#" #>
+{
+  "$schema": "https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/main/monorepo/src/NerdBank.GitVersioning/version.schema.json",
+  "version": "0.8.0-alpha",
+  "inherit": true,
+  "hierarchicalVersion": true
+}
+

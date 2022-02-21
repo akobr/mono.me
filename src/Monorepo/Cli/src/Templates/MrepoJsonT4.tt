@@ -1,0 +1,46 @@
+<#@ template language="C#" #>
+{
+  "repo": {
+    "name": "<#= Model.Name #>",
+    "description": "<#= Model.Description #>",
+    "features": [ <#= Model.Features #> ],
+    "scripts": {
+      /* add any global scripts here */
+    },
+    "folders": {
+      "source": "src",
+      "documentation": "docs"
+    }
+  },
+  "release": {
+    "branches": [
+      "^refs/heads/main$"
+    ],
+    "changes": {
+      "major": [ /* custom major commit message types */ ],
+      "minor": [ "feat", ":sparkles:" ],
+      "patch": [ "fix", "perf", "refactor", ":bug:", ":zap:", ":recycle:" ],
+      "harmless": [ "style", "test", "build", "ci", "docs", ":art:", ":test_tube:", ":hammer:", ":construction_worker:", ":memo:" ]
+    }
+  },
+  "types": {
+    /* add custom types of items here (workstead, project) */
+    "dotnet-project": {
+      "custom": {
+        "filePattern": "*.*?proj",
+        "useFullProjectNames": false
+      },
+      "scripts": {
+        "build": "dotnet build src",
+        "clean": "dotnet clean src",
+        "pack": "dotnet pack src",
+        "restore": "dotnet restore src",
+        "run": "dotnet run src",
+        "test": "dotnet test test"
+      }
+    }
+  },
+  "items": [
+    /* your worksteads/projects configuration is going to be here */
+  ]
+}
