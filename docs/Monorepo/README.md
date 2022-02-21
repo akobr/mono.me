@@ -13,17 +13,17 @@ This project is trying to tackle problems around a mono-repository and .NET tech
 
 Main concept of a mono-repository structure is using workstreads and projects. Where workstead is a grouping concept of multiple projects or other worksteads. You can imagine a worstead as a business project which contains all necesary coding projects (libraries, packages and applications) inside.
 
-The most important folder of a repository is `src` which contains all code, all worksteads and projects. Is recomended to use *"siblings folders to source"*, a folder with mirrored structure as `src` and content which is related to worskteads and projects, but not the code itself. Simplest example is `doc` folder with Markdown documentation for the projects and their release notes. The second example could be `.azure/pipelines` to carry all CI/CD pipelines to all deliverables.
+The most important folder of a repository is `src` which contains all code, all worksteads and projects. Is recomended to use *"siblings folders to source"*, a folder with mirrored structure as `src` and its content is related to worskteads and projects, but not the code itself. Simplest example is `doc` folder with Markdown documentation for the projects and their release notes. The second example could be `.azure/pipelines` to carry all CI/CD pipelines for all deliverables.
 
-I recomend to use one centralized place to hold all artifacts from all the code of the mono-repository. Then it can be simply used as source for continous deployment or as a package source for other solution. In the mono-repository structure is `.artifacts` folder for these needs.
+Another recomendation is to use one centralized place to hold all artifacts from all the code of the mono-repository. Then it can be simply used as source for continous deployment or as a package source for other solution. In the mono-repository structure is `.artifacts` folder for these needs.
 
 > There is a simple naming convention for the non-code content of a mono-repository, each folder or file uses `lower-case-name`, but a code should follow the convention used by the technical stack, e.g. MsBuild and .NET names use `CammelCaseNotation` and the code should follow namespace structure.
 
-> All non-directly releated content is placed in folders with a dot on the beginning, for example `.azure` or `.mrepo`. This notation allow you to add a custom content directly into `src` folder which won't be processed by the tooling.
+All non-directly releated content is placed in folders with a dot on the beginning, for example `.azure` or `.mrepo`. The same notation allow you to add a custom content directly into `src` folder which won't be processed by the tooling.
 
 ### Example of src content
 
-Let's consider a simple example of a mono-repository with solution of table reservation system for restaurants and their customers. The entire problem is separated into two worksteads, one with application for customers where a table reservation can happen and the second part is administration desktop application for restaurants.
+Let's consider a simple example of a mono-repository with a solution of table reservation system for restaurants and their customers. The entire problem is separated into two worksteads, one with application for customers where a table reservation can happen and the second part is administration desktop application for restaurants.
 
 - src
   - restaurant
@@ -59,8 +59,8 @@ In the visual studio solution we will see a total of seven projects.
 
 ## Entire toolset
 
-TBD
+The heart of the toolset is a CLI application served as dotnet tool under the command `mrepo`. This powerfull command helps you to  manage, create and release everything inside a mono-repository.
 
 ## Configuration
 
-TBD
+Basic configuration of the mono-repository is stored in `mrepo.json` file in the root of the repository. Detailed pieces and custom scripts are located in folder `.mrepo`.
