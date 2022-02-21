@@ -7,8 +7,6 @@ using Alba.CsConsoleFormat;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 
-using Prompt = Sharprompt.Prompt;
-
 namespace _42.Monorepo.Cli.Commands.Init
 {
     [Command(CommandNames.INIT, Description = "Initialise a new mono-repository.")]
@@ -27,13 +25,15 @@ namespace _42.Monorepo.Cli.Commands.Init
 
         protected override Task<int> ExecuteAsync()
         {
+#if !DEBUG
             if (Context.IsValid)
             {
-                Console.WriteImportant("You are already in ", "mono-repository".ThemedHighlight(Console.Theme), ", hurray!");
+                Console.WriteImportant("You are already in a ", "mono-repository".ThemedHighlight(Console.Theme), ", hurray!");
                 return Task.FromResult(ExitCodes.WARNING_NO_WORK_NEEDED);
             }
+#endif
 
-            if (!Console.Confirm("Do you want to create a new mono-repository in current folder"))
+            if (!Console.Confirm("Do you want to create a new .net mono-repository in current folder"))
             {
                 return Task.FromResult(ExitCodes.WARNING_ABORTED);
             }
@@ -58,51 +58,31 @@ namespace _42.Monorepo.Cli.Commands.Init
             Console.WriteLine(
                 "I recommend you to use ",
                 "Central package version management".ThemedHighlight(Console.Theme),
-                " even when it is still in preview, because this is the simple out-of-the-box solution which can be easily changed to any other strategy.");
+                " even when it is still in preview, because this is the out-of-the-box solution in .net SDK which can be easily changed to any other strategy.");
+
 
             SelectOptions<Feature> featureOptions = new()
             {
                 Items = new List<Feature>
                 {
-                    // Use a smart versioning based on git history and allow to generate release logs from conventional commit messages.
-                    // The Microsoft.Build.Traversal msbuild SDK is used to have two different views of repository projects. The first one is a human/developer point of view with solution and their filter files per each workstead. Second one is used for machines/tooling defined by Directory.Build.proj, which allow to have custom build per any point/directory of the mono-repository.
-
-                    new("CentralPackageVersionsSdk",
-                        "External MsBuild SDK",
-                        "A custom MsBuild SDK built by NuGet team, named as Microsoft.Build.CentralPackageVersions. SHORT_LINK"),
                     new("CentralPackageVersionManagement",
                         "Central package version management [Preview]",
-                        "A baked in solution into .NET Core SDK (from 3.1.300), out-of-the-box solution with Directory.Packages.props file, but still a preview feature. SHORT_LINK"),
+                        "Recommended. A baked in solution into .NET Core SDK (from 3.1.300), out-of-the-box solution with Directory.Packages.props file, but still a preview feature. https://bit.ly/3oKJCpq"),
+                    new("CentralPackageVersionsSdk",
+                        "External MsBuild SDK",
+                        "A custom MsBuild SDK built by NuGet team, named as Microsoft.Build.CentralPackageVersions. https://bit.ly/3GMloRG"),
+                    new("DirectoryBuildTargets",
+                        "Directory.Build.props [MsBuild 15+]",
+                        "Use of hierarchical Directory.Build.props and posibility to update version of package reference by MsBuild 15 and newer."),
                     new("Paket",
                         "Paket package manager",
-                        "An alternative package manager to NuGet for .NET projects, which has some great features. SHORT_LINK"),
+                        "An alternative package manager to NuGet for .NET projects, which has some great features. Currently not yet supported by my tooling. https://bit.ly/3oHTJLp"),
                 },
                 Message = "Please pickup which dependency management you want to use",
                 TextSelector = f => f.Name,
             };
 
-            featureOptions.DefaultValue = featureOptions.Items.Skip(1).First();
-            Console.WriteLine();
-            var featureDependencies = Console.Select(featureOptions);
-
-            Console.WriteLine();
-            Console.WriteHeader("(2) Versioning");
-            Console.WriteLine("If you are lucky and all projects are just internally used inside your mono-repository you don't need to care about versioning and everything will be just project references.");
-            Console.WriteLine("More scary case is when you need to serve multiple libraries as NuGet packages or through any other packing system, then you should manage multiple versions and independent releases.");
-            Console.WriteLine("Don't be scared even for this approach I put together a couple of tooling as part of this toolset.");
-            Console.WriteLine();
-            Console.WriteLine("Mine versioning system is using git history as the only source of the truth. It is based on NerdBank.GetVersioning library which has been slightly updated to a mono-repository needs. SHORT_LINK");
-            Console.WriteLine("To simplify releases and their notes I recommend you to use conventional commits and our CLI tools for releasing. SHORT_LINK");
-
-            // TODO
-            Console.Confirm("Do you want to turn on CommitLint for conventional messages");
-
-            Console.WriteLine();
-            Console.WriteHeader("(3) Build and CI tooling");
-            Console.WriteLine("");
-
             var doc = new Document(
-                new Span("# Feature list:"),
                 new Grid
                 {
                     Color = ConsoleColor.Gray,
@@ -111,21 +91,125 @@ namespace _42.Monorepo.Cli.Commands.Init
                     Columns = { GridLength.Auto, GridLength.Star(1) },
                     Children =
                     {
-                        new Cell("Feature") { Stroke = LineThickness.None },
-                        new Cell("Description") { Stroke = LineThickness.None },
-                        new Cell(new Separator()) { ColumnSpan = 2, Stroke = LineThickness.None },
-                        featureOptions.Items.Select(f => new[]
-                        {
-                            new Cell($"> {f.Name}  ") { Stroke = LineThickness.None },
-                            new Cell(f.Description) { Stroke = LineThickness.None, Padding = new Thickness(0, 0, 0, 1)},
-                        }),
+                                    new Cell("Possible solution") { Stroke = LineThickness.None },
+                                    new Cell("Description") { Stroke = LineThickness.None },
+                                    new Cell(new Separator()) { ColumnSpan = 2, Stroke = LineThickness.None },
+                                    featureOptions.Items.Select(f => new[]
+                                    {
+                                        new Cell($"> {f.Name}  ") { Stroke = LineThickness.None },
+                                        new Cell(f.Description) { Stroke = LineThickness.None, Padding = new Thickness(0, 0, 0, 1) },
+                                    }),
                     },
                 });
 
+            Console.WriteLine();
             Console.WriteExactDocument(doc);
             Console.WriteLine();
 
+            // TODO: [P3] When there is more options
+            // featureOptions.DefaultValue = featureOptions.Items.First();
+            // Console.WriteLine();
+            // var featureForDependencies = Console.Select(featureOptions);
+            var useCentralDependencies = Console.Confirm("Should I turn on the Central package version management");
+            Console.WriteLine();
+
+            if (useCentralDependencies)
+            {
+                Console.WriteLine("Detailed information about central package version management:");
+                Console.WriteLine("    http://GitHub.todo.pages");
+            }
+            else
+            {
+                Console.WriteLine("All dependencies must be managed independenty inside each project file. The advantages of centralized approach are described at:");
+                Console.WriteLine("    http://GitHub.todo.pages");
+            }
+
+            Console.WriteLine();
+            Console.WriteHeader("(2) Versioning");
+            Console.WriteLine("If you are lucky and all projects are used only internally inside your mono-repository you don't need to care about versioning and everything will be just a project reference.");
+            Console.WriteLine("More scary case is when you need to serve multiple libraries as NuGet packages or through any other packing system, then you should manage multiple versions and independent releases.");
+            Console.WriteLine("Don't be scared too much even for this approach I put together a couple of tooling and recommendations as part of this toolset.");
+            Console.WriteLine();
+            Console.WriteLine(
+                "Mine versioning system is using git history as the only source of the truth and a version. It is based on ",
+                "NerdBank.GetVersioning".ThemedHighlight(Console.Theme),
+                " library which has been slightly updated to a mono-repository needs. https://bit.ly/3sAjIpy");
+            Console.WriteLine(
+                "Principle is simple, the monorepo contains one or multiple ",
+                "version.json".ThemedLowlight(Console.Theme),
+                " files which define and control version(s) for projects inside the repository where every single commit can be built and produce a unique version.");
+
+            Console.WriteLine();
+            var useVersioning = Console.Confirm("Configure and use mentioned versioning system");
+            Console.WriteLine();
+
+            if (useVersioning)
+            {
+                Console.WriteLine("Detailed information about the versioning:");
+                Console.WriteLine("    http://GitHub.todo.pages");
+            }
+            else
+            {
+                Console.WriteLine("Guide how to manualy configure versions in .net project:");
+                Console.WriteLine("    http://GitHub.todo.pages");
+            }
+
+            Console.WriteLine();
+            Console.WriteHeader("(3) Build and CI tooling");
+            Console.WriteLine("First recomendation is to separate human and machine view of the codebase. The solution file(s) should be used only by developers and never by any machine or a bot.");
+            Console.WriteLine(
+                "The ",
+                "Microsoft.Build.Traversal".ThemedHighlight(Console.Theme),
+                " msbuild SDK is used to have the second view, for a machine. The magic is done by ",
+                "Directory.Build.proj".ThemedLowlight(Console.Theme),
+                " files, which allow to have custom build per any point/directory of the mono-repository. https://bit.ly/3sJl7tQ");
+            Console.WriteLine("By default my CLI tooling use this system to build through it, if you pick to don't use it you have to write your own scripts for building.");
+
+            Console.WriteLine();
+            var useCodeViewSeparation = Console.Confirm("Turn it on and automatically create Directory.Build.proj file with a workstead");
+            Console.WriteLine();
+
+            if (useCodeViewSeparation)
+            {
+                Console.WriteLine("My idea how to built from the mono-repository is described here:");
+                Console.WriteLine("    http://GitHub.todo.pages");
+                Console.WriteLine();
+            }
+
+            Console.WriteLine("To simplify releases and their notes I recommend you to start with conventional commits. https://bit.ly/3JsPtHY");
+            Console.WriteLine("To push it even one step further, you should setup CommitLint to force any developer to have clean and nice git history ready for automated releases. https://bit.ly/3rLCAm7");
+            Console.WriteLine(
+                "With all above prerequsities and mine CLI tools for releasing (",
+                "mrepo release".ThemedLowlight(Console.Theme),
+                "), the release and creation of release notes will be just a piece of cake.");
+
+            Console.WriteLine();
+            var useCommitLint = Console.Confirm("Do you want to turn on CommitLint for conventional messages");
+            Console.WriteLine();
+
+            if (useCommitLint)
+            {
+                Console.WriteLine("I will help you with configuration of the CommitLint but the installation needs to be done manually.");
+                Console.WriteLine("You need to setup node.js, CommitLint and Husky to force the rules on each commit:");
+                Console.WriteLine();
+                Console.WriteLine("    # install node.js by Chocolatey".ThemedLowlight(Console.Theme));
+                Console.WriteLine("    choco install nodejs-lts");
+                Console.WriteLine("    # install comitlint cli and conventional config".ThemedLowlight(Console.Theme));
+                Console.WriteLine("    npm install --save-dev @commitlint/config-conventional @commitlint/cli");
+                Console.WriteLine("    # install husky".ThemedLowlight(Console.Theme));
+                Console.WriteLine("    npm install husky --save-dev");
+                Console.WriteLine("    # activate git hooks".ThemedLowlight(Console.Theme));
+                Console.WriteLine("    npx husky install");
+                Console.WriteLine("    # add git commit message hook".ThemedLowlight(Console.Theme));
+                Console.WriteLine("    npx husky add .husky/commit-msg 'npx --no -- commitlint --edit \"$1\"'");
+                Console.WriteLine();
+            }
+
+
+
             Console.WriteImportant("This command is still under development...");
+            Console.WriteLine("You went through the most important aspects, but there is much more to discuss and consider. Fore more info please visit our detailed documentation about a mono-repository at http://GitHub.todo.pages");
+
             return Task.FromResult(ExitCodes.SUCCESS);
         }
     }
