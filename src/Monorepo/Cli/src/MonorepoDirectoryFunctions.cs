@@ -63,21 +63,28 @@ namespace _42.Monorepo.Cli
             return GetRecord(Directory.GetCurrentDirectory());
         }
 
-        public static IRecord GetRecord(string directoryPath)
+        public static IRecord GetRecord(string anyPathProcessedAsAbsolute)
         {
-            if (!Directory.Exists(directoryPath))
+            var path = anyPathProcessedAsAbsolute;
+
+            if (File.Exists(path))
             {
-                return new InvalidRecord(directoryPath);
+                path = Path.GetDirectoryName(path)!;
             }
 
-            RepositoryRecord repo = new(GetMonorepoRootDirectory(directoryPath));
+            if (!Directory.Exists(path))
+            {
+                return new InvalidRecord(path);
+            }
+
+            RepositoryRecord repo = new(GetMonorepoRootDirectory(path));
 
             if (!repo.IsValid)
             {
-                return new InvalidRecord(directoryPath);
+                return new InvalidRecord(path);
             }
 
-            string relativePath = directoryPath.GetRelativePath(repo.Path);
+            string relativePath = path.GetRelativePath(repo.Path);
             string[] segments = relativePath.Split(
                 new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
                 StringSplitOptions.RemoveEmptyEntries);
