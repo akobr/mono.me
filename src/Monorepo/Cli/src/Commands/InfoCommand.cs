@@ -3,16 +3,17 @@ using System.Linq;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
+using _42.Monorepo.Cli.Features;
 using _42.Monorepo.Cli.Model.Items;
 using _42.Monorepo.Cli.Output;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command(CommandNames.INFO, Description = "Display info of a location in the mono-repository.")]
+    [Command(CommandNames.INFO, Description = "Display informatin of a current location in the mono-repository.")]
     public class InfoCommand : BaseCommand
     {
-        private readonly IItemOptionsProvider optionsProvider;
+        private readonly IItemOptionsProvider _optionsProvider;
 
         public InfoCommand(
             IExtendedConsole console,
@@ -20,7 +21,7 @@ namespace _42.Monorepo.Cli.Commands
             IItemOptionsProvider optionsProvider)
             : base(console, context)
         {
-            this.optionsProvider = optionsProvider;
+            _optionsProvider = optionsProvider;
         }
 
         protected override async Task<int> ExecuteAsync()
@@ -28,7 +29,7 @@ namespace _42.Monorepo.Cli.Commands
             var item = Context.Item;
             var record = item.Record;
             var exactVersions = await item.GetExactVersionsAsync();
-            var options = optionsProvider.GetOptions(record.Path);
+            var options = _optionsProvider.GetOptions(record.Path);
 
             Console.WriteHeader(
                 $"{record.GetTypeAsString()}: ",
@@ -42,22 +43,21 @@ namespace _42.Monorepo.Cli.Commands
 
             if (options.Exclude.Contains(Excludes.VERSION))
             {
-                Console.WriteLine("The versioning is disabled.".ThemedLowlight(Console.Theme));
-                Console.WriteLine("Not releasable by the tool.");
+                Console.WriteLine("The versioning is disabled (nonreleasable).".ThemedLowlight(Console.Theme));
             }
             else if (options.Exclude.Contains(Excludes.RELEASE))
             {
-                Console.WriteLine("Not releasable by the tool.");
+                Console.WriteLine("Explicitly exluded from a release.");
             }
 
             var files = await GetFilesAsync(item, Context.Repository);
 
-            if (!options.Exclude.Contains(Excludes.VERSION))
+            if (files.VersionFiles.Count > 0 && !options.Exclude.Contains(Excludes.VERSION))
             {
                 Console.WriteLine();
-                Console.WriteHeader("Version definition");
+                Console.WriteHeader("Definition of version");
                 var root = new Composition(string.Empty);
-                files.versionFiles.Aggregate(root, (p, s) =>
+                files.VersionFiles.Aggregate(root, (p, s) =>
                 {
                     var node = new Composition(s);
                     p.Children.Add(node);
@@ -66,16 +66,19 @@ namespace _42.Monorepo.Cli.Commands
                 Console.WriteTree(root.Children.First(), n => n);
             }
 
-            Console.WriteLine();
-            Console.WriteHeader("Package reference definitions");
-            var rootPackages = new Composition(string.Empty);
-            files.packageFiles.Aggregate(rootPackages, (p, s) =>
+            if (files.PackageFiles.Count > 0)
             {
-                var node = new Composition(s);
-                p.Children.Add(node);
-                return node;
-            });
-            Console.WriteTree(rootPackages.Children.First(), n => n);
+                Console.WriteLine();
+                Console.WriteHeader("Definition of package dependencies");
+                var rootPackages = new Composition(string.Empty);
+                files.PackageFiles.Aggregate(rootPackages, (p, s) =>
+                {
+                    var node = new Composition(s);
+                    p.Children.Add(node);
+                    return node;
+                });
+                Console.WriteTree(rootPackages.Children.First(), n => n);
+            }
 
             if (item is IProject project)
             {
@@ -84,10 +87,10 @@ namespace _42.Monorepo.Cli.Commands
                 if (internalDependencies.Count > 0)
                 {
                     Console.WriteLine();
-                    Console.WriteHeader("Project references:");
+                    Console.WriteHeader("Project references");
                     Console.WriteTable(
                         internalDependencies,
-                        d => new[] { $"> {d.Name}", d.Path.GetRelativePath(Context.Repository.Record.Path) },
+                        d => new[] { $"> {d.Name}", d.RepoRelativePath },
                         new[] { "Project", "Repository path" });
                 }
             }
@@ -97,7 +100,7 @@ namespace _42.Monorepo.Cli.Commands
             if (externalDependencies.Count > 0)
             {
                 Console.WriteLine();
-                Console.WriteHeader("Package references:");
+                Console.WriteHeader("Package dependencies");
                 Console.WriteTable(
                     externalDependencies,
                     d => new[] { $"> {d.Name}", d.Version.ToString() },
@@ -107,7 +110,7 @@ namespace _42.Monorepo.Cli.Commands
             return ExitCodes.SUCCESS;
         }
 
-        private static async Task<(IEnumerable<string> versionFiles, IEnumerable<string> packageFiles)> GetFilesAsync(IItem item, IRepository repository)
+        private static async Task<(IReadOnlyCollection<string> VersionFiles, IReadOnlyCollection<string> PackageFiles)> GetFilesAsync(IItem item, IRepository repository)
         {
             var workItem = item;
             var versionFiles = new List<string>();
