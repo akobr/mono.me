@@ -3,7 +3,7 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)..\'))" />
   <ItemGroup>
 
-    <PackageVersion Include="42.Monorepo.GitVersioning.Core" Version="3.5.32-alpha-g2cfac6e984" />
+    <PackageVersion Include="42.Monorepo.GitVersioning.Core" Version="3.5.83-alpha-g67a81b71f0" />
 
     <!-- CLI libraries -->
     <PackageVersion Include="Alba.CsConsoleFormat-NoXaml" Version="1.0.0" />
@@ -18,7 +18,7 @@
     <PackageVersion Include="semver" Version="2.0.6" />
 
     <!-- Git -->
-    <PackageVersion Include="LibGit2Sharp" Version="0.27.0-preview-0119" />
+    <PackageVersion Include="LibGit2Sharp" Version="0.27.0-preview-0158" />
 
   </ItemGroup>
 </Project>

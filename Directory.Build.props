@@ -8,7 +8,7 @@
   
   <!-- global references -->
   <ItemGroup Condition=" '$(EnableGitVersioning)' != 'false' ">
-    <PackageReference Include="Nerdbank.GitVersioning" PrivateAssets="all" />
+    <PackageReference Include="42.Monorepo.GitVersioning" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup Condition=" '$(EnableStyleCop)' != 'false' ">
     <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" />

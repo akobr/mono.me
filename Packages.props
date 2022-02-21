@@ -19,6 +19,7 @@
     <PackageReference Update="Microsoft.Extensions.Hosting" Version="5.0.0" />
     <PackageReference Update="Microsoft.Extensions.Http" Version="5.0.0" />
     <PackageReference Update="Microsoft.Extensions.Options" Version="5.0.0" />
+    <PackageReference Update="System.CodeDom" Version="5.0.0" />
     <PackageReference Update="System.ComponentModel.Annotations" Version="5.0.0" />
     <PackageReference Update="System.Text.Json" Version="5.0.2" />
 
@@ -34,6 +35,7 @@
 	
     <!-- versioning -->
     <PackageReference Update="Nerdbank.GitVersioning" Version="3.4.231" />
+    <PackageReference Update="42.Monorepo.GitVersioning" Version="3.5.83-alpha-g67a81b71f0" />
 	
     <!-- code analysis -->
     <PackageReference Update="StyleCop.Analyzers" Version="1.2.0-beta.354" />
