@@ -1,0 +1,444 @@
+{
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/object1645218559.json",
+  "title": "mrepo.json schema",
+  "type": "object",
+  "required": [
+    "repo"
+  ],
+  "properties": {
+    "repo": {
+      "$id": "#root/repo",
+      "title": "Repo",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "$id": "#root/repo/name",
+          "title": "Name",
+          "type": "string",
+          "default": "",
+          "examples": [
+            "mono.me"
+          ],
+          "pattern": "^.*$"
+        },
+        "description": {
+          "$id": "#root/repo/description",
+          "title": "Description",
+          "type": "string",
+          "default": "",
+          "examples": [
+            "My personal mono-repository."
+          ],
+          "pattern": "^.*$"
+        },
+        "prefix": {
+          "$id": "#root/repo/prefix",
+          "title": "Prefix",
+          "type": "string",
+          "default": "",
+          "examples": [
+            "Company.RootNamespace"
+          ],
+          "pattern": "^.*$"
+        },
+        "features": {
+          "$id": "#root/repo/features",
+          "title": "Features",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$id": "#root/repo/features/items",
+            "title": "Items",
+            "type": "string",
+            "default": "",
+            "examples": [
+              "git-version"
+            ],
+            "pattern": "^.*$"
+          }
+        },
+        "scripts": {
+          "$id": "#root/repo/scripts",
+          "title": "Scripts",
+          "type": "object",
+          "required": [
+            "hello",
+            "ls"
+          ],
+          "properties": {
+            "hello": {
+              "$id": "#root/repo/scripts/hello",
+              "title": "Hello",
+              "type": "string",
+              "default": "",
+              "examples": [
+                "echo 'Hello world!'"
+              ],
+              "pattern": "^.*$"
+            },
+            "ls": {
+              "$id": "#root/repo/scripts/ls",
+              "title": "Ls",
+              "type": "string",
+              "default": "",
+              "examples": [
+                "dir"
+              ],
+              "pattern": "^.*$"
+            }
+          }
+        },
+        "folders": {
+          "$id": "#root/repo/folders",
+          "title": "Folders",
+          "type": "object",
+          "required": [
+            "source",
+            "documentation"
+          ],
+          "properties": {
+            "source": {
+              "$id": "#root/repo/folders/source",
+              "title": "Source",
+              "type": "string",
+              "default": "",
+              "examples": [
+                "src"
+              ],
+              "pattern": "^.*$"
+            },
+            "documentation": {
+              "$id": "#root/repo/folders/documentation",
+              "title": "Documentation",
+              "type": "string",
+              "default": "",
+              "examples": [
+                "docs"
+              ],
+              "pattern": "^.*$"
+            }
+          }
+        }
+
+      }
+    },
+    "release": {
+      "$id": "#root/release",
+      "title": "Release",
+      "type": "object",
+      "required": [
+        "branches",
+        "changes",
+        "createReleaseBranch"
+      ],
+      "properties": {
+        "branches": {
+          "$id": "#root/release/branches",
+          "title": "Branches",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$id": "#root/release/branches/items",
+            "title": "Items",
+            "type": "string",
+            "default": "",
+            "examples": [
+              "^refs/heads/main$"
+            ],
+            "pattern": "^.*$"
+          }
+        },
+        "changes": {
+          "$id": "#root/release/changes",
+          "title": "Changes",
+          "type": "object",
+          "required": [
+            "major",
+            "minor",
+            "patch",
+            "harmless"
+          ],
+          "properties": {
+            "major": {
+              "$id": "#root/release/changes/major",
+              "title": "Major",
+              "type": "array",
+              "default": []
+            },
+            "minor": {
+              "$id": "#root/release/changes/minor",
+              "title": "Minor",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$id": "#root/release/changes/minor/items",
+                "title": "Items",
+                "type": "string",
+                "default": "",
+                "examples": [
+                  "feat"
+                ],
+                "pattern": "^.*$"
+              }
+            },
+            "patch": {
+              "$id": "#root/release/changes/patch",
+              "title": "Patch",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$id": "#root/release/changes/patch/items",
+                "title": "Items",
+                "type": "string",
+                "default": "",
+                "examples": [
+                  "fix"
+                ],
+                "pattern": "^.*$"
+              }
+            },
+            "harmless": {
+              "$id": "#root/release/changes/harmless",
+              "title": "Harmless",
+              "type": "array",
+              "default": [],
+              "items": {
+                "$id": "#root/release/changes/harmless/items",
+                "title": "Items",
+                "type": "string",
+                "default": "",
+                "examples": [
+                  "style"
+                ],
+                "pattern": "^.*$"
+              }
+            }
+          }
+        },
+        "createReleaseBranch": {
+          "$id": "#root/release/createReleaseBranch",
+          "title": "Createreleasebranch",
+          "type": "boolean",
+          "examples": [
+            true
+          ],
+          "default": true
+        }
+      }
+    },
+    "types": {
+      "$id": "#root/types",
+      "title": "Types",
+      "type": "object",
+      "required": [
+        "dotnet-project",
+        "nodejs-project"
+      ],
+      "properties": {
+        "dotnet-project": {
+          "$id": "#root/types/dotnet-project",
+          "title": "Dotnet-project",
+          "type": "object",
+          "required": [
+            "custom",
+            "scripts"
+          ],
+          "properties": {
+            "custom": {
+              "$id": "#root/types/dotnet-project/custom",
+              "title": "Custom",
+              "type": "object",
+              "required": [
+                "filePattern",
+                "useFullProjectNames"
+              ],
+              "properties": {
+                "filePattern": {
+                  "$id": "#root/types/dotnet-project/custom/filePattern",
+                  "title": "Filepattern",
+                  "type": "string",
+                  "default": "",
+                  "examples": [
+                    "*.*?proj"
+                  ],
+                  "pattern": "^.*$"
+                },
+                "useFullProjectNames": {
+                  "$id": "#root/types/dotnet-project/custom/useFullProjectNames",
+                  "title": "Usefullprojectnames",
+                  "type": "boolean",
+                  "examples": [
+                    false
+                  ],
+                  "default": true
+                }
+              }
+            },
+            "scripts": {
+              "$id": "#root/types/dotnet-project/scripts",
+              "title": "Scripts",
+              "type": "object",
+              "required": [
+                "build",
+                "clean",
+                "pack",
+                "restore",
+                "run",
+                "test"
+              ],
+              "properties": {
+                "build": {
+                  "$id": "#root/types/dotnet-project/scripts/build",
+                  "title": "Build",
+                  "type": "string",
+                  "default": "",
+                  "examples": [
+                    "dotnet build src"
+                  ],
+                  "pattern": "^.*$"
+                },
+                "clean": {
+                  "$id": "#root/types/dotnet-project/scripts/clean",
+                  "title": "Clean",
+                  "type": "string",
+                  "default": "",
+                  "examples": [
+                    "dotnet clean src"
+                  ],
+                  "pattern": "^.*$"
+                },
+                "pack": {
+                  "$id": "#root/types/dotnet-project/scripts/pack",
+                  "title": "Pack",
+                  "type": "string",
+                  "default": "",
+                  "examples": [
+                    "dotnet pack src"
+                  ],
+                  "pattern": "^.*$"
+                },
+                "restore": {
+                  "$id": "#root/types/dotnet-project/scripts/restore",
+                  "title": "Restore",
+                  "type": "string",
+                  "default": "",
+                  "examples": [
+                    "dotnet restore src"
+                  ],
+                  "pattern": "^.*$"
+                },
+                "run": {
+                  "$id": "#root/types/dotnet-project/scripts/run",
+                  "title": "Run",
+                  "type": "string",
+                  "default": "",
+                  "examples": [
+                    "dotnet run src"
+                  ],
+                  "pattern": "^.*$"
+                },
+                "test": {
+                  "$id": "#root/types/dotnet-project/scripts/test",
+                  "title": "Test",
+                  "type": "string",
+                  "default": "",
+                  "examples": [
+                    "dotnet test test"
+                  ],
+                  "pattern": "^.*$"
+                }
+              }
+            }
+
+          }
+        },
+        "nodejs-project": {
+          "$id": "#root/types/nodejs-project",
+          "title": "Nodejs-project",
+          "type": "object",
+          "required": [
+            "scripts"
+          ],
+          "properties": {
+            "scripts": {
+              "$id": "#root/types/nodejs-project/scripts",
+              "title": "Scripts",
+              "type": "object",
+              "required": [
+                "build"
+              ],
+              "properties": {
+                "build": {
+                  "$id": "#root/types/nodejs-project/scripts/build",
+                  "title": "Build",
+                  "type": "string",
+                  "default": "",
+                  "examples": [
+                    "custom build"
+                  ],
+                  "pattern": "^.*$"
+                }
+              }
+            }
+
+          }
+        }
+
+      }
+    },
+    "items": {
+      "$id": "#root/items",
+      "title": "Items",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$id": "#root/items/items",
+        "title": "Items",
+        "type": "object",
+        "required": [
+          "path",
+          "name",
+          "description"
+        ],
+        "properties": {
+          "path": {
+            "$id": "#root/items/items/path",
+            "title": "Path",
+            "type": "string",
+            "default": "",
+            "examples": [
+              "src/Monorepo"
+            ],
+            "pattern": "^.*$"
+          },
+          "name": {
+            "$id": "#root/items/items/name",
+            "title": "Name",
+            "type": "string",
+            "default": "",
+            "examples": [
+              "Monorepo"
+            ],
+            "pattern": "^.*$"
+          },
+          "description": {
+            "$id": "#root/items/items/description",
+            "title": "Description",
+            "type": "string",
+            "default": "",
+            "examples": [
+              "Tooling around mono-repository."
+            ],
+            "pattern": "^.*$"
+          }
+        }
+      }
+
+    }
+  }
+}
