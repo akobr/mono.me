@@ -7,7 +7,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.New
 {
-    [Command(CommandNames.NEW, Description = "Create a new workstead or project.")]
+    [Command(CommandNames.NEW, Description = "Create new workstead, project, or version.")]
     [Subcommand(typeof(NewWorksteadCommand), typeof(NewProjectCommand), typeof(NewVersionCommand))]
     public class NewCommand : BaseCommand
     {
@@ -34,11 +34,11 @@ namespace _42.Monorepo.Cli.Commands.New
             switch (Context.Item.Record.Type)
             {
                 case RecordType.Repository:
-                case RecordType.Project:
                     return application.Commands.ExecuteByNameAsync(CommandNames.WORKSTEAD);
 
                 case RecordType.TopWorkstead:
                 case RecordType.Workstead:
+                case RecordType.Project:
                     return application.Commands.ExecuteByNameAsync(CommandNames.PROJECT);
 
                 default:
