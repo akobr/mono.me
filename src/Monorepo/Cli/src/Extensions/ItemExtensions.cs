@@ -74,6 +74,15 @@ namespace _42.Monorepo.Cli.Extensions
             return Enum.GetName(type) ?? string.Empty;
         }
 
+        public static char GetTypeAsChar(this IRecord record)
+        {
+            var type = record.Type == RecordType.TopWorkstead
+                ? RecordType.Workstead
+                : record.Type;
+
+            return char.ToLowerInvariant(Enum.GetName(type)?[0] ?? ' ');
+        }
+
         public static bool IsWorkstead(this RecordType type)
         {
             return type is RecordType.TopWorkstead or RecordType.Workstead;

@@ -47,7 +47,7 @@ namespace _42.Monorepo.Cli.Commands
             }
             else if (options.Exclude.Contains(Excludes.RELEASE))
             {
-                Console.WriteLine("Explicitly exluded from a release.");
+                Console.WriteLine("Explicitly excluded from a release.");
             }
 
             var files = await GetFilesAsync(item, Context.Repository);

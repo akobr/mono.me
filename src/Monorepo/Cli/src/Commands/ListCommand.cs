@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Model;
@@ -21,6 +22,9 @@ namespace _42.Monorepo.Cli.Commands
         [Option("-w|--worksteads", CommandOptionType.NoValue, Description = "Display the list of top-level worksteads.")]
         public bool DisplayWorksteads { get; set; }
 
+        [Option("-t|--tree", CommandOptionType.NoValue, Description = "Display the entire hierarchical structure as tree.")]
+        public bool DisplayTree { get; set; }
+
         protected override async Task<int> ExecuteAsync()
         {
             var item = Context.Item;
@@ -30,7 +34,16 @@ namespace _42.Monorepo.Cli.Commands
             {
                 item = Context.Repository;
                 await ShowItemHeader(item);
-                await ShowListOfItems(Context.Repository.GetWorksteads(), "Workstead");
+
+                if (DisplayTree)
+                {
+                    await ShowTree(item);
+                }
+                else
+                {
+                    await ShowListOfItems(Context.Repository.GetWorksteads(), "Workstead");
+                }
+
                 return ExitCodes.SUCCESS;
             }
 
@@ -45,8 +58,17 @@ namespace _42.Monorepo.Cli.Commands
             }
 
             await ShowItemHeader(item);
-            await ShowListOfItems(workstead.GetSubWorksteads(), "Workstead");
-            await ShowListOfItems(workstead.GetProjects(), "Project");
+
+            if (DisplayTree)
+            {
+                await ShowTree(item);
+            }
+            else
+            {
+                await ShowListOfItems(workstead.GetSubWorksteads(), "Workstead");
+                await ShowListOfItems(workstead.GetProjects(), "Project");
+            }
+
             return ExitCodes.SUCCESS;
         }
 
@@ -88,6 +110,26 @@ namespace _42.Monorepo.Cli.Commands
             Console.WriteTable(
                 tableRows,
                 new[] { itemType, "Version" });
+        }
+
+        private async Task ShowTree(IItem item)
+        {
+            var root = new Composition(string.Empty);
+            await BuildTreeAsync(item, root);
+
+            Console.WriteLine();
+            Console.WriteTree(root.Children.First(), n => n);
+        }
+
+        private async Task BuildTreeAsync(IItem item, Composition parent)
+        {
+            var node = new Composition($"{item.Record.GetTypeAsChar()} {item.Record.Name} ({(await item.GetExactVersionsAsync()).PackageVersion})");
+            parent.Children.Add(node);
+
+            foreach (var child in item.GetChildren())
+            {
+                await BuildTreeAsync(child, node);
+            }
         }
     }
 }
