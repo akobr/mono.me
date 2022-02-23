@@ -15,9 +15,9 @@ namespace _42.Monorepo.Cli.Templates
     /// Class to produce the template output
     /// </summary>
     
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\WorksteadVersionJsonT4.tt"
+    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootVersionJsonT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public partial class WorksteadVersionJsonT4 : WorksteadVersionJsonT4Base
+    public partial class RootVersionJsonT4 : RootVersionJsonT4Base
     {
 #line hidden
         /// <summary>
@@ -25,9 +25,25 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("{\r\n  \"$schema\": \"https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/m" +
-                    "ain/monorepo/src/NerdBank.GitVersioning/version.schema.json\",\r\n  \"version\": \"0.8" +
-                    ".0-alpha\",\r\n  \"inherit\": true,\r\n  \"hierarchicalVersion\": true\r\n}\r\n\r\n");
+            this.Write(@"{
+  ""$schema"": ""https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/main/monorepo/src/NerdBank.GitVersioning/version.schema.json"",
+  ""version"": ""0.8.0-alpha"",
+  ""publicReleaseRefSpec"": [
+    ""^refs/heads/main$"" // we release only out of main
+  ],
+  ""cloudBuild"": {
+    ""setVersionVariables"": true,
+    ""buildNumber"": {
+      ""enabled"": true,
+      ""includeCommitId"": {
+        ""when"": ""nonPublicReleaseOnly"",
+        ""where"": ""buildMetadata""
+      }
+    }
+  }
+}
+
+");
             return this.GenerationEnvironment.ToString();
         }
     }
@@ -39,7 +55,7 @@ namespace _42.Monorepo.Cli.Templates
     /// Base class for this transformation
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public class WorksteadVersionJsonT4Base
+    public class RootVersionJsonT4Base
     {
         #region Fields
         private global::System.Text.StringBuilder generationEnvironmentField;

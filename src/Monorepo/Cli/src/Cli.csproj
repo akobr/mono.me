@@ -13,7 +13,7 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;TESTING</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -76,6 +76,18 @@
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <LastGenOutput>MainVersionJsonT4.cs</LastGenOutput>
     </None>
+    <None Update="Templates\RootDirectoryPackagesPropsT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>RootDirectoryPackagesPropsT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\RootVersionJsonT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>RootVersionJsonT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\VersionJsonT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>VersionJsonT4.cs</LastGenOutput>
+    </None>
     <None Update="Templates\WorksteadVersionJsonT4.tt">
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <LastGenOutput>WorksteadVersionJsonT4.cs</LastGenOutput>
@@ -131,6 +143,21 @@
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
       <DependentUpon>ProjectTestCsprojT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\RootDirectoryPackagesPropsT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>RootDirectoryPackagesPropsT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\RootVersionJsonT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>RootVersionJsonT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\VersionJsonT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>VersionJsonT4.tt</DependentUpon>
     </Compile>
     <Compile Update="Templates\WorksteadVersionJsonT4.cs">
       <DesignTime>True</DesignTime>

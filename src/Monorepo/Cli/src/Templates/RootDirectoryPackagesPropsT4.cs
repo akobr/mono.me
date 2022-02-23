@@ -15,9 +15,9 @@ namespace _42.Monorepo.Cli.Templates
     /// Class to produce the template output
     /// </summary>
     
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\MainVersionJsonT4.tt"
+    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootDirectoryPackagesPropsT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public partial class MainVersionJsonT4 : MainVersionJsonT4Base
+    public partial class RootDirectoryPackagesPropsT4 : RootDirectoryPackagesPropsT4Base
     {
 #line hidden
         /// <summary>
@@ -25,25 +25,88 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write(@"{
-  ""$schema"": ""https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/main/monorepo/src/NerdBank.GitVersioning/version.schema.json"",
-  ""version"": ""0.8.0-alpha"",
-  ""publicReleaseRefSpec"": [
-    ""^refs/heads/main$"" // we release only out of main
-  ],
-  ""cloudBuild"": {
-    ""setVersionVariables"": true,
-    ""buildNumber"": {
-      ""enabled"": true,
-      ""includeCommitId"": {
-        ""when"": ""nonPublicReleaseOnly"",
-        ""where"": ""buildMetadata""
-      }
-    }
-  }
-}
+            this.Write(@"<?xml version=""1.0"" encoding=""utf-8""?>
+<Project xmlns=""http://schemas.microsoft.com/developer/msbuild/2003"">
+  <ItemGroup>
 
+    <!-- Please create any groups of dependencies if you need -->
+    <!-- <PackageVersion Include=""package-name"" Version=""package-version"" /> -->
+
+    <!-- abstractions for .NET libraries -->
+    <PackageVersion Include=""Microsoft.Extensions.Configuration.Abstractions"" Version=""6.0.0"" />
+    <PackageVersion Include=""Microsoft.Extensions.DependencyInjection.Abstractions"" Version=""6.0.0"" />
+    <PackageVersion Include=""Microsoft.Extensions.Hosting.Abstractions"" Version=""6.0.0"" />
+    <PackageVersion Include=""Microsoft.Extensions.Logging.Abstractions"" Version=""6.0.0"" />
+
+    <!-- .NET libraries -->
+    <PackageVersion Include=""Microsoft.Extensions.Configuration"" Version=""6.0.0"" />
+    <PackageVersion Include=""Microsoft.Extensions.DependencyInjection"" Version=""6.0"" />
+    <PackageVersion Include=""Microsoft.Extensions.Hosting"" Version=""6.0.0"" />
+    <PackageVersion Include=""Microsoft.Extensions.Logging"" Version=""6.0.0"" />
+      
+    <!-- unit testing -->
+    <PackageVersion Include=""coverlet.collector"" Version=""3.1.2"" />
+    <PackageVersion Include=""FluentAssertions"" Version=""6.5.1"" />
+    <PackageVersion Include=""Microsoft.NET.Test.Sdk"" Version=""17.1.0"" />
+    <PackageVersion Include=""Moq"" Version=""4.16.1"" />
 ");
+            
+            #line 26 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootDirectoryPackagesPropsT4.tt"
+ if (_featureProvider.IsEnabled("tests-xunit")) { 
+            
+            #line default
+            #line hidden
+            this.Write("    <PackageVersion Include=\"xunit\" Version=\"2.4.1\" />\r\n    <PackageVersion Inclu" +
+                    "de=\"xunit.runner.visualstudio\" Version=\"2.4.3\" />\r\n");
+            
+            #line 29 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootDirectoryPackagesPropsT4.tt"
+ } 
+            
+            #line default
+            #line hidden
+            
+            #line 29 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootDirectoryPackagesPropsT4.tt"
+ if (_featureProvider.IsEnabled("tests-nunit")) { 
+            
+            #line default
+            #line hidden
+            this.Write("    <PackageVersion Include=\"NUnit\" Version=\"3.13.2\" />\r\n    <PackageVersion Incl" +
+                    "ude=\"NUnit3TestAdapter\" Version=\"4.2.1\" />\r\n");
+            
+            #line 32 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootDirectoryPackagesPropsT4.tt"
+ } 
+            
+            #line default
+            #line hidden
+            
+            #line 32 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootDirectoryPackagesPropsT4.tt"
+ if (_featureProvider.IsEnabled("git-version")) { 
+            
+            #line default
+            #line hidden
+            this.Write("\r\n    <!-- versioning -->\r\n    <PackageVersion Include=\"42.Monorepo.GitVersioning" +
+                    "\" Version=\"3.5.82-alpha-gc03e12373f\" />\r\n");
+            
+            #line 36 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootDirectoryPackagesPropsT4.tt"
+ } 
+            
+            #line default
+            #line hidden
+            
+            #line 36 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootDirectoryPackagesPropsT4.tt"
+ if (_featureProvider.IsEnabled("stylecop")) { 
+            
+            #line default
+            #line hidden
+            this.Write("\r\n    <!-- code analysis -->\r\n    <PackageVersion Include=\"StyleCop.Analyzers\" Ve" +
+                    "rsion=\"1.2.0-beta.406\" />\r\n");
+            
+            #line 40 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\RootDirectoryPackagesPropsT4.tt"
+ } 
+            
+            #line default
+            #line hidden
+            this.Write("\r\n  </ItemGroup>\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
@@ -55,7 +118,7 @@ namespace _42.Monorepo.Cli.Templates
     /// Base class for this transformation
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public class MainVersionJsonT4Base
+    public class RootDirectoryPackagesPropsT4Base
     {
         #region Fields
         private global::System.Text.StringBuilder generationEnvironmentField;

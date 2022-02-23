@@ -25,9 +25,23 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("<Project Sdk=\"Microsoft.NET.Sdk\">\r\n\r\n  <PropertyGroup>\r\n    <TargetFramework>net6" +
-                    ".0</TargetFramework>\r\n    <LangVersion>latest</LangVersion>\r\n    <Nullable>enabl" +
-                    "e</Nullable>\r\n  </PropertyGroup>\r\n\r\n</Project>\r\n");
+            this.Write("<Project Sdk=\"Microsoft.NET.Sdk\">\r\n\r\n  <PropertyGroup>\r\n    <AssemblyName>");
+            
+            #line 5 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(Model.AssemblyName));
+            
+            #line default
+            #line hidden
+            this.Write("</AssemblyName>\r\n    <RootNamespace>");
+            
+            #line 6 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(Model.RootNamespace));
+            
+            #line default
+            #line hidden
+            this.Write("</RootNamespace>\r\n\r\n    <TargetFramework>net6.0</TargetFramework>\r\n    <LangVersi" +
+                    "on>latest</LangVersion>\r\n    <Nullable>enable</Nullable>\r\n  </PropertyGroup>\r\n\r\n" +
+                    "</Project>\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }

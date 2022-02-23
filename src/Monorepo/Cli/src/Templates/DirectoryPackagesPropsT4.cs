@@ -27,86 +27,16 @@ namespace _42.Monorepo.Cli.Templates
         {
             this.Write(@"<?xml version=""1.0"" encoding=""utf-8""?>
 <Project xmlns=""http://schemas.microsoft.com/developer/msbuild/2003"">
+  <!-- Don't remove, creates a hierarchical linking -->
+  <Import Project=""$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)..\'))"" />
   <ItemGroup>
 
-    <!-- Please create any group of dependencies if you need -->
-    <!-- <PackageVersion Include=""package-name"" Version=""package-version"" /> -->
+      <!-- Please create any groups of dependencies if you need -->
+      <!-- <PackageVersion Include=""package-name"" Version=""package-version"" /> -->
 
-    <!-- abstractions for .NET libraries -->
-    <PackageVersion Include=""Microsoft.Extensions.Configuration.Abstractions"" Version=""6.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.DependencyInjection.Abstractions"" Version=""6.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.Hosting.Abstractions"" Version=""6.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.Logging.Abstractions"" Version=""6.0.0"" />
-
-    <!-- .NET libraries -->
-    <PackageVersion Include=""Microsoft.Extensions.Configuration"" Version=""6.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.DependencyInjection"" Version=""6.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.Hosting"" Version=""6.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.Logging"" Version=""6.0.0"" />
-      
-    <!-- unit testing -->
-    <PackageVersion Include=""coverlet.collector"" Version=""3.1.2"" />
-    <PackageVersion Include=""FluentAssertions"" Version=""6.5.1"" />
-    <PackageVersion Include=""Microsoft.NET.Test.Sdk"" Version=""17.1.0"" />
-    <PackageVersion Include=""Moq"" Version=""4.16.1"" />
+  </ItemGroup>
+</Project>
 ");
-            
-            #line 26 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryPackagesPropsT4.tt"
- if (_featureProvider.IsEnabled("tests-xunit")) { 
-            
-            #line default
-            #line hidden
-            this.Write("    <PackageVersion Include=\"xunit\" Version=\"2.4.1\" />\r\n    <PackageVersion Inclu" +
-                    "de=\"xunit.runner.visualstudio\" Version=\"2.4.3\" />\r\n");
-            
-            #line 29 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryPackagesPropsT4.tt"
- } 
-            
-            #line default
-            #line hidden
-            
-            #line 29 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryPackagesPropsT4.tt"
- if (_featureProvider.IsEnabled("tests-nunit")) { 
-            
-            #line default
-            #line hidden
-            this.Write("    <PackageVersion Include=\"NUnit\" Version=\"3.13.2\" />\r\n    <PackageVersion Incl" +
-                    "ude=\"NUnit3TestAdapter\" Version=\"4.2.1\" />\r\n");
-            
-            #line 32 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryPackagesPropsT4.tt"
- } 
-            
-            #line default
-            #line hidden
-            
-            #line 32 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryPackagesPropsT4.tt"
- if (_featureProvider.IsEnabled("git-version")) { 
-            
-            #line default
-            #line hidden
-            this.Write("\r\n    <!-- versioning -->\r\n    <PackageVersion Include=\"42.Monorepo.GitVersioning" +
-                    "\" Version=\"3.5.82-alpha-gc03e12373f\" />\r\n");
-            
-            #line 36 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryPackagesPropsT4.tt"
- } 
-            
-            #line default
-            #line hidden
-            
-            #line 36 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryPackagesPropsT4.tt"
- if (_featureProvider.IsEnabled("stylecop")) { 
-            
-            #line default
-            #line hidden
-            this.Write("\r\n    <!-- code analysis -->\r\n    <PackageVersion Include=\"StyleCop.Analyzers\" Ve" +
-                    "rsion=\"1.2.0-beta.406\" />\r\n");
-            
-            #line 40 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryPackagesPropsT4.tt"
- } 
-            
-            #line default
-            #line hidden
-            this.Write("\r\n  </ItemGroup>\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }

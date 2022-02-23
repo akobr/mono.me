@@ -15,9 +15,9 @@ namespace _42.Monorepo.Cli.Templates
     /// Class to produce the template output
     /// </summary>
     
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
+    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public partial class ProjectTestCsprojT4 : ProjectTestCsprojT4Base
+    public partial class VersionJsonT4 : VersionJsonT4Base
     {
 #line hidden
         /// <summary>
@@ -25,54 +25,36 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("<Project Sdk=\"Microsoft.NET.Sdk\">\r\n\r\n  <PropertyGroup>\r\n    <TargetFramework>net6" +
-                    ".0</TargetFramework>\r\n    <LangVersion>latest</LangVersion>\r\n    <IsPackable>fal" +
-                    "se</IsPackable>\r\n");
+            this.Write("{\r\n  \"$schema\": \"https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/m" +
+                    "ain/monorepo/src/NerdBank.GitVersioning/version.schema.json\",\r\n  \"version\": \"");
             
-            #line 8 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
- if (_featureProvider.IsEnabled("git-version")) { 
+            #line 4 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
+            this.Write(this.ToStringHelper.ToStringWithCulture(Model.Version));
             
             #line default
             #line hidden
-            this.Write("    <EnableGitVersioning>false</EnableGitVersioning>\r\n");
+            this.Write("\",\r\n  \"inherit\": true,\r\n");
             
-            #line 10 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
+            #line 6 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
+ if (Model.IsHierarchical) { 
+            
+            #line default
+            #line hidden
+            this.Write("  \"hierarchicalVersion\": true\r\n");
+            
+            #line 8 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
+ } else { 
+            
+            #line default
+            #line hidden
+            this.Write("  \"pathFilters\": [ \".\" ]\r\n");
+            
+            #line 10 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
  } 
             
             #line default
             #line hidden
-            this.Write("  </PropertyGroup>\r\n\r\n  <ItemGroup>\r\n    <PackageReference Include=\"FluentAsserti" +
-                    "ons\" />\r\n    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" />\r\n    <Package" +
-                    "Reference Include=\"Moq\" />\r\n");
-            
-            #line 17 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
- if (_testsType == "nunit") { 
-            
-            #line default
-            #line hidden
-            this.Write("    <PackageReference Include=\"NUnit\" />\r\n    <PackageReference Include=\"NUnit3Te" +
-                    "stAdapter\" />\r\n");
-            
-            #line 20 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
- } 
-            
-            #line default
-            #line hidden
-            
-            #line 21 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
- else { 
-            
-            #line default
-            #line hidden
-            this.Write("    <PackageReference Include=\"xunit\" />\r\n    <PackageReference Include=\"xunit.ru" +
-                    "nner.visualstudio\" />\r\n");
-            
-            #line 24 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
- } 
-            
-            #line default
-            #line hidden
-            this.Write("  </ItemGroup>\r\n\r\n</Project>\r\n");
+            this.Write("}\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
@@ -84,7 +66,7 @@ namespace _42.Monorepo.Cli.Templates
     /// Base class for this transformation
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public class ProjectTestCsprojT4Base
+    public class VersionJsonT4Base
     {
         #region Fields
         private global::System.Text.StringBuilder generationEnvironmentField;
