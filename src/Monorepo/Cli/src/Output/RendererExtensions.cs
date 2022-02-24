@@ -39,6 +39,14 @@ namespace _42.Monorepo.Cli.Output
             };
         }
 
+        public static Span ThemedError(this string @this, IConsoleTheme theme)
+        {
+            return new(@this)
+            {
+                Color = new ConsoleColor?(theme.LowlightColor),
+            };
+        }
+
         public static void WriteHeader(this IRenderer renderer, params object[] elements)
         {
             Document document = new()

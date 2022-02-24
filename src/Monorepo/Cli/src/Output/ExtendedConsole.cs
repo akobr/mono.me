@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Alba.CsConsoleFormat;
-using Alba.CsConsoleFormat.Fluent;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 using ShellProgressBar;
@@ -28,6 +26,7 @@ namespace _42.Monorepo.Cli.Output
                 HeaderColor = ConsoleColor.White,
                 HighlightColor = ConsoleColor.Magenta,
                 LowlightColor = ConsoleColor.DarkGray,
+                ErrorColor = ConsoleColor.Red,
             };
         }
 

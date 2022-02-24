@@ -11,5 +11,7 @@ namespace _42.Monorepo.Cli.Output
         ConsoleColor HighlightColor { get; }
 
         ConsoleColor LowlightColor { get; }
+
+        ConsoleColor ErrorColor { get; }
     }
 }
