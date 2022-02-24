@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.ConventionalCommits;
 using _42.Monorepo.Cli.Extensions;
+using _42.Monorepo.Cli.Git;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
 using _42.Monorepo.Cli.Operations;
@@ -25,18 +26,21 @@ namespace _42.Monorepo.Cli.Commands.Release
     [Command(CommandNames.RELEASE, Description = "Create new release of a workstead or project.")]
     public class ReleaseCommand : BaseCommand
     {
-        private readonly IGitRepositoryService repositoryService;
-        private readonly ReleaseOptions options;
+        private readonly IGitRepositoryService _repositoryService;
+        private readonly IGitHistoryService _historyService;
+        private readonly ReleaseOptions _options;
 
         public ReleaseCommand(
             IExtendedConsole console,
             ICommandContext context,
             IGitRepositoryService repositoryService,
+            IGitHistoryService historyService,
             IOptions<ReleaseOptions> configuration)
             : base(console, context)
         {
-            this.repositoryService = repositoryService;
-            options = configuration.Value;
+            _repositoryService = repositoryService;
+            _historyService = historyService;
+            _options = configuration.Value;
         }
 
         protected override async Task<int> ExecuteAsync()
@@ -89,11 +93,11 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             Console.WriteHeader($"Release for {record.GetTypeAsString().ToLowerInvariant()} ", identifier.ThemedHighlight(Console.Theme));
 
-            using var repo = repositoryService.BuildRepository();
+            using var repo = _repositoryService.BuildRepository();
             Console.WriteLine("In branch ", repo.Head.FriendlyName.ThemedHighlight(Console.Theme));
             Console.WriteLine("The current version is ", exactVersions.PackageVersion.ToString().ThemedHighlight(Console.Theme));
 
-            var isReleaseBranch = options.Branches.Any(bt => Regex.IsMatch(repo.Head.CanonicalName, bt, RegexOptions.Singleline));
+            var isReleaseBranch = _options.Branches.Any(bt => Regex.IsMatch(repo.Head.CanonicalName, bt, RegexOptions.Singleline));
 
             if (isReleaseBranch)
             {
@@ -127,89 +131,14 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             Console.WriteLine();
 
-            var stopCommits = new HashSet<ObjectId>(releases.Select(r => r.Tag.Target.Id));
-            var visitedCommits = new HashSet<ObjectId>();
-            var parser = new StrictConventionalParser();
-            var changes = new List<IConventionalMessage>();
-            var unknownCommits = new List<Commit>();
-            var unknownDeep = 0;
-            var knownChangeTypeSet = new HashSet<string>(
-                options.Changes.Major
-                    .Concat(options.Changes.Minor)
-                    .Concat(options.Changes.Patch)
-                    .Concat(options.Changes.Harmless));
-
+            var releaseCommits = releases.Select(r => r.Tag.Target.Peel<Commit>()).ToList();
             var targetedRepoFolderPath = record.Type == RecordType.Repository
                 ? Constants.SOURCE_DIRECTORY_NAME
                 : record.Path.GetRelativePath(Context.Repository.Record.Path);
+            var report = _historyService.GetHistory(targetedRepoFolderPath, releaseCommits);
 
-            var toProcess = new Stack<Commit>();
-            toProcess.Push(repo.Head.Tip);
-
-            while (toProcess.Count > 0)
-            {
-                var commit = toProcess.Pop();
-
-                // stop at any release or already visited commit
-                if (stopCommits.Contains(commit.Id)
-                    || visitedCommits.Contains(commit.Id))
-                {
-                    continue;
-                }
-
-                // flag as visited
-                visitedCommits.Add(commit.Id);
-
-                // too deep with unknown changes
-                if (unknownDeep > 1000)
-                {
-                    continue;
-                }
-
-                // register parents for processing
-                foreach (var parent in commit.Parents)
-                {
-                    toProcess.Push(parent);
-                }
-
-                // detect if the commit is relevant (there are some changes)
-                if (!IsRelevantCommit(repo, commit, targetedRepoFolderPath))
-                {
-                    continue;
-                }
-
-                if (!parser.TryParseCommitMessage(commit.MessageShort, out var conventionalMessage))
-                {
-                    if (++unknownDeep > 200)
-                    {
-                        continue;
-                    }
-
-                    // as unknown change
-                    unknownCommits.Add(commit);
-                }
-                else
-                {
-                    // stop at any previous release commit
-                    if (conventionalMessage.Type is "release" or ":bookmark:")
-                    {
-                        continue;
-                    }
-
-                    // store changes (unknown or known)
-                    if (knownChangeTypeSet.Contains(conventionalMessage.Type))
-                    {
-                        changes.Add(conventionalMessage);
-                    }
-                    else
-                    {
-                        unknownCommits.Add(commit);
-                    }
-                }
-            }
-
-            if (changes.Count < 1
-                && unknownCommits.Count < 1)
+            if (report.Changes.Count < 1
+                && report.UnknownChanges.Count < 1)
             {
                 Console.WriteImportant("No changes has been detected, the release is aborted.");
                 return ExitCodes.WARNING_ABORTED;
@@ -220,15 +149,30 @@ namespace _42.Monorepo.Cli.Commands.Release
                 : lastRelease?.Version ?? new SemVersion(1);
             var newVersion = exactVersions.PackageVersion;
 
-            var majorChangeTypeSet = new HashSet<string>(options.Changes.Major);
-            var minorChangeTypeSet = new HashSet<string>(options.Changes.Minor);
-            var patchChangeTypeSet = new HashSet<string>(options.Changes.Patch);
-            var harmlessChangeTypeSet = new HashSet<string>(options.Changes.Harmless);
+            var majorChangeTypeSet = new HashSet<string>(_options.Changes.Major);
+            var minorChangeTypeSet = new HashSet<string>(_options.Changes.Minor);
+            var patchChangeTypeSet = new HashSet<string>(_options.Changes.Patch);
+            var harmlessChangeTypeSet = new HashSet<string>(_options.Changes.Harmless);
 
-            var majorChanges = changes.Where(m => m.IsBreakingChange || majorChangeTypeSet.Contains(m.Type)).ToList();
-            var minorChanges = changes.Where(m => minorChangeTypeSet.Contains(m.Type)).ToList();
-            var pathChanges = changes.Where(m => patchChangeTypeSet.Contains(m.Type)).ToList();
-            var harmlessChanges = changes.Where(m => harmlessChangeTypeSet.Contains(m.Type)).ToList();
+            var majorChanges = report.Changes
+                .Where(ch => ch.Message.IsBreakingChange || majorChangeTypeSet.Contains(ch.Message.Type))
+                .Select(ch => ch.Message)
+                .ToList();
+
+            var minorChanges = report.Changes
+                .Where(ch => minorChangeTypeSet.Contains(ch.Message.Type))
+                .Select(ch => ch.Message)
+                .ToList();
+
+            var pathChanges = report.Changes
+                .Where(ch => patchChangeTypeSet.Contains(ch.Message.Type))
+                .Select(ch => ch.Message)
+                .ToList();
+
+            var harmlessChanges = report.Changes
+                .Where(ch => harmlessChangeTypeSet.Contains(ch.Message.Type))
+                .Select(ch => ch.Message)
+                .ToList();
 
             if (isFirstRelease)
             {
@@ -256,7 +200,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                 }
                 else
                 {
-                    Console.WriteImportant($"There are only unknown changes [{unknownCommits}]");
+                    Console.WriteImportant($"There are only unknown changes [{report.UnknownChanges.Count}]");
                     if (!Console.Confirm("Do you want to processed with the release"))
                     {
                         return ExitCodes.WARNING_ABORTED;
@@ -279,7 +223,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                 MinorChanges = minorChanges,
                 PathChanges = pathChanges,
                 HarmlessChanges = harmlessChanges,
-                UnknownChanges = unknownCommits,
+                UnknownChanges = report.UnknownChanges,
             };
 
             if (record.Type != RecordType.Project)
@@ -306,7 +250,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             ShowReleasePreview(preview);
 
             var possibleUserOptions = new List<string> { "show release notes", "change version", "release it!", "abort" };
-            if (unknownCommits.Count > 0)
+            if (report.UnknownChanges.Count > 0)
             {
                 possibleUserOptions.Insert(0, "show unknown changes");
             }
@@ -326,7 +270,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                 switch (userOption)
                 {
                     case "show unknown changes":
-                        ShowUnknownChanges(unknownCommits);
+                        ShowUnknownChanges(report.UnknownChanges);
                         break;
 
                     case "show release notes":
@@ -459,7 +403,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             Console.WriteLine("Version: ", preview.Version.ToString().ThemedHighlight(Console.Theme));
             Console.WriteLine($"Tag:     {preview.Tag}");
 
-            if (options.CreateReleaseBranch)
+            if (_options.CreateReleaseBranch)
             {
                 Console.WriteLine($"Branch:  {preview.Branch}");
             }
