@@ -2,6 +2,8 @@ using System.IO;
 using _42.Monorepo.Cli.Cache;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
+using _42.Monorepo.Cli.Features;
+using _42.Monorepo.Cli.Git;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Operations;
 using _42.Monorepo.Cli.Operations.Strategies;
@@ -38,6 +40,8 @@ namespace _42.Monorepo.Cli
             services.AddSingleton<IGitTagsService, GitTagsService>();
             services.AddSingleton<IScriptingService, ScriptingService>();
             services.AddSingleton<IMarkdownService, MarkdownService>();
+            services.AddSingleton<IFeatureProvider, FeatureProvider>();
+            services.AddSingleton<IGitHistoryService, GitHistoryService>();
         }
 
         public void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
