@@ -26,43 +26,48 @@ namespace _42.Monorepo.Cli.ConventionalCommits
 
         public string GetFullRepresentation()
         {
-            var simpleText = new StringBuilder();
-            simpleText.Append(Type);
+            var builder = new StringBuilder();
+            builder.Append(Type);
 
             if (!string.IsNullOrEmpty(Scope))
             {
-                simpleText.Append(" (");
-                simpleText.Append(Scope);
-                simpleText.Append(')');
+                builder.Append(" (");
+                builder.Append(Scope);
+                builder.Append(')');
             }
 
-            simpleText.Append(": ");
+            if (IsBreakingChange)
+            {
+                builder.Append('!');
+            }
+
+            builder.Append(": ");
 
             if (!string.IsNullOrEmpty(IssueLink))
             {
-                simpleText.Append(IssueLink);
-                simpleText.Append(' ');
+                builder.Append(IssueLink);
+                builder.Append(' ');
             }
 
-            simpleText.Append(Description);
-            return simpleText.ToString();
+            builder.Append(Description);
+            return builder.ToString();
         }
 
         public string GetSimpleRepresentation()
         {
-            var simpleText = new StringBuilder();
-            simpleText.Append(Type);
-            simpleText.Append(": ");
-            simpleText.Append(Description);
+            var builder = new StringBuilder();
+            builder.Append(Type);
+            builder.Append(": ");
+            builder.Append(Description);
 
             if (!string.IsNullOrEmpty(IssueLink))
             {
-                simpleText.Append(" (");
-                simpleText.Append(IssueLink);
-                simpleText.Append(')');
+                builder.Append(" (");
+                builder.Append(IssueLink);
+                builder.Append(')');
             }
 
-            return simpleText.ToString();
+            return builder.ToString();
         }
     }
 }

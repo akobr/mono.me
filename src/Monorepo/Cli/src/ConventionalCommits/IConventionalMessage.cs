@@ -11,5 +11,9 @@ namespace _42.Monorepo.Cli.ConventionalCommits
         string? Scope { get; }
 
         string? IssueLink { get; }
+
+        string GetFullRepresentation();
+
+        string GetSimpleRepresentation();
     }
 }
