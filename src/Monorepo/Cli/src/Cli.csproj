@@ -10,6 +10,7 @@
 
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>mrepo</ToolCommandName>
+    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -37,6 +38,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Texo\Core.Markdown\src\Core.Markdown.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE.txt" Pack="true" PackagePath="$(PackageLicenseFile)"/>
   </ItemGroup>
 
   <ItemGroup>
