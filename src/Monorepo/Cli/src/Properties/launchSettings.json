@@ -2,12 +2,13 @@
   "profiles": {
     "current-repo": {
       "commandName": "Project",
-      "commandLineArgs": "info"
+      "commandLineArgs": "release"
     },
-    "mono-playground": {
-      "commandName": "Project",
-      "commandLineArgs": "info",
-      "workingDirectory": "C:\\dev\\mono-playground"
+    "windows-terminal": {
+      "commandName": "Executable",
+      "executablePath": "c:\\Users\\kobra\\AppData\\Local\\Microsoft\\WindowsApps\\wt.exe",
+      "commandLineArgs": "dotnet.exe run --project C:\\working\\mono.me\\src\\Monorepo\\Cli\\src\\Cli.csproj -- new version",
+      "workingDirectory": "C:\\working\\mono.me\\src\\Monorepo\\Cli\\src"
     }
   }
 }

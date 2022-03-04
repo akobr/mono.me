@@ -1,0 +1,1 @@
+dotnet tool install -g 42.monorepo.cli --prerelease

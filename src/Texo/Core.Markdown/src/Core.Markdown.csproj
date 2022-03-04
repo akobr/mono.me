@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.Monorepo.Core.Markdown</AssemblyName>
+    <AssemblyName>42.Monorepo.Texo.Core.Markdown</AssemblyName>
     <RootNamespace>_42.Monorepo.Texo.Core.Markdown</RootNamespace>
     <TargetFramework>netstandard2.1</TargetFramework>
   </PropertyGroup>
