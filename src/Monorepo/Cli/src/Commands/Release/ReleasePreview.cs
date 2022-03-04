@@ -7,7 +7,7 @@ using Semver;
 
 namespace _42.Monorepo.Cli.Commands.Release
 {
-    internal class ReleasePreview
+    public class ReleasePreview
     {
         public SemVersion Version { get; set; } = new(1);
 
@@ -20,6 +20,8 @@ namespace _42.Monorepo.Cli.Commands.Release
         public IRelease? PreviousRelease { get; set; }
 
         public SemVersion CurrentVersion { get; set; } = new(1);
+
+        public string VersionFileFullPath { get; set; } = string.Empty;
 
         public IReadOnlyList<(string Project, SemVersion Version)> ProjectsToRelease { get; set; } = Array.Empty<(string, SemVersion)>();
 

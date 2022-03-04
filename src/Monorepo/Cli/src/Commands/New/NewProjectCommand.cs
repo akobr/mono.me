@@ -117,7 +117,7 @@ namespace _42.Monorepo.Cli.Commands.New
                     {
                         DefaultValue = "xunit",
                         Items = new[] { "xunit", "nunit" },
-                        Message = "What type of unit tests do you want to use",
+                        Message = "Which unit testing framework do you want to use",
                     });
                 }
                 else if (_featureProvider.IsEnabled(FeatureNames.TestsNunit))
@@ -137,7 +137,7 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteLine($"Test Project: {projectTestFilePath}".ThemedLowlight(Console.Theme));
 
             if (_featureProvider.IsEnabled(FeatureNames.GitVersion)
-                && Console.Confirm("Do you want to set a custom version for this project"))
+                && Console.Confirm("Do you want to set a custom versioning for this project"))
             {
                 var inputVersion = Console.Input<string>("What is the initial version", "0.1");
 

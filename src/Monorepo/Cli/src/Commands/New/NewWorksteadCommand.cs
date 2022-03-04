@@ -81,15 +81,19 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteImportant("The workstead '", name.ThemedHighlight(Console.Theme), "' has been created.");
             Console.WriteLine($"Path: {path}".ThemedLowlight(Console.Theme));
 
-            if (_featureProvider.IsEnabled(FeatureNames.Packages)
-                && Console.Confirm("Do you want to setup new Directory.Packages.props"))
+            if (_featureProvider.IsEnabled(FeatureNames.Packages))
             {
-                // Directory.Packages.props
-                var packagesTemplate = new DirectoryPackagesPropsT4();
-                var packagesFilePath = Path.Combine(path, FileNames.DirectoryPackagesProps);
+                Console.WriteLine("If the workstead is containing a lot of dependecies which are unique in the mono-repository is recomended do create a separeated definition file.");
+
+                if (Console.Confirm("Do you want to setup new Directory.Packages.props"))
+                {
+                    // Directory.Packages.props
+                    var packagesTemplate = new DirectoryPackagesPropsT4();
+                    var packagesFilePath = Path.Combine(path, FileNames.DirectoryPackagesProps);
 #if !DEBUG || TESTING
-                await File.WriteAllTextAsync(packagesFilePath, packagesTemplate.TransformText());
+                    await File.WriteAllTextAsync(packagesFilePath, packagesTemplate.TransformText());
 #endif
+                }
             }
 
             if (_featureProvider.IsEnabled(FeatureNames.GitVersion)

@@ -1,8 +1,8 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using _42.Monorepo.Cli.Commands.Release;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Git;
@@ -38,11 +38,11 @@ namespace _42.Monorepo.Cli.Commands.New
         {
             using var repo = new Repository(Context.Repository.Record.Path);
             SemVersion currentVersion = await Context.Item.TryGetDefinedVersionAsync() ?? new SemVersion(0, 1);
-            var versionFile = await Context.Item.TryGetVersionFilePathAsync() ?? Path.Combine(Context.Repository.Record.Path, Constants.VERSION_FILE_NAME);
-            versionFile = versionFile.GetRelativePath(Context.Repository.Record.Path);
+            var versionFileFullPath = await Context.Item.TryGetVersionFilePathAsync() ?? Path.Combine(Context.Repository.Record.Path, Constants.VERSION_FILE_NAME);
+            var versionFileRepoPath = versionFileFullPath.GetRelativePath(Context.Repository.Record.Path);
 
             var lastChangeInVersion = repo.Commits
-                .QueryBy(versionFile)
+                .QueryBy(versionFileRepoPath)
                 .FirstOrDefault();
 
             if (lastChangeInVersion == null)
@@ -130,6 +130,16 @@ namespace _42.Monorepo.Cli.Commands.New
                         break;
                     }
                 }
+            }
+
+            Console.WriteLine();
+
+            if (Console.Confirm($"Do you want to update '{versionFileRepoPath}' version file"))
+            {
+                newVersion = Console.AskForVersion("What is the final version", newVersion);
+#if !DEBUG || TESTING
+                ReleaseHelper.UpdateVersionFile(newVersion.ToString(), versionFileFullPath);
+#endif
             }
 
             return ExitCodes.SUCCESS;

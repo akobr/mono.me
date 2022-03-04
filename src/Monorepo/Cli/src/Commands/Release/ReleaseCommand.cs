@@ -12,7 +12,6 @@ using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
 using _42.Monorepo.Cli.Operations;
 using _42.Monorepo.Cli.Output;
-using _42.Monorepo.Texo.Core.Markdown.Builder;
 using LibGit2Sharp;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
@@ -99,7 +98,7 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             var isReleaseBranch = _options.Branches.Any(bt => Regex.IsMatch(repo.Head.CanonicalName, bt, RegexOptions.Singleline));
 
-            if (isReleaseBranch)
+            if (!isReleaseBranch)
             {
                 Console.WriteLine();
                 Console.WriteImportant("Current branch is not marked as releasable");
@@ -147,7 +146,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             var previousVersion = isFirstRelease
                 ? exactVersions.PackageVersion
                 : lastRelease?.Version ?? new SemVersion(1);
-            var newVersion = exactVersions.PackageVersion;
+            var newVersion = exactVersions.PackageVersion.Change(patch: exactVersions.PackageVersion.Patch + 1, build: string.Empty);
 
             var majorChangeTypeSet = new HashSet<string>(_options.Changes.Major);
             var minorChangeTypeSet = new HashSet<string>(_options.Changes.Minor);
@@ -177,7 +176,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             if (isFirstRelease)
             {
                 Console.WriteImportant("This is the first release.");
-                newVersion = AskForVersion("What should be the first version", newVersion);
+                newVersion = Console.AskForVersion("What should be the first version", newVersion);
                 Console.WriteLine();
             }
             else
@@ -206,19 +205,22 @@ namespace _42.Monorepo.Cli.Commands.Release
                         return ExitCodes.WARNING_ABORTED;
                     }
 
-                    newVersion = AskForVersion("Please provide the version", newVersion);
+                    newVersion = Console.AskForVersion("Please provide the version", newVersion);
                     Console.WriteLine();
                 }
             }
+
+            var hierarchicalName = item.Record.GetHierarchicalName();
 
             var preview = new ReleasePreview()
             {
                 Version = newVersion,
                 CurrentVersion = exactVersions.PackageVersion,
+                VersionFileFullPath = versionFilePath,
                 PreviousRelease = lastRelease,
-                Tag = $"{item.Record.Name}/v.{newVersion}",
-                Branch = $"release/{item.Record.RepoRelativePath}/v.{newVersion}",
-                NotesRepoPath = $"docs/Monorepo/Cli/releases/{newVersion}.md",
+                Tag = $"{hierarchicalName}/v.{newVersion}",
+                Branch = $"release/{hierarchicalName}/v.{newVersion}",
+                NotesRepoPath = $"docs/{hierarchicalName}/release-notes/{newVersion}.md",
                 MajorChanges = majorChanges,
                 MinorChanges = minorChanges,
                 PathChanges = pathChanges,
@@ -283,8 +285,8 @@ namespace _42.Monorepo.Cli.Commands.Release
                         break;
 
                     case "release it!":
-                        ProcessRelease(preview);
-                        break;
+                        await ProcessReleaseAsync(preview);
+                        return ExitCodes.SUCCESS;
 
                     default:
                         Console.WriteImportant("The release has been aborted.");
@@ -293,105 +295,80 @@ namespace _42.Monorepo.Cli.Commands.Release
             }
         }
 
-        private static bool IsRelevantCommit(Repository repository, Commit commit, string repoFolderPath)
+        private async Task ProcessReleaseAsync(ReleasePreview preview)
         {
-            if (!commit.Parents.Any())
+            Console.WriteLine();
+            var inBranch = Console.Confirm("Should I automatically prepare a commit in a new branch or just changes", true);
+            var isNewVersion = preview.CurrentVersion != preview.Version;
+
+            Console.WriteLine();
+
+            if (isNewVersion)
             {
-                return commit.Tree[repoFolderPath] is not null;
+#if !DEBUG || TESTING
+                ReleaseHelper.UpdateVersionFile(preview.Version.ToString(), preview.VersionFileFullPath);
+#endif
+                var versionFileRepoPath = preview.VersionFileFullPath.GetRelativePath(Context.Repository.Record.Path);
+                Console.WriteLine($"Version: {versionFileRepoPath}");
             }
 
-            return commit.Parents.Any(p => IsRelevantCommit(repository, commit, p, repoFolderPath));
+#if !DEBUG || TESTING
+            var releaseNotes = ReleaseHelper.BuildReleaseNotes(preview);
+            var releaseNotesFullPath = Path.Combine(Context.Repository.Record.Path, preview.NotesRepoPath);
+            var releaseNotesDirectory = Path.GetDirectoryName(releaseNotesFullPath)!;
+            Directory.CreateDirectory(releaseNotesDirectory);
+            await File.WriteAllTextAsync(releaseNotesFullPath, releaseNotes.ToString());
+#endif
+            Console.WriteLine($"Notes:   {preview.NotesRepoPath}");
+
+            if (!inBranch)
+            {
+                PrepareInGit(preview);
+                Console.WriteLine($"Branch:  {preview.Branch}");
+                Console.WriteLine("...the branch is ready and checked out.".ThemedLowlight(Console.Theme));
+                return;
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("Don't forget to create the tag after a merge:");
+            Console.WriteLine($"    {preview.Tag}".ThemedHighlight(Console.Theme));
+            Console.WriteLine();
         }
 
-        private static bool IsRelevantCommit(Repository repository, Commit currentCommit, Commit oldCommit, string repoFolderPath)
+        private void PrepareInGit(ReleasePreview preview)
         {
-            var currentTree = currentCommit.Tree;
-            var oldTree = oldCommit.Tree;
+            var isNewVersion = preview.CurrentVersion != preview.Version;
 
-            var currentFolderEntry = currentTree[repoFolderPath];
-            var oldFolderEntry = oldTree[repoFolderPath];
+#if !DEBUG || TESTING
+            var repository = _repositoryService.BuildRepository();
+            var branch = repository.CreateBranch(preview.Branch);
+            LibGit2Sharp.Commands.Checkout(repository, branch);
 
-            if (currentFolderEntry is null)
+            if (isNewVersion)
             {
-                return oldFolderEntry is not null;
+                var versionFileRepoPath = preview.VersionFileFullPath.GetRelativePath(Context.Repository.Record.Path);
+                LibGit2Sharp.Commands.Stage(repository, versionFileRepoPath);
             }
 
-            if (oldFolderEntry is null)
-            {
-                return true;
-            }
+            LibGit2Sharp.Commands.Stage(repository, preview.NotesRepoPath);
 
-            var changes = repository.Diff.Compare<TreeChanges>(oldTree, currentTree, new[] { repoFolderPath });
-            return changes.Count > 0;
-        }
-
-        private void ProcessRelease(ReleasePreview preview)
-        {
-            throw new NotImplementedException();
+            var gitConfig = repository.Config;
+            var signature = gitConfig.BuildSignature(DateTimeOffset.Now);
+            repository.Commit($"release: release of {preview.Tag}", signature, signature);
+#endif
         }
 
         private void ChangeVersion(ReleasePreview preview)
         {
             Console.WriteLine();
-            preview.Version = AskForVersion("Please provide new version", preview.Version);
+            preview.Version = Console.AskForVersion("Please provide new version", preview.Version);
             Console.WriteImportant("Version has been changed to: ", preview.Version.ToString().ThemedHighlight(Console.Theme));
             Console.WriteLine();
         }
 
         private void ShowReleaseNotes(ReleasePreview preview)
         {
-            var breakChanges = preview.MajorChanges;
-            var unknownChanges = preview.UnknownChanges;
-
-            var features = preview.MinorChanges
-                .Where(m => m.Type is "feat" or ":sparkles:")
-                .ToList();
-
-            var minorChanges = preview.MinorChanges
-                .Where(m => m.Type is not "feat" or ":sparkles:")
-                .Concat(preview.PathChanges)
-                .ToList();
-
-            var markdownBuilder = new MarkdownBuilder();
-            markdownBuilder.Header($"Release v.{preview.Version}");
-            markdownBuilder.Bullet($"Tagged as `{preview.Tag}`");
-            markdownBuilder.Bullet($"At {DateTime.Today.ToShortDateString()} {DateTime.Now.ToLongTimeString()}");
-
-            if (breakChanges.Count > 0)
-            {
-                markdownBuilder.Header("Breaking changes", 2);
-                foreach (var change in breakChanges)
-                {
-                    markdownBuilder.Bullet($"{change.Type}: {change.Description}");
-                }
-            }
-
-            if (features.Count > 0)
-            {
-                markdownBuilder.Header("New features", 2);
-                foreach (var feature in features)
-                {
-                    markdownBuilder.Bullet(feature.Description);
-                }
-            }
-
-            if (minorChanges.Count > 0)
-            {
-                markdownBuilder.Header("Minor changes", 2);
-                foreach (var change in minorChanges)
-                {
-                    markdownBuilder.Bullet($"{change.Type}: {change.Description}");
-                }
-            }
-
-            if (unknownChanges.Count > 0)
-            {
-                markdownBuilder.Header("Unknown changes", 2);
-                foreach (var unknown in unknownChanges)
-                {
-                    markdownBuilder.Bullet($"{unknown.Sha[..4]}: {unknown.MessageShort}");
-                }
-            }
+            var markdownBuilder = ReleaseHelper.BuildReleaseNotes(preview);
 
             Console.WriteLine();
             System.Console.WriteLine(markdownBuilder.ToString());
@@ -477,18 +454,6 @@ namespace _42.Monorepo.Cli.Commands.Release
             }
 
             return node;
-        }
-
-        private SemVersion AskForVersion(string message, SemVersion newVersion)
-        {
-            var versionInput = Console.Input<string>(message, $"{newVersion}");
-
-            if (!SemVersion.TryParse(versionInput, out var requestedVersion))
-            {
-                throw new InvalidOperationException("A version needs to be a valid semantic version.");
-            }
-
-            return requestedVersion;
         }
     }
 }
