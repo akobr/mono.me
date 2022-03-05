@@ -32,7 +32,14 @@
     <PackageVersion Include="NBuilder" Version="6.1.0" />
     <PackageVersion Include="xunit" Version="2.4.1" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.4.3" />
-	
+
+    <!-- logging -->
+    <PackageVersion Include="Sentry" Version="3.14.1" />
+    <PackageVersion Include="Sentry.Serilog" Version="3.14.1" />
+    <PackageVersion Include="Serilog.Extensions.Logging" Version="3.1.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="4.0.1" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="5.0.0" />
+    
     <!-- versioning -->
     <PackageVersion Include="Nerdbank.GitVersioning" Version="3.4.231" />
     <PackageVersion Include="42.Monorepo.GitVersioning" Version="3.5.83-alpha-g67a81b71f0" />

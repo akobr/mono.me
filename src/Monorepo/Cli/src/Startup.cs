@@ -14,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog;
 
 namespace _42.Monorepo.Cli
 {
@@ -26,9 +27,10 @@ namespace _42.Monorepo.Cli
 
         public IHostEnvironment Environment { get; }
 
-        public void ConfigureServices(IServiceCollection services)
+        public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
         {
-            services.AddLogging(ConfigureLogging);
+            services.AddLogging((builder) => ConfigureLogging(builder, configuration));
+            ConfigureOptions(configuration, services);
             services.AddOpStrategies(ConfigureOpStrategies);
 
             services.AddSingleton<ICommandContext, CommandContext>();
@@ -44,35 +46,52 @@ namespace _42.Monorepo.Cli
             services.AddSingleton<IGitHistoryService, GitHistoryService>();
         }
 
-        public void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
+        public void ConfigureApplication(IConfigurationBuilder builder)
+        {
+            builder.AddJsonFile(Constants.APPLICATION_CONFIG_JSON, false, false);
+
+            var repoRootPath = MonorepoDirectoryFunctions.GetMonorepoRootDirectory();
+            var repoConfigFilePath = Path.Combine(repoRootPath, Constants.MONOREPO_CONFIG_JSON);
+
+            if (File.Exists(repoConfigFilePath))
+            {
+                builder.AddJsonFile(repoConfigFilePath, true, true);
+            }
+        }
+
+        private void ConfigureLogging(ILoggingBuilder builder, IConfiguration configuration)
+        {
+            var options = configuration
+                .GetSection(ConfigurationSections.LOGGING)
+                .Get<LoggingOptions>();
+
+            if (Environment.IsDevelopment())
+            {
+                builder.AddDebug();
+            }
+
+            builder.AddSerilog(
+                new LoggerConfiguration()
+                    .MinimumLevel.Information()
+                    .Enrich.FromLogContext()
+                    .WriteTo.Sentry(
+                        initializeSdk: false,
+                        minimumEventLevel: Serilog.Events.LogEventLevel.Warning)
+                    .WriteTo.File(
+                        options?.GetTemplateLogFullPath() ?? "logs/cli.log",
+                        rollingInterval: RollingInterval.Day,
+                        rollOnFileSizeLimit: true)
+                    .CreateLogger());
+        }
+
+        private static void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
         {
             services.AddSingleton<IItemOptionsProvider, ItemOptionsProvider>();
             services.AddSingleton<ITypeOptionsProvider, TypeOptionsProvider>();
 
+            services.Configure<LoggingOptions>(configuration.GetSection(ConfigurationSections.LOGGING));
             services.Configure<MonoRepoOptions>(configuration.GetSection(ConfigurationSections.REPO));
             services.Configure<ReleaseOptions>(configuration.GetSection(ConfigurationSections.RELEASE));
-        }
-
-        public void ConfigureApplication(IConfigurationBuilder builder)
-        {
-            var repoRootPath = MonorepoDirectoryFunctions.GetMonorepoRootDirectory();
-            var repoConfigFilePath = Path.Combine(repoRootPath, Constants.MONOREPO_CONFIG_JSON);
-
-            if (!File.Exists(repoConfigFilePath))
-            {
-                return;
-            }
-
-            // TODO: load logging settings
-            builder.AddJsonFile(repoConfigFilePath, true, true);
-        }
-
-        private void ConfigureLogging(ILoggingBuilder builder)
-        {
-            // TODO: add sentry and serilog
-#if DEBUG
-            builder.AddDebug();
-#endif
         }
 
         private static void ConfigureOpStrategies(IOpStrategiesRegister register)

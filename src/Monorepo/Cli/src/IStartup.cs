@@ -7,8 +7,6 @@ namespace _42.Monorepo.Cli
     {
         void ConfigureApplication(IConfigurationBuilder builder);
 
-        void ConfigureServices(IServiceCollection services);
-
-        void ConfigureOptions(IConfiguration configuration, IServiceCollection services);
+        void ConfigureServices(IServiceCollection services, IConfiguration configuration);
     }
 }

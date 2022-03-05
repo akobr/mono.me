@@ -7,7 +7,7 @@ namespace _42.Monorepo.Cli.Configuration
 {
     public class ItemOptionsProvider : IItemOptionsProvider
     {
-        private readonly Dictionary<string, ItemOptions> options;
+        private readonly Dictionary<string, ItemOptions> _options;
 
         public ItemOptionsProvider(IConfiguration configuration)
         {
@@ -15,21 +15,28 @@ namespace _42.Monorepo.Cli.Configuration
                 .GetSection(ConfigurationSections.ITEMS)
                 .Get<List<ItemOptions>>();
 
-            options = new Dictionary<string, ItemOptions>(
+            if (items is null
+                || items.Count < 1)
+            {
+                _options = new Dictionary<string, ItemOptions>();
+                return;
+            }
+
+            _options = new Dictionary<string, ItemOptions>(
                 items.Select(i => new KeyValuePair<string, ItemOptions>(i.Path, i)),
                 StringComparer.OrdinalIgnoreCase);
         }
 
         public ItemOptions GetOptions(string path)
         {
-            return options.TryGetValue(path, out var itemOptions)
+            return _options.TryGetValue(path, out var itemOptions)
                 ? itemOptions
                 : new ItemOptions { Path = path };
         }
 
         public IEnumerable<ItemOptions> GetAllOptions()
         {
-            return options.Values;
+            return _options.Values;
         }
     }
 }

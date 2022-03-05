@@ -31,6 +31,10 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="semver" />
+    <PackageReference Include="Sentry" />
+    <PackageReference Include="Sentry.Serilog" />
+    <PackageReference Include="Serilog.Extensions.Logging" />
+    <PackageReference Include="Serilog.Sinks.File" />
     <PackageReference Include="Sharprompt" />
     <PackageReference Include="ShellProgressBar" />
     <PackageReference Include="System.CodeDom" />
@@ -41,10 +45,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="LICENSE.txt" Pack="true" PackagePath="$(PackageLicenseFile)"/>
+    <None Include="LICENSE.txt" Pack="true" PackagePath="$(PackageLicenseFile)" />
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="app.config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Templates\DirectoryBuildProjT4.tt">
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <LastGenOutput>DirectoryBuildProjT4.cs</LastGenOutput>

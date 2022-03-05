@@ -1,7 +1,6 @@
-using System;
+using _42.Monorepo.Cli.Commands;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
-using _42.Monorepo.Cli.Operations;
 
 namespace _42.Monorepo.Cli
 {
@@ -26,7 +25,7 @@ namespace _42.Monorepo.Cli
         {
             if (!IsValid)
             {
-                throw new InvalidOperationException("This tool can be used only inside a mono-repository.");
+                throw new OutsideMonorepoException("This tool can be used only inside a mono-repository.");
             }
         }
     }

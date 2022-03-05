@@ -27,8 +27,7 @@ namespace _42.Monorepo.Cli.Extensions
             where TStartup : class, IStartup
         {
             var startup = (TStartup)context.Properties[typeof(TStartup)];
-            startup.ConfigureServices(services);
-            startup.ConfigureOptions(context.Configuration, services);
+            startup.ConfigureServices(services, context.Configuration);
         }
 
         private static IServiceProvider BuildStartupServices<TStartup>(HostBuilderContext context)

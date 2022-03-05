@@ -1,0 +1,6 @@
+{
+  "logging": {
+    "logFilePath": "logs/cli.log",
+    "sentryDsn": ""
+  }
+}

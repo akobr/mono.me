@@ -2,6 +2,7 @@ namespace _42.Monorepo.Cli
 {
     public static class Constants
     {
+        public const string APPLICATION_CONFIG_JSON = "app.config.json";
         public const string MONOREPO_CONFIG_JSON = "mrepo.json";
 
         public const string VERSION_FILE_NAME = "version.json";
