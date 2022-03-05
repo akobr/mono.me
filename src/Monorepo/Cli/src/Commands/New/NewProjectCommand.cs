@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Configuration;
@@ -41,8 +42,9 @@ namespace _42.Monorepo.Cli.Commands.New
 
             if (workstead == null)
             {
-                // TODO: [P2] interactive way to pick a workstead
-                throw new NotImplementedException();
+                var worksteads = Context.Repository.GetWorksteads().ToDictionary(w => w.Record.Name);
+                var selectedWorksted = Console.Select(new Sharprompt.SelectOptions<string>() { Items = worksteads.Keys, Message = "Under which workstead", PageSize = 20 });
+                workstead = worksteads[selectedWorksted];
             }
 
             var name = Name;
