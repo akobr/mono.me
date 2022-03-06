@@ -15,9 +15,9 @@ namespace _42.Monorepo.Cli.Templates
     /// Class to produce the template output
     /// </summary>
     
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildProjT4.tt"
+    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\StylecopGlobalSuppressionsT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public partial class DirectoryBuildProjT4 : DirectoryBuildProjT4Base
+    public partial class StylecopGlobalSuppressionsT4 : StylecopGlobalSuppressionsT4Base
     {
 #line hidden
         /// <summary>
@@ -25,8 +25,27 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("<Project Sdk=\"Microsoft.Build.Traversal\">\r\n  <ItemGroup>\r\n    <ProjectReference I" +
-                    "nclude=\"**\\*.*?proj\" />\r\n  </ItemGroup>\r\n</Project>\r\n");
+            this.Write("using System.Diagnostics.CodeAnalysis;\r\n\r\n[assembly: SuppressMessage(\"StyleCop.CS" +
+                    "harp.DocumentationRules\", \"SA1601:EnableXmlDocumentationOutput\", Justification =" +
+                    " \"Reviewed.\")]\r\n[assembly: SuppressMessage(\"StyleCop.CSharp.DocumentationRules\"," +
+                    " \"SA1652:PartialElementsMustBeDocumented\", Justification = \"Reviewed.\")]\r\n[assem" +
+                    "bly: SuppressMessage(\"StyleCop.CSharp.MaintainabilityRules\", \"SA1408:Conditional" +
+                    "ExpressionsMustDeclarePrecedence\", Justification = \"Reviewed.\")]\r\n[assembly: Sup" +
+                    "pressMessage(\"StyleCop.CSharp.NamingRules\", \"SA1309:FieldNamesMustNotBeginWithUn" +
+                    "derscore\", Justification = \"Reviewed.\")]\r\n[assembly: SuppressMessage(\"StyleCop.C" +
+                    "Sharp.ReadabilityRules\", \"SA1101:PrefixLocalCallsWithThis\", Justification = \"Rev" +
+                    "iewed.\")]\r\n[assembly: SuppressMessage(\"StyleCop.CSharp.ReadabilityRules\", \"SA111" +
+                    "8:ParameterMustNotSpanMultipleLines\", Justification = \"Reviewed.\")]\r\n[assembly: " +
+                    "SuppressMessage(\"StyleCop.CSharp.ReadabilityRules\", \"SA1121:UseBuiltInTypeAlias\"" +
+                    ", Justification = \"Reviewed.\")]\r\n\r\n[assembly: SuppressMessage(\"StyleCop.CSharp.N" +
+                    "amingRules\", \"SA1300:ElementMustBeginWithUpperCaseLetter\", Justification = \"Revi" +
+                    "ewed.\")]\r\n[assembly: SuppressMessage(\"StyleCop.CSharp.NamingRules\", \"SA1310:Fiel" +
+                    "dNamesMustNotContainUnderscore\", Justification = \"Reviewed.\")]\r\n[assembly: Suppr" +
+                    "essMessage(\"StyleCop.CSharp.ReadabilityRules\", \"SA1204:StaticElementsMustAppearB" +
+                    "eforeInstanceElements\", Justification = \"Reviewed.\")]\r\n[assembly: SuppressMessag" +
+                    "e(\"StyleCop.CSharp.DocumentationRules\", \"SA1633:FileMustHaveHeader\", Justificati" +
+                    "on = \"Reviewed.\")]\r\n[assembly: SuppressMessage(\"StyleCop.CSharp.SpecialRules\", \"" +
+                    "SA0001:XmlCommentAnalysisDisabled\", Justification = \"Reviewed.\")]\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
@@ -38,7 +57,7 @@ namespace _42.Monorepo.Cli.Templates
     /// Base class for this transformation
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public class DirectoryBuildProjT4Base
+    public class StylecopGlobalSuppressionsT4Base
     {
         #region Fields
         private global::System.Text.StringBuilder generationEnvironmentField;

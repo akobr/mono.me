@@ -15,9 +15,9 @@ namespace _42.Monorepo.Cli.Templates
     /// Class to produce the template output
     /// </summary>
     
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildProjT4.tt"
+    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DotGitAttributesT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public partial class DirectoryBuildProjT4 : DirectoryBuildProjT4Base
+    public partial class DotGitAttributesT4 : DotGitAttributesT4Base
     {
 #line hidden
         /// <summary>
@@ -25,8 +25,8 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("<Project Sdk=\"Microsoft.Build.Traversal\">\r\n  <ItemGroup>\r\n    <ProjectReference I" +
-                    "nclude=\"**\\*.*?proj\" />\r\n  </ItemGroup>\r\n</Project>\r\n");
+            this.Write("## Set default behaviour to automatically normalize line endings.\r\n* text=auto\r\n*" +
+                    ".sh eol=lf\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
@@ -38,7 +38,7 @@ namespace _42.Monorepo.Cli.Templates
     /// Base class for this transformation
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public class DirectoryBuildProjT4Base
+    public class DotGitAttributesT4Base
     {
         #region Fields
         private global::System.Text.StringBuilder generationEnvironmentField;

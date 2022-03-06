@@ -15,9 +15,9 @@ namespace _42.Monorepo.Cli.Templates
     /// Class to produce the template output
     /// </summary>
     
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildProjT4.tt"
+    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DotVsConfigT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public partial class DirectoryBuildProjT4 : DirectoryBuildProjT4Base
+    public partial class DotVsConfigT4 : DotVsConfigT4Base
     {
 #line hidden
         /// <summary>
@@ -25,8 +25,48 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("<Project Sdk=\"Microsoft.Build.Traversal\">\r\n  <ItemGroup>\r\n    <ProjectReference I" +
-                    "nclude=\"**\\*.*?proj\" />\r\n  </ItemGroup>\r\n</Project>\r\n");
+            this.Write("{\r\n  \"version\": \"1.0\",\r\n  \"components\": [\r\n    \"Microsoft.VisualStudio.Component." +
+                    "CoreEditor\",\r\n    \"Microsoft.VisualStudio.Workload.CoreEditor\",\r\n    \"Microsoft." +
+                    "Net.Component.4.8.SDK\",\r\n    \"Microsoft.Net.Component.4.7.2.TargetingPack\",\r\n   " +
+                    " \"Microsoft.Net.ComponentGroup.DevelopmentPrerequisites\",\r\n    \"Microsoft.Visual" +
+                    "Studio.Component.TypeScript.TSServer\",\r\n    \"Microsoft.VisualStudio.ComponentGro" +
+                    "up.WebToolsExtensions\",\r\n    \"Microsoft.VisualStudio.Component.JavaScript.TypeSc" +
+                    "ript\",\r\n    \"Microsoft.VisualStudio.Component.JavaScript.Diagnostics\",\r\n    \"Mic" +
+                    "rosoft.VisualStudio.Component.Roslyn.Compiler\",\r\n    \"Microsoft.Component.MSBuil" +
+                    "d\",\r\n    \"Microsoft.VisualStudio.Component.Roslyn.LanguageServices\",\r\n    \"Micro" +
+                    "soft.VisualStudio.Component.TextTemplating\",\r\n    \"Component.Microsoft.VisualStu" +
+                    "dio.RazorExtension\",\r\n    \"Microsoft.VisualStudio.Component.IISExpress\",\r\n    \"M" +
+                    "icrosoft.VisualStudio.Component.NuGet\",\r\n    \"Microsoft.VisualStudio.Component.M" +
+                    "SODBC.SQL\",\r\n    \"Microsoft.VisualStudio.Component.SQL.LocalDB.Runtime\",\r\n    \"M" +
+                    "icrosoft.VisualStudio.Component.Common.Azure.Tools\",\r\n    \"Microsoft.VisualStudi" +
+                    "o.Component.SQL.CLR\",\r\n    \"Microsoft.VisualStudio.Component.MSSQL.CMDLnUtils\",\r" +
+                    "\n    \"Microsoft.Component.ClickOnce\",\r\n    \"Microsoft.VisualStudio.Component.Man" +
+                    "agedDesktop.Core\",\r\n    \"Microsoft.VisualStudio.Component.SQL.SSDT\",\r\n    \"Micro" +
+                    "soft.VisualStudio.Component.SQL.DataSources\",\r\n    \"Component.Microsoft.Web.Libr" +
+                    "aryManager\",\r\n    \"Component.Microsoft.WebTools.BrowserLink.WebLivePreview\",\r\n  " +
+                    "  \"Microsoft.VisualStudio.ComponentGroup.Web\",\r\n    \"Microsoft.NetCore.Component" +
+                    ".Runtime.6.0\",\r\n    \"Microsoft.NetCore.Component.SDK\",\r\n    \"Microsoft.VisualStu" +
+                    "dio.Component.FSharp\",\r\n    \"Microsoft.ComponentGroup.ClickOnce.Publish\",\r\n    \"" +
+                    "Microsoft.NetCore.Component.DevelopmentTools\",\r\n    \"Microsoft.VisualStudio.Comp" +
+                    "onent.FSharp.WebTemplates\",\r\n    \"Microsoft.VisualStudio.Component.DockerTools\"," +
+                    "\r\n    \"Microsoft.NetCore.Component.Web\",\r\n    \"Microsoft.VisualStudio.Component." +
+                    "WebDeploy\",\r\n    \"Microsoft.VisualStudio.Component.AppInsights.Tools\",\r\n    \"Mic" +
+                    "rosoft.VisualStudio.Component.Web\",\r\n    \"Microsoft.Net.Component.4.8.TargetingP" +
+                    "ack\",\r\n    \"Microsoft.Net.ComponentGroup.4.8.DeveloperTools\",\r\n    \"Component.Mi" +
+                    "crosoft.VisualStudio.Web.AzureFunctions\",\r\n    \"Microsoft.VisualStudio.Component" +
+                    "Group.AzureFunctions\",\r\n    \"Microsoft.VisualStudio.ComponentGroup.Web.CloudTool" +
+                    "s\",\r\n    \"Microsoft.VisualStudio.Component.DiagnosticTools\",\r\n    \"Microsoft.Vis" +
+                    "ualStudio.Component.Debugger.JustInTime\",\r\n    \"Component.Microsoft.VisualStudio" +
+                    ".LiveShare.2022\",\r\n    \"Microsoft.VisualStudio.Workload.NetWeb\",\r\n    \"Microsoft" +
+                    ".VisualStudio.Component.Azure.ClientLibs\",\r\n    \"Microsoft.VisualStudio.Componen" +
+                    "tGroup.Azure.Prerequisites\",\r\n    \"Microsoft.VisualStudio.Component.Azure.Resour" +
+                    "ceManager.Tools\",\r\n    \"Microsoft.VisualStudio.ComponentGroup.Azure.ResourceMana" +
+                    "ger.Tools\",\r\n    \"Microsoft.VisualStudio.Component.Azure.AuthoringTools\",\r\n    \"" +
+                    "Microsoft.VisualStudio.Component.Azure.Waverton.BuildTools\",\r\n    \"Microsoft.Vis" +
+                    "ualStudio.Component.Azure.Compute.Emulator\",\r\n    \"Microsoft.VisualStudio.Compon" +
+                    "ent.Azure.Waverton\",\r\n    \"Microsoft.VisualStudio.ComponentGroup.Azure.CloudServ" +
+                    "ices\",\r\n    \"Microsoft.VisualStudio.Component.Azure.Powershell\",\r\n    \"Microsoft" +
+                    ".VisualStudio.Workload.Azure\"\r\n  ]\r\n}\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
@@ -38,7 +78,7 @@ namespace _42.Monorepo.Cli.Templates
     /// Base class for this transformation
     /// </summary>
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
-    public class DirectoryBuildProjT4Base
+    public class DotVsConfigT4Base
     {
         #region Fields
         private global::System.Text.StringBuilder generationEnvironmentField;

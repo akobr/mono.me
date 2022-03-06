@@ -18,12 +18,22 @@ namespace _42.Monorepo.Cli.Features
             options.OnChange(SetRepoOptions);
         }
 
+        private FeatureProvider(IEnumerable<string> features)
+        {
+            _features = new HashSet<string>(features, StringComparer.OrdinalIgnoreCase);
+        }
+
         public bool IsEnabled(string featureName)
         {
             lock (_locker)
             {
                 return _features.Contains(featureName);
             }
+        }
+
+        internal static FeatureProvider Build(IEnumerable<string> features)
+        {
+            return new FeatureProvider(features);
         }
 
         private void SetRepoOptions(MonoRepoOptions options, string optionName)

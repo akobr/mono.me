@@ -4,9 +4,9 @@
     "version": "6.0.100",
     "rollForward": "latestMajor",
     "allowPrerelease": false
-  }<# if (_featureProvider.IsEnabled("Build.Traversal")) { #>,
+  }<# if (_featureProvider.IsEnabled("build-traversal")) { #>,
   "msbuild-sdks": {
     "Microsoft.Build.Traversal": "3.1.3"
-  }
-<# } #>
+  }<# } #>
+
 }

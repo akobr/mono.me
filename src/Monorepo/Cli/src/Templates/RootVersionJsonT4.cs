@@ -29,7 +29,7 @@ namespace _42.Monorepo.Cli.Templates
   ""$schema"": ""https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/main/monorepo/src/NerdBank.GitVersioning/version.schema.json"",
   ""version"": ""0.8.0-alpha"",
   ""publicReleaseRefSpec"": [
-    ""^refs/heads/main$"" // we release only out of main
+    ""^refs/heads/main$""
   ],
   ""cloudBuild"": {
     ""setVersionVariables"": true,
@@ -42,7 +42,6 @@ namespace _42.Monorepo.Cli.Templates
     }
   }
 }
-
 ");
             return this.GenerationEnvironment.ToString();
         }

@@ -1,0 +1,4 @@
+<#@ template language="C#" #>
+## Set default behaviour to automatically normalize line endings.
+* text=auto
+*.sh eol=lf

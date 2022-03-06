@@ -37,8 +37,7 @@ namespace _42.Monorepo.Cli.Templates
   </activePackageSource>
   <packageSources>
     <clear />
-	<add key=""NuGet.org"" value=""https://api.nuget.org/v3/index.json"" protocolVersion=""3"" />
-    <add key=""Local packages"" value=""./.artifacts"" />
+    <add key=""NuGet.org"" value=""https://api.nuget.org/v3/index.json"" protocolVersion=""3"" />
   </packageSources>
 </configuration>
 ");

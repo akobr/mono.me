@@ -29,18 +29,18 @@ namespace _42.Monorepo.Cli.Templates
                     "\"allowPrerelease\": false\r\n  }");
             
             #line 7 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\GlobalJsonT4.tt"
- if (_featureProvider.IsEnabled("Build.Traversal")) { 
+ if (_featureProvider.IsEnabled("build-traversal")) { 
             
             #line default
             #line hidden
-            this.Write(",\r\n  \"msbuild-sdks\": {\r\n    \"Microsoft.Build.Traversal\": \"3.1.3\"\r\n  }\r\n");
+            this.Write(",\r\n  \"msbuild-sdks\": {\r\n    \"Microsoft.Build.Traversal\": \"3.1.3\"\r\n  }");
             
-            #line 11 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\GlobalJsonT4.tt"
+            #line 10 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\GlobalJsonT4.tt"
  } 
             
             #line default
             #line hidden
-            this.Write("}\r\n");
+            this.Write("\r\n}\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <AssemblyName>42.Monorepo.Cli</AssemblyName>
@@ -64,6 +64,22 @@
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <LastGenOutput>DirectoryPackagesPropsT4.cs</LastGenOutput>
     </None>
+    <None Update="Templates\DotEditorConfigT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>DotEditorConfigT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\DotGitAttributesT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>DotGitAttributesT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\DotGitIgnoreT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>DotGitIgnoreT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\DotVsConfigT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>DotVsConfigT4.cs</LastGenOutput>
+    </None>
     <None Update="Templates\GlobalJsonT4.tt">
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <LastGenOutput>GlobalJsonT4.cs</LastGenOutput>
@@ -96,6 +112,14 @@
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <LastGenOutput>RootVersionJsonT4.cs</LastGenOutput>
     </None>
+    <None Update="Templates\StylecopGlobalSuppressionsT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>StylecopGlobalSuppressionsT4.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\StylecopJsonT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>StylecopJsonT4.cs</LastGenOutput>
+    </None>
     <None Update="Templates\VersionJsonT4.tt">
       <Generator>TextTemplatingFilePreprocessor</Generator>
       <LastGenOutput>VersionJsonT4.cs</LastGenOutput>
@@ -125,6 +149,26 @@
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
       <DependentUpon>DirectoryPackagesPropsT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\DotEditorConfigT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>DotEditorConfigT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\DotGitAttributesT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>DotGitAttributesT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\DotGitIgnoreT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>DotGitIgnoreT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\DotVsConfigT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>DotVsConfigT4.tt</DependentUpon>
     </Compile>
     <Compile Update="Templates\GlobalJsonT4.cs">
       <DesignTime>True</DesignTime>
@@ -165,6 +209,16 @@
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
       <DependentUpon>RootVersionJsonT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\StylecopGlobalSuppressionsT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>StylecopGlobalSuppressionsT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\StylecopJsonT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>StylecopJsonT4.tt</DependentUpon>
     </Compile>
     <Compile Update="Templates\VersionJsonT4.cs">
       <DesignTime>True</DesignTime>

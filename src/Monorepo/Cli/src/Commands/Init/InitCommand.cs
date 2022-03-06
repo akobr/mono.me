@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using _42.Monorepo.Cli.Features;
 using _42.Monorepo.Cli.Output;
+using _42.Monorepo.Cli.Templates;
 using Alba.CsConsoleFormat;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
@@ -23,7 +26,7 @@ namespace _42.Monorepo.Cli.Commands.Init
             return Task.CompletedTask;
         }
 
-        protected override Task<int> ExecuteAsync()
+        protected override async Task<int> ExecuteAsync()
         {
 #if !DEBUG
             if (Context.IsValid)
@@ -35,7 +38,7 @@ namespace _42.Monorepo.Cli.Commands.Init
 
             if (!Console.Confirm("Do you want to create a new .net mono-repository in current folder"))
             {
-                return Task.FromResult(ExitCodes.WARNING_ABORTED);
+                return ExitCodes.WARNING_ABORTED;
             }
 
             Console.WriteLine();
@@ -106,10 +109,6 @@ namespace _42.Monorepo.Cli.Commands.Init
             Console.WriteExactDocument(doc);
             Console.WriteLine();
 
-            // TODO: [P3] When there is more options
-            // featureOptions.DefaultValue = featureOptions.Items.First();
-            // Console.WriteLine();
-            // var featureForDependencies = Console.Select(featureOptions);
             var useCentralDependencies = Console.Confirm("Should I turn on the Central package version management");
             Console.WriteLine();
 
@@ -166,7 +165,7 @@ namespace _42.Monorepo.Cli.Commands.Init
             Console.WriteLine("By default my CLI tooling use this system to build through it, if you pick to don't use it you have to write your own scripts for building.");
 
             Console.WriteLine();
-            var useCodeViewSeparation = Console.Confirm("Turn it on and automatically create Directory.Build.proj file with a workstead");
+            var useCodeViewSeparation = Console.Confirm("Turn it on and automatically create Directory.Build.proj file with each workstead");
             Console.WriteLine();
 
             if (useCodeViewSeparation)
@@ -190,7 +189,7 @@ namespace _42.Monorepo.Cli.Commands.Init
             if (useCommitLint)
             {
                 Console.WriteLine("I will help you with configuration of the CommitLint but the installation needs to be done manually.");
-                Console.WriteLine("You need to setup node.js, CommitLint and Husky to force the rules on each commit:");
+                Console.WriteLine("You need to setup node.js with npm, CommitLint and Husky to force the rules on each commit:");
                 Console.WriteLine();
                 Console.WriteLine("    # install node.js by Chocolatey".ThemedLowlight(Console.Theme));
                 Console.WriteLine("    choco install nodejs-lts");
@@ -205,12 +204,160 @@ namespace _42.Monorepo.Cli.Commands.Init
                 Console.WriteLine();
             }
 
-
-
-            Console.WriteImportant("This command is still under development...");
             Console.WriteLine("You went through the most important aspects, but there is much more to discuss and consider. Fore more info please visit our detailed documentation about a mono-repository at http://GitHub.todo.pages");
 
-            return Task.FromResult(ExitCodes.SUCCESS);
+            Console.WriteLine();
+            Console.WriteImportant("New monorepo is about to be created in the current directory.");
+            Console.WriteHeader("Selected features");
+
+            var featureList = new List<string>();
+
+            if (useCentralDependencies)
+            {
+                featureList.Add(FeatureNames.Packages);
+                Console.WriteLine("  - Central package version management");
+            }
+
+            if (useVersioning)
+            {
+                featureList.Add(FeatureNames.GitVersion);
+                Console.WriteLine("  - Git based versioning system");
+            }
+
+            if (useCodeViewSeparation)
+            {
+                Console.WriteLine("  - Microsoft.Build.Traversal for simple building by tools");
+            }
+
+            if (useCommitLint)
+            {
+                Console.WriteLine("  - CommitLint for conventional commit messages");
+            }
+
+            Console.WriteLine();
+            if (!Console.Confirm("Do you want to proceed and prepare everything"))
+            {
+                return ExitCodes.WARNING_ABORTED;
+            }
+
+            if (Directory.GetFiles(Environment.CurrentDirectory, "*", SearchOption.TopDirectoryOnly).Length > 0
+                && !Console.Confirm("The directory is not empty some files can be overwritten, should I continue"))
+            {
+                return ExitCodes.WARNING_ABORTED;
+            }
+
+            Console.WriteLine();
+            Console.WriteHeader("Created files");
+
+            featureList.AddRange(new[]
+            {
+                FeatureNames.TestsXunit,
+                FeatureNames.TestsNunit,
+                FeatureNames.Stylecop,
+            });
+
+            var featureProvider = FeatureProvider.Build(featureList);
+
+            // .editorconfig
+            var editorConfig = new DotEditorConfigT4();
+#if !DEBUG || TESTING
+            await File.WriteAllTextAsync(FileNames.DotEditorConfig, editorConfig.TransformText());
+#endif
+            Console.WriteLine($"  {FileNames.DotEditorConfig}");
+
+            // .gitattributes
+            var gitAttributes = new DotGitAttributesT4();
+#if !DEBUG || TESTING
+            await File.WriteAllTextAsync(FileNames.DotGitAttributes, gitAttributes.TransformText());
+#endif
+            Console.WriteLine($"  {FileNames.DotGitAttributes}");
+
+            // .gitignore
+            var gitIgnore = new DotGitIgnoreT4();
+#if !DEBUG || TESTING
+            await File.WriteAllTextAsync(FileNames.DotGitIgnore, gitIgnore.TransformText());
+#endif
+            Console.WriteLine($"  {FileNames.DotGitIgnore}");
+
+            // .vsconfig
+            var vsConfig = new DotVsConfigT4();
+#if !DEBUG || TESTING
+            await File.WriteAllTextAsync(FileNames.DotVsConfig, vsConfig.TransformText());
+#endif
+            Console.WriteLine($"  {FileNames.DotVsConfig}");
+
+            // Directory.Build.props
+            var directoryBuildProps = new DirectoryBuildPropsT4(featureProvider);
+#if !DEBUG || TESTING
+            await File.WriteAllTextAsync(FileNames.DirectoryBuildProps, directoryBuildProps.TransformText());
+#endif
+            Console.WriteLine($"  {FileNames.DirectoryBuildProps}");
+
+            // Directory.Packages.props
+            if (useCentralDependencies)
+            {
+                var directoryPackages = new RootDirectoryPackagesPropsT4(featureProvider);
+#if !DEBUG || TESTING
+                await File.WriteAllTextAsync(FileNames.DirectoryPackagesProps, directoryPackages.TransformText());
+#endif
+                Console.WriteLine($"  {FileNames.DirectoryPackagesProps}");
+            }
+
+            // glogal.json
+            var globalJson = new GlobalJsonT4(featureProvider);
+#if !DEBUG || TESTING
+            await File.WriteAllTextAsync(FileNames.GlogalJson, globalJson.TransformText());
+#endif
+            Console.WriteLine($"  {FileNames.GlogalJson}");
+
+            // mrepo.json
+            var mrepoJson = new MrepoJsonT4(new MrepoJsonModel()
+            {
+                Name = Path.GetFileName(Environment.CurrentDirectory),
+                Description = "An awesome .net mono-repository.",
+                Features = string.Join(", ", featureList.Select(f => $"\"{f}\"")),
+            });
+#if !DEBUG || TESTING
+            await File.WriteAllTextAsync(FileNames.MrepoJson, mrepoJson.TransformText());
+#endif
+            Console.WriteLine($"  {FileNames.MrepoJson}");
+
+            // nuget.config
+            var nugetConfig = new NugetConfigT4();
+#if !DEBUG || TESTING
+            await File.WriteAllTextAsync(FileNames.NugetConfig, nugetConfig.TransformText());
+#endif
+            Console.WriteLine($"  {FileNames.NugetConfig}");
+
+            // stylecop.json
+            var stylecopJson = new NugetConfigT4();
+#if !DEBUG || TESTING
+            await File.WriteAllTextAsync(FileNames.StylecopJson, stylecopJson.TransformText());
+#endif
+            Console.WriteLine($"  {FileNames.StylecopJson}");
+
+            // version.json
+            if (useVersioning)
+            {
+                var versionJson = new RootVersionJsonT4();
+#if !DEBUG || TESTING
+                await File.WriteAllTextAsync(FileNames.VersionJson, versionJson.TransformText());
+#endif
+                Console.WriteLine($"  {FileNames.VersionJson}");
+            }
+
+            // src/.stylecop/GlobalStylecopSuppressions.cs
+            var stylecopGlobalSuppressions = new StylecopGlobalSuppressionsT4();
+#if !DEBUG || TESTING
+            Directory.CreateDirectory("src\\.stylecop");
+            await File.WriteAllTextAsync($"src\\.stylecop\\{FileNames.StylecopGlobalSuppressions}", stylecopGlobalSuppressions.TransformText());
+#endif
+            Console.WriteLine($"  src/.stylecop/{FileNames.StylecopGlobalSuppressions}");
+
+            Console.WriteLine();
+            Console.WriteLine("Last step is to make this folder a git repository.".ThemedLowlight(Console.Theme));
+
+            return ExitCodes.SUCCESS;
         }
     }
 }
