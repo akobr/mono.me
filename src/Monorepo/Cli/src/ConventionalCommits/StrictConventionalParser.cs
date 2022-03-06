@@ -5,7 +5,7 @@ namespace _42.Monorepo.Cli.ConventionalCommits
     public class StrictConventionalParser
     {
         private const string TEMPLATE =
-            @"^(?<type>[\w]+)(\((?<scope>[\w\-]+)\))?(?<breaking>!)?: ?((?<issue>([A-Z]+-|#)[\d]+) )?(?<description>.*)";
+            @"^(?<type>[\w]+) ?(\((?<scope>[\w\-]+)\))?(?<breaking>!)? ?: ?((?<issue>([A-Z]+-|#)[\d]+) )?(?<description>.*)";
 
         private readonly Regex regex;
 

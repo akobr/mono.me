@@ -298,7 +298,7 @@ namespace _42.Monorepo.Cli.Commands.Release
         private async Task ProcessReleaseAsync(ReleasePreview preview)
         {
             Console.WriteLine();
-            var inBranch = Console.Confirm("Should I automatically prepare a commit in a new branch or just changes", true);
+            var inBranch = Console.Confirm("Should I automatically prepare a commit and a new branch", true);
             var isNewVersion = preview.CurrentVersion != preview.Version;
 
             Console.WriteLine();
@@ -321,7 +321,7 @@ namespace _42.Monorepo.Cli.Commands.Release
 #endif
             Console.WriteLine($"Notes:   {preview.NotesRepoPath}");
 
-            if (!inBranch)
+            if (inBranch)
             {
                 PrepareInGit(preview);
                 Console.WriteLine($"Branch:  {preview.Branch}");
