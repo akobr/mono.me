@@ -3,7 +3,7 @@
   <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)..\'))" />
   <ItemGroup>
 
-    <PackageVersion Include="42.Monorepo.GitVersioning.Core" Version="3.5.83-alpha-g67a81b71f0" />
+    <PackageVersion Include="42.Monorepo.GitVersioning.Core" Version="1.0.2" />
 
     <!-- CLI libraries -->
     <PackageVersion Include="Alba.CsConsoleFormat-NoXaml" Version="1.0.0" />
