@@ -15,7 +15,7 @@ namespace _42.Monorepo.Cli.Templates
     /// Class to produce the template output
     /// </summary>
     
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
+    #line 1 "C:\dev\.personal\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
     public partial class ProjectCsprojT4 : ProjectCsprojT4Base
     {
@@ -25,23 +25,36 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("<Project Sdk=\"Microsoft.NET.Sdk\">\r\n\r\n  <PropertyGroup>\r\n    <AssemblyName>");
+            this.Write("<Project Sdk=\"Microsoft.NET.Sdk\">\r\n\r\n  <PropertyGroup>\r\n");
             
-            #line 5 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
+            #line 5 "C:\dev\.personal\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
+ if (Model.HasCustomName) { 
+            
+            #line default
+            #line hidden
+            this.Write("    <AssemblyName>");
+            
+            #line 6 "C:\dev\.personal\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(Model.AssemblyName));
             
             #line default
             #line hidden
             this.Write("</AssemblyName>\r\n    <RootNamespace>");
             
-            #line 6 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
+            #line 7 "C:\dev\.personal\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(Model.RootNamespace));
             
             #line default
             #line hidden
-            this.Write("</RootNamespace>\r\n\r\n    <TargetFramework>net6.0</TargetFramework>\r\n    <LangVersi" +
-                    "on>latest</LangVersion>\r\n    <Nullable>enable</Nullable>\r\n  </PropertyGroup>\r\n\r\n" +
-                    "</Project>\r\n");
+            this.Write("</RootNamespace>\r\n");
+            
+            #line 8 "C:\dev\.personal\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
+ } 
+            
+            #line default
+            #line hidden
+            this.Write("\r\n    <TargetFramework>net6.0</TargetFramework>\r\n    <LangVersion>latest</LangVer" +
+                    "sion>\r\n    <Nullable>enable</Nullable>\r\n  </PropertyGroup>\r\n\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }

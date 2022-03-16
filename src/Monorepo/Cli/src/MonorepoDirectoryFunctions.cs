@@ -2,7 +2,6 @@ using System;
 using System.IO;
 using System.Linq;
 using _42.Monorepo.Cli.Extensions;
-using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Records;
 
 namespace _42.Monorepo.Cli
@@ -84,8 +83,8 @@ namespace _42.Monorepo.Cli
                 return new InvalidRecord(path);
             }
 
-            string relativePath = path.GetRelativePath(repo.Path);
-            string[] segments = relativePath.Split(
+            var relativePath = path.GetRelativePath(repo.Path);
+            var segments = relativePath.Split(
                 new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
                 StringSplitOptions.RemoveEmptyEntries);
 
@@ -105,7 +104,7 @@ namespace _42.Monorepo.Cli
             IRecord record = workstead;
             for (var i = 2; i < segments.Length; i++)
             {
-                string directory = Path.Combine(record.Path, segments[i]);
+                var directory = Path.Combine(record.Path, segments[i]);
                 if (IsProjectDirectory(directory))
                 {
                     record = new ProjectRecord(directory, record);
@@ -120,19 +119,19 @@ namespace _42.Monorepo.Cli
 
         public static bool IsExcludedDirectory(string directory)
         {
-            string name = Path.GetFileName(directory);
+            var name = Path.GetFileName(directory);
             return name[0] == '.';
         }
 
         public static bool IsProjectDirectory(string directory)
         {
-            return Directory.GetDirectories(directory, Constants.SOURCE_DIRECTORY_NAME).Any()
+            return Directory.GetDirectories(directory, Constants.SOURCE_DIRECTORY_NAME, SearchOption.TopDirectoryOnly).Any()
                    || Directory.GetFiles(directory, "*.*?proj", SearchOption.TopDirectoryOnly).Any();
         }
 
         private static bool IsMonorepoRootDirectory(DirectoryInfo directory)
         {
-            FileInfo[] files = directory.GetFiles(Constants.MONOREPO_CONFIG_JSON, SearchOption.TopDirectoryOnly);
+            var files = directory.GetFiles(Constants.MONOREPO_CONFIG_JSON, SearchOption.TopDirectoryOnly);
 
             if (files.Length < 1)
             {

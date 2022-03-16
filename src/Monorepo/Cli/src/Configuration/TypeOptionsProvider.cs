@@ -1,31 +1,36 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 
 namespace _42.Monorepo.Cli.Configuration
 {
     public class TypeOptionsProvider : ITypeOptionsProvider
     {
-        private readonly Dictionary<string, TypeOptions> options;
+        private readonly Dictionary<string, TypeOptions> _options;
 
         public TypeOptionsProvider(IConfiguration configuration)
         {
-            options = new Dictionary<string, TypeOptions>();
+            _options = new Dictionary<string, TypeOptions>();
             var section = configuration.GetSection(ConfigurationSections.TYPES);
 
             foreach (var typeSection in section.GetChildren())
             {
                 var typeName = typeSection.Key;
                 var typeOptions = typeSection.Get<TypeOptions>();
-                typeOptions.Name = typeName;
-                options.Add(typeName, typeOptions);
+                typeOptions.Key = typeName;
+                _options.Add(typeName, typeOptions);
             }
         }
 
-        public TypeOptions GetOptions(string typeName)
+        public TypeOptions GetOptions(string typeKey)
         {
-            return options.TryGetValue(typeName, out var typeOptions)
+            return _options.TryGetValue(typeKey, out var typeOptions)
                 ? typeOptions
-                : new TypeOptions { Name = typeName };
+                : new TypeOptions { Key = typeKey };
+        }
+
+        public IEnumerable<TypeOptions> GetAllOptions()
+        {
+            return _options.Values;
         }
     }
 }

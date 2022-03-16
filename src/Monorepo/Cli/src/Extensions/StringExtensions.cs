@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace _42.Monorepo.Cli.Extensions
@@ -15,7 +16,6 @@ namespace _42.Monorepo.Cli.Extensions
             return text.Equals(value, StringComparison.Ordinal);
         }
 
-        // TODO: [P3] Each section needs to be a valid identifier, starts with letter or _ (not only the first one)
         public static string ToValidItemName(this string? text)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -24,14 +24,29 @@ namespace _42.Monorepo.Cli.Extensions
             }
 
             var builder = new StringBuilder(text.Trim());
+            var dotIndexes = new Stack<int>();
+            var lastDotIndex = -1;
 
             for (var i = 0; i < builder.Length; i++)
             {
                 var character = builder[i];
 
+                if (character is '.')
+                {
+                    if (lastDotIndex == i - 1)
+                    {
+                        lastDotIndex = i;
+                        builder[i] = '_';
+                        continue;
+                    }
+
+                    lastDotIndex = i;
+                    dotIndexes.Push(i);
+                    continue;
+                }
+
                 if (char.IsLetterOrDigit(character)
-                    || character == '_'
-                    || character == '.')
+                    || character is '_')
                 {
                     continue;
                 }

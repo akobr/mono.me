@@ -20,17 +20,20 @@ namespace _42.Monorepo.Cli.Commands.New
     public class NewProjectCommand : BaseCommand
     {
         private readonly IFeatureProvider _featureProvider;
+        private readonly IItemFullOptionsProvider _itemOptionsProvider;
         private readonly MonoRepoOptions _repoOptions;
 
         public NewProjectCommand(
             IExtendedConsole console,
             ICommandContext context,
             IFeatureProvider featureProvider,
-            IOptions<MonoRepoOptions> monoRepoOptions)
+            IOptions<MonoRepoOptions> monoRepoOptions,
+            IItemFullOptionsProvider itemOptionsProvider)
             : base(console, context)
         {
             _featureProvider = featureProvider;
             _repoOptions = monoRepoOptions.Value;
+            _itemOptionsProvider = itemOptionsProvider;
         }
 
         [Argument(0, Description = "Name of the project.")]
@@ -43,8 +46,8 @@ namespace _42.Monorepo.Cli.Commands.New
             if (workstead == null)
             {
                 var worksteads = Context.Repository.GetWorksteads().ToDictionary(w => w.Record.Name);
-                var selectedWorksted = Console.Select(new Sharprompt.SelectOptions<string>() { Items = worksteads.Keys, Message = "Under which workstead", PageSize = 20 });
-                workstead = worksteads[selectedWorksted];
+                var selectedWorkstead = Console.Select(new Sharprompt.SelectOptions<string> { Items = worksteads.Keys, Message = "Under which workstead", PageSize = 20 });
+                workstead = worksteads[selectedWorkstead];
             }
 
             var name = Name;
@@ -60,7 +63,16 @@ namespace _42.Monorepo.Cli.Commands.New
                 }
             }
 
-            name = name.Trim().ToValidItemName();
+            var worksteadName = GetAssemblyName(workstead);
+            var worksteadHasName = !string.IsNullOrWhiteSpace(worksteadName);
+            name = name.Trim();
+            var projectOptions = _itemOptionsProvider.GetProjectOptions($"{workstead.Record.RepoRelativePath}/{name}");
+
+            if (projectOptions.UseFullProjectName()
+                && worksteadHasName)
+            {
+                name = $"{worksteadName}.name";
+            }
 
             var path = Path.Combine(workstead.Record.Path, name);
 
@@ -76,37 +88,27 @@ namespace _42.Monorepo.Cli.Commands.New
             Directory.CreateDirectory(Path.Combine(path, Constants.TEST_DIRECTORY_NAME));
 #endif
 
-            string projectFilePath = Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME, FileNames.GetProjectFileName(name));
-            string projectTestFilePath = Path.Combine(path, Constants.TEST_DIRECTORY_NAME, FileNames.GetTestProjectFileName(name));
+            var projectFilePath = Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME, FileNames.GetProjectFileName(name));
+            var projectTestFilePath = Path.Combine(path, Constants.TEST_DIRECTORY_NAME, FileNames.GetTestProjectFileName(name));
 
             if (!File.Exists(projectFilePath))
             {
-                var namespaceBuilder = GetNamespace(workstead);
-                namespaceBuilder.Append('.');
-                namespaceBuilder.Append(name);
+                var worksteadNamespace = GetNamespace(workstead);
 
-                var prefix = _repoOptions.Prefix.ToValidItemName();
-
-                if (!string.IsNullOrEmpty(prefix))
+                var projectTemplate = new ProjectCsprojT4(new ProjectCsprojModel
                 {
-                    namespaceBuilder.Insert(0, '.');
-                    namespaceBuilder.Insert(0, prefix);
-                }
-
-                var assemblyName = namespaceBuilder[0] == '_'
-                    ? namespaceBuilder.ToString(1, namespaceBuilder.Length - 1)
-                    : namespaceBuilder.ToString();
-
-                var projectTemplate = new ProjectCsprojT4(new ProjectCsprojModel()
-                {
-                    AssemblyName = assemblyName,
-                    RootNamespace = namespaceBuilder.ToString(),
+                    HasCustomName = !projectOptions.UseFullProjectName() && worksteadHasName,
+                    AssemblyName = !projectOptions.UseFullProjectName() && worksteadHasName
+                        ? $"{worksteadName}.{name}"
+                        : name,
+                    RootNamespace = !string.IsNullOrWhiteSpace(worksteadNamespace)
+                        ? $"{worksteadNamespace}.{name.ToValidItemName()}"
+                        : name.ToValidItemName(),
                 });
 #if !DEBUG || TESTING
                 await File.WriteAllTextAsync(projectFilePath, projectTemplate.TransformText());
 #endif
             }
-
 
             if (!File.Exists(projectTestFilePath))
             {
@@ -163,18 +165,80 @@ namespace _42.Monorepo.Cli.Commands.New
             return ExitCodes.SUCCESS;
         }
 
-        private static StringBuilder GetNamespace(IItem item)
+        private string GetNamespace(IItem item)
         {
-            var builder = new StringBuilder(item.Record.Name);
-            var next = item;
+            IItem? itemToProcess = item;
+            var builder = new StringBuilder();
 
-            while (next.Parent is IWorkstead workstead)
+            do
             {
-                builder.Insert(0, '.');
-                builder.Insert(0, workstead.Record.Name);
+                var options = _itemOptionsProvider.GetWorksteadOptions(itemToProcess.Record.RepoRelativePath);
+
+                if (!options.IsSuppressed())
+                {
+                    if (builder.Length > 0)
+                    {
+                        builder.Insert(0, '.');
+                    }
+
+                    builder.Insert(0, itemToProcess.Record.GetValidIdentifier());
+                }
+
+                itemToProcess = itemToProcess.Parent;
+            }
+            while (itemToProcess is IWorkstead);
+
+            var prefix = _repoOptions.Prefix.ToValidItemName();
+
+            if (!string.IsNullOrEmpty(prefix))
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Insert(0, '.');
+                }
+
+                builder.Insert(0, prefix);
             }
 
-            return builder;
+            return builder.ToString();
+        }
+
+        private string GetAssemblyName(IItem item)
+        {
+            IItem? itemToProcess = item;
+            var builder = new StringBuilder();
+
+            do
+            {
+                var options = _itemOptionsProvider.GetWorksteadOptions(itemToProcess.Record.RepoRelativePath);
+
+                if (!options.IsSuppressed())
+                {
+                    if (builder.Length > 0)
+                    {
+                        builder.Insert(0, '.');
+                    }
+
+                    builder.Insert(0, itemToProcess.Record.Name);
+                }
+
+                itemToProcess = itemToProcess.Parent;
+            }
+            while (itemToProcess is IWorkstead);
+
+            var prefix = (_repoOptions.Prefix ?? string.Empty).Trim();
+
+            if (!string.IsNullOrEmpty(prefix))
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Insert(0, '.');
+                }
+
+                builder.Insert(0, prefix);
+            }
+
+            return builder.ToString();
         }
     }
 }

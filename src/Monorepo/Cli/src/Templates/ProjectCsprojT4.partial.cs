@@ -15,5 +15,7 @@ namespace _42.Monorepo.Cli.Templates
         public string AssemblyName { get; set; } = string.Empty;
 
         public string RootNamespace { get; set; } = string.Empty;
+
+        public bool HasCustomName { get; set; }
     }
 }

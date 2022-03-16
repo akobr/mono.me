@@ -88,6 +88,7 @@ namespace _42.Monorepo.Cli
         {
             services.AddSingleton<IItemOptionsProvider, ItemOptionsProvider>();
             services.AddSingleton<ITypeOptionsProvider, TypeOptionsProvider>();
+            services.AddSingleton<IItemFullOptionsProvider, ItemFullOptionsProvider>();
 
             services.Configure<LoggingOptions>(configuration.GetSection(ConfigurationSections.LOGGING));
             services.Configure<MonoRepoOptions>(configuration.GetSection(ConfigurationSections.REPO));
