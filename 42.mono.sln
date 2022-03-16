@@ -19,7 +19,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".configuration", ".configur
 		Directory.Packages.props = Directory.Packages.props
 		global.json = global.json
 		mrepo.json = mrepo.json
-		Packages.props = Packages.props
 		version.json = version.json
 	EndProjectSection
 EndProject
