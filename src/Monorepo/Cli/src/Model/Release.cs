@@ -1,10 +1,10 @@
 using System;
-using System.IO;
-using LibGit2Sharp;
-using Semver;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using _42.Monorepo.Cli.Model.Records;
+using LibGit2Sharp;
+using Semver;
 
 namespace _42.Monorepo.Cli.Model
 {

@@ -8,10 +8,12 @@ namespace _42.Monorepo.Cli.Model.Records
     public class RootDirectoryRecord : Record, IRootDirectoryRecord
     {
         private readonly Lazy<IReadOnlyCollection<IWorksteadRecord>> worksteads;
+        private readonly IRepositoryRecord _repository;
 
-        public RootDirectoryRecord(string path, IRecord parent)
+        public RootDirectoryRecord(string path, IRepositoryRecord parent)
             : base(path, parent)
         {
+            _repository = parent;
             worksteads = new(CalculateWorksteads);
         }
 
@@ -28,7 +30,7 @@ namespace _42.Monorepo.Cli.Model.Records
             return Directory
                 .GetDirectories(Path)
                 .Where(dir => !MonorepoDirectoryFunctions.IsExcludedDirectory(dir))
-                .Select(dir => new WorksteadRecord(dir, this))
+                .Select(dir => new WorksteadRecord(dir, _repository))
                 .ToList();
         }
     }

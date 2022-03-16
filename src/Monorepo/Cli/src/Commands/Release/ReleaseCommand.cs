@@ -90,7 +90,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                 Console.WriteLine();
             }
 
-            Console.WriteHeader($"Release for {record.GetTypeAsString().ToLowerInvariant()} ", identifier.ThemedHighlight(Console.Theme));
+            Console.WriteHeader($"Release for {record.GetTypeAsString().ToLowerInvariant()} ", record.Name.ThemedHighlight(Console.Theme));
 
             using var repo = _repositoryService.BuildRepository();
             Console.WriteLine("In branch ", repo.Head.FriendlyName.ThemedHighlight(Console.Theme));
@@ -218,9 +218,9 @@ namespace _42.Monorepo.Cli.Commands.Release
                 CurrentVersion = exactVersions.PackageVersion,
                 VersionFileFullPath = versionFilePath,
                 PreviousRelease = lastRelease,
-                Tag = $"{hierarchicalName}/v.{newVersion}",
-                Branch = $"release/{hierarchicalName}/v.{newVersion}",
-                NotesRepoPath = $"docs/{hierarchicalName}/release-notes/{newVersion}.md",
+                Tag = hierarchicalName is "." ? $"v.{newVersion}" : $"{hierarchicalName}/v.{newVersion}",
+                Branch = hierarchicalName is "." ? $"release/v.{newVersion}" : $"release/{hierarchicalName}/v.{newVersion}",
+                NotesRepoPath = hierarchicalName is "." ? $"docs/release-notes/{newVersion}.md" : $"docs/{hierarchicalName}/release-notes/{newVersion}.md",
                 MajorChanges = majorChanges,
                 MinorChanges = minorChanges,
                 PathChanges = pathChanges,
@@ -230,13 +230,13 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             if (record.Type != RecordType.Project)
             {
-                var projects = ((ICompositionOfProjects)item).GetAllProjects();
+                var projects = ((ICompositionOfProjects)item).GetAllProjects().ToList();
                 var listOfReleases = new List<(string Project, SemVersion Version)>();
 
                 foreach (var project in projects)
                 {
                     var projectVersionFile = await project.TryGetVersionFilePathAsync();
-                    if (versionFilePath.EqualsOrdinalIgnoreCase(projectVersionFile))
+                    if (!versionFilePath.EqualsOrdinalIgnoreCase(projectVersionFile))
                     {
                         continue;
                     }
