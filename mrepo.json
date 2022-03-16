@@ -21,9 +21,9 @@
     ],
     "changes": {
       "major": [ /* custom major commit message types */ ],
-      "minor": [ "feat", ":sparkles:" ],
-      "patch": [ "fix", "perf", "refactor", ":bug:", ":zap:", ":recycle:" ],
-      "harmless": [ "style", "test", "build", "ci", "docs", ":art:", ":test_tube:", ":hammer:", ":construction_worker:", ":memo:" ]
+      "minor": [ "feat" ],
+      "patch": [ "fix", "perf", "refactor" ],
+      "harmless": [ "style", "test", "build", "ci", "docs", "chore" ]
     },
     "createReleaseBranch": true
   },
