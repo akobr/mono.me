@@ -19,6 +19,7 @@ namespace _42.Monorepo.Cli
     {
         private static IHost? _host;
         private static ILogger<Program>? _logger;
+        private static LoggingOptions? _loggingOptions;
 
         public static IHost Host => _host ?? throw new InvalidOperationException("The host app is not initialised.");
 
@@ -46,7 +47,6 @@ namespace _42.Monorepo.Cli
             }
             catch (OutsideMonorepoException)
             {
-                Console.WriteLine();
                 Console.Write("! ", Color.Magenta);
                 Console.WriteLine("The CLI tooling can be used only inside a mono-repository.");
                 Console.WriteLine("  A git repository with mrepo.config file in the root.", Color.DarkGray);
@@ -59,13 +59,14 @@ namespace _42.Monorepo.Cli
             }
             catch (Exception exception)
             {
-                Console.WriteLine();
                 Console.WriteWithGradient("# Total mayhem", Color.Yellow, Color.Magenta);
                 Console.WriteLine(", the tool is broken! ):", Color.Magenta);
-                Console.WriteLine("  For more info check the log file at:", Color.DarkGray);
 
-                var logOptions = Host.Services.GetRequiredService<IOptions<LoggingOptions>>().Value;
-                Console.WriteLine($"    {logOptions.GetTodayLogFullPath()}", Color.DarkGray);
+                if (_loggingOptions is not null)
+                {
+                    Console.WriteLine("  For more info check the log file at:", Color.DarkGray);
+                    Console.WriteLine($"    {_loggingOptions.GetTodayLogFullPath()}", Color.DarkGray);
+                }
 
                 await Task.Run(() => LogWithSentry(() => _logger.LogError(exception, "Unhandled exception occurred at input: {args}", new object[] { args })));
                 return ExitCodes.ERROR_CRASH;
@@ -78,13 +79,13 @@ namespace _42.Monorepo.Cli
             {
                 _host = CreateHostBuilder(args).Build();
                 _logger = _host.Services.GetRequiredService<ILogger<Program>>();
+                _loggingOptions = Host.Services.GetService<IOptions<LoggingOptions>>()?.Value;
                 return true;
             }
             catch (Exception exception)
             {
-                Console.WriteLine();
                 Console.Write("! ", Color.Magenta);
-                Console.WriteLine("Totally enbarasing the application failed to initialize, please contant developers.");
+                Console.WriteLine("Totally embarrassing the application failed to initialize, please shout at developers.");
                 Console.WriteLine();
                 Console.WriteLine(exception.Message);
                 Console.WriteLine(exception.StackTrace);
@@ -115,15 +116,14 @@ namespace _42.Monorepo.Cli
 
         private static void LogWithSentry(Action logOperation)
         {
-            var options = Host.Services.GetRequiredService<IOptions<LoggingOptions>>().Value;
-
-            if (string.IsNullOrWhiteSpace(options.SentryDsn))
+            if (_loggingOptions is null
+                || string.IsNullOrWhiteSpace(_loggingOptions.SentryDsn))
             {
                 logOperation();
                 return;
             }
 
-            using (SentrySdk.Init(options.SentryDsn))
+            using (SentrySdk.Init(_loggingOptions.SentryDsn))
             {
                 logOperation();
             }
