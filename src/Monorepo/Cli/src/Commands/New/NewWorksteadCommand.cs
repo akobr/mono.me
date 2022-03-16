@@ -60,7 +60,9 @@ namespace _42.Monorepo.Cli.Commands.New
 
             name = name.Trim().ToValidItemName();
 
-            var path = Path.Combine(targetItem.Record.Path, Constants.SOURCE_DIRECTORY_NAME, name);
+            var path = targetItem.Record.Type == RecordType.Repository
+                ? Path.Combine(targetItem.Record.Path, Constants.SOURCE_DIRECTORY_NAME, name)
+                : Path.Combine(targetItem.Record.Path, name);
 
             if (Directory.Exists(path))
             {
@@ -108,11 +110,12 @@ namespace _42.Monorepo.Cli.Commands.New
                 }
 
                 // version.json
-                var versionTemplate = new VersionJsonT4(new VersionJsonModel()
+                var versionTemplate = new VersionJsonT4(new VersionJsonModel
                 {
                     Version = version.ToString(),
                     IsHierarchical = hierarchical,
                 });
+
                 var versionFilePath = Path.Combine(path, FileNames.VersionJson);
 #if !DEBUG || TESTING
                 await File.WriteAllTextAsync(versionFilePath, versionTemplate.TransformText());
