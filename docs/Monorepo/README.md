@@ -1,6 +1,13 @@
 # mono-repository
 
-This project is trying to tackle problems around a mono-repository and .NET technical stack, but not exlusively. The other goal is to put together useful tooling for a monorepo which is already out there and explain best practices which I recomend to use.
+This project is trying to tackle problems around [a mono-repository](https://en.wikipedia.org/wiki/Monorepo) and .NET technical stack, but not exlusively. The other goal is to put together useful tooling for a monorepo which is already out there and explain best practices which I recomend to use.
+
+## Table of content
+
+- [Good habits](good-habits.md)
+- [Versioning](versioning.md)
+- [Feature list](features.md)
+- [Configuration](mrepo-json.md)
 
 ## The structure
 
@@ -8,16 +15,16 @@ This project is trying to tackle problems around a mono-repository and .NET tech
   - .artifacts
   - .azure/pipelines
   - .mrepo
-  - doc
+  - docs
   - src
 
-Main concept of a mono-repository structure is using workstreads and projects. Where workstead is a grouping concept of multiple projects or other worksteads. You can imagine a worstead as a business project which contains all necesary coding projects (libraries, packages and applications) inside.
+Main concept of a mono-repository structure is using **workstreads and projects**. Where workstead is a grouping concept of multiple projects or other worksteads. You can imagine a worstead as a business project which contains all necesary coding projects (libraries, packages and applications) inside.
 
-The most important folder of a repository is `src` which contains all code, all worksteads and projects. Is recomended to use *"siblings folders to source"*, a folder with mirrored structure as `src` and its content is related to worskteads and projects, but not the code itself. Simplest example is `doc` folder with Markdown documentation for the projects and their release notes. The second example could be `.azure/pipelines` to carry all CI/CD pipelines for all deliverables.
+The most important folder of a repository is `src` which contains all code, all worksteads and projects. Is recomended to use *"siblings folders to source"*, a folder with mirrored structure as `src` and its content is related to worskteads and projects, but not the code itself. Simplest example is `docs` folder with Markdown documentation for the projects and their release notes. The second example could be `.azure/pipelines` to carry all CI/CD pipelines for all deliverables.
 
-Another recomendation is to use one centralized place to hold all artifacts from all the code of the mono-repository. Then it can be simply used as source for continous deployment or as a package source for other solution. In the mono-repository structure is `.artifacts` folder for these needs.
+Another recomendation is to use one centralized place to hold all artifacts from all the code of the mono-repository. This can be simply used as source for continous deployment or as a package source for other solution. In the mono-repository structure it is `.artifacts` folder.
 
-> There is a simple naming convention for the non-code content of a mono-repository, each folder or file uses `lower-case-name`, but a code should follow the convention used by the technical stack, e.g. MsBuild and .NET names use `CammelCaseNotation` and the code should follow namespace structure.
+> There is a simple naming convention for the non-code content of a mono-repository, each folder or file uses `lower-case-name`, but a code should follow the convention used by the technical stack, e.g. MsBuild and .NET names use `CammelCaseNotation` and it is a good habit to follow namespace/packages structure in folders.
 
 All non-directly releated content is placed in folders with a dot on the beginning, for example `.azure` or `.mrepo`. The same notation allow you to add a custom content directly into `src` folder which won't be processed by the tooling.
 
@@ -57,10 +64,10 @@ In the visual studio solution we will see a total of seven projects.
 - Customer.Reservation.App.Tests.njsproj
 - Customer.Reservation.App.IntegrationTests.csproj
 
-## Entire toolset
+## mrepo toolset
 
 The heart of the toolset is a CLI application served as dotnet tool under the command `mrepo`. This powerfull command helps you to  manage, create and release everything inside a mono-repository.
 
 ## Configuration
 
-Basic configuration of the mono-repository is stored in `mrepo.json` file in the root of the repository. Detailed pieces and custom scripts are located in folder `.mrepo`.
+Basic configuration of the mono-repository is stored in `mrepo.json` file in the root of the repository. Detailed pieces and custom scripts should be located in folder `.mrepo`.
