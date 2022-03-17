@@ -1,11 +1,12 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using LibGit2Sharp;
 
 namespace _42.Monorepo.Cli.Git
 {
     public interface IGitHistoryService
     {
-        GitHistoryReport GetHistory(string targetedRepoRelativePath, IReadOnlyCollection<Commit> commitsToStop);
-    }
+        GitHistoryReport GetHistory(string targetedRepoRelativePath, IEnumerable<ObjectId> commitsToStop);
 
+        GitHistoryReport GetHistory(Repository repo, string targetedRepoRelativePath, IEnumerable<Commit> commitsToStop);
+    }
 }

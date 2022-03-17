@@ -26,10 +26,19 @@ namespace _42.Monorepo.Cli.Git
             _repositoryService = repositoryService;
         }
 
-        public GitHistoryReport GetHistory(string targetedRepoRelativePath, IReadOnlyCollection<Commit> commitsToStop)
+        public GitHistoryReport GetHistory(string targetedRepoRelativePath, IEnumerable<ObjectId> commitIdsToStop)
         {
             using var repo = _repositoryService.BuildRepository();
+            return PrepareReport(repo, targetedRepoRelativePath, commitIdsToStop.Select(id => repo.Lookup<Commit>(id)));
+        }
 
+        public GitHistoryReport GetHistory(Repository repo, string targetedRepoRelativePath, IEnumerable<Commit> commitsToStop)
+        {
+            return PrepareReport(repo, targetedRepoRelativePath, commitsToStop);
+        }
+
+        private GitHistoryReport PrepareReport(Repository repo, string targetedRepoRelativePath, IEnumerable<Commit> commitsToStop)
+        {
             var stopCommits = CreateStopSet(commitsToStop);
             var visitedCommits = new HashSet<ObjectId>();
             var parser = new ConventionalParser();
@@ -111,7 +120,7 @@ namespace _42.Monorepo.Cli.Git
             return new GitHistoryReport(changes, unknownCommits);
         }
 
-        private ISet<ObjectId> CreateStopSet(IReadOnlyCollection<Commit> commitsToStop)
+        private ISet<ObjectId> CreateStopSet(IEnumerable<Commit> commitsToStop)
         {
             var stopCommits = new HashSet<ObjectId>();
             var toProcess = new Stack<(Commit Commit, int Deep)>(commitsToStop.Select(c => (c, 0)));

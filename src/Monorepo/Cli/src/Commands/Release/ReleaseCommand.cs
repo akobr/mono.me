@@ -130,11 +130,10 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             Console.WriteLine();
 
-            var releaseCommits = releases.Select(r => r.Tag.Target.Peel<Commit>()).ToList();
             var targetedRepoFolderPath = record.Type == RecordType.Repository
                 ? Constants.SOURCE_DIRECTORY_NAME
                 : record.Path.GetRelativePath(Context.Repository.Record.Path);
-            var report = _historyService.GetHistory(targetedRepoFolderPath, releaseCommits);
+            var report = _historyService.GetHistory(targetedRepoFolderPath, releases.Select(r => r.CommitId));
 
             if (report.Changes.Count < 1
                 && report.UnknownChanges.Count < 1)
@@ -340,7 +339,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             var isNewVersion = preview.CurrentVersion != preview.Version;
 
 #if !DEBUG || TESTING
-            var repository = _repositoryService.BuildRepository();
+            using var repository = _repositoryService.BuildRepository();
             var branch = repository.CreateBranch(preview.Branch);
             LibGit2Sharp.Commands.Checkout(repository, branch);
 

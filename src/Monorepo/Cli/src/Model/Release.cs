@@ -12,15 +12,15 @@ namespace _42.Monorepo.Cli.Model
     {
         private readonly List<IRelease> subReleases;
 
-        public Release(SemVersion version, Tag tag, IRecord target)
+        public Release(SemVersion version, ObjectId commitId, IRecord target)
         {
-            Tag = tag;
+            CommitId = commitId;
             Target = target;
             Version = version;
             subReleases = new List<IRelease>();
         }
 
-        public Tag Tag { get; }
+        public ObjectId CommitId { get; }
 
         public IRecord Target { get; }
 
@@ -40,41 +40,47 @@ namespace _42.Monorepo.Cli.Model
 
         public static bool TryParse(Tag tag, IRecord repository, out Release release)
         {
-            string tagName = tag.FriendlyName;
+            var tagName = tag.FriendlyName;
+            var commit = tag.Target.Peel<Commit>();
 
             if (string.IsNullOrWhiteSpace(tagName))
             {
-                release = CreateEmpty(tag);
+                release = CreateEmpty(commit);
                 return false;
             }
 
             if (!TryParseReleaseName(tagName, repository, out var target, out var version))
             {
-                release = CreateEmpty(tag);
+                release = CreateEmpty(commit);
                 return false;
             }
 
-            release = new Release(version, tag, target);
-            TryParseAnnotation(release, repository);
+            release = new Release(version, commit.Id, target);
+            TryParseAnnotation(release, tag, commit, repository);
             return true;
         }
 
-        private static void TryParseAnnotation(Release release, IRecord root)
+        private static void TryParseAnnotation(Release release, Tag tag, Commit commit, IRecord root)
         {
-            var annotation = release.Tag.Annotation;
+            if (!tag.IsAnnotated)
+            {
+                return;
+            }
+
+            var annotation = tag.Annotation;
 
             if (annotation is null)
             {
                 return;
             }
 
-            string[] lines = annotation.Message.Split(new[] { "\r\n", "\n" }, 256, StringSplitOptions.RemoveEmptyEntries);
+            var lines = annotation.Message.Split(new[] { "\r\n", "\n" }, 256, StringSplitOptions.RemoveEmptyEntries);
 
             release.AddSubReleases(
                 lines.Select(l =>
                     {
                         var isValid = TryParseReleaseName(l, root, out var subTarget, out var subVersion);
-                        return new { Release = new Release(subVersion, release.Tag, subTarget), IsValid = isValid };
+                        return new { Release = new Release(subVersion, commit.Id, subTarget), IsValid = isValid };
                     })
                     .Where(pr => pr.IsValid)
                     .Select(pr => pr.Release));
@@ -87,10 +93,14 @@ namespace _42.Monorepo.Cli.Model
             if (segments.Length == 1)
             {
                 target = rootRecord;
-                return TryParseVersionSegment(segments[^1], out version);
+                return TryParseVersionSegment(segments[0], out version);
             }
 
-            string path = Path.Combine(rootRecord.Path, Path.Combine(segments[Range.EndAt(^2)]));
+            var path = Path.Combine(
+                rootRecord.Path,
+                Constants.SOURCE_DIRECTORY_NAME,
+                Path.Combine(segments[Range.EndAt(^1)]));
+
             target = MonorepoDirectoryFunctions.GetRecord(path);
             return TryParseVersionSegment(segments[^1], out version)
                    && target is not InvalidRecord;
@@ -107,9 +117,9 @@ namespace _42.Monorepo.Cli.Model
             return false;
         }
 
-        private static Release CreateEmpty(Tag tag)
+        private static Release CreateEmpty(Commit commit)
         {
-            return new Release(new SemVersion(0), tag, new InvalidRecord(string.Empty));
+            return new Release(new SemVersion(0), commit.Id, new InvalidRecord(string.Empty));
         }
     }
 }

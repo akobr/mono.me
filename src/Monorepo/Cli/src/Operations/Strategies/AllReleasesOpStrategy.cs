@@ -11,11 +11,11 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 {
     public class AllReleasesOpStrategy : IOpStrategy<IReadOnlyList<IRelease>>
     {
-        private readonly IGitTagsService gitTagsService;
+        private readonly IGitRepositoryService _gitRepositoryService;
 
-        public AllReleasesOpStrategy(IGitTagsService gitTagsService)
+        public AllReleasesOpStrategy(IGitRepositoryService gitRepositoryService)
         {
-            this.gitTagsService = gitTagsService;
+            _gitRepositoryService = gitRepositoryService;
         }
 
         public async Task<IReadOnlyList<IRelease>> OperateAsync(IItem item, CancellationToken cancellationToken = default)
@@ -36,12 +36,16 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
         private List<IRelease> GetExactReleases(IItem item, CancellationToken cancellationToken)
         {
-            string releasePrefix = $"{item.Record.Identifier.Humanized}/v.";
+            var hierarchicalName = item.Record.GetHierarchicalName();
+            string releasePrefix = hierarchicalName is "."
+                ? $"v."
+                : $"{hierarchicalName}/v.";
+
             var repository = item.Record.TryGetConcreteItem(RecordType.Repository) ?? MonorepoDirectoryFunctions.GetMonoRepository();
-
             List<IRelease> exactReleases = new();
+            using var gitRepo = _gitRepositoryService.BuildRepository();
 
-            foreach (var tag in gitTagsService.GetTags())
+            foreach (var tag in gitRepo.Tags)
             {
                 if (tag.FriendlyName.StartsWith(releasePrefix, StringComparison.OrdinalIgnoreCase)
                     && Release.TryParse(tag, repository, out var release))

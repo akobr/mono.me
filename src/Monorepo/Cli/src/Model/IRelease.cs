@@ -7,7 +7,7 @@ namespace _42.Monorepo.Cli.Model
 {
     public interface IRelease
     {
-        Tag Tag { get; }
+        ObjectId CommitId { get; }
 
         IRecord Target { get; }
 

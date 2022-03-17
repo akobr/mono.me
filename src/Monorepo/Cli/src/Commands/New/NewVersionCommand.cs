@@ -51,7 +51,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 return ExitCodes.WARNING_NO_WORK_NEEDED;
             }
 
-            var report = _historyService.GetHistory(Context.Item.Record.RepoRelativePath, new Commit[] { lastChangeInVersion.Commit });
+            var report = _historyService.GetHistory(repo, Context.Item.Record.RepoRelativePath, new Commit[] { lastChangeInVersion.Commit });
             var hasChanges = report.Changes.Count > 0;
 
             if (report.Changes.Count < 1 && report.UnknownChanges.Count < 1)
