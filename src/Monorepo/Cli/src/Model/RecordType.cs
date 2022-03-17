@@ -4,8 +4,8 @@ namespace _42.Monorepo.Cli.Model
     {
         Repository = 0,
         RootDirectory = 1,
-        TopWorkstead = 1,
-        Workstead = 2,
-        Project = 3,
+        TopWorkstead = 2,
+        Workstead = 3,
+        Project = 4,
     }
 }
