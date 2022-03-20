@@ -1,14 +1,17 @@
 {
   "profiles": {
-    "current-repo": {
+    "current-repo-list": {
       "commandName": "Project",
-      "commandLineArgs": "release"
+      "commandLineArgs": "list --worksteads --tree"
     },
-    "windows-terminal": {
+    "init-new-repo": {
+      "commandName": "Project",
+      "commandLineArgs": "init"
+    },
+    "windows-10-terminal-init": {
       "commandName": "Executable",
-      "executablePath": "c:\\Users\\kobra\\AppData\\Local\\Microsoft\\WindowsApps\\wt.exe",
-      "commandLineArgs": "dotnet.exe run --project C:\\working\\mono.me\\src\\Monorepo\\Cli\\src\\Cli.csproj -- new version",
-      "workingDirectory": "C:\\working\\mono.me\\src\\Monorepo\\Cli\\src"
+      "executablePath": "%USERPROFILE%\\AppData\\Local\\Microsoft\\WindowsApps\\wt.exe",
+      "commandLineArgs": "dotnet.exe run --project ..\\..\\..\\Cli.csproj -- init"
     }
   }
 }
