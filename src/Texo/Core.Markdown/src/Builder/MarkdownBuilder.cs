@@ -33,6 +33,7 @@ namespace _42.Monorepo.Texo.Core.Markdown.Builder
             stringBuilder.Append('#', Math.Max(level, 1));
             stringBuilder.Append(' ');
             stringBuilder.AppendLine(text);
+            stringBuilder.AppendLine();
             return this;
         }
 
