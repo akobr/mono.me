@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace _42.Monorepo.Cli.ConventionalCommits
@@ -12,17 +14,22 @@ namespace _42.Monorepo.Cli.ConventionalCommits
             Type = type;
             Description = description;
             IsBreakingChange = isBreakingChange;
+            Links = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
         public string Type { get; init; }
 
         public string Description { get; init; }
 
-        public bool IsBreakingChange { get; init; }
+        public bool IsBreakingChange { get; set; }
 
         public string? Scope { get; init; }
 
         public string? IssueLink { get; init; }
+
+        public HashSet<string> Links { get; set; }
+
+        IReadOnlyCollection<string> IConventionalMessage.Links => Links;
 
         public string GetFullRepresentation()
         {

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using _42.Monorepo.Cli.ConventionalCommits;
 using _42.Monorepo.Texo.Core.Markdown.Builder;
 
 namespace _42.Monorepo.Cli.Commands.Release
@@ -69,34 +70,45 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             if (breakChanges.Count > 0)
             {
+                markdownBuilder.WriteLine();
                 markdownBuilder.Header("Breaking changes", 2);
+
                 foreach (var change in breakChanges)
                 {
                     markdownBuilder.Bullet($"{change.Type}: {change.Description}");
+                    WriteLinks(markdownBuilder, change);
                 }
             }
 
             if (features.Count > 0)
             {
+                markdownBuilder.WriteLine();
                 markdownBuilder.Header("New features", 2);
+
                 foreach (var feature in features)
                 {
                     markdownBuilder.Bullet(feature.Description);
+                    WriteLinks(markdownBuilder, feature);
                 }
             }
 
             if (minorChanges.Count > 0)
             {
+                markdownBuilder.WriteLine();
                 markdownBuilder.Header("Minor changes", 2);
+
                 foreach (var change in minorChanges)
                 {
                     markdownBuilder.Bullet($"{change.Type}: {change.Description}");
+                    WriteLinks(markdownBuilder, change);
                 }
             }
 
             if (unknownChanges.Count > 0)
             {
+                markdownBuilder.WriteLine();
                 markdownBuilder.Header("Unknown changes", 2);
+
                 foreach (var unknown in unknownChanges)
                 {
                     markdownBuilder.Bullet($"{unknown.Sha[..4]}: {unknown.MessageShort}");
@@ -104,6 +116,16 @@ namespace _42.Monorepo.Cli.Commands.Release
             }
 
             return markdownBuilder;
+        }
+
+        private static void WriteLinks(MarkdownBuilder markdownBuilder, IConventionalMessage change)
+        {
+            foreach (string urlLink in change.Links)
+            {
+                markdownBuilder.Bullet(1);
+                markdownBuilder.Link(urlLink, urlLink);
+                markdownBuilder.WriteLine();
+            }
         }
     }
 }

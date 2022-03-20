@@ -41,7 +41,7 @@ namespace _42.Monorepo.Cli.Git
         {
             var stopCommits = CreateStopSet(commitsToStop);
             var visitedCommits = new HashSet<ObjectId>();
-            var parser = new ConventionalParser();
+            var parser = new ConventionalParser(_options.IssueUrlTemplate);
             var changes = new List<(Commit, IConventionalMessage)>();
             var unknownCommits = new List<Commit>();
             var unknownDeep = 0;
@@ -86,7 +86,7 @@ namespace _42.Monorepo.Cli.Git
                     continue;
                 }
 
-                if (!parser.TryParseCommitMessage(commit.MessageShort, out var conventionalMessage))
+                if (!parser.TryParseCommitMessage(commit.MessageShort, commit.Message, out var conventionalMessage))
                 {
                     if (++unknownDeep > MaxUnknownChangesInReport)
                     {

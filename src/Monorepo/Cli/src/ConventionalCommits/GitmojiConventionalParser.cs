@@ -27,7 +27,7 @@ namespace _42.Monorepo.Cli.ConventionalCommits
             conventionalMessage = new ConventionalMessage(
                 match.Groups["type"].Value,
                 match.Groups["description"].Value,
-                match.Groups.ContainsKey("breaking"))
+                match.Groups["breaking"].Success)
             {
                 Scope = match.Groups.ContainsKey("scope") ? match.Groups["scope"].Value : null,
                 IssueLink = match.Groups.ContainsKey("issue") ? match.Groups["issue"].Value : null,

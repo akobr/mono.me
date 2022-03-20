@@ -9,5 +9,7 @@ namespace _42.Monorepo.Cli.Configuration
         public ReleaseChangesOptions Changes { get; set; } = new ReleaseChangesOptions();
 
         public bool CreateReleaseBranch { get; set; }
+
+        public string? IssueUrlTemplate { get; set; }
     }
 }
