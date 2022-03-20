@@ -45,3 +45,11 @@ If you need to implement any custom steps during the build or somehow affect the
 ## Centralized artefacts
 
 It is nice to have one centralized place where all NuGet packages are stored. This folder can be easily used as a source for continuous deployment systems or as a local NuGet feed for a different repository. For these needs, the monorepo has the `.artifacts` folder in the root.
+
+## Separate human and machine view
+
+TBC
+
+## Configuration about details
+
+TBC (mrepo.json)
