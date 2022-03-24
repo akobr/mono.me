@@ -10,7 +10,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command(CommandNames.LIST, Description = "List items in current position of the mono-repository.")]
+    [Command(CommandNames.LIST, Description = "Show list of items in a specific location.")]
     public class ListCommand : BaseCommand
     {
         public ListCommand(IExtendedConsole console, ICommandContext context)

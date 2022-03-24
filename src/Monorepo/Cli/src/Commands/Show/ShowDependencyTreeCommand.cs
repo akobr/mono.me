@@ -7,7 +7,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.Show
 {
-    [Command(CommandNames.DEPENDENCY_TREE, Description = "Show dependency tree for current project/workstead.")]
+    [Command(CommandNames.DEPENDENCY_TREE, Description = "Show dependency tree for a current location.")]
     public class ShowDependencyTreeCommand : BaseCommand
     {
         public ShowDependencyTreeCommand(IExtendedConsole console, ICommandContext context)

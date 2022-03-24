@@ -57,7 +57,7 @@ namespace _42.Monorepo.Cli
             return new RepositoryRecord(GetMonorepoRootDirectory());
         }
 
-        public static IRecord GetCurrentItem()
+        public static IRecord GetCurrentRecord()
         {
             return GetRecord(Directory.GetCurrentDirectory());
         }
@@ -141,7 +141,7 @@ namespace _42.Monorepo.Cli
 #if DEBUG
             return true;
 #else
-            return LibGit2Sharp.Repository.IsValid(directory);
+            return LibGit2Sharp.Repository.IsValid(directory.FullName);
 #endif
         }
     }

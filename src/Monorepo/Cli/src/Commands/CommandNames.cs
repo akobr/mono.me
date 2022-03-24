@@ -8,7 +8,10 @@ namespace _42.Monorepo.Cli.Commands
         public const string LIST = "list";
         public const string EXPLAIN = "explain";
         public const string RUN = "run";
+        public const string BUILD = "build";
+
         public const string RELEASE = "release";
+        public const string TAG = "tag";
 
         public const string SHOW = "show";
         public const string DEPENDENCY_TREE = "dependency-tree";
@@ -18,5 +21,13 @@ namespace _42.Monorepo.Cli.Commands
         public const string NEW = "new";
         public const string WORKSTEAD = "workstead";
         public const string PROJECT = "project";
+        public const string REPOSITORY = "repository";
+        public const string VERSION = "version";
+
+        public const string FIX = "fix";
+        public const string PACKAGES = "packages";
+
+        public const string UPDATE = "update";
+        public const string PACKAGE = "package";
     }
 }

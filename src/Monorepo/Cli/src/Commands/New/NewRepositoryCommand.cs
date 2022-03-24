@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using _42.Monorepo.Cli.Commands.New;
 using _42.Monorepo.Cli.Features;
 using _42.Monorepo.Cli.Output;
 using _42.Monorepo.Cli.Templates;
@@ -11,12 +10,12 @@ using Alba.CsConsoleFormat;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 
-namespace _42.Monorepo.Cli.Commands.Init
+namespace _42.Monorepo.Cli.Commands.New
 {
-    [Command(CommandNames.INIT, Description = "Initialise a new mono-repository.")]
-    public class InitCommand : BaseCommand
+    [Command(CommandNames.REPOSITORY, "repo", Description = "Create new mono-repository.")]
+    public class NewRepositoryCommand : BaseCommand
     {
-        public InitCommand(IExtendedConsole console, ICommandContext context)
+        public NewRepositoryCommand(IExtendedConsole console, ICommandContext context)
             : base(console, context)
         {
             // no operation
@@ -292,13 +291,9 @@ namespace _42.Monorepo.Cli.Commands.Init
 
             featureList.AddRange(new[]
             {
-                FeatureNames.GitVersion,
-                FeatureNames.Packages,
-                FeatureNames.Traversal,
                 FeatureNames.TestsXunit,
                 FeatureNames.TestsNunit,
                 FeatureNames.Stylecop,
-                FeatureNames.Sonar,
             });
 
             var featureProvider = FeatureProvider.Build(featureList);

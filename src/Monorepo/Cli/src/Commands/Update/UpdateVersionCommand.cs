@@ -3,12 +3,12 @@ using System.Threading.Tasks;
 using _42.Monorepo.Cli.Output;
 using McMaster.Extensions.CommandLineUtils;
 
-namespace _42.Monorepo.Cli.Commands.Fix
+namespace _42.Monorepo.Cli.Commands.Update
 {
-    [Command(CommandNames.PACKAGES, Description = "Move all locally versioned packages to centralized point.")]
-    public class FixPackagesCommand : BaseCommand
+    [Command(CommandNames.VERSION, Description = "Update version of a current location based on git history.")]
+    public class UpdateVersionCommand : BaseCommand
     {
-        public FixPackagesCommand(IExtendedConsole console, ICommandContext context)
+        public UpdateVersionCommand(IExtendedConsole console, ICommandContext context)
             : base(console, context)
         {
             // no operation

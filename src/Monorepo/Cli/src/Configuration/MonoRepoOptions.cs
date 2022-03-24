@@ -13,8 +13,8 @@ namespace _42.Monorepo.Cli.Configuration
 
         public string[] Features { get; set; } = Array.Empty<string>();
 
-        public string[] SrcSiblings { get; set; } = Array.Empty<string>();
-
         public Dictionary<string, string> Scripts { get; set; } = new();
+
+        public string? Shell { get; set; }
     }
 }

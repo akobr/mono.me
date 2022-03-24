@@ -1,12 +1,25 @@
 {
   "profiles": {
+    "current-repo-dev": {
+      "commandName": "Project",
+      "commandLineArgs": "build"
+    },
     "current-repo-list": {
       "commandName": "Project",
       "commandLineArgs": "list --worksteads --tree"
     },
+    "current-repo-release": {
+      "commandName": "Project",
+      "commandLineArgs": "release"
+    },
     "init-new-repo": {
       "commandName": "Project",
       "commandLineArgs": "init"
+    },
+    "outside-new-workstead": {
+      "commandName": "Project",
+      "commandLineArgs": "new workstead",
+      "workingDirectory": "c:\\working\\new.mrepo"
     },
     "windows-10-terminal-init": {
       "commandName": "Executable",

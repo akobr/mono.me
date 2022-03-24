@@ -3,12 +3,12 @@ using System.Threading.Tasks;
 using _42.Monorepo.Cli.Output;
 using McMaster.Extensions.CommandLineUtils;
 
-namespace _42.Monorepo.Cli.Commands.Fix
+namespace _42.Monorepo.Cli.Commands.Release
 {
-    [Command(CommandNames.PACKAGES, Description = "Move all locally versioned packages to centralized point.")]
-    public class FixPackagesCommand : BaseCommand
+    [Command(CommandNames.TAG, Description = "Create new git tag after a release.")]
+    public class TagCommand : BaseCommand
     {
-        public FixPackagesCommand(IExtendedConsole console, ICommandContext context)
+        public TagCommand(IExtendedConsole console, ICommandContext context)
             : base(console, context)
         {
             // no operation

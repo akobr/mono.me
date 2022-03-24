@@ -21,11 +21,12 @@ namespace _42.Monorepo.Cli.Configuration
             }
         }
 
-        public TypeOptions GetOptions(string typeKey)
+        public TypeOptions GetOptions(string? typeKey)
         {
-            return _options.TryGetValue(typeKey, out var typeOptions)
-                ? typeOptions
-                : new TypeOptions { Key = typeKey };
+            return !string.IsNullOrWhiteSpace(typeKey)
+                && _options.TryGetValue(typeKey, out var typeOptions)
+                    ? typeOptions
+                    : new TypeOptions { Key = typeKey ?? string.Empty };
         }
 
         public IEnumerable<TypeOptions> GetAllOptions()

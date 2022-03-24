@@ -14,15 +14,15 @@ namespace _42.Monorepo.Cli.Commands
             // no operation
         }
 
-        [Argument(0, "path", Description = "Path to a file/directory in the mono-repository.")]
-        public string? Path { get; set; } = string.Empty;
+        [Argument(0, "item-path", Description = "Relative path to a file/directory in the mono-repository.")]
+        public string? RelativeItemPath { get; set; } = string.Empty;
 
         protected override Task<int> ExecuteAsync()
         {
-            if (string.IsNullOrWhiteSpace(Path)
-                || Path.EqualsOrdinalIgnoreCase("/")
-                || Path.EqualsOrdinalIgnoreCase("repo")
-                || Path.EqualsOrdinalIgnoreCase("mrepo"))
+            if (string.IsNullOrWhiteSpace(RelativeItemPath)
+                || RelativeItemPath.EqualsOrdinalIgnoreCase("/")
+                || RelativeItemPath.EqualsOrdinalIgnoreCase("repo")
+                || RelativeItemPath.EqualsOrdinalIgnoreCase("mrepo"))
             {
                 Console.WriteLine("Welcome in a mono-repository!");
 
@@ -43,7 +43,7 @@ namespace _42.Monorepo.Cli.Commands
                 }
             }
 
-            string name = (System.IO.Path.GetFileName(Path) ?? Path ?? string.Empty).ToLowerInvariant();
+            string name = (System.IO.Path.GetFileName(RelativeItemPath) ?? RelativeItemPath ?? string.Empty).ToLowerInvariant();
 
             switch (name)
             {

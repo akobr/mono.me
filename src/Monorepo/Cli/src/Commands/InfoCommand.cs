@@ -9,7 +9,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command(CommandNames.INFO, Description = "Display informatin of a current location in the mono-repository.")]
+    [Command(CommandNames.INFO, Description = "Display information of a current location.")]
     public class InfoCommand : BaseCommand
     {
         private readonly IItemOptionsProvider _optionsProvider;

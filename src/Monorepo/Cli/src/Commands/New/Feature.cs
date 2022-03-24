@@ -1,4 +1,4 @@
-namespace _42.Monorepo.Cli.Commands.Init
+namespace _42.Monorepo.Cli.Commands.New
 {
     public class Feature
     {
