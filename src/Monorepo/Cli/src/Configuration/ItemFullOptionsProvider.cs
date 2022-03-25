@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace _42.Monorepo.Cli.Configuration;
 
 public class ItemFullOptionsProvider : IItemFullOptionsProvider
@@ -13,12 +15,20 @@ public class ItemFullOptionsProvider : IItemFullOptionsProvider
         _typeOptionsProvider = typeOptionsProvider;
     }
 
-    public IItemFullOption GetOptions(string path, string defaultTypeKey = TypeKeys.UNKNOWN)
+    public IItemFullOption GetOptions(string path, string? defaultTypeKey = null)
     {
         var itemOptions = _itemOptionsProvider.GetOptions(path);
         var typeOptionsKey = itemOptions.Type ?? defaultTypeKey;
         var typeOptions = _typeOptionsProvider.GetOptions(typeOptionsKey);
-
         return new ItemFullOption(itemOptions, typeOptions);
+    }
+
+    public IEnumerable<IItemFullOption> GetAllOptions()
+    {
+        foreach (var itemOptions in _itemOptionsProvider.GetAllOptions())
+        {
+            var typeOptions = _typeOptionsProvider.GetOptions(null);
+            yield return new ItemFullOption(itemOptions, typeOptions);
+        }
     }
 }

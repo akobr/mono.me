@@ -6,6 +6,7 @@ namespace _42.Monorepo.Cli.Features
         public const string GitVersion = "git-version";
         public const string BuildTraversal = "build-traversal";
         public const string Stylecop = "stylecop";
+        public const string Sonar = "sonar";
 
         public const string Tests = "tests";
         public const string TestsXunit = "tests-xunit";

@@ -12,18 +12,15 @@ namespace _42.Monorepo.Cli.Scripting
     public class ScriptingService : IScriptingService
     {
         private readonly MonoRepoOptions repositoryOptions;
-        private readonly IItemOptionsProvider itemOptionsProvider;
-        private readonly ITypeOptionsProvider typeOptionsProvider;
+        private readonly IItemFullOptionsProvider itemOptionsProvider;
         private readonly ScriptTree scriptTree;
 
         public ScriptingService(
             IOptions<MonoRepoOptions> repositoryOptions,
-            IItemOptionsProvider itemOptionsProvider,
-            ITypeOptionsProvider typeOptionsProvider)
+            IItemFullOptionsProvider itemOptionsProvider)
         {
             this.repositoryOptions = repositoryOptions.Value;
             this.itemOptionsProvider = itemOptionsProvider;
-            this.typeOptionsProvider = typeOptionsProvider;
             scriptTree = InitialiseScriptTree();
         }
 
@@ -49,13 +46,14 @@ namespace _42.Monorepo.Cli.Scripting
 
         public async Task<int> ExecuteScriptAsync(string script, string? workingDirectory = null, CancellationToken cancellationToken = default)
         {
-            ProcessStartInfo startInfo = new("powershell", script)
+            ProcessStartInfo startInfo = new(repositoryOptions.Shell ?? "powershell", script)
             {
                 UseShellExecute = false,
                 CreateNoWindow = false,
                 WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory,
             };
 
+            Console.WriteLine($"{startInfo.WorkingDirectory}> {script}"); // TODO [P2]
             var process = Process.Start(startInfo);
 
             if (process is null
@@ -66,6 +64,12 @@ namespace _42.Monorepo.Cli.Scripting
 
             await process.WaitForExitAsync(cancellationToken);
             return process.ExitCode;
+        }
+
+        // TODO: [P2] Prepare script with arguments (parameter replacement)
+        private string PrepareScriptToExecute(string script, IScriptContext context)
+        {
+            return string.Empty;
         }
 
         private ScriptTree InitialiseScriptTree()
@@ -87,14 +91,6 @@ namespace _42.Monorepo.Cli.Scripting
                 if (itemNode is null)
                 {
                     continue;
-                }
-
-                itemNode.AddScripts(itemOptions.Scripts);
-
-                if (!string.IsNullOrEmpty(itemOptions.Type))
-                {
-                    var typeOptions = typeOptionsProvider.GetOptions(itemOptions.Type);
-                    itemNode.AddScripts(typeOptions.Scripts);
                 }
             }
 

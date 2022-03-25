@@ -3,8 +3,7 @@
     "name": "mono.me",
     "description": "My personal mono-repository with most of my projects.",
     "prefix": "42",
-    "features": [ "git-version", "packages", "tests-xunit", "tests-nunit", "documentation" ],
-    "srcSiblings": [ "docs", ".azure/pipelines" ],
+    "features": [ "git-version", "packages", "build-traversal", "tests-xunit", "tests-nunit", "stylecop", "sonar" ],
     "scripts": {
       /* add any global scripts here */
       "hello": "echo 'Hello world!'",

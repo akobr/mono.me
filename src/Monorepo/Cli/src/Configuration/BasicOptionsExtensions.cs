@@ -22,6 +22,12 @@ public static class BasicOptionsExtensions
         return filePattern ?? string.Empty;
     }
 
+    public static string GetStartupProject(this IBasicOptions @this)
+    {
+        @this.Custom.TryGetValue(CustomProperties.STARTUP_PROJECT, out var startupProject);
+        return startupProject ?? string.Empty;
+    }
+
     public static bool IsVersioned(this IBasicOptions options)
     {
         return !options.Exclude.Contains(Excludes.VERSION);

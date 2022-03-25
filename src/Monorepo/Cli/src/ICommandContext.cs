@@ -1,5 +1,4 @@
 using _42.Monorepo.Cli.Model.Items;
-using _42.Monorepo.Cli.Operations;
 
 namespace _42.Monorepo.Cli
 {
@@ -11,6 +10,8 @@ namespace _42.Monorepo.Cli
 
         IRepository Repository { get; }
 
-        public void TryFailedIfInvalid();
+        void ReInitialize(string repoRelativePath);
+
+        void TryFailedIfInvalid();
     }
 }

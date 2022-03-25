@@ -53,7 +53,7 @@ namespace _42.Monorepo.Cli.Scripting
                 : Parent?.GetScript(scriptName);
         }
 
-        public void AddScripts(IDictionary<string, string> scripts)
+        public void AddScripts(IReadOnlyDictionary<string, string> scripts)
         {
             foreach (var (scriptName, script) in scripts)
             {

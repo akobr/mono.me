@@ -8,6 +8,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Monorepo.Cli.Commands
 {
     [Subcommand(
+        typeof(BuildCommand),
         typeof(RunCommand),
         typeof(InitCommand),
         typeof(NewCommand),
