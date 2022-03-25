@@ -18,11 +18,10 @@ using Microsoft.Extensions.Options;
 using Semver;
 using Sharprompt;
 
-using Repository = LibGit2Sharp.Repository;
-
 namespace _42.Monorepo.Cli.Commands.Release
 {
-    [Command(CommandNames.RELEASE, Description = "Create new release of a workstead or project.")]
+    [Command(CommandNames.RELEASE, Description = "Create new release of a current location.")]
+    [Subcommand(typeof(TagCommand))]
     public class ReleaseCommand : BaseCommand
     {
         private readonly IGitRepositoryService _repositoryService;

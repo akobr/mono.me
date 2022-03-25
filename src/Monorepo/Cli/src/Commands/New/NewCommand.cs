@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-using _42.Monorepo.Cli.Commands.Init;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Output;
@@ -7,8 +6,8 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.New
 {
-    [Command(CommandNames.NEW, Description = "Create new workstead, project, or version.")]
-    [Subcommand(typeof(NewWorksteadCommand), typeof(NewProjectCommand), typeof(NewVersionCommand))]
+    [Command(CommandNames.NEW, Description = "Create new project, workstead, version or mono-repository.")]
+    [Subcommand(typeof(NewWorksteadCommand), typeof(NewProjectCommand), typeof(NewVersionCommand), typeof(NewRepositoryCommand))]
     public class NewCommand : BaseCommand
     {
         private readonly CommandLineApplication application;
@@ -28,7 +27,7 @@ namespace _42.Monorepo.Cli.Commands.New
         {
             if (!Context.IsValid)
             {
-                return new InitCommand(Console, Context).OnExecuteAsync();
+                return application.Commands.ExecuteByNameAsync(CommandNames.REPOSITORY);
             }
 
             switch (Context.Item.Record.Type)

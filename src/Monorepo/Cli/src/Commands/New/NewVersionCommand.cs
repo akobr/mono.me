@@ -14,7 +14,7 @@ using Semver;
 
 namespace _42.Monorepo.Cli.Commands.New
 {
-    [Command("version", Description = "Set new version.")]
+    [Command(CommandNames.VERSION, Description = "Create new version file.")]
     public class NewVersionCommand : BaseCommand
     {
         private readonly IGitHistoryService _historyService;
@@ -44,6 +44,12 @@ namespace _42.Monorepo.Cli.Commands.New
             var lastChangeInVersion = repo.Commits
                 .QueryBy(versionFileRepoPath)
                 .FirstOrDefault();
+
+            var versionFolderPath = Path.GetDirectoryName(versionFileFullPath);
+            if (!Context.Item.Record.Path.EqualsOrdinalIgnoreCase(versionFolderPath))
+            {
+                Console.Confirm("Do you want to create new version.json file or update version for ");
+            }
 
             if (lastChangeInVersion == null)
             {

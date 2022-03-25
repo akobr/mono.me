@@ -13,7 +13,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.Show
 {
-    [Command(CommandNames.USAGES, Description = "Show usages of current project/workstead.")]
+    [Command(CommandNames.USAGES, Description = "Show usages of a current location.")]
     public class ShowUsagesCommand : BaseCommand
     {
         public ShowUsagesCommand(IExtendedConsole console, ICommandContext context)
@@ -308,6 +308,5 @@ namespace _42.Monorepo.Cli.Commands.Show
 
             public string? Version { get; }
         }
-
     }
 }
