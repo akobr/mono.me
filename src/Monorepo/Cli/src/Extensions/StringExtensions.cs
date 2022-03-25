@@ -62,6 +62,5 @@ namespace _42.Monorepo.Cli.Extensions
 
             return builder.ToString();
         }
-
     }
 }

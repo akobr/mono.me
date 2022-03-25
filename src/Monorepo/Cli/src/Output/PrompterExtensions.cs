@@ -20,8 +20,8 @@ namespace _42.Monorepo.Cli.Output
         public static TValue Input<TValue>(
             this IPrompter prompter,
             string message,
-            object defaultValue = null,
-            IList<Func<object, ValidationResult>> validators = null)
+            object? defaultValue = null,
+            IList<Func<object, ValidationResult>>? validators = null)
         {
             InputOptions options = new()
             {
@@ -32,6 +32,5 @@ namespace _42.Monorepo.Cli.Output
             options.Validators.Merge(validators);
             return prompter.Input<TValue>(options);
         }
-
     }
 }

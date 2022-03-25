@@ -145,5 +145,4 @@ namespace _42.Monorepo.Cli.Git
             return stopCommits;
         }
     }
-
 }

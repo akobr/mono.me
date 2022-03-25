@@ -4,7 +4,6 @@ using LibGit2Sharp;
 
 namespace _42.Monorepo.Cli.Git
 {
-
     public class GitHistoryReport
     {
         public GitHistoryReport(
@@ -19,5 +18,4 @@ namespace _42.Monorepo.Cli.Git
 
         public IReadOnlyList<Commit> UnknownChanges { get; }
     }
-
 }
