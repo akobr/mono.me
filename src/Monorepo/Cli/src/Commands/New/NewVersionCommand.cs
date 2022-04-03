@@ -1,15 +1,11 @@
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using _42.Monorepo.Cli.Commands.Release;
-using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
-using _42.Monorepo.Cli.Git;
 using _42.Monorepo.Cli.Output;
+using _42.Monorepo.Cli.Templates;
 using LibGit2Sharp;
 using McMaster.Extensions.CommandLineUtils;
-using Microsoft.Extensions.Options;
 using Semver;
 
 namespace _42.Monorepo.Cli.Commands.New
@@ -17,18 +13,10 @@ namespace _42.Monorepo.Cli.Commands.New
     [Command(CommandNames.VERSION, Description = "Create new version file.")]
     public class NewVersionCommand : BaseCommand
     {
-        private readonly IGitHistoryService _historyService;
-        private readonly ReleaseOptions _options;
-
-        public NewVersionCommand(
-            IExtendedConsole console,
-            ICommandContext context,
-            IGitHistoryService historyService,
-            IOptions<ReleaseOptions> configuration)
+        public NewVersionCommand(IExtendedConsole console, ICommandContext context)
             : base(console, context)
         {
-            _historyService = historyService;
-            _options = configuration.Value;
+            // no operation
         }
 
         [Argument(0, Description = "A custom version to set.")]
@@ -46,108 +34,56 @@ namespace _42.Monorepo.Cli.Commands.New
                 .FirstOrDefault();
 
             var versionFolderPath = Path.GetDirectoryName(versionFileFullPath);
-            if (!Context.Item.Record.Path.EqualsOrdinalIgnoreCase(versionFolderPath))
+            if (Context.Item.Record.Path.EqualsOrdinalIgnoreCase(versionFolderPath))
             {
-                Console.Confirm("Do you want to create new version.json file or update version for ");
-            }
-
-            if (lastChangeInVersion == null)
-            {
-                Console.WriteImportant("There is no version history in the current location of the mono-repository.");
+                Console.WriteImportant($"There is already a version file at the current location with version {currentVersion}.");
                 return ExitCodes.WARNING_NO_WORK_NEEDED;
             }
 
-            var report = _historyService.GetHistory(repo, Context.Item.Record.RepoRelativePath, new Commit[] { lastChangeInVersion.Commit });
-            var hasChanges = report.Changes.Count > 0;
+            var versionedRecord = MonorepoDirectoryFunctions.GetRecord(versionFileFullPath);
 
-            if (report.Changes.Count < 1 && report.UnknownChanges.Count < 1)
+            Console.WriteLine(
+                "Currently ",
+                Context.Item.Record.Name.ThemedHighlight(Console.Theme),
+                " is versionend as part of ",
+                versionedRecord.Name.ThemedHighlight(Console.Theme),
+                " and the version is ",
+                currentVersion.ToString());
+
+            if (!Console.Confirm($"Do you want to create a separated version file for {Context.Item.Record.Name}"))
             {
-                Console.WriteImportant($"There are no changes in current version '{currentVersion}'.");
-                return ExitCodes.WARNING_NO_WORK_NEEDED;
+                return ExitCodes.SUCCESS;
             }
 
-            var majorChangeTypeSet = new HashSet<string>(_options.Changes.Major);
-            var minorChangeTypeSet = new HashSet<string>(_options.Changes.Minor);
-            var patchChangeTypeSet = new HashSet<string>(_options.Changes.Patch);
-            var harmlessChangeTypeSet = new HashSet<string>(_options.Changes.Harmless);
+            SemVersion version;
 
-            var majorChanges = report.Changes.Where(ch => ch.Message.IsBreakingChange || majorChangeTypeSet.Contains(ch.Message.Type)).ToList();
-            var minorChanges = report.Changes.Where(ch => minorChangeTypeSet.Contains(ch.Message.Type)).ToList();
-            var pathChanges = report.Changes.Where(ch => patchChangeTypeSet.Contains(ch.Message.Type)).ToList();
-            var harmlessChanges = report.Changes.Where(ch => harmlessChangeTypeSet.Contains(ch.Message.Type)).ToList();
-
-            var hasMajorChange = majorChanges.Count > 0;
-            var hasMinorChange = minorChanges.Count > 0;
-            var hasPatchChange = pathChanges.Count > 0;
-
-            var newVersion = currentVersion.Change(prerelease: string.Empty);
-
-            if (hasMajorChange)
+            if (string.IsNullOrWhiteSpace(Version)
+                || !SemVersion.TryParse(Version, out version))
             {
-                newVersion = new(currentVersion.Major + 1);
-            }
-            else if (hasMinorChange)
-            {
-                newVersion = new(currentVersion.Major, currentVersion.Minor + 1);
-            }
-            else if (hasPatchChange)
-            {
-                newVersion = new(currentVersion.Major, currentVersion.Minor, currentVersion.Patch + 1);
-            }
-            else
-            {
-                Console.WriteImportant("There are no changes which should affect the version.");
-            }
+                var inputVersion = Console.Input<string>("What is the initial version", currentVersion.ToString());
 
-            if (hasChanges)
-            {
-                Console.WriteImportant($"New version should be ", $"{newVersion}".ThemedHighlight(Console.Theme));
-                Console.WriteLine();
-                Console.WriteHeader("Changes:");
-                var count = 0;
-
-                foreach (var change in report.Changes)
+                if (!SemVersion.TryParse(inputVersion, out version))
                 {
-                    count++;
-                    Console.WriteLine($"> {change.Message.GetFullRepresentation()}");
-
-                    if (count >= 50)
-                    {
-                        Console.WriteLine("... and more".ThemedLowlight(Console.Theme));
-                        break;
-                    }
+                    version = new SemVersion(0, 1);
                 }
             }
 
-            if (report.UnknownChanges.Count > 0)
+            var hierarchical = Console.Confirm("Should the version be hierarchical");
+
+            // version.json
+            var versionTemplate = new VersionJsonT4(new VersionJsonModel
             {
-                Console.WriteLine();
-                Console.WriteHeader("Unknown changes:");
-                var count = 0;
+                Version = version.ToString(),
+                IsHierarchical = hierarchical,
+            });
 
-                foreach (var unknownCommit in report.UnknownChanges)
-                {
-                    count++;
-                    Console.WriteLine($"> {unknownCommit.MessageShort}");
-
-                    if (count >= 50)
-                    {
-                        Console.WriteLine("... and more".ThemedLowlight(Console.Theme));
-                        break;
-                    }
-                }
-            }
-
-            Console.WriteLine();
-
-            if (Console.Confirm($"Do you want to update '{versionFileRepoPath}' version file"))
-            {
-                newVersion = Console.AskForVersion("What is the final version", newVersion);
+            var versionFilePath = Path.Combine(Context.Item.Record.Path, FileNames.VersionJson);
 #if !DEBUG || TESTING
-                ReleaseHelper.UpdateVersionFile(newVersion.ToString(), versionFileFullPath);
+            await File.WriteAllTextAsync(versionFilePath, versionTemplate.TransformText());
 #endif
-            }
 
+            var versionRepoPath = Path.Combine(Context.Item.Record.RepoRelativePath, FileNames.VersionJson);
+            Console.WriteLine($"new version file: {versionRepoPath}");
             return ExitCodes.SUCCESS;
         }
     }
