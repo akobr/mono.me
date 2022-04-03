@@ -23,7 +23,7 @@ I highly recommend using the TDD development approach. My CLI tooling always cre
 
 The code should be self-documenting, but some overview technical documentation is always helpful and should be created and managed in the same way as source code (*by git*). Place it into the `docs` folder next to the `src` folder and follow the same structure as the code itself.
 
-> Later I will explain how to generate some nice looking static websites from the documentation by [VuePress](https://v2.vuepress.vuejs.org/) or [GitHub Pages](https://pages.github.com/).
+> Later, I will explain how to generate some nice-looking static websites from the documentation by [VuePress](https://v2.vuepress.vuejs.org/) or [GitHub Pages](https://pages.github.com/).
 
 ## Code standards
 

@@ -18,7 +18,7 @@ This project is trying to tackle problems around [a mono-repository](https://en.
   - docs
   - src
 
-Main concept of a mono-repository structure is using **workstreads and projects**. Where workstead is a grouping concept of multiple projects or other worksteads. You can imagine a worstead as a business project which contains all necesary coding projects (libraries, packages and applications) inside.
+The concept of a mono-repository structure is using **workstreads and projects**. Where workstead is a grouping concept of multiple projects or other worksteads. You can imagine a workstead as a business project which contains all necessary coding projects (libraries, packages, and applications) inside.
 
 The most important folder of a repository is `src` which contains all code, all worksteads and projects. Is recomended to use *"siblings folders to source"*, a folder with mirrored structure as `src` and its content is related to worskteads and projects, but not the code itself. Simplest example is `docs` folder with Markdown documentation for the projects and their release notes. The second example could be `.azure/pipelines` to carry all CI/CD pipelines for all deliverables.
 

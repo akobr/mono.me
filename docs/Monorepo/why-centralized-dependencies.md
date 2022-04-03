@@ -1,11 +1,11 @@
 # Why centralized dependencies
 
-If no centralized dependency system is in place then the dependencies needs to be managed on each project. This is well described for .NET platform at official documentation: [Manage package dependencies in .NET applications](https://docs.microsoft.com/en-us/dotnet/core/tools/dependencies).
+If no centralized dependency system is in place then the dependencies need to be managed on each project. This is well described for .NET platform at official documentation: [Manage package dependencies in .NET applications](https://docs.microsoft.com/en-us/dotnet/core/tools/dependencies).
 
-## Disadvantages without centralized system
+## Disadvantages without a centralized system
 
-- difficult to update version of a dependency; needs to be done for each project separatelly
-- keep same version of a dependency in all projects is complex and is easy to forgot some
+- difficult to update a version of a dependency; need to be done for each project separately
+- keep the same version of a dependency in all projects is complex, and it is easy to forget some
 - has a global knowledge of all used dependencies is difficult
 - It's easy to smuggle in an inconvenient dependency
 

@@ -23,7 +23,7 @@ Install-Package 42.Monorepo.GitVersioning
 
 ## Global version settings for entire mono-repository
 
-To define one version for all unversioned projecs or create shared configuration, e.g. cloud build settings, add `version.json` file to the root of the mono-repository.
+To define one version for all unversioned projects or create shared configuration, e.g. cloud build settings, add `version.json` file to the root of the mono-repository.
 
 ```json
 {
