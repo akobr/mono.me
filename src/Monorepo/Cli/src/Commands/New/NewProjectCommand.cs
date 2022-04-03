@@ -46,7 +46,12 @@ namespace _42.Monorepo.Cli.Commands.New
             if (workstead == null)
             {
                 var worksteads = Context.Repository.GetWorksteads().ToDictionary(w => w.Record.Name);
-                var selectedWorkstead = Console.Select(new Sharprompt.SelectOptions<string> { Items = worksteads.Keys, Message = "Under which workstead", PageSize = 20 });
+                var selectedWorkstead = Console.Select(new Sharprompt.SelectOptions<string>
+                {
+                    Items = worksteads.Keys,
+                    Message = "Under which workstead",
+                    PageSize = 20,
+                });
                 workstead = worksteads[selectedWorkstead];
             }
 

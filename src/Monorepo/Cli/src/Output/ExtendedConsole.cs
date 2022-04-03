@@ -135,7 +135,7 @@ namespace _42.Monorepo.Cli.Output
         public void Write(Document document)
         {
             document.Color = Theme.ForegroundColor;
-            document.Margin = Thickness.Add(document.Margin, new Thickness(2, 0, 0, 0));
+            document.Margin = Thickness.Add(document.Margin, new Thickness(2, 0, 2, 0));
             ConsoleRenderer.RenderDocument(document);
         }
 
