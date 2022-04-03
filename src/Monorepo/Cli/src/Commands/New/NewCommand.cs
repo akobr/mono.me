@@ -7,7 +7,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Monorepo.Cli.Commands.New
 {
     [Command(CommandNames.NEW, Description = "Create new project, workstead, version or mono-repository.")]
-    [Subcommand(typeof(NewWorksteadCommand), typeof(NewProjectCommand), typeof(NewVersionCommand), typeof(NewRepositoryCommand))]
+    [Subcommand(typeof(NewWorksteadCommand), typeof(NewProjectCommand), typeof(NewPackageCommand), typeof(NewVersionCommand), typeof(NewRepositoryCommand))]
     public class NewCommand : BaseCommand
     {
         private readonly CommandLineApplication application;

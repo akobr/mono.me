@@ -1,19 +1,18 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.NuGet;
 using _42.Monorepo.Cli.Output;
 using McMaster.Extensions.CommandLineUtils;
 using Semver;
 using Sharprompt;
 
-namespace _42.Monorepo.Cli.Commands.Update
+namespace _42.Monorepo.Cli.Commands.New
 {
-    [Command(CommandNames.PACKAGE, Description = "Update version of a specific package.")]
-    public class UpdatePackageCommand : BaseCommand
+    [Command(CommandNames.PACKAGE, Description = "Add new package to centralized definition.")]
+    public class NewPackageCommand : BaseCommand
     {
-        public UpdatePackageCommand(IExtendedConsole console, ICommandContext context)
+        public NewPackageCommand(IExtendedConsole console, ICommandContext context)
             : base(console, context)
         {
             // no operation
@@ -28,12 +27,16 @@ namespace _42.Monorepo.Cli.Commands.Update
         [Option("-p|--prerelease", CommandOptionType.NoValue, Description = "Determining whether to include pre-release versions.")]
         public bool UsePrereleases { get; set; }
 
-        [Option("-m|--move", CommandOptionType.NoValue, Description = "Determining whether you want to possibly move the package version definition.")]
-        public bool WantMovePackage { get; set; }
-
         protected override async Task<int> ExecuteAsync()
         {
-            var packageId = await GetPackageId();
+            var packageId = PackageId;
+
+            if (string.IsNullOrWhiteSpace(packageId))
+            {
+                Console.WriteImportant("The package id needs to be specified.");
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
+
             var targetVersion = await GetTargetVersionAsync(packageId);
 
             if (string.IsNullOrEmpty(targetVersion))
@@ -53,72 +56,20 @@ namespace _42.Monorepo.Cli.Commands.Update
                 return ExitCodes.WARNING_NO_WORK_NEEDED;
             }
 
-            if (!WantMovePackage || packagesFilePaths.Count < 2)
-            {
-                foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p)))
-                {
-                    if (await packagesManager.TryUpdatePackageVersionAsync(packageId, targetVersion))
-                    {
-                        await packagesManager.SaveAsync();
-                        return ExitCodes.SUCCESS;
-                    }
-                }
-
-                return ExitCodes.WARNING_NO_WORK_NEEDED;
-            }
-
-            var currentPackagesFile = string.Empty;
-
             foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p)))
             {
-                if (await packagesManager.IsPackageDefinedInAsync(packageId))
+                if (await packagesManager.TryUpdatePackageVersionAsync(packageId, targetVersion))
                 {
-                    currentPackagesFile = packagesManager.DefinitionFilePath;
-                    break;
+                    await packagesManager.SaveAsync();
+                    return ExitCodes.SUCCESS;
                 }
             }
 
-            var currentPackagesFileRelative = currentPackagesFile.GetRelativePath(Context.Repository.Record.Path);
-            Console.WriteLine($"Currently the package is defined in: {currentPackagesFileRelative}");
-            var pickedPackagesFile = Console.Select(new SelectOptions<string>
-            {
-                Items = packagesFilePaths.Select(p => p.GetRelativePath(Context.Repository.Record.Path)),
-                DefaultValue = currentPackagesFileRelative,
-                Message = "Into which Directory.Packages.props file you want to move",
-            });
-
-            if (currentPackagesFile != pickedPackagesFile)
-            {
-                var currentManager = new PackagesDefinitionManager(currentPackagesFile);
-                await currentManager.RemovePackageAsync(packageId);
-                await currentManager.SaveAsync();
-            }
-
-            var pickedManager = new PackagesDefinitionManager(pickedPackagesFile);
-            await pickedManager.AddOrUpdatePackageAsync(packageId, targetVersion);
-            await pickedManager.SaveAsync();
+            var directManager = new PackagesDefinitionManager(packagesFilePaths.First());
+            await directManager.AddOrUpdatePackageAsync(packageId, targetVersion);
+            await directManager.SaveAsync();
 
             return ExitCodes.SUCCESS;
-        }
-
-        private async Task<string> GetPackageId()
-        {
-            var packageId = PackageId;
-            var externalDependencies = await Context.Item.GetExternalDependenciesAsync();
-            var possiblePackageNames = new SortedSet<string>(externalDependencies.Select(d => d.Name));
-
-            if (string.IsNullOrWhiteSpace(packageId)
-                || !possiblePackageNames.Contains(packageId))
-            {
-                packageId = Console.Select(new SelectOptions<string>()
-                {
-                    Items = possiblePackageNames,
-                    Message = "Select which package to update",
-                    PageSize = 20,
-                });
-            }
-
-            return packageId;
         }
 
         private async Task<string> GetTargetVersionAsync(string packageId)
