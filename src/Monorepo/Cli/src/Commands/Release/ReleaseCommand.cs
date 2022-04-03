@@ -321,9 +321,11 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             if (inBranch)
             {
-                PrepareInGit(preview);
-                Console.WriteLine($"Branch:  {preview.Branch}");
-                Console.WriteLine("...the branch is ready and checked out.".ThemedLowlight(Console.Theme));
+                if (PrepareInGit(preview))
+                {
+                    Console.WriteLine($"Branch:  {preview.Branch}");
+                    Console.WriteLine("...the branch is ready and checked out.".ThemedLowlight(Console.Theme));
+                }
                 return;
             }
 
@@ -333,12 +335,18 @@ namespace _42.Monorepo.Cli.Commands.Release
             Console.WriteLine();
         }
 
-        private void PrepareInGit(ReleasePreview preview)
+        private bool PrepareInGit(ReleasePreview preview)
         {
             var isNewVersion = preview.CurrentVersion != preview.Version;
+            using var repository = _repositoryService.BuildRepository();
+
+            if (repository.Index.Count > 0)
+            {
+                Console.WriteImportant("There are already files in the git stage, please do the changes manualy.");
+                return false;
+            }
 
 #if !DEBUG || TESTING
-            using var repository = _repositoryService.BuildRepository();
             var branch = repository.CreateBranch(preview.Branch);
             LibGit2Sharp.Commands.Checkout(repository, branch);
 
@@ -353,6 +361,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             var gitConfig = repository.Config;
             var signature = gitConfig.BuildSignature(DateTimeOffset.Now);
             repository.Commit($"release: release of {preview.Tag}", signature, signature);
+            return true;
 #endif
         }
 

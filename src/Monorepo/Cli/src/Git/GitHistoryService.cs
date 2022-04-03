@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using _42.Monorepo.Cli.Configuration;
@@ -35,6 +36,37 @@ namespace _42.Monorepo.Cli.Git
         public GitHistoryReport GetHistory(Repository repo, string targetedRepoRelativePath, IEnumerable<Commit> commitsToStop)
         {
             return PrepareReport(repo, targetedRepoRelativePath, commitsToStop);
+        }
+
+        public Commit? FindFirstCommit(Repository repo, Func<Commit, bool> predicate, int maxVisits = 200)
+        {
+            var toProcess = new Stack<Commit>();
+            toProcess.Push(repo.Head.Tip);
+            var visitNumber = 0;
+
+            while (toProcess.Count > 0)
+            {
+                visitNumber++;
+                var commit = toProcess.Pop();
+
+                if (predicate(commit))
+                {
+                    return commit;
+                }
+
+                if (visitNumber > maxVisits)
+                {
+                    return null;
+                }
+
+                // register parents for processing
+                foreach (var parent in commit.Parents)
+                {
+                    toProcess.Push(parent);
+                }
+            }
+
+            return null;
         }
 
         private GitHistoryReport PrepareReport(Repository repo, string targetedRepoRelativePath, IEnumerable<Commit> commitsToStop)

@@ -111,7 +111,7 @@ namespace _42.Monorepo.Cli.Commands.Release
 
                 foreach (var unknown in unknownChanges)
                 {
-                    markdownBuilder.Bullet($"{unknown.Sha[..4]}: {unknown.MessageShort}");
+                    markdownBuilder.Bullet($"{unknown.Sha[..7]}: {unknown.MessageShort}");
                 }
             }
 
