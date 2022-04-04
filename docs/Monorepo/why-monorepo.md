@@ -5,7 +5,7 @@ I try to explain reasons why I think the mono-repo make sense. As the first thin
 - **[Google](https://qeunit.com/blog/how-google-does-monorepo/)**: all web services, 86 TB code-base, 40000 commits per day, 10000 developers, git
 - **[Facebook](https://engineering.fb.com/2014/01/07/core-data/scaling-mercurial-at-facebook/)**: uses Mercurial as source control
 - **[Microsoft](https://devblogs.microsoft.com/bharry/the-largest-git-repo-on-the-planet/)**: one single code-base for the entire Windows OS in git
-- other big fishes: *Twitter, Airbnb, Uber*
+- other big fishes: *Twitter, [Airbnb](https://qeunit.com/blog/airbnbs-monorepo-journey-to-quality-engineering/), Uber*
 
 ## Disadvantages
 
@@ -14,7 +14,7 @@ I try to explain reasons why I think the mono-repo make sense. As the first thin
 
 The firsts disadvantage is valid only for colossal code bases. 4% of all mono-repos will need to solve this issue and put some tooling in place. The largest of them use a virtual file system (VFS) to tackle this problem. Google uses [Perforce](https://www.perforce.com/), and Microsoft builds open-source [GVFS](https://en.wikipedia.org/wiki/Virtual_File_System_for_Git) for Git. Facebook uses different source control, the decentralized system called [Mercurial](https://www.mercurial-scm.org/), which is more suitable for a large mono-repo.
 
-The second point about access control currently doesn't have a simple solution, but the question should be: Do I need it? The most important benefit of a mono-repo is the visibility and accessibility of the code. I would say every developer should be able to see it all.
+The second point about access control currently doesn't have a simple solution, but the question should be: *Do I need it?* The most important benefit of a mono-repo is the visibility and accessibility of the code. I would say every developer should be able to see it all.
 
 > It is a particularity to accept and align in the culture and practices to avoid restricting accesses. Shared visibility being a strong point of a monorepo. -- Google
 
@@ -28,15 +28,15 @@ Suppose your setup still requires limited access to a specific sub-project. E.g.
 
 ## Advantages
 
-- sharing, transparency, discoverability, and visibility
+- sharing, **transparency, discoverability**, and visibility
 - better debugging + dev testing
-- simplified dependency management or no dependencies at all
-- reduce code duplication and complexity
+- **simplified dependency management** or no dependencies at all
+- **reduce code duplication** and complexity
 - effective code reviews
 - easy refactoring (cross-project changes)
-- tooling and standards
+- tooling and **standards**
 
-Some advantages can be beneficial even for fully independent projects, same as in this mono-repo. For example, tooling, standards, effective code reviews, and transparency would be applied to any project created under the mono-repo. It is much easier to create a folder than an entire repository and configure everything again.
+Some advantages can be beneficial even for fully independent projects, same as in this mono-repo. For example, *tooling, standards, effective code reviews, and transparency* would be applied to any project created under the mono-repo. It is much easier to create a folder than an entire repository and configure everything again.
 
 Nothing in this beautiful world of ours is black and white. Everything can be achieved by custom tooling. All advantages in the list above can be transferred into a poly-repo environment. Still, it is much easier to start with the setup where they will work efficiently and automatically rather than manage and spend resources on more tooling.
 
@@ -50,15 +50,20 @@ Here, you can read about [the poly-repo approach used in Netflix](https://netfli
 - [How Google Does Monorepo - QE Unit](https://qeunit.com/blog/how-google-does-monorepo/)
 - [5 ways to configure a monorepo for DevSecOps efficiency - Bridgecrew Blog](https://bridgecrew.io/blog/5-ways-to-configure-a-monorepo-for-devsecops-efficiency/)
 - [Airbnb's Monorepo Journey To Quality Engineering - QE Unit](https://qeunit.com/blog/airbnbs-monorepo-journey-to-quality-engineering/)
+- [The largest Git repo on the planet](https://devblogs.microsoft.com/bharry/the-largest-git-repo-on-the-planet/)
 - [Scaling Git (and some back story)](https://devblogs.microsoft.com/bharry/scaling-git-and-some-back-story/)
 - [The Hands-on Mainstream Repo Models You Need To Know - QE Unit](https://qeunit.com/blog/the-hands-on-mainstream-repo-models-you-need-to-know/)
 - [Monorepos: Please don’t!. Here we are at the beginning of 2019… | by Matt Klein | Medium](https://medium.com/@mattklein123/monorepos-please-dont-e9a279be011b)
+- [Towards true continuous integration: distributed repositories and dependencies](https://netflixtechblog.com/towards-true-continuous-integration-distributed-repositories-and-dependencies-2a2e3108c051)
 - [Working with a Monorepo](https://devblogs.microsoft.com/cse/2021/11/23/working-with-a-monorepo/)
 - [Mono-repo or multi-repo? Why choose one, when you can have both? | by Patrick Lee Scott | Medium](https://patrickleet.medium.com/mono-repo-or-multi-repo-why-choose-one-when-you-can-have-both-e9c77bd0c668)
 - [What is monorepo? (and should you use it?) - Semaphore (semaphoreci.com)](https://semaphoreci.com/blog/what-is-monorepo)
+- [Scaling Mercurial at Facebook](https://engineering.fb.com/2014/01/07/core-data/scaling-mercurial-at-facebook/)
 
 ### Tooling
 
 - [Git - git-sparse-checkout Documentation (git-scm.com)](https://git-scm.com/docs/git-sparse-checkout)
 - [Git subtree: the alternative to Git submodule | Atlassian Git Tutorial](https://www.atlassian.com/git/tutorials/git-subtree)
+- [VFS for Git](https://github.com/microsoft/VFSForGit)
 - [Mercurial SCM (mercurial-scm.org)](https://www.mercurial-scm.org/)
+- [Perforce](https://www.perforce.com/)
