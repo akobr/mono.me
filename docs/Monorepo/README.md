@@ -4,8 +4,11 @@ This project is trying to tackle problems around [a mono-repository](https://en.
 
 ## Table of content
 
+- [Why mono-repo?](why-monorepo.md)
+- [Why centralized dependencies?](why-centralized-dependencies.md)
 - [Good habits](good-habits.md)
 - [Versioning](versioning.md)
+- [Releasing](releasing.md)
 - [Feature list](features.md)
 - [Configuration](mrepo-json.md)
 

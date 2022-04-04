@@ -4,6 +4,7 @@ The list of currently supported features:
 
 - versioning based on git
 - centralized management of dependencies
+- automated releasing and release notes generating
 - machine-friendly builds
 - support for StyleCop and Sonar code analyzers
 - unit-testing support (xUnit and NUnit)

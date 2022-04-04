@@ -1,19 +1,19 @@
 # Why centralized dependencies
 
-If no centralized dependency system is in place then the dependencies need to be managed on each project. This is well described for .NET platform at official documentation: [Manage package dependencies in .NET applications](https://docs.microsoft.com/en-us/dotnet/core/tools/dependencies).
+If no centralized dependency system is in place, the dependencies need to be managed on each project. This is well described for .NET platform in the official documentation: [Manage package dependencies in .NET applications](https://docs.microsoft.com/en-us/dotnet/core/tools/dependencies).
 
 ## Disadvantages without a centralized system
 
-- difficult to update a version of a dependency; need to be done for each project separately
-- keep the same version of a dependency in all projects is complex, and it is easy to forget some
-- has a global knowledge of all used dependencies is difficult
-- It's easy to smuggle in an inconvenient dependency
+- challenging to update a version of a dependency; needs to be done for each project separately
+- to keep the same version of a dependency in all projects is complex, and it is easy to forget some
+- has global knowledge of all used dependencies is difficult
+- it's easy to smuggle in an inconvenient dependency
 
 ## Advantages of centralized system
 
-- simple way to control dependencies and their versions in "one" place
-- true ease to update version of a dependency
-- keep all projects up to date; force to have same version everywhere
+- a simple way to control dependencies and their versions in "one" place
+- true ease in updating a version of a dependency
+- keep all projects up to date; force to have the same version everywhere
 
 ## A couple of possible solutions
 
@@ -24,4 +24,4 @@ If no centralized dependency system is in place then the dependencies need to be
 
 ## Used system
 
-In my mono-repo is used an out-of-box solution of central package version management, which is part of .NET Core SDK *from version 3.1.300*. Everything is described at documentation about [dependency management](dependency-management.md).
+My mono-repo uses an out-of-box solution of central package version management, which is part of .NET Core SDK *from version 3.1.300*. Everything is described in the documentation about [dependency management](dependency-management.md).
