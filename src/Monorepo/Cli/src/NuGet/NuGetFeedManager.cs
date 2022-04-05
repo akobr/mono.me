@@ -46,8 +46,12 @@ namespace _42.Monorepo.Cli.NuGet
             }
 
             var versions = _usePrereleases
-                ? versionInfo.Versions.Select(v => SemVersion.Parse(v))
-                : versionInfo.Versions.Select(v => SemVersion.Parse(v)).Where(v => string.IsNullOrEmpty(v.Prerelease));
+                ? versionInfo.Versions
+                    .Where(v => SemVersion.TryParse(v, out _))
+                    .Select(v => SemVersion.Parse(v))
+                : versionInfo.Versions
+                    .Where(v => SemVersion.TryParse(v, out var ver) && string.IsNullOrEmpty(ver.Prerelease))
+                    .Select(v => SemVersion.Parse(v));
 
             return new SortedSet<SemVersion>(versions, new LatestFirstVersionComparer());
         }
