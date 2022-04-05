@@ -282,7 +282,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                         break;
 
                     case "change version":
-                        ChangeVersion(preview);
+                        ChangeVersion(preview, item);
                         ShowReleasePreview(preview);
                         break;
 
@@ -371,10 +371,10 @@ namespace _42.Monorepo.Cli.Commands.Release
 #endif
         }
 
-        private void ChangeVersion(ReleasePreview preview)
+        private void ChangeVersion(ReleasePreview preview, IItem item)
         {
             var newVersion = Console.AskForVersionTemplate("Please provide new version", preview.VersionDefinition.Template);
-            var hierarchicalName = Context.Item.Record.GetHierarchicalName();
+            var hierarchicalName = item.Record.GetHierarchicalName();
 
             preview.VersionDefinition = newVersion;
             preview.Tag = hierarchicalName is "." ? $"v.{newVersion.Version}" : $"{hierarchicalName}/v.{newVersion.Version}";
