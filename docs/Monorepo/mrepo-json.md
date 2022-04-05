@@ -31,6 +31,20 @@ All configuration for the monorepo, his behaviour and CLI toolset is done by one
   },
   "types": {
     // add custom types of items here (workstead, project)
+    "dotnet-project": {
+      "custom": {
+        "filePattern": "*.*?proj",
+        "useFullProjectNames": false
+      },
+      "scripts": {
+        "build": "dotnet build src",
+        "clean": "dotnet clean src",
+        "pack": "dotnet pack src",
+        "restore": "dotnet restore src",
+        "run": "dotnet run src",
+        "test": "dotnet test test"
+      }
+    }
   },
   "items": [
     // your worksteads/projects configuration is going to be here
