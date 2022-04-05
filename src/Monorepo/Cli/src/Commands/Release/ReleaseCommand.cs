@@ -326,6 +326,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                     Console.WriteLine($"Branch:  {preview.Branch}");
                     Console.WriteLine("...the branch is ready and checked out.".ThemedLowlight(Console.Theme));
                 }
+
                 return;
             }
 

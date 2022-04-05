@@ -52,7 +52,7 @@ namespace _42.Monorepo.Cli.Extensions
 
             var item = ancestor;
 
-            foreach (var segment in relativeSegments)
+            foreach (var segment in relativeSegments.Skip(1))
             {
                 item = item.GetChildren().FirstOrDefault(i => i.Record.Identifier.Name.EqualsOrdinalIgnoreCase(segment));
 

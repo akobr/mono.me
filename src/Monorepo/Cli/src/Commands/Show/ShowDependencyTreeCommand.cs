@@ -87,7 +87,38 @@ namespace _42.Monorepo.Cli.Commands.Show
 
                 if (projectItem is IProject subProject)
                 {
-                    projectNode.Children.Add(await BuildProjectNodeAsync(subProject));
+                    projectNode.Children.Add(await BuildDependProjectNodeAsync(subProject, 1));
+                }
+                else
+                {
+                    projectNode.Children.Add(new[] { projectRecord.Identifier.Humanized, " [unknown]".Lowlight() });
+                }
+            }
+
+            return projectNode;
+        }
+
+        private async Task<Composition> BuildDependProjectNodeAsync(IProject project, int level)
+        {
+            var record = project.Record;
+            var repository = Context.Repository;
+            var dependencies = await project.GetInternalDependenciesAsync();
+
+            if (level > 10)
+            {
+                return new Composition(new[] { record.GetHierarchicalName(), " [max depth reached]".Lowlight() });
+            }
+
+            var projectNode = new Composition(record.GetHierarchicalName());
+
+            foreach (var dependency in dependencies)
+            {
+                var projectRecord = MonorepoDirectoryFunctions.GetRecord(dependency.FullPath);
+                var projectItem = repository.TryGetDescendant(projectRecord);
+
+                if (projectItem is IProject subProject)
+                {
+                    projectNode.Children.Add(await BuildDependProjectNodeAsync(subProject, level + 1));
                 }
                 else
                 {
