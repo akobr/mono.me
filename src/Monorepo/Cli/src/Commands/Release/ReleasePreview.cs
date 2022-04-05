@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using _42.Monorepo.Cli.ConventionalCommits;
 using _42.Monorepo.Cli.Model;
+using _42.Monorepo.Cli.Versioning;
 using LibGit2Sharp;
 using Semver;
 
@@ -9,7 +10,7 @@ namespace _42.Monorepo.Cli.Commands.Release
 {
     public class ReleasePreview
     {
-        public SemVersion Version { get; set; } = new(1);
+        public VersionTemplate VersionDefinition { get; set; } = new("1.0");
 
         public string Tag { get; set; } = string.Empty;
 

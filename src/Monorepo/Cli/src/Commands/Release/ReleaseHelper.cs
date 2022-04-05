@@ -64,7 +64,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                 .ToList();
 
             var markdownBuilder = new MarkdownBuilder();
-            markdownBuilder.Header($"Release v.{preview.Version}");
+            markdownBuilder.Header($"Release v.{preview.VersionDefinition}");
             markdownBuilder.Bullet($"Tagged as `{preview.Tag}`");
             markdownBuilder.Bullet($"At {DateTime.Today.ToShortDateString()} {DateTime.Now.ToLongTimeString()}");
 

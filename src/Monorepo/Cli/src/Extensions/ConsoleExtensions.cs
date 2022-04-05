@@ -1,5 +1,6 @@
 using System;
 using _42.Monorepo.Cli.Output;
+using _42.Monorepo.Cli.Versioning;
 using Semver;
 
 namespace _42.Monorepo.Cli.Extensions
@@ -16,6 +17,18 @@ namespace _42.Monorepo.Cli.Extensions
             }
 
             return newVersion;
+        }
+
+        public static VersionTemplate AskForVersionTemplate(this IExtendedConsole @this, string message, string defaultTemplate)
+        {
+            var templateInput = @this.Input<string>(message, $"{defaultTemplate}");
+
+            if (!VersionTemplate.TryParse(templateInput, out var newTemplate))
+            {
+                throw new InvalidOperationException("A template needs to be a valid semantic version.");
+            }
+
+            return newTemplate;
         }
     }
 }

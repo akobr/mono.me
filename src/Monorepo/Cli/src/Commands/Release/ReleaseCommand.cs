@@ -12,6 +12,7 @@ using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
 using _42.Monorepo.Cli.Operations;
 using _42.Monorepo.Cli.Output;
+using _42.Monorepo.Cli.Versioning;
 using LibGit2Sharp;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
@@ -143,8 +144,8 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             var previousVersion = isFirstRelease
                 ? exactVersions.PackageVersion
-                : lastRelease?.Version ?? new SemVersion(1);
-            var newVersion = exactVersions.PackageVersion.Change(patch: exactVersions.PackageVersion.Patch + 1, build: string.Empty);
+                : lastRelease?.Version ?? new SemVersion(0, 9);
+            var newVersion = new VersionTemplate(exactVersions.PackageVersion);
 
             var majorChangeTypeSet = new HashSet<string>(_options.Changes.Major);
             var minorChangeTypeSet = new HashSet<string>(_options.Changes.Minor);
@@ -174,7 +175,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             if (isFirstRelease)
             {
                 Console.WriteImportant("This is the first release.");
-                newVersion = Console.AskForVersion("What should be the first version", newVersion);
+                newVersion = Console.AskForVersionTemplate("What should be the first version", "0.9-beta");
                 Console.WriteLine();
             }
             else
@@ -185,15 +186,18 @@ namespace _42.Monorepo.Cli.Commands.Release
 
                 if (hasMajorChange)
                 {
-                    newVersion = new(previousVersion.Major + 1);
+                    var newMajor = previousVersion.Major + 1;
+                    newVersion = new($"{newMajor}.0");
                 }
                 else if (hasMinorChange)
                 {
-                    newVersion = new(previousVersion.Major, previousVersion.Minor + 1);
+                    var newMinor = previousVersion.Minor + 1;
+                    newVersion = new($"{previousVersion.Major}.{newMinor}-{previousVersion.Prerelease}");
                 }
                 else if (hasPatchChange)
                 {
-                    newVersion = new(previousVersion.Major, previousVersion.Minor, previousVersion.Patch + 1);
+                    var newPatch = previousVersion.Patch + 1;
+                    newVersion = new($"{previousVersion.Major}.{previousVersion.Minor}-{previousVersion.Prerelease}", previousVersion.Change(patch: newPatch));
                 }
                 else
                 {
@@ -203,7 +207,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                         return ExitCodes.WARNING_ABORTED;
                     }
 
-                    newVersion = Console.AskForVersion("Please provide the version", newVersion);
+                    newVersion = Console.AskForVersionTemplate("Please provide the version", newVersion.Template);
                     Console.WriteLine();
                 }
             }
@@ -212,13 +216,13 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             var preview = new ReleasePreview()
             {
-                Version = newVersion,
+                VersionDefinition = newVersion,
                 CurrentVersion = exactVersions.PackageVersion,
                 VersionFileFullPath = versionFilePath,
                 PreviousRelease = lastRelease,
-                Tag = hierarchicalName is "." ? $"v.{newVersion}" : $"{hierarchicalName}/v.{newVersion}",
-                Branch = hierarchicalName is "." ? $"release/v.{newVersion}" : $"release/{hierarchicalName}/v.{newVersion}",
-                NotesRepoPath = hierarchicalName is "." ? $"docs/release-notes/{newVersion}.md" : $"docs/{hierarchicalName}/release-notes/{newVersion}.md",
+                Tag = hierarchicalName is "." ? $"v.{newVersion.Version}" : $"{hierarchicalName}/v.{newVersion.Version}",
+                Branch = hierarchicalName is "." ? $"release/v.{newVersion.Version}" : $"release/{hierarchicalName}/v.{newVersion.Version}",
+                NotesRepoPath = hierarchicalName is "." ? $"docs/release-notes/{newVersion.Version}.md" : $"docs/{hierarchicalName}/release-notes/{newVersion.Version}.md",
                 MajorChanges = majorChanges,
                 MinorChanges = minorChanges,
                 PathChanges = pathChanges,
@@ -239,7 +243,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                         continue;
                     }
 
-                    var projectIdentifier = project.Record.Identifier.Humanized;
+                    var projectIdentifier = project.Record.GetHierarchicalName();
                     var projectVersion = (await project.GetExactVersionsAsync()).PackageVersion;
                     listOfReleases.Add((projectIdentifier, projectVersion));
                 }
@@ -297,14 +301,14 @@ namespace _42.Monorepo.Cli.Commands.Release
         {
             Console.WriteLine();
             var inBranch = Console.Confirm("Should I automatically prepare a commit and a new branch", true);
-            var isNewVersion = preview.CurrentVersion != preview.Version;
+            var isNewVersion = preview.CurrentVersion != preview.VersionDefinition.Version;
 
             Console.WriteLine();
 
             if (isNewVersion)
             {
 #if !DEBUG || TESTING
-                ReleaseHelper.UpdateVersionFile(preview.Version.ToString(), preview.VersionFileFullPath);
+                ReleaseHelper.UpdateVersionFile(preview.VersionDefinition.Template, preview.VersionFileFullPath);
 #endif
                 var versionFileRepoPath = preview.VersionFileFullPath.GetRelativePath(Context.Repository.Record.Path);
                 Console.WriteLine($"Version: {versionFileRepoPath}");
@@ -338,12 +342,13 @@ namespace _42.Monorepo.Cli.Commands.Release
 
         private bool PrepareInGit(ReleasePreview preview)
         {
-            var isNewVersion = preview.CurrentVersion != preview.Version;
+            var isNewVersion = preview.CurrentVersion != preview.VersionDefinition.Version;
             using var repository = _repositoryService.BuildRepository();
+            var statuses = repository.RetrieveStatus();
 
-            if (repository.Index.Count > 0)
+            if (statuses.Staged.Any())
             {
-                Console.WriteImportant("There are already files in the git stage, please do the changes manualy.");
+                Console.WriteImportant("There are already files in the git stage, please do the changes manually.");
                 return false;
             }
 
@@ -368,9 +373,16 @@ namespace _42.Monorepo.Cli.Commands.Release
 
         private void ChangeVersion(ReleasePreview preview)
         {
+            var newVersion = Console.AskForVersionTemplate("Please provide new version", preview.VersionDefinition.Template);
+            var hierarchicalName = Context.Item.Record.GetHierarchicalName();
+
+            preview.VersionDefinition = newVersion;
+            preview.Tag = hierarchicalName is "." ? $"v.{newVersion.Version}" : $"{hierarchicalName}/v.{newVersion.Version}";
+            preview.Branch = hierarchicalName is "." ? $"release/v.{newVersion.Version}" : $"release/{hierarchicalName}/v.{newVersion.Version}";
+            preview.NotesRepoPath = hierarchicalName is "." ? $"docs/release-notes/{newVersion.Version}.md" : $"docs/{hierarchicalName}/release-notes/{newVersion.Version}.md";
+
             Console.WriteLine();
-            preview.Version = Console.AskForVersion("Please provide new version", preview.Version);
-            Console.WriteImportant("Version has been changed to: ", preview.Version.ToString().ThemedHighlight(Console.Theme));
+            Console.WriteImportant("Version has been changed to: ", preview.VersionDefinition.Template.ThemedHighlight(Console.Theme));
             Console.WriteLine();
         }
 
@@ -385,7 +397,7 @@ namespace _42.Monorepo.Cli.Commands.Release
         private void ShowReleasePreview(ReleasePreview preview)
         {
             Console.WriteHeader("Release preview");
-            Console.WriteLine("Version: ", preview.Version.ToString().ThemedHighlight(Console.Theme));
+            Console.WriteLine("Version: ", preview.VersionDefinition.Version.ToString().ThemedHighlight(Console.Theme));
             Console.WriteLine($"Tag:     {preview.Tag}");
 
             if (_options.CreateReleaseBranch)
@@ -395,7 +407,7 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             Console.WriteLine($"Notes:   {preview.NotesRepoPath}");
 
-            var isNewVersion = preview.CurrentVersion != preview.Version;
+            var isNewVersion = preview.CurrentVersion != preview.VersionDefinition.Version;
 
             if (isNewVersion)
             {
@@ -407,13 +419,22 @@ namespace _42.Monorepo.Cli.Commands.Release
                 Console.WriteLine();
                 Console.WriteHeader("Released projects");
                 var pRoot = new Composition(preview.Tag);
-                pRoot.Children.AddRange(preview.ProjectsToRelease.Select(p => new Composition($"{p.Project}/v.{p.Version}")));
+
+                if (isNewVersion)
+                {
+                    pRoot.Children.AddRange(preview.ProjectsToRelease.Select(p => new Composition($"{p.Project}/v.{preview.VersionDefinition.Version}")));
+                }
+                else
+                {
+                    pRoot.Children.AddRange(preview.ProjectsToRelease.Select(p => new Composition($"{p.Project}/v.{p.Version}")));
+                }
+
                 Console.WriteTree(pRoot, n => n);
             }
 
             Console.WriteLine();
             Console.WriteHeader("Change list");
-            var root = new Composition(preview.Version.ToString());
+            var root = new Composition(preview.VersionDefinition.Version.ToString());
             root.Children.Add(BuildChangeNode("major (breaking changes)", preview.MajorChanges));
             root.Children.Add(BuildChangeNode("minor (new features)", preview.MinorChanges));
             root.Children.Add(BuildChangeNode("patch (code changes)", preview.PathChanges));
