@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
+using _42.Monorepo.Cli.Versioning;
 using Semver;
 
 namespace _42.Monorepo.Cli.Operations
@@ -11,7 +12,7 @@ namespace _42.Monorepo.Cli.Operations
     {
         Task<string?> CalculateVersionFilePathAsync(IItem item, CancellationToken cancellationToken);
 
-        Task<SemVersion?> CalculateDefinedVersionAsync(IItem item, CancellationToken cancellationToken);
+        Task<IVersionTemplate?> CalculateDefinedVersionAsync(IItem item, CancellationToken cancellationToken);
 
         Task<IExactVersions> CalculateExactVersionsAsync(IItem item, CancellationToken cancellationToken);
 

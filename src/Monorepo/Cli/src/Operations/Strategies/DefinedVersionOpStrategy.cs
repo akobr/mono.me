@@ -5,12 +5,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Cache;
 using _42.Monorepo.Cli.Model.Items;
+using _42.Monorepo.Cli.Versioning;
 using Microsoft.Extensions.Logging;
 using Semver;
 
 namespace _42.Monorepo.Cli.Operations.Strategies
 {
-    public class DefinedVersionOpStrategy : IOpStrategy<SemVersion?>
+    public class DefinedVersionOpStrategy : IOpStrategy<IVersionTemplate?>
     {
         private readonly IFileContentCache fileCache;
         private readonly ILogger<DefinedVersionOpStrategy> logger;
@@ -23,10 +24,10 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             this.logger = logger;
         }
 
-        public async Task<SemVersion?> OperateAsync(IItem item, CancellationToken cancellationToken = default)
+        public async Task<IVersionTemplate?> OperateAsync(IItem item, CancellationToken cancellationToken = default)
         {
             var directory = item.Record.Path;
-            string filePath = Path.Combine(directory, Constants.VERSION_FILE_NAME);
+            var filePath = Path.Combine(directory, Constants.VERSION_FILE_NAME);
 
             if (!File.Exists(filePath))
             {
@@ -51,7 +52,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             }
 
             if (versionString is null
-                || !SemVersion.TryParse(versionString, out SemVersion parsedVersion))
+                || !VersionTemplate.TryParse(versionString, out var parsedVersion))
             {
                 return item.Parent is null
                     ? null

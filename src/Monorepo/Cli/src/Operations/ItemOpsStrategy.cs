@@ -11,6 +11,7 @@ using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
+using _42.Monorepo.Cli.Versioning;
 using Nerdbank.GitVersioning;
 using Semver;
 
@@ -45,10 +46,10 @@ namespace _42.Monorepo.Cli.Operations
         }
 
         // TODO: [P3] refactor this method
-        public async Task<SemVersion?> CalculateDefinedVersionAsync(IItem item, CancellationToken cancellationToken)
+        public async Task<IVersionTemplate?> CalculateDefinedVersionAsync(IItem item, CancellationToken cancellationToken)
         {
             var directory = item.Record.Path;
-            string filePath = Path.Combine(directory, Constants.VERSION_FILE_NAME);
+            var filePath = Path.Combine(directory, Constants.VERSION_FILE_NAME);
 
             if (!File.Exists(filePath))
             {
@@ -74,7 +75,7 @@ namespace _42.Monorepo.Cli.Operations
             }
 
             if (versionString is null
-                || !SemVersion.TryParse(versionString, out SemVersion parsedVersion))
+                || !VersionTemplate.TryParse(versionString, out var parsedVersion))
             {
                 return item.Parent is null
                     ? null

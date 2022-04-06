@@ -1,12 +1,11 @@
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Output;
 using _42.Monorepo.Cli.Templates;
+using _42.Monorepo.Cli.Versioning;
 using LibGit2Sharp;
 using McMaster.Extensions.CommandLineUtils;
-using Semver;
 
 namespace _42.Monorepo.Cli.Commands.New
 {
@@ -25,13 +24,8 @@ namespace _42.Monorepo.Cli.Commands.New
         protected override async Task<int> ExecuteAsync()
         {
             using var repo = new Repository(Context.Repository.Record.Path);
-            SemVersion currentVersion = await Context.Item.TryGetDefinedVersionAsync() ?? new SemVersion(0, 1);
+            var currentVersion = await Context.Item.TryGetDefinedVersionAsync() ?? new VersionTemplate(Constants.DEFAULT_INITIAL_VERSION);
             var versionFileFullPath = await Context.Item.TryGetVersionFilePathAsync() ?? Path.Combine(Context.Repository.Record.Path, Constants.VERSION_FILE_NAME);
-            var versionFileRepoPath = versionFileFullPath.GetRelativePath(Context.Repository.Record.Path);
-
-            var lastChangeInVersion = repo.Commits
-                .QueryBy(versionFileRepoPath)
-                .FirstOrDefault();
 
             var versionFolderPath = Path.GetDirectoryName(versionFileFullPath);
             if (Context.Item.Record.Path.EqualsOrdinalIgnoreCase(versionFolderPath))
@@ -45,27 +39,22 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteLine(
                 "Currently ",
                 Context.Item.Record.Name.ThemedHighlight(Console.Theme),
-                " is versionend as part of ",
+                " is versioned as part of ",
                 versionedRecord.Name.ThemedHighlight(Console.Theme),
                 " and the version is ",
-                currentVersion.ToString());
+                currentVersion.Template);
 
             if (!Console.Confirm($"Do you want to create a separated version file for {Context.Item.Record.Name}"))
             {
                 return ExitCodes.SUCCESS;
             }
 
-            SemVersion version;
+            var inputVersion = new VersionTemplate(Constants.DEFAULT_INITIAL_VERSION);
 
             if (string.IsNullOrWhiteSpace(Version)
-                || !SemVersion.TryParse(Version, out version))
+                || !VersionTemplate.TryParse(Version, out _))
             {
-                var inputVersion = Console.Input<string>("What is the initial version", currentVersion.ToString());
-
-                if (!SemVersion.TryParse(inputVersion, out version))
-                {
-                    version = new SemVersion(0, 1);
-                }
+                inputVersion = Console.AskForVersionTemplate("What is the initial version", currentVersion.Template);
             }
 
             var hierarchical = Console.Confirm("Should the version be hierarchical");
@@ -73,7 +62,7 @@ namespace _42.Monorepo.Cli.Commands.New
             // version.json
             var versionTemplate = new VersionJsonT4(new VersionJsonModel
             {
-                Version = version.ToString(),
+                Version = inputVersion.Template,
                 IsHierarchical = hierarchical,
             });
 

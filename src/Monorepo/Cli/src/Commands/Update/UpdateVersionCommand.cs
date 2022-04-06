@@ -7,6 +7,7 @@ using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Git;
 using _42.Monorepo.Cli.Output;
+using _42.Monorepo.Cli.Versioning;
 using LibGit2Sharp;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
@@ -38,9 +39,10 @@ namespace _42.Monorepo.Cli.Commands.Update
         protected override async Task<int> ExecuteAsync()
         {
             using var repo = new Repository(Context.Repository.Record.Path);
-            SemVersion currentVersion = await Context.Item.TryGetDefinedVersionAsync() ?? new SemVersion(0, 1);
+            var currentVersion = await Context.Item.TryGetDefinedVersionAsync() ?? new VersionTemplate(Constants.DEFAULT_INITIAL_VERSION);
             var versionFileFullPath = await Context.Item.TryGetVersionFilePathAsync() ?? Path.Combine(Context.Repository.Record.Path, Constants.VERSION_FILE_NAME);
             var versionFileRepoPath = versionFileFullPath.GetRelativePath(Context.Repository.Record.Path);
+            var newVersion = new VersionTemplate(currentVersion.Template);
 
             var lastChangeInVersion = repo.Commits
                 .QueryBy(versionFileRepoPath)
@@ -55,62 +57,59 @@ namespace _42.Monorepo.Cli.Commands.Update
             var report = _historyService.GetHistory(repo, Context.Item.Record.RepoRelativePath, new Commit[] { lastChangeInVersion.Commit });
             var hasChanges = report.Changes.Count > 0;
 
-            if (report.Changes.Count < 1 && report.UnknownChanges.Count < 1)
-            {
-                Console.WriteImportant($"There are no changes in current version '{currentVersion}'.");
-                return ExitCodes.WARNING_NO_WORK_NEEDED;
-            }
-
-            var majorChangeTypeSet = new HashSet<string>(_options.Changes.Major);
-            var minorChangeTypeSet = new HashSet<string>(_options.Changes.Minor);
-            var patchChangeTypeSet = new HashSet<string>(_options.Changes.Patch);
-            var harmlessChangeTypeSet = new HashSet<string>(_options.Changes.Harmless);
-
-            var majorChanges = report.Changes.Where(ch => ch.Message.IsBreakingChange || majorChangeTypeSet.Contains(ch.Message.Type)).ToList();
-            var minorChanges = report.Changes.Where(ch => minorChangeTypeSet.Contains(ch.Message.Type)).ToList();
-            var pathChanges = report.Changes.Where(ch => patchChangeTypeSet.Contains(ch.Message.Type)).ToList();
-            var harmlessChanges = report.Changes.Where(ch => harmlessChangeTypeSet.Contains(ch.Message.Type)).ToList();
-
-            var hasMajorChange = majorChanges.Count > 0;
-            var hasMinorChange = minorChanges.Count > 0;
-            var hasPatchChange = pathChanges.Count > 0;
-
-            var newVersion = currentVersion.Change(prerelease: string.Empty);
-
-            if (hasMajorChange)
-            {
-                newVersion = new(currentVersion.Major + 1);
-            }
-            else if (hasMinorChange)
-            {
-                newVersion = new(currentVersion.Major, currentVersion.Minor + 1);
-            }
-            else if (hasPatchChange)
-            {
-                newVersion = new(currentVersion.Major, currentVersion.Minor, currentVersion.Patch + 1);
-            }
-            else
-            {
-                Console.WriteImportant("There are no changes which should affect the version.");
-            }
-
             if (hasChanges)
             {
-                Console.WriteImportant($"New version should be ", $"{newVersion}".ThemedHighlight(Console.Theme));
-                Console.WriteLine();
-                Console.WriteHeader("Changes:");
-                var count = 0;
+                var majorChangeTypeSet = new HashSet<string>(_options.Changes.Major);
+                var minorChangeTypeSet = new HashSet<string>(_options.Changes.Minor);
+                var patchChangeTypeSet = new HashSet<string>(_options.Changes.Patch);
 
-                foreach (var change in report.Changes)
+                var majorChanges = report.Changes.Where(ch => ch.Message.IsBreakingChange || majorChangeTypeSet.Contains(ch.Message.Type)).ToList();
+                var minorChanges = report.Changes.Where(ch => minorChangeTypeSet.Contains(ch.Message.Type)).ToList();
+                var pathChanges = report.Changes.Where(ch => patchChangeTypeSet.Contains(ch.Message.Type)).ToList();
+
+                var hasMajorChange = majorChanges.Count > 0;
+                var hasMinorChange = minorChanges.Count > 0;
+                var hasPatchChange = pathChanges.Count > 0;
+                var someChanges = hasMajorChange || hasMinorChange || hasPatchChange;
+
+                if (hasMajorChange)
                 {
-                    count++;
-                    Console.WriteLine($"> {change.Message.GetFullRepresentation()}");
+                    var newMajor = currentVersion.Version.Major + 1;
+                    newVersion = new($"{newMajor}.0");
+                }
+                else if (hasMinorChange)
+                {
+                    var newMinor = currentVersion.Version.Minor + 1;
+                    newVersion = new(new SemVersion(currentVersion.Version.Major, newMinor));
+                }
+                else if (hasPatchChange)
+                {
+                    var newPatch = currentVersion.Version.Patch + 1;
+                    newVersion = new(new SemVersion(currentVersion.Version.Major, currentVersion.Version.Minor, newPatch, currentVersion.Version.Prerelease));
+                }
 
-                    if (count >= 50)
+                if (someChanges)
+                {
+                    Console.WriteImportant("New version should be ", $"{newVersion.Template}".ThemedHighlight(Console.Theme));
+                    Console.WriteLine();
+                    Console.WriteHeader("Changes:");
+                    var count = 0;
+
+                    foreach (var change in report.Changes)
                     {
-                        Console.WriteLine("... and more".ThemedLowlight(Console.Theme));
-                        break;
+                        count++;
+                        Console.WriteLine($"> {change.Message.GetFullRepresentation()}");
+
+                        if (count >= 50)
+                        {
+                            Console.WriteLine("... and more".ThemedLowlight(Console.Theme));
+                            break;
+                        }
                     }
+                }
+                else
+                {
+                    Console.WriteImportant("There are no changes which should affect the version.");
                 }
             }
 
@@ -132,14 +131,18 @@ namespace _42.Monorepo.Cli.Commands.Update
                     }
                 }
             }
+            else if (!hasChanges)
+            {
+                Console.WriteImportant($"There are no changes in current version '{currentVersion.Template}'.");
+            }
 
             Console.WriteLine();
 
             if (Console.Confirm($"Do you want to update '{versionFileRepoPath}' version file"))
             {
-                newVersion = Console.AskForVersion("What is the final version", newVersion);
+                newVersion = Console.AskForVersionTemplate("What is the final version", newVersion.Template);
 #if !DEBUG || TESTING
-                ReleaseHelper.UpdateVersionFile(newVersion.ToString(), versionFileFullPath);
+                ReleaseHelper.UpdateVersionFile(newVersion.Template, versionFileFullPath);
 #endif
             }
 

@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Model.Records;
 using _42.Monorepo.Cli.Operations;
+using _42.Monorepo.Cli.Versioning;
 using Semver;
 
 namespace _42.Monorepo.Cli.Model.Items
@@ -48,8 +49,8 @@ namespace _42.Monorepo.Cli.Model.Items
         public Task<string?> TryGetVersionFilePathAsync(CancellationToken cancellationToken = default)
             => executor.ExecuteAsync<string?>(this, cancellationToken: cancellationToken);
 
-        public Task<SemVersion?> TryGetDefinedVersionAsync(CancellationToken cancellationToken = default)
-            => executor.ExecuteAsync<SemVersion?>(this, cancellationToken: cancellationToken);
+        public Task<IVersionTemplate?> TryGetDefinedVersionAsync(CancellationToken cancellationToken = default)
+            => executor.ExecuteAsync<IVersionTemplate?>(this, cancellationToken: cancellationToken);
 
         public Task<IExactVersions> GetExactVersionsAsync(CancellationToken cancellationToken = default)
             => executor.ExecuteAsync<IExactVersions>(this, cancellationToken: cancellationToken);

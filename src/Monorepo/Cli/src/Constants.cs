@@ -14,5 +14,7 @@ namespace _42.Monorepo.Cli
         public const string TEST_DIRECTORY_NAME = "test";
 
         public const string DIRECTORY_SEPARATOR = "/";
+
+        public const string DEFAULT_INITIAL_VERSION = "0.1-alpha";
     }
 }

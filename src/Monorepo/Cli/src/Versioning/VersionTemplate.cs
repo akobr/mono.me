@@ -1,9 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
+using _42.Monorepo.Cli.Extensions;
 using Semver;
 
 namespace _42.Monorepo.Cli.Versioning
 {
-    public class VersionTemplate
+    public class VersionTemplate : IVersionTemplate
     {
         public VersionTemplate(string template)
         {
@@ -13,7 +14,7 @@ namespace _42.Monorepo.Cli.Versioning
 
         public VersionTemplate(SemVersion version)
         {
-            Template = version.ToString();
+            Template = version.ToTemplate();
             Version = version.Change();
         }
 

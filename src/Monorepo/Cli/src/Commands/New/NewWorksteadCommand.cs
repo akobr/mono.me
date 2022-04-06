@@ -85,7 +85,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
             if (_featureProvider.IsEnabled(FeatureNames.Packages))
             {
-                Console.WriteLine("If the workstead is containing a lot of dependecies which are unique in the mono-repository is recomended do create a separeated definition file.");
+                Console.WriteLine("If the workstead is containing a lot of dependencies that are unique in the mono-repository is recommended to create a separated definition file.");
 
                 if (Console.Confirm("Do you want to setup new Directory.Packages.props"))
                 {
@@ -101,18 +101,18 @@ namespace _42.Monorepo.Cli.Commands.New
             if (_featureProvider.IsEnabled(FeatureNames.GitVersion)
                 && Console.Confirm("Do you want to prepare new version file"))
             {
-                var inputVersion = Console.Input<string>("What is the initial version", "0.1");
+                var inputVersion = Console.Input<string>("What is the initial version", Constants.DEFAULT_INITIAL_VERSION);
                 var hierarchical = Console.Confirm("Should the version be hierarchical");
 
-                if (!SemVersion.TryParse(inputVersion, out var version))
+                if (!SemVersion.TryParse(inputVersion, out _))
                 {
-                    version = new SemVersion(0, 1);
+                    inputVersion = Constants.DEFAULT_INITIAL_VERSION;
                 }
 
                 // version.json
                 var versionTemplate = new VersionJsonT4(new VersionJsonModel
                 {
-                    Version = version.ToString(),
+                    Version = inputVersion,
                     IsHierarchical = hierarchical,
                 });
 

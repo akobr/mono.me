@@ -144,8 +144,8 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             var previousVersion = isFirstRelease
                 ? exactVersions.PackageVersion
-                : lastRelease?.Version ?? new SemVersion(0, 9);
-            var newVersion = new VersionTemplate(exactVersions.PackageVersion);
+                : lastRelease?.Version ?? new SemVersion(0, 1);
+            var newVersion = new VersionTemplate(previousVersion);
 
             var majorChangeTypeSet = new HashSet<string>(_options.Changes.Major);
             var minorChangeTypeSet = new HashSet<string>(_options.Changes.Minor);
@@ -175,7 +175,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             if (isFirstRelease)
             {
                 Console.WriteImportant("This is the first release.");
-                newVersion = Console.AskForVersionTemplate("What should be the first version", "0.9-beta");
+                newVersion = Console.AskForVersionTemplate("What should be the first version", Constants.DEFAULT_INITIAL_VERSION);
                 Console.WriteLine();
             }
             else
@@ -192,12 +192,12 @@ namespace _42.Monorepo.Cli.Commands.Release
                 else if (hasMinorChange)
                 {
                     var newMinor = previousVersion.Minor + 1;
-                    newVersion = new($"{previousVersion.Major}.{newMinor}-{previousVersion.Prerelease}");
+                    newVersion = new(new SemVersion(previousVersion.Major, newMinor));
                 }
                 else if (hasPatchChange)
                 {
                     var newPatch = previousVersion.Patch + 1;
-                    newVersion = new($"{previousVersion.Major}.{previousVersion.Minor}-{previousVersion.Prerelease}", previousVersion.Change(patch: newPatch));
+                    newVersion = new(new SemVersion(previousVersion.Major, previousVersion.Minor, newPatch, previousVersion.Prerelease));
                 }
                 else
                 {
@@ -397,7 +397,10 @@ namespace _42.Monorepo.Cli.Commands.Release
         private void ShowReleasePreview(ReleasePreview preview)
         {
             Console.WriteHeader("Release preview");
-            Console.WriteLine("Version: ", preview.VersionDefinition.Version.ToString().ThemedHighlight(Console.Theme));
+            Console.WriteLine(
+                "Version: ",
+                preview.VersionDefinition.Template.ThemedHighlight(Console.Theme),
+                $" ({preview.VersionDefinition.Version})".ThemedLowlight(Console.Theme));
             Console.WriteLine($"Tag:     {preview.Tag}");
 
             if (_options.CreateReleaseBranch)

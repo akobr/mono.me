@@ -148,17 +148,17 @@ namespace _42.Monorepo.Cli.Commands.New
             if (_featureProvider.IsEnabled(FeatureNames.GitVersion)
                 && Console.Confirm("Do you want to set a custom versioning for this project"))
             {
-                var inputVersion = Console.Input<string>("What is the initial version", "0.1");
+                var inputVersion = Console.Input<string>("What is the initial version", Constants.DEFAULT_INITIAL_VERSION);
 
-                if (!SemVersion.TryParse(inputVersion, out var version))
+                if (!SemVersion.TryParse(inputVersion, out _))
                 {
-                    version = new SemVersion(0, 1);
+                    inputVersion = Constants.DEFAULT_INITIAL_VERSION;
                 }
 
                 // version.json
                 var versionTemplate = new VersionJsonT4(new VersionJsonModel()
                 {
-                    Version = version.ToString(),
+                    Version = inputVersion,
                     IsHierarchical = false,
                 });
                 var versionFilePath = Path.Combine(path, FileNames.VersionJson);
