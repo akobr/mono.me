@@ -4,7 +4,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Monorepo.Cli.Commands.Show
 {
     [Command(CommandNames.SHOW, Description = "Show detailed information about a current location.")]
-    [Subcommand(typeof(ShowUsagesCommand), typeof(ShowDependencyTreeCommand))]
+    [Subcommand(typeof(ShowUsagesCommand), typeof(ShowDependencyTreeCommand), typeof(ShowVersionsCommand))]
     public class ShowCommand : BaseParentCommand
     {
         public ShowCommand(IExtendedConsole console, ICommandContext context, CommandLineApplication application)

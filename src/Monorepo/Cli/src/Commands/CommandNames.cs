@@ -23,6 +23,7 @@ namespace _42.Monorepo.Cli.Commands
         public const string PROJECT = "project";
         public const string REPOSITORY = "repository";
         public const string VERSION = "version";
+        public const string VERSIONS = "versions";
 
         public const string FIX = "fix";
         public const string PACKAGES = "packages";
