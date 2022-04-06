@@ -76,7 +76,7 @@ namespace _42.Monorepo.Cli.Commands.New
             if (projectOptions.UseFullProjectName()
                 && worksteadHasName)
             {
-                name = $"{worksteadName}.name";
+                name = $"{worksteadName}.{name}";
             }
 
             var path = Path.Combine(workstead.Record.Path, name);
