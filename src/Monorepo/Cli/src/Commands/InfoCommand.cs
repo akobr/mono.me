@@ -28,7 +28,9 @@ namespace _42.Monorepo.Cli.Commands
             var item = Context.Item;
             var record = item.Record;
             var exactVersions = await item.GetExactVersionsAsync();
-            var options = _optionsProvider.GetOptions(record.Path);
+            var options = _optionsProvider.GetOptions(record.RepoRelativePath);
+
+            WriteItemInfo(options);
 
             Console.WriteHeader(
                 $"{record.GetTypeAsString()}: ",
@@ -42,7 +44,7 @@ namespace _42.Monorepo.Cli.Commands
 
             if (options.Exclude.Contains(Excludes.VERSION))
             {
-                Console.WriteLine("The versioning is disabled (nonreleasable).".ThemedLowlight(Console.Theme));
+                Console.WriteLine("The versioning is disabled (non-releasable).".ThemedLowlight(Console.Theme));
             }
             else if (options.Exclude.Contains(Excludes.RELEASE))
             {
@@ -107,6 +109,28 @@ namespace _42.Monorepo.Cli.Commands
             }
 
             return ExitCodes.SUCCESS;
+        }
+
+        private void WriteItemInfo(ItemOptions options)
+        {
+            var someInfo = false;
+
+            if (!string.IsNullOrWhiteSpace(options.Name))
+            {
+                Console.WriteHeader(options.Name);
+                someInfo = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.Description))
+            {
+                Console.WriteLine(options.Description.ThemedLowlight(Console.Theme));
+                someInfo = true;
+            }
+
+            if (someInfo)
+            {
+                Console.WriteLine();
+            }
         }
 
         private static async Task<(IReadOnlyCollection<string> VersionFiles, IReadOnlyCollection<string> PackageFiles)> GetFilesAsync(IItem item, IRepository repository)
