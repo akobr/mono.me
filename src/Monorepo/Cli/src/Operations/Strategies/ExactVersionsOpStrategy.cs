@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Cache;
 using _42.Monorepo.Cli.Configuration;
+using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
 using Nerdbank.GitVersioning;
@@ -51,10 +52,11 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             var packageVersion = SemVersion.TryParse(oracle.SemVer2, out var parsedVersion)
                 ? parsedVersion
                 : new SemVersion(oracle.Version);
- 
+
             return new ExactVersions
             {
-                Version = new SemVersion(oracle.Version),
+                Version = oracle.Version,
+                SemVersion = packageVersion,
                 AssemblyVersion = oracle.AssemblyVersion,
                 AssemblyFileVersion = oracle.AssemblyFileVersion,
                 AssemblyInformationalVersion = oracle.AssemblyInformationalVersion,
@@ -69,7 +71,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 return new ExactVersions(new Version(1, 0));
             }
 
-            string projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item);
+            var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item);
 
             if (!File.Exists(projectFilePath))
             {
@@ -86,7 +88,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             var @namespace = xContent.Root.GetDefaultNamespace();
             var versionElement = xContent.Descendants(@namespace + "Version").FirstOrDefault();
             var versionPrefix = xContent.Descendants(@namespace + "VersionPrefix").FirstOrDefault();
-            var versinSuffix = xContent.Descendants(@namespace + "VersionSuffix").FirstOrDefault();
+            var versionSuffix = xContent.Descendants(@namespace + "VersionSuffix").FirstOrDefault();
             var assemblyVersionElement = xContent.Descendants(@namespace + "AssemblyVersion").FirstOrDefault();
             var fileVersionElement = xContent.Descendants(@namespace + "FileVersion").FirstOrDefault();
             var informationalVersionElement = xContent.Descendants(@namespace + "InformationalVersion").FirstOrDefault()
@@ -110,10 +112,10 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             {
                 version = new SemVersion(parsedPrefix);
 
-                if (versinSuffix is not null
-                    && Regex.IsMatch(versinSuffix.Value, "[0-9A-Za-z-]*"))
+                if (versionSuffix is not null
+                    && Regex.IsMatch(versionSuffix.Value, "[0-9A-Za-z-]*"))
                 {
-                    version = version.Change(prerelease: versinSuffix.Value);
+                    version = version.Change(prerelease: versionSuffix.Value);
                 }
             }
 
@@ -162,7 +164,8 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
             return new ExactVersions
             {
-                Version = version,
+                SemVersion = version,
+                Version = version.ToVersion(),
                 AssemblyVersion = assemblyVersion,
                 AssemblyFileVersion = fileVersion,
                 AssemblyInformationalVersion = informationalVersion,

@@ -1,4 +1,5 @@
 using System;
+using _42.Monorepo.Cli.Extensions;
 using Semver;
 
 namespace _42.Monorepo.Cli.Model
@@ -7,19 +8,31 @@ namespace _42.Monorepo.Cli.Model
     {
         public ExactVersions()
         {
-            Version = PackageVersion = new SemVersion(0);
+            Version = new Version(0, 0);
+            SemVersion = PackageVersion = new SemVersion(0);
             AssemblyVersion = AssemblyFileVersion = new Version(0, 0);
             AssemblyInformationalVersion = "0.0.0";
         }
 
         public ExactVersions(Version version)
         {
-            Version = PackageVersion = new SemVersion(version);
+            Version = version;
+            SemVersion = PackageVersion = version.ToSemVersion();
             AssemblyVersion = AssemblyFileVersion = version;
             AssemblyInformationalVersion = version.ToString();
         }
 
-        public SemVersion Version { get; init; }
+        public ExactVersions(Version version, SemVersion packageVersion)
+        {
+            Version = version;
+            SemVersion = PackageVersion = packageVersion;
+            AssemblyVersion = AssemblyFileVersion = version;
+            AssemblyInformationalVersion = packageVersion.ToString();
+        }
+
+        public Version Version { get; init; }
+
+        public SemVersion SemVersion { get; init; }
 
         public Version AssemblyVersion { get; init; }
 

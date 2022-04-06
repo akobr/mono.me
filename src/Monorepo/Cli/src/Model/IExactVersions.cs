@@ -5,7 +5,9 @@ namespace _42.Monorepo.Cli.Model
 {
     public interface IExactVersions
     {
-        public SemVersion Version { get; }
+        public Version Version { get; }
+
+        public SemVersion SemVersion { get; }
 
         public Version AssemblyVersion { get; }
 
