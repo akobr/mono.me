@@ -10,6 +10,7 @@ This project is trying to tackle problems around [a mono-repository](https://en.
 ## Get started
 
 - [Structure](structure.md)
+- [CLI interface](mrepo-cli.md)
 - [Configuration](mrepo-json.md)
 - [Versioning](versioning.md)
 - [Releasing](releasing.md)
@@ -18,7 +19,7 @@ This project is trying to tackle problems around [a mono-repository](https://en.
 
 ## mrepo toolset
 
-The heart of the toolset is a CLI application served as dotnet tool under the command `mrepo`. This powerfull command helps you to manage, create and release everything inside a mono-repository.
+The heart of the toolset is [a CLI application](mrepo-cli.md) served as dotnet tool under the command `mrepo`. This powerfull command helps you to manage, create and release everything inside a mono-repository.
 
 ## Configuration
 
