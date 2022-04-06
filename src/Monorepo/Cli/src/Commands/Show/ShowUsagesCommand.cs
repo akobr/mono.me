@@ -25,6 +25,9 @@ namespace _42.Monorepo.Cli.Commands.Show
         [Option("-s|--search", CommandOptionType.SingleValue, Description = "Will try to search any directory/repository for usages.")]
         public string? SearchPath { get; }
 
+        [Option("-p|--as-package", CommandOptionType.NoValue, Description = "Determining whether to include search for usages as package.")]
+        public bool SearchAsPackage { get; }
+
         protected override async Task<int> ExecuteAsync()
         {
             if (Context.Item is not IProject targetProject)
@@ -40,31 +43,71 @@ namespace _42.Monorepo.Cli.Commands.Show
             }
 
             var record = targetProject.Record;
-            var projectMap = new HashSet<IIdentifier>();
+            var packageName = record.Name;
+            var internalMap = new HashSet<IIdentifier>();
+            var externalMap = new HashSet<IIdentifier>();
+            var searchForPackageUsage = SearchAsPackage && await targetProject.GetIsPackableAsync();
+
+            if (searchForPackageUsage)
+            {
+                packageName = await targetProject.GetPackageNameAsync();
+            }
 
             foreach (var project in Context.Repository.GetAllProjects())
             {
-                var dependencies = await project.GetInternalDependenciesAsync();
-                if (dependencies.Any(d => record == MonorepoDirectoryFunctions.GetRecord(d.FullPath)))
+                var internalDependencies = await project.GetInternalDependenciesAsync();
+
+                if (internalDependencies.Any(d => MonorepoDirectoryFunctions.GetRecord(d.FullPath).Equals(record)))
                 {
-                    projectMap.Add(project.Record.Identifier);
+                    internalMap.Add(project.Record.Identifier);
+                }
+
+                if (searchForPackageUsage)
+                {
+                    var externalDependencies = await project.GetExternalDependenciesAsync();
+
+                    if (externalDependencies.Any(d => d.Name.EqualsOrdinalIgnoreCase(packageName)))
+                    {
+                        externalMap.Add(project.Record.Identifier);
+                    }
                 }
             }
 
+            var noUsage = internalMap.Count < 1 && externalMap.Count < 1;
+
             Console.WriteHeader("Usage of ", record.Identifier.Humanized.ThemedHighlight(Console.Theme));
 
-            if (projectMap.Count < 1)
+            if (internalMap.Count < 1)
             {
                 Console.WriteLine("There is NO internal usage of the project.");
-
-                Console.WriteLine();
-                Console.WriteLine("Do you know that you can search for usages beyond the mono-repository?".ThemedLowlight(Console.Theme));
-                Console.WriteLine("Just run same command with option ".ThemedLowlight(Console.Theme), "--search <path-to-search>");
             }
             else
             {
-                var tree = BuildTree(Context.Repository, projectMap);
+                var tree = BuildTree(Context.Repository, internalMap);
                 Console.WriteTree(tree, n => n);
+            }
+
+            if (searchForPackageUsage)
+            {
+                Console.WriteLine();
+                Console.WriteHeader("Usage of ", packageName.ThemedHighlight(Console.Theme), " package");
+
+                if (externalMap.Count < 1)
+                {
+                    Console.WriteLine("There is NO usage of the package.");
+                }
+                else
+                {
+                    var tree = BuildTree(Context.Repository, externalMap);
+                    Console.WriteTree(tree, n => n);
+                }
+            }
+
+            if (noUsage)
+            {
+                Console.WriteLine();
+                Console.WriteLine("Do you know that you can search for usages beyond the mono-repository?".ThemedLowlight(Console.Theme));
+                Console.WriteLine("Just run same command with option ".ThemedLowlight(Console.Theme), "--search <path-to-search>");
             }
 
             return ExitCodes.SUCCESS;
