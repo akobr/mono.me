@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Model.Items;
+using _42.Monorepo.Cli.Model.Records;
 using Microsoft.Extensions.Options;
 
 namespace _42.Monorepo.Cli.Scripting
@@ -46,7 +48,9 @@ namespace _42.Monorepo.Cli.Scripting
 
         public async Task<int> ExecuteScriptAsync(string script, string? workingDirectory = null, CancellationToken cancellationToken = default)
         {
-            ProcessStartInfo startInfo = new(repositoryOptions.Shell ?? "powershell", script)
+            var arguments = script.Replace("\"", "\"\"\"");
+
+            ProcessStartInfo startInfo = new(repositoryOptions.Shell ?? "powershell", arguments)
             {
                 UseShellExecute = false,
                 CreateNoWindow = false,
@@ -81,20 +85,33 @@ namespace _42.Monorepo.Cli.Scripting
                 return ScriptTree.Empty;
             }
 
-            var tree = new ScriptTree(
-                new ScriptTreeNode(repository.Name, null, repositoryOptions.Scripts));
+            var rootNode = new ScriptTreeNode(repository.Name, null, repositoryOptions.Scripts);
+            var tree = new ScriptTree(rootNode);
+            InitialiseScriptFiles(rootNode.ScriptMap, repository.Path);
 
             foreach (var itemOptions in itemOptionsProvider.GetAllOptions())
             {
-                var itemNode = tree.GetOrCreateTargetNode(itemOptions.Path);
-
-                if (itemNode is null)
-                {
-                    continue;
-                }
+                tree.GetOrCreateTargetNode(itemOptions.Path);
             }
 
             return tree;
+        }
+
+        private static void InitialiseScriptFiles(Dictionary<string, string> target, string repositoryPath)
+        {
+            var scriptsFolder = Path.Combine(repositoryPath, Constants.SCRIPTS_DIRECTORY_REPO_PATH);
+
+            if (!Directory.Exists(scriptsFolder))
+            {
+                return;
+            }
+
+            foreach (var scriptFilePath in Directory.GetFiles(scriptsFolder, "*.ps1", SearchOption.TopDirectoryOnly))
+            {
+                var scriptName = Path.GetFileNameWithoutExtension(scriptFilePath);
+                var script = $"Set-ExecutionPolicy Bypass -Scope Process -Force; iex {scriptFilePath}";
+                target.TryAdd(scriptName, script);
+            }
         }
     }
 }
