@@ -2,14 +2,14 @@
 
 - mono-repo
   - .artifacts
-  - .azure/pipelines
+  - .azuredevops/pipelines
   - .mrepo
   - docs
   - src
 
 The concept of a mono-repository structure is using **workstreads and projects**. Where workstead is a grouping concept of multiple projects or other worksteads. You can imagine a workstead as a business project which contains all necessary coding projects (libraries, packages, and applications) inside.
 
-The most important folder of a repository is `src` which contains all code, all worksteads and projects. Is recomended to use *"siblings folders to source"*, a folder with mirrored structure as `src` and its content is related to worskteads and projects, but not the code itself. Simplest example is `docs` folder with Markdown documentation for the projects and their release notes. The second example could be `.azure/pipelines` to carry all CI/CD pipelines for all deliverables.
+The most important folder of a repository is `src` which contains all code, all worksteads and projects. Is recomended to use *"siblings folders to source"*, a folder with mirrored structure as `src` and its content is related to worskteads and projects, but not the code itself. Simplest example is `docs` folder with Markdown documentation for the projects and their release notes. The second example could be `.azuredevops/pipelines` to carry all CI/CD pipelines for all deliverables.
 
 Another recomendation is to use one centralized place to hold all artifacts from all the code of the mono-repository. This can be simply used as source for continous deployment or as a package source for other solution. In the mono-repository structure it is `.artifacts` folder.
 
