@@ -60,6 +60,14 @@ Here, you can read about [the poly-repo approach used in Netflix](https://netfli
 - [What is monorepo? (and should you use it?) - Semaphore (semaphoreci.com)](https://semaphoreci.com/blog/what-is-monorepo)
 - [Scaling Mercurial at Facebook](https://engineering.fb.com/2014/01/07/core-data/scaling-mercurial-at-facebook/)
 
+### Something to watch on YouTube
+
+- [Uber Technology Day: Monorepo to Multirepo and Back Again](https://www.youtube.com/watch?v=lV8-1S28ycM)
+- [From Monorail to Monorepo: Airbnb's journey into microservices - GitHub Universe 2018](https://www.youtube.com/watch?v=47VOcGGm6aU)
+- [Dependency Hell, Monorepos and beyond](https://www.youtube.com/watch?v=VNqmHJtItCs)
+- [Why Google Stores Billions of Lines of Code in a Single Repository](https://www.youtube.com/watch?v=W71BTkUbdqE)
+- [What Is A Monorepo And Why You Should Care - Monorepo vs. Polyrepo](https://www.youtube.com/watch?v=VvcJGjjEyKo)
+
 ### Tooling
 
 - [Git - git-sparse-checkout Documentation (git-scm.com)](https://git-scm.com/docs/git-sparse-checkout)
