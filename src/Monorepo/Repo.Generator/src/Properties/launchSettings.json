@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Repo.Generator": {
+      "commandName": "Project",
+      "commandLineArgs": "e:\\working\\repo-gen\\main e:\\working\\repo-gen\\working 5"
+    }
+  }
+}

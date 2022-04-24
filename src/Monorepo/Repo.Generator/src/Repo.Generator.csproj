@@ -1,0 +1,67 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Monorepo.Repo.Generator</AssemblyName>
+    <RootNamespace>_42.Monorepo.Repo.Generator</RootNamespace>
+
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Bogus" />
+    <PackageReference Include="Humanizer" />
+    <PackageReference Include="LibGit2Sharp" />
+    <PackageReference Include="Microsoft.Build" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Build.Locator" />
+    <PackageReference Include="Microsoft.CodeAnalysis" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.Common" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" />
+    <PackageReference Include="Microsoft.CSharp" />
+    <PackageReference Include="System.CodeDom" />
+    <PackageReference Include="QuikGraph" />
+    <PackageReference Include="QuikGraph.Serialization" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Templates\DotGitIgnoreT4.tt">
+      <LastGenOutput>DotGitIgnoreT4.cs</LastGenOutput>
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+    </None>
+    <None Update="Templates\ProjectCsprojT4.tt">
+      <LastGenOutput>ProjectCsprojT4.cs</LastGenOutput>
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+    </None>
+    <None Update="Templates\StaticClassT4.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>StaticClassT4.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Templates\DotGitIgnoreT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>DotGitIgnoreT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\ProjectCsprojT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>ProjectCsprojT4.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\StaticClassT4.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>StaticClassT4.tt</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+</Project>

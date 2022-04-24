@@ -1,0 +1,6 @@
+<#@ template language="C#" #>
+namespace <#= Model.Namespace #>;
+
+public static class <#= Model.ClassName #>
+{
+}

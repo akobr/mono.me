@@ -1,0 +1,15 @@
+<#@ template language="C#" #>
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+<# if (Model.HasCustomName) { #>
+    <AssemblyName><#= Model.AssemblyName #></AssemblyName>
+    <RootNamespace><#= Model.RootNamespace #></RootNamespace>
+<# } #>
+
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
