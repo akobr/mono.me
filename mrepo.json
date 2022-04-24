@@ -5,9 +5,9 @@
     "prefix": "42",
     "features": [ "git-version", "packages", "build-traversal", "tests-xunit", "tests-nunit", "stylecop", "sonar" ],
     "scripts": {
-      /* add any global scripts here */
-      "hello": "echo 'Hello world!'",
-      "ls": "dir"
+      "rock": "echo \"There's no wrong time to rock! 🎸\"",
+      "truth": "echo 'Simplicity is the ultimate sophistication.'",
+      "answer": "echo 42"
     },
     "folders": {
       "source": "src",
@@ -19,7 +19,7 @@
       "^refs/heads/main$"
     ],
     "changes": {
-      "major": [ /* custom major commit message types */ ],
+      "major": [ ],
       "minor": [ "feat" ],
       "patch": [ "fix", "perf", "refactor" ],
       "harmless": [ "style", "test", "build", "ci", "docs", "chore" ]
@@ -28,7 +28,6 @@
     "issueUrlTemplate": "https://app.clickup.com/t/{0}"
   },
   "types": {
-    /* add custom types of items here (workstead, project) */
     "dotnet-project": {
       "custom": {
         "filePattern": "*.*?proj",
@@ -42,15 +41,9 @@
         "run": "dotnet run src",
         "test": "dotnet test test"
       }
-    },
-    "nodejs-project": {
-      "scripts": {
-        /* add any project related scripts here */
-      }
     }
   },
   "items": [
-    /* your worksteads/projects configuration is going to be here */
     {
       "path": "src/Monorepo",
       "name": "Monorepo",
@@ -62,29 +55,40 @@
       "description": "Powerful text base UI framework."
     },
     {
-      "path": "src/StrongBeaver",
-      "name": "StrongBeaver",
-      "description": "Universal layered application toolkit for .NET platform."
+      "path": "src/BFF",
+      "name": "Bright and friendly fella",
+      "description": "Helpful bot to any developer."
     },
     {
-      "path": "src/Widgetised.Blazor",
-      "name": "Widgetised.Blazor"
+      "path": "src/c0ded0c",
+      "name": "c0ded0c",
+      "description": "Smart and rich view of a code."
     },
     {
-      "path": "src/Cetris",
+      "path": "src/Widgetized.Blazor",
+      "name": "Widgetized.Blazor",
+      "description": "A way how to bring reusable components blocks to blazor UI."
+    },
+    {
+      "path": "src/Libraries",
+      "name": "Reusable libraries",
+      "description": "List of reusable libraries served as NuGet packages.",
+      "custom": {
+        "suppressNamespace": true
+      }
+    },
+    {
+      "path": "src/Games",
+      "name": "Best games to play!",
+      "description": "The intersection of the legendary game Tetris + Command line = Cetris.",
+      "custom": {
+        "suppressNamespace": true
+      }
+    },
+    {
+      "path": "src/Games/Cetris",
       "name": "Cetris",
       "description": "The intersection of the legendary game Tetris + Command line = Cetris."
-    },
-    {
-      "path": "src/Monorepo/Dotnet.Project.Templates",
-      "type": "dotnet-project",
-      "dependencies": [
-        "src/Cetris/Cetris.Game"
-      ],
-      "exclude": [
-        "release",
-        "version"
-      ]
     }
   ]
 }
