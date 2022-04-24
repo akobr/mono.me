@@ -19,9 +19,21 @@
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="5.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="5.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="5.0.0" />
-    <PackageVersion Include="System.CodeDom" Version="5.0.0" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="5.0.0" />
     <PackageVersion Include="System.Text.Json" Version="5.0.2" />
+
+    <!-- C# code -->
+    <PackageVersion Include="Microsoft.CodeAnalysis" Version="4.1.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.1.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="4.1.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.1.0" />
+    <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
+    <PackageVersion Include="System.CodeDom" Version="5.0.0" />
+
+    <!-- MsBuild -->
+    <PackageVersion Include="Microsoft.Build" Version="17.1.0" />
+    <PackageVersion Include="Microsoft.Build.Locator" Version="1.4.1" />
 
     <!-- unit testing -->
     <PackageVersion Include="Bogus" Version="33.1.1" />
