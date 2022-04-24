@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Roslyn.Compose</AssemblyName>
+    <RootNamespace>_42.Roslyn.Compose</RootNamespace>
+
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.Common" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" />
+    <PackageReference Include="Microsoft.CSharp" />
+    <PackageReference Include="System.CodeDom" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Templates\CreateClass.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>CreateClass.cs</LastGenOutput>
+    </None>
+    <None Update="Templates\CreateStatements.tt">
+      <Generator>TextTemplatingFilePreprocessor</Generator>
+      <LastGenOutput>CreateStatements.cs</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Templates\CreateClass.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>CreateClass.tt</DependentUpon>
+    </Compile>
+    <Compile Update="Templates\CreateStatements.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>CreateStatements.tt</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+</Project>
