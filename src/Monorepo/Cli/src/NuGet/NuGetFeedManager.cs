@@ -30,7 +30,7 @@ namespace _42.Monorepo.Cli.NuGet
         public async Task<IReadOnlySet<SemVersion>> GetPossibleVersionsAsync(string packageId)
         {
             var client = new HttpClient();
-            var versionsResponse = await client.GetAsync($"{_nugetFeedUrl}/v3-flatcontainer/{packageId}/index.json");
+            var versionsResponse = await client.GetAsync($"{_nugetFeedUrl}/v3-flatcontainer/{packageId.ToLowerInvariant()}/index.json");
 
             if (!versionsResponse.IsSuccessStatusCode)
             {
