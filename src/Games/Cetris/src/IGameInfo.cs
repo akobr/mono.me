@@ -1,4 +1,4 @@
-﻿namespace Tetris.Console
+namespace _42.Cetris
 {
     public interface IGameInfo
     {

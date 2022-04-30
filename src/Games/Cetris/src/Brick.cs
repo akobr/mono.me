@@ -1,21 +1,21 @@
-﻿using System.Collections.Generic;
-using System.Drawing;
+using System.Collections.Generic;
 
-namespace Tetris.Console
+namespace _42.Cetris;
+
+public class Brick : IBrick
 {
-    public class Brick : IBrick
+    public Brick(BrickType type, byte color, params short[] states)
     {
-        public Brick(BrickType type, Color colour, params short[] states)
-        {
-            Type = type;
-            Colour = colour;
-            States = states;
-        }
-
-        public BrickType Type { get; }
-
-        public Color Colour { get; }
-
-        public IReadOnlyList<short> States { get; }
+        Type = type;
+        Color = color;
+        States = states;
     }
+
+    public BrickType Type { get; }
+
+    public byte Color { get; }
+
+    public IReadOnlyList<short> States { get; }
+
+    public override int GetHashCode() => (int)Type;
 }

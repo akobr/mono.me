@@ -1,13 +1,19 @@
-﻿namespace Tetris.Console
+using System.Threading.Tasks;
+
+namespace _42.Cetris
 {
     public interface IGameLogic
     {
         bool IsGameOver { get; }
+
         bool IsPaused { get; }
 
-        void Start();
+        Task PlayAsync();
+
         void Restart();
+
         void Pause();
+
         void Resume();
     }
 }

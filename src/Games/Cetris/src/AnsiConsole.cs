@@ -1,29 +1,33 @@
-﻿using SystemConsole = System.Console;
+using SystemConsole = System.Console;
 
-namespace Tetris.Console
+namespace _42.Cetris;
+
+public class AnsiConsole : IAnsiConsole
 {
-    public class AnsiConsole : IAnsiConsole
+    private const string EscapeCharacter = "\u001b";
+
+    public void ClearEntireScreen()
     {
-        private const string EscapeCharacter = "\u001b";
+        SystemConsole.Write($"{EscapeCharacter}[2J");
+    }
 
-        public void ClearEntireScreen()
-        {
-            SystemConsole.Write($"{EscapeCharacter}[J2");
-        }
+    public void ClearScreenUp()
+    {
+        SystemConsole.Write($"{EscapeCharacter}[1J");
+    }
 
-        public void ClearScreenUp()
-        {
-            SystemConsole.Write($"{EscapeCharacter}[J1");
-        }
+    public void MoveCursorToBeginning()
+    {
+        SystemConsole.Write($"{EscapeCharacter}[0;0H");
+    }
 
-        public void MoveCursorToPreviousLine()
-        {
-            SystemConsole.Write($"{EscapeCharacter}[F1");
-        }
+    public void MoveCursorToPreviousLine()
+    {
+        SystemConsole.Write($"{EscapeCharacter}[1F");
+    }
 
-        public void MoveCursorToNextLine()
-        {
-            SystemConsole.Write($"{EscapeCharacter}[E1");
-        }
+    public void MoveCursorToNextLine()
+    {
+        SystemConsole.Write($"{EscapeCharacter}[1E");
     }
 }

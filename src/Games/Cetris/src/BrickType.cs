@@ -1,13 +1,12 @@
-﻿namespace Tetris.Console
+namespace _42.Cetris;
+
+public enum BrickType : byte
 {
-    public enum BrickType
-    {
-        O,
-        I,
-        S,
-        Z,
-        T,
-        J,
-        L
-    }
+    O,
+    I,
+    S,
+    Z,
+    T,
+    L,
+    J,
 }

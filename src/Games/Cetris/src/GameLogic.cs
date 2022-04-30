@@ -1,70 +1,132 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Threading;
+using System.Threading.Tasks;
 
-namespace Tetris.Console
+namespace _42.Cetris
 {
     public class GameLogic : IGameLogic, IDisposable
     {
-        private readonly BrickManager brickManager;
-        private readonly GameState gameState;
-        private readonly Timer gameTimer;
-        private readonly IGameView view;
+        private readonly BrickManager _brickManager;
+        private readonly GameState _state;
+        private readonly Timer _timer;
+        private readonly IGameView _view;
+        private readonly TaskCompletionSource _gameTask;
 
-        private IBrick? brick;
-        private int brickStateIndex;
-        private short brickState;
-        private Point brickPosition;
-        private IBrick nextBrick;
+        private GameInfo _info;
+        private IBrick? _brick;
+        private int _brickStateIndex;
+        private short _brickState;
+        private Point _brickPosition;
+        private IBrick _nextBrick;
 
         public GameLogic(IGameView view)
         {
-            brickManager = new BrickManager();
-            gameState = new GameState();
-            gameTimer = new Timer(OnGameIntervalElapsed);
+            _view = view ?? throw new ArgumentNullException(nameof(view));
+            _gameTask = new TaskCompletionSource();
+            _info = new GameInfo();
+            _brickManager = new BrickManager();
+            _state = new GameState();
+            _timer = new Timer(OnGameIntervalElapsed, null, Timeout.Infinite, Timeout.Infinite);
 
-            this.view = view;
+            IsGameOver = true;
             InitialiseGameView();
-
-            nextBrick = brickManager.GetRandomBrick();
         }
 
-        public bool IsGameOver { get; }
+        public bool IsGameOver { get; private set; }
 
-        public bool IsPaused { get; }
+        public bool IsRunning { get; private set; }
+
+        public bool IsPaused => !IsRunning;
+
+        public Task PlayAsync()
+        {
+            if (IsGameOver)
+            {
+                Start();
+            }
+            else
+            {
+                TogglePause();
+            }
+
+            return _gameTask.Task;
+        }
 
         public void Start()
         {
-            // TODO
-            gameTimer.Change(0, 500);
+            Restart();
+            IsRunning = true;
+            _timer.Change(0, GetGamePeriod());
         }
 
         public void Restart()
         {
-            // TODO
+            _info = new GameInfo();
+            _nextBrick = _brickManager.GetRandomBrick();
+            IsGameOver = false;
         }
 
         public void Pause()
         {
-            // TODO
+            if (IsPaused)
+            {
+                return;
+            }
+
+            IsRunning = false;
         }
 
         public void Resume()
         {
-            // TODO
+            if (!IsPaused)
+            {
+                return;
+            }
+
+            if (IsGameOver)
+            {
+                Start();
+                return;
+            }
+
+            IsRunning = true;
+            _timer.Change(0, GetGamePeriod());
+        }
+
+        public void TogglePause()
+        {
+            if (IsPaused)
+            {
+                Resume();
+                return;
+            }
+
+            Pause();
+        }
+
+        public void SpeedUp()
+        {
+            if (_info.Speed >= 10)
+            {
+                return;
+            }
+
+            _info.Speed++;
         }
 
         public void Dispose()
         {
-            gameTimer.Dispose();
-            view.OnKeyPressed -= OnGameViewKeyPressed;
+            _timer.Dispose();
+            _view.OnKeyPressed -= OnGameViewKeyPressed;
+            _view.OnClosing -= OnGameEndRequest;
         }
 
         private void OnGameIntervalElapsed(object? state)
         {
-            if (IsGameOver)
+            if (!IsRunning)
             {
-                gameTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                _timer.Change(Timeout.Infinite, Timeout.Infinite);
                 return;
             }
 
@@ -74,7 +136,20 @@ namespace Tetris.Console
 
         private void InitialiseGameView()
         {
-            view.OnKeyPressed += OnGameViewKeyPressed;
+            _view.OnKeyPressed += OnGameViewKeyPressed;
+            _view.OnClosing += OnGameEndRequest;
+        }
+
+        private void OnGameEndRequest(object? sender, EventArgs e)
+        {
+            if (IsGameOver)
+            {
+                return;
+            }
+
+            Pause();
+            // TODO: Save
+            _gameTask.SetResult();
         }
 
         private void OnGameViewKeyPressed(object? sender, ConsoleKey e)
@@ -108,19 +183,25 @@ namespace Tetris.Console
                 case ConsoleKey.E:
                 case ConsoleKey.V:
                 case ConsoleKey.NumPad1:
-                    // TODO: Speed up
+                    SpeedUp();
+                    return;
+
+                case ConsoleKey.R:
+                case ConsoleKey.B:
+                case ConsoleKey.NumPad3:
+                    Start();
                     return;
 
                 case ConsoleKey.Spacebar:
                 case ConsoleKey.NumPad0:
-                    // TODO: pause
+                    TogglePause();
                     return;
             }
         }
 
         private void ProcessGame()
         {
-            if (brick == null)
+            if (_brick is null)
             {
                 SpawnNewBrick();
                 return;
@@ -133,39 +214,43 @@ namespace Tetris.Console
 
             if (IsBrickSettled())
             {
-                gameState.Fill(brickState, brickPosition, brick.Colour);
-                brick = null;
+                _state.Fill(_brickState, _brickPosition, _brick.Color);
+                _brick = null;
             }
         }
 
         private void RenderGame()
         {
-            Color[,] game = new Color[GameConstants.GAME_ROWS_COUNT, GameConstants.GAME_COLUMNS_COUNT];
-            IGameInfo info = new GameInfo();
+            var game = _state.Clone();
 
-            view.RenderGame(game, info);
+            if (_brick is not null)
+            {
+                game.Fill(_brickState, _brickPosition, _brick.Color);
+            }
+
+            _view.RenderGame(game, _info);
         }
 
         private bool IsBrickSettled()
         {
-            short affectedView = gameState.GetBrickSizeView(new Point(brickPosition.X + 1, brickPosition.Y));
-            return (brickState & affectedView) != 0;
+            var affectedView = _state.GetBrickSizeView(new Point(_brickPosition.X + 1, _brickPosition.Y));
+            return (_brickState & affectedView) != 0;
         }
 
         private bool TryRotate()
         {
-            if (brick == null)
+            if (_brick == null)
             {
                 return false;
             }
 
-            short affectedView = gameState.GetBrickSizeView(brickPosition);
-            int newBrickStateIndex = GetNextStateIndex(brick, brickStateIndex);
-            short newBrickState = brick.States[newBrickStateIndex];
+            var affectedView = _state.GetBrickSizeView(_brickPosition);
+            var newBrickStateIndex = GetNextStateIndex(_brick, _brickStateIndex);
+            var newBrickState = _brick.States[newBrickStateIndex];
 
             if ((newBrickState & affectedView) == 0)
             {
-                brickState = newBrickState;
+                _brickState = newBrickState;
                 return true;
             }
 
@@ -174,17 +259,17 @@ namespace Tetris.Console
 
         private bool TryMoveRight()
         {
-            return TryMoveTo(new Point(brickPosition.X, brickPosition.Y + 1));
+            return TryMoveTo(new Point(_brickPosition.X, _brickPosition.Y + 1));
         }
 
         private bool TryMoveLeft()
         {
-            return TryMoveTo(new Point(brickPosition.X, brickPosition.Y - 1));
+            return TryMoveTo(new Point(_brickPosition.X, _brickPosition.Y - 1));
         }
 
         private bool TryDrop()
         {
-            return TryMoveTo(new Point(brickPosition.X + 1, brickPosition.Y));
+            return TryMoveTo(new Point(_brickPosition.X + 1, _brickPosition.Y));
         }
 
         private bool TryMoveTo(Point newPosition)
@@ -194,11 +279,11 @@ namespace Tetris.Console
                 return false;
             }
 
-            short affectedView = gameState.GetBrickSizeView(newPosition);
+            var affectedView = _state.GetBrickSizeView(newPosition);
 
-            if ((brickState & affectedView) == 0)
+            if ((_brickState & affectedView) == 0)
             {
-                brickPosition = newPosition;
+                _brickPosition = newPosition;
                 return true;
             }
 
@@ -218,15 +303,21 @@ namespace Tetris.Console
 
         private void SpawnNewBrick()
         {
-            brick = nextBrick;
-            brickStateIndex = 0;
-            brickState = brick.States[brickStateIndex];
-            nextBrick = brickManager.GetRandomBrick();
+            _brick = _nextBrick;
+            _brickStateIndex = 0;
+            _brickState = _brick.States[_brickStateIndex];
+            _brickPosition = GameConstants.BRICK_START_POSITION;
+            _nextBrick = _brickManager.GetRandomBrick();
+        }
+
+        private int GetGamePeriod()
+        {
+            return 1000 - (_info.Speed * 50);
         }
 
         private static int GetNextStateIndex(IBrick brick, int brickStateIndex)
         {
-            int newBrickStateIndex = brickStateIndex++;
+            var newBrickStateIndex = brickStateIndex++;
             return newBrickStateIndex < brick.States.Count
                 ? newBrickStateIndex
                 : 0;

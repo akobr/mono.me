@@ -1,13 +1,13 @@
-﻿using System;
-using System.Drawing;
+using System;
 
-namespace Tetris.Console
+namespace _42.Cetris
 {
     public interface IGameView
     {
         event EventHandler? OnClosing;
+
         event EventHandler<ConsoleKey>? OnKeyPressed;
 
-        void RenderGame(Color[,] game, IGameInfo info);
+        void RenderGame(byte[,] game, IGameInfo info);
     }
 }

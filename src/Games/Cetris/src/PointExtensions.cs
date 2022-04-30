@@ -1,6 +1,6 @@
 ﻿using System.Drawing;
 
-namespace Tetris.Console
+namespace _42.Cetris
 {
     public static class PointExtensions
     {

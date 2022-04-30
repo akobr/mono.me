@@ -1,11 +1,10 @@
-﻿using System.Collections.Generic;
-using System.Drawing;
+using System.Collections.Generic;
 
-namespace Tetris.Console
+namespace _42.Cetris
 {
     public interface IBrick
     {
-        Color Colour { get; }
+        byte Color { get; }
 
         IReadOnlyList<short> States { get; }
 

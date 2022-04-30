@@ -1,15 +1,15 @@
-﻿using System;
-using System.Drawing;
+using System;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 
 using SystemConsole = System.Console;
 
-namespace Tetris.Console
+namespace _42.Cetris
 {
     class Program
     {
-        static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             SystemConsole.WriteLine(Path.GetRandomFileName());
 
@@ -46,23 +46,29 @@ namespace Tetris.Console
             SystemConsole.WriteLine(" ████ ");
             SystemConsole.WriteLine();
 
-
             BrickManager brickManager = new BrickManager();
-            short iBrick = brickManager.AllBricks[1].States[1];
+            short iBrick = brickManager.AllBricks[(int)BrickType.I].States[1];
             SystemConsole.WriteLine("iBrick");
             PrintBrick(iBrick);
 
-            short view = state.GetBrickSizeView(GameConstants.INSIDE_BRICK_ZERO_POSITION);
+            short testView = state.GetBrickSizeView(GameConstants.INSIDE_BRICK_ZERO_POSITION);
             SystemConsole.WriteLine("view");
-            PrintBrick(view);
+            PrintBrick(testView);
 
             SystemConsole.WriteLine("AND");
-            PrintBrick((short)(view & iBrick));
+            PrintBrick((short)(testView & iBrick));
+
+            var console = new AnsiConsole();
+            var view = new GameView(console);
+            var game = new GameLogic(view);
+
+            console.ClearEntireScreen();
+            await game.PlayAsync();
         }
 
         private static void PrintBrick(short brick)
         {
-            StringBuilder stringRepresentation = new StringBuilder();
+            var stringRepresentation = new StringBuilder();
             stringRepresentation.Append(Convert.ToString(brick, 2));
 
             if (stringRepresentation.Length < 16)
