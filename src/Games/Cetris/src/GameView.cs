@@ -1,4 +1,6 @@
 using System;
+using System.Drawing;
+using System.Text;
 using System.Threading;
 
 using SystemConsole = System.Console;
@@ -29,6 +31,32 @@ namespace _42.Cetris
                 RenderContentRectangle(game);
                 // TODO: render rest
             }
+        }
+
+        public void PrintText(string text, Point position)
+        {
+            _ansiConsole.SetCursor(position);
+            SystemConsole.Write(text);
+        }
+
+        public void PrintBrick(short brick, Point position)
+        {
+            var asText = new StringBuilder();
+            asText.Append(Convert.ToString(brick, 2));
+
+            if (asText.Length < 16)
+            {
+                asText.Insert(0, new string('0', 16 - asText.Length));
+            }
+
+            _ansiConsole.SetCursor(position);
+            SystemConsole.Write(asText.ToString(0, 4));
+            _ansiConsole.SetCursor(new Point(position.X + 1, position.Y));
+            SystemConsole.Write(asText.ToString(4, 4));
+            _ansiConsole.SetCursor(new Point(position.X + 2, position.Y));
+            SystemConsole.Write(asText.ToString(8, 4));
+            _ansiConsole.SetCursor(new Point(position.X + 3, position.Y));
+            SystemConsole.Write(asText.ToString(12, 4));
         }
 
         private void RenderContentRectangle(byte[,] game)
@@ -83,8 +111,8 @@ namespace _42.Cetris
 
         private void OnConsoleCancelKeyPress(object sender, ConsoleCancelEventArgs e)
         {
-            OnClosing?.Invoke(this, new EventArgs());
-            Dispose();
+            OnClosing?.Invoke(this, EventArgs.Empty);
+            e.Cancel = true;
         }
 
         public void Dispose()

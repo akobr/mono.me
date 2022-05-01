@@ -239,7 +239,7 @@ namespace _42.Cetris
 
         private bool TryRotate()
         {
-            if (_brick == null)
+            if (_brick is null)
             {
                 return false;
             }
@@ -248,9 +248,13 @@ namespace _42.Cetris
             var newBrickStateIndex = GetNextStateIndex(_brick, _brickStateIndex);
             var newBrickState = _brick.States[newBrickStateIndex];
 
+            _view.PrintBrick(affectedView, new Point(10, 24));
+            _view.PrintBrick(newBrickState, new Point(15, 24));
+
             if ((newBrickState & affectedView) == 0)
             {
                 _brickState = newBrickState;
+                _brickStateIndex = newBrickStateIndex;
                 return true;
             }
 
@@ -280,6 +284,10 @@ namespace _42.Cetris
             }
 
             var affectedView = _state.GetBrickSizeView(newPosition);
+
+            _view.PrintText($"[{_brickPosition.X}, {_brickPosition.Y}] [{newPosition.X}, {newPosition.Y}]", new Point(8, 24));
+            _view.PrintBrick(affectedView, new Point(10, 24));
+            _view.PrintBrick(_brickState, new Point(15, 24));
 
             if ((_brickState & affectedView) == 0)
             {
@@ -317,7 +325,7 @@ namespace _42.Cetris
 
         private static int GetNextStateIndex(IBrick brick, int brickStateIndex)
         {
-            var newBrickStateIndex = brickStateIndex++;
+            var newBrickStateIndex = ++brickStateIndex;
             return newBrickStateIndex < brick.States.Count
                 ? newBrickStateIndex
                 : 0;

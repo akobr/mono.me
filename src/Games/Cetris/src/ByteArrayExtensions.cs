@@ -23,9 +23,11 @@ public static class ByteArrayExtensions
             for (var c = 0; c < GameConstants.BRICK_SIZE; c++)
             {
                 var gamePosition = new Point(startRowIndex + r, startColumnIndex + c);
-                var bit = bitsOfMask[new Point(r, c).ToFlatIndex(4)];
+                var bit = bitsOfMask[15 - new Point(r, c).ToFlatIndex(GameConstants.BRICK_SIZE)];
 
-                if (bit)
+                if (bit
+                    && gamePosition.X is >= 0 and < 20
+                    && gamePosition.Y is >= 0 and < 10)
                 {
                     @this[gamePosition.X, gamePosition.Y] = color;
                 }

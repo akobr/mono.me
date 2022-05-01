@@ -58,13 +58,15 @@ namespace _42.Cetris
             short view = 0;
             var count = 16;
 
-            for (var r = startRowIndex; r < startColumnIndex + GameConstants.BRICK_SIZE; r++)
+            for (var r = startRowIndex; r < startRowIndex + GameConstants.BRICK_SIZE; r++)
             {
                 for (var c = startColumnIndex; c < startColumnIndex + GameConstants.BRICK_SIZE; c++)
                 {
                     --count;
 
-                    if (_bits[new Point(r, c).ToFlatIndex()])
+                    if (r is < 0 or > 19
+                        || c is < 0 or > 9
+                        || _bits[new Point(r, c).ToFlatIndex()])
                     {
                         view |= (short)(1 << count);
                     }
@@ -90,9 +92,15 @@ namespace _42.Cetris
                 for (var c = 0; c < GameConstants.BRICK_SIZE; c++)
                 {
                     var gamePosition = new Point(startRowIndex + r, startColumnIndex + c);
+                    var isGamePositionInPlayground = gamePosition.X is >= 0 and < 20 && gamePosition.Y is >= 0 and < 10;
                     var gamePositionFlat = gamePosition.ToFlatIndex();
-                    var gameBit = _bits[gamePositionFlat];
-                    var maskBit = bitsOfMask[new Point(r, c).ToFlatIndex()];
+                    var gameBit = !isGamePositionInPlayground || _bits[gamePositionFlat];
+                    var maskBit = bitsOfMask[15 - new Point(r, c).ToFlatIndex(GameConstants.BRICK_SIZE)];
+
+                    if (!isGamePositionInPlayground)
+                    {
+                        continue;
+                    }
 
                     if (!gameBit && maskBit)
                     {
