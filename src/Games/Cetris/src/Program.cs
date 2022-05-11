@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.Threading.Tasks;
 
 using SystemConsole = System.Console;
@@ -15,9 +16,14 @@ namespace _42.Cetris
 
             console.ClearEntireScreen();
             console.HideCursor();
+            SystemConsole.CursorVisible = false;
+
             await game.PlayAsync();
+
+            SystemConsole.CursorVisible = true;
             console.ShowCursor();
 
+            console.SetCursor(new Point(23, 0));
             SystemConsole.WriteLine();
             SystemConsole.WriteLine("The game saved.");
             SystemConsole.Write("To continue, simply run ");

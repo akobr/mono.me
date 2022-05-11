@@ -69,6 +69,11 @@ public class BrickManager
         return Bricks[_random.Next(0, Bricks.Length)];
     }
 
+    public IBrick GetBrick(BrickType type)
+    {
+        return Bricks[(int)type];
+    }
+
     private void InitialiseBag()
     {
         foreach (var brick in Bricks)

@@ -1,5 +1,4 @@
 using System;
-using System.Drawing;
 
 namespace _42.Cetris
 {
@@ -9,10 +8,6 @@ namespace _42.Cetris
 
         event EventHandler<ConsoleKey>? OnKeyPressed;
 
-        void RenderGame(byte[,] game, IGameInfo info);
-
-        void PrintBrick(short brick, Point position);
-
-        void PrintText(string text, Point position);
+        void RenderGame(byte[,] game, IGameInfo info, TimeSpan gameClock, bool isPaused, bool isGameOver);
     }
 }

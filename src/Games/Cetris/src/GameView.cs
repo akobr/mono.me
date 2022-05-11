@@ -1,6 +1,5 @@
 using System;
 using System.Drawing;
-using System.Text;
 using System.Threading;
 
 using SystemConsole = System.Console;
@@ -13,10 +12,6 @@ namespace _42.Cetris
         private readonly IAnsiConsole _ansiConsole;
         private readonly Timer _inputTimer;
 
-        public event EventHandler<ConsoleKey>? OnKeyPressed;
-
-        public event EventHandler? OnClosing;
-
         public GameView(IAnsiConsole ansiConsole)
         {
             _ansiConsole = ansiConsole ?? throw new ArgumentNullException(nameof(ansiConsole));
@@ -24,39 +19,42 @@ namespace _42.Cetris
             SystemConsole.CancelKeyPress += OnConsoleCancelKeyPress;
         }
 
-        public void RenderGame(byte[,] game, IGameInfo info)
+        public event EventHandler<ConsoleKey>? OnKeyPressed;
+
+        public event EventHandler? OnClosing;
+
+        public void RenderGame(byte[,] game, IGameInfo info, TimeSpan gameClock, bool isPaused, bool isGameOver)
         {
             lock (_locker)
             {
                 RenderContentRectangle(game);
-                // TODO: render rest
+
+                var tmpColor = SystemConsole.ForegroundColor;
+                SystemConsole.ForegroundColor = ConsoleColor.White;
+                PrintText($"Score: {info.Score} ({info.Lines})", new Point(2, 24));
+                PrintText($"Speed: {info.Speed}", new Point(3, 24));
+                PrintText($"Time:  {info.Time + gameClock:hh\\:mm\\:ss}", new Point(4, 24));
+
+                if (isGameOver)
+                {
+                    SystemConsole.ForegroundColor = ConsoleColor.Red;
+                    PrintText("Game over, press R to restart.", new Point(6, 24));
+                }
+                else if (isPaused)
+                {
+                    SystemConsole.ForegroundColor = ConsoleColor.Yellow;
+                    PrintText("Game paused, press SPACE to continue.", new Point(6, 24));
+                }
+
+                SystemConsole.ForegroundColor = tmpColor;
+                _ansiConsole.SetCursor(new Point(21, 24));
             }
         }
 
-        public void PrintText(string text, Point position)
+        private void PrintText(string text, Point position)
         {
             _ansiConsole.SetCursor(position);
             SystemConsole.Write(text);
-        }
-
-        public void PrintBrick(short brick, Point position)
-        {
-            var asText = new StringBuilder();
-            asText.Append(Convert.ToString(brick, 2));
-
-            if (asText.Length < 16)
-            {
-                asText.Insert(0, new string('0', 16 - asText.Length));
-            }
-
-            _ansiConsole.SetCursor(position);
-            SystemConsole.Write(asText.ToString(0, 4));
-            _ansiConsole.SetCursor(new Point(position.X + 1, position.Y));
-            SystemConsole.Write(asText.ToString(4, 4));
-            _ansiConsole.SetCursor(new Point(position.X + 2, position.Y));
-            SystemConsole.Write(asText.ToString(8, 4));
-            _ansiConsole.SetCursor(new Point(position.X + 3, position.Y));
-            SystemConsole.Write(asText.ToString(12, 4));
         }
 
         private void RenderContentRectangle(byte[,] game)
@@ -109,7 +107,7 @@ namespace _42.Cetris
             }
         }
 
-        private void OnConsoleCancelKeyPress(object sender, ConsoleCancelEventArgs e)
+        private void OnConsoleCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
         {
             OnClosing?.Invoke(this, EventArgs.Empty);
             e.Cancel = true;

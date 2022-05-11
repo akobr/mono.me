@@ -10,40 +10,31 @@ namespace _42.Cetris
         private readonly BitArray _bits;
         private readonly byte[,] _colors;
 
-        private readonly int _rowCount;
-        private readonly int _columnCount;
+        private readonly int _rowCount = GameConstants.GAME_ROWS_COUNT;
+        private readonly int _columnCount = GameConstants.GAME_COLUMNS_COUNT;
 
-        public GameState(int rowCount = GameConstants.GAME_ROWS_COUNT, int columnCount = GameConstants.GAME_COLUMNS_COUNT)
+        public GameState()
         {
-            _rowCount = rowCount > 0 ? rowCount : throw new ArgumentOutOfRangeException(nameof(rowCount));
-            _columnCount = columnCount > 0 ? columnCount : throw new ArgumentOutOfRangeException(nameof(columnCount));
-            _bits = new BitArray(rowCount * columnCount);
-            _colors = new byte[rowCount, columnCount];
+            _bits = new BitArray(_rowCount * _columnCount);
+            _colors = new byte[_rowCount, _columnCount];
         }
 
-        public bool this[int rowIndex, int columnIndex]
+        public GameState(GameStateModel model)
         {
-            get => Get(rowIndex, columnIndex);
-            set => Set(rowIndex, columnIndex, value);
+            _bits = new BitArray(model.Bytes);
+            _colors = new byte[_rowCount, _columnCount];
+
+            var index = -1;
+            foreach (var color in model.Colors)
+            {
+                var position = (++index).ToRectangularIndex();
+                _colors[position.X, position.Y] = color;
+            }
         }
 
-        public byte GetColor(int rowIndex, int columnIndex)
-        {
-            CheckBounds(rowIndex, columnIndex);
-            return _colors[rowIndex, columnIndex];
-        }
+        public BitArray Bits => _bits;
 
-        public bool Get(int rowIndex, int columnIndex)
-        {
-            CheckBounds(rowIndex, columnIndex);
-            return _bits[new Point(rowIndex, columnIndex).ToFlatIndex()];
-        }
-
-        public bool Set(int rowIndex, int columnIndex, bool value)
-        {
-            CheckBounds(rowIndex, columnIndex);
-            return _bits[new Point(rowIndex, columnIndex).ToFlatIndex()] = value;
-        }
+        public byte[,] Colors => _colors;
 
         public short GetBrickSizeView(Point position)
         {
@@ -76,11 +67,11 @@ namespace _42.Cetris
             return view;
         }
 
-        public void Fill(short mask, Point position, byte color)
+        public int Fill(short mask, Point position, byte color)
         {
             if (!position.IsValidPosition())
             {
-                return;
+                return 0;
             }
 
             var startRowIndex = position.X - GameConstants.INSIDE_BRICK_ZERO_POSITION.X;
@@ -110,6 +101,32 @@ namespace _42.Cetris
                     _bits[gamePositionFlat] = maskBit || gameBit;
                 }
             }
+
+            var fullRowsCount = 0;
+
+            for (var r = _rowCount - 1; r >= Math.Max(startRowIndex, 0); r--)
+            {
+                var isFullRow = true;
+
+                for (var c = 0; c < _columnCount; c++)
+                {
+                    var gamePosition = new Point(r, c);
+                    if (!_bits[gamePosition.ToFlatIndex()])
+                    {
+                        isFullRow = false;
+                        break;
+                    }
+                }
+
+                if (isFullRow)
+                {
+                    fullRowsCount++;
+                    RemoveRow(r);
+                    r++;
+                }
+            }
+
+            return fullRowsCount;
         }
 
         public byte[,] Clone()
@@ -117,6 +134,26 @@ namespace _42.Cetris
             var copy = new byte[_rowCount, _columnCount];
             Array.Copy(_colors, copy, _colors.Length);
             return copy;
+        }
+
+        private void RemoveRow(int row)
+        {
+            for (var r = row - 1; r >= 0; r--)
+            {
+                for (var c = 0; c < _columnCount; c++)
+                {
+                    var gamePosition = new Point(r, c);
+                    var flatIndex = gamePosition.ToFlatIndex();
+                    _bits[flatIndex + _columnCount] = _bits[flatIndex];
+                    _colors[r + 1, c] = _colors[r, c];
+                }
+            }
+
+            for (var c = 0; c < _columnCount; c++)
+            {
+                _bits[_columnCount] = false;
+                _colors[0, c] = 0;
+            }
         }
 
         private void CheckBounds(int rowIndex, int columnIndex)

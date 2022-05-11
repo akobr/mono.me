@@ -1,3 +1,5 @@
+using System;
+
 namespace _42.Cetris;
 
 public class GameInfo : IGameInfo
@@ -7,4 +9,6 @@ public class GameInfo : IGameInfo
     public int Lines { get; set; }
 
     public int Speed { get; set; }
+
+    public TimeSpan Time { get; set; }
 }

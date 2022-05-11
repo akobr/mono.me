@@ -19,5 +19,10 @@ namespace _42.Cetris
         {
             return (position.X * columnsCount) + position.Y;
         }
+
+        public static Point ToRectangularIndex(this int flatIndex, int columnsCount = GameConstants.GAME_COLUMNS_COUNT)
+        {
+            return new Point(flatIndex / columnsCount, flatIndex % columnsCount);
+        }
     }
 }
