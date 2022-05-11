@@ -1,0 +1,6 @@
+{
+  "$schema": "https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/main/monorepo/src/NerdBank.GitVersioning/version.schema.json",
+  "version": "0.9.3",
+  "inherit": true,
+  "pathFilters": [ "." ]
+}
