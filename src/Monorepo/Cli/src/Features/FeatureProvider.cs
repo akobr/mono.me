@@ -1,6 +1,6 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
 using _42.Monorepo.Cli.Configuration;
 using Microsoft.Extensions.Options;
 
@@ -28,6 +28,14 @@ namespace _42.Monorepo.Cli.Features
             lock (_locker)
             {
                 return _features.Contains(featureName);
+            }
+        }
+
+        public IEnumerable<string> GetAllEnabled(string featurePrefix)
+        {
+            lock (_locker)
+            {
+                return _features.Where(f => f.StartsWith(featurePrefix, StringComparison.OrdinalIgnoreCase));
             }
         }
 
