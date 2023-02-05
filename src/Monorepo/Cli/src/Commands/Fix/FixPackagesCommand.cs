@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -15,9 +15,15 @@ namespace _42.Monorepo.Cli.Commands.Fix
     [Command(CommandNames.PACKAGES, Description = "Move all locally versioned packages to centralized point.")]
     public class FixPackagesCommand : BaseCommand
     {
-        public FixPackagesCommand(IExtendedConsole console, ICommandContext context)
+        private readonly IFileSystem _fileSystem;
+
+        public FixPackagesCommand(
+            IFileSystem fileSystem,
+            IExtendedConsole console,
+            ICommandContext context)
             : base(console, context)
         {
+            _fileSystem = fileSystem;
             // no operation
         }
 
@@ -38,7 +44,7 @@ namespace _42.Monorepo.Cli.Commands.Fix
 
             foreach (var project in projects)
             {
-                string projectFilePath = ProjectStrategyHelper.GetProjectFilePath(project);
+                var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(project, _fileSystem);
                 if (await TryFixDecentralizedPackageVersionsAsync(projectFilePath, packagesFilePaths))
                 {
                     modifiedFiles.Add(projectFilePath.GetRelativePath(Context.Repository.Record.Path));
@@ -63,7 +69,7 @@ namespace _42.Monorepo.Cli.Commands.Fix
 
         private async Task<bool> TryFixDecentralizedPackageVersionsAsync(string projectFilePath, IReadOnlyCollection<string> packagesFilePaths)
         {
-            var lines = await File.ReadAllLinesAsync(projectFilePath);
+            var lines = await _fileSystem.File.ReadAllLinesAsync(projectFilePath);
             var packageIdRegex = new Regex("Include=\"(?<packageId>[a-zA-Z0-9\\-\\.]+)\"", RegexOptions.Compiled);
             var versionRegex = new Regex("Version=\"(?<packageVersion>[a-zA-Z0-9\\-\\.\\+]*)\"", RegexOptions.Compiled);
             var packagesToUpdate = new Dictionary<string, string>();
@@ -94,9 +100,9 @@ namespace _42.Monorepo.Cli.Commands.Fix
                 return false;
             }
 
-            await File.WriteAllLinesAsync(projectFilePath, lines);
+            await _fileSystem.File.WriteAllLinesAsync(projectFilePath, lines);
 
-            foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p)))
+            foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p, _fileSystem)))
             {
                 foreach (var packagePair in packagesToUpdate.ToList())
                 {
@@ -110,7 +116,7 @@ namespace _42.Monorepo.Cli.Commands.Fix
 
             if (packagesToUpdate.Count > 0)
             {
-                var directManager = new PackagesDefinitionManager(packagesFilePaths.First());
+                var directManager = new PackagesDefinitionManager(packagesFilePaths.First(), _fileSystem);
 
                 foreach (var packagePair in packagesToUpdate)
                 {

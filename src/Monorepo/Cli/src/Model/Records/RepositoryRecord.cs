@@ -7,17 +7,17 @@ namespace _42.Monorepo.Cli.Model.Records
 {
     public class RepositoryRecord : Record, IRepositoryRecord
     {
-        private readonly IRootDirectoryRecord sourceDirectory;
-        private readonly HashSet<IRootDirectoryRecord> rootDirectories;
+        private readonly IRootDirectoryRecord _sourceDirectory;
+        private readonly HashSet<IRootDirectoryRecord> _rootDirectories;
 
         public RepositoryRecord(string path)
             : base(path, null)
         {
-            sourceDirectory = new RootDirectoryRecord(
+            _sourceDirectory = new RootDirectoryRecord(
                 System.IO.Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME),
                 this);
 
-            rootDirectories = new HashSet<IRootDirectoryRecord> { sourceDirectory };
+            _rootDirectories = new HashSet<IRootDirectoryRecord> { _sourceDirectory };
         }
 
         public override RecordType Type => RecordType.Repository;
@@ -30,13 +30,13 @@ namespace _42.Monorepo.Cli.Model.Records
                 .Any();
 
         public IReadOnlyCollection<IRootDirectoryRecord> GetDirectories()
-            => rootDirectories;
+            => _rootDirectories;
 
         public IReadOnlyCollection<IWorksteadRecord> GetWorksteads()
-            => sourceDirectory.GetWorksteads();
+            => _sourceDirectory.GetWorksteads();
 
         public IEnumerable<IProjectRecord> GetAllProjects()
-            => sourceDirectory.GetAllProjects();
+            => _sourceDirectory.GetAllProjects();
 
         public void AddRootDirectory(string path)
         {
@@ -47,7 +47,7 @@ namespace _42.Monorepo.Cli.Model.Records
                 return;
             }
 
-            rootDirectories.Add(new RootDirectoryRecord(fullPath, this));
+            _rootDirectories.Add(new RootDirectoryRecord(fullPath, this));
         }
     }
 }

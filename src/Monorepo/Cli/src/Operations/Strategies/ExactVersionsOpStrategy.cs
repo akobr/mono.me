@@ -1,5 +1,5 @@
 using System;
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
@@ -16,18 +16,23 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 {
     public class ExactVersionsOpStrategy : IOpStrategy<IExactVersions>
     {
-        private readonly IItemOptionsProvider optionsProvider;
-        private readonly IFileContentCache fileCache;
+        private readonly IFileSystem _fileSystem;
+        private readonly IItemOptionsProvider _optionsProvider;
+        private readonly IFileContentCache _fileCache;
 
-        public ExactVersionsOpStrategy(IItemOptionsProvider optionsProvider, IFileContentCache fileCache)
+        public ExactVersionsOpStrategy(
+            IFileSystem fileSystem,
+            IItemOptionsProvider optionsProvider,
+            IFileContentCache fileCache)
         {
-            this.optionsProvider = optionsProvider;
-            this.fileCache = fileCache;
+            _fileSystem = fileSystem;
+            _optionsProvider = optionsProvider;
+            _fileCache = fileCache;
         }
 
         public Task<IExactVersions> OperateAsync(IItem item, CancellationToken cancellationToken = default)
         {
-            var options = optionsProvider.GetOptions(item.Record.Path);
+            var options = _optionsProvider.GetOptions(item.Record.Path);
 
             if (options.IsVersioned())
             {
@@ -71,14 +76,14 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 return new ExactVersions(new Version(1, 0));
             }
 
-            var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item);
+            var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item, _fileSystem);
 
-            if (!File.Exists(projectFilePath))
+            if (!_fileSystem.File.Exists(projectFilePath))
             {
                 return new ExactVersions(new Version(1, 0));
             }
 
-            var xContent = await fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
+            var xContent = await _fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
 
             if (xContent.Root is null)
             {

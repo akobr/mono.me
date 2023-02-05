@@ -1,4 +1,5 @@
 using System.IO;
+using System.IO.Abstractions;
 using _42.Monorepo.Cli.Cache;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
@@ -32,6 +33,13 @@ namespace _42.Monorepo.Cli
             services.AddLogging((builder) => ConfigureLogging(builder, configuration));
             ConfigureOptions(configuration, services);
             services.AddOpStrategies(ConfigureOpStrategies);
+
+#if !DEBUG || TESTING
+            services.AddSingleton<IFileSystem, FileSystem>();
+#else
+            // TODO: [testing] add file system which will just print operations to console
+            services.AddSingleton<IFileSystem, FileSystem>();
+#endif
 
             services.AddSingleton<ICommandContext, CommandContext>();
             services.AddSingleton<IFileContentCache, FileContentCache>();

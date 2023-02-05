@@ -1,4 +1,4 @@
-using System.IO;
+using System.IO.Abstractions;
 using _42.Monorepo.Cli.Commands;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
@@ -7,11 +7,15 @@ namespace _42.Monorepo.Cli
 {
     public class CommandContext : ICommandContext
     {
-        private readonly IItemsFactory powerItemFactory;
+        private readonly IFileSystem _fileSystem;
+        private readonly IItemsFactory _powerItemFactory;
 
-        public CommandContext(IItemsFactory powerItemFactory)
+        public CommandContext(
+            IFileSystem fileSystem,
+            IItemsFactory powerItemFactory)
         {
-            this.powerItemFactory = powerItemFactory;
+            _fileSystem = fileSystem;
+            _powerItemFactory = powerItemFactory;
             var repositoryItem = MonorepoDirectoryFunctions.GetMonoRepository();
             Repository = powerItemFactory.BuildItem<IRepository>(repositoryItem);
 
@@ -27,14 +31,14 @@ namespace _42.Monorepo.Cli
 
         public void ReInitialize(string repoRelativePath)
         {
-            var possibleItemPath = Path.Combine(Repository.Record.Path, repoRelativePath);
+            var possibleItemPath = _fileSystem.Path.Combine(Repository.Record.Path, repoRelativePath);
 
-            if (!Directory.Exists(possibleItemPath) && !File.Exists(possibleItemPath))
+            if (!_fileSystem.Directory.Exists(possibleItemPath) && !_fileSystem.File.Exists(possibleItemPath))
             {
                 return;
             }
 
-            possibleItemPath = Path.GetFullPath(possibleItemPath);
+            possibleItemPath = _fileSystem.Path.GetFullPath(possibleItemPath);
 
             if (!possibleItemPath.StartsWith(Repository.Record.Path, System.StringComparison.OrdinalIgnoreCase))
             {
@@ -42,7 +46,7 @@ namespace _42.Monorepo.Cli
             }
 
             var item = MonorepoDirectoryFunctions.GetRecord(possibleItemPath);
-            Item = powerItemFactory.BuildItem(item);
+            Item = _powerItemFactory.BuildItem(item);
         }
 
         public void TryFailedIfInvalid()

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -25,11 +25,13 @@ namespace _42.Monorepo.Cli.Commands.Release
     [Subcommand(typeof(TagCommand))]
     public class ReleaseCommand : BaseCommand
     {
+        private readonly IFileSystem _fileSystem;
         private readonly IGitRepositoryService _repositoryService;
         private readonly IGitHistoryService _historyService;
         private readonly ReleaseOptions _options;
 
         public ReleaseCommand(
+            IFileSystem fileSystem,
             IExtendedConsole console,
             ICommandContext context,
             IGitRepositoryService repositoryService,
@@ -37,6 +39,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             IOptions<ReleaseOptions> configuration)
             : base(console, context)
         {
+            _fileSystem = fileSystem;
             _repositoryService = repositoryService;
             _historyService = historyService;
             _options = configuration.Value;
@@ -59,7 +62,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                 return ExitCodes.WARNING_NO_WORK_NEEDED;
             }
 
-            var versionFolder = Path.GetDirectoryName(versionFilePath);
+            var versionFolder = _fileSystem.Path.GetDirectoryName(versionFilePath);
 
             while (!record.Path.EqualsOrdinalIgnoreCase(versionFolder))
             {
@@ -307,20 +310,17 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             if (isNewVersion)
             {
-#if !DEBUG || TESTING
-                ReleaseHelper.UpdateVersionFile(preview.VersionDefinition.Template, preview.VersionFileFullPath);
-#endif
+                ReleaseHelper.UpdateVersionFile(preview.VersionDefinition.Template, preview.VersionFileFullPath, _fileSystem);
                 var versionFileRepoPath = preview.VersionFileFullPath.GetRelativePath(Context.Repository.Record.Path);
                 Console.WriteLine($"Version: {versionFileRepoPath}");
             }
 
-#if !DEBUG || TESTING
             var releaseNotes = ReleaseHelper.BuildReleaseNotes(preview);
-            var releaseNotesFullPath = Path.Combine(Context.Repository.Record.Path, preview.NotesRepoPath);
-            var releaseNotesDirectory = Path.GetDirectoryName(releaseNotesFullPath)!;
-            Directory.CreateDirectory(releaseNotesDirectory);
-            await File.WriteAllTextAsync(releaseNotesFullPath, releaseNotes.ToString());
-#endif
+            var releaseNotesFullPath = _fileSystem.Path.Combine(Context.Repository.Record.Path, preview.NotesRepoPath);
+            var releaseNotesDirectory = _fileSystem.Path.GetDirectoryName(releaseNotesFullPath)!;
+            _fileSystem.Directory.CreateDirectory(releaseNotesDirectory);
+            await _fileSystem.File.WriteAllTextAsync(releaseNotesFullPath, releaseNotes.ToString());
+
             Console.WriteLine($"Notes:   {preview.NotesRepoPath}");
 
             if (inBranch)

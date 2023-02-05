@@ -39,7 +39,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             if (!isReleaseBranch)
             {
                 Console.WriteImportant(
-                    "The currect branch is not releasable: ",
+                    "The current branch is not releasable: ",
                     repo.Head.FriendlyName.ThemedHighlight(Console.Theme));
                 return Task.FromResult(ExitCodes.ERROR_WRONG_PLACE);
             }

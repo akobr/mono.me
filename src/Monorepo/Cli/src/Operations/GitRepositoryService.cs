@@ -5,16 +5,16 @@ namespace _42.Monorepo.Cli.Operations
 {
     public class GitRepositoryService : IGitRepositoryService
     {
-        private readonly Lazy<string> repositoryPath;
+        private readonly Lazy<string> _repositoryPath;
 
         public GitRepositoryService()
         {
-            repositoryPath = new Lazy<string>(MonorepoDirectoryFunctions.GetMonorepoRootDirectory);
+            _repositoryPath = new Lazy<string>(MonorepoDirectoryFunctions.GetMonorepoRootDirectory);
         }
 
         public Repository BuildRepository()
         {
-            return new Repository(repositoryPath.Value);
+            return new Repository(_repositoryPath.Value);
         }
     }
 }

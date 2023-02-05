@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using _42.Monorepo.Cli.Cache;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
@@ -19,15 +19,18 @@ namespace _42.Monorepo.Cli.Operations
 {
     public class ItemOpsStrategy : IItemOpsStrategy
     {
+        private readonly IFileSystem _fileSystem;
         private readonly IGitTagsService gitTagsService;
         private readonly IItemOptionsProvider optionsProvider;
         private readonly IFileContentCache fileCache;
 
         public ItemOpsStrategy(
+            IFileSystem fileSystem,
             IGitTagsService gitTagsService,
             IItemOptionsProvider optionsProvider,
             IFileContentCache fileCache)
         {
+            _fileSystem = fileSystem;
             this.gitTagsService = gitTagsService;
             this.optionsProvider = optionsProvider;
             this.fileCache = fileCache;
@@ -36,9 +39,9 @@ namespace _42.Monorepo.Cli.Operations
         public async Task<string?> CalculateVersionFilePathAsync(IItem item, CancellationToken cancellationToken)
         {
             var directory = item.Record.Path;
-            var filePath = Path.Combine(directory, Constants.VERSION_FILE_NAME);
+            var filePath = _fileSystem.Path.Combine(directory, Constants.VERSION_FILE_NAME);
 
-            return File.Exists(filePath)
+            return _fileSystem.File.Exists(filePath)
                 ? filePath
                 : item.Parent is null
                     ? null
@@ -49,9 +52,9 @@ namespace _42.Monorepo.Cli.Operations
         public async Task<IVersionTemplate?> CalculateDefinedVersionAsync(IItem item, CancellationToken cancellationToken)
         {
             var directory = item.Record.Path;
-            var filePath = Path.Combine(directory, Constants.VERSION_FILE_NAME);
+            var filePath = _fileSystem.Path.Combine(directory, Constants.VERSION_FILE_NAME);
 
-            if (!File.Exists(filePath))
+            if (!_fileSystem.File.Exists(filePath))
             {
                 return item.Parent is null
                     ? null
@@ -122,9 +125,9 @@ namespace _42.Monorepo.Cli.Operations
         public async Task<string?> CalculatePackagesFilePathAsync(IItem item, CancellationToken cancellationToken)
         {
             var directory = item.Record.Path;
-            var filePath = Path.Combine(directory, Constants.PACKAGES_FILE_NAME);
+            var filePath = _fileSystem.Path.Combine(directory, Constants.PACKAGES_FILE_NAME);
 
-            return File.Exists(filePath)
+            return _fileSystem.File.Exists(filePath)
                 ? filePath
                 : item.Parent is null
                     ? null
@@ -148,12 +151,12 @@ namespace _42.Monorepo.Cli.Operations
 
             var projectFilePath = CalculateProjectFile(item.Record.Path);
 
-            if (!File.Exists(projectFilePath))
+            if (!_fileSystem.File.Exists(projectFilePath))
             {
                 return Array.Empty<IInternalDependency>();
             }
 
-            var projectDirectory = Path.GetDirectoryName(projectFilePath)!;
+            var projectDirectory = _fileSystem.Path.GetDirectoryName(projectFilePath)!;
             var xContent = await fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
 
             if (xContent.Root is null)
@@ -178,9 +181,9 @@ namespace _42.Monorepo.Cli.Operations
                     continue;
                 }
 
-                var fullPath = Path.GetFullPath(Path.Combine(projectDirectory, relativePath));
+                var fullPath = _fileSystem.Path.GetFullPath(_fileSystem.Path.Combine(projectDirectory, relativePath));
                 var projectRepoPath = fullPath.GetRelativePath(repository.Path);
-                var projectName = Path.GetFileName(projectRepoPath);
+                var projectName = _fileSystem.Path.GetFileName(projectRepoPath);
                 references.Add(new InternalDependency(projectName, projectRepoPath, fullPath));
             }
 
@@ -196,7 +199,7 @@ namespace _42.Monorepo.Cli.Operations
 
             var projectFilePath = CalculateProjectFile(item.Record.Path);
 
-            if (!File.Exists(projectFilePath))
+            if (!_fileSystem.File.Exists(projectFilePath))
             {
                 return new ExactVersions(new Version(1, 0));
             }
@@ -294,7 +297,7 @@ namespace _42.Monorepo.Cli.Operations
 
         private List<IRelease> GetExactReleases(IItem item, CancellationToken cancellationToken)
         {
-            string releasePrefix = $"{item.Record.Identifier.Humanized}/v.";
+            var releasePrefix = $"{item.Record.Identifier.Humanized}/v.";
             var repository = item.Record.TryGetConcreteItem(RecordType.Repository) ?? MonorepoDirectoryFunctions.GetMonoRepository();
 
             List<IRelease> exactReleases = new();
@@ -317,12 +320,12 @@ namespace _42.Monorepo.Cli.Operations
         private async Task<IReadOnlyCollection<IExternalDependency>> CalculateGlobalExternalDependenciesAsync(IItem item, CancellationToken cancellationToken)
         {
             var directory = item.Record.Path;
-            string filePath = Path.Combine(directory, Constants.PACKAGES_FILE_NAME);
+            var filePath = _fileSystem.Path.Combine(directory, Constants.PACKAGES_FILE_NAME);
             var parentTask = item.Parent is null
                 ? Task.FromResult<IReadOnlyCollection<IExternalDependency>>(Array.Empty<IExternalDependency>())
                 : item.Parent.GetExternalDependenciesAsync(cancellationToken);
 
-            if (!File.Exists(filePath))
+            if (!_fileSystem.File.Exists(filePath))
             {
                 return await parentTask;
             }
@@ -331,7 +334,7 @@ namespace _42.Monorepo.Cli.Operations
             var map = parentDependencies
                 .ToDictionary(d => d.Name, d => new ExternalDependency(d.Name, d.Version, false));
 
-            XDocument xContent = await fileCache.GetOrLoadXmlContentAsync(filePath, cancellationToken);
+            var xContent = await fileCache.GetOrLoadXmlContentAsync(filePath, cancellationToken);
 
             if (xContent.Root is null)
             {
@@ -360,7 +363,7 @@ namespace _42.Monorepo.Cli.Operations
         {
             var projectFilePath = CalculateProjectFile(item.Record.Path);
 
-            if (!File.Exists(projectFilePath))
+            if (!_fileSystem.File.Exists(projectFilePath))
             {
                 return Array.Empty<IExternalDependency>();
             }
@@ -392,16 +395,16 @@ namespace _42.Monorepo.Cli.Operations
                 .ToList();
         }
 
-        private static string CalculateProjectFile(string projectPath)
+        private string CalculateProjectFile(string projectPath)
         {
-            var sourceDirectoryPath = Path.Combine(projectPath, Constants.SOURCE_DIRECTORY_NAME);
+            var sourceDirectoryPath = _fileSystem.Path.Combine(projectPath, Constants.SOURCE_DIRECTORY_NAME);
 
-            if (!Directory.Exists(sourceDirectoryPath))
+            if (!_fileSystem.Directory.Exists(sourceDirectoryPath))
             {
                 sourceDirectoryPath = projectPath;
             }
 
-            var projectFiles = Directory.GetFiles(sourceDirectoryPath, "*.csproj", SearchOption.TopDirectoryOnly);
+            var projectFiles = _fileSystem.Directory.GetFiles(sourceDirectoryPath, "*.csproj", SearchOption.TopDirectoryOnly);
             return projectFiles.Length > 0 ? projectFiles[0] : string.Empty;
         }
     }

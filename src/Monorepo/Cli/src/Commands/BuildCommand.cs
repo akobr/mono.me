@@ -1,4 +1,4 @@
-using System.IO;
+using System.IO.Abstractions;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
@@ -14,12 +14,14 @@ namespace _42.Monorepo.Cli.Commands
     [Command(CommandNames.BUILD, Description = "Build a specific location.")]
     public class BuildCommand : BaseCommand
     {
+        private readonly IFileSystem _fileSystem;
         private readonly IScriptingService _scripting;
         private readonly IItemFullOptionsProvider _optionsProvider;
         private readonly IFeatureProvider _featureProvider;
         private readonly CommandLineApplication _application;
 
         public BuildCommand(
+            IFileSystem fileSystem,
             IExtendedConsole console,
             ICommandContext context,
             IScriptingService scripting,
@@ -28,6 +30,7 @@ namespace _42.Monorepo.Cli.Commands
             CommandLineApplication application)
             : base(console, context)
         {
+            _fileSystem = fileSystem;
             _scripting = scripting;
             _optionsProvider = optionsProvider;
             _featureProvider = featureProvider;
@@ -205,7 +208,7 @@ namespace _42.Monorepo.Cli.Commands
                     Console.WriteImportant($"No startup project for: {projectItem.Record.RepoRelativePath}");
                 }
 
-                var projectRecord = MonorepoDirectoryFunctions.GetRecord(Path.Combine(Context.Repository.Record.Path, startupProjectRepoPath));
+                var projectRecord = MonorepoDirectoryFunctions.GetRecord(_fileSystem.Path.Combine(Context.Repository.Record.Path, startupProjectRepoPath));
                 projectItem = Context.Repository.TryGetDescendant(projectRecord);
             }
 
@@ -215,8 +218,8 @@ namespace _42.Monorepo.Cli.Commands
                 return ExitCodes.ERROR_WRONG_PLACE;
             }
 
-            string projectFilePath = ProjectStrategyHelper.GetProjectFilePath(targetProject);
-            string script = $"dotnet run --project {projectFilePath}";
+            var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(targetProject, _fileSystem);
+            var script = $"dotnet run --project {projectFilePath}";
             var scriptOutput = await _scripting.ExecuteScriptAsync(script, Context.Item.Record.Path);
             return scriptOutput;
         }
@@ -225,7 +228,7 @@ namespace _42.Monorepo.Cli.Commands
         {
             var buildTarget = GetTraversalTargetFile(operation, fullPath, profile);
 
-            if (!File.Exists(Path.Combine(fullPath, buildTarget)))
+            if (!_fileSystem.File.Exists(_fileSystem.Path.Combine(fullPath, buildTarget)))
             {
                 return null;
             }
@@ -235,7 +238,7 @@ namespace _42.Monorepo.Cli.Commands
             return scriptOutput;
         }
 
-        private static string GetTraversalTargetFile(string operation, string fullPath, string profile)
+        private string GetTraversalTargetFile(string operation, string fullPath, string profile)
         {
             var buildTarget = "Directory.Build.proj";
 
@@ -243,7 +246,7 @@ namespace _42.Monorepo.Cli.Commands
             {
                 buildTarget = $"Directory.{char.ToUpperInvariant(operation[0])}{operation[1..].ToLowerInvariant()}.proj";
 
-                if (!File.Exists(Path.Combine(fullPath, buildTarget)))
+                if (!_fileSystem.File.Exists(_fileSystem.Path.Combine(fullPath, buildTarget)))
                 {
                     buildTarget = "Directory.Build.proj";
                 }
@@ -252,7 +255,7 @@ namespace _42.Monorepo.Cli.Commands
             {
                 buildTarget = $"Directory.{char.ToUpperInvariant(operation[0])}{operation[1..].ToLowerInvariant()}.{profile}.proj";
 
-                if (!File.Exists(Path.Combine(fullPath, buildTarget)))
+                if (!_fileSystem.File.Exists(_fileSystem.Path.Combine(fullPath, buildTarget)))
                 {
                     buildTarget = $"Directory.Build.{profile}.proj";
                 }

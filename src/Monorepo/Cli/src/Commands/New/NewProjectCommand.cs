@@ -1,6 +1,5 @@
-using System;
 using System.Collections.Generic;
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -20,11 +19,13 @@ namespace _42.Monorepo.Cli.Commands.New
     [Command(CommandNames.PROJECT, Description = "Create new .net project.")]
     public class NewProjectCommand : BaseCommand
     {
+        private readonly IFileSystem _fileSystem;
         private readonly IFeatureProvider _featureProvider;
         private readonly IItemFullOptionsProvider _itemOptionsProvider;
         private readonly MonoRepoOptions _repoOptions;
 
         public NewProjectCommand(
+            IFileSystem fileSystem,
             IExtendedConsole console,
             ICommandContext context,
             IFeatureProvider featureProvider,
@@ -32,6 +33,7 @@ namespace _42.Monorepo.Cli.Commands.New
             IItemFullOptionsProvider itemOptionsProvider)
             : base(console, context)
         {
+            _fileSystem = fileSystem;
             _featureProvider = featureProvider;
             _repoOptions = monoRepoOptions.Value;
             _itemOptionsProvider = itemOptionsProvider;
@@ -80,19 +82,18 @@ namespace _42.Monorepo.Cli.Commands.New
                 name = $"{worksteadName}.{name}";
             }
 
-            var path = Path.Combine(workstead.Record.Path, name);
+            var path = _fileSystem.Path.Combine(workstead.Record.Path, name);
 
-            if (Directory.Exists(path))
+            if (_fileSystem.Directory.Exists(path))
             {
                 Console.WriteImportant($"The project '{name}' already exists.".ThemedError(Console.Theme));
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
 
-#if !DEBUG || TESTING
-            Directory.CreateDirectory(path);
-            Directory.CreateDirectory(Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME));
-#endif
-            var projectFilePath = Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME, FileNames.GetProjectFileName(name));
+            _fileSystem.Directory.CreateDirectory(path);
+            _fileSystem.Directory.CreateDirectory(_fileSystem.Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME));
+
+            var projectFilePath = _fileSystem.Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME, FileNames.GetProjectFileName(name));
             var worksteadNamespace = GetNamespace(workstead);
             var projectTemplate = new ProjectCsprojT4(new ProjectCsprojModel
             {
@@ -105,12 +106,11 @@ namespace _42.Monorepo.Cli.Commands.New
                     : name.ToValidItemName(),
             });
 
-#if !DEBUG || TESTING
-            if (!File.Exists(projectFilePath))
+            if (!_fileSystem.File.Exists(projectFilePath))
             {
-                await File.WriteAllTextAsync(projectFilePath, projectTemplate.TransformText());
+                await _fileSystem.File.WriteAllTextAsync(projectFilePath, projectTemplate.TransformText());
             }
-#endif
+
             var testTypes = new List<string>();
             var testType = "none";
 
@@ -136,19 +136,17 @@ namespace _42.Monorepo.Cli.Commands.New
                 });
             }
 
-            var projectTestFilePath = Path.Combine(path, Constants.TEST_DIRECTORY_NAME, FileNames.GetTestProjectFileName(name));
+            var projectTestFilePath = _fileSystem.Path.Combine(path, Constants.TEST_DIRECTORY_NAME, FileNames.GetTestProjectFileName(name));
 
             if (testType != "none")
             {
                 var testProjectTemplate = new ProjectTestCsprojT4(_featureProvider, testType);
-#if !DEBUG || TESTING
-                Directory.CreateDirectory(Path.Combine(path, Constants.TEST_DIRECTORY_NAME));
+                _fileSystem.Directory.CreateDirectory(_fileSystem.Path.Combine(path, Constants.TEST_DIRECTORY_NAME));
 
-                if (!File.Exists(projectTestFilePath))
+                if (!_fileSystem.File.Exists(projectTestFilePath))
                 {
-                    await File.WriteAllTextAsync(projectTestFilePath, testProjectTemplate.TransformText());
+                    await _fileSystem.File.WriteAllTextAsync(projectTestFilePath, testProjectTemplate.TransformText());
                 }
-#endif
             }
 
             if (_featureProvider.IsEnabled(FeatureNames.IacPulumi))
@@ -182,10 +180,8 @@ namespace _42.Monorepo.Cli.Commands.New
                     Version = inputVersion,
                     IsHierarchical = false,
                 });
-                var versionFilePath = Path.Combine(path, FileNames.VersionJson);
-#if !DEBUG || TESTING
-                await File.WriteAllTextAsync(versionFilePath, versionTemplate.TransformText());
-#endif
+                var versionFilePath = _fileSystem.Path.Combine(path, FileNames.VersionJson);
+                await _fileSystem.File.WriteAllTextAsync(versionFilePath, versionTemplate.TransformText());
             }
 
             return ExitCodes.SUCCESS;
@@ -193,7 +189,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
         private string GetNamespace(IItem item)
         {
-            IItem? itemToProcess = item;
+            var itemToProcess = item;
             var builder = new StringBuilder();
 
             do
@@ -231,7 +227,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
         private string GetAssemblyName(IItem item)
         {
-            IItem? itemToProcess = item;
+            var itemToProcess = item;
             var builder = new StringBuilder();
 
             do

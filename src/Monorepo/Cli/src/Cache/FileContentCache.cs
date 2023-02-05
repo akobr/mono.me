@@ -1,6 +1,6 @@
-﻿using System;
+using System;
 using System.Collections.Concurrent;
-using System.IO;
+using System.IO.Abstractions;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,52 +10,54 @@ namespace _42.Monorepo.Cli.Cache
 {
     public class FileContentCache : IFileContentCache
     {
-        private readonly ConcurrentDictionary<string, FileContent> cache;
+        private readonly IFileSystem _fileSystem;
+        private readonly ConcurrentDictionary<string, FileContent> _cache;
 
-        public FileContentCache()
+        public FileContentCache(IFileSystem fileSystem)
         {
-            cache = new ConcurrentDictionary<string, FileContent>(StringComparer.OrdinalIgnoreCase);
+            _fileSystem = fileSystem;
+            _cache = new ConcurrentDictionary<string, FileContent>(StringComparer.OrdinalIgnoreCase);
         }
 
         public bool IsLoaded(string filePath)
         {
-            return cache.TryGetValue(filePath, out var content)
+            return _cache.TryGetValue(filePath, out var content)
                    && content.IsLoaded;
         }
 
         public Task<XDocument> GetOrLoadXmlContentAsync(string filePath, CancellationToken cancellationToken = default)
         {
-            return cache
+            return _cache
                 .GetOrAdd(filePath, PrepareXmlContent)
                 .Xml.GetValueAsync(cancellationToken);
         }
 
         public Task<JsonDocument> GetOrLoadJsonContentAsync(string filePath, CancellationToken cancellationToken = default)
         {
-            return cache
+            return _cache
                 .GetOrAdd(filePath, PrepareJsonContent)
                 .Json.GetValueAsync(cancellationToken);
         }
 
-        private static FileContent PrepareXmlContent(string path)
+        private FileContent PrepareXmlContent(string path)
         {
             return new FileContent(path, new AsyncLazy<XDocument>(t => XmlFactory(path, t)));
         }
 
-        private static FileContent PrepareJsonContent(string path)
+        private FileContent PrepareJsonContent(string path)
         {
             return new FileContent(path, new AsyncLazy<JsonDocument>(t => JsonFactory(path, t)));
         }
 
-        private static async Task<XDocument> XmlFactory(string path, CancellationToken cancellationToken)
+        private async Task<XDocument> XmlFactory(string path, CancellationToken cancellationToken)
         {
-            using var reader = File.OpenText(path);
+            using var reader = _fileSystem.File.OpenText(path);
             return await XDocument.LoadAsync(reader, LoadOptions.None, cancellationToken);
         }
 
-        private static async Task<JsonDocument> JsonFactory(string path, CancellationToken cancellationToken)
+        private async Task<JsonDocument> JsonFactory(string path, CancellationToken cancellationToken)
         {
-            await using var reader = File.OpenRead(path);
+            await using var reader = _fileSystem.File.OpenRead(path);
             return await JsonDocument.ParseAsync(
                 reader,
                 new JsonDocumentOptions
@@ -69,25 +71,25 @@ namespace _42.Monorepo.Cli.Cache
 
         private class FileContent
         {
-            private readonly string path;
-            private readonly ContentType type;
-            private readonly AsyncLazy<XDocument>? xmlContent;
-            private readonly AsyncLazy<JsonDocument>? jsonContent;
+            private readonly string _path;
+            private readonly ContentType _type;
+            private readonly AsyncLazy<XDocument>? _xmlContent;
+            private readonly AsyncLazy<JsonDocument>? _jsonContent;
 
             public FileContent(string filePath, AsyncLazy<XDocument> xml)
             {
-                path = filePath;
-                type = ContentType.Xml;
-                xmlContent = xml;
-                jsonContent = null;
+                _path = filePath;
+                _type = ContentType.Xml;
+                _xmlContent = xml;
+                _jsonContent = null;
             }
 
             public FileContent(string filePath, AsyncLazy<JsonDocument> json)
             {
-                path = filePath;
-                type = ContentType.Json;
-                jsonContent = json;
-                xmlContent = null;
+                _path = filePath;
+                _type = ContentType.Json;
+                _jsonContent = json;
+                _xmlContent = null;
             }
 
             private enum ContentType : byte
@@ -97,16 +99,16 @@ namespace _42.Monorepo.Cli.Cache
             }
 
             public AsyncLazy<XDocument> Xml
-                => xmlContent ?? throw new InvalidOperationException($"The file '{path}' is not Xml document.");
+                => _xmlContent ?? throw new InvalidOperationException($"The file '{_path}' is not Xml document.");
 
             public AsyncLazy<JsonDocument> Json
-                => jsonContent ?? throw new InvalidOperationException($"The file '{path}' is not Json document.");
+                => _jsonContent ?? throw new InvalidOperationException($"The file '{_path}' is not Json document.");
 
             public bool IsLoaded
             {
                 get
                 {
-                    return type switch
+                    return _type switch
                     {
                         ContentType.Xml => Xml.Task.IsCompleted,
                         _ => Json.Task.IsCompleted,

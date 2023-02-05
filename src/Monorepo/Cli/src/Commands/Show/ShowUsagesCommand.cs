@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -16,10 +17,15 @@ namespace _42.Monorepo.Cli.Commands.Show
     [Command(CommandNames.USAGES, Description = "Show usages of a current location.")]
     public class ShowUsagesCommand : BaseCommand
     {
-        public ShowUsagesCommand(IExtendedConsole console, ICommandContext context)
+        private readonly IFileSystem _fileSystem;
+
+        public ShowUsagesCommand(
+            IFileSystem fileSystem,
+            IExtendedConsole console,
+            ICommandContext context)
             : base(console, context)
         {
-            // no operation
+            _fileSystem = fileSystem;
         }
 
         [Option("-s|--search", CommandOptionType.SingleValue, Description = "Will try to search any directory/repository for usages.")]
@@ -159,7 +165,7 @@ namespace _42.Monorepo.Cli.Commands.Show
         {
             var path = SearchPath ?? MonorepoDirectoryFunctions.GetMonorepoRootDirectory();
 
-            if (!Directory.Exists(SearchPath))
+            if (!_fileSystem.Directory.Exists(SearchPath))
             {
                 Console.WriteImportant("The specified directory doesn't exist.");
                 return;
@@ -314,7 +320,7 @@ namespace _42.Monorepo.Cli.Commands.Show
 
         private async IAsyncEnumerable<ExternalUsage> GetExternalUsagesAsync(string directoryPath, string fileFilter, Func<Stream, string, Task<ExternalUsage?>> processingFunction)
         {
-            foreach (var filePath in Directory.GetFiles(directoryPath, fileFilter, SearchOption.AllDirectories))
+            foreach (var filePath in _fileSystem.Directory.GetFiles(directoryPath, fileFilter, SearchOption.AllDirectories))
             {
                 var usage = await SearchFileAsync(filePath, processingFunction);
 
@@ -329,7 +335,7 @@ namespace _42.Monorepo.Cli.Commands.Show
         {
             try
             {
-                await using var reader = File.OpenRead(filePath);
+                await using var reader = _fileSystem.File.OpenRead(filePath);
                 return await processingFunction(reader, filePath);
             }
             catch (Exception e)

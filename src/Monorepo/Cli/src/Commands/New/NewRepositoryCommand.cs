@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Features;
@@ -15,10 +16,15 @@ namespace _42.Monorepo.Cli.Commands.New
     [Command(CommandNames.REPOSITORY, "repo", Description = "Create new mono-repository.")]
     public class NewRepositoryCommand : BaseCommand
     {
-        public NewRepositoryCommand(IExtendedConsole console, ICommandContext context)
+        private readonly IFileSystem _fileSystem;
+
+        public NewRepositoryCommand(
+            IFileSystem fileSystem,
+            IExtendedConsole console,
+            ICommandContext context)
             : base(console, context)
         {
-            // no operation
+            _fileSystem = fileSystem;
         }
 
         protected override Task ExecutePreconditionsAsync()
@@ -280,7 +286,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 return ExitCodes.WARNING_ABORTED;
             }
 
-            if (Directory.GetFiles(Environment.CurrentDirectory, "*", SearchOption.TopDirectoryOnly).Length > 0
+            if (_fileSystem.Directory.GetFiles(Environment.CurrentDirectory, "*", SearchOption.TopDirectoryOnly).Length > 0
                 && !Console.Confirm("The directory is not empty; some files could be overwritten. Should I continue", false))
             {
                 return ExitCodes.WARNING_ABORTED;
@@ -305,105 +311,79 @@ namespace _42.Monorepo.Cli.Commands.New
 
             // .editorconfig
             var editorConfig = new DotEditorConfigT4();
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(FileNames.DotEditorConfig, editorConfig.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync(FileNames.DotEditorConfig, editorConfig.TransformText());
             Console.WriteLine($"    {FileNames.DotEditorConfig}");
 
             // .gitattributes
             var gitAttributes = new DotGitAttributesT4();
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(FileNames.DotGitAttributes, gitAttributes.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync(FileNames.DotGitAttributes, gitAttributes.TransformText());
             Console.WriteLine($"    {FileNames.DotGitAttributes}");
 
             // .gitignore
             var gitIgnore = new DotGitIgnoreT4();
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(FileNames.DotGitIgnore, gitIgnore.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync(FileNames.DotGitIgnore, gitIgnore.TransformText());
             Console.WriteLine($"    {FileNames.DotGitIgnore}");
 
             // .vsconfig
             var vsConfig = new DotVsConfigT4();
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(FileNames.DotVsConfig, vsConfig.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync(FileNames.DotVsConfig, vsConfig.TransformText());
             Console.WriteLine($"    {FileNames.DotVsConfig}");
 
             // Directory.Build.props
             var directoryBuildProps = new DirectoryBuildPropsT4(featureProvider);
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(FileNames.DirectoryBuildProps, directoryBuildProps.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync(FileNames.DirectoryBuildProps, directoryBuildProps.TransformText());
             Console.WriteLine($"    {FileNames.DirectoryBuildProps}");
 
             // Directory.Packages.props
             if (useCentralDependencies)
             {
                 var directoryPackages = new RootDirectoryPackagesPropsT4(featureProvider);
-#if !DEBUG || TESTING
-                await File.WriteAllTextAsync(FileNames.DirectoryPackagesProps, directoryPackages.TransformText());
-#endif
+                await _fileSystem.File.WriteAllTextAsync(FileNames.DirectoryPackagesProps, directoryPackages.TransformText());
                 Console.WriteLine($"    {FileNames.DirectoryPackagesProps}");
             }
 
             // glogal.json
             var globalJson = new GlobalJsonT4(featureProvider);
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(FileNames.GlogalJson, globalJson.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync(FileNames.GlogalJson, globalJson.TransformText());
             Console.WriteLine($"    {FileNames.GlogalJson}");
 
             // mrepo.json
             var mrepoJson = new MrepoJsonT4(new MrepoJsonModel()
             {
-                Name = Path.GetFileName(Environment.CurrentDirectory),
+                Name = _fileSystem.Path.GetFileName(Environment.CurrentDirectory),
                 Description = "An awesome .net mono-repository.",
                 Features = string.Join(", ", featureList.Select(f => $"\"{f}\"")),
             });
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(FileNames.MrepoJson, mrepoJson.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync(FileNames.MrepoJson, mrepoJson.TransformText());
             Console.WriteLine($"    {FileNames.MrepoJson}");
 
             // nuget.config
             var nugetConfig = new NugetConfigT4();
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(FileNames.NugetConfig, nugetConfig.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync(FileNames.NugetConfig, nugetConfig.TransformText());
             Console.WriteLine($"    {FileNames.NugetConfig}");
 
             // stylecop.json
             var stylecopJson = new NugetConfigT4();
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(FileNames.StylecopJson, stylecopJson.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync(FileNames.StylecopJson, stylecopJson.TransformText());
             Console.WriteLine($"    {FileNames.StylecopJson}");
 
             // version.json
             if (useVersioning)
             {
                 var versionJson = new RootVersionJsonT4();
-#if !DEBUG || TESTING
-                await File.WriteAllTextAsync(FileNames.VersionJson, versionJson.TransformText());
-#endif
+                await _fileSystem.File.WriteAllTextAsync(FileNames.VersionJson, versionJson.TransformText());
                 Console.WriteLine($"    {FileNames.VersionJson}");
             }
 
             // src/.stylecop/GlobalStylecopSuppressions.cs
             var stylecopGlobalSuppressions = new StylecopGlobalSuppressionsT4();
-#if !DEBUG || TESTING
-            Directory.CreateDirectory("src\\.stylecop");
-            await File.WriteAllTextAsync($"src\\.stylecop\\{FileNames.StylecopGlobalSuppressions}", stylecopGlobalSuppressions.TransformText());
-#endif
+            _fileSystem.Directory.CreateDirectory("src\\.stylecop");
+            await _fileSystem.File.WriteAllTextAsync($"src\\.stylecop\\{FileNames.StylecopGlobalSuppressions}", stylecopGlobalSuppressions.TransformText());
             Console.WriteLine($"    src/.stylecop/{FileNames.StylecopGlobalSuppressions}");
 
             // src/Directory.Build.Proj
             var directoryBuildProj = new DirectoryBuildProjT4();
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync($"src\\{FileNames.DirectoryBuildProj}", nugetConfig.TransformText());
-#endif
+            await _fileSystem.File.WriteAllTextAsync($"src\\{FileNames.DirectoryBuildProj}", directoryBuildProj.TransformText());
             Console.WriteLine($"    src/{FileNames.DirectoryBuildProj}");
 
             Console.WriteLine();

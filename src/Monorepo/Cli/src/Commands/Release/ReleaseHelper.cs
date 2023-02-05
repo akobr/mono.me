@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -11,10 +12,10 @@ namespace _42.Monorepo.Cli.Commands.Release
 {
     public static class ReleaseHelper
     {
-        public static bool UpdateVersionFile(string version, string versionFilePath)
+        public static bool UpdateVersionFile(string version, string versionFilePath, IFileSystem fileSystem)
         {
             JsonNode? versionNode;
-            using (var versionFileStream = new FileStream(versionFilePath, FileMode.Open, FileAccess.Read))
+            using (var versionFileStream = fileSystem.FileStream.New(versionFilePath, FileMode.Open, FileAccess.Read))
             {
                 versionNode = JsonNode.Parse(versionFileStream, documentOptions: new JsonDocumentOptions() { CommentHandling = JsonCommentHandling.Skip });
             }
@@ -36,7 +37,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                 rootObject["version"] = version;
             }
 
-            using (var versionFileStream = new FileStream(versionFilePath, FileMode.Create, FileAccess.Write))
+            using (var versionFileStream = fileSystem.FileStream.New(versionFilePath, FileMode.Create, FileAccess.Write))
             {
                 using (var writer = new Utf8JsonWriter(versionFileStream, new JsonWriterOptions() { Indented = true }))
                 {
@@ -120,7 +121,7 @@ namespace _42.Monorepo.Cli.Commands.Release
 
         private static void WriteLinks(MarkdownBuilder markdownBuilder, IConventionalMessage change)
         {
-            foreach (string urlLink in change.Links)
+            foreach (var urlLink in change.Links)
             {
                 markdownBuilder.Bullet(1);
                 markdownBuilder.Link(urlLink, urlLink);

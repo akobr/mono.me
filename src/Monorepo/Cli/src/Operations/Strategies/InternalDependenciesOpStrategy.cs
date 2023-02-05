@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
+using System.IO.Abstractions;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Cache;
@@ -12,11 +12,15 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 {
     public class InternalDependenciesOpStrategy : IOpStrategy<IReadOnlyCollection<IInternalDependency>>
     {
-        private readonly IFileContentCache fileCache;
+        private readonly IFileSystem _fileSystem;
+        private readonly IFileContentCache _fileCache;
 
-        public InternalDependenciesOpStrategy(IFileContentCache fileCache)
+        public InternalDependenciesOpStrategy(
+            IFileSystem fileSystem,
+            IFileContentCache fileCache)
         {
-            this.fileCache = fileCache;
+            _fileSystem = fileSystem;
+            _fileCache = fileCache;
         }
 
         public async Task<IReadOnlyCollection<IInternalDependency>> OperateAsync(IItem item, CancellationToken cancellationToken = default)
@@ -26,15 +30,15 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 return Array.Empty<IInternalDependency>();
             }
 
-            string projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item);
+            var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item, _fileSystem);
 
-            if (!File.Exists(projectFilePath))
+            if (!_fileSystem.File.Exists(projectFilePath))
             {
                 return Array.Empty<IInternalDependency>();
             }
 
-            string projectDirectory = Path.GetDirectoryName(projectFilePath)!;
-            var xContent = await fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
+            var projectDirectory = _fileSystem.Path.GetDirectoryName(projectFilePath)!;
+            var xContent = await _fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
 
             if (xContent.Root is null)
             {
@@ -58,9 +62,9 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                     continue;
                 }
 
-                string fullPath = Path.GetFullPath(Path.Combine(projectDirectory, relativePath));
-                string projectRepoPath = fullPath.GetRelativePath(repository.Path);
-                string projectName = Path.GetFileName(projectRepoPath);
+                var fullPath = _fileSystem.Path.GetFullPath(_fileSystem.Path.Combine(projectDirectory, relativePath));
+                var projectRepoPath = fullPath.GetRelativePath(repository.Path);
+                var projectName = _fileSystem.Path.GetFileName(projectRepoPath);
                 references.Add(new InternalDependency(projectName, projectRepoPath, fullPath));
             }
 

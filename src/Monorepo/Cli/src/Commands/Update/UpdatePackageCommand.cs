@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Extensions;
@@ -13,9 +14,15 @@ namespace _42.Monorepo.Cli.Commands.Update
     [Command(CommandNames.PACKAGE, Description = "Update version of a specific package.")]
     public class UpdatePackageCommand : BaseCommand
     {
-        public UpdatePackageCommand(IExtendedConsole console, ICommandContext context)
+        private readonly IFileSystem _fileSystem;
+
+        public UpdatePackageCommand(
+            IFileSystem fileSystem,
+            IExtendedConsole console,
+            ICommandContext context)
             : base(console, context)
         {
+            _fileSystem = fileSystem;
             // no operation
         }
 
@@ -55,7 +62,7 @@ namespace _42.Monorepo.Cli.Commands.Update
 
             if (!WantMovePackage || packagesFilePaths.Count < 2)
             {
-                foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p)))
+                foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p, _fileSystem)))
                 {
                     if (await packagesManager.TryUpdatePackageVersionAsync(packageId, targetVersion))
                     {
@@ -69,7 +76,7 @@ namespace _42.Monorepo.Cli.Commands.Update
 
             var currentPackagesFile = string.Empty;
 
-            foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p)))
+            foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p, _fileSystem)))
             {
                 if (await packagesManager.IsPackageDefinedInAsync(packageId))
                 {
@@ -89,12 +96,12 @@ namespace _42.Monorepo.Cli.Commands.Update
 
             if (currentPackagesFile != pickedPackagesFile)
             {
-                var currentManager = new PackagesDefinitionManager(currentPackagesFile);
+                var currentManager = new PackagesDefinitionManager(currentPackagesFile, _fileSystem);
                 await currentManager.RemovePackageAsync(packageId);
                 await currentManager.SaveAsync();
             }
 
-            var pickedManager = new PackagesDefinitionManager(pickedPackagesFile);
+            var pickedManager = new PackagesDefinitionManager(pickedPackagesFile, _fileSystem);
             await pickedManager.AddOrUpdatePackageAsync(packageId, targetVersion);
             await pickedManager.SaveAsync();
 

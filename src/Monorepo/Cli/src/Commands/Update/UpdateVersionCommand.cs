@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Commands.Release;
@@ -18,16 +18,19 @@ namespace _42.Monorepo.Cli.Commands.Update
     [Command(CommandNames.VERSION, Description = "Update version of a current location based on git history.")]
     public class UpdateVersionCommand : BaseCommand
     {
+        private readonly IFileSystem _fileSystem;
         private readonly IGitHistoryService _historyService;
         private readonly ReleaseOptions _options;
 
         public UpdateVersionCommand(
+            IFileSystem fileSystem,
             IExtendedConsole console,
             ICommandContext context,
             IGitHistoryService historyService,
             IOptions<ReleaseOptions> configuration)
             : base(console, context)
         {
+            _fileSystem = fileSystem;
             _historyService = historyService;
             _options = configuration.Value;
         }
@@ -40,7 +43,7 @@ namespace _42.Monorepo.Cli.Commands.Update
         {
             using var repo = new Repository(Context.Repository.Record.Path);
             var currentVersion = await Context.Item.TryGetDefinedVersionAsync() ?? new VersionTemplate(Constants.DEFAULT_INITIAL_VERSION);
-            var versionFileFullPath = await Context.Item.TryGetVersionFilePathAsync() ?? Path.Combine(Context.Repository.Record.Path, Constants.VERSION_FILE_NAME);
+            var versionFileFullPath = await Context.Item.TryGetVersionFilePathAsync() ?? _fileSystem.Path.Combine(Context.Repository.Record.Path, Constants.VERSION_FILE_NAME);
             var versionFileRepoPath = versionFileFullPath.GetRelativePath(Context.Repository.Record.Path);
             var newVersion = new VersionTemplate(currentVersion.Template);
 
@@ -141,9 +144,7 @@ namespace _42.Monorepo.Cli.Commands.Update
             if (Console.Confirm($"Do you want to update '{versionFileRepoPath}' version file"))
             {
                 newVersion = Console.AskForVersionTemplate("What is the final version", newVersion.Template);
-#if !DEBUG || TESTING
-                ReleaseHelper.UpdateVersionFile(newVersion.Template, versionFileFullPath);
-#endif
+                ReleaseHelper.UpdateVersionFile(newVersion.Template, versionFileFullPath, _fileSystem);
             }
 
             return ExitCodes.SUCCESS;

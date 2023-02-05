@@ -1,5 +1,4 @@
-using System;
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -11,11 +10,15 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 {
     public class PackageNameProjectOpStrategy : IOpStrategy<string>
     {
-        private readonly IFileContentCache fileCache;
+        private readonly IFileSystem _fileSystem;
+        private readonly IFileContentCache _fileCache;
 
-        public PackageNameProjectOpStrategy(IFileContentCache fileCache)
+        public PackageNameProjectOpStrategy(
+            IFileSystem fileSystem,
+            IFileContentCache fileCache)
         {
-            this.fileCache = fileCache;
+            _fileSystem = fileSystem;
+            _fileCache = fileCache;
         }
 
         public async Task<string> OperateAsync(IItem item, CancellationToken cancellationToken = default)
@@ -25,25 +28,25 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 return item.Record.Name;
             }
 
-            string projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item);
+            var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item, _fileSystem);
 
-            if (!File.Exists(projectFilePath))
+            if (!_fileSystem.File.Exists(projectFilePath))
             {
                 return item.Record.Name;
             }
 
-            var xContent = await fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
+            var xContent = await _fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
 
             if (xContent.Root is null)
             {
-                return Path.GetFileNameWithoutExtension(projectFilePath);
+                return _fileSystem.Path.GetFileNameWithoutExtension(projectFilePath);
             }
 
             var @namespace = xContent.Root.GetDefaultNamespace();
             var packageNameElement = xContent.Descendants(@namespace + "PackageId").FirstOrDefault()
                               ?? xContent.Descendants(@namespace + "AssemblyName").FirstOrDefault();
 
-            return packageNameElement?.Value ?? Path.GetFileNameWithoutExtension(projectFilePath);
+            return packageNameElement?.Value ?? _fileSystem.Path.GetFileNameWithoutExtension(projectFilePath);
         }
     }
 }

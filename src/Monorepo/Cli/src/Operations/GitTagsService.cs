@@ -7,20 +7,20 @@ namespace _42.Monorepo.Cli.Operations
 {
     public class GitTagsService : IGitTagsService
     {
-        private readonly IGitRepositoryService gitRepositoryService;
-        private readonly Lazy<IReadOnlyCollection<Tag>> tags;
+        private readonly IGitRepositoryService _gitRepositoryService;
+        private readonly Lazy<IReadOnlyCollection<Tag>> _tags;
 
         public GitTagsService(IGitRepositoryService gitRepositoryService)
         {
-            this.gitRepositoryService = gitRepositoryService;
-            tags = new Lazy<IReadOnlyCollection<Tag>>(LoadTags);
+            _gitRepositoryService = gitRepositoryService;
+            _tags = new Lazy<IReadOnlyCollection<Tag>>(LoadTags);
         }
 
-        public IReadOnlyCollection<Tag> GetTags() => tags.Value;
+        public IReadOnlyCollection<Tag> GetTags() => _tags.Value;
 
         private IReadOnlyCollection<Tag> LoadTags()
         {
-            using Repository repo = gitRepositoryService.BuildRepository();
+            using var repo = _gitRepositoryService.BuildRepository();
             return repo.Tags.ToList();
         }
     }

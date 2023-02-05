@@ -1,4 +1,4 @@
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,11 +10,15 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 {
     public class IsPackableProjectOpStrategy : IOpStrategy<bool>
     {
-        private readonly IFileContentCache fileCache;
+        private readonly IFileSystem _fileSystem;
+        private readonly IFileContentCache _fileCache;
 
-        public IsPackableProjectOpStrategy(IFileContentCache fileCache)
+        public IsPackableProjectOpStrategy(
+            IFileSystem fileSystem,
+            IFileContentCache fileCache)
         {
-            this.fileCache = fileCache;
+            _fileSystem = fileSystem;
+            _fileCache = fileCache;
         }
 
         public async Task<bool> OperateAsync(IItem item, CancellationToken cancellationToken = default)
@@ -24,14 +28,14 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 return false;
             }
 
-            string projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item);
+            var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item, _fileSystem);
 
-            if (!File.Exists(projectFilePath))
+            if (!_fileSystem.File.Exists(projectFilePath))
             {
                 return false;
             }
 
-            var xContent = await fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
+            var xContent = await _fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
 
             if (xContent.Root is null)
             {

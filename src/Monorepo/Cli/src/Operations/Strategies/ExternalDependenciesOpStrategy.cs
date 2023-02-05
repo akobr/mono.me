@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 using _42.Monorepo.Cli.Cache;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
@@ -14,11 +13,15 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 {
     public class ExternalDependenciesOpStrategy : IOpStrategy<IReadOnlyCollection<IExternalDependency>>
     {
-        private readonly IFileContentCache fileCache;
+        private readonly IFileSystem _fileSystem;
+        private readonly IFileContentCache _fileCache;
 
-        public ExternalDependenciesOpStrategy(IFileContentCache fileCache)
+        public ExternalDependenciesOpStrategy(
+            IFileSystem fileSystem,
+            IFileContentCache fileCache)
         {
-            this.fileCache = fileCache;
+            _fileSystem = fileSystem;
+            _fileCache = fileCache;
         }
 
         public Task<IReadOnlyCollection<IExternalDependency>> OperateAsync(IItem item, CancellationToken cancellationToken = default)
@@ -32,12 +35,12 @@ namespace _42.Monorepo.Cli.Operations.Strategies
         private async Task<IReadOnlyCollection<IExternalDependency>> CalculateGlobalExternalDependenciesAsync(IItem item, CancellationToken cancellationToken)
         {
             var directory = item.Record.Path;
-            string filePath = Path.Combine(directory, Constants.PACKAGES_FILE_NAME);
+            var filePath = _fileSystem.Path.Combine(directory, Constants.PACKAGES_FILE_NAME);
             var parentTask = item.Parent is null
                 ? Task.FromResult<IReadOnlyCollection<IExternalDependency>>(Array.Empty<IExternalDependency>())
                 : item.Parent.GetExternalDependenciesAsync(cancellationToken);
 
-            if (!File.Exists(filePath))
+            if (!_fileSystem.File.Exists(filePath))
             {
                 return await parentTask;
             }
@@ -46,7 +49,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             var map = parentDependencies
                 .ToDictionary(d => d.Name, d => new ExternalDependency(d.Name, d.Version, false));
 
-            XDocument xContent = await fileCache.GetOrLoadXmlContentAsync(filePath, cancellationToken);
+            var xContent = await _fileCache.GetOrLoadXmlContentAsync(filePath, cancellationToken);
 
             if (xContent.Root is null)
             {
@@ -74,9 +77,9 @@ namespace _42.Monorepo.Cli.Operations.Strategies
         // TODO: [P3] refactor this method
         private async Task<IReadOnlyCollection<IExternalDependency>> CalculateExternalDependenciesForProjectAsync(IItem item, CancellationToken cancellationToken)
         {
-            string projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item);
+            var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item, _fileSystem);
 
-            if (!File.Exists(projectFilePath))
+            if (!_fileSystem.File.Exists(projectFilePath))
             {
                 return Array.Empty<IExternalDependency>();
             }
@@ -84,7 +87,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             var dependencies = await CalculateGlobalExternalDependenciesAsync(item, cancellationToken);
             var map = dependencies.ToDictionary(d => d.Name, d => d.Version);
             var localMap = new Dictionary<string, SemVersion>();
-            var xContent = await fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
+            var xContent = await _fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
 
             if (xContent.Root is null)
             {

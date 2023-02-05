@@ -24,7 +24,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 ? Array.Empty<IRelease>()
                 : await item.Parent.GetAllReleasesAsync(cancellationToken);
 
-            List<IRelease> allReleases = parentReleases
+            var allReleases = parentReleases
                 .Where(r => r.SubReleases.Any(sr => sr.Target.Identifier == item.Record.Identifier))
                 .Select(r => r.SubReleases.First(sr => sr.Target.Identifier == item.Record.Identifier))
                 .ToList();
@@ -37,7 +37,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
         private List<IRelease> GetExactReleases(IItem item, CancellationToken cancellationToken)
         {
             var hierarchicalName = item.Record.GetHierarchicalName();
-            string releasePrefix = hierarchicalName is "."
+            var releasePrefix = hierarchicalName is "."
                 ? $"v."
                 : $"{hierarchicalName}/v.";
 

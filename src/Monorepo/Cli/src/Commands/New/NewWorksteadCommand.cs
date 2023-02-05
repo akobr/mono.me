@@ -1,5 +1,4 @@
-using System;
-using System.IO;
+using System.IO.Abstractions;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Features;
@@ -15,14 +14,17 @@ namespace _42.Monorepo.Cli.Commands.New
     [Command(CommandNames.WORKSTEAD, Description = "Create new workstead.")]
     public class NewWorksteadCommand : BaseCommand
     {
+        private readonly IFileSystem _fileSystem;
         private readonly IFeatureProvider _featureProvider;
 
         public NewWorksteadCommand(
+            IFileSystem fileSystem,
             IExtendedConsole console,
             ICommandContext context,
             IFeatureProvider featureProvider)
             : base(console, context)
         {
+            _fileSystem = fileSystem;
             _featureProvider = featureProvider;
         }
 
@@ -61,25 +63,22 @@ namespace _42.Monorepo.Cli.Commands.New
             name = name.Trim().ToValidItemName();
 
             var path = targetItem.Record.Type == RecordType.Repository
-                ? Path.Combine(targetItem.Record.Path, Constants.SOURCE_DIRECTORY_NAME, name)
-                : Path.Combine(targetItem.Record.Path, name);
+                ? _fileSystem.Path.Combine(targetItem.Record.Path, Constants.SOURCE_DIRECTORY_NAME, name)
+                : _fileSystem.Path.Combine(targetItem.Record.Path, name);
 
-            if (Directory.Exists(path))
+            if (_fileSystem.Directory.Exists(path))
             {
                 Console.WriteImportant($"The workstead '{name}' already exists.".ThemedError(Console.Theme));
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
 
-#if !DEBUG || TESTING
-            Directory.CreateDirectory(path);
-#endif
+            _fileSystem.Directory.CreateDirectory(path);
 
             // Directory.Build.proj
             var buildProjTemplate = new DirectoryBuildProjT4();
-            var buildProjFilePath = Path.Combine(path, FileNames.DirectoryBuildProj);
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(buildProjFilePath, buildProjTemplate.TransformText());
-#endif
+            var buildProjFilePath = _fileSystem.Path.Combine(path, FileNames.DirectoryBuildProj);
+            await _fileSystem.File.WriteAllTextAsync(buildProjFilePath, buildProjTemplate.TransformText());
+
             Console.WriteImportant("The workstead '", name.ThemedHighlight(Console.Theme), "' has been created.");
             Console.WriteLine($"Path: {path}".ThemedLowlight(Console.Theme));
 
@@ -91,10 +90,8 @@ namespace _42.Monorepo.Cli.Commands.New
                 {
                     // Directory.Packages.props
                     var packagesTemplate = new DirectoryPackagesPropsT4();
-                    var packagesFilePath = Path.Combine(path, FileNames.DirectoryPackagesProps);
-#if !DEBUG || TESTING
-                    await File.WriteAllTextAsync(packagesFilePath, packagesTemplate.TransformText());
-#endif
+                    var packagesFilePath = _fileSystem.Path.Combine(path, FileNames.DirectoryPackagesProps);
+                    await _fileSystem.File.WriteAllTextAsync(packagesFilePath, packagesTemplate.TransformText());
                 }
             }
 
@@ -116,10 +113,8 @@ namespace _42.Monorepo.Cli.Commands.New
                     IsHierarchical = hierarchical,
                 });
 
-                var versionFilePath = Path.Combine(path, FileNames.VersionJson);
-#if !DEBUG || TESTING
-                await File.WriteAllTextAsync(versionFilePath, versionTemplate.TransformText());
-#endif
+                var versionFilePath = _fileSystem.Path.Combine(path, FileNames.VersionJson);
+                await _fileSystem.File.WriteAllTextAsync(versionFilePath, versionTemplate.TransformText());
             }
 
             return ExitCodes.SUCCESS;

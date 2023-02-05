@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.NuGet;
@@ -12,9 +13,15 @@ namespace _42.Monorepo.Cli.Commands.New
     [Command(CommandNames.PACKAGE, Description = "Add new package to centralized definition.")]
     public class NewPackageCommand : BaseCommand
     {
-        public NewPackageCommand(IExtendedConsole console, ICommandContext context)
+        private readonly IFileSystem _fileSystem;
+
+        public NewPackageCommand(
+            IFileSystem fileSystem,
+            IExtendedConsole console,
+            ICommandContext context)
             : base(console, context)
         {
+            _fileSystem = fileSystem;
             // no operation
         }
 
@@ -56,7 +63,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 return ExitCodes.WARNING_NO_WORK_NEEDED;
             }
 
-            foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p)))
+            foreach (var packagesManager in packagesFilePaths.Select(p => new PackagesDefinitionManager(p, _fileSystem)))
             {
                 if (await packagesManager.TryUpdatePackageVersionAsync(packageId, targetVersion))
                 {
@@ -65,7 +72,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 }
             }
 
-            var directManager = new PackagesDefinitionManager(packagesFilePaths.First());
+            var directManager = new PackagesDefinitionManager(packagesFilePaths.First(), _fileSystem);
             await directManager.AddOrUpdatePackageAsync(packageId, targetVersion);
             await directManager.SaveAsync();
 

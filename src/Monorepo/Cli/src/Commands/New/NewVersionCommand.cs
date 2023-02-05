@@ -1,4 +1,4 @@
-using System.IO;
+using System.IO.Abstractions;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Output;
@@ -12,10 +12,15 @@ namespace _42.Monorepo.Cli.Commands.New
     [Command(CommandNames.VERSION, Description = "Create new version file.")]
     public class NewVersionCommand : BaseCommand
     {
-        public NewVersionCommand(IExtendedConsole console, ICommandContext context)
+        private readonly IFileSystem _fileSystem;
+
+        public NewVersionCommand(
+            IFileSystem fileSystem,
+            IExtendedConsole console,
+            ICommandContext context)
             : base(console, context)
         {
-            // no operation
+            _fileSystem = fileSystem;
         }
 
         [Argument(0, Description = "A custom version to set.")]
@@ -25,9 +30,9 @@ namespace _42.Monorepo.Cli.Commands.New
         {
             using var repo = new Repository(Context.Repository.Record.Path);
             var currentVersion = await Context.Item.TryGetDefinedVersionAsync() ?? new VersionTemplate(Constants.DEFAULT_INITIAL_VERSION);
-            var versionFileFullPath = await Context.Item.TryGetVersionFilePathAsync() ?? Path.Combine(Context.Repository.Record.Path, Constants.VERSION_FILE_NAME);
+            var versionFileFullPath = await Context.Item.TryGetVersionFilePathAsync() ?? _fileSystem.Path.Combine(Context.Repository.Record.Path, Constants.VERSION_FILE_NAME);
 
-            var versionFolderPath = Path.GetDirectoryName(versionFileFullPath);
+            var versionFolderPath = _fileSystem.Path.GetDirectoryName(versionFileFullPath);
             if (Context.Item.Record.Path.EqualsOrdinalIgnoreCase(versionFolderPath))
             {
                 Console.WriteImportant($"There is already a version file at the current location with version {currentVersion}.");
@@ -66,12 +71,10 @@ namespace _42.Monorepo.Cli.Commands.New
                 IsHierarchical = hierarchical,
             });
 
-            var versionFilePath = Path.Combine(Context.Item.Record.Path, FileNames.VersionJson);
-#if !DEBUG || TESTING
-            await File.WriteAllTextAsync(versionFilePath, versionTemplate.TransformText());
-#endif
+            var versionFilePath = _fileSystem.Path.Combine(Context.Item.Record.Path, FileNames.VersionJson);
+            await _fileSystem.File.WriteAllTextAsync(versionFilePath, versionTemplate.TransformText());
 
-            var versionRepoPath = Path.Combine(Context.Item.Record.RepoRelativePath, FileNames.VersionJson);
+            var versionRepoPath = _fileSystem.Path.Combine(Context.Item.Record.RepoRelativePath, FileNames.VersionJson);
             Console.WriteLine($"new version file: {versionRepoPath}");
             return ExitCodes.SUCCESS;
         }

@@ -7,11 +7,11 @@ namespace _42.Monorepo.Cli.Scripting
 {
     internal class ScriptTree
     {
-        private readonly ScriptTreeNode root;
+        private readonly ScriptTreeNode _root;
 
         public ScriptTree(ScriptTreeNode root)
         {
-            this.root = root;
+            _root = root;
         }
 
         public static ScriptTree Empty { get; } = new(new ScriptTreeNode(string.Empty, null));
@@ -23,7 +23,7 @@ namespace _42.Monorepo.Cli.Scripting
 
         public IEnumerable<string> GetAvailableScriptNames(string path)
         {
-            string[] segments = path.Split(
+            var segments = path.Split(
                 new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
                 StringSplitOptions.RemoveEmptyEntries);
 
@@ -40,21 +40,21 @@ namespace _42.Monorepo.Cli.Scripting
 
         public ScriptTreeNode? GetOrCreateTargetNode(string path)
         {
-            string[] segments = path.Split(
+            var segments = path.Split(
                 new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
                 StringSplitOptions.RemoveEmptyEntries);
 
             switch (segments.Length)
             {
                 case < 1:
-                case 2 when segments[0] == ".." && segments[1] == root.Name:
-                    return root;
+                case 2 when segments[0] == ".." && segments[1] == _root.Name:
+                    return _root;
 
                 case > 0 when segments[0] == "..":
                     return null;
             }
 
-            var targetNode = root;
+            var targetNode = _root;
             for (int i = 0, ln = segments.Length; i < ln && targetNode is not null; i++)
             {
                 var segment = segments[i];
@@ -83,21 +83,21 @@ namespace _42.Monorepo.Cli.Scripting
 
         private ScriptTreeNode? GetTargetNode(string path)
         {
-            string[] segments = path.Split(
+            var segments = path.Split(
                 new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
                 StringSplitOptions.RemoveEmptyEntries);
 
             switch (segments.Length)
             {
                 case < 1:
-                case 2 when segments[0] == ".." && segments[1] == root.Name:
-                    return root;
+                case 2 when segments[0] == ".." && segments[1] == _root.Name:
+                    return _root;
 
                 case > 0 when segments[0] == "..":
                     return null;
             }
 
-            var targetNode = root;
+            var targetNode = _root;
             for (int i = 0, ln = segments.Length; i < ln && targetNode is not null; i++)
             {
                 var segment = segments[i];

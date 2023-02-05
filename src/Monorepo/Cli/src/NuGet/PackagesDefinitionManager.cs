@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -9,10 +9,12 @@ namespace _42.Monorepo.Cli.NuGet
     {
         private readonly AsyncLazy<List<string>> _fileContent;
         private readonly string _packagesFilePath;
+        private readonly IFileSystem _fileSystem;
 
-        public PackagesDefinitionManager(string packagesFilePath)
+        public PackagesDefinitionManager(string packagesFilePath, IFileSystem fileSystem)
         {
             _packagesFilePath = packagesFilePath;
+            _fileSystem = fileSystem;
             _fileContent = new AsyncLazy<List<string>>(LoadPackagesDefinitionFileAsync);
         }
 
@@ -136,12 +138,12 @@ namespace _42.Monorepo.Cli.NuGet
 
         public async Task SaveAsync()
         {
-            await File.WriteAllLinesAsync(_packagesFilePath, await _fileContent.GetValueAsync());
+            await _fileSystem.File.WriteAllLinesAsync(_packagesFilePath, await _fileContent.GetValueAsync());
         }
 
         private async Task<List<string>> LoadPackagesDefinitionFileAsync()
         {
-            return (await File.ReadAllLinesAsync(_packagesFilePath)).ToList();
+            return (await _fileSystem.File.ReadAllLinesAsync(_packagesFilePath)).ToList();
         }
     }
 }
