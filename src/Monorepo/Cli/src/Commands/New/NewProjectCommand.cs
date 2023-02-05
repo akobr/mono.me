@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -90,60 +91,80 @@ namespace _42.Monorepo.Cli.Commands.New
 #if !DEBUG || TESTING
             Directory.CreateDirectory(path);
             Directory.CreateDirectory(Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME));
-            Directory.CreateDirectory(Path.Combine(path, Constants.TEST_DIRECTORY_NAME));
 #endif
-
             var projectFilePath = Path.Combine(path, Constants.SOURCE_DIRECTORY_NAME, FileNames.GetProjectFileName(name));
-            var projectTestFilePath = Path.Combine(path, Constants.TEST_DIRECTORY_NAME, FileNames.GetTestProjectFileName(name));
+            var worksteadNamespace = GetNamespace(workstead);
+            var projectTemplate = new ProjectCsprojT4(new ProjectCsprojModel
+            {
+                HasCustomName = !projectOptions.UseFullProjectName() && worksteadHasName,
+                AssemblyName = !projectOptions.UseFullProjectName() && worksteadHasName
+                    ? $"{worksteadName}.{name}"
+                    : name,
+                RootNamespace = !string.IsNullOrWhiteSpace(worksteadNamespace)
+                    ? $"{worksteadNamespace}.{name.ToValidItemName()}"
+                    : name.ToValidItemName(),
+            });
 
+#if !DEBUG || TESTING
             if (!File.Exists(projectFilePath))
             {
-                var worksteadNamespace = GetNamespace(workstead);
-
-                var projectTemplate = new ProjectCsprojT4(new ProjectCsprojModel
-                {
-                    HasCustomName = !projectOptions.UseFullProjectName() && worksteadHasName,
-                    AssemblyName = !projectOptions.UseFullProjectName() && worksteadHasName
-                        ? $"{worksteadName}.{name}"
-                        : name,
-                    RootNamespace = !string.IsNullOrWhiteSpace(worksteadNamespace)
-                        ? $"{worksteadNamespace}.{name.ToValidItemName()}"
-                        : name.ToValidItemName(),
-                });
-#if !DEBUG || TESTING
                 await File.WriteAllTextAsync(projectFilePath, projectTemplate.TransformText());
+            }
+#endif
+            var testTypes = new List<string>();
+            var testType = "none";
+
+            if (_featureProvider.IsEnabled(FeatureNames.TestsXunit))
+            {
+                testTypes.Add("xunit");
+            }
+
+            if (_featureProvider.IsEnabled(FeatureNames.TestsNunit))
+            {
+                testTypes.Add("nunit");
+            }
+
+            if (testTypes.Count > 0)
+            {
+                testTypes.Add("none");
+
+                testType = Console.Select(new Sharprompt.SelectOptions<string>()
+                {
+                    DefaultValue = testTypes.First(),
+                    Items = testTypes,
+                    Message = "Which unit testing framework do you want to use",
+                });
+            }
+
+            var projectTestFilePath = Path.Combine(path, Constants.TEST_DIRECTORY_NAME, FileNames.GetTestProjectFileName(name));
+
+            if (testType != "none")
+            {
+                var testProjectTemplate = new ProjectTestCsprojT4(_featureProvider, testType);
+#if !DEBUG || TESTING
+                Directory.CreateDirectory(Path.Combine(path, Constants.TEST_DIRECTORY_NAME));
+
+                if (!File.Exists(projectTestFilePath))
+                {
+                    await File.WriteAllTextAsync(projectTestFilePath, testProjectTemplate.TransformText());
+                }
 #endif
             }
 
-            if (!File.Exists(projectTestFilePath))
+            if (_featureProvider.IsEnabled(FeatureNames.IacPulumi))
             {
-                var testType = "xunit";
-
-                if (_featureProvider.IsEnabled(FeatureNames.TestsXunit)
-                    && _featureProvider.IsEnabled(FeatureNames.TestsNunit))
-                {
-                    testType = Console.Select(new Sharprompt.SelectOptions<string>()
-                    {
-                        DefaultValue = "xunit",
-                        Items = new[] { "xunit", "nunit" },
-                        Message = "Which unit testing framework do you want to use",
-                    });
-                }
-                else if (_featureProvider.IsEnabled(FeatureNames.TestsNunit))
-                {
-                    testType = "nunit";
-                }
-
-                var testProjectTemplate = new ProjectTestCsprojT4(_featureProvider, testType);
-#if !DEBUG || TESTING
-                await File.WriteAllTextAsync(projectTestFilePath, testProjectTemplate.TransformText());
-#endif
+                // TODO: [IaC] implement it
+                Console.WriteLine("Support for IaC is coming soon!");
             }
 
             Console.WriteImportant("The project '", name.ThemedHighlight(Console.Theme), "' has been created.");
             Console.WriteLine($"Directory: {path}".ThemedLowlight(Console.Theme));
             Console.WriteLine($"Project: {projectFilePath}".ThemedLowlight(Console.Theme));
-            Console.WriteLine($"Test Project: {projectTestFilePath}".ThemedLowlight(Console.Theme));
+
+            if (testType != "none")
+            {
+                Console.WriteLine($"Test Project: {projectTestFilePath}".ThemedLowlight(Console.Theme));
+            }
 
             if (_featureProvider.IsEnabled(FeatureNames.GitVersion)
                 && Console.Confirm("Do you want to set a custom versioning for this project"))
@@ -156,7 +177,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 }
 
                 // version.json
-                var versionTemplate = new VersionJsonT4(new VersionJsonModel()
+                var versionTemplate = new VersionJsonT4(new VersionJsonModel
                 {
                     Version = inputVersion,
                     IsHierarchical = false,

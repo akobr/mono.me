@@ -268,9 +268,9 @@
                   ],
                   "pattern": "^.*$"
                 },
-                "useFullProjectNames": {
-                  "$id": "#root/types/dotnet-project/custom/useFullProjectNames",
-                  "title": "Usefullprojectnames",
+                "useFullProjectName": {
+                  "$id": "#root/types/dotnet-project/custom/useFullProjectName",
+                  "title": "Usefullprojectname",
                   "type": "boolean",
                   "examples": [
                     false
