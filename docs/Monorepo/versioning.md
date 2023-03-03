@@ -1,18 +1,18 @@
 # Versioning
 
-I recomend to use [NerdBank.GetVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) library for version control based on git history, where every single commit can be built and produce a unique version.
+I recommend to use [NerdBank.GetVersioning](https://github.com/dotnet/Nerdbank.GitVersioning) library for version control based on git history, where every single commit can be built and produce a unique version.
 
 > This package adds precise, semver-compatible git commit information to every assembly, VSIX, NuGet and NPM package, and more. It implicitly supports all cloud build services and CI server software because it simply uses git itself and integrates naturally in MSBuild, gulp and other build scripts.
 
 For needs of a mono-repository, I slightly [bend its functionality](https://github.com/akobr/Nerdbank.GitVersioning).
 
-- posibility to specify inheritance behavior of path filters
+- possibility to specify inheritance behavior of path filters
   - an explicit behavior can be set by `pathFiltersInheritBehavior` property
 - **hierarchical version**: the version in current directory structure is hierarchical and calculated independently per each sub-tree
   - must be explicitly set by `hierarchicalVersion` flag
   - When this option is enabled the functionality of path filters is ignored and version of each folder is affected only by its own content.
 
-## Install manualy
+## Install manually
 
 The versioning can be added into .NET project by the Visual Studio
 NuGet package manager GUI, or the NuGet package manager console:
@@ -45,7 +45,7 @@ To define one version for all unversioned projects or create shared configuratio
 }
 ```
 
-## Specific version for a concreate point
+## Specific version for a concrete point
 
 To specify an exact version for any project or an entire workstead just simply add minimal `version.json` file to it.
 
@@ -65,15 +65,15 @@ The `pathFilters` is quite important because the default behavior of the version
 In case of a single version for a project group or workstead:
 
 - all projects has the same version
-- any change/commit affects the vesion (*version of all projects*)
+- any change/commit affects the version (*version of all projects*)
 
-This can or cannot be good. In some cases we want one exclusive version for all projects and any change means version update for all of them, they are strictly connected together.
+In some cases we want one exclusive version for all projects and any change means version update for all of them, they are strictly connected together and shared one specific version.
 
-Second posibility is to synchronize version only on main milestones like major and minor verions. This is described in next section.
+Second possibility is to synchronize version only on main milestones like major and minor versions. This is described in next section.
 
 ## Synchronized version for all projects under a workstead
 
-If a single version for entire workstead is required but you still want to allow small changes between releases, in each project independently, please use `hierarchivalVersion`. This approach will still defines one and centralized version for all sub-projects, but in the same time an independent changes are allowed, probably a patch version updates.
+If a single version for entire workstead is required but you still want to allow small changes between releases, in each project independently, please use `hierarchivalVersion`. This approach will still defines one and centralized version for all sub-projects, but in the same time an independent changes are allowed. If the patch segment is not explicitly defined then the each change generate different version independently in each folder subtree.
 
 ```json
 {
@@ -107,7 +107,7 @@ after two new commit into the Console.Application:
   - version.json
   - **Console.Application** (2.1.2) *[project]*
   - **Web.Application** (2.1.2) *[project]*
-  
+
 > Any change in the entire workstead will affect version of all projects.
 
 ### A workstead with a synchronized version
@@ -132,5 +132,5 @@ after two new commit into the Console.Application:
   - version.json
   - **Console.Application** (2.1.2) *[project]*
   - **Web.Application** (2.1) *[project]*
-  
-> Any change in any project are affecting only the concrete project, but the global update of the `version.json` is still affecting the entire workstead.
+
+> Any change in any project is affecting only the concrete project, but the global update of the `version.json` affectS the entire version of the workstead.

@@ -1,11 +1,11 @@
 # akobr/mono.me
 
-Welcome to my mono-repository.
+Welcome to my mono-repository. The vault of my all small and bigger projects which I try to maintain and expand.
 
 ## Projects
 
 - [Cetris](docs/Cetris/README.md): a tetris game for command-lines
-- [Monorepo](docs/Monorepo/README.md): suggestions around a mono-repository aprroach + some helpful tooling
+- [Monorepo](docs/Monorepo/README.md): suggestions around a mono-repository approach + some helpful tooling
 - [Texo](docs/Texo/README.md): Universal text based user interface for any type of application
 
 ## Main motos

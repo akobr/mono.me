@@ -12,7 +12,7 @@ I try to explain reasons why I think the mono-repo make sense. As the first thin
 1. worse scaling (slow on huge sizes) => large clones => longer build times
 2. unable to define access control per subfolder *(git doesn't support read permissions for subtrees, only write rules)*
 
-The firsts disadvantage is valid only for colossal code bases. 4% of all mono-repos will need to solve this issue and put some tooling in place. The largest of them use a virtual file system (VFS) to tackle this problem. Google uses [Perforce](https://www.perforce.com/), and Microsoft builds open-source [GVFS](https://en.wikipedia.org/wiki/Virtual_File_System_for_Git) for Git. Facebook uses different source control, the decentralized system called [Mercurial](https://www.mercurial-scm.org/), which is more suitable for a large mono-repo.
+The firsts disadvantage is valid only for colossal code bases. 4% of all mono-repos will need to solve this issue and put some tooling in place. The largest of them use a virtual file system (VFS) to tackle this problem. Google uses [Perforce](https://www.perforce.com/), and Microsoft builds open-source [GVFS](https://en.wikipedia.org/wiki/Virtual_File_System_for_Git) for Git. Facebook uses different source control, the decentralized system called [Mercurial](https://www.mercurial-scm.org/), which is more suitable for an extremely large mono-repo.
 
 The second point about access control currently doesn't have a simple solution, but the question should be: *Do I need it?* The most important benefit of a mono-repo is the visibility and accessibility of the code. I would say every developer should be able to see it all.
 
@@ -22,7 +22,7 @@ If the different levels of the access control are absolutely needed, I would pre
 
 ### A possible workaround for the lack of access control
 
-Suppose your setup still requires limited access to a specific sub-project. E.g., an external worker needs to modify one of them, and you don't want to give him a full read-access to the entire mono-repo. In this scenarion is important to keep all projects isolated as possible and when the time comes just simple use git's subtree command to split and create new repository with the requested sub-project. The separated repo can be configured in any desired way and shared with the external worker quite easily.
+Suppose your setup still requires limited access to a specific sub-project. E.g., an external worker needs to modify one of them, and you don't want to give him a full read-access to the entire mono-repo. In this scenario is important to keep all projects isolated as possible and when the time comes just simple use git's subtree command to split and create new repository with the requested sub-project. The separated repo can be configured in any desired way and shared with the external worker quite easily.
 
 > Later on, I will describe how to create this separated repo, what difficulties you can discover, and how to merge it back to a mono-repo after all the external work is done.
 
@@ -38,7 +38,7 @@ Suppose your setup still requires limited access to a specific sub-project. E.g.
 
 Some advantages can be beneficial even for fully independent projects, same as in this mono-repo. For example, *tooling, standards, effective code reviews, and transparency* would be applied to any project created under the mono-repo. It is much easier to create a folder than an entire repository and configure everything again.
 
-Nothing in this beautiful world of ours is black and white. Everything can be achieved by custom tooling. All advantages in the list above can be transferred into a poly-repo environment. Still, it is much easier to start with the setup where they will work efficiently and automatically rather than manage and spend resources on more tooling.
+Nothing in this beautiful world of ours is black and white. Everything can be achieved by custom tooling. All advantages in the list above can be transferred into a poly-repo environment. Still, it is much easier to start with the setup where they will work efficiently and automatically rather than manage and spend resources on more complex tooling.
 
 ## Example of poly-repos
 

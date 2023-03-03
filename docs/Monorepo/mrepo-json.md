@@ -12,7 +12,7 @@ All configuration for the monorepo, his behaviour and CLI toolset is done by one
         // a list of features used in the mono-repo
         "git-version",
         "packages",
-        "build-traversal",
+        "build-traversal"
     ],
     "scripts": { /* add any global scripts here */ }
   },
@@ -34,7 +34,7 @@ All configuration for the monorepo, his behaviour and CLI toolset is done by one
     "dotnet-project": {
       "custom": {
         "filePattern": "*.*?proj",
-        "useFullProjectNames": false
+        "useFullProjectName": false
       },
       "scripts": {
         "build": "dotnet build src",

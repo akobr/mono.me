@@ -2,7 +2,7 @@
 
 Install the tool:
 
-```bash
+```powershell
 dotnet tool install 42.Monorepo.Cli --global --prerelease --ignore-failed-sources
 ```
 
@@ -10,7 +10,7 @@ dotnet tool install 42.Monorepo.Cli --global --prerelease --ignore-failed-source
 
 To see all available commands:
 
-```bash
+```powershell
 mrepo
 ```
 

@@ -6,6 +6,7 @@ If no centralized dependency system is in place, the dependencies need to be man
 
 - challenging to update a version of a dependency; needs to be done for each project separately
 - to keep the same version of a dependency in all projects is complex, and it is easy to forget some
+  - build in tools of IDEs are having issues to work with large solutions
 - has global knowledge of all used dependencies is difficult
 - it's easy to smuggle in an inconvenient dependency
 
@@ -25,3 +26,22 @@ If no centralized dependency system is in place, the dependencies need to be man
 ## Used system
 
 My mono-repo uses an out-of-box solution of central package version management, which is part of .NET Core SDK *from version 3.1.300*. Everything is described in the documentation about [dependency management](dependency-management.md).
+
+## Edge cases
+
+If some workstead or project still need a custom dependency versions you can introduce a specific ` Directory.Packages.props` file for it. Use inheritance or explicit reference to connect it into the rest of monorepo.
+
+### Inheritance in package versions
+
+Put a specific `Directory.Packages.props` in the structure and set the inheritance explicitly, because by default MsBuild process will stop on first hit of these props file:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Packages.props', '$(MSBuildThisFileDirectory)..\'))" />
+
+    <ItemGroup>
+        <!-- ...package versions -->
+    </ItemGroup>
+</Project>
+```

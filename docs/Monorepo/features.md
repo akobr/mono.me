@@ -11,6 +11,6 @@ The list of currently supported features:
 
 ## Minor features
 
-- possibility to use full project names or build namespaces based on the folder structure
+- possibility to use full project name or build namespaces based on the folder structure
 - specify custom configuration per each workstead or project
   - custom scripts, suppress namespace, etc.

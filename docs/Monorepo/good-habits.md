@@ -33,7 +33,7 @@ It's good to use some library to force the same code standards in the entire tea
 
 > Recommended configuration is to use [StyleCop](https://github.com/DotNetAnalyzers/StyleCopAnalyzers) for code styling rules, and [Sonar](https://rules.sonarsource.com/csharp) as an excellent tool against code smells and vulnerabilities.
 
-By default, the rules are processed and evaluated on each build. If your mono-repo overgrows, I recommend using pre-commit and running Release build on it and keeping Debug builds minimal.
+By default, the rules are processed and evaluated on each build. If your mono-repo overgrows, I recommend using [pre-commit](https://pre-commit.com/) and running release build on it and keeping debug builds minimal.
 
 ## Conventional commit messages
 
@@ -58,7 +58,9 @@ It is nice to have one centralized place where all NuGet packages are stored. Th
 
 ## Separate human and machine view
 
-TBC
+I recommend to split machine and human views of a mono-repo. The solution files should be used only for developers itself, where you can have solution files as many as you need. Another great idea is to have one large solution with all the content and then define [solution filters](https://learn.microsoft.com/en-us/visualstudio/ide/filtered-solutions) in each workstead where it is required, this approach can help you to solve most of the issues about a large mono-repo and IDEs.
+
+>TODO: Explain `Microsoft.Build.Traversal` SDK and how the machine views are defined.
 
 ## Configuration about details
 
