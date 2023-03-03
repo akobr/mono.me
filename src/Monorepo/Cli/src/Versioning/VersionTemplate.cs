@@ -28,6 +28,11 @@ namespace _42.Monorepo.Cli.Versioning
 
         public SemVersion Version { get; }
 
+        public override string ToString()
+        {
+            return Version.ToString();
+        }
+
         public static bool TryParse(string template, [MaybeNullWhen(false)] out VersionTemplate model)
         {
             if (!SemVersion.TryParse(template, out var version))
