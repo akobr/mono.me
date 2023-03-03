@@ -31,7 +31,7 @@
     "dotnet-project": {
       "custom": {
         "filePattern": "*.*?proj",
-        "useFullProjectNames": false
+        "useFullProjectName": false
       },
       "scripts": {
         "build": "dotnet build src",
@@ -74,7 +74,7 @@
       "name": "Reusable libraries",
       "description": "List of reusable libraries served as NuGet packages.",
       "custom": {
-        "suppressNamespace": true
+        "isSuppressed": true
       }
     },
     {
@@ -82,7 +82,7 @@
       "name": "Best games to play!",
       "description": "The intersection of the legendary game Tetris + Command line = Cetris.",
       "custom": {
-        "suppressNamespace": true
+        "isSuppressed": true
       }
     },
     {
