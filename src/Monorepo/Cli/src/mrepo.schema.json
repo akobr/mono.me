@@ -255,7 +255,7 @@
               "type": "object",
               "required": [
                 "filePattern",
-                "useFullProjectNames"
+                "useFullProjectName"
               ],
               "properties": {
                 "filePattern": {
@@ -270,7 +270,7 @@
                 },
                 "useFullProjectName": {
                   "$id": "#root/types/dotnet-project/custom/useFullProjectName",
-                  "title": "Usefullprojectname",
+                  "title": "UseFullProjectName",
                   "type": "boolean",
                   "examples": [
                     false
