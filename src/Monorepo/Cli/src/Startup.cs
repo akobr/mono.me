@@ -11,6 +11,8 @@ using _42.Monorepo.Cli.Operations.Strategies;
 using _42.Monorepo.Cli.Output;
 using _42.Monorepo.Cli.Scripting;
 using _42.Monorepo.Texo.Core.Markdown;
+using _42.Testing.System.IO.Abstractions;
+using _42.Testing.System.IO.Abstractions.Tracers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -37,8 +39,9 @@ namespace _42.Monorepo.Cli
 #if !DEBUG || TESTING
             services.AddSingleton<IFileSystem, FileSystem>();
 #else
-            // TODO: [testing] add file system which will just print operations to console
-            services.AddSingleton<IFileSystem, FileSystem>();
+            services.AddSingleton<IFileSystem>(_ => new DiagnosticFileSystem(
+                new ReadonlyFileSystem(new FileSystem()),
+                new ConsoleFileSystemTracer()));
 #endif
 
             services.AddSingleton<ICommandContext, CommandContext>();

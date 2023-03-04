@@ -367,8 +367,8 @@ namespace _42.Monorepo.Cli.Commands.Release
             var gitConfig = repository.Config;
             var signature = gitConfig.BuildSignature(DateTimeOffset.Now);
             repository.Commit($"release: release of {preview.Tag}", signature, signature);
-            return true;
 #endif
+            return true;
         }
 
         private void ChangeVersion(ReleasePreview preview, IItem item)
