@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.CLI.Toolkit</AssemblyName>
+    <RootNamespace>_42.CLI.Toolkit</RootNamespace>
+
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Alba.CsConsoleFormat-NoXaml" />
+    <PackageReference Include="Colorful.Console" />
+    <PackageReference Include="ConsoleTableExt" />
+    <PackageReference Include="McMaster.Extensions.CommandLineUtils" />
+    <PackageReference Include="McMaster.Extensions.Hosting.CommandLine" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Sharprompt" />
+    <PackageReference Include="ShellProgressBar" />
+  </ItemGroup>
+
+</Project>
