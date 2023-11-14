@@ -1,3 +1,5 @@
-# Live demo of Splatform
+# Live demo of 2S platform
 
-TBC
+The live demo is under development.
+
+**TBD**

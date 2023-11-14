@@ -26,10 +26,10 @@ features:
     details: Transparency, visibility, standards, and tooling for your code.
   - title: Modulith
     details: A powerful compromise between monolith and microservices. Flexible scalability without complexness.
-  - title: Platform
+  - title: 2S platform
     details: A subscription-based platform for your product and all applications around.
   - title: CLI tools
-    details: Simple but strong and useful tooling around your codebase and platform.
+    details: Simple but useful tooling around your codebase and platform.
 
 # Proudly powering Bricknode & Huddlestock | Cload based and scalable finance systems.
 ---

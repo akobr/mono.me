@@ -41,14 +41,6 @@ export default defineConfig({
           { text: 'Road map', link: '/monorepo/road-map' },
         ]
       },
-      /*{
-        text: 'Other concepts',
-        items: [
-          { text: 'Automated testing', link: '/concepts/automation-testing' },
-          { text: 'Infrastructure', link: '/concepts/infrastructure' },
-          { text: 'Hell of dependencies', link: '/concepts/dependency-hell' },
-        ]
-      },*/
       {
         text: 'Platform',
         items: [
@@ -63,6 +55,16 @@ export default defineConfig({
         items: [
           { text: 'mrepo', link: '/cli/mrepo' },
           { text: 'sform', link: '/cli/sform' }
+        ]
+      },
+      {
+        text: 'Other talks',
+        items: [
+          { text: 'Automation testing', link: '/articles/automation-testing' },
+          { text: 'Hell of dependencies', link: '/articles/dependency-hell' },
+          { text: 'Infrastructure', link: '/articles/infrastructure' },
+          { text: 'Technical decisions', link: '/articles/technical-decisions' },
+          { text: 'Scarecrow of contracting', link: '/articles/contractors' }
         ]
       }
     ],

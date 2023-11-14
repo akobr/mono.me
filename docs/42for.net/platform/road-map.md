@@ -1,3 +1,5 @@
 # Road map of Splatform
 
-TBC
+A road-map to version 1.0 and peak to the future.
+
+**TBD**
