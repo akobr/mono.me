@@ -1,10 +1,10 @@
-# Overview of Splatform
+# Overview of 2S platform
 
 ::: danger
 The platform is under development, see [the road map](road-map).
 :::
 
-TBC
+**TBD**
 
 ## Storyteller
 
@@ -14,20 +14,20 @@ The model of annotations define all important relationships from the business po
 
 ![annotations](images/annotations.jpg)
 
-TODO: change to interactive component with synonyms and examples
+**TODO: change to interactive component with synonyms and examples**
 
-The **subject** should represent the most important entity, it is like the sun of your business solar system. The next one is **context**, which represet a parallel universe in the solar system. You can imagine it as a first level of abstraction. The last annotion of **responsibility** is like a planet or a building block of your business. It most of the cases a responsibility represet one satelite in the monolith application.
+The **subject** should represent the most important entity, it is like the sun of your business solar system. The next one is **context**, which represet a parallel universe in the solar system. You can imagine it as a first level of abstraction. The last annotion of **responsibility** is like a planet or a building block of your business. It most of the cases a responsibility represet one satelite in the modulith application.
 
 The relationships between these block are ilustrated on the next diagram. A subject has one or more contexts, and **use** multiple responsibilities. A combination of context and responsibility is a concrete unit of work or **execution** of a satelite.
 
 ![annotations](images/annotations-relations.jpg)
 
-TODO: change to interactive component with detailed tooltip descriptions
+**TODO: change to interactive component with detailed tooltip descriptions**
 
 The model is kept simple but quite generic to make it possible to describe a lot of variations of complex software systems. It can describe relation between your SaS product and your customers, a complex business workflows or differences between versions of a software which is released in major versions every year. There are no limits for the imagination and what you want to describe by the annotation model, it should be always something which will help you to manage your product.
 
 ::: tip
-This platform can be very useful for microservices aproach because it can help you to picture the full architecture of the system and simplify management. The platform is modeled to handle hundred thousands or millions of annotations and serve them blazingly fast. 
+This platform can be very useful for microservices aproach because it can help you to picture the full architecture of the system and simplify management. The platform is modeled to handle hundred thousands of annotations and serve them blazingly fast. 
 :::
 
 ## Supervisor
@@ -36,10 +36,10 @@ A service where entire ecosystem can be reviewed in real time and notifications 
 
 You can connect to the superviser as to a stream source to see the real-time events from your ecosystem. There is a secured web UI or CLI client. The events can be overwatched based on variable rules and variable actions can be triggered, e.g. a notification will be send or new support ticket created.
 
-The supervisor comes with a simple SDK library and its implemented on top of standartized concepts in .net, it uses healt-checks or can retrive messages through ILogger.
+The supervisor comes with a simple SDK library and its implemented on top of standartized concepts in .net, it uses health-checks or can retrive messages through *ILogger*.
 
 ## Scheduler
 
-The last actor for managing time based and recurent jobs. This can be handy when you have a lot of them and you want to describe smaller units then just responsibilities (satelites) in the ecosystem. You can imagine how convenient can be to know *what is running per each customer*, for billng pourposes or simillar.
+The last actor for managing time-based and recurent jobs. This can be handy when you have a lot of them and you want to describe smaller units then just responsibilities (satelites) in the ecosystem. Imagine, how convenient is to know *what is running per each customer*, for billing purposes or similar.
 
 

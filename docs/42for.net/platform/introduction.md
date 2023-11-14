@@ -4,7 +4,7 @@
 The platform is under development, see [the road map](road-map).
 :::
 
-The **2S platform**, as I call it, should help you to manage your products and complex monolith application(s). The **2S** represents **S**implicity and **S**ubscription based platform.
+The **2S platform**, as I call it, should help you to manage your products and complex monolith application(s). The **2S** represents **S**implicity and **S**ubscription-based platform.
 
 ::: info
 I'm going to use in the text a lot of expressions which are described in the section about the [modulith](../architecture/modulith) architecture, for example **ecosystem** and **satelite**. If you didn't know them, I recomend you to read that section first.
