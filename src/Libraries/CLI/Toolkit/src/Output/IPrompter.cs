@@ -5,7 +5,7 @@ namespace _42.CLI.Toolkit.Output
 {
     public interface IPrompter
     {
-        T Input<T>(InputOptions options);
+        T Input<T>(InputOptions<T> options);
 
         bool Confirm(ConfirmOptions options);
 

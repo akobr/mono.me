@@ -10,7 +10,7 @@ namespace _42.CLI.Toolkit
 {
     public static class CommandLineApplicationExtensions
     {
-        public static Task<int> ExecuteByNameAsync(this List<CommandLineApplication> commands, string commandName)
+        public static Task<int> ExecuteByNameAsync(this IReadOnlyCollection<CommandLineApplication> commands, string commandName)
         {
             return commands.First(c => c.Name == commandName).ExecuteAsync(Array.Empty<string>());
         }

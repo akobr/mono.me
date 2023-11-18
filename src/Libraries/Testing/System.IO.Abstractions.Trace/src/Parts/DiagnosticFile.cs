@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
@@ -6,6 +6,7 @@ using System.Runtime.Versioning;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Win32.SafeHandles;
 
 namespace _42.Testing.System.IO.Abstractions.Parts;
 
@@ -92,6 +93,18 @@ public class DiagnosticFile : IFile
     {
         _processor.Process(new object?[] { path, encoding, cancellationToken });
         return _executingFile.ReadAllTextAsync(path, encoding, cancellationToken);
+    }
+
+    public IAsyncEnumerable<string> ReadLinesAsync(string path, CancellationToken cancellationToken = default)
+    {
+        _processor.Process(new object?[] { path, cancellationToken });
+        return _executingFile.ReadLinesAsync(path, cancellationToken);
+    }
+
+    public IAsyncEnumerable<string> ReadLinesAsync(string path, Encoding encoding, CancellationToken cancellationToken = default)
+    {
+        _processor.Process(new object?[] { path, encoding, cancellationToken });
+        return _executingFile.ReadLinesAsync(path, encoding, cancellationToken);
     }
 
     public Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken = default)
@@ -239,10 +252,22 @@ public class DiagnosticFile : IFile
         return _executingFile.GetAttributes(path);
     }
 
+    public FileAttributes GetAttributes(SafeFileHandle fileHandle)
+    {
+        _processor.Process(new object?[] { fileHandle });
+        return _executingFile.GetAttributes(fileHandle);
+    }
+
     public DateTime GetCreationTime(string path)
     {
         _processor.Process(new object?[] { path });
         return _executingFile.GetCreationTime(path);
+    }
+
+    public DateTime GetCreationTime(SafeFileHandle fileHandle)
+    {
+        _processor.Process(new object?[] { fileHandle });
+        return _executingFile.GetCreationTime(fileHandle);
     }
 
     public DateTime GetCreationTimeUtc(string path)
@@ -251,10 +276,22 @@ public class DiagnosticFile : IFile
         return _executingFile.GetCreationTimeUtc(path);
     }
 
+    public DateTime GetCreationTimeUtc(SafeFileHandle fileHandle)
+    {
+        _processor.Process(new object?[] { fileHandle });
+        return _executingFile.GetCreationTimeUtc(fileHandle);
+    }
+
     public DateTime GetLastAccessTime(string path)
     {
         _processor.Process(new object?[] { path });
         return _executingFile.GetLastAccessTime(path);
+    }
+
+    public DateTime GetLastAccessTime(SafeFileHandle fileHandle)
+    {
+        _processor.Process(new object?[] { fileHandle });
+        return _executingFile.GetLastAccessTime(fileHandle);
     }
 
     public DateTime GetLastAccessTimeUtc(string path)
@@ -263,16 +300,46 @@ public class DiagnosticFile : IFile
         return _executingFile.GetLastAccessTimeUtc(path);
     }
 
+    public DateTime GetLastAccessTimeUtc(SafeFileHandle fileHandle)
+    {
+        _processor.Process(new object?[] { fileHandle });
+        return _executingFile.GetLastAccessTimeUtc(fileHandle);
+    }
+
     public DateTime GetLastWriteTime(string path)
     {
         _processor.Process(new object?[] { path });
         return _executingFile.GetLastWriteTime(path);
     }
 
+    public DateTime GetLastWriteTime(SafeFileHandle fileHandle)
+    {
+        _processor.Process(new object?[] { fileHandle });
+        return _executingFile.GetLastWriteTime(fileHandle);
+    }
+
     public DateTime GetLastWriteTimeUtc(string path)
     {
         _processor.Process(new object?[] { path });
         return _executingFile.GetLastWriteTimeUtc(path);
+    }
+
+    public DateTime GetLastWriteTimeUtc(SafeFileHandle fileHandle)
+    {
+        _processor.Process(new object?[] { fileHandle });
+        return _executingFile.GetLastWriteTimeUtc(fileHandle);
+    }
+
+    public UnixFileMode GetUnixFileMode(string path)
+    {
+        _processor.Process(new object?[] { path });
+        return _executingFile.GetUnixFileMode(path);
+    }
+
+    public UnixFileMode GetUnixFileMode(SafeFileHandle fileHandle)
+    {
+        _processor.Process(new object?[] { fileHandle });
+        return _executingFile.GetUnixFileMode(fileHandle);
     }
 
     public void Move(string sourceFileName, string destFileName)
@@ -399,10 +466,22 @@ public class DiagnosticFile : IFile
         _executingFile.SetAttributes(path, fileAttributes);
     }
 
+    public void SetAttributes(SafeFileHandle fileHandle, FileAttributes fileAttributes)
+    {
+        _processor.Process(new object?[] { fileHandle, fileAttributes });
+        _executingFile.SetAttributes(fileHandle, fileAttributes);
+    }
+
     public void SetCreationTime(string path, DateTime creationTime)
     {
         _processor.Process(new object?[] { path, creationTime });
         _executingFile.SetCreationTime(path, creationTime);
+    }
+
+    public void SetCreationTime(SafeFileHandle fileHandle, DateTime creationTime)
+    {
+        _processor.Process(new object?[] { fileHandle, creationTime });
+        _executingFile.SetCreationTime(fileHandle, creationTime);
     }
 
     public void SetCreationTimeUtc(string path, DateTime creationTimeUtc)
@@ -411,10 +490,22 @@ public class DiagnosticFile : IFile
         _executingFile.SetCreationTimeUtc(path, creationTimeUtc);
     }
 
+    public void SetCreationTimeUtc(SafeFileHandle fileHandle, DateTime creationTimeUtc)
+    {
+        _processor.Process(new object?[] { fileHandle, creationTimeUtc });
+        _executingFile.SetCreationTimeUtc(fileHandle, creationTimeUtc);
+    }
+
     public void SetLastAccessTime(string path, DateTime lastAccessTime)
     {
         _processor.Process(new object?[] { path, lastAccessTime });
         _executingFile.SetLastAccessTime(path, lastAccessTime);
+    }
+
+    public void SetLastAccessTime(SafeFileHandle fileHandle, DateTime lastAccessTime)
+    {
+        _processor.Process(new object?[] { fileHandle, lastAccessTime });
+        _executingFile.SetLastAccessTime(fileHandle, lastAccessTime);
     }
 
     public void SetLastAccessTimeUtc(string path, DateTime lastAccessTimeUtc)
@@ -423,16 +514,46 @@ public class DiagnosticFile : IFile
         _executingFile.SetLastAccessTimeUtc(path, lastAccessTimeUtc);
     }
 
+    public void SetLastAccessTimeUtc(SafeFileHandle fileHandle, DateTime lastAccessTimeUtc)
+    {
+        _processor.Process(new object?[] { fileHandle, lastAccessTimeUtc });
+        _executingFile.SetLastAccessTimeUtc(fileHandle, lastAccessTimeUtc);
+    }
+
     public void SetLastWriteTime(string path, DateTime lastWriteTime)
     {
         _processor.Process(new object?[] { path, lastWriteTime });
         _executingFile.SetLastWriteTime(path, lastWriteTime);
     }
 
+    public void SetLastWriteTime(SafeFileHandle fileHandle, DateTime lastWriteTime)
+    {
+        _processor.Process(new object?[] { fileHandle, lastWriteTime });
+        _executingFile.SetLastWriteTime(fileHandle, lastWriteTime);
+    }
+
     public void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc)
     {
         _processor.Process(new object?[] { path, lastWriteTimeUtc });
         _executingFile.SetLastWriteTimeUtc(path, lastWriteTimeUtc);
+    }
+
+    public void SetLastWriteTimeUtc(SafeFileHandle fileHandle, DateTime lastWriteTimeUtc)
+    {
+        _processor.Process(new object?[] { fileHandle, lastWriteTimeUtc });
+        _executingFile.SetLastWriteTimeUtc(fileHandle, lastWriteTimeUtc);
+    }
+
+    public void SetUnixFileMode(string path, UnixFileMode mode)
+    {
+        _processor.Process(new object?[] { path, mode });
+        _executingFile.SetUnixFileMode(path, mode);
+    }
+
+    public void SetUnixFileMode(SafeFileHandle fileHandle, UnixFileMode mode)
+    {
+        _processor.Process(new object?[] { fileHandle, mode });
+        _executingFile.SetUnixFileMode(fileHandle, mode);
     }
 
     public void WriteAllBytes(string path, byte[] bytes)

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
@@ -23,10 +23,20 @@ public class ReadonlyDirectory : IDirectory
         return new DirectoryInfoWrapper(FileSystem, new DirectoryInfo(path));
     }
 
+    public IDirectoryInfo CreateDirectory(string path, UnixFileMode unixCreateMode)
+    {
+        throw new NotImplementedException();
+    }
+
     public IFileSystemInfo CreateSymbolicLink(string path, string pathToTarget)
     {
         // TODO: simulate it by in memory map
         return new FileInfoWrapper(FileSystem, new FileInfo(path));
+    }
+
+    public IDirectoryInfo CreateTempSubdirectory(string? prefix = null)
+    {
+        throw new NotImplementedException();
     }
 
     public void Delete(string path)

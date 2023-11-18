@@ -1,95 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-
     <!-- Please create any group of dependencies if you need -->
     <!-- <PackageVersion Include="package-name" Version="package-version" /> -->
-
     <!-- abstractions for .NET libraries -->
-    <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.FileProviders.Abstractions" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="5.0.0" />
-    <PackageVersion Include="TestableIO.System.IO.Abstractions" Version="19.1.14" />
-
+    <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.FileProviders.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageVersion Include="TestableIO.System.IO.Abstractions" Version="19.2.87" />
     <!-- .NET libraries -->
-    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="5.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.FileProviders.Physical" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="5.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="5.0.0" />
-    <PackageVersion Include="System.Collections.Immutable" Version="5.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.FileProviders.Physical" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.0" />
+    <PackageVersion Include="System.Collections.Immutable" Version="8.0.0" />
     <PackageVersion Include="System.ComponentModel.Annotations" Version="5.0.0" />
-    <PackageVersion Include="System.Text.Json" Version="5.0.2" />
-    <PackageVersion Include="TestableIO.System.IO.Abstractions.Wrappers" Version="19.1.14" />
-
+    <PackageVersion Include="System.Text.Json" Version="8.0.0" />
+    <PackageVersion Include="TestableIO.System.IO.Abstractions.Wrappers" Version="19.2.87" />
+    <!-- Azure -->
+    <PackageVersion Include="Azure.Identity" Version="1.10.4" />
+    <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.36.0" />
+    <PackageVersion Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.5" />
     <!-- data structures -->
-    <PackageVersion Include="QuikGraph" Version="2.3.0" />
-    <PackageVersion Include="QuikGraph.Serialization" Version="2.3.0" />
-
+    <PackageVersion Include="QuikGraph" Version="2.5.0" />
+    <PackageVersion Include="QuikGraph.Serialization" Version="2.5.0" />
     <!-- data formats -->
-    <PackageVersion Include="YamlDotNet" Version="9.1.0" />
-
+    <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageVersion Include="YamlDotNet" Version="13.7.1" />
+    <!-- REST API -->
+    <PackageVersion Include="Asp.Versioning.Http" Version="7.1.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.Identity.Web" Version="2.15.3" />
+    <PackageVersion Include="Microsoft.Identity.Web.UI" Version="2.15.3" />
+    <PackageVersion Include="Microsoft.Identity.Web.MicrosoftGraph" Version="2.15.3" />
+    <PackageVersion Include="NSwag.AspNetCore" Version="13.20.0" />
     <!-- CLI libraries -->
     <PackageVersion Include="Alba.CsConsoleFormat-NoXaml" Version="1.0.0" />
     <PackageVersion Include="Colorful.Console" Version="1.2.15" />
-    <PackageVersion Include="ConsoleTableExt" Version="3.1.9" />
+    <PackageVersion Include="ConsoleTableExt" Version="3.2.0" />
     <PackageVersion Include="Humanizer" Version="2.14.1" />
-    <PackageVersion Include="McMaster.Extensions.CommandLineUtils" Version="3.1.0" />
-    <PackageVersion Include="McMaster.Extensions.Hosting.CommandLine" Version="3.1.0" />
-    <PackageVersion Include="Sharprompt" Version="2.3.3" />
-    <PackageVersion Include="ShellProgressBar" Version="5.1.0" />
-
+    <PackageVersion Include="McMaster.Extensions.CommandLineUtils" Version="4.1.0" />
+    <PackageVersion Include="McMaster.Extensions.Hosting.CommandLine" Version="4.1.0" />
+    <PackageVersion Include="Sharprompt" Version="2.4.5" />
+    <PackageVersion Include="ShellProgressBar" Version="5.2.0" />
     <!-- C# code -->
-    <PackageVersion Include="Microsoft.CodeAnalysis" Version="4.1.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.1.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.1.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="4.1.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.1.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis" Version="4.7.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.7.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.7.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="4.7.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" Version="4.7.0" />
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
-    <PackageVersion Include="System.CodeDom" Version="5.0.0" />
-
+    <PackageVersion Include="System.CodeDom" Version="8.0.0" />
     <!-- MsBuild -->
-    <PackageVersion Include="Microsoft.Build" Version="17.1.0" />
-    <PackageVersion Include="Microsoft.Build.Locator" Version="1.4.1" />
-
+    <PackageVersion Include="Microsoft.Build" Version="17.8.3" />
+    <PackageVersion Include="Microsoft.Build.Locator" Version="1.6.10" />
     <!-- NuGet -->
-    <PackageVersion Include="NuGet.Frameworks" Version="5.8.0" />
-    <PackageVersion Include="NuGet.Packaging" Version="5.8.0" />
-    <PackageVersion Include="NuGet.ProjectModel" Version="5.8.0" />
-    <PackageVersion Include="NuGet.Versioning" Version="5.8.0" />
-
+    <PackageVersion Include="NuGet.Frameworks" Version="6.8.0" />
+    <PackageVersion Include="NuGet.Packaging" Version="6.8.0" />
+    <PackageVersion Include="NuGet.ProjectModel" Version="6.8.0" />
+    <PackageVersion Include="NuGet.Versioning" Version="6.8.0" />
     <!-- unit testing -->
-    <PackageVersion Include="Bogus" Version="33.1.1" />
-    <PackageVersion Include="coverlet.collector" Version="3.1.0" />
-    <PackageVersion Include="FluentAssertions" Version="6.1.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="16.11.0" />
-    <PackageVersion Include="Moq" Version="4.16.1" />
+    <PackageVersion Include="Bogus" Version="34.0.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.0" />
+    <PackageVersion Include="FluentAssertions" Version="6.12.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageVersion Include="Moq" Version="4.20.69" />
     <PackageVersion Include="NBuilder" Version="6.1.0" />
-    <PackageVersion Include="Shouldly" Version="4.0.1" />
-    <PackageVersion Include="xunit" Version="2.4.1" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="2.4.3" />
-
+    <PackageVersion Include="Shouldly" Version="4.2.1" />
+    <PackageVersion Include="xunit" Version="2.6.1" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.3" />
     <!-- logging -->
-    <PackageVersion Include="Sentry" Version="3.14.1" />
-    <PackageVersion Include="Sentry.Serilog" Version="3.14.1" />
-    <PackageVersion Include="Serilog.Extensions.Logging" Version="3.1.0" />
-    <PackageVersion Include="Serilog.Sinks.Console" Version="4.0.1" />
+    <PackageVersion Include="Sentry" Version="3.41.0" />
+    <PackageVersion Include="Sentry.Serilog" Version="3.41.0" />
+    <PackageVersion Include="Serilog.Extensions.Logging" Version="3.41.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="5.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="5.0.0" />
-    
+    <PackageVersion Include="Serilog.Sinks.ApplicationInsights" Version="4.0.0" />
     <!-- versioning -->
-    <PackageVersion Include="semver" Version="2.0.6" />
-    <PackageVersion Include="Nerdbank.GitVersioning" Version="3.4.231" />
+    <PackageVersion Include="semver" Version="2.3.0" />
+    <PackageVersion Include="Nerdbank.GitVersioning" Version="3.6.133" />
     <PackageVersion Include="42.Monorepo.GitVersioning" Version="1.1.1" />
-
     <!-- code analysis -->
-    <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.435" />
+    <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.507" />
     <PackageVersion Include="TestableIO.System.IO.Abstractions.Analyzers" Version="2022.0.0" />
-
-    </ItemGroup>
+  </ItemGroup>
 </Project>

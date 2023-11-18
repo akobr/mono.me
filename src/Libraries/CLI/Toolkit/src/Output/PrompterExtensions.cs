@@ -22,7 +22,7 @@ namespace _42.CLI.Toolkit.Output
             object? defaultValue = null,
             IList<Func<object, ValidationResult>>? validators = null)
         {
-            InputOptions options = new()
+            InputOptions<TValue> options = new()
             {
                 Message = message,
                 DefaultValue = defaultValue,

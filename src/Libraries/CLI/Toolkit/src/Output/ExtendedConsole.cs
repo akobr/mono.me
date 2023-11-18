@@ -145,7 +145,7 @@ namespace _42.CLI.Toolkit.Output
             ConsoleRenderer.RenderDocument(document);
         }
 
-        public T Input<T>(InputOptions options)
+        public T Input<T>(InputOptions<T> options)
         {
             return Prompt.Input<T>(options);
         }
