@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Testing.System.IO.Abstractions.Wrappers;
+using Microsoft.Win32.SafeHandles;
 
 namespace _42.Testing.System.IO.Abstractions.Parts;
 
@@ -89,6 +90,16 @@ public class ReadonlyFile : IFile
     public Task<string> ReadAllTextAsync(string path, Encoding encoding, CancellationToken cancellationToken = default)
     {
         return _executingFile.ReadAllTextAsync(path, encoding, cancellationToken);
+    }
+
+    public IAsyncEnumerable<string> ReadLinesAsync(string path, CancellationToken cancellationToken = default)
+    {
+        return _executingFile.ReadLinesAsync(path, cancellationToken);
+    }
+
+    public IAsyncEnumerable<string> ReadLinesAsync(string path, Encoding encoding, CancellationToken cancellationToken = default)
+    {
+        return _executingFile.ReadLinesAsync(path, encoding, cancellationToken);
     }
 
     public Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken = default)
@@ -225,9 +236,19 @@ public class ReadonlyFile : IFile
         return _executingFile.GetAttributes(path);
     }
 
+    public FileAttributes GetAttributes(SafeFileHandle fileHandle)
+    {
+        return _executingFile.GetAttributes(fileHandle);
+    }
+
     public DateTime GetCreationTime(string path)
     {
         return _executingFile.GetCreationTime(path);
+    }
+
+    public DateTime GetCreationTime(SafeFileHandle fileHandle)
+    {
+        return _executingFile.GetCreationTime(fileHandle);
     }
 
     public DateTime GetCreationTimeUtc(string path)
@@ -235,9 +256,19 @@ public class ReadonlyFile : IFile
         return _executingFile.GetCreationTimeUtc(path);
     }
 
+    public DateTime GetCreationTimeUtc(SafeFileHandle fileHandle)
+    {
+        return _executingFile.GetCreationTimeUtc(fileHandle);
+    }
+
     public DateTime GetLastAccessTime(string path)
     {
         return _executingFile.GetLastAccessTime(path);
+    }
+
+    public DateTime GetLastAccessTime(SafeFileHandle fileHandle)
+    {
+        return _executingFile.GetLastAccessTime(fileHandle);
     }
 
     public DateTime GetLastAccessTimeUtc(string path)
@@ -245,14 +276,39 @@ public class ReadonlyFile : IFile
         return _executingFile.GetLastAccessTimeUtc(path);
     }
 
+    public DateTime GetLastAccessTimeUtc(SafeFileHandle fileHandle)
+    {
+        return _executingFile.GetLastAccessTimeUtc(fileHandle);
+    }
+
     public DateTime GetLastWriteTime(string path)
     {
         return _executingFile.GetLastWriteTime(path);
     }
 
+    public DateTime GetLastWriteTime(SafeFileHandle fileHandle)
+    {
+        return _executingFile.GetLastWriteTime(fileHandle);
+    }
+
     public DateTime GetLastWriteTimeUtc(string path)
     {
         return _executingFile.GetLastWriteTimeUtc(path);
+    }
+
+    public DateTime GetLastWriteTimeUtc(SafeFileHandle fileHandle)
+    {
+        return _executingFile.GetLastWriteTimeUtc(fileHandle);
+    }
+
+    public UnixFileMode GetUnixFileMode(string path)
+    {
+        return _executingFile.GetUnixFileMode(path);
+    }
+
+    public UnixFileMode GetUnixFileMode(SafeFileHandle fileHandle)
+    {
+        return _executingFile.GetUnixFileMode(fileHandle);
     }
 
     public void Move(string sourceFileName, string destFileName)
@@ -378,7 +434,17 @@ public class ReadonlyFile : IFile
         // TODO: simulate it by in memory map
     }
 
+    public void SetAttributes(SafeFileHandle fileHandle, FileAttributes fileAttributes)
+    {
+        // TODO: simulate it by in memory map
+    }
+
     public void SetCreationTime(string path, DateTime creationTime)
+    {
+        // TODO: simulate it by in memory map
+    }
+
+    public void SetCreationTime(SafeFileHandle fileHandle, DateTime creationTime)
     {
         // TODO: simulate it by in memory map
     }
@@ -388,7 +454,17 @@ public class ReadonlyFile : IFile
         // TODO: simulate it by in memory map
     }
 
+    public void SetCreationTimeUtc(SafeFileHandle fileHandle, DateTime creationTimeUtc)
+    {
+        // TODO: simulate it by in memory map
+    }
+
     public void SetLastAccessTime(string path, DateTime lastAccessTime)
+    {
+        // TODO: simulate it by in memory map
+    }
+
+    public void SetLastAccessTime(SafeFileHandle fileHandle, DateTime lastAccessTime)
     {
         // TODO: simulate it by in memory map
     }
@@ -398,12 +474,37 @@ public class ReadonlyFile : IFile
         // TODO: simulate it by in memory map
     }
 
+    public void SetLastAccessTimeUtc(SafeFileHandle fileHandle, DateTime lastAccessTimeUtc)
+    {
+        // TODO: simulate it by in memory map
+    }
+
     public void SetLastWriteTime(string path, DateTime lastWriteTime)
     {
         // TODO: simulate it by in memory map
     }
 
+    public void SetLastWriteTime(SafeFileHandle fileHandle, DateTime lastWriteTime)
+    {
+        // TODO: simulate it by in memory map
+    }
+
     public void SetLastWriteTimeUtc(string path, DateTime lastWriteTimeUtc)
+    {
+        // TODO: simulate it by in memory map
+    }
+
+    public void SetLastWriteTimeUtc(SafeFileHandle fileHandle, DateTime lastWriteTimeUtc)
+    {
+        // TODO: simulate it by in memory map
+    }
+
+    public void SetUnixFileMode(string path, UnixFileMode mode)
+    {
+        // TODO: simulate it by in memory map
+    }
+
+    public void SetUnixFileMode(SafeFileHandle fileHandle, UnixFileMode mode)
     {
         // TODO: simulate it by in memory map
     }

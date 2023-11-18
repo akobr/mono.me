@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
@@ -28,10 +28,22 @@ public class DiagnosticDirectory : IDirectory
         return _executingDirectory.CreateDirectory(path);
     }
 
+    public IDirectoryInfo CreateDirectory(string path, UnixFileMode unixCreateMode)
+    {
+        _processor.Process(new object?[] { path, unixCreateMode });
+        return _executingDirectory.CreateDirectory(path, unixCreateMode);
+    }
+
     public IFileSystemInfo CreateSymbolicLink(string path, string pathToTarget)
     {
         _processor.Process(new object?[] { path, pathToTarget });
         return _executingDirectory.CreateSymbolicLink(path, pathToTarget);
+    }
+
+    public IDirectoryInfo CreateTempSubdirectory(string? prefix = null)
+    {
+        _processor.Process(new object?[] { prefix });
+        return _executingDirectory.CreateTempSubdirectory(prefix);
     }
 
     public void Delete(string path)

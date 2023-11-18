@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO.Abstractions;
 
 namespace _42.Testing.System.IO.Abstractions.Parts;
@@ -96,6 +96,12 @@ public class DiagnosticPath : IPath
     {
         _processor.Process(new object?[] { path });
         return _executingPath.EndsInDirectorySeparator(path);
+    }
+
+    public bool Exists(string? path)
+    {
+        _processor.Process(new object?[] { path });
+        return _executingPath.Exists(path);
     }
 
     public ReadOnlySpan<char> GetDirectoryName(ReadOnlySpan<char> path)
