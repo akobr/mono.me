@@ -11,7 +11,7 @@ namespace _42.Monorepo.Cli.Extensions
 {
     public static class CommandLineApplicationExtensions
     {
-        public static Task<int> ExecuteByNameAsync(this List<CommandLineApplication> commands, string commandName)
+        public static Task<int> ExecuteByNameAsync(this IEnumerable<CommandLineApplication> commands, string commandName)
         {
             return commands.First(c => c.Name == commandName).ExecuteAsync(Array.Empty<string>());
         }

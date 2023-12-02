@@ -144,7 +144,7 @@ namespace _42.Monorepo.Cli.Output
             ConsoleRenderer.RenderDocument(document);
         }
 
-        public T Input<T>(InputOptions options)
+        public T Input<T>(InputOptions<T> options)
         {
             return Prompt.Input<T>(options);
         }

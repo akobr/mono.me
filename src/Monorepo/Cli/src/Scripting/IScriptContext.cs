@@ -9,6 +9,6 @@ namespace _42.Monorepo.Cli.Scripting
 
         IItem Item { get; }
 
-        List<string> Args { get; }
+        IReadOnlyList<string> Args { get; }
     }
 }
