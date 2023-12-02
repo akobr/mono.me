@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using Sharprompt;
 
 namespace _42.Monorepo.Cli.Output
 {
     public interface IPrompter
     {
-        T Input<T>(InputOptions options);
+        T Input<T>(InputOptions<T> options);
 
         bool Confirm(ConfirmOptions options);
 

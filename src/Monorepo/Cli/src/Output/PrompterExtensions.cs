@@ -23,14 +23,14 @@ namespace _42.Monorepo.Cli.Output
             object? defaultValue = null,
             IList<Func<object, ValidationResult>>? validators = null)
         {
-            InputOptions options = new()
+            InputOptions<TValue> options = new()
             {
                 Message = message,
                 DefaultValue = defaultValue,
             };
 
             options.Validators.Merge(validators);
-            return prompter.Input<TValue>(options);
+            return prompter.Input(options);
         }
     }
 }
