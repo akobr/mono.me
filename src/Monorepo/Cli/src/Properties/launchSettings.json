@@ -8,6 +8,14 @@
       "commandName": "Project",
       "commandLineArgs": "init"
     },
+    "invalid-command": {
+      "commandName": "Project",
+      "commandLineArgs": "non-existing"
+    },
+    "current-repo-build": {
+      "commandName": "Project",
+      "commandLineArgs": "build"
+    },
     "windows-10-terminal-init": {
       "commandName": "Executable",
       "executablePath": "%USERPROFILE%\\AppData\\Local\\Microsoft\\WindowsApps\\wt.exe",
