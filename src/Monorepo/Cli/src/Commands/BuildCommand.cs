@@ -187,7 +187,7 @@ namespace _42.Monorepo.Cli.Commands
                 Console.WriteLine($" > Directory.Build.proj");
                 Console.WriteLine();
 
-                var createDirectoryBuildFile = Console.Confirm("Create new Directory.Build.proj", true);
+                var createDirectoryBuildFile = Console.Confirm("Create new Directory.Build.proj");
 
                 if (createDirectoryBuildFile)
                 {
@@ -195,7 +195,7 @@ namespace _42.Monorepo.Cli.Commands
                     var filePath = _fileSystem.Path.Combine(fullPath, FileNames.DirectoryBuildProj);
                     await _fileSystem.File.WriteAllTextAsync(filePath, template.TransformText());
                     Console.WriteLine(
-                        "  The traversal build file has been created, please run ".ThemedLowlight(Console.Theme),
+                        "The traversal build file has been created, please run ".ThemedLowlight(Console.Theme),
                         "mrepo build",
                         " again.".ThemedLowlight(Console.Theme));
                     return ExitCodes.SUCCESS;
