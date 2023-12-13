@@ -22,8 +22,9 @@ The full list of available commands:
 - creating
   - new workstead: create a new workstead
   - new project: create a new project
+  - new repository: initiate a new mono repository
 - building
-  - build: build, clear, restore, test or run current location
+  - build: build, clear, restore, test, pack or run current location
 - versioning
   - show versions: show details about all versions of a current location
   - new version: create a new version definition file
@@ -35,6 +36,7 @@ The full list of available commands:
   - new package: add new package to current location
   - update package: change version of a package in current location
   - fix packages: fix all hardcoded versions in current project
+  - show packages: show all available packages in current location
   - show usages: show usages of current project
   - show dependency-tree: show full dependency tree of current location
 - executing
