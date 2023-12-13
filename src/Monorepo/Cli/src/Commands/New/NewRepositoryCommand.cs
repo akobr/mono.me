@@ -13,7 +13,7 @@ using Sharprompt;
 
 namespace _42.Monorepo.Cli.Commands.New
 {
-    [Command(CommandNames.REPOSITORY, "repo", Description = "Create new mono-repository.")]
+    [Command(CommandNames.REPOSITORY, CommandNames.REPO, Description = "Create new mono-repository.")]
     public class NewRepositoryCommand : BaseCommand
     {
         private readonly IFileSystem _fileSystem;
@@ -69,18 +69,15 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteLine(
                 "I recommend you to use ",
                 "Central package version management".ThemedHighlight(Console.Theme),
-                " even when it is still in preview because this is the out-of-the-box solution in .net SDK, which is easily changeable to any other strategy.");
+                " because this is the out-of-the-box solution in .net SDK, which is easily changeable to any other strategy.");
 
             SelectOptions<Feature> featureOptions = new()
             {
                 Items = new List<Feature>
                 {
                     new("CentralPackageVersionManagement",
-                        "Central package version management [Preview]",
-                        "Recommended. A baked in solution into .NET Core SDK (from 3.1.300), using Directory.Packages.props file, but still a preview feature. https://bit.ly/3oKJCpq"),
-                    new("CentralPackageVersionsSdk",
-                        "External MsBuild SDK",
-                        "A custom MsBuild SDK built by NuGet team, named Microsoft.Build.CentralPackageVersions. https://bit.ly/3GMloRG"),
+                        "Central package version management",
+                        "Recommended. A baked in solution into .NET Core SDK (from 3.1.300), using Directory.Packages.props file. https://bit.ly/3oKJCpq"),
                     new("DirectoryBuildTargets",
                         "Directory.Build.props [MsBuild 15+]",
                         "Use of hierarchical Directory.Build.props and the possibility to update version of package reference by MsBuild 15 and newer."),
@@ -122,12 +119,12 @@ namespace _42.Monorepo.Cli.Commands.New
             if (useCentralDependencies)
             {
                 Console.WriteLine("Detailed information about central package version management:");
-                Console.WriteLine("    http://GitHub.todo.pages");
+                Console.WriteLine("    https://bit.ly/3tdIwI5");
             }
             else
             {
                 Console.WriteLine("All dependencies are managed independently inside each project file. The advantages of the centralized approach are described at:");
-                Console.WriteLine("    http://GitHub.todo.pages");
+                Console.WriteLine("    https://bit.ly/3TjSQc5");
             }
 
             Console.WriteLine();
@@ -178,7 +175,7 @@ namespace _42.Monorepo.Cli.Commands.New
             if (useCodeViewSeparation)
             {
                 Console.WriteLine("My idea of how to build from the mono-repository is described here:");
-                Console.WriteLine("    http://GitHub.todo.pages");
+                Console.WriteLine("    https://bit.ly/3NhhN43");
                 Console.WriteLine();
             }
 
@@ -200,7 +197,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 Console.WriteLine();
                 Console.WriteLine("    # install node.js by Chocolatey".ThemedLowlight(Console.Theme));
                 Console.WriteLine("    choco install nodejs-lts");
-                Console.WriteLine("    # install comitlint cli and conventional config".ThemedLowlight(Console.Theme));
+                Console.WriteLine("    # install commitlint cli and conventional config".ThemedLowlight(Console.Theme));
                 Console.WriteLine("    npm install --save-dev @commitlint/config-conventional @commitlint/cli");
                 Console.WriteLine("    # install husky".ThemedLowlight(Console.Theme));
                 Console.WriteLine("    npm install husky --save-dev");
@@ -222,7 +219,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 " file.");
 
             Console.WriteLine();
-            var codingStandards = Console.MultiSelect(new MultiSelectOptions<string>()
+            var codingStandards = Console.MultiSelect(new MultiSelectOptions<string>
             {
                 Items = new[] { "StyleCop", "Sonar", "Make it less strict (only warnings)" },
                 Message = "Select how to set up coding standards",
@@ -348,7 +345,7 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteLine($"    {FileNames.GlogalJson}");
 
             // mrepo.json
-            var mrepoJson = new MrepoJsonT4(new MrepoJsonModel()
+            var mrepoJson = new MrepoJsonT4(new MrepoJsonModel
             {
                 Name = _fileSystem.Path.GetFileName(Environment.CurrentDirectory),
                 Description = "An awesome .net mono-repository.",
@@ -363,7 +360,7 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteLine($"    {FileNames.NugetConfig}");
 
             // stylecop.json
-            var stylecopJson = new NugetConfigT4();
+            var stylecopJson = new StylecopJsonT4();
             await _fileSystem.File.WriteAllTextAsync(FileNames.StylecopJson, stylecopJson.TransformText());
             Console.WriteLine($"    {FileNames.StylecopJson}");
 

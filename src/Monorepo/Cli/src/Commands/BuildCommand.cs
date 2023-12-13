@@ -7,6 +7,7 @@ using _42.Monorepo.Cli.Model.Items;
 using _42.Monorepo.Cli.Operations.Strategies;
 using _42.Monorepo.Cli.Output;
 using _42.Monorepo.Cli.Scripting;
+using _42.Monorepo.Cli.Templates;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
@@ -184,6 +185,21 @@ namespace _42.Monorepo.Cli.Commands
                 Console.WriteImportant($"No custom script or traversal target file found.");
                 Console.WriteLine($" > {scriptName}");
                 Console.WriteLine($" > Directory.Build.proj");
+                Console.WriteLine();
+
+                var createDirectoryBuildFile = Console.Confirm("Create new Directory.Build.proj", true);
+
+                if (createDirectoryBuildFile)
+                {
+                    var template = new DirectoryBuildProjT4();
+                    var filePath = _fileSystem.Path.Combine(fullPath, FileNames.DirectoryBuildProj);
+                    await _fileSystem.File.WriteAllTextAsync(filePath, template.TransformText());
+                    Console.WriteLine(
+                        "  The traversal build file has been created, please run ".ThemedLowlight(Console.Theme),
+                        "mrepo build",
+                        " again.".ThemedLowlight(Console.Theme));
+                    return ExitCodes.SUCCESS;
+                }
             }
             else
             {
