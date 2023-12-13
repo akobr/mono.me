@@ -47,7 +47,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
             var parentDependencies = await parentTask;
             var map = parentDependencies
-                .ToDictionary(d => d.Name, d => new ExternalDependency(d.Name, d.Version, false));
+                .ToDictionary(d => d.Name, d => new ExternalDependency(d.Name, d.Version));
 
             var xContent = await _fileCache.GetOrLoadXmlContentAsync(filePath, cancellationToken);
 
@@ -65,7 +65,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                 if (name is not null && stringVersion is not null
                                      && SemVersion.TryParse(stringVersion, out var version))
                 {
-                    map[name] = new ExternalDependency(name, version, true);
+                    map[name] = new ExternalDependency(name, version) { IsDirect = true };
                 }
             }
 
@@ -85,8 +85,13 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             }
 
             var dependencies = await CalculateGlobalExternalDependenciesAsync(item, cancellationToken);
-            var map = dependencies.ToDictionary(d => d.Name, d => d.Version);
-            var localMap = new Dictionary<string, SemVersion>();
+            var map = new Dictionary<string, ExternalDependency>();
+
+            foreach (var dependency in dependencies)
+            {
+                map[dependency.Name] = new ExternalDependency(dependency.Name, dependency.Version);
+            }
+
             var xContent = await _fileCache.GetOrLoadXmlContentAsync(projectFilePath, cancellationToken);
 
             if (xContent.Root is null)
@@ -103,12 +108,11 @@ namespace _42.Monorepo.Cli.Operations.Strategies
                     continue;
                 }
 
-                localMap[packageName] = map.TryGetValue(packageName, out var version) ? version : new SemVersion(1);
+                var version = map.TryGetValue(packageName, out var dependency) ? dependency.Version : new SemVersion(1);
+                map[packageName] = new ExternalDependency(packageName, version) { IsDirect = true };
             }
 
-            return localMap
-                .Select(i => new ExternalDependency(i.Key, i.Value, true))
-                .ToList();
+            return map.Values;
         }
     }
 }

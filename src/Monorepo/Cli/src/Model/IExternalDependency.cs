@@ -7,5 +7,7 @@ namespace _42.Monorepo.Cli.Model
         string Name { get; }
 
         SemVersion Version { get; }
+
+        bool IsDirect { get; }
     }
 }

@@ -217,7 +217,7 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             var hierarchicalName = item.Record.GetHierarchicalName();
 
-            var preview = new ReleasePreview()
+            var preview = new ReleasePreview
             {
                 VersionDefinition = newVersion,
                 CurrentVersion = exactVersions.PackageVersion,

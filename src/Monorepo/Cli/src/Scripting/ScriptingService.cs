@@ -44,9 +44,13 @@ namespace _42.Monorepo.Cli.Scripting
             var record = context.Item.Record;
             var script = _scriptTree.GetScript(record.RepoRelativePath, context.ScriptName);
 
-            return string.IsNullOrEmpty(script)
-                ? Task.FromResult(ExitCodes.ERROR_WRONG_INPUT)
-                : ExecuteScriptAsync(script, record.Path, cancellationToken);
+            if (string.IsNullOrWhiteSpace(script))
+            {
+                return Task.FromResult(ExitCodes.ERROR_WRONG_INPUT);
+            }
+
+            script = PrepareScriptToExecute(script, context);
+            return ExecuteScriptAsync(script, record.Path, cancellationToken);
         }
 
         public async Task<int> ExecuteScriptAsync(string script, string? workingDirectory = null, CancellationToken cancellationToken = default)
@@ -73,10 +77,10 @@ namespace _42.Monorepo.Cli.Scripting
             return process.ExitCode;
         }
 
-        // TODO: [P2] Prepare script with arguments (parameter replacement)
         private string PrepareScriptToExecute(string script, IScriptContext context)
         {
-            return string.Empty;
+            // TODO: [P2] Prepare script with arguments (parameter replacement, check for parameters)
+            return script + string.Join(' ', context.Args);
         }
 
         private ScriptTree InitialiseScriptTree()

@@ -22,6 +22,7 @@ namespace _42.Monorepo.Cli.Commands
         public const string WORKSTEAD = "workstead";
         public const string PROJECT = "project";
         public const string REPOSITORY = "repository";
+        public const string REPO = "repo";
         public const string VERSION = "version";
         public const string VERSIONS = "versions";
 

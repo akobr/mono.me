@@ -12,7 +12,7 @@ namespace _42.Monorepo.Cli
         public const int ERROR_WRONG_INPUT = 2;
         public const int ERROR_WRONG_PLACE = 3;
 
-        // warnigs from 40
+        // warnings from 40
         public const int WARNING_ABORTED = 40;
         public const int WARNING_NO_WORK_NEEDED = 42;
     }

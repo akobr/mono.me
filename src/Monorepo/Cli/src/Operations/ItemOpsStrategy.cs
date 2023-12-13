@@ -332,7 +332,7 @@ namespace _42.Monorepo.Cli.Operations
 
             var parentDependencies = await parentTask;
             var map = parentDependencies
-                .ToDictionary(d => d.Name, d => new ExternalDependency(d.Name, d.Version, false));
+                .ToDictionary(d => d.Name, d => new ExternalDependency(d.Name, d.Version));
 
             var xContent = await fileCache.GetOrLoadXmlContentAsync(filePath, cancellationToken);
 
@@ -349,7 +349,10 @@ namespace _42.Monorepo.Cli.Operations
                 if (name is not null && stringVersion is not null
                                      && SemVersion.TryParse(stringVersion, out var version))
                 {
-                    map[name] = new ExternalDependency(name, version, true);
+                    map[name] = new ExternalDependency(name, version)
+                    {
+                        IsDirect = true,
+                    };
                 }
             }
 
@@ -391,7 +394,7 @@ namespace _42.Monorepo.Cli.Operations
             }
 
             return localMap
-                .Select(i => new ExternalDependency(i.Key, i.Value, true))
+                .Select(i => new ExternalDependency(i.Key, i.Value) { IsDirect = true })
                 .ToList();
         }
 

@@ -23,11 +23,11 @@ namespace _42.Monorepo.Cli.Commands
     [Command(CommandNames.MREPO, Description = "Mono-repository CLI tooling.")]
     public class MonorepoCommand : IAsyncCommand
     {
-        private readonly CommandLineApplication application;
+        private readonly CommandLineApplication _application;
 
         public MonorepoCommand(CommandLineApplication application)
         {
-            this.application = application;
+            _application = application;
         }
 
         [VersionOption("-v|--version", "", Description = "Display version of this tool.")]
@@ -35,7 +35,7 @@ namespace _42.Monorepo.Cli.Commands
 
         public Task<int> OnExecuteAsync()
         {
-            application.ShowHelp();
+            _application.ShowHelp();
             return Task.FromResult(ExitCodes.SUCCESS);
         }
     }

@@ -25,13 +25,16 @@ namespace _42.Monorepo.Cli.Commands
 
         protected override Task<int> ExecuteAsync()
         {
-            string name = (System.IO.Path.GetFileName(RelativeItemPath) ?? RelativeItemPath ?? string.Empty).ToLowerInvariant();
+            var name = (System.IO.Path.GetFileName(RelativeItemPath) ?? RelativeItemPath ?? string.Empty).ToLowerInvariant();
 
             if (_explanationMapping.TryGetValue(name, out var explanation))
             {
                 explanation();
                 return Task.FromResult(ExitCodes.SUCCESS);
             }
+
+            Console.WriteLine("The requested item is not described. Please try to the official documentation at:");
+            Console.WriteLine("    https://bit.ly/41mXJn2");
 
             switch (Context.Item.Record.Type)
             {

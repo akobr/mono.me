@@ -81,6 +81,7 @@ namespace _42.Monorepo.Cli.Commands
                 Console.WriteTree(rootPackages.Children.First(), n => n);
             }
 
+            // Show dependencies only for projects (not for repositories and worksteads)
             if (item is IProject project)
             {
                 var internalDependencies = await project.GetInternalDependenciesAsync();
@@ -90,22 +91,24 @@ namespace _42.Monorepo.Cli.Commands
                     Console.WriteLine();
                     Console.WriteHeader("Project references");
                     Console.WriteTable(
-                        internalDependencies,
+                        internalDependencies.OrderBy(d => d.Name),
                         d => new[] { $"> {d.Name}", d.RepoRelativePath },
                         new[] { "Project", "Repository path" });
                 }
-            }
 
-            var externalDependencies = await item.GetExternalDependenciesAsync();
+                var externalDependencies =
+                    (await item.GetExternalDependenciesAsync())
+                    .Where(d => d.IsDirect);
 
-            if (externalDependencies.Count > 0)
-            {
-                Console.WriteLine();
-                Console.WriteHeader("Package dependencies");
-                Console.WriteTable(
-                    externalDependencies,
-                    d => new[] { $"> {d.Name}", d.Version.ToString() },
-                    new[] { "Package", "Version" });
+                if (externalDependencies.Any())
+                {
+                    Console.WriteLine();
+                    Console.WriteHeader("Package dependencies");
+                    Console.WriteTable(
+                        externalDependencies.OrderBy(d => d.Name),
+                        d => new[] { $"> {d.Name}", d.Version.ToString() },
+                        new[] { "Package", "Version" });
+                }
             }
 
             return ExitCodes.SUCCESS;

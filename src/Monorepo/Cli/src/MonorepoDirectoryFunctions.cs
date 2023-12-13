@@ -120,7 +120,7 @@ namespace _42.Monorepo.Cli
         public static bool IsExcludedDirectory(string directory)
         {
             var name = Path.GetFileName(directory);
-            return name[0] == '.';
+            return name[0] == '.' || name == "obj" || name == "bin"; // TODO [P3]: make this more robust
         }
 
         public static bool IsProjectDirectory(string directory)

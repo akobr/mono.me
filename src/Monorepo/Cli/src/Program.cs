@@ -21,7 +21,7 @@ namespace _42.Monorepo.Cli
         private static ILogger<Program>? _logger;
         private static LoggingOptions? _loggingOptions;
 
-        public static IHost Host => _host ?? throw new InvalidOperationException("The host app is not initialised.");
+        public static IHost Host => _host ?? throw new InvalidOperationException("The host app is not initialized.");
 
         public static async Task<int> Main(string[] args)
         {
@@ -49,16 +49,29 @@ namespace _42.Monorepo.Cli
             {
                 Console.Write("! ", Color.Magenta);
                 Console.WriteLine("The CLI tooling can be used only inside a mono-repository.");
-                Console.WriteLine("  A git repository with mrepo.config file in the root.", Color.DarkGray);
+                Console.WriteLine("  A git repository with mrepo.json config file in the root.", Color.DarkGray);
                 Console.WriteLine();
                 Console.WriteLine("  Command to create new monorepo in any directory:");
-                Console.WriteLine("    mrepo init", Color.Magenta);
+                Console.WriteLine("    mrepo new", Color.Magenta);
 
                 await Task.Run(() => LogWithSentry(() => _logger.LogWarning("Called from outside of a monorepo: {args}", new object[] { args })));
                 return ExitCodes.ERROR_WRONG_PLACE;
             }
             catch (Exception exception)
             {
+                // TODO: [P2] Hot fix for bug https://github.com/natemcmaster/CommandLineUtils/issues/541
+                if (exception.GetType() == typeof(InvalidOperationException)
+                    && string.Equals(
+                        exception.Message,
+                        "Enumeration already finished.",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.Write("! ", Color.Magenta);
+                    Console.WriteLine($"Unknown input: {string.Join(' ', args)}");
+                    Console.WriteLine($"  What happened, {ParsingErrorResponseMessages.GetRandom()}?", Color.DarkGray);
+                    return ExitCodes.ERROR_INPUT_PARSING;
+                }
+
                 Console.WriteWithGradient("# Total mayhem", Color.Yellow, Color.Magenta);
                 Console.WriteLine(", the tool is broken! ):", Color.Magenta);
 
