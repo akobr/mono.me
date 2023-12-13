@@ -1,5 +1,9 @@
 # Good habits
 
+## The structure is the key
+
+The structure is the main sauce in a mono-repository. It is essential to have it correct from the beginning. My mono repository is constructed from **worksteads** and **projects**, please read the [structure](./structure.md) document for more information.
+
 ## Unit testing and TDD
 
 I highly recommend using the TDD development approach. My CLI tooling always creates a unit-testing part with any newly created project.
@@ -17,7 +21,7 @@ I highly recommend using the TDD development approach. My CLI tooling always cre
 - stylecop.json
 - version.json
 
-> More information is coming soon.
+> Use all tools out there which can simplify your life and make your work more comfortable. I recommend using [EditorConfig](https://editorconfig.org/) for code styling, [GitAttributes](https://git-scm.com/docs/gitattributes) for better git management, [VsConfig](https://docs.microsoft.com/en-us/visualstudio/ide/vsconfig-schema-reference?view=vs-2022) for IDE configuration, [GlobalJson](https://docs.microsoft.com/en-us/dotnet/core/tools/global-json?tabs=netcore3x) for SDK versioning, [NuGet.Config](https://docs.microsoft.com/en-us/nuget/reference/nuget-config-file) for NuGet configuration, etc.
 
 ## Technical documentation
 

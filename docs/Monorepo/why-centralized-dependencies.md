@@ -18,8 +18,8 @@ If no centralized dependency system is in place, the dependencies need to be man
 
 ## A couple of possible solutions
 
-- **Central package version management** *[Preview but recommended]*: A baked-in solution into .NET Core SDK (from 3.1.300), using Directory.Packages.props file, but still a preview feature. https://bit.ly/3oKJCpq
-- **External MsBuild SDK**: A custom MsBuild SDK built by NuGet team, named Microsoft.Build.CentralPackageVersions. https://bit.ly/3GMloRG
+- **Central package version management**: A baked-in solution into .NET Core SDK (from 3.1.300), using Directory.Packages.props file, but still a preview feature. https://bit.ly/3RhzYb9
+- **External MsBuild SDK** *[deprecated]*: A custom MsBuild SDK built by NuGet team, named Microsoft.Build.CentralPackageVersions. https://bit.ly/3GMloRG
 - **Directory.Build.props** *[MsBuild 15+]*: Use of hierarchical Directory.Build.props and the possibility to update version of package reference by MsBuild 15 and newer.
 - **Paket package manager**: An alternative package manager for NuGet and .NET projects, which has some great features. Currently not yet supported by my tooling. https://bit.ly/3oHTJLp
 
