@@ -81,10 +81,10 @@
     <PackageVersion Include="xunit" Version="2.6.1" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="2.5.3" />
     <!-- logging -->
-    <PackageVersion Include="Sentry" Version="3.41.0" />
-    <PackageVersion Include="Sentry.Serilog" Version="3.41.0" />
-    <PackageVersion Include="Serilog.Extensions.Logging" Version="3.41.0" />
-    <PackageVersion Include="Serilog.Sinks.Console" Version="5.0.0" />
+    <PackageVersion Include="Sentry" Version="3.41.3" />
+    <PackageVersion Include="Sentry.Serilog" Version="3.41.3" />
+    <PackageVersion Include="Serilog.Extensions.Logging" Version="8.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="5.0.1" />
     <PackageVersion Include="Serilog.Sinks.File" Version="5.0.0" />
     <PackageVersion Include="Serilog.Sinks.ApplicationInsights" Version="4.0.0" />
     <!-- versioning -->
