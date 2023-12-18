@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/main/monorepo/src/NerdBank.GitVersioning/version.schema.json",
-  "version": "0.9-beta",
+  "version": "0.10-beta",
   "inherit": true,
   "hierarchicalVersion": true
 }
