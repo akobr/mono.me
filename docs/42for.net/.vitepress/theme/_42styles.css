@@ -1,0 +1,36 @@
+#special-sponsor {
+    border-top: 1px solid var(--vp-c-divider);
+    border-bottom: 1px solid var(--vp-c-divider);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    margin-top: 64px;
+}
+
+#special-sponsor span {
+    color: var(--vp-c-text-2);
+    font-weight: 500;
+    font-size: 13px;
+    vertical-align: middle;
+    flex: 1;
+}
+
+#special-sponsor span:first-child {
+    text-align: right;
+}
+
+#special-sponsor a {
+    display: flex;
+    justify-content: center;
+    padding: 0 24px;
+}
+
+#special-sponsor img {
+    height: 42px;
+}
+
+@media (max-width: 640px) {
+    #special-sponsor {
+        flex-direction: column
+    }
+}
