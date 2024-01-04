@@ -6,7 +6,7 @@ Hi there, thank you for coming here! The purpose of this website is to show you 
 
 I always like to question concepts and compare them to be sure that the used one is the best compromise between complexity and benefits. Think about me as a devil's advocate who likes to do things in different ways because that is how you get the most fun from architecting and implementing software projects. Software engineering is an exact science and you should do everything based on data and have real reasons for it, not just your personal preferences or gut feeling.
 
-::: info
+::: tip
 The **best balance between complexity and flexibility** is the golden vein which is super difficult to find and follow.
 :::
 
@@ -49,7 +49,6 @@ Luckily this wasn't the case of the company where I'm currently and proudly work
 ::: details
 People currently working on your product are the most valuable part of your business and you should be extremely grateful for them. To replace them with consultants or bring two many new faces which will overhelm them is a silly decision.
 :::
-
 
 ## The solution
 

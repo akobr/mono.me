@@ -21,7 +21,7 @@ You probably read over the internet a lot of buzzwords which should solve all yo
 I recomend to **avoid**:
 
 - [microservices](/architecture/no-microservices)
-- complex infrastructure if not needed, e.g. Kubernetees
+- complex infrastructure if not needed
 - spliting you app into multiple independent blocks which are totally unrelated and not standartized
 - hire external contractors to work on the core of your product
 - any horizontal slices in your development, split frontend and backend, separate QA from developers, introduce separeted DevOps team, etc.
@@ -36,6 +36,7 @@ I recomend **to do**:
   - use containers with a simple abstraction, like [Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/overview)
 - simplify processes around development (releasing, documentation, automated QA, code standards)
 - learn to write clean and self-documenting code
+- keep it simple!
 
 **TODO: overview diagram + description**
 
@@ -43,6 +44,6 @@ I recomend **to do**:
 
 It is recomended to start with [the motivation article](/motivation).
 
-I offer you two open-source tools. The first is a CLI interface with a lot of recomendations about how to manage [mono repository for .net platform](/monorepo/introduction). The second is a [modulith architecture](/architecture/modulith) and its [subscription-based platform](/platform/introduction).
+Two open-source tools are offered to you. The first is a CLI interface with a lot of recomendations about how to manage [mono repository for .net platform](/monorepo/introduction). The second is a [modulith architecture](/architecture/modulith) and its [subscription-based platform](/platform/introduction).
 
 

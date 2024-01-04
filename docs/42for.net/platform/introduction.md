@@ -1,4 +1,4 @@
-# Introduction of 2S platform <Badge type="danger" text="0% done" />
+# Introduction of 2S platform <Badge type="danger" text="35% done" />
 
 ::: danger
 The platform is under development, see [the road map](road-map).
