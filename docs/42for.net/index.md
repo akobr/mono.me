@@ -7,7 +7,7 @@ hero:
   text: "ultimate answer for clean and simple .net"
   tagline: Software products with grace and simplicity❣ When all unnecessary complexities are eliminated, just a small team is enough.
   image:
-    src: /42-for-net.svg
+    src: /42-logo.png
     alt: 42for.net
   actions:
     - theme: brand

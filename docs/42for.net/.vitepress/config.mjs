@@ -6,7 +6,7 @@ export default defineConfig({
   description: "simple and clean .net",
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
-    logo: "/42-for-net.svg",
+    logo: "/42-logo.png",
     lastUpdated: true,
     search: {
       provider: 'local'
@@ -71,6 +71,10 @@ export default defineConfig({
 
     socialLinks: [
       { icon: 'github', link: 'https://github.com/akobr/mono.me' }
-    ]
+    ],
+    footer: {
+      message: "Released under the MIT License.",
+      copyright: "Copyright © 2024 Ales Kobr"
+    }
   }
 })
