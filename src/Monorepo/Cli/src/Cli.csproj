@@ -8,13 +8,15 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
 
+    <IsPackable>true</IsPackable>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>mrepo</ToolCommandName>
-    <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    <Description>Command-line interface for .net focused mono-repository tooling.</Description>
+    <PackageTags>$(PackageTags);cli;mrepo;mono;monorepo;repository;git;codebase</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;TESTING</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>
@@ -46,10 +48,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Libraries\Testing\System.IO.Abstractions.Trace\src\System.IO.Abstractions.Trace.csproj" />
     <ProjectReference Include="..\..\..\Texo\Core.Markdown\src\Core.Markdown.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="LICENSE.txt" Pack="true" PackagePath="$(PackageLicenseFile)" />
   </ItemGroup>
 
   <ItemGroup>

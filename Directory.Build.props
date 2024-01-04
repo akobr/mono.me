@@ -2,17 +2,40 @@
   <PropertyGroup>
     <!-- $(RepoRoot) is normally set globally and this override just makes sure about a trailing slash. -->
     <RepoRoot Condition=" '$(RepoRoot)' == '' OR !HasTrailingSlash('$(RepoRoot)') ">$(MSBuildThisFileDirectory)</RepoRoot>
-    <PackageOutputPath>$(RepoRoot).artifacts</PackageOutputPath>
+
+    <!-- relative paths in the mono repository -->
+    <ProjectRepoRelativePath>$(MSBuildProjectDirectory.Substring($(RepoRoot.Length)))</ProjectRepoRelativePath>
+    <ProjectStructurePath>$(ProjectRepoRelativePath.Replace('src','').Trim('/').Trim('\'))</ProjectStructurePath>
+    <ProjectStructurePathForwardSlashes>$(ProjectStructurePath.Replace('\','/'))</ProjectStructurePathForwardSlashes>
+
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+
+    <!-- Nuget package global properties -->
+    <PackageOutputPath>$(RepoRoot)\.artifacts</PackageOutputPath>
+    <PackageProjectUrl>https://42for.net/</PackageProjectUrl>
+    <PackageReadmeFile Condition="Exists('$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md')">package-readme.md</PackageReadmeFile>
+    <PackageIcon>42logo-128.png</PackageIcon>
+    <RepositoryUrl>https://github.com/akobr/mono.me/tree/main/src/$(ProjectStructurePathForwardSlashes)/src</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Authors>Ales Kobr</Authors>
+    <PackageTags>$(PackageTags);42</PackageTags>
   </PropertyGroup>
-  
+
   <!-- global references -->
   <ItemGroup Condition=" '$(EnableGitVersioning)' != 'false' ">
     <PackageReference Include="42.Monorepo.GitVersioning" PrivateAssets="all" />
   </ItemGroup>
+
+  <!-- code styles configuration -->
   <ItemGroup Condition=" '$(EnableStyleCop)' != 'false' ">
     <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" />
     <Compile Include="$(RepoRoot)\src\.stylecop\GlobalStylecopSuppressions.cs" Visible="False" />
     <AdditionalFiles Include="$(RepoRoot)\stylecop.json" Visible="False" />
+  </ItemGroup>
+
+  <!-- Nuget package global content -->
+  <ItemGroup Condition=" '$(IsPackable)' == 'true' ">
+    <None Condition="Exists('$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md')" Include="$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md" Pack="true" PackagePath="\" Visible="False"/>
+    <None Include="$(RepoRoot)\.asset\42logo-128.png" Pack="true" PackagePath="\" Visible="False" />
   </ItemGroup>
 </Project>
