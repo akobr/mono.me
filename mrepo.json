@@ -7,7 +7,8 @@
     "scripts": {
       "rock": "echo \"There's no wrong time to rock! 🎸\"",
       "truth": "echo 'Simplicity is the ultimate sophistication.'",
-      "answer": "echo 42"
+      "answer": "echo 42",
+      "pack-release": "cd src; dotnet pack -c RELEASE /p:ContinuousIntegrationBuild=true"
     },
     "folders": {
       "source": "src",
