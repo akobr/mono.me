@@ -1,5 +1,5 @@
 # Why not microservices?
 
-Why the miroservices are danger and why I think they are not suitable for most of the applications.
+Why are the microservices dangerous, and why are they unsuitable for most applications?
 
 **TBD**

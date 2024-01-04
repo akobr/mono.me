@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "42for.net"
   text: "ultimate answer for clean and simple .net"
-  tagline: Software products with grace and simplicity❣ When all unnecessary complexities are eliminated, just a small team is enough.
+  tagline: Software products with grace and simplicity❣ When all unnecessary complexities are eliminated, just a tiny team is enough.
   image:
     src: /42-logo.png
     alt: 42for.net
@@ -29,6 +29,6 @@ features:
   - title: 2S platform
     details: A subscription-based platform for your product and all applications around.
   - title: CLI tools
-    details: Simple but useful tooling around your codebase and platform.
+    details: Simple but valuable tooling around your codebase and platform.
 
 ---

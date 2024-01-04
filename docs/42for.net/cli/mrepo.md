@@ -1,24 +1,22 @@
 # mrepo
 
-::: danger
-The mrepo tool is under development, see [the road map](/monorepo/road-map).
-:::
-
 Here is a short taste of what the mrepo CLI interface can do.
 
+**TODO: add a video**
+
 ::: tip
-For more detailed description, please visit [the technical documentation of the tool](https://github.com/akobr/mono.me/blob/main/docs/Monorepo/mrepo-cli.md). 
+For a more detailed description, please visit [the technical documentation of the tool](https://github.com/akobr/mono.me/blob/main/docs/Monorepo/mrepo-cli.md). 
 :::
 
 ## Get information
 
-**TODO: add a gif**
+**TODO: add a video**
 
-You can use the tool to get information about which Nuget packages are used and which versions. Where the project is referenced, even outside the repository as Nuget package. Get the exact dependecy tree, get a list of all projects, and much more.
+You can use the tool to learn which Nuget packages are used and which versions, where the project is referenced, and even outside the repository as a Nuget package. Get the exact dependency tree, get a version, and much more.
 
 ## Build any subtree
 
-By just calling a single command from any place of the repository. The MsBuild will be triggered and always build the coresponding subtree.
+By calling a single command from any place in the repository. The MsBuild will be triggered, and the corresponding subtree will be built.
 
 ``` powershell
 
@@ -28,12 +26,12 @@ mrepo build [--clean|restore|build|test|pack|run]
 
 ## Prepare release + notes
 
-**TODO: add a gif**
+**TODO: add a video**
 
-A posibility to fully automate releases and release notes, just with help of git history and clean commits.
+A possibility to fully automate releases and release notes, just with the help of git history and clean commits.
 
 ## Create new content
 
-**TODO: add a gif**
+**TODO: add a video**
 
-The creation of the new content is simple and it will help with setting up of the correct structure.
+Creating the new content is simple, and it will help set up the correct structure.
