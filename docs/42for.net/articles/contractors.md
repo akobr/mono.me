@@ -1,5 +1,5 @@
 # Scarecrow of contracting
 
-Discuss when using contractors is smart and when scary.
+Discuss when using contractors is brilliant and when it is scary.
 
 **TBD**

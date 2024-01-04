@@ -1,5 +1,5 @@
 # Modulith
 
-The overview and idea behind modulith (monolith + modules).
+The overview and idea behind the modulith (monolith + modules).
 
 **TBD**
