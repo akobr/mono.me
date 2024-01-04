@@ -16,7 +16,7 @@ namespace _42.CLI.Toolkit
             _application = application;
         }
 
-        public Task<int> ExecuteAsync()
+        public override Task<int> OnExecuteAsync()
         {
             return SelectSubCommandAndExecuteAsync(_application, Console);
         }

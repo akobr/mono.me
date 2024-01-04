@@ -1,15 +1,14 @@
 using ShellProgressBar;
 
-namespace _42.CLI.Toolkit.Output
+namespace _42.CLI.Toolkit.Output;
+
+public interface IProgressReporter
 {
-    public interface IProgressReporter
-    {
-        bool HasMainProgressBar { get; }
+    bool HasMainProgressBar { get; }
 
-        IProgressBar? GetMainProgressBar();
+    IProgressBar? GetMainProgressBar();
 
-        void EndMainProgressBar();
+    void EndMainProgressBar();
 
-        public IProgressBar StartProgressBar(string message, ProgressBarOptions? options = null);
-    }
+    public IProgressBar StartProgressBar(string message, ProgressBarOptions? options = null);
 }

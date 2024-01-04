@@ -1,9 +1,8 @@
 using McMaster.Extensions.CommandLineUtils;
 
-namespace _42.CLI.Toolkit.Output
+namespace _42.CLI.Toolkit.Output;
+
+public interface IExtendedConsole : IRenderer, IPrompter, IProgressReporter
 {
-    public interface IExtendedConsole : IRenderer, IPrompter, IProgressReporter
-    {
-        public IConsole Console { get; }
-    }
+    public IConsole Console { get; }
 }
