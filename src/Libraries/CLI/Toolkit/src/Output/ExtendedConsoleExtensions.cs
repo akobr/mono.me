@@ -1,12 +1,11 @@
 using McMaster.Extensions.CommandLineUtils;
 
-namespace _42.CLI.Toolkit.Output
+namespace _42.CLI.Toolkit.Output;
+
+public static class ExtendedConsoleExtensions
 {
-    public static class ExtendedConsoleExtensions
+    public static void WriteLine(this IExtendedConsole console)
     {
-        public static void WriteLine(this IExtendedConsole console)
-        {
-            console.Console.WriteLine();
-        }
+        console.Console.WriteLine();
     }
 }

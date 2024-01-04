@@ -1,32 +1,31 @@
 using System.Collections.Generic;
 
-namespace _42.CLI.Toolkit.Output
+namespace _42.CLI.Toolkit.Output;
+
+public class ConsoleOutputComposition : IConsoleOutput
 {
-    public class ConsoleOutputComposition : IConsoleOutput
+    private readonly IEnumerable<IConsoleOutput> _children;
+
+    public ConsoleOutputComposition(IEnumerable<IConsoleOutput> children)
     {
-        private readonly IEnumerable<IConsoleOutput> children;
+        this._children = children;
+    }
 
-        public ConsoleOutputComposition(IEnumerable<IConsoleOutput> children)
-        {
-            this.children = children;
-        }
+    public ConsoleOutputComposition(params IConsoleOutput[] children)
+    {
+        this._children = children;
+    }
 
-        public ConsoleOutputComposition(params IConsoleOutput[] children)
-        {
-            this.children = children;
-        }
+    public static implicit operator ConsoleOutputComposition(IConsoleOutput[] items)
+    {
+        return new ConsoleOutputComposition(items);
+    }
 
-        public static implicit operator ConsoleOutputComposition(IConsoleOutput[] items)
+    public void WriteTo(IExtendedConsole console)
+    {
+        foreach (var child in _children)
         {
-            return new ConsoleOutputComposition(items);
-        }
-
-        public void WriteTo(IExtendedConsole console)
-        {
-            foreach (var child in children)
-            {
-                child.WriteTo(console);
-            }
+            child.WriteTo(console);
         }
     }
 }

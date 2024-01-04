@@ -1,12 +1,11 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace _42.CLI.Toolkit
-{
-    public interface IStartup
-    {
-        void ConfigureApplication(IConfigurationBuilder builder);
+namespace _42.CLI.Toolkit;
 
-        void ConfigureServices(IServiceCollection services, IConfiguration configuration);
-    }
+public interface IStartup
+{
+    void ConfigureApplication(IConfigurationBuilder builder);
+
+    void ConfigureServices(IServiceCollection services, IConfiguration configuration);
 }

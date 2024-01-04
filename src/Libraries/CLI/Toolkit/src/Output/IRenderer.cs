@@ -6,7 +6,7 @@ namespace _42.CLI.Toolkit.Output
 {
     public interface IRenderer
     {
-        public IConsoleTheme Theme { get; }
+        public IConsoleTheme Theme { get; set; }
 
         void Write(params object[] elements);
 

@@ -1,27 +1,26 @@
 using System;
 using McMaster.Extensions.CommandLineUtils;
 
-namespace _42.CLI.Toolkit.Output
+namespace _42.CLI.Toolkit.Output;
+
+public class ConsoleOutputThemedText : IConsoleOutput
 {
-    public class ConsoleOutputThemedText : IConsoleOutput
+    private readonly string _text;
+    private readonly Func<IConsoleTheme, ConsoleColor> _colorProvider;
+
+    public ConsoleOutputThemedText(string text, Func<IConsoleTheme, ConsoleColor> colorProvider)
     {
-        private readonly string text;
-        private readonly Func<IConsoleTheme, ConsoleColor> colorProvider;
+        _text = text;
+        _colorProvider = colorProvider;
+    }
 
-        public ConsoleOutputThemedText(string text, Func<IConsoleTheme, ConsoleColor> colorProvider)
-        {
-            this.text = text;
-            this.colorProvider = colorProvider;
-        }
+    public void WriteTo(IExtendedConsole console)
+    {
+        var tConsole = console.Console;
 
-        public void WriteTo(IExtendedConsole console)
-        {
-            var tConsole = console.Console;
-
-            var foregroundColor = tConsole.ForegroundColor;
-            tConsole.ForegroundColor = colorProvider(console.Theme);
-            tConsole.Write(text);
-            tConsole.ForegroundColor = foregroundColor;
-        }
+        var foregroundColor = tConsole.ForegroundColor;
+        tConsole.ForegroundColor = _colorProvider(console.Theme);
+        tConsole.Write(_text);
+        tConsole.ForegroundColor = foregroundColor;
     }
 }

@@ -1,7 +1,6 @@
-namespace _42.CLI.Toolkit.Output
+namespace _42.CLI.Toolkit.Output;
+
+public interface IConsoleOutput
 {
-    public interface IConsoleOutput
-    {
-        void WriteTo(IExtendedConsole console);
-    }
+    void WriteTo(IExtendedConsole console);
 }

@@ -1,9 +1,8 @@
 using System.Threading.Tasks;
 
-namespace _42.CLI.Toolkit
+namespace _42.CLI.Toolkit;
+
+public interface IAsyncCommand
 {
-    public interface IAsyncCommand
-    {
-        Task<int> OnExecuteAsync();
-    }
+    Task<int> OnExecuteAsync();
 }
