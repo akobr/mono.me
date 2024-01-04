@@ -31,5 +31,4 @@ features:
   - title: CLI tools
     details: Simple but useful tooling around your codebase and platform.
 
-# Proudly powering Bricknode & Huddlestock | Cload based and scalable finance systems.
 ---
