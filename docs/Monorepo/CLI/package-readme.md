@@ -1,12 +1,16 @@
-# CLI interface
+# We ❤ mono-repository
 
-Install the tool:
+This project is trying to tackle problems around [a mono-repository](https://en.wikipedia.org/wiki/Monorepo) and .NET technical stack, but not exlusively. The other goal is to put together useful tooling for a monorepo which is already out there and explain best practices which I recomend to use.
+
+> For more info go to [the documentation](https://github.com/akobr/mono.me/blob/main/docs/Monorepo/README.md) on GitHub.
+
+## Install
 
 ```powershell
 dotnet tool install 42.Monorepo.Cli --global --prerelease
 ```
 
-## Commands
+## Available commands
 
 To see all available commands:
 
@@ -45,3 +49,4 @@ The full list of available commands:
   - `explain`: display explanation of an item inside a mono-repo
   - `--help`: display list of all available commands
   - `--version`: show current version of the tool
+
