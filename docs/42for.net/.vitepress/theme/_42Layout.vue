@@ -12,7 +12,7 @@ const { Layout } = DefaultTheme
             <a href="https://huddlestock.com/" target="_blank">
                 <img
                 height="42"
-                src="huddlestock_white.svg"
+                src="/huddlestock_white.svg"
                 alt="huddlestock"
                 />
             </a>
