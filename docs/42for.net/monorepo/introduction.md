@@ -1,8 +1,4 @@
-# Introduction to the mono repository <Badge type="warning" text="80% done" />
-
-::: danger
-The mrepo tool is under development, see [the road map](road-map).
-:::
+# Introduction to the mono repository
 
 I'm trying to solve the problem of a mono repository for the .net platform and come up with a suite of handy tools and recommendations on how to manage a large codebase, versioning, releasing, and code standards in a simple way.
 

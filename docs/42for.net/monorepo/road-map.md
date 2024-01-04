@@ -1,20 +1,13 @@
 # Road map of mrepo
 
-::: tip
-Current version is 0.9-beta.
-:::
-
-## First public release (version 1.0)
-
-- Polish releasing process <Badge type="tip" text="in progress" />
-- Make unit test project optional
-
 ## Version 1.1
 
-- Native support for infrastructure in Pulumi
-- Smart build system of dependencies and usages
+- native support for infrastructure in [Pulumi](https://www.pulumi.com/)
+- trigger system for CI/CD builds realised as git changes (tracable and transparent)
+- better and detailed documentation, especially for releasing system
 
-## Later versions
+## Version 1.2
 
-- Performance updates for large repositories
-- Better and detailed documentation
+- add posibility to drive the entire release process fully automated from CI/CD processes
+- performance updates for large repositories
+- extend configurability

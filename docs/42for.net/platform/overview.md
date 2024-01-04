@@ -40,6 +40,6 @@ The supervisor comes with a simple SDK library and its implemented on top of sta
 
 ## Scheduler
 
-The last actor for managing time-based and recurent jobs. This can be handy when you have a lot of them and you want to describe smaller units then just responsibilities (satelites) in the ecosystem. Imagine, how convenient is to know *what is running per each customer*, for billing purposes or similar.
+The last actor for managing time-based and recurent jobs. This can be handy when you have a lot of them and you want to describe smaller units then just responsibilities (satelites) in the ecosystem. Imagine, how convenient is to know: *what and when is running per each customer?*
 
 
