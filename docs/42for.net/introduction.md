@@ -16,7 +16,7 @@ Are you working on software products that are starting to have some technical is
 
 We should start with a simple question: *What are the exact problems with your product?* I'm assuming some maintenance complexities, scaling and performance problems, and a mess in the codebase + infrastructure.
 
-You can read many buzzwords over the internet which should solve all your problems, e.g., *microservices*. Please be vigilant and don't use these principles as silver bullets. They can be powerful and valuable, but only in cases where they are needed and all their benefits are used. They are complex, the learning curve is incredibly steep, and the final maintenance is expensive; that is why you shouldn't use them if they help you solve some edge problems.
+You can read many buzzwords over the internet which should solve all your problems, e.g., *microservices*. Please be vigilant and don't use these principles as silver bullets. They can be powerful and valuable, but only in cases where they are needed and all their benefits are used. They are complex, the learning curve is incredibly steep, and the final maintenance is expensive; that is why you shouldn't use them if they help you solve just some edge problems.
 
 I recomend to **avoid**:
 
@@ -38,12 +38,10 @@ I recommend **to do**:
 - learn to write clean and self-documenting code
 - keep it simple!
 
-**TODO: overview diagram + description**
-
 ## Where to start?
 
 It is recommended to start with [the motivation article](/motivation).
 
-Two open-source tools are offered to you. The first is a CLI interface with many recommendations about managing [mono repository for .net platform](/mono repo/introduction). The second is a [modulith architecture](/architecture/modulith) with [subscription-based platform](/platform/introduction).
+Two open-source tools are offered to you. The first is a CLI with many recommendations about managing [mono repository for .net platform](/monorepo/introduction). The second is a [modulith architecture](/architecture/modulith) with [subscription-based platform](/platform/introduction).
 
 
