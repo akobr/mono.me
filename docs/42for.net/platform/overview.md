@@ -83,7 +83,7 @@ flowchart LR
   unit([unit])
   usage([usage])
   execution([execution])
-  scheduled-unit([scheduled unit])
+  scheduled-unit([unit of execution])
 
   style usage stroke-dasharray: 5 5
   style execution stroke-dasharray: 5 5

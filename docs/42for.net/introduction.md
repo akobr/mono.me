@@ -55,7 +55,7 @@ flowchart LR
   end
   platform(((2S platform)))
 
-  git-. deploy .-> product
+  git -. deploy .-> product
   product <==> platform
 ```
 
