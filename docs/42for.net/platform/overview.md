@@ -115,7 +115,7 @@ You can connect to the supervisor as a stream source to see the real-time events
 The supervisor comes with a simple SDK library, and it's implemented on top of standardized concepts in .net; it uses [health checks](https://learn.microsoft.com/en-us/aspnet/core/host-and-deploy/health-checks) or can retrieve messages through *ILogger*.
 
 ::: tip
-Use our AI to detect anomalies in your ecosystem. <Badge type="warning" text="under the development" />
+Try AI to detect anomalies in your ecosystem. <Badge type="warning" text="under the development" />
 :::
 
 ## Scheduler
