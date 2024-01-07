@@ -3,7 +3,11 @@
 I'm trying to solve the problem of a mono repository for the .net platform and come up with a suite of handy tools and recommendations on managing a large codebase, versioning, releasing, and code standards in a simple way.
 
 ::: info
-You should ❤ mono-repository. Monorepo ≠ monolith❗ It is possible to manage a large codebase of multiple projects in a centralized, standardized, and sustainable way.
+You should ❤ mono-repository.
+
+Monorepo ≠ monolith❗
+
+It is possible to manage a large codebase of multiple projects in a centralized, standardized, and sustainable way.
 :::
 
 Everything is built around the developer's most favorite tool Git, versioning and releasing + release notes are generated based on Git's history of commits. The served tool is a [CLI called mrepo](/cli/mrepo) with an MIT license and an open-source codebase that is the same for all the other tools on this website. Here is a list of the most elemental features:

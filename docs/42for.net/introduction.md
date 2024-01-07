@@ -31,12 +31,33 @@ I recommend **to do**:
 
 - slowly disassemble your monolith to [modulith](/architecture/modulith) (modules + monolith)
 - stay in [mono-repository](/monorepo/why-monorepo) and create standards for your small team of superheroes
-- use [minimum infrastructure](/articles/infrastructure) as possible (serverless + event-driven concepts)
+- use minimum infrastructure as possible (serverless + event-driven concepts)
   - use infrastructure as code, and make everything transparent and visible in your single repository
   - use containers with a simple abstraction, like [Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/overview)
 - simplify processes around development (releasing, documentation, automated QA, code standards)
 - learn to write clean and self-documenting code
 - keep it simple!
+
+<!-- TODO: create a link and new article [minimum infrastructure](/articles/infrastructure) -->
+
+``` mermaid
+flowchart LR
+  git[(mono-repository)]
+  subgraph product [product as modulith]
+    A((app A))
+    B((app B))
+    C((app C))
+    D((app D))
+
+    A --> C
+    A --> D
+    B --> D
+  end
+  platform(((2S platform)))
+
+  git-. deploy .-> product
+  product <==> platform
+```
 
 ## Where to start?
 

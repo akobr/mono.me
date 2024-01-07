@@ -1,5 +1,7 @@
 # Road map of mrepo
 
+The expected list and the order of new features.
+
 ## Version 1.1
 
 - native support for infrastructure in [Pulumi](https://www.pulumi.com/)
