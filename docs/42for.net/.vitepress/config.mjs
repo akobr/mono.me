@@ -1,16 +1,23 @@
 import { defineConfig } from 'vitepress'
+import { withMermaid } from 'vitepress-plugin-mermaid'
+import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
 
 // https://vitepress.dev/reference/site-config
-export default defineConfig({
-  title: "42for.net",
-  description: "simple and clean .net",
+export default withMermaid({
+  title: '42for.net',
+  description: 'simple and clean .net',
   head: [
-    ['link', { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32x32.png"}],
-    ['link', { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16x16.png"}],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32x32.png'}],
+    ['link', { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16x16.png'}],
   ],
+  markdown: {
+    config(md) {
+      md.use(tabsMarkdownPlugin)
+    }
+  },
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
-    logo: "/42-logo.png",
+    logo: '/42-logo.png',
     lastUpdated: true,
     search: {
       provider: 'local'
@@ -60,7 +67,7 @@ export default defineConfig({
           { text: 'mrepo', link: '/cli/mrepo' },
           { text: 'sform', link: '/cli/sform' }
         ]
-      },
+      }/*,
       {
         text: 'Other talks',
         items: [
@@ -70,15 +77,20 @@ export default defineConfig({
           { text: 'Technical decisions', link: '/articles/technical-decisions' },
           { text: 'Scarecrow of contracting', link: '/articles/contractors' }
         ]
-      }
+      }*/
     ],
-
     socialLinks: [
       { icon: 'github', link: 'https://github.com/akobr/mono.me' }
     ],
     footer: {
-      message: "Released under the MIT License.",
-      copyright: "Copyright © 2024 Ales Kobr"
+      message: 'Released under the MIT License.',
+      copyright: 'Copyright © 2024 Ales Kobr'
     }
-  }
+  },
+  mermaid: {
+    // refer https://mermaid.js.org/config/setup/modules/mermaidAPI.html#mermaidapi-configuration-defaults for options
+  },
+  mermaidPlugin: {
+    class: "mermaid", // set additional css classes for parent container 
+  },
 })
