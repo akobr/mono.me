@@ -6,7 +6,7 @@
     },
     "init-new-repo": {
       "commandName": "Project",
-      "commandLineArgs": "init"
+      "commandLineArgs": "new repository"
     },
     "invalid-command": {
       "commandName": "Project",
@@ -15,6 +15,14 @@
     "current-repo-build": {
       "commandName": "Project",
       "commandLineArgs": "build"
+    },
+    "current-repo-info": {
+      "commandName": "Project",
+      "commandLineArgs": "info"
+    },
+    "current-repo-update-version": {
+      "commandName": "Project",
+      "commandLineArgs": "update version"
     },
     "windows-10-terminal-init": {
       "commandName": "Executable",
