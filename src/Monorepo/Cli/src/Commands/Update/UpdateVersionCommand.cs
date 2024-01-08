@@ -48,7 +48,7 @@ namespace _42.Monorepo.Cli.Commands.Update
             var newVersion = new VersionTemplate(currentVersion.Template);
 
             var lastChangeInVersion = repo.Commits
-                .QueryBy(versionFileRepoPath)
+                .QueryBy(versionFileRepoPath, new CommitFilter { SortBy = CommitSortStrategies.Topological })
                 .FirstOrDefault();
 
             if (lastChangeInVersion == null)
