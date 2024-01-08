@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Abstractions;
+using _42.CLI.Toolkit;
 using _42.Monorepo.Cli.Cache;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
@@ -8,11 +9,8 @@ using _42.Monorepo.Cli.Git;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Operations;
 using _42.Monorepo.Cli.Operations.Strategies;
-using _42.Monorepo.Cli.Output;
 using _42.Monorepo.Cli.Scripting;
 using _42.Monorepo.Texo.Core.Markdown;
-using _42.Testing.System.IO.Abstractions;
-using _42.Testing.System.IO.Abstractions.Tracers;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -33,6 +31,8 @@ namespace _42.Monorepo.Cli
         public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
         {
             services.AddLogging((builder) => ConfigureLogging(builder, configuration));
+            services.AddCliToolkit();
+
             ConfigureOptions(configuration, services);
             services.AddOpStrategies(ConfigureOpStrategies);
 
@@ -47,7 +47,6 @@ namespace _42.Monorepo.Cli
             services.AddSingleton<ICommandContext, CommandContext>();
             services.AddSingleton<IFileContentCache, FileContentCache>();
             services.AddSingleton<IItemsFactory, ItemsFactory>();
-            services.AddSingleton<IExtendedConsole, ExtendedConsole>();
 
             services.AddSingleton<IGitRepositoryService, GitRepositoryService>();
             services.AddSingleton<IGitTagsService, GitTagsService>();

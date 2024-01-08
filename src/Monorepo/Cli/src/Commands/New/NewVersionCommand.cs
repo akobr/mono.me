@@ -1,7 +1,7 @@
 using System.IO.Abstractions;
 using System.Threading.Tasks;
+using _42.CLI.Toolkit.Output;
 using _42.Monorepo.Cli.Extensions;
-using _42.Monorepo.Cli.Output;
 using _42.Monorepo.Cli.Templates;
 using _42.Monorepo.Cli.Versioning;
 using LibGit2Sharp;

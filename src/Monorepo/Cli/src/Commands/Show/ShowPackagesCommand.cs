@@ -1,7 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
-using _42.Monorepo.Cli.Model.Items;
-using _42.Monorepo.Cli.Output;
+using _42.CLI.Toolkit.Output;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.Show;

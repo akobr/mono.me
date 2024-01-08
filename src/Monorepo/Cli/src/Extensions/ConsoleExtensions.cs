@@ -1,5 +1,5 @@
 using System;
-using _42.Monorepo.Cli.Output;
+using _42.CLI.Toolkit.Output;
 using _42.Monorepo.Cli.Versioning;
 using Semver;
 

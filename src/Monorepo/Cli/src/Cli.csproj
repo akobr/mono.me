@@ -21,15 +21,8 @@
 
   <ItemGroup>
     <PackageReference Include="42.Monorepo.GitVersioning.Core" />
-    <PackageReference Include="Alba.CsConsoleFormat-NoXaml" />
-    <PackageReference Include="Colorful.Console" />
-    <PackageReference Include="ConsoleTableExt" />
-    <PackageReference Include="LibGit2Sharp" />
-    <PackageReference Include="McMaster.Extensions.CommandLineUtils" />
-    <PackageReference Include="McMaster.Extensions.Hosting.CommandLine" />
     <PackageReference Include="Microsoft.Extensions.Configuration" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="semver" />
@@ -46,6 +39,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\..\Libraries\CLI\Toolkit\src\Toolkit.csproj" />
     <ProjectReference Include="..\..\..\Libraries\Testing\System.IO.Abstractions.Trace\src\System.IO.Abstractions.Trace.csproj" />
     <ProjectReference Include="..\..\..\Texo\Core.Markdown\src\Core.Markdown.csproj" />
   </ItemGroup>
