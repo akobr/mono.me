@@ -1,4 +1,4 @@
-using _42.Monorepo.Cli.Output;
+using _42.CLI.Toolkit.Output;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.Update

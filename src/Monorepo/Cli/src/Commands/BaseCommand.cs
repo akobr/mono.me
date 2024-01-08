@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
-using _42.Monorepo.Cli.Output;
+using _42.CLI.Toolkit;
+using _42.CLI.Toolkit.Output;
 
 namespace _42.Monorepo.Cli.Commands
 {

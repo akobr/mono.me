@@ -3,11 +3,11 @@ using System.IO.Abstractions;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using _42.CLI.Toolkit.Output;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Model.Items;
 using _42.Monorepo.Cli.NuGet;
 using _42.Monorepo.Cli.Operations.Strategies;
-using _42.Monorepo.Cli.Output;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.Fix

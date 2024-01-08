@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using _42.CLI.Toolkit.Output;
 using _42.Monorepo.Cli.Extensions;
-using _42.Monorepo.Cli.Output;
 using _42.Monorepo.Cli.Templates;
 using McMaster.Extensions.CommandLineUtils;
 
