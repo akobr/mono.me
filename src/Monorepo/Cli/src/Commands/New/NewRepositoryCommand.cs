@@ -42,18 +42,18 @@ namespace _42.Monorepo.Cli.Commands.New
             }
 #endif
 
-            if (!Console.Confirm("Do you want to create a new .net mono-repository in the current folder"))
+            if (!Console.Confirm("Would you like to create a new .net mono-repository in the current folder"))
             {
                 return ExitCodes.WARNING_ABORTED;
             }
 
             Console.WriteLine();
             Console.WriteHeader("Mono-repository tools");
-            Console.WriteLine("Hi Earthling, now I'm going to ask you a couple of questions and explain to you what kind of tools you should use to simplify processes around managing a mono-repository.");
+            Console.WriteLine("Hi Earthling, now I will ask you a couple of questions and explain what tools you should use to simplify processes around managing a mono-repository.");
 
             Console.WriteLine();
             Console.WriteLine(
-                "Very important to solve are problems of ",
+                "Problems of ",
                 "(1) dependency management".ThemedHighlight(Console.Theme),
                 ", ",
                 "(2) versioning".ThemedHighlight(Console.Theme),
@@ -61,11 +61,11 @@ namespace _42.Monorepo.Cli.Commands.New
                 "(3) build/CI tooling".ThemedHighlight(Console.Theme),
                 ", and ",
                 "(4) coding standards".ThemedHighlight(Console.Theme),
-                ".");
+                " are essential to solve.");
 
             Console.WriteLine();
             Console.WriteHeader("(1) Dependency management");
-            Console.WriteLine("Dependency management is a tricky problem, but there are a couple of handy possibilities for centralizing the management for the entire repository or project groups.");
+            Console.WriteLine("Dependency management is a tricky problem, but there are a couple of handy possibilities for centralizing the management of the entire repository or project groups.");
             Console.WriteLine(
                 "I recommend you to use ",
                 "Central package version management".ThemedHighlight(Console.Theme),
@@ -77,13 +77,13 @@ namespace _42.Monorepo.Cli.Commands.New
                 {
                     new("CentralPackageVersionManagement",
                         "Central package version management",
-                        "Recommended. A baked in solution into .NET Core SDK (from 3.1.300), using Directory.Packages.props file. https://bit.ly/3oKJCpq"),
+                        "Recommended. A baked-in solution into .NET Core SDK (from 3.1.300), using Directory.Packages.props file. https://bit.ly/3oKJCpq"),
                     new("DirectoryBuildTargets",
                         "Directory.Build.props [MsBuild 15+]",
-                        "Use of hierarchical Directory.Build.props and the possibility to update version of package reference by MsBuild 15 and newer."),
+                        "Use of hierarchical Directory.Build.props and the possibility of updating the version of package reference by MsBuild 15 and newer."),
                     new("Paket",
                         "Paket package manager",
-                        "An alternative package manager for NuGet and .NET projects, which has some great features. Currently not yet supported by my tooling. https://bit.ly/3oHTJLp"),
+                        "An alternative package manager for NuGet and .NET projects with some great features. Currently, it is not supported by my tooling. https://bit.ly/3oHTJLp"),
                 },
                 Message = "Please pickup which dependency management you want to use",
                 TextSelector = f => f.Name,
@@ -129,9 +129,9 @@ namespace _42.Monorepo.Cli.Commands.New
 
             Console.WriteLine();
             Console.WriteHeader("(2) Versioning");
-            Console.WriteLine("If you are lucky and all projects are used only internally inside your mono-repository, you don't need to care about versioning, and everything will be just a project reference.");
-            Console.WriteLine("A more complex case is when you need to serve multiple libraries as NuGet packages or through any other packing system, then you should manage numerous versions and independent releases.");
-            Console.WriteLine("Don't be scared too much, even for this approach I put together a couple of tooling and recommendations as part of the toolset.");
+            Console.WriteLine("If you are lucky and all projects are used only internally inside your mono-repository, you don't need to care about versioning; everything will be just a project reference.");
+            Console.WriteLine("A more complex case is when you need to serve multiple libraries as NuGet packages or through any other packing system. You should manage numerous versions and independent releases.");
+            Console.WriteLine("Please don't be scared too much. Even for this approach, I put together a couple of tools and recommendations as part of the toolset.");
             Console.WriteLine();
             Console.WriteLine(
                 "Mine versioning system uses git history as the only source of the truth and a version. It is based on ",
@@ -166,7 +166,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 " msbuild SDK is used to serve the second view for machines. The magic is done by ",
                 "Directory.Build.proj".ThemedLowlight(Console.Theme),
                 " files allowing to build per any point/directory of the mono-repository. https://bit.ly/3sJl7tQ");
-            Console.WriteLine("By default, my CLI tooling uses this system to build through it; if you pick to don't use it, you have to write your scripts for building.");
+            Console.WriteLine("By default, my CLI tooling uses this system to build through it. You must write your building scripts if you don't use it.");
 
             Console.WriteLine();
             var useCodeViewSeparation = Console.Confirm("Turn it on and automatically create Directory.Build.proj file with each workstead", true);
@@ -179,8 +179,8 @@ namespace _42.Monorepo.Cli.Commands.New
                 Console.WriteLine();
             }
 
-            Console.WriteLine("To simplify releases and their notes, I recommend starting with conventional commits. https://bit.ly/3JsPtHY");
-            Console.WriteLine("To push it even one step further, you should set up CommitLint to force any developer to have clean and friendly git history ready for automated releases. https://bit.ly/3rLCAm7");
+            Console.WriteLine("To simplify releases and their notes, start with conventional commits. https://bit.ly/3JsPtHY");
+            Console.WriteLine("To push it even further, you should set up CommitLint to force any developer to have a clean and friendly git history ready for automated releases. https://bit.ly/3rLCAm7");
             Console.WriteLine(
                 "With all the above prerequisites and my CLI tools for releasing (",
                 "mrepo release".ThemedLowlight(Console.Theme),
@@ -214,7 +214,7 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteLine("And Sonar analyzers against code smell and vulnerabilities. https://bit.ly/3iiRL0J");
             Console.WriteLine("By default, the setting is strict; the code styles are set as build errors and most sonar rules as warnings.");
             Console.WriteLine(
-                "It can be challenging for the already existing codebase; if you need to tweak any rule's severity, change it in the ",
+                "It can be challenging for the existing codebase; if you need to tweak any rule's severity, change it in the ",
                 ".editorconfig".ThemedHighlight(Console.Theme),
                 " file.");
 
@@ -231,7 +231,7 @@ namespace _42.Monorepo.Cli.Commands.New
             var useLessStrictCodingRules = codingStandards.Contains("Make it less strict (only warnings)");
 
             Console.WriteLine();
-            Console.WriteLine("You went through the most important aspects, but there is much more to discuss and consider. Fore more info please visit our detailed documentation about a mono-repository at https://bit.ly/37DZ1SB");
+            Console.WriteLine("You went through the most critical aspects, but there is much more to discuss and consider. For more info, please visit our detailed documentation about a mono-repository at https://bit.ly/37DZ1SB");
 
             Console.WriteLine();
             Console.WriteImportant("A new monorepo is about to be created in the current directory.");
