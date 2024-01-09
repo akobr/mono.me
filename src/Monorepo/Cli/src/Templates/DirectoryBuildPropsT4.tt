@@ -1,18 +1,25 @@
-<#@ template language="C#" #>
+<#@ template language="C#" linePragmas="false" #>
 <Project>
   <PropertyGroup>
     <!-- $(RepoRoot) is normally set globally and this override just makes sure about a trailing slash. -->
     <RepoRoot Condition=" '$(RepoRoot)' == '' OR !HasTrailingSlash('$(RepoRoot)') ">$(MSBuildThisFileDirectory)</RepoRoot>
     <PackageOutputPath>$(RepoRoot).artifacts</PackageOutputPath>
+    <!-- relative paths in the mono repository -->
+    <ProjectRepoRelativePath>$(MSBuildProjectDirectory.Substring($(RepoRoot.Length)))</ProjectRepoRelativePath>
+    <ProjectStructurePath>$(ProjectRepoRelativePath.Replace('src','').Trim('/').Trim('\'))</ProjectStructurePath>
+    <ProjectStructurePathForwardSlashes>$(ProjectStructurePath.Replace('\','/'))</ProjectStructurePathForwardSlashes>
 <# if (_featureProvider.IsEnabled("packages")) { #>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
 <# } #>
+    <!-- Nuget package global properties -->
+    <PackageOutputPath>$(RepoRoot)\.artifacts</PackageOutputPath>
+    <PackageReadmeFile Condition="Exists('$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md')">package-readme.md</PackageReadmeFile>
   </PropertyGroup>
-  
+
   <!-- global references -->
 <# if (_featureProvider.IsEnabled("git-version")) { #>
   <ItemGroup Condition=" '$(EnableGitVersioning)' != 'false' ">
-    <PackageReference Include="Nerdbank.GitVersioning" PrivateAssets="all" />
+    <PackageReference Include="42.Monorepo.GitVersioning" PrivateAssets="all" />
   </ItemGroup>
 <# } #>
 <# if (_featureProvider.IsEnabled("stylecop")) { #>
@@ -22,4 +29,9 @@
     <AdditionalFiles Include="$(RepoRoot)\stylecop.json" Visible="False" />
   </ItemGroup>
 <# } #>
+
+  <!-- Nuget package global content -->
+  <ItemGroup Condition=" '$(IsPackable)' == 'true' ">
+    <None Condition="Exists('$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md')" Include="$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md" Pack="true" PackagePath="\" Visible="False"/>
+  </ItemGroup>
 </Project>
