@@ -24,7 +24,7 @@ namespace _42.Monorepo.Cli.Templates
         {
             this.Write(@"<?xml version=""1.0"" encoding=""utf-8""?>
 <configuration>
-  <config/>
+  <config />
   <packageRestore>
     <add key=""enabled"" value=""True"" />
     <add key=""automatic"" value=""True"" />
