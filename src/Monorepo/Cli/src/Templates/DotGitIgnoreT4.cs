@@ -14,12 +14,9 @@ namespace _42.Monorepo.Cli.Templates
     /// <summary>
     /// Class to produce the template output
     /// </summary>
-    
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DotGitIgnoreT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
     public partial class DotGitIgnoreT4 : DotGitIgnoreT4Base
     {
-#line hidden
         /// <summary>
         /// Create the template output
         /// </summary>
@@ -111,9 +108,6 @@ namespace _42.Monorepo.Cli.Templates
             return this.GenerationEnvironment.ToString();
         }
     }
-    
-    #line default
-    #line hidden
     #region Base class
     /// <summary>
     /// Base class for this transformation
@@ -133,7 +127,7 @@ namespace _42.Monorepo.Cli.Templates
         /// <summary>
         /// The string builder that generation-time code is using to assemble generated output
         /// </summary>
-        protected System.Text.StringBuilder GenerationEnvironment
+        public System.Text.StringBuilder GenerationEnvironment
         {
             get
             {

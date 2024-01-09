@@ -1,4 +1,4 @@
-<#@ template language="C#" #>
+<#@ template language="C#" linePragmas="false" #>
 {
   "version": "1.0",
   "components": [
