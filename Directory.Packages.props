@@ -61,7 +61,7 @@
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageVersion Include="System.CodeDom" Version="8.0.0" />
     <!-- Git -->
-    <PackageVersion Include="LibGit2Sharp" Version="0.27.0-preview-0182" />
+    <PackageVersion Include="LibGit2Sharp" Version="0.29.0" />
     <!-- MsBuild -->
     <PackageVersion Include="Microsoft.Build" Version="17.8.3" />
     <PackageVersion Include="Microsoft.Build.Locator" Version="1.6.10" />
@@ -93,7 +93,7 @@
     <PackageVersion Include="42.Monorepo.GitVersioning" Version="1.2.3" />
     <PackageVersion Include="42.Monorepo.GitVersioning.Core" Version="1.2.3" />
     <!-- code analysis -->
-    <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.507" />
+    <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
     <PackageVersion Include="TestableIO.System.IO.Abstractions.Analyzers" Version="2022.0.0" />
   </ItemGroup>
 </Project>
