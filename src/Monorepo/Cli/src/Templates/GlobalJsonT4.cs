@@ -14,39 +14,23 @@ namespace _42.Monorepo.Cli.Templates
     /// <summary>
     /// Class to produce the template output
     /// </summary>
-    
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\GlobalJsonT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
     public partial class GlobalJsonT4 : GlobalJsonT4Base
     {
-#line hidden
         /// <summary>
         /// Create the template output
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("{\r\n  \"sdk\": {\r\n    \"version\": \"6.0.100\",\r\n    \"rollForward\": \"latestMajor\",\r\n    " +
+            this.Write("{\r\n  \"sdk\": {\r\n    \"version\": \"8.0.100\",\r\n    \"rollForward\": \"latestMajor\",\r\n    " +
                     "\"allowPrerelease\": false\r\n  }");
-            
-            #line 7 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\GlobalJsonT4.tt"
  if (_featureProvider.IsEnabled("build-traversal")) { 
-            
-            #line default
-            #line hidden
-            this.Write(",\r\n  \"msbuild-sdks\": {\r\n    \"Microsoft.Build.Traversal\": \"3.1.3\"\r\n  }");
-            
-            #line 10 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\GlobalJsonT4.tt"
+            this.Write(",\r\n  \"msbuild-sdks\": {\r\n    \"Microsoft.Build.Traversal\": \"4.1.0\"\r\n  }");
  } 
-            
-            #line default
-            #line hidden
-            this.Write("\r\n}\r\n");
+            this.Write("}\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
-    
-    #line default
-    #line hidden
     #region Base class
     /// <summary>
     /// Base class for this transformation
@@ -66,7 +50,7 @@ namespace _42.Monorepo.Cli.Templates
         /// <summary>
         /// The string builder that generation-time code is using to assemble generated output
         /// </summary>
-        protected System.Text.StringBuilder GenerationEnvironment
+        public System.Text.StringBuilder GenerationEnvironment
         {
             get
             {
