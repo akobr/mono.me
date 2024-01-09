@@ -14,71 +14,41 @@ namespace _42.Monorepo.Cli.Templates
     /// <summary>
     /// Class to produce the template output
     /// </summary>
-    
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
     public partial class ProjectTestCsprojT4 : ProjectTestCsprojT4Base
     {
-#line hidden
         /// <summary>
         /// Create the template output
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write("<Project Sdk=\"Microsoft.NET.Sdk\">\r\n\r\n  <PropertyGroup>\r\n    <TargetFramework>net6" +
-                    ".0</TargetFramework>\r\n    <LangVersion>latest</LangVersion>\r\n    <IsPackable>fal" +
-                    "se</IsPackable>\r\n");
-            
-            #line 8 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
+            this.Write(@"<Project Sdk=""Microsoft.NET.Sdk"">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+");
  if (_featureProvider.IsEnabled("git-version")) { 
-            
-            #line default
-            #line hidden
             this.Write("    <EnableGitVersioning>false</EnableGitVersioning>\r\n");
-            
-            #line 10 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
  } 
-            
-            #line default
-            #line hidden
             this.Write("  </PropertyGroup>\r\n\r\n  <ItemGroup>\r\n    <PackageReference Include=\"FluentAsserti" +
                     "ons\" />\r\n    <PackageReference Include=\"Microsoft.NET.Test.Sdk\" />\r\n    <Package" +
                     "Reference Include=\"Moq\" />\r\n");
-            
-            #line 17 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
  if (_testsType == "nunit") { 
-            
-            #line default
-            #line hidden
             this.Write("    <PackageReference Include=\"NUnit\" />\r\n    <PackageReference Include=\"NUnit3Te" +
                     "stAdapter\" />\r\n");
-            
-            #line 20 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
  } 
-            
-            #line default
-            #line hidden
-            
-            #line 21 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
  else { 
-            
-            #line default
-            #line hidden
             this.Write("    <PackageReference Include=\"xunit\" />\r\n    <PackageReference Include=\"xunit.ru" +
                     "nner.visualstudio\" />\r\n");
-            
-            #line 24 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\ProjectTestCsprojT4.tt"
  } 
-            
-            #line default
-            #line hidden
             this.Write("  </ItemGroup>\r\n\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
-    
-    #line default
-    #line hidden
     #region Base class
     /// <summary>
     /// Base class for this transformation
@@ -98,7 +68,7 @@ namespace _42.Monorepo.Cli.Templates
         /// <summary>
         /// The string builder that generation-time code is using to assemble generated output
         /// </summary>
-        protected System.Text.StringBuilder GenerationEnvironment
+        public System.Text.StringBuilder GenerationEnvironment
         {
             get
             {

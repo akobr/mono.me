@@ -1,4 +1,4 @@
-<#@ template language="C#" #>
+<#@ template language="C#" linePragmas="false" #>
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
@@ -10,6 +10,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
 </Project>
