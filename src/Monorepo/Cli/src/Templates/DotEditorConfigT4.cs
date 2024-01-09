@@ -14,12 +14,9 @@ namespace _42.Monorepo.Cli.Templates
     /// <summary>
     /// Class to produce the template output
     /// </summary>
-    
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DotEditorConfigT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
     public partial class DotEditorConfigT4 : DotEditorConfigT4Base
     {
-#line hidden
         /// <summary>
         /// Create the template output
         /// </summary>
@@ -36,106 +33,103 @@ namespace _42.Monorepo.Cli.Templates
                     " require var all the time\r\ncsharp_style_var_for_built_in_types = true:suggestion" +
                     "\r\ncsharp_style_var_when_type_is_apparent = true:suggestion\r\ncsharp_style_var_els" +
                     "ewhere = true:suggestion\r\n# disallow throw expressions\r\ncsharp_style_throw_expre" +
-                    "ssion = false:suggestion\r\n# newline settings \r\ncsharp_new_line_before_open_brace" +
-                    " = all\r\ncsharp_new_line_before_else = true\r\ncsharp_new_line_before_catch = true\r" +
-                    "\ncsharp_new_line_before_finally = true\r\ncsharp_new_line_before_members_in_object" +
-                    "_initializers = true\r\ncsharp_new_line_before_members_in_anonymous_types = true\r\n" +
-                    "\r\n\r\n[*.{xml,config,*proj,nuspec,props,resx,targets,yml,tasks}]\r\nindent_size = 2\r" +
-                    "\n\r\n\r\n[*.{props,targets,ruleset,config,nuspec,resx,vsixmanifest,vsct}]\r\nindent_si" +
-                    "ze = 2\r\n\r\n\r\n[*.json]\r\nindent_size = 2\r\n\r\n\r\n[*.{ps1,psm1}]\r\nindent_size = 4\r\n\r\n\r\n" +
-                    "[*.sh]\r\nindent_size = 4\r\nend_of_line = lf\r\n\r\n\r\n[*.{razor,cshtml}]\r\ncharset = utf" +
-                    "-8-bom\r\n\r\n\r\n[*.{cs,vb}]\r\n# CA1018: Mark attributes with AttributeUsageAttribute\r" +
-                    "\ndotnet_diagnostic.CA1018.severity = warning\r\n# CA1047: Do not declare protected" +
-                    " member in sealed type\r\ndotnet_diagnostic.CA1047.severity = warning\r\n# CA1305: S" +
-                    "pecify IFormatProvider\r\ndotnet_diagnostic.CA1305.severity = suggestion\r\n# CA1507" +
-                    ": Use nameof to express symbol names\r\ndotnet_diagnostic.CA1507.severity = warnin" +
-                    "g\r\n# CA1725: Parameter names should match base declaration\r\ndotnet_diagnostic.CA" +
-                    "1725.severity = suggestion\r\n# CA1802: Use literals where appropriate\r\ndotnet_dia" +
-                    "gnostic.CA1802.severity = warning\r\n# CA1805: Do not initialize unnecessarily\r\ndo" +
-                    "tnet_diagnostic.CA1805.severity = warning\r\n# CA1810: Do not initialize unnecessa" +
-                    "rily\r\ndotnet_diagnostic.CA1810.severity = suggestion\r\n# CA1821: Remove empty Fin" +
-                    "alizers\r\ndotnet_diagnostic.CA1821.severity = warning\r\n# CA1822: Make member stat" +
-                    "ic\r\ndotnet_diagnostic.CA1822.severity = suggestion\r\n# CA1823: Avoid unused priva" +
-                    "te fields\r\ndotnet_diagnostic.CA1823.severity = warning\r\n# CA1825: Avoid zero-len" +
-                    "gth array allocations\r\ndotnet_diagnostic.CA1825.severity = warning\r\n# CA1826: Do" +
-                    " not use Enumerable methods on indexable collections. Instead use the collection" +
-                    " directly\r\ndotnet_diagnostic.CA1826.severity = warning\r\n# CA1827: Do not use Cou" +
-                    "nt() or LongCount() when Any() can be used\r\ndotnet_diagnostic.CA1827.severity = " +
-                    "warning\r\n# CA1828: Do not use CountAsync() or LongCountAsync() when AnyAsync() c" +
-                    "an be used\r\ndotnet_diagnostic.CA1828.severity = warning\r\n# CA1829: Use Length/Co" +
-                    "unt property instead of Count() when available\r\ndotnet_diagnostic.CA1829.severit" +
-                    "y = warning\r\n# CA1830: Prefer strongly-typed Append and Insert method overloads " +
-                    "on StringBuilder\r\ndotnet_diagnostic.CA1830.severity = warning\r\n# CA1831: Use AsS" +
-                    "pan or AsMemory instead of Range-based indexers when appropriate\r\ndotnet_diagnos" +
-                    "tic.CA1831.severity = warning\r\n# CA1832: Use AsSpan or AsMemory instead of Range" +
-                    "-based indexers when appropriate\r\ndotnet_diagnostic.CA1832.severity = warning\r\n#" +
-                    " CA1833: Use AsSpan or AsMemory instead of Range-based indexers when appropriate" +
-                    "\r\ndotnet_diagnostic.CA1833.severity = warning\r\n# CA1834: Consider using \'StringB" +
-                    "uilder.Append(char)\' when applicable\r\ndotnet_diagnostic.CA1834.severity = warnin" +
-                    "g\r\n# CA1835: Prefer the \'Memory\'-based overloads for \'ReadAsync\' and \'WriteAsync" +
-                    "\'\r\ndotnet_diagnostic.CA1835.severity = warning\r\n# CA1836: Prefer IsEmpty over Co" +
-                    "unt\r\ndotnet_diagnostic.CA1836.severity = warning\r\n# CA1837: Use \'Environment.Pro" +
-                    "cessId\'\r\ndotnet_diagnostic.CA1837.severity = warning\r\n# CA1838: Avoid \'StringBui" +
-                    "lder\' parameters for P/Invokes\r\ndotnet_diagnostic.CA1838.severity = warning\r\n# C" +
-                    "A1839: Use \'Environment.ProcessPath\'\r\ndotnet_diagnostic.CA1839.severity = warnin" +
-                    "g\r\n# CA1840: Use \'Environment.CurrentManagedThreadId\'\r\ndotnet_diagnostic.CA1840." +
-                    "severity = warning\r\n# CA1841: Prefer Dictionary.Contains methods\r\ndotnet_diagnos" +
-                    "tic.CA1841.severity = warning\r\n# CA1842: Do not use \'WhenAll\' with a single task" +
-                    "\r\ndotnet_diagnostic.CA1842.severity = warning\r\n# CA1843: Do not use \'WaitAll\' wi" +
-                    "th a single task\r\ndotnet_diagnostic.CA1843.severity = warning\r\n# CA1845: Use spa" +
-                    "n-based \'string.Concat\'\r\ndotnet_diagnostic.CA1845.severity = warning\r\n# CA1846: " +
-                    "Prefer AsSpan over Substring\r\ndotnet_diagnostic.CA1846.severity = warning\r\n# CA2" +
-                    "008: Do not create tasks without passing a TaskScheduler\r\ndotnet_diagnostic.CA20" +
-                    "08.severity = warning\r\n# CA2009: Do not call ToImmutableCollection on an Immutab" +
-                    "leCollection value\r\ndotnet_diagnostic.CA2009.severity = warning\r\n# CA2011: Avoid" +
-                    " infinite recursion\r\ndotnet_diagnostic.CA2011.severity = warning\r\n# CA2012: Use " +
-                    "ValueTask correctly\r\ndotnet_diagnostic.CA2012.severity = warning\r\n# CA2013: Do n" +
-                    "ot use ReferenceEquals with value types\r\ndotnet_diagnostic.CA2013.severity = war" +
-                    "ning\r\n# CA2014: Do not use stackalloc in loops.\r\ndotnet_diagnostic.CA2014.severi" +
-                    "ty = warning\r\n# CA2016: Forward the \'CancellationToken\' parameter to methods tha" +
-                    "t take one\r\ndotnet_diagnostic.CA2016.severity = warning\r\n# CA2200: Rethrow to pr" +
-                    "eserve stack details\r\ndotnet_diagnostic.CA2200.severity = warning\r\n# CA2208: Ins" +
-                    "tantiate argument exceptions correctly\r\ndotnet_diagnostic.CA2208.severity = warn" +
-                    "ing\r\n# IDE0035: Remove unreachable code\r\ndotnet_diagnostic.IDE0035.severity = wa" +
-                    "rning\r\n# IDE0036: Order modifiers\r\ncsharp_preferred_modifier_order = public,priv" +
-                    "ate,protected,internal,static,extern,new,virtual,abstract,sealed,override,readon" +
-                    "ly,unsafe,volatile,async:suggestion\r\ndotnet_diagnostic.IDE0036.severity = warnin" +
-                    "g\r\n# IDE0043: Format string contains invalid placeholder\r\ndotnet_diagnostic.IDE0" +
-                    "043.severity = warning\r\n# IDE0044: Make field readonly\r\ndotnet_diagnostic.IDE004" +
-                    "4.severity = warning\r\n\r\n\r\n[**/{test,samples,perf}/**.{cs,vb}]\r\n# CA1018: Mark at" +
-                    "tributes with AttributeUsageAttribute\r\ndotnet_diagnostic.CA1018.severity = sugge" +
-                    "stion\r\n# CA1507: Use nameof to express symbol names\r\ndotnet_diagnostic.CA1507.se" +
-                    "verity = suggestion\r\n# CA1802: Use literals where appropriate\r\ndotnet_diagnostic" +
-                    ".CA1802.severity = suggestion\r\n# CA1805: Do not initialize unnecessarily\r\ndotnet" +
-                    "_diagnostic.CA1805.severity = suggestion\r\n# CA1823: Avoid zero-length array allo" +
-                    "cations\r\ndotnet_diagnostic.CA1825.severity = suggestion\r\n# CA1826: Do not use En" +
-                    "umerable methods on indexable collections. Instead use the collection directly\r\n" +
-                    "dotnet_diagnostic.CA1826.severity = suggestion\r\n# CA1827: Do not use Count() or " +
-                    "LongCount() when Any() can be used\r\ndotnet_diagnostic.CA1827.severity = suggesti" +
-                    "on\r\n# CA1829: Use Length/Count property instead of Count() when available\r\ndotne" +
-                    "t_diagnostic.CA1829.severity = suggestion\r\n# CA1834: Consider using \'StringBuild" +
-                    "er.Append(char)\' when applicable\r\ndotnet_diagnostic.CA1834.severity = suggestion" +
+                    "ssion = false:suggestion\r\n# newline settings\r\ncsharp_new_line_before_open_brace " +
+                    "= all\r\ncsharp_new_line_before_else = true\r\ncsharp_new_line_before_catch = true\r\n" +
+                    "csharp_new_line_before_finally = true\r\ncsharp_new_line_before_members_in_object_" +
+                    "initializers = true\r\ncsharp_new_line_before_members_in_anonymous_types = true\r\n\r" +
+                    "\n\r\n[*.{xml,config,*proj,nuspec,props,resx,targets,yml,tasks}]\r\nindent_size = 2\r\n" +
+                    "\r\n\r\n[*.{props,targets,ruleset,config,nuspec,resx,vsixmanifest,vsct}]\r\nindent_siz" +
+                    "e = 2\r\n\r\n\r\n[*.json]\r\nindent_size = 2\r\n\r\n\r\n[*.{ps1,psm1}]\r\nindent_size = 4\r\n\r\n\r\n[" +
+                    "*.sh]\r\nindent_size = 4\r\nend_of_line = lf\r\n\r\n\r\n[*.{razor,cshtml}]\r\ncharset = utf-" +
+                    "8-bom\r\n\r\n\r\n[*.{cs,vb}]\r\n# CA1018: Mark attributes with AttributeUsageAttribute\r\n" +
+                    "dotnet_diagnostic.CA1018.severity = warning\r\n# CA1047: Do not declare protected " +
+                    "member in sealed type\r\ndotnet_diagnostic.CA1047.severity = warning\r\n# CA1305: Sp" +
+                    "ecify IFormatProvider\r\ndotnet_diagnostic.CA1305.severity = suggestion\r\n# CA1507:" +
+                    " Use nameof to express symbol names\r\ndotnet_diagnostic.CA1507.severity = warning" +
+                    "\r\n# CA1725: Parameter names should match base declaration\r\ndotnet_diagnostic.CA1" +
+                    "725.severity = suggestion\r\n# CA1802: Use literals where appropriate\r\ndotnet_diag" +
+                    "nostic.CA1802.severity = warning\r\n# CA1805: Do not initialize unnecessarily\r\ndot" +
+                    "net_diagnostic.CA1805.severity = warning\r\n# CA1810: Do not initialize unnecessar" +
+                    "ily\r\ndotnet_diagnostic.CA1810.severity = suggestion\r\n# CA1821: Remove empty Fina" +
+                    "lizers\r\ndotnet_diagnostic.CA1821.severity = warning\r\n# CA1822: Make member stati" +
+                    "c\r\ndotnet_diagnostic.CA1822.severity = suggestion\r\n# CA1823: Avoid unused privat" +
+                    "e fields\r\ndotnet_diagnostic.CA1823.severity = warning\r\n# CA1825: Avoid zero-leng" +
+                    "th array allocations\r\ndotnet_diagnostic.CA1825.severity = warning\r\n# CA1826: Do " +
+                    "not use Enumerable methods on indexable collections. Instead use the collection " +
+                    "directly\r\ndotnet_diagnostic.CA1826.severity = warning\r\n# CA1827: Do not use Coun" +
+                    "t() or LongCount() when Any() can be used\r\ndotnet_diagnostic.CA1827.severity = w" +
+                    "arning\r\n# CA1828: Do not use CountAsync() or LongCountAsync() when AnyAsync() ca" +
+                    "n be used\r\ndotnet_diagnostic.CA1828.severity = warning\r\n# CA1829: Use Length/Cou" +
+                    "nt property instead of Count() when available\r\ndotnet_diagnostic.CA1829.severity" +
+                    " = warning\r\n# CA1830: Prefer strongly-typed Append and Insert method overloads o" +
+                    "n StringBuilder\r\ndotnet_diagnostic.CA1830.severity = warning\r\n# CA1831: Use AsSp" +
+                    "an or AsMemory instead of Range-based indexers when appropriate\r\ndotnet_diagnost" +
+                    "ic.CA1831.severity = warning\r\n# CA1832: Use AsSpan or AsMemory instead of Range-" +
+                    "based indexers when appropriate\r\ndotnet_diagnostic.CA1832.severity = warning\r\n# " +
+                    "CA1833: Use AsSpan or AsMemory instead of Range-based indexers when appropriate\r" +
+                    "\ndotnet_diagnostic.CA1833.severity = warning\r\n# CA1834: Consider using \'StringBu" +
+                    "ilder.Append(char)\' when applicable\r\ndotnet_diagnostic.CA1834.severity = warning" +
                     "\r\n# CA1835: Prefer the \'Memory\'-based overloads for \'ReadAsync\' and \'WriteAsync\'" +
-                    "\r\ndotnet_diagnostic.CA1835.severity = suggestion\r\n# CA1837: Use \'Environment.Pro" +
-                    "cessId\'\r\ndotnet_diagnostic.CA1837.severity = suggestion\r\n# CA1838: Avoid \'String" +
-                    "Builder\' parameters for P/Invokes\r\ndotnet_diagnostic.CA1838.severity = suggestio" +
-                    "n\r\n# CA1841: Prefer Dictionary.Contains methods\r\ndotnet_diagnostic.CA1841.severi" +
-                    "ty = suggestion\r\n# CA1844: Provide memory-based overrides of async methods when " +
-                    "subclassing \'Stream\'\r\ndotnet_diagnostic.CA1844.severity = suggestion\r\n# CA1845: " +
-                    "Use span-based \'string.Concat\'\r\ndotnet_diagnostic.CA1845.severity = suggestion\r\n" +
-                    "# CA1846: Prefer AsSpan over Substring\r\ndotnet_diagnostic.CA1846.severity = sugg" +
-                    "estion\r\n# CA2008: Do not create tasks without passing a TaskScheduler\r\ndotnet_di" +
-                    "agnostic.CA2008.severity = suggestion\r\n# CA2012: Use ValueTask correctly\r\ndotnet" +
-                    "_diagnostic.CA2012.severity = suggestion\r\n# IDE0044: Make field readonly\r\ndotnet" +
-                    "_diagnostic.IDE0044.severity = suggestion\r\n# CA2016: Forward the \'CancellationTo" +
-                    "ken\' parameter to methods that take one\r\ndotnet_diagnostic.CA2016.severity = sug" +
-                    "gestion\r\n");
+                    "\r\ndotnet_diagnostic.CA1835.severity = warning\r\n# CA1836: Prefer IsEmpty over Cou" +
+                    "nt\r\ndotnet_diagnostic.CA1836.severity = warning\r\n# CA1837: Use \'Environment.Proc" +
+                    "essId\'\r\ndotnet_diagnostic.CA1837.severity = warning\r\n# CA1838: Avoid \'StringBuil" +
+                    "der\' parameters for P/Invokes\r\ndotnet_diagnostic.CA1838.severity = warning\r\n# CA" +
+                    "1839: Use \'Environment.ProcessPath\'\r\ndotnet_diagnostic.CA1839.severity = warning" +
+                    "\r\n# CA1840: Use \'Environment.CurrentManagedThreadId\'\r\ndotnet_diagnostic.CA1840.s" +
+                    "everity = warning\r\n# CA1841: Prefer Dictionary.Contains methods\r\ndotnet_diagnost" +
+                    "ic.CA1841.severity = warning\r\n# CA1842: Do not use \'WhenAll\' with a single task\r" +
+                    "\ndotnet_diagnostic.CA1842.severity = warning\r\n# CA1843: Do not use \'WaitAll\' wit" +
+                    "h a single task\r\ndotnet_diagnostic.CA1843.severity = warning\r\n# CA1845: Use span" +
+                    "-based \'string.Concat\'\r\ndotnet_diagnostic.CA1845.severity = warning\r\n# CA1846: P" +
+                    "refer AsSpan over Substring\r\ndotnet_diagnostic.CA1846.severity = warning\r\n# CA20" +
+                    "08: Do not create tasks without passing a TaskScheduler\r\ndotnet_diagnostic.CA200" +
+                    "8.severity = warning\r\n# CA2009: Do not call ToImmutableCollection on an Immutabl" +
+                    "eCollection value\r\ndotnet_diagnostic.CA2009.severity = warning\r\n# CA2011: Avoid " +
+                    "infinite recursion\r\ndotnet_diagnostic.CA2011.severity = warning\r\n# CA2012: Use V" +
+                    "alueTask correctly\r\ndotnet_diagnostic.CA2012.severity = warning\r\n# CA2013: Do no" +
+                    "t use ReferenceEquals with value types\r\ndotnet_diagnostic.CA2013.severity = warn" +
+                    "ing\r\n# CA2014: Do not use stackalloc in loops.\r\ndotnet_diagnostic.CA2014.severit" +
+                    "y = warning\r\n# CA2016: Forward the \'CancellationToken\' parameter to methods that" +
+                    " take one\r\ndotnet_diagnostic.CA2016.severity = warning\r\n# CA2200: Rethrow to pre" +
+                    "serve stack details\r\ndotnet_diagnostic.CA2200.severity = warning\r\n# CA2208: Inst" +
+                    "antiate argument exceptions correctly\r\ndotnet_diagnostic.CA2208.severity = warni" +
+                    "ng\r\n# IDE0035: Remove unreachable code\r\ndotnet_diagnostic.IDE0035.severity = war" +
+                    "ning\r\n# IDE0036: Order modifiers\r\ncsharp_preferred_modifier_order = public,priva" +
+                    "te,protected,internal,static,extern,new,virtual,abstract,sealed,override,readonl" +
+                    "y,unsafe,volatile,async:suggestion\r\ndotnet_diagnostic.IDE0036.severity = warning" +
+                    "\r\n# IDE0043: Format string contains invalid placeholder\r\ndotnet_diagnostic.IDE00" +
+                    "43.severity = warning\r\n# IDE0044: Make field readonly\r\ndotnet_diagnostic.IDE0044" +
+                    ".severity = warning\r\n\r\n\r\n[**/{test,samples,perf}/**.{cs,vb}]\r\n# CA1018: Mark att" +
+                    "ributes with AttributeUsageAttribute\r\ndotnet_diagnostic.CA1018.severity = sugges" +
+                    "tion\r\n# CA1507: Use nameof to express symbol names\r\ndotnet_diagnostic.CA1507.sev" +
+                    "erity = suggestion\r\n# CA1802: Use literals where appropriate\r\ndotnet_diagnostic." +
+                    "CA1802.severity = suggestion\r\n# CA1805: Do not initialize unnecessarily\r\ndotnet_" +
+                    "diagnostic.CA1805.severity = suggestion\r\n# CA1823: Avoid zero-length array alloc" +
+                    "ations\r\ndotnet_diagnostic.CA1825.severity = suggestion\r\n# CA1826: Do not use Enu" +
+                    "merable methods on indexable collections. Instead use the collection directly\r\nd" +
+                    "otnet_diagnostic.CA1826.severity = suggestion\r\n# CA1827: Do not use Count() or L" +
+                    "ongCount() when Any() can be used\r\ndotnet_diagnostic.CA1827.severity = suggestio" +
+                    "n\r\n# CA1829: Use Length/Count property instead of Count() when available\r\ndotnet" +
+                    "_diagnostic.CA1829.severity = suggestion\r\n# CA1834: Consider using \'StringBuilde" +
+                    "r.Append(char)\' when applicable\r\ndotnet_diagnostic.CA1834.severity = suggestion\r" +
+                    "\n# CA1835: Prefer the \'Memory\'-based overloads for \'ReadAsync\' and \'WriteAsync\'\r" +
+                    "\ndotnet_diagnostic.CA1835.severity = suggestion\r\n# CA1837: Use \'Environment.Proc" +
+                    "essId\'\r\ndotnet_diagnostic.CA1837.severity = suggestion\r\n# CA1838: Avoid \'StringB" +
+                    "uilder\' parameters for P/Invokes\r\ndotnet_diagnostic.CA1838.severity = suggestion" +
+                    "\r\n# CA1841: Prefer Dictionary.Contains methods\r\ndotnet_diagnostic.CA1841.severit" +
+                    "y = suggestion\r\n# CA1844: Provide memory-based overrides of async methods when s" +
+                    "ubclassing \'Stream\'\r\ndotnet_diagnostic.CA1844.severity = suggestion\r\n# CA1845: U" +
+                    "se span-based \'string.Concat\'\r\ndotnet_diagnostic.CA1845.severity = suggestion\r\n#" +
+                    " CA1846: Prefer AsSpan over Substring\r\ndotnet_diagnostic.CA1846.severity = sugge" +
+                    "stion\r\n# CA2008: Do not create tasks without passing a TaskScheduler\r\ndotnet_dia" +
+                    "gnostic.CA2008.severity = suggestion\r\n# CA2012: Use ValueTask correctly\r\ndotnet_" +
+                    "diagnostic.CA2012.severity = suggestion\r\n# IDE0044: Make field readonly\r\ndotnet_" +
+                    "diagnostic.IDE0044.severity = suggestion\r\n# CA2016: Forward the \'CancellationTok" +
+                    "en\' parameter to methods that take one\r\ndotnet_diagnostic.CA2016.severity = sugg" +
+                    "estion\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
-    
-    #line default
-    #line hidden
     #region Base class
     /// <summary>
     /// Base class for this transformation
@@ -155,7 +149,7 @@ namespace _42.Monorepo.Cli.Templates
         /// <summary>
         /// The string builder that generation-time code is using to assemble generated output
         /// </summary>
-        protected System.Text.StringBuilder GenerationEnvironment
+        public System.Text.StringBuilder GenerationEnvironment
         {
             get
             {

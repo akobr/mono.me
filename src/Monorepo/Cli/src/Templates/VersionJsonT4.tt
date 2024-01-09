@@ -1,4 +1,4 @@
-<#@ template language="C#" #>
+<#@ template language="C#" linePragmas="false" #>
 {
   "$schema": "https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/main/monorepo/src/NerdBank.GitVersioning/version.schema.json",
   "version": "<#= Model.Version #>",

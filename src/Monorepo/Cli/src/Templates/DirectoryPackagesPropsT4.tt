@@ -1,4 +1,4 @@
-<#@ template language="C#" #>
+<#@ template language="C#" linePragmas="false" #>
 <?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!-- Don't remove, creates a hierarchical linking -->

@@ -1,4 +1,4 @@
-<#@ template language="C#" #>
+<#@ template language="C#" linePragmas="false" #>
 <Project Sdk="Microsoft.Build.Traversal">
   <ItemGroup>
     <ProjectReference Include="**\*.*?proj" />

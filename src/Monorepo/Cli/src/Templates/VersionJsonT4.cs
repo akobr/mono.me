@@ -14,12 +14,9 @@ namespace _42.Monorepo.Cli.Templates
     /// <summary>
     /// Class to produce the template output
     /// </summary>
-    
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
     public partial class VersionJsonT4 : VersionJsonT4Base
     {
-#line hidden
         /// <summary>
         /// Create the template output
         /// </summary>
@@ -27,40 +24,17 @@ namespace _42.Monorepo.Cli.Templates
         {
             this.Write("{\r\n  \"$schema\": \"https://raw.githubusercontent.com/akobr/Nerdbank.GitVersioning/m" +
                     "ain/monorepo/src/NerdBank.GitVersioning/version.schema.json\",\r\n  \"version\": \"");
-            
-            #line 4 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(Model.Version));
-            
-            #line default
-            #line hidden
             this.Write("\",\r\n  \"inherit\": true,\r\n");
-            
-            #line 6 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
  if (Model.IsHierarchical) { 
-            
-            #line default
-            #line hidden
             this.Write("  \"hierarchicalVersion\": true\r\n");
-            
-            #line 8 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
  } else { 
-            
-            #line default
-            #line hidden
             this.Write("  \"pathFilters\": [ \".\" ]\r\n");
-            
-            #line 10 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\VersionJsonT4.tt"
  } 
-            
-            #line default
-            #line hidden
             this.Write("}\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
-    
-    #line default
-    #line hidden
     #region Base class
     /// <summary>
     /// Base class for this transformation
@@ -80,7 +54,7 @@ namespace _42.Monorepo.Cli.Templates
         /// <summary>
         /// The string builder that generation-time code is using to assemble generated output
         /// </summary>
-        protected System.Text.StringBuilder GenerationEnvironment
+        public System.Text.StringBuilder GenerationEnvironment
         {
             get
             {
