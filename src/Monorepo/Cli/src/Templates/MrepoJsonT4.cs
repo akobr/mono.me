@@ -14,41 +14,26 @@ namespace _42.Monorepo.Cli.Templates
     /// <summary>
     /// Class to produce the template output
     /// </summary>
-    
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\MrepoJsonT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
     public partial class MrepoJsonT4 : MrepoJsonT4Base
     {
-#line hidden
         /// <summary>
         /// Create the template output
         /// </summary>
         public virtual string TransformText()
         {
             this.Write("{\r\n  \"repo\": {\r\n    \"name\": \"");
-            
-            #line 4 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\MrepoJsonT4.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(Model.Name));
-            
-            #line default
-            #line hidden
             this.Write("\",\r\n    \"description\": \"");
-            
-            #line 5 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\MrepoJsonT4.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(Model.Description));
-            
-            #line default
-            #line hidden
             this.Write("\",\r\n    \"features\": [ ");
-            
-            #line 6 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\MrepoJsonT4.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(Model.Features));
-            
-            #line default
-            #line hidden
             this.Write(@" ],
     ""scripts"": {
       /* add any global scripts here */
+      ""rock"": ""echo \""There's no wrong time to rock! ??\"""",
+      ""truth"": ""echo 'Simplicity is the ultimate sophistication.'"",
+      ""answer"": ""echo 42"",
     },
     ""folders"": {
       ""source"": ""src"",
@@ -76,7 +61,7 @@ namespace _42.Monorepo.Cli.Templates
       ""scripts"": {
         ""build"": ""dotnet build src"",
         ""clean"": ""dotnet clean src"",
-        ""pack"": ""dotnet pack src"",
+        ""pack"": ""dotnet pack src -c RELEASE /p:ContinuousIntegrationBuild=true"",
         ""restore"": ""dotnet restore src"",
         ""run"": ""dotnet run src"",
         ""test"": ""dotnet test test""
@@ -91,9 +76,6 @@ namespace _42.Monorepo.Cli.Templates
             return this.GenerationEnvironment.ToString();
         }
     }
-    
-    #line default
-    #line hidden
     #region Base class
     /// <summary>
     /// Base class for this transformation
@@ -113,7 +95,7 @@ namespace _42.Monorepo.Cli.Templates
         /// <summary>
         /// The string builder that generation-time code is using to assemble generated output
         /// </summary>
-        protected System.Text.StringBuilder GenerationEnvironment
+        public System.Text.StringBuilder GenerationEnvironment
         {
             get
             {

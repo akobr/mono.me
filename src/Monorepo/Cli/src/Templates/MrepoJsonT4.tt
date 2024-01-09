@@ -1,4 +1,4 @@
-<#@ template language="C#" #>
+<#@ template language="C#" linePragmas="false" #>
 {
   "repo": {
     "name": "<#= Model.Name #>",
@@ -6,6 +6,9 @@
     "features": [ <#= Model.Features #> ],
     "scripts": {
       /* add any global scripts here */
+      "rock": "echo \"There's no wrong time to rock! 🎸\"",
+      "truth": "echo 'Simplicity is the ultimate sophistication.'",
+      "answer": "echo 42",
     },
     "folders": {
       "source": "src",
@@ -33,7 +36,7 @@
       "scripts": {
         "build": "dotnet build src",
         "clean": "dotnet clean src",
-        "pack": "dotnet pack src",
+        "pack": "dotnet pack src -c RELEASE /p:ContinuousIntegrationBuild=true",
         "restore": "dotnet restore src",
         "run": "dotnet run src",
         "test": "dotnet test test"
