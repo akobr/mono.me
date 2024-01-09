@@ -14,12 +14,9 @@ namespace _42.Monorepo.Cli.Templates
     /// <summary>
     /// Class to produce the template output
     /// </summary>
-    
-    #line 1 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildPropsT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
     public partial class DirectoryBuildPropsT4 : DirectoryBuildPropsT4Base
     {
-#line hidden
         /// <summary>
         /// Create the template output
         /// </summary>
@@ -30,60 +27,44 @@ namespace _42.Monorepo.Cli.Templates
     <!-- $(RepoRoot) is normally set globally and this override just makes sure about a trailing slash. -->
     <RepoRoot Condition="" '$(RepoRoot)' == '' OR !HasTrailingSlash('$(RepoRoot)') "">$(MSBuildThisFileDirectory)</RepoRoot>
     <PackageOutputPath>$(RepoRoot).artifacts</PackageOutputPath>
+    <!-- relative paths in the mono repository -->
+    <ProjectRepoRelativePath>$(MSBuildProjectDirectory.Substring($(RepoRoot.Length)))</ProjectRepoRelativePath>
+    <ProjectStructurePath>$(ProjectRepoRelativePath.Replace('src','').Trim('/').Trim('\'))</ProjectStructurePath>
+    <ProjectStructurePathForwardSlashes>$(ProjectStructurePath.Replace('\','/'))</ProjectStructurePathForwardSlashes>
 ");
-            
-            #line 7 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildPropsT4.tt"
  if (_featureProvider.IsEnabled("packages")) { 
-            
-            #line default
-            #line hidden
             this.Write("    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>\r\n");
-            
-            #line 9 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildPropsT4.tt"
  } 
-            
-            #line default
-            #line hidden
-            this.Write("  </PropertyGroup>\r\n  \r\n  <!-- global references -->\r\n");
-            
-            #line 13 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildPropsT4.tt"
+            this.Write(@"    <!-- Nuget package global properties -->
+    <PackageOutputPath>$(RepoRoot)\.artifacts</PackageOutputPath>
+    <PackageReadmeFile Condition=""Exists('$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md')"">package-readme.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <!-- global references -->
+");
  if (_featureProvider.IsEnabled("git-version")) { 
-            
-            #line default
-            #line hidden
             this.Write("  <ItemGroup Condition=\" \'$(EnableGitVersioning)\' != \'false\' \">\r\n    <PackageRefe" +
-                    "rence Include=\"Nerdbank.GitVersioning\" PrivateAssets=\"all\" />\r\n  </ItemGroup>\r\n");
-            
-            #line 17 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildPropsT4.tt"
+                    "rence Include=\"42.Monorepo.GitVersioning\" PrivateAssets=\"all\" />\r\n  </ItemGroup>" +
+                    "\r\n");
  } 
-            
-            #line default
-            #line hidden
-            
-            #line 18 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildPropsT4.tt"
  if (_featureProvider.IsEnabled("stylecop")) { 
-            
-            #line default
-            #line hidden
             this.Write(@"  <ItemGroup Condition="" '$(EnableStyleCop)' != 'false' "">
     <PackageReference Include=""StyleCop.Analyzers"" PrivateAssets=""all"" />
     <Compile Include=""$(RepoRoot)\src\.stylecop\GlobalStylecopSuppressions.cs"" Visible=""False"" />
     <AdditionalFiles Include=""$(RepoRoot)\stylecop.json"" Visible=""False"" />
   </ItemGroup>
 ");
-            
-            #line 24 "C:\working\mono.me\src\Monorepo\Cli\src\Templates\DirectoryBuildPropsT4.tt"
  } 
-            
-            #line default
-            #line hidden
-            this.Write("</Project>\r\n");
+            this.Write(@"
+  <!-- Nuget package global content -->
+  <ItemGroup Condition="" '$(IsPackable)' == 'true' "">
+    <None Condition=""Exists('$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md')"" Include=""$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md"" Pack=""true"" PackagePath=""\"" Visible=""False""/>
+  </ItemGroup>
+</Project>
+");
             return this.GenerationEnvironment.ToString();
         }
     }
-    
-    #line default
-    #line hidden
     #region Base class
     /// <summary>
     /// Base class for this transformation
@@ -103,7 +84,7 @@ namespace _42.Monorepo.Cli.Templates
         /// <summary>
         /// The string builder that generation-time code is using to assemble generated output
         /// </summary>
-        protected System.Text.StringBuilder GenerationEnvironment
+        public System.Text.StringBuilder GenerationEnvironment
         {
             get
             {
