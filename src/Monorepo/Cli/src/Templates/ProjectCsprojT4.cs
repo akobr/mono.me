@@ -14,53 +14,28 @@ namespace _42.Monorepo.Cli.Templates
     /// <summary>
     /// Class to produce the template output
     /// </summary>
-    
-    #line 1 "D:\work\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.TextTemplating", "17.0.0.0")]
     public partial class ProjectCsprojT4 : ProjectCsprojT4Base
     {
-#line hidden
         /// <summary>
         /// Create the template output
         /// </summary>
         public virtual string TransformText()
         {
             this.Write("<Project Sdk=\"Microsoft.NET.Sdk\">\r\n\r\n  <PropertyGroup>\r\n");
-            
-            #line 5 "D:\work\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
  if (Model.HasCustomName) { 
-            
-            #line default
-            #line hidden
             this.Write("    <AssemblyName>");
-            
-            #line 6 "D:\work\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(Model.AssemblyName));
-            
-            #line default
-            #line hidden
             this.Write("</AssemblyName>\r\n    <RootNamespace>");
-            
-            #line 7 "D:\work\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
             this.Write(this.ToStringHelper.ToStringWithCulture(Model.RootNamespace));
-            
-            #line default
-            #line hidden
             this.Write("</RootNamespace>\r\n\r\n");
-            
-            #line 9 "D:\work\mono.me\src\Monorepo\Cli\src\Templates\ProjectCsprojT4.tt"
  } 
-            
-            #line default
-            #line hidden
             this.Write("    <TargetFramework>net8.0</TargetFramework>\r\n    <LangVersion>latest</LangVersi" +
-                    "on>\r\n    <Nullable>enable</Nullable>\r\n  </PropertyGroup>\r\n\r\n</Project>\r\n");
+                    "on>\r\n    <Nullable>enable</Nullable>\r\n    <ImplicitUsings>enable</ImplicitUsings" +
+                    ">\r\n  </PropertyGroup>\r\n\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
-    
-    #line default
-    #line hidden
     #region Base class
     /// <summary>
     /// Base class for this transformation
