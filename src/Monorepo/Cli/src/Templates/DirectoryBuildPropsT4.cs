@@ -26,16 +26,18 @@ namespace _42.Monorepo.Cli.Templates
   <PropertyGroup>
     <!-- $(RepoRoot) is normally set globally and this override just makes sure about a trailing slash. -->
     <RepoRoot Condition="" '$(RepoRoot)' == '' OR !HasTrailingSlash('$(RepoRoot)') "">$(MSBuildThisFileDirectory)</RepoRoot>
-    <PackageOutputPath>$(RepoRoot).artifacts</PackageOutputPath>
-    <!-- relative paths in the mono repository -->
-    <ProjectRepoRelativePath>$(MSBuildProjectDirectory.Substring($(RepoRoot.Length)))</ProjectRepoRelativePath>
-    <ProjectStructurePath>$(ProjectRepoRelativePath.Replace('src','').Trim('/').Trim('\'))</ProjectStructurePath>
-    <ProjectStructurePathForwardSlashes>$(ProjectStructurePath.Replace('\','/'))</ProjectStructurePathForwardSlashes>
+    <IsTestProject Condition="" '$(IsTestProject)' == '' AND $(MSBuildProjectName.EndsWith('Tests')) "">true</IsTestProject>
 ");
  if (_featureProvider.IsEnabled("packages")) { 
             this.Write("    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>\r\n");
  } 
-            this.Write(@"    <!-- Nuget package global properties -->
+            this.Write(@"
+    <!-- relative paths in the mono repository -->
+    <ProjectRepoRelativePath>$(MSBuildProjectDirectory.Substring($(RepoRoot.Length)))</ProjectRepoRelativePath>
+    <ProjectStructurePath>$(ProjectRepoRelativePath.Replace('src','').Trim('/').Trim('\'))</ProjectStructurePath>
+    <ProjectStructurePathForwardSlashes>$(ProjectStructurePath.Replace('\','/'))</ProjectStructurePathForwardSlashes>
+
+    <!-- Nuget package global properties -->
     <PackageOutputPath>$(RepoRoot)\.artifacts</PackageOutputPath>
     <PackageReadmeFile Condition=""Exists('$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md')"">package-readme.md</PackageReadmeFile>
   </PropertyGroup>
@@ -54,6 +56,11 @@ namespace _42.Monorepo.Cli.Templates
     <AdditionalFiles Include=""$(RepoRoot)\stylecop.json"" Visible=""False"" />
   </ItemGroup>
 ");
+ } 
+ if (_featureProvider.IsEnabled("sonar")) { 
+            this.Write("  <ItemGroup Condition=\" \'$(EnableSonar)\' != \'false\' AND \'$(IsTestProject)\' != \'t" +
+                    "rue\' \">\r\n    <PackageReference Include=\"SonarAnalyzer.CSharp\" PrivateAssets=\"all" +
+                    "\" />\r\n  </ItemGroup>\r\n");
  } 
             this.Write(@"
   <!-- Nuget package global content -->
