@@ -77,7 +77,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 {
                     new("CentralPackageVersionManagement",
                         "Central package version management",
-                        "Recommended. A baked-in solution into .NET Core SDK (from 3.1.300), using Directory.Packages.props file. https://bit.ly/3oKJCpq"),
+                        "Recommended. A baked-in solution into .NET Core SDK (from 3.1.300), using Directory.Packages.props file. https://bit.ly/3RhzYb9"),
                     new("DirectoryBuildTargets",
                         "Directory.Build.props [MsBuild 15+]",
                         "Use of hierarchical Directory.Build.props and the possibility of updating the version of package reference by MsBuild 15 and newer."),
@@ -221,14 +221,14 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteLine();
             var codingStandards = Console.MultiSelect(new MultiSelectOptions<string>
             {
-                Items = new[] { "StyleCop", "Sonar", "Make it less strict (only warnings)" },
+                Minimum = 0,
+                Items = new[] { "StyleCop", "Sonar" },
                 Message = "Select how to set up coding standards",
                 DefaultValues = new[] { "StyleCop", "Sonar" },
             }).ToList();
 
             var useStyleCop = codingStandards.Contains("StyleCop");
             var useSonar = codingStandards.Contains("Sonar");
-            var useLessStrictCodingRules = codingStandards.Contains("Make it less strict (only warnings)");
 
             Console.WriteLine();
             Console.WriteLine("You went through the most critical aspects, but there is much more to discuss and consider. For more info, please visit our detailed documentation about a mono-repository at https://bit.ly/37DZ1SB");
@@ -237,6 +237,7 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteImportant("A new monorepo is about to be created in the current directory.");
             Console.WriteLine();
             Console.WriteHeader("Selected features");
+            Console.WriteLine(" - Prepare basic structure of mono-repository");
 
             var featureList = new List<string>();
 
@@ -254,6 +255,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
             if (useCodeViewSeparation)
             {
+                featureList.Add(FeatureNames.BuildTraversal);
                 Console.WriteLine("  - Microsoft.Build.Traversal for simple building by tools");
             }
 
@@ -264,17 +266,14 @@ namespace _42.Monorepo.Cli.Commands.New
 
             if (useStyleCop)
             {
+                featureList.Add(FeatureNames.Stylecop);
                 Console.WriteLine("  - StyleCop for coding styles");
             }
 
             if (useSonar)
             {
+                featureList.Add(FeatureNames.Sonar);
                 Console.WriteLine("  - Sonar analyzers for better code");
-            }
-
-            if (useLessStrictCodingRules)
-            {
-                Console.WriteLine("  - Less strict coding standards");
             }
 
             Console.WriteLine();
@@ -292,57 +291,42 @@ namespace _42.Monorepo.Cli.Commands.New
             Console.WriteLine();
             Console.WriteHeader("Created files");
 
-            // TODO: [P2] needs to be properly controlled by picked options
-            featureList.AddRange(new[]
-            {
-                FeatureNames.GitVersion,
-                FeatureNames.Packages,
-                FeatureNames.BuildTraversal,
-                FeatureNames.TestsXunit,
-                FeatureNames.TestsNunit,
-                FeatureNames.Stylecop,
-                FeatureNames.Sonar,
-            });
-
             var featureProvider = FeatureProvider.Build(featureList);
-
-            // .editorconfig
-            var editorConfig = new DotEditorConfigT4();
-            await _fileSystem.File.WriteAllTextAsync(FileNames.DotEditorConfig, editorConfig.TransformText());
-            Console.WriteLine($"    {FileNames.DotEditorConfig}");
-
-            // .gitattributes
-            var gitAttributes = new DotGitAttributesT4();
-            await _fileSystem.File.WriteAllTextAsync(FileNames.DotGitAttributes, gitAttributes.TransformText());
-            Console.WriteLine($"    {FileNames.DotGitAttributes}");
 
             // .gitignore
             var gitIgnore = new DotGitIgnoreT4();
             await _fileSystem.File.WriteAllTextAsync(FileNames.DotGitIgnore, gitIgnore.TransformText());
             Console.WriteLine($"    {FileNames.DotGitIgnore}");
 
+            // .gitattributes
+            var gitAttributes = new DotGitAttributesT4();
+            await _fileSystem.File.WriteAllTextAsync(FileNames.DotGitAttributes, gitAttributes.TransformText());
+            Console.WriteLine($"    {FileNames.DotGitAttributes}");
+
+            // .editorconfig
+            var editorConfig = new DotEditorConfigT4();
+            await _fileSystem.File.WriteAllTextAsync(FileNames.DotEditorConfig, editorConfig.TransformText());
+            Console.WriteLine($"    {FileNames.DotEditorConfig}");
+
             // .vsconfig
             var vsConfig = new DotVsConfigT4();
             await _fileSystem.File.WriteAllTextAsync(FileNames.DotVsConfig, vsConfig.TransformText());
             Console.WriteLine($"    {FileNames.DotVsConfig}");
 
-            // Directory.Build.props
-            var directoryBuildProps = new DirectoryBuildPropsT4(featureProvider);
-            await _fileSystem.File.WriteAllTextAsync(FileNames.DirectoryBuildProps, directoryBuildProps.TransformText());
-            Console.WriteLine($"    {FileNames.DirectoryBuildProps}");
-
-            // Directory.Packages.props
-            if (useCentralDependencies)
-            {
-                var directoryPackages = new RootDirectoryPackagesPropsT4(featureProvider);
-                await _fileSystem.File.WriteAllTextAsync(FileNames.DirectoryPackagesProps, directoryPackages.TransformText());
-                Console.WriteLine($"    {FileNames.DirectoryPackagesProps}");
-            }
+            // nuget.config
+            var nugetConfig = new NugetConfigT4();
+            await _fileSystem.File.WriteAllTextAsync(FileNames.NugetConfig, nugetConfig.TransformText());
+            Console.WriteLine($"    {FileNames.NugetConfig}");
 
             // glogal.json
             var globalJson = new GlobalJsonT4(featureProvider);
             await _fileSystem.File.WriteAllTextAsync(FileNames.GlogalJson, globalJson.TransformText());
             Console.WriteLine($"    {FileNames.GlogalJson}");
+
+            // Directory.Build.props
+            var directoryBuildProps = new DirectoryBuildPropsT4(featureProvider);
+            await _fileSystem.File.WriteAllTextAsync(FileNames.DirectoryBuildProps, directoryBuildProps.TransformText());
+            Console.WriteLine($"    {FileNames.DirectoryBuildProps}");
 
             // mrepo.json
             var mrepoJson = new MrepoJsonT4(new MrepoJsonModel
@@ -354,15 +338,13 @@ namespace _42.Monorepo.Cli.Commands.New
             await _fileSystem.File.WriteAllTextAsync(FileNames.MrepoJson, mrepoJson.TransformText());
             Console.WriteLine($"    {FileNames.MrepoJson}");
 
-            // nuget.config
-            var nugetConfig = new NugetConfigT4();
-            await _fileSystem.File.WriteAllTextAsync(FileNames.NugetConfig, nugetConfig.TransformText());
-            Console.WriteLine($"    {FileNames.NugetConfig}");
-
-            // stylecop.json
-            var stylecopJson = new StylecopJsonT4();
-            await _fileSystem.File.WriteAllTextAsync(FileNames.StylecopJson, stylecopJson.TransformText());
-            Console.WriteLine($"    {FileNames.StylecopJson}");
+            // Directory.Packages.props
+            if (useCentralDependencies)
+            {
+                var directoryPackages = new RootDirectoryPackagesPropsT4(featureProvider);
+                await _fileSystem.File.WriteAllTextAsync(FileNames.DirectoryPackagesProps, directoryPackages.TransformText());
+                Console.WriteLine($"    {FileNames.DirectoryPackagesProps}");
+            }
 
             // version.json
             if (useVersioning)
@@ -372,16 +354,27 @@ namespace _42.Monorepo.Cli.Commands.New
                 Console.WriteLine($"    {FileNames.VersionJson}");
             }
 
-            // src/.stylecop/GlobalStylecopSuppressions.cs
-            var stylecopGlobalSuppressions = new StylecopGlobalSuppressionsT4();
-            _fileSystem.Directory.CreateDirectory("src\\.stylecop");
-            await _fileSystem.File.WriteAllTextAsync($"src\\.stylecop\\{FileNames.StylecopGlobalSuppressions}", stylecopGlobalSuppressions.TransformText());
-            Console.WriteLine($"    src/.stylecop/{FileNames.StylecopGlobalSuppressions}");
+            if (useStyleCop)
+            {
+                // stylecop.json
+                var stylecopJson = new StylecopJsonT4();
+                await _fileSystem.File.WriteAllTextAsync(FileNames.StylecopJson, stylecopJson.TransformText());
+                Console.WriteLine($"    {FileNames.StylecopJson}");
 
-            // src/Directory.Build.Proj
-            var directoryBuildProj = new DirectoryBuildProjT4();
-            await _fileSystem.File.WriteAllTextAsync($"src\\{FileNames.DirectoryBuildProj}", directoryBuildProj.TransformText());
-            Console.WriteLine($"    src/{FileNames.DirectoryBuildProj}");
+                // src/.stylecop/GlobalStylecopSuppressions.cs
+                var stylecopGlobalSuppressions = new StylecopGlobalSuppressionsT4();
+                _fileSystem.Directory.CreateDirectory("src\\.stylecop");
+                await _fileSystem.File.WriteAllTextAsync($"src\\.stylecop\\{FileNames.StylecopGlobalSuppressions}", stylecopGlobalSuppressions.TransformText());
+                Console.WriteLine($"    src/.stylecop/{FileNames.StylecopGlobalSuppressions}");
+            }
+
+            if (useCodeViewSeparation)
+            {
+                // src/Directory.Build.Proj
+                var directoryBuildProj = new DirectoryBuildProjT4();
+                await _fileSystem.File.WriteAllTextAsync($"src\\{FileNames.DirectoryBuildProj}", directoryBuildProj.TransformText());
+                Console.WriteLine($"    src/{FileNames.DirectoryBuildProj}");
+            }
 
             Console.WriteLine();
             Console.WriteLine("The last step is to make this folder a Git repository:");

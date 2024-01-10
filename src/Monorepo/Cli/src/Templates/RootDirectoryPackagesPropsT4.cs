@@ -59,11 +59,14 @@ namespace _42.Monorepo.Cli.Templates
             this.Write("\r\n    <!-- versioning -->\r\n    <PackageVersion Include=\"42.Monorepo.GitVersioning" +
                     "\" Version=\"1.2.3\" />\r\n");
  } 
+            this.Write("\r\n    <!-- code analysis -->\r\n");
  if (_featureProvider.IsEnabled("stylecop")) { 
-            this.Write("\r\n    <!-- code analysis -->\r\n    <PackageVersion Include=\"StyleCop.Analyzers\" Ve" +
-                    "rsion=\"1.2.0-beta.556\" />\r\n");
+            this.Write("    <PackageVersion Include=\"StyleCop.Analyzers\" Version=\"1.2.0-beta.556\" />\r\n");
  } 
-            this.Write("\r\n  </ItemGroup>\r\n</Project>\r\n");
+ if (_featureProvider.IsEnabled("sonar")) { 
+            this.Write("    <PackageVersion Include=\"SonarAnalyzer.CSharp\" Version=\"9.16.0.82469\" />\r\n");
+ } 
+            this.Write("  </ItemGroup>\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }

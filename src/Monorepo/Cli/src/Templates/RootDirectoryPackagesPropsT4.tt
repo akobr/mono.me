@@ -33,11 +33,13 @@
 
     <!-- versioning -->
     <PackageVersion Include="42.Monorepo.GitVersioning" Version="1.2.3" />
-<# } #><# if (_featureProvider.IsEnabled("stylecop")) { #>
-
-    <!-- code analysis -->
-    <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
 <# } #>
 
+    <!-- code analysis -->
+<# if (_featureProvider.IsEnabled("stylecop")) { #>
+    <PackageVersion Include="StyleCop.Analyzers" Version="1.2.0-beta.556" />
+<# } #><# if (_featureProvider.IsEnabled("sonar")) { #>
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="9.16.0.82469" />
+<# } #>
   </ItemGroup>
 </Project>

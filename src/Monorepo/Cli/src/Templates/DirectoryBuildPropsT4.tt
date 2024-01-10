@@ -3,14 +3,16 @@
   <PropertyGroup>
     <!-- $(RepoRoot) is normally set globally and this override just makes sure about a trailing slash. -->
     <RepoRoot Condition=" '$(RepoRoot)' == '' OR !HasTrailingSlash('$(RepoRoot)') ">$(MSBuildThisFileDirectory)</RepoRoot>
-    <PackageOutputPath>$(RepoRoot).artifacts</PackageOutputPath>
+    <IsTestProject Condition=" '$(IsTestProject)' == '' AND $(MSBuildProjectName.EndsWith('Tests')) ">true</IsTestProject>
+<# if (_featureProvider.IsEnabled("packages")) { #>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+<# } #>
+
     <!-- relative paths in the mono repository -->
     <ProjectRepoRelativePath>$(MSBuildProjectDirectory.Substring($(RepoRoot.Length)))</ProjectRepoRelativePath>
     <ProjectStructurePath>$(ProjectRepoRelativePath.Replace('src','').Trim('/').Trim('\'))</ProjectStructurePath>
     <ProjectStructurePathForwardSlashes>$(ProjectStructurePath.Replace('\','/'))</ProjectStructurePathForwardSlashes>
-<# if (_featureProvider.IsEnabled("packages")) { #>
-    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-<# } #>
+
     <!-- Nuget package global properties -->
     <PackageOutputPath>$(RepoRoot)\.artifacts</PackageOutputPath>
     <PackageReadmeFile Condition="Exists('$(RepoRoot)\docs\$(ProjectStructurePath)\package-readme.md')">package-readme.md</PackageReadmeFile>
@@ -27,6 +29,11 @@
     <PackageReference Include="StyleCop.Analyzers" PrivateAssets="all" />
     <Compile Include="$(RepoRoot)\src\.stylecop\GlobalStylecopSuppressions.cs" Visible="False" />
     <AdditionalFiles Include="$(RepoRoot)\stylecop.json" Visible="False" />
+  </ItemGroup>
+<# } #>
+<# if (_featureProvider.IsEnabled("sonar")) { #>
+  <ItemGroup Condition=" '$(EnableSonar)' != 'false' AND '$(IsTestProject)' != 'true' ">
+    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="all" />
   </ItemGroup>
 <# } #>
 
