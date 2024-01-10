@@ -31,7 +31,7 @@ namespace _42.Monorepo.Cli.Templates
             this.Write(@" ],
     ""scripts"": {
       /* add any global scripts here */
-      ""rock"": ""echo \""There's no wrong time to rock! ??\"""",
+      ""rock"": ""echo \""There's no wrong time to rock!\"""",
       ""truth"": ""echo 'Simplicity is the ultimate sophistication.'"",
       ""answer"": ""echo 42"",
     },

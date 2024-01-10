@@ -27,7 +27,7 @@ namespace _42.Monorepo.Cli.Templates
  if (_featureProvider.IsEnabled("build-traversal")) { 
             this.Write(",\r\n  \"msbuild-sdks\": {\r\n    \"Microsoft.Build.Traversal\": \"4.1.0\"\r\n  }");
  } 
-            this.Write("}\r\n");
+            this.Write("\r\n}\r\n");
             return this.GenerationEnvironment.ToString();
         }
     }
