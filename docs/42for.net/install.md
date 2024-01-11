@@ -10,7 +10,7 @@ To install the mono-repo CLI, you need to have the dotnet ready on your machine 
 dotnet tool install 42.Monorepo.Cli --global --prerelease
 ```
 
-After that, you can use your favorite IDE and Git tools to build your first .net friendly mono repository. Creating it is as easy as running a single command in your desired target directory for it:
+After that, you can use your favorite IDE and Git tools to build your first .net friendly mono repository. Creating it is as easy as running a single command in your desired target directory:
 
 ``` powershell
 mrepo new

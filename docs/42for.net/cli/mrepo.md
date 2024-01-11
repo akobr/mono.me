@@ -8,6 +8,18 @@ Here is a short taste of what the mrepo CLI interface can do.
 For a more detailed description, please visit [the technical documentation of the tool](https://github.com/akobr/mono.me/blob/main/docs/Monorepo/mrepo-cli.md). 
 :::
 
+## Create new mono-repository
+
+A new mono-repository can be created just by calling a single command in any empty target directory:
+
+``` powershell
+mrepo new
+```
+
+<iframe style="width: 100%; max-width: 560px; height: 315px; margin: auto;" src="https://www.youtube.com/embed/og5a7Zs6IHU?si=ykA9OThQmqRJ5wmM" 
+title="YouTube video player" frameborder="0" 
+allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
 ## Get information
 
 **TODO: add a video**
@@ -19,9 +31,7 @@ You can use the tool to learn which Nuget packages are used and which versions, 
 By calling a single command from any place in the repository. The MsBuild will be triggered, and the corresponding subtree will be built.
 
 ``` powershell
-
 mrepo build [--clean|restore|build|test|pack|run]
-
 ```
 
 ## Prepare release + notes
