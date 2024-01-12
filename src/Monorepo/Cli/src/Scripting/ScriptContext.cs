@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using _42.Monorepo.Cli.Model.Items;
 
 namespace _42.Monorepo.Cli.Scripting
 {
+    [DebuggerDisplay("{ScriptName}")]
     public class ScriptContext : IScriptContext
     {
         public ScriptContext(string scriptName, IItem item)
