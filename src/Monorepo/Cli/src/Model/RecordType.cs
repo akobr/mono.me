@@ -7,5 +7,6 @@ namespace _42.Monorepo.Cli.Model
         TopWorkstead = 2,
         Workstead = 3,
         Project = 4,
+        Special = 5,
     }
 }

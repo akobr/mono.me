@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Model.Records;
 
@@ -8,6 +9,8 @@ namespace _42.Monorepo.Cli
 {
     public static class MonorepoDirectoryFunctions
     {
+        private static string? _monorepoRootDirectory;
+
         public static bool IsMonoRepository()
         {
             return IsMonoRepository(Directory.GetCurrentDirectory());
@@ -32,7 +35,12 @@ namespace _42.Monorepo.Cli
 
         public static string GetMonorepoRootDirectory()
         {
-            return GetMonorepoRootDirectory(Directory.GetCurrentDirectory());
+            if (_monorepoRootDirectory is not null)
+            {
+                return _monorepoRootDirectory;
+            }
+
+            return _monorepoRootDirectory = GetMonorepoRootDirectory(Directory.GetCurrentDirectory());
         }
 
         public static string GetMonorepoRootDirectory(string directoryPath)
@@ -57,12 +65,12 @@ namespace _42.Monorepo.Cli
             return new RepositoryRecord(GetMonorepoRootDirectory());
         }
 
-        public static IRecord GetCurrentRecord()
+        public static IRecord GetCurrentRecord(IItemOptionsProvider? optionsProvider = null)
         {
-            return GetRecord(Directory.GetCurrentDirectory());
+            return GetRecord(Directory.GetCurrentDirectory(), optionsProvider);
         }
 
-        public static IRecord GetRecord(string anyPathProcessedAsAbsolute)
+        public static IRecord GetRecord(string anyPathProcessedAsAbsolute, IItemOptionsProvider? optionsProvider = null)
         {
             var path = anyPathProcessedAsAbsolute;
 
@@ -91,6 +99,11 @@ namespace _42.Monorepo.Cli
             if (segments.Length < 2
                 || !segments[0].EqualsOrdinalIgnoreCase(Constants.SOURCE_DIRECTORY_NAME))
             {
+                if (optionsProvider?.TryGetOptions(relativePath, out _) ?? false)
+                {
+                    return new SpecialRecord(Path.Combine(repo.Path, relativePath), repo);
+                }
+
                 return repo;
             }
 

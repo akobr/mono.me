@@ -1,9 +1,11 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using _42.Monorepo.Cli.Extensions;
 
 namespace _42.Monorepo.Cli.Configuration;
 
+[DebuggerDisplay("{Path}")]
 public class ItemFullOption : IItemFullOption
 {
     private readonly ItemOptions _item;

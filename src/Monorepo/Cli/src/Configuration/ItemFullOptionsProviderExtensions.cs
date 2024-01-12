@@ -1,3 +1,4 @@
+using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Records;
 
 namespace _42.Monorepo.Cli.Configuration;
@@ -23,8 +24,9 @@ public static class ItemFullOptionsProviderExtensions
     {
         return record.Type switch
         {
-            Model.RecordType.Workstead => TypeKeys.DOTNET_WORKSTEAD,
-            Model.RecordType.Project => TypeKeys.DOTNET_PROJECT,
+            RecordType.Workstead => TypeKeys.DOTNET_WORKSTEAD,
+            RecordType.Project => TypeKeys.DOTNET_PROJECT,
+            RecordType.Special => TypeKeys.SPECIAL,
             _ => null,
         };
     }

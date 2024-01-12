@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using _42.Monorepo.Cli.Commands;
+using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
 
@@ -9,17 +10,20 @@ namespace _42.Monorepo.Cli
     {
         private readonly IFileSystem _fileSystem;
         private readonly IItemsFactory _powerItemFactory;
+        private readonly IItemOptionsProvider _optionsProvider;
 
         public CommandContext(
             IFileSystem fileSystem,
-            IItemsFactory powerItemFactory)
+            IItemsFactory powerItemFactory,
+            IItemOptionsProvider optionsProvider)
         {
             _fileSystem = fileSystem;
             _powerItemFactory = powerItemFactory;
+            _optionsProvider = optionsProvider;
             var repositoryItem = MonorepoDirectoryFunctions.GetMonoRepository();
             Repository = powerItemFactory.BuildItem<IRepository>(repositoryItem);
 
-            var item = MonorepoDirectoryFunctions.GetCurrentRecord();
+            var item = MonorepoDirectoryFunctions.GetCurrentRecord(optionsProvider);
             Item = powerItemFactory.BuildItem(item);
         }
 
@@ -45,7 +49,7 @@ namespace _42.Monorepo.Cli
                 return;
             }
 
-            var item = MonorepoDirectoryFunctions.GetRecord(possibleItemPath);
+            var item = MonorepoDirectoryFunctions.GetRecord(possibleItemPath, _optionsProvider);
             Item = _powerItemFactory.BuildItem(item);
         }
 
