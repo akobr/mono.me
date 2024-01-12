@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
+using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -41,6 +42,11 @@ namespace _42.Monorepo.Cli.Commands
                 $"Path: {record.Path.GetRelativePath(Context.Repository.Record.Path)}".ThemedLowlight(Console.Theme));
             Console.WriteLine(
                 $"Version: {exactVersions.PackageVersion}".ThemedLowlight(Console.Theme));
+
+            if (record.Type == RecordType.Special)
+            {
+                return ExitCodes.SUCCESS;
+            }
 
             if (options.Exclude.Contains(Excludes.VERSION))
             {
@@ -98,9 +104,10 @@ namespace _42.Monorepo.Cli.Commands
 
                 var externalDependencies =
                     (await item.GetExternalDependenciesAsync())
-                    .Where(d => d.IsDirect);
+                    .Where(d => d.IsDirect)
+                    .ToList();
 
-                if (externalDependencies.Any())
+                if (externalDependencies.Count > 0)
                 {
                     Console.WriteLine();
                     Console.WriteHeader("Package dependencies");

@@ -30,7 +30,7 @@ namespace _42.Monorepo.Cli.Commands
             var item = Context.Item;
             var record = item.Record;
 
-            if (DisplayWorksteads || record.Type == RecordType.Repository)
+            if (DisplayWorksteads || record.Type is RecordType.Repository or RecordType.Special)
             {
                 item = Context.Repository;
                 await ShowItemHeader(item);
