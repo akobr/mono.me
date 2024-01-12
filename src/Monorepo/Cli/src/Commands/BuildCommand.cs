@@ -1,19 +1,18 @@
 using System.IO.Abstractions;
 using System.Threading.Tasks;
-using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Features;
+using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
-using _42.Monorepo.Cli.Operations.Strategies;
 using _42.Monorepo.Cli.Scripting;
 using _42.Monorepo.Cli.Templates;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command(CommandNames.BUILD, Description = "Build a specific location.")]
+    [Command(CommandNames.BUILD, "b", Description = "Build a specific location.")]
     public class BuildCommand : BaseCommand
     {
         private readonly IFileSystem _fileSystem;
@@ -63,16 +62,17 @@ namespace _42.Monorepo.Cli.Commands
         [Option("-x|--run", CommandOptionType.NoValue, Description = "Run the project or a startup project.")]
         public bool ShouldRun { get; set; }
 
-        protected override async Task ExecutePreconditionsAsync()
+        protected override async Task<int?> ExecutePreconditionsAsync()
         {
             await base.ExecutePreconditionsAsync();
 
             if (string.IsNullOrWhiteSpace(RelativePath))
             {
-                return;
+                return null;
             }
 
             Context.ReInitialize(RelativePath);
+            return null;
         }
 
         protected override async Task<int> ExecuteAsync()
@@ -136,7 +136,7 @@ namespace _42.Monorepo.Cli.Commands
 
             if (ShouldRun)
             {
-                var code = await RunProjectAsync();
+                var code = await RunAnyItemAsync();
                 return code;
             }
 
@@ -158,12 +158,14 @@ namespace _42.Monorepo.Cli.Commands
             var scriptName = hasProfile ? $"{operation}-{profile}" : operation;
             var scriptContext = new ScriptContext(scriptName, Context.Item) { Args = _application.RemainingArguments };
 
+            // try to run the script from explicit script definition (script tree)
             if (_scripting.HasScript(scriptContext))
             {
                 var scriptOutput = await _scripting.ExecuteScriptAsync(scriptContext);
                 return scriptOutput;
             }
 
+            // try to run the build operation from traversal target file
             if (useTraversal)
             {
                 var traversalOutput = await TryOperateWithTraversal(operation, fullPath, profile);
@@ -174,13 +176,15 @@ namespace _42.Monorepo.Cli.Commands
                 }
             }
 
-            var fallbackOutput = await TryFallbackToDefaultProject(scriptName, fullPath);
+            // try fallback to default item type (implicit type)
+            var fallbackOutput = await TryFallbackToDefaultItemType(Context.Item, scriptName);
 
             if (fallbackOutput.HasValue)
             {
                 return fallbackOutput.Value;
             }
 
+            // if there is no script and traversal target file is missing ask to create it
             if (useTraversal)
             {
                 Console.WriteImportant($"No custom script or traversal target file found.");
@@ -188,7 +192,7 @@ namespace _42.Monorepo.Cli.Commands
                 Console.WriteLine($" > Directory.Build.proj");
                 Console.WriteLine();
 
-                var createDirectoryBuildFile = Console.Confirm("Create new Directory.Build.proj");
+                var createDirectoryBuildFile = Console.Confirm("Create new default Directory.Build.proj");
 
                 if (createDirectoryBuildFile)
                 {
@@ -210,34 +214,65 @@ namespace _42.Monorepo.Cli.Commands
             return ExitCodes.ERROR_WRONG_PLACE;
         }
 
-        private async Task<int> RunProjectAsync()
+        private async Task<int> RunAnyItemAsync()
         {
-            var projectItem = Context.Item;
+            var item = Context.Item;
             var startupProjectRepoPath = Context.Item.Record.RepoRelativePath;
 
-            if (projectItem.Record.Type != Model.RecordType.Project)
+            if (item.Record.Type == RecordType.Special)
+            {
+                return await RunItemAsync(item);
+            }
+
+            if (item.Record.Type != RecordType.Project)
             {
                 var options = _optionsProvider.GetWorksteadOptions(Context.Item.Record.RepoRelativePath);
                 startupProjectRepoPath = options.GetStartupProject();
 
                 if (string.IsNullOrWhiteSpace(startupProjectRepoPath))
                 {
-                    Console.WriteImportant($"No startup project for: {projectItem.Record.RepoRelativePath}");
+                    Console.WriteImportant($"No startup project for: {item.Record.RepoRelativePath}, set some in mrepo.json");
+                    return ExitCodes.ERROR_WRONG_PLACE;
                 }
 
                 var projectRecord = MonorepoDirectoryFunctions.GetRecord(_fileSystem.Path.Combine(Context.Repository.Record.Path, startupProjectRepoPath));
-                projectItem = Context.Repository.TryGetDescendant(projectRecord);
+                item = Context.Repository.TryGetDescendant(projectRecord);
             }
 
-            if (projectItem is not IProject targetProject)
+            if (item is not IProject)
             {
                 Console.WriteImportant($"Unknown startup project: {startupProjectRepoPath}");
                 return ExitCodes.ERROR_WRONG_PLACE;
             }
 
-            var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(targetProject, _fileSystem);
-            var script = $"dotnet run --project {projectFilePath}";
-            var scriptOutput = await _scripting.ExecuteScriptAsync(script, Context.Item.Record.Path);
+            return await RunItemAsync(item);
+        }
+
+        private async Task<int> RunItemAsync(IItem item)
+        {
+            var profile = !string.IsNullOrWhiteSpace(Profile) ? Profile.Trim() : string.Empty;
+            var hasProfile = !string.IsNullOrEmpty(profile);
+
+            var scriptName = hasProfile ? $"run-{profile}" : "run";
+            var scriptContext = new ScriptContext(scriptName, item) { Args = _application.RemainingArguments };
+
+            // try to run the script from explicit script definition (script tree)
+            if (_scripting.HasScript(scriptContext))
+            {
+                return await _scripting.ExecuteScriptAsync(scriptContext);
+            }
+
+            // try fallback to default item type (implicit type)
+            var fallbackOutput = await TryFallbackToDefaultItemType(item, scriptName);
+
+            if (fallbackOutput.HasValue)
+            {
+                return fallbackOutput.Value;
+            }
+
+            // if there is no script and no fallback in default item type, try to run the .net project
+            var script = $"dotnet run --project {item.Record.Path}";
+            var scriptOutput = await _scripting.ExecuteScriptAsync(script, item.Record.Path);
             return scriptOutput;
         }
 
@@ -281,16 +316,16 @@ namespace _42.Monorepo.Cli.Commands
             return buildTarget;
         }
 
-        private async Task<int?> TryFallbackToDefaultProject(string scriptName, string fullPath)
+        private async Task<int?> TryFallbackToDefaultItemType(IItem item, string scriptName)
         {
-            var typedItemOptions = _optionsProvider.GetItemOptions(Context.Item.Record);
+            var typedItemOptions = _optionsProvider.GetItemOptions(item.Record);
 
             if (!typedItemOptions.Scripts.TryGetValue(scriptName, out var script))
             {
                 return null;
             }
 
-            var scriptOutput = await _scripting.ExecuteScriptAsync(script, fullPath);
+            var scriptOutput = await _scripting.ExecuteScriptAsync(script, item.Record.Path);
             return scriptOutput;
         }
     }
