@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 
@@ -25,6 +26,11 @@ namespace _42.Monorepo.Cli.Configuration
             _options = new Dictionary<string, ItemOptions>(
                 items.Select(i => new KeyValuePair<string, ItemOptions>(i.Path, i)),
                 StringComparer.OrdinalIgnoreCase);
+        }
+
+        public bool TryGetOptions(string path, [MaybeNullWhen(false)] out ItemOptions? options)
+        {
+            return _options.TryGetValue(path, out options);
         }
 
         public ItemOptions GetOptions(string path)

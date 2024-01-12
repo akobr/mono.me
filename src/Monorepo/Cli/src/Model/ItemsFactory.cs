@@ -21,6 +21,7 @@ namespace _42.Monorepo.Cli.Model
                 RepositoryRecord repository => new Repository(repository, executor, BuildItem),
                 WorksteadRecord workstead => new Workstead(workstead, executor, BuildItem),
                 ProjectRecord project => new Project(project, executor, BuildItem),
+                SpecialRecord special => new Special(special, executor, BuildItem),
                 InvalidRecord invalid => new InvalidItem(invalid),
                 _ => throw new ArgumentOutOfRangeException(nameof(record), record, "An unsupported type of item."),
             };

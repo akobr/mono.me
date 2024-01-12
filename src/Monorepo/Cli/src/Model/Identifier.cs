@@ -15,8 +15,8 @@ namespace _42.Monorepo.Cli.Model
         {
             Name = Path.GetFileName(path);
             Humanized = parent is null
-                ? Constants.SOURCE_DIRECTORY_NAME
-                : $"{parent.Identifier.Humanized}/{Name}";
+                ? Constants.ROOT_REPO_IDENTIFIER
+                : path.GetRelativePath(MonorepoDirectoryFunctions.GetMonorepoRootDirectory());
             Normalized = Humanized.ToLowerInvariant();
 
             // TODO: murmur hash
