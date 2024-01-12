@@ -12,7 +12,7 @@ using Sharprompt;
 namespace _42.Monorepo.Cli.Commands.Update
 {
     [Command(CommandNames.PACKAGE, Description = "Update version of a specific package.")]
-    public class UpdatePackageCommand : BaseCommand
+    public class UpdatePackageCommand : BaseSourceCommand
     {
         private readonly IFileSystem _fileSystem;
 

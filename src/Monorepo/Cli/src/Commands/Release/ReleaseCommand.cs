@@ -23,7 +23,7 @@ namespace _42.Monorepo.Cli.Commands.Release
 {
     [Command(CommandNames.RELEASE, Description = "Create new release of a current location.")]
     [Subcommand(typeof(TagCommand))]
-    public class ReleaseCommand : BaseCommand
+    public class ReleaseCommand : BaseSourceCommand
     {
         private readonly IFileSystem _fileSystem;
         private readonly IGitRepositoryService _repositoryService;

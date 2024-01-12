@@ -18,9 +18,9 @@ namespace _42.Monorepo.Cli.Commands.New
             this.application = application;
         }
 
-        protected override Task ExecutePreconditionsAsync()
+        protected override Task<int?> ExecutePreconditionsAsync()
         {
-            return Task.CompletedTask;
+            return Task.FromResult<int?>(null);
         }
 
         protected override Task<int> ExecuteAsync()

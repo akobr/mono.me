@@ -18,7 +18,13 @@ namespace _42.Monorepo.Cli.Commands
 
         public async Task<int> OnExecuteAsync()
         {
-            await ExecutePreconditionsAsync();
+            var resultCode = await ExecutePreconditionsAsync();
+
+            if (resultCode.HasValue)
+            {
+                return resultCode.Value;
+            }
+
             var exitCode = await ExecuteAsync();
             await ExecutePostconditionsAsync();
             return exitCode;
@@ -26,10 +32,10 @@ namespace _42.Monorepo.Cli.Commands
 
         protected abstract Task<int> ExecuteAsync();
 
-        protected virtual Task ExecutePreconditionsAsync()
+        protected virtual Task<int?> ExecutePreconditionsAsync()
         {
             Context.TryFailedIfInvalid();
-            return Task.CompletedTask;
+            return Task.FromResult<int?>(null);
         }
 
         protected virtual Task ExecutePostconditionsAsync()

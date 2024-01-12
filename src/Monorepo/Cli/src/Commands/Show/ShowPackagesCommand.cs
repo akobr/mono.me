@@ -6,7 +6,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Monorepo.Cli.Commands.Show;
 
 [Command(CommandNames.PACKAGES, Description = "Show all available packages for a current location.")]
-public class ShowPackagesCommand : BaseCommand
+public class ShowPackagesCommand : BaseSourceCommand
 {
     public ShowPackagesCommand(IExtendedConsole console, ICommandContext context)
         : base(console, context)

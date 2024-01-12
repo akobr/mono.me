@@ -11,7 +11,7 @@ using Sharprompt;
 namespace _42.Monorepo.Cli.Commands.New
 {
     [Command(CommandNames.PACKAGE, Description = "Add new package to centralized definition.")]
-    public class NewPackageCommand : BaseCommand
+    public class NewPackageCommand : BaseSourceCommand
     {
         private readonly IFileSystem _fileSystem;
 
@@ -22,7 +22,6 @@ namespace _42.Monorepo.Cli.Commands.New
             : base(console, context)
         {
             _fileSystem = fileSystem;
-            // no operation
         }
 
         [Argument(0, Description = "Id of the package.")]
