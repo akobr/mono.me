@@ -56,6 +56,7 @@ namespace _42.Monorepo.Cli.Scripting
         public async Task<int> ExecuteScriptAsync(string script, string? workingDirectory = null, CancellationToken cancellationToken = default)
         {
             var arguments = script.Replace("\"", "\"\"\"");
+            workingDirectory = workingDirectory?.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
 
             ProcessStartInfo startInfo = new(_repositoryOptions.Shell ?? "powershell", arguments)
             {
@@ -98,7 +99,8 @@ namespace _42.Monorepo.Cli.Scripting
 
             foreach (var itemOptions in _itemOptionsProvider.GetAllOptions())
             {
-                tree.GetOrCreateTargetNode(itemOptions.Path);
+                var node = tree.GetOrCreateTargetNode(itemOptions.Path);
+                node?.AddScripts(itemOptions.Scripts);
             }
 
             return tree;
