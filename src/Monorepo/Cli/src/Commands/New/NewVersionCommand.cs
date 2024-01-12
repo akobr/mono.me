@@ -10,7 +10,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Monorepo.Cli.Commands.New
 {
     [Command(CommandNames.VERSION, Description = "Create new version file.")]
-    public class NewVersionCommand : BaseCommand
+    public class NewVersionCommand : BaseSourceCommand
     {
         private readonly IFileSystem _fileSystem;
 

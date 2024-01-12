@@ -12,7 +12,7 @@ using Semver;
 namespace _42.Monorepo.Cli.Commands.New
 {
     [Command(CommandNames.WORKSTEAD, Description = "Create new workstead.")]
-    public class NewWorksteadCommand : BaseCommand
+    public class NewWorksteadCommand : BaseSourceCommand
     {
         private readonly IFileSystem _fileSystem;
         private readonly IFeatureProvider _featureProvider;

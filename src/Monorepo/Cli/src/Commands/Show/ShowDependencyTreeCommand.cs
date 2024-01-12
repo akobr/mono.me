@@ -8,7 +8,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Monorepo.Cli.Commands.Show
 {
     [Command(CommandNames.DEPENDENCY_TREE, Description = "Show dependency tree for a current location.")]
-    public class ShowDependencyTreeCommand : BaseCommand
+    public class ShowDependencyTreeCommand : BaseSourceCommand
     {
         public ShowDependencyTreeCommand(IExtendedConsole console, ICommandContext context)
             : base(console, context)
@@ -16,9 +16,15 @@ namespace _42.Monorepo.Cli.Commands.Show
             // no operation
         }
 
+        [Option("-p|--packages", CommandOptionType.NoValue, Description = "Determining whether to include external dependencies to packages.")]
+        public bool ShowPackages { get; }
+
         protected override async Task<int> ExecuteAsync()
         {
-            Console.WriteHeader("Internal dependency tree of ", Context.Item.Record.Identifier.Humanized.ThemedHighlight(Console.Theme));
+            Console.WriteHeader(
+                ShowPackages ? "Dependency tree of " : "Internal dependency tree of ",
+                Context.Item.Record.Identifier.Humanized.ThemedHighlight(Console.Theme));
+
             var tree = await BuildTreeAsync(Context.Item);
 
             if (tree.Children.Count < 1)
@@ -77,24 +83,8 @@ namespace _42.Monorepo.Cli.Commands.Show
         {
             var record = project.Record;
             var repository = Context.Repository;
-            var dependencies = await project.GetInternalDependenciesAsync();
             var projectNode = new Composition(record.Name);
-
-            foreach (var dependency in dependencies)
-            {
-                var projectRecord = MonorepoDirectoryFunctions.GetRecord(dependency.FullPath);
-                var projectItem = repository.TryGetDescendant(projectRecord);
-
-                if (projectItem is IProject subProject)
-                {
-                    projectNode.Children.Add(await BuildDependProjectNodeAsync(subProject, 1));
-                }
-                else
-                {
-                    projectNode.Children.Add(new[] { projectRecord.Identifier.Humanized, " [unknown]".Lowlight() });
-                }
-            }
-
+            await BuildProjectChildren(project, projectNode, 1, repository);
             return projectNode;
         }
 
@@ -102,7 +92,6 @@ namespace _42.Monorepo.Cli.Commands.Show
         {
             var record = project.Record;
             var repository = Context.Repository;
-            var dependencies = await project.GetInternalDependenciesAsync();
 
             if (level > 10)
             {
@@ -110,6 +99,14 @@ namespace _42.Monorepo.Cli.Commands.Show
             }
 
             var projectNode = new Composition(record.GetHierarchicalName());
+            await BuildProjectChildren(project, projectNode, level, repository);
+
+            return projectNode;
+        }
+
+        private async Task BuildProjectChildren(IProject project, Composition projectNode, int level, IRepository repository)
+        {
+            var dependencies = await project.GetInternalDependenciesAsync();
 
             foreach (var dependency in dependencies)
             {
@@ -124,9 +121,21 @@ namespace _42.Monorepo.Cli.Commands.Show
                 {
                     projectNode.Children.Add(new[] { projectRecord.Identifier.Humanized, " [unknown]".Lowlight() });
                 }
-            }
 
-            return projectNode;
+                if (ShowPackages)
+                {
+                    var externalDependencies = await project.GetExternalDependenciesAsync();
+
+                    if (externalDependencies.Count > 0)
+                    {
+                        foreach (var externalDependency in externalDependencies)
+                        {
+                            projectNode.Children.Add(new[]
+                                { $"{externalDependency.Name} v.{externalDependency.Version}".Lowlight() });
+                        }
+                    }
+                }
+            }
         }
     }
 }

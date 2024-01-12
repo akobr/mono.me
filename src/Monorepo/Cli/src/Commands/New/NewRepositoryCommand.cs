@@ -27,9 +27,9 @@ namespace _42.Monorepo.Cli.Commands.New
             _fileSystem = fileSystem;
         }
 
-        protected override Task ExecutePreconditionsAsync()
+        protected override Task<int?> ExecutePreconditionsAsync()
         {
-            return Task.CompletedTask;
+            return Task.FromResult<int?>(null);
         }
 
         protected override async Task<int> ExecuteAsync()

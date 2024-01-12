@@ -13,7 +13,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Monorepo.Cli.Commands.Fix
 {
     [Command(CommandNames.PACKAGES, Description = "Move all locally versioned packages to centralized point.")]
-    public class FixPackagesCommand : BaseCommand
+    public class FixPackagesCommand : BaseSourceCommand
     {
         private readonly IFileSystem _fileSystem;
 

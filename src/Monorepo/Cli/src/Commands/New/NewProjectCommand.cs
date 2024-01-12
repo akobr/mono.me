@@ -17,7 +17,7 @@ using Semver;
 namespace _42.Monorepo.Cli.Commands.New
 {
     [Command(CommandNames.PROJECT, Description = "Create new .net project.")]
-    public class NewProjectCommand : BaseCommand
+    public class NewProjectCommand : BaseSourceCommand
     {
         private readonly IFileSystem _fileSystem;
         private readonly IFeatureProvider _featureProvider;

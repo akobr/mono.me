@@ -15,7 +15,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Monorepo.Cli.Commands.Show
 {
     [Command(CommandNames.USAGES, Description = "Show usages of a current location.")]
-    public class ShowUsagesCommand : BaseCommand
+    public class ShowUsagesCommand : BaseSourceCommand
     {
         private readonly IFileSystem _fileSystem;
 

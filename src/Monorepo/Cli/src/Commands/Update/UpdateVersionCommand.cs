@@ -16,7 +16,7 @@ using Semver;
 namespace _42.Monorepo.Cli.Commands.Update
 {
     [Command(CommandNames.VERSION, Description = "Update version of a current location based on git history.")]
-    public class UpdateVersionCommand : BaseCommand
+    public class UpdateVersionCommand : BaseSourceCommand
     {
         private readonly IFileSystem _fileSystem;
         private readonly IGitHistoryService _historyService;

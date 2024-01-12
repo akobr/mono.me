@@ -6,7 +6,7 @@ using McMaster.Extensions.CommandLineUtils;
 namespace _42.Monorepo.Cli.Commands.Show
 {
     [Command(CommandNames.VERSIONS, Description = "Show all versions of a current location.")]
-    public class ShowVersionsCommand : BaseCommand
+    public class ShowVersionsCommand : BaseSourceCommand
     {
         public ShowVersionsCommand(IExtendedConsole console, ICommandContext context)
             : base(console, context)
