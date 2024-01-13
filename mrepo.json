@@ -39,7 +39,6 @@
         "pack": "dotnet pack src",
         "pack-publish": "dotnet pack src -c RELEASE /p:ContinuousIntegrationBuild=true",
         "restore": "dotnet restore src",
-        "run": "dotnet run src",
         "test": "dotnet test test"
       }
     }
@@ -93,7 +92,6 @@
     {
       "path": "src/Games",
       "name": "Best games to play!",
-      "description": "The intersection of the legendary game Tetris + Command line = Cetris.",
       "custom": {
         "isSuppressed": true,
         "startupProject": "src/Games/Cetris"
