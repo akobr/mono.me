@@ -6,6 +6,7 @@ using _42.Monorepo.Cli.Extensions;
 using _42.Monorepo.Cli.Features;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
+using _42.Monorepo.Cli.Operations.Strategies;
 using _42.Monorepo.Cli.Scripting;
 using _42.Monorepo.Cli.Templates;
 using McMaster.Extensions.CommandLineUtils;
@@ -271,9 +272,23 @@ namespace _42.Monorepo.Cli.Commands
             }
 
             // if there is no script and no fallback in default item type, try to run the .net project
-            var script = $"dotnet run --project {item.Record.Path}";
-            var scriptOutput = await _scripting.ExecuteScriptAsync(script, item.Record.Path);
-            return scriptOutput;
+            if (item is IProject projectItem)
+            {
+                var projectFilePath = ProjectStrategyHelper.GetProjectFilePath(item, _fileSystem);
+
+                if (!_fileSystem.File.Exists(projectFilePath))
+                {
+                    Console.WriteImportant("Project file not found.");
+                    return ExitCodes.ERROR_WRONG_PLACE;
+                }
+
+                var script = $"dotnet run --project {projectFilePath}";
+                var scriptOutput = await _scripting.ExecuteScriptAsync(script, item.Record.Path);
+                return scriptOutput;
+            }
+
+            Console.WriteImportant("Runnable target not found.");
+            return ExitCodes.ERROR_WRONG_PLACE;
         }
 
         private async Task<int?> TryOperateWithTraversal(string operation, string fullPath, string profile)
