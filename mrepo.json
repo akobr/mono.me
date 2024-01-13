@@ -7,8 +7,7 @@
     "scripts": {
       "rock": "echo \"There's no wrong time to rock! 🎸\"",
       "truth": "echo 'Simplicity is the ultimate sophistication.'",
-      "answer": "echo 42",
-      "pack-release": "cd src; dotnet pack -c RELEASE /p:ContinuousIntegrationBuild=true"
+      "answer": "echo 42"
     },
     "folders": {
       "source": "src",
@@ -38,6 +37,7 @@
         "build": "dotnet build src",
         "clean": "dotnet clean src",
         "pack": "dotnet pack src",
+        "pack-publish": "dotnet pack src -c RELEASE /p:ContinuousIntegrationBuild=true",
         "restore": "dotnet restore src",
         "run": "dotnet run src",
         "test": "dotnet test test"
@@ -45,6 +45,18 @@
     }
   },
   "items": [
+    {
+      "path": "docs/42for.net",
+      "name": "42for.net",
+      "description": "Websites of 42for.net in VitePress. Visit us at https://42for.net",
+      "scripts": {
+        "install": "npm install",
+        "build": "npx vitepress build",
+        "run": "npx vitepress dev",
+        "pack": "npx vitepress build",
+        "preview": "npx vitepress preview"
+      }
+    },
     {
       "path": "src/Monorepo",
       "name": "Monorepo",
@@ -83,7 +95,8 @@
       "name": "Best games to play!",
       "description": "The intersection of the legendary game Tetris + Command line = Cetris.",
       "custom": {
-        "isSuppressed": true
+        "isSuppressed": true,
+        "startupProject": "src/Games/Cetris"
       }
     },
     {
