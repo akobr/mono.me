@@ -42,7 +42,7 @@ namespace _42.Monorepo.Cli.Commands
         [Option("--path", CommandOptionType.SingleValue, Description = "Relative path in the mono-repository to build.")]
         public string? RelativePath { get; set; } = string.Empty;
 
-        [Option("-l|--profile", CommandOptionType.SingleValue, Description = "The profile of the build. Specify which Directory.<PROFILE>.proj file is used or which build script to use.")]
+        [Option("-l|--profile", CommandOptionType.SingleValue, Description = "The profile of the build. Specify which Directory.<OPERATION>.<PROFILE>.proj file is used or which build script to use.")]
         public string? Profile { get; set; } = string.Empty;
 
         [Option("-c|--clean", CommandOptionType.NoValue, Description = "Perform clean operation.")]
@@ -113,10 +113,10 @@ namespace _42.Monorepo.Cli.Commands
                 }
             }
 
-            if (ShouldPack)
+            if (ShouldTest)
             {
                 isCustom = true;
-                var code = await ExecuteOperationAsync("pack");
+                var code = await ExecuteOperationAsync("test");
 
                 if (code != ExitCodes.SUCCESS)
                 {
@@ -124,10 +124,10 @@ namespace _42.Monorepo.Cli.Commands
                 }
             }
 
-            if (ShouldTest)
+            if (ShouldPack)
             {
                 isCustom = true;
-                var code = await ExecuteOperationAsync("test");
+                var code = await ExecuteOperationAsync("pack");
 
                 if (code != ExitCodes.SUCCESS)
                 {
@@ -152,8 +152,14 @@ namespace _42.Monorepo.Cli.Commands
         private async Task<int> ExecuteOperationAsync(string operation)
         {
             var fullPath = Context.Item.Record.Path;
+
+            if (Context.Item.Record.Type is RecordType.Repository)
+            {
+                fullPath = _fileSystem.Path.Combine(fullPath, Constants.SOURCE_DIRECTORY_NAME);
+            }
+
             var profile = !string.IsNullOrWhiteSpace(Profile) ? Profile.Trim() : string.Empty;
-            var hasProfile = !string.IsNullOrEmpty(profile);
+            var hasProfile = !string.IsNullOrWhiteSpace(profile);
             var useTraversal = _featureProvider.IsEnabled(FeatureNames.BuildTraversal);
 
             var scriptName = hasProfile ? $"{operation}-{profile}" : operation;
@@ -188,17 +194,39 @@ namespace _42.Monorepo.Cli.Commands
             // if there is no script and traversal target file is missing ask to create it
             if (useTraversal)
             {
-                Console.WriteImportant($"No custom script or traversal target file found.");
+                var operationNormalized = char.ToUpperInvariant(operation[0]) + operation[1..].ToLowerInvariant();
+                var basicTraversalTarget = "Directory.Build.proj";
+                var isNotBuild = operation != "build";
+                Console.WriteImportant("No custom script or traversal target file found.");
                 Console.WriteLine($" > {scriptName}");
-                Console.WriteLine($" > Directory.Build.proj");
-                Console.WriteLine();
 
-                var createDirectoryBuildFile = Console.Confirm("Create new default Directory.Build.proj");
+                if (hasProfile)
+                {
+                    Console.WriteLine($" > Directory.{operationNormalized}.{profile}.proj");
+
+                    if (isNotBuild)
+                    {
+                        basicTraversalTarget = $"Directory.Build.{profile}.proj";
+                        Console.WriteLine($" > Directory.Build.{profile}.proj");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($" > Directory.{operationNormalized}.proj");
+
+                    if (isNotBuild)
+                    {
+                        Console.WriteLine($" > Directory.Build.proj");
+                    }
+                }
+
+                Console.WriteLine();
+                var createDirectoryBuildFile = Console.Confirm($"Create new traversal target {basicTraversalTarget}");
 
                 if (createDirectoryBuildFile)
                 {
                     var template = new DirectoryBuildProjT4();
-                    var filePath = _fileSystem.Path.Combine(fullPath, FileNames.DirectoryBuildProj);
+                    var filePath = _fileSystem.Path.Combine(fullPath, basicTraversalTarget);
                     await _fileSystem.File.WriteAllTextAsync(filePath, template.TransformText());
                     Console.WriteLine(
                         "The traversal build file has been created, please run ".ThemedLowlight(Console.Theme),
@@ -220,7 +248,7 @@ namespace _42.Monorepo.Cli.Commands
             var item = Context.Item;
             var startupProjectRepoPath = Context.Item.Record.RepoRelativePath;
 
-            if (item.Record.Type == RecordType.Special)
+            if (item.Record.Type is RecordType.Special)
             {
                 return await RunItemAsync(item);
             }
