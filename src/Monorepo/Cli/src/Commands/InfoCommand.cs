@@ -10,7 +10,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command(CommandNames.INFO, Description = "Display information of a current location.")]
+    [Command(CommandNames.INFO, "i", Description = "Display information of a current location.")]
     public class InfoCommand : BaseCommand
     {
         private readonly IItemOptionsProvider _optionsProvider;

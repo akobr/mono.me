@@ -21,7 +21,7 @@ using Sharprompt;
 
 namespace _42.Monorepo.Cli.Commands.Release
 {
-    [Command(CommandNames.RELEASE, Description = "Create new release of a current location.")]
+    [Command(CommandNames.RELEASE, "r", Description = "Create new release of a current location.")]
     [Subcommand(typeof(TagCommand))]
     public class ReleaseCommand : BaseSourceCommand
     {
