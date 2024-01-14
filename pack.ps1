@@ -1,1 +1,0 @@
-dotnet pack Directory.Build.proj
