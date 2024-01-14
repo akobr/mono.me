@@ -3,7 +3,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands.Show
 {
-    [Command(CommandNames.SHOW, Description = "Show detailed information about a current location.")]
+    [Command(CommandNames.SHOW, "s", Description = "Show detailed information about a current location.")]
     [Subcommand(typeof(ShowUsagesCommand), typeof(ShowDependencyTreeCommand), typeof(ShowVersionsCommand), typeof(ShowPackagesCommand))]
     public class ShowCommand : BaseParentCommand
     {

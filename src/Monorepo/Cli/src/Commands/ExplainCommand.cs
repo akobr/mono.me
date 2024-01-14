@@ -8,7 +8,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Monorepo.Cli.Commands
 {
-    [Command(CommandNames.EXPLAIN, Description = "Display explanation of an item inside the mono-repository.")]
+    [Command(CommandNames.EXPLAIN, "e", Description = "Display explanation of an item inside the mono-repository.")]
     public class ExplainCommand : BaseCommand
     {
         private readonly Dictionary<string, Action> _explanationMapping;
