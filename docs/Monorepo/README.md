@@ -1,8 +1,16 @@
 # We ❤ mono-repository
 
-> Monorepo ≠ monolith❗ It is a possibility how to manage a large codebase or multiple projects in a centralized, standardized, and sustainable way.
+> Monorepo ≠ monolith❗ It is possible to manage a large codebase or multiple projects in a centralized, standardized, and sustainable way.
 
-This project is trying to tackle problems around [a mono-repository](https://en.wikipedia.org/wiki/Monorepo) and .NET technical stack, but not exlusively. The other goal is to put together useful tooling for a monorepo which is already out there and explain best practices which I recomend to use.
+This project tackles problems around [a mono-repository](https://en.wikipedia.org/wiki/Monorepo) and .NET technical stack, but not exclusively. The other goal is to put together ideas for mono repository tooling that are already out there and explain the best practices.
+
+## Main benefits
+
+- centralized dependency management
+- intelligent versioning based only on git history
+- flexible build system and custom scripting
+- automated releasing and generating release notes
+- transparent view and navigation through the codebase
 
 ## Before started
 
@@ -15,6 +23,7 @@ This project is trying to tackle problems around [a mono-repository](https://en.
 - [CLI interface](mrepo-cli.md)
 - [Configuration](mrepo-json.md)
 - [Versioning](versioning.md)
+- [Building](building.md)
 - [Releasing](releasing.md)
 - [Good habits](good-habits.md)
 - [Feature list](features.md)
@@ -22,8 +31,8 @@ This project is trying to tackle problems around [a mono-repository](https://en.
 
 ## mrepo toolset
 
-The heart of the toolset is [a CLI application](mrepo-cli.md) served as dotnet tool under the command `mrepo`. This powerful command helps you to manage, create and release everything inside a mono-repository.
+The heart of the toolset is [a CLI application](mrepo-cli.md) served as dotnet tool under the command `mrepo`. This powerful command helps you to manage, create, and release everything inside a mono-repository.
 
 ## Configuration
 
-Basic [configuration of a mono-repository](mrepo-json.md) is stored in `mrepo.json` file in the root of the repository. Detailed pieces and custom scripts should be located in folder `.mrepo`.
+Basic [configuration of a mono-repository](mrepo-json.md) is stored in the `mrepo.json` file in the repository's root. Detailed pieces and custom scripts should be located in folder `.mrepo`.
