@@ -80,6 +80,7 @@ namespace _42.Monorepo.Cli.Commands.Release
             repo.Tags.Add(releaseName, releaseCommit);
 #endif
             Console.WriteImportant($"The tag {releaseName} has been created at commit {releaseCommit.Sha[0..7]}.");
+            Console.WriteLine("Now, you can execute: ".Lowlight(), $"git push origin {releaseName}");
             return Task.FromResult(ExitCodes.SUCCESS);
         }
     }
