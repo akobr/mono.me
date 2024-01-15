@@ -133,4 +133,4 @@ after two new commit into the Console.Application:
   - **Console.Application** (2.1.2) *[project]*
   - **Web.Application** (2.1) *[project]*
 
-> Any change in any project is affecting only the concrete project, but the global update of the `version.json` affectS the entire version of the workstead.
+> Any change in any project is affecting only the concrete project, but the global update of the `version.json` affects the entire version of the workstead.
