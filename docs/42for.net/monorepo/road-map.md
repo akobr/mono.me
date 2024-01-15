@@ -4,8 +4,8 @@ The expected list and the order of new features.
 
 ## Version 1.1
 
-- native support for infrastructure in [Pulumi](https://www.pulumi.com/)
 - trigger system for CI/CD builds realized as git changes (traceable and transparent)
+- native support for infrastructure in [Pulumi](https://www.pulumi.com/)
 - better and detailed documentation, especially for releasing system
 
 ## Version 1.2
