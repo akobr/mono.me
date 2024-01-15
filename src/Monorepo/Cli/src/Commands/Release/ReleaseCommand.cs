@@ -348,7 +348,7 @@ namespace _42.Monorepo.Cli.Commands.Release
 
             if (statuses.Staged.Any())
             {
-                Console.WriteImportant("There are already files in the git stage, please do the changes manually.");
+                Console.WriteImportant("There are already files in the staging area, please do the changes manually.");
                 return false;
             }
 
