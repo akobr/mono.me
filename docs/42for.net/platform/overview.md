@@ -122,7 +122,7 @@ Try AI to detect anomalies in your ecosystem. <Badge type="warning" text="under 
 
 The last actor for managing time-based and recurrent jobs. It can be handy when you have many of them and want to describe smaller units than just responsibilities (satellites) in the ecosystem. Imagine how convenient it is to know: *what and when is running per each customer?*
 
-The sheduler is using more granular view of responisbilities, these units represent jobs and each job can be scheduled in any desired time.
+The scheduler uses a more granular view of responsibilities, called units. These units represent jobs; each job can be triggered at any desired time controlled by CRON expression.
 
 <div id="tooltip-modal" class="modal">
 
