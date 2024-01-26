@@ -10,7 +10,7 @@ The main concepts of the **2S** platform are described here.
 
 The hearth of the platform. The term ecosystem is vital in the concept of a managable modulith. It is a description and a model of your product. The description can be used as a data source for fundamental questions, like *what is used by a concrete customer?* The storyteller describes the entire ecosystem in simple but flexible way of annotations and acts as a single point of truth for configuring a satellite in any state/context.
 
-The model of annotations defines all critical relationships from the business point of view. The shape of it is crucial and probably the most important decision to make. The concept of annotation is quite abstract, flexible, and still simple. There are these annotations:
+The model of annotations defines all critical relationships from the business point of view. The shape of it is crucial and probably the most important decision to make. The concept of annotation is quite abstract, flexible, and still simple. There are these annotations *(the diagrams are interactive)*:
 
 :::tabs
 == default
@@ -100,7 +100,7 @@ flowchart LR
 ```
 :::
 
-The model is kept simple but generic to make it possible to describe a lot of variations of complex software systems. It can describe the relationship between your SaS product and your customers, complex business workflows, or differences between major software versions released yearly. There are no limits to the imagination and what you want to describe by the annotation model. It should always be something that will help you to manage your product.
+The model is kept simple but generic to make it possible to describe a lot of variations of complex software systems. It can describe the relationship between your SaaS product and your customers, complex business workflows, or differences between major software versions released yearly. There are no limits to the imagination and what you want to describe by the annotation model. It should always be something that will help you to manage your product.
 
 ::: tip
 This platform can be very useful for the microservices approach because it can help you picture the system's whole architecture and simplify management. The platform is modeled to handle hundreds of thousands of annotations and serve them blazingly fast. 
@@ -121,3 +121,50 @@ Try AI to detect anomalies in your ecosystem. <Badge type="warning" text="under 
 ## Scheduler
 
 The last actor for managing time-based and recurrent jobs. It can be handy when you have many of them and want to describe smaller units than just responsibilities (satellites) in the ecosystem. Imagine how convenient it is to know: *what and when is running per each customer?*
+
+The sheduler is using more granular view of responisbilities, these units represent jobs and each job can be scheduled in any desired time.
+
+<div id="tooltip-modal" class="modal">
+
+  <!-- Modal content -->
+  <div class="modal-content">
+    <div class="modal-body">
+      <div id="modal-content-subject" class="invisible">
+        <h3>Subject</h3>
+        <p>The subject should represent the most crucial entity in your business.</p>
+        <p>It will probably be your B2B <b>customers</b> in a SaaS operation, but it can be anything. When you are building an extensive desktop application, it could represent released versions. For a car infotainment system, you can set car models as subjects. An environment with prototyped features is a possible idea in extensive multitenant web services or microservices systems. The 2S platform is performance enough to use millions of end-customers as subjects.</p>
+      </div>
+      <div id="modal-content-context" class="invisible">
+        <h3>Context</h3>
+        <p>An optional abstraction layer for a subject. <i>(optional)</i></p>
+        <p>If another degree of separation for a subject is needed, you can model it as a context. Context can be anything helpful, e.g., version, environment, specific setup, edition, project, or instance of a single-tenant system.</p>
+      </div>
+      <div id="modal-content-responsibility" class="invisible">
+        <h3>Responsibility</h3>
+        <p>A satellite / application inside of your ecosystem.</p>
+        <p>It doesn't matter how granular your product is. It can be a less granular set of satellites or many microservices. There are no limits. A responsibility can represent an add-on, application, service, or function in any modular solution or workflow you want to describe on the platform.</p>
+      </div>
+      <div id="modal-content-usage" class="invisible">
+        <h3>Usage</h3>
+        <p>A relation entity between subject and responsibility. <i>(virtual)</i></p>
+        <p>Represent a usage of a responsibility for a specific subject. It can contain particular properties of the responsibility related to the subject.</p>
+      </div>
+      <div id="modal-content-execution" class="invisible">
+        <h3>Execution</h3>
+        <p>An instance of usage, an intersection between a subject, responsibility, and context. <i>(virtual)</i></p>
+        <p>You can imagine the execution as a runtime entity of a satellite. It allows custom configurations and defines in which context the satellite operates.</p>
+      </div>
+      <div id="modal-content-unit" class="invisible">
+        <h3>Unit</h3>
+        <p>The unit allows you to go deeper below responsibility. <i>(optional)</i></p>
+        <p>It is often used for modeling time-triggered jobs under a satellite. It can represent any practical unit inside a responsibility, e.g., a job, function, or workflow step.</p>
+      </div>
+      <div id="modal-content-unit-of-execution" class="invisible">
+        <h3>Unit of execution</h3>
+        <p>A concrete unit of a single execution. <i>(virtual)</i></p>
+        <p>A runtime entity of a unit. A satellite will receive an execution request for the unit at the scheduled time.</p>
+      </div>
+    </div>
+  </div>
+
+</div>

@@ -13,3 +13,8 @@ The expected list and the order of new features.
 - add a possibility to drive the entire release process fully automated from CI/CD processes
 - performance updates for large repositories
 - extend configurability
+
+## Other features
+
+- native support for generating and updating solution filters
+- automatically update solution file on a new content
