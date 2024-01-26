@@ -21,6 +21,13 @@ export default withMermaid({
       {},
       "window.dataLayer = window.dataLayer || [];\nfunction gtag(){dataLayer.push(arguments);}\ngtag('js', new Date());\ngtag('config', 'G-HDDVP9E098');",
     ],
+    [
+      'script',
+      {
+        async: true,
+        src: '/tooltips.js',
+      }
+    ]
   ],
   markdown: {
     config(md) {
