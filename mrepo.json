@@ -19,7 +19,7 @@
       "^refs/heads/main$"
     ],
     "changes": {
-      "major": [ ],
+      "major": [],
       "minor": [ "feat" ],
       "patch": [ "fix", "perf", "refactor" ],
       "harmless": [ "style", "test", "build", "ci", "docs", "chore" ]
@@ -41,6 +41,19 @@
         "restore": "dotnet restore src",
         "test": "dotnet test test"
       }
+    },
+    "dotnet-azure-functions": {
+      "custom": {
+        "filePattern": "*.csproj",
+        "useFullProjectName": false
+      },
+      "scripts": {
+        "build": "dotnet build src",
+        "clean": "dotnet clean src",
+        "pack": "dotnet publish $env:MREPO_PROJECT_PATH -o src/bin/publish; Compress-Archive -Path src/bin/publish/* -DestinationPath $env:MREPO_PATH_ARTIFACTS/$env:MREPO_FULL_NAME.$env:MREPO_VERSION_PACKAGE.zip -Force",
+        "restore": "dotnet restore src",
+        "test": "dotnet test test"
+      }
     }
   },
   "items": [
@@ -59,7 +72,18 @@
     {
       "path": "src/Monorepo",
       "name": "Monorepo",
-      "description": "Tooling around mono-repository."
+      "description": "Tooling around mono-repository.",
+      "custom": {
+        "startupProject": "src/Monorepo/Cli"
+      }
+    },
+    {
+      "path": "src/Platform",
+      "name": "2S platform",
+      "description": "2S platform, its serverless implementation and CLI toolkit.",
+      "custom": {
+        "startupProject": "src/Platform/Cli"
+      }
     },
     {
       "path": "src/Texo",
@@ -96,6 +120,12 @@
         "isSuppressed": true,
         "startupProject": "src/Games/Cetris"
       }
+    },
+    {
+      "path": "src/Platform/Storyteller/Api.Functions",
+      "type": "dotnet-azure-functions",
+      "name": "Storyteller API",
+      "description": "Serverless implementation of storyteller API."
     },
     {
       "path": "src/Games/Cetris",
