@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "version": {
+      "commandName": "Project",
+      "commandLineArgs": "--version"
+    },
+    "login": {
+      "commandName": "Project",
+      "commandLineArgs": "login"
+    }
+  }
+}
