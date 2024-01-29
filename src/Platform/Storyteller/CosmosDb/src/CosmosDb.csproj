@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.CosmosDb</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller</RootNamespace>
+
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Azure.Cosmos" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Libraries\Utils\Async\src\Async.csproj" />
+    <ProjectReference Include="..\..\Abstraction\src\Abstraction.csproj" />
+  </ItemGroup>
+
+</Project>

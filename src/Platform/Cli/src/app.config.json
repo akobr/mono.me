@@ -1,0 +1,6 @@
+{
+  "logging": {
+    "logFilePath": "logs/cli.log",
+    "sentryDsn": "https://988120045abb1ca84d44ae67565c204c@o383062.ingest.sentry.io/4506487297212416"
+  }
+}
