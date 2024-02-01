@@ -2,7 +2,9 @@
   "IsEncrypted": false,
   "Values": {
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true"
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "OpenApiAuthTenantId": "f2b1a691-0cf0-47d2-9b2c-b13cb7b6467e",
+    "OpenApiAuthClientId": "7f37b203-3599-4c73-9796-39d96883198c"
   },
   "Host": {
     "LocalHttpPort": 7071,
