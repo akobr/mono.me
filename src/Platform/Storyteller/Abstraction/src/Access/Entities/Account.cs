@@ -4,7 +4,7 @@ namespace _42.Platform.Storyteller.Access.Entities;
 
 public record class Account
 {
-    public string PartitionKey => "AccessManagement";
+    public string PartitionKey => "access";
 
     public string Id => $"act.{Key}";
 

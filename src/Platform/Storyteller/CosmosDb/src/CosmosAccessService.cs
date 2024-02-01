@@ -13,7 +13,7 @@ namespace _42.Platform.Storyteller;
 
 public class CosmosAccessService : IAccessService
 {
-    private const string MAIN_PARTITION_KEY = "AccessManagement";
+    private const string MAIN_PARTITION_KEY = "access";
 
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly IMachineAccessService _machineAccessService;
@@ -33,19 +33,19 @@ public class CosmosAccessService : IAccessService
     {
         var accountId = $"act.{key}";
         var repository = _repositoryProvider.GetCore();
-        var response = await repository.Container.ReadItemAsync<Account>(accountId, new PartitionKey(MAIN_PARTITION_KEY));
-        return response.Resource;
+        var account = await repository.Container.TryReadItem<Account>(accountId, new PartitionKey(MAIN_PARTITION_KEY));
+        return account;
     }
 
-    public async Task<Account?> CreateAccountAsync(AccountCreate model)
+    public async Task<Account> CreateAccountAsync(AccountCreate model)
     {
-        var accountName = model.Name.Trim().ToLowerInvariant();
-        var accountKey = model.Name.ToKey();
+        var accountName = model.Name.Trim();
+        var accountKey = model.Key.ToNormalizedKey();
         var account = await GetAccountAsync(accountKey);
 
         if (account is not null)
         {
-            throw new InvalidOperationException($"The account '{accountName}' already exists.");
+            throw new InvalidOperationException($"The account '{accountKey}' already exists.");
         }
 
         var point = await CreateAccessPointAsync(new AccessPointCreate
@@ -122,8 +122,8 @@ public class CosmosAccessService : IAccessService
     {
         var accessPointId = $"apt.{key}";
         var repository = _repositoryProvider.GetCore();
-        var response = await repository.Container.ReadItemAsync<AccessPoint>(accessPointId, new PartitionKey(MAIN_PARTITION_KEY));
-        return response.Resource;
+        var accessPoint = await repository.Container.TryReadItem<AccessPoint>(accessPointId, new PartitionKey(MAIN_PARTITION_KEY));
+        return accessPoint;
     }
 
     public async Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model)
@@ -141,13 +141,12 @@ public class CosmosAccessService : IAccessService
 
         if (organizationAccessPoint is null)
         {
-            await _containerFactory.CreateContainerIfNotExistsAsync(model.Organization);
-            await _machineAccessService.CreateOrganizationAsync(model.Organization);
+            await _containerFactory.CreateContainerIfNotExistsAsync($"org.{model.Organization}");
 
             organizationAccessPoint = new AccessPoint
             {
                 Key = model.Organization,
-                AccessMap = new() { { model.OwnerKey, AccountRole.Owner } },
+                AccessMap = { { model.OwnerKey, AccountRole.Owner } },
             };
             await repository.Container.CreateItemAsync(organizationAccessPoint, partitionKey);
         }
@@ -163,7 +162,7 @@ public class CosmosAccessService : IAccessService
         accessPoint = new AccessPoint
         {
             Key = accessPointKey,
-            AccessMap = new() { { model.OwnerKey, AccountRole.Owner } },
+            AccessMap = { { model.OwnerKey, AccountRole.Owner } },
         };
 
         var response = await repository.Container.CreateItemAsync(accessPoint, partitionKey);
@@ -281,14 +280,14 @@ public class CosmosAccessService : IAccessService
 
     public async Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project)
     {
-        var repository = _repositoryProvider.Get(organization);
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var query = new QueryDefinition("SELECT * FROM ma");
 
         using var iterator = repository.Container.GetItemQueryIterator<MachineAccess>(
             query,
             requestOptions: new QueryRequestOptions
             {
-                PartitionKey = new PartitionKey(project),
+                PartitionKey = new PartitionKey($"{project}.access"),
             });
 
         var resultList = new List<MachineAccess>();
@@ -303,25 +302,22 @@ public class CosmosAccessService : IAccessService
 
     public async Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id)
     {
-        var repository = _repositoryProvider.Get(organization);
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var response = await repository.Container.ReadItemAsync<MachineAccess>(id, new PartitionKey(project));
         return response.Resource;
     }
 
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
-        var repository = _repositoryProvider.Get(model.Organization);
-        var partitionKey = new PartitionKey(model.Project);
+        var repository = _repositoryProvider.GetOrganizationContainer(model.Organization);
+        var partitionKey = new PartitionKey($"{model.Project}.access");
 
-        var machineAccess = await _machineAccessService.CreateMachineAccessAsync(model.Organization);
+        var machineAccess = await _machineAccessService.CreateMachineAccessAsync(model);
 
         var accessKey = machineAccess.AccessKey;
         machineAccess = machineAccess with
         {
             AccessKey = $"{accessKey[..3]}***",
-            PartitionKey = model.Project,
-            Scope = model.Scope,
-            AnnotationKey = model.AnnotationKey,
         };
 
         var response = await repository.Container.CreateItemAsync(machineAccess, partitionKey);
@@ -329,14 +325,33 @@ public class CosmosAccessService : IAccessService
         return machineAccess;
     }
 
+    public async Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id)
+    {
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var partitionKey = new PartitionKey($"{project}.access");
+        var response = await repository.Container.ReadItemAsync<MachineAccess>(id, partitionKey);
+        var machineAccess = response.Resource;
+        var accessKey = await _machineAccessService.ResetMachineAccessAsync(machineAccess.Id);
+
+        if (accessKey is null)
+        {
+            throw new InvalidOperationException($"The machine access {id} reset failed.");
+        }
+
+        machineAccess = machineAccess with { AccessKey = $"{accessKey[..3]}***" };
+        await repository.Container.UpsertItemAsync(machineAccess, partitionKey);
+        machineAccess = machineAccess with { AccessKey = accessKey };
+        return machineAccess;
+    }
+
     public async Task<bool> DeleteMachineAccessAsync(string organization, string project, string id)
     {
-        var repository = _repositoryProvider.Get(organization);
-        var response = await repository.Container.DeleteItemAsync<MachineAccess>(id, new PartitionKey(project));
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var response = await repository.Container.DeleteItemAsync<MachineAccess>(id, new PartitionKey($"{project}.access"));
 
         if (response.StatusCode != HttpStatusCode.NotFound)
         {
-            await _machineAccessService.DeleteMachineAccessAsync(organization, id);
+            await _machineAccessService.DeleteMachineAccessAsync(id);
         }
 
         return response.StatusCode != HttpStatusCode.NotFound;

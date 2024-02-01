@@ -21,7 +21,7 @@ public class Response
     public Response<TAnnotation> AsTyped<TAnnotation>()
         where TAnnotation : Annotation
     {
-        return new Response<TAnnotation>()
+        return new Response<TAnnotation>
         {
             Annotations = Annotations.OfType<TAnnotation>(),
             ContinuationToken = ContinuationToken,
