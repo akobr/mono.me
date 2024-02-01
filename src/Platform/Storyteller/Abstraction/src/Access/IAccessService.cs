@@ -9,7 +9,7 @@ public interface IAccessService
 {
     Task<Account?> GetAccountAsync(string key);
 
-    Task<Account?> CreateAccountAsync(AccountCreate model);
+    Task<Account> CreateAccountAsync(AccountCreate model);
 
     Task<AccountRole> GetAccountRoleAsync(string accountKey, string accessPointKey);
 
@@ -28,6 +28,8 @@ public interface IAccessService
     Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id);
 
     Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model);
+
+    Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id);
 
     Task<bool> DeleteMachineAccessAsync(string organization, string project, string id);
 }

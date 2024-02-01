@@ -1,13 +1,14 @@
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Access.Entities;
+using _42.Platform.Storyteller.Access.Models;
 
 namespace _42.Platform.Storyteller.Access;
 
 public interface IMachineAccessService
 {
-    Task<bool> CreateOrganizationAsync(string organization);
+    Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model);
 
-    Task<MachineAccess> CreateMachineAccessAsync(string organization);
+    Task<string?> ResetMachineAccessAsync(string appId);
 
-    Task<bool> DeleteMachineAccessAsync(string organization, string id);
+    Task<bool> DeleteMachineAccessAsync(string appId);
 }

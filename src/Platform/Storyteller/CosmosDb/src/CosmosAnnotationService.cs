@@ -22,7 +22,7 @@ public class CosmosAnnotationService : IAnnotationService
 
     public async Task<Annotation?> GetAnnotationAsync(FullKey fullKey)
     {
-        var repository = _repositoryProvider.Get(fullKey.OrganizationName);
+        var repository = _repositoryProvider.GetOrganizationContainer(fullKey.OrganizationName);
         using var response = await repository.Container.ReadItemStreamAsync(fullKey.GetCosmosItemKey(), fullKey.GetCosmosPartitionKey());
         var jData = await JsonNode.ParseAsync(response.Content);
 
@@ -79,7 +79,7 @@ public class CosmosAnnotationService : IAnnotationService
 
     public async Task CreateOrUpdateAnnotationAsync(string organization, Annotation annotation)
     {
-        var repository = _repositoryProvider.Get(organization);
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
 
         using var memoryStream = new MemoryStream();
         await JsonSerializer.SerializeAsync(
@@ -119,7 +119,7 @@ public class CosmosAnnotationService : IAnnotationService
             .Where(b => b.Against == AnnotationType.Responsibility)
             .Cast<Request.Condition<TAnnotation>>();
 
-        var repository = _repositoryProvider.Get(model.Request.Organization);
+        var repository = _repositoryProvider.GetOrganizationContainer(model.Request.Organization);
         var queryable = repository.Container.GetItemLinqQueryable<TAnnotation>(
             continuationToken: model.InputContinuationToken?.CosmosToken,
             requestOptions: new QueryRequestOptions

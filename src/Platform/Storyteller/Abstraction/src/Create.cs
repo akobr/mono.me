@@ -14,7 +14,7 @@ public static class Create
     {
         return new Responsibility
         {
-            PartitionKey = $"{projectName}.{responsibilityName}",
+            PartitionKey = $"{projectName}.{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Responsibility,
@@ -34,7 +34,7 @@ public static class Create
     {
         return new Subject
         {
-            PartitionKey = $"{projectName}.{subjectName}",
+            PartitionKey = $"{projectName}.{AnnotationTypeCodes.Subject}.{subjectName}",
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Subject,
@@ -59,7 +59,7 @@ public static class Create
     {
         return new Context
         {
-            PartitionKey = $"{projectName}.{subjectName}",
+            PartitionKey = $"{projectName}.{AnnotationTypeCodes.Subject}.{subjectName}",
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Context,
@@ -81,7 +81,7 @@ public static class Create
     {
         return new Usage
         {
-            PartitionKey = $"{projectName}.{responsibilityName}",
+            PartitionKey = $"{projectName}.{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Usage,
@@ -108,7 +108,7 @@ public static class Create
     {
         return new Execution
         {
-            PartitionKey = $"{projectName}.{responsibilityName}",
+            PartitionKey = $"{projectName}.{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Execution,

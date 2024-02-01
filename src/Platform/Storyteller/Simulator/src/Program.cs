@@ -8,7 +8,7 @@ namespace _42.Platform.Storyteller.Simulator;
 
 public class Program
 {
-    private const string organization = "42for-net";
+    private const string organization = "42dotnet";
 
     public static async Task<int> Main(string[] args)
     {
@@ -22,7 +22,7 @@ public class Program
         var containerFactory = services.GetRequiredService<IContainerFactory>();
 
         var coreContainer = await containerFactory.CreateContainerIfNotExistsAsync("core");
-        var houseContainer = await containerFactory.CreateContainerIfNotExistsAsync(organization);
+        var houseContainer = await containerFactory.CreateContainerIfNotExistsAsync($"org.{organization}");
 
         await Data.CreateCore(houseContainer);
         Console.WriteLine("2S platform core structure created.");
@@ -39,9 +39,11 @@ public class Program
                 AnnotationType.Context,
                 AnnotationType.Execution,
             },
+            Organization = organization,
         });
 
-        Console.WriteLine($"Responsibilities count: {response.Count}");
+        Console.WriteLine();
+        Console.WriteLine($"Annotations count: {response.Count}");
 
         foreach (var annotation in response.Annotations)
         {
@@ -54,7 +56,15 @@ public class Program
             {
                 AnnotationType.Responsibility,
             },
+            Organization = organization,
         });
+
+        Console.WriteLine();
+        Console.WriteLine($"Responsibilities count: {responsibilities.Count}");
+        foreach (var responsibility in responsibilities)
+        {
+            Console.WriteLine(responsibility.AnnotationKey);
+        }
 
         return 0;
     }

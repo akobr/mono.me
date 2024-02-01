@@ -14,10 +14,15 @@ public class ContainerRepositoryProvider : IContainerRepositoryProvider
 
     public IContainerRepository GetCore()
     {
-        return Get("core");
+        return GetContainer("core");
     }
 
-    public IContainerRepository Get(string containerName)
+    public IContainerRepository GetOrganizationContainer(string organizationName)
+    {
+        return GetContainer($"org.{organizationName}");
+    }
+
+    private IContainerRepository GetContainer(string containerName)
     {
         if (_cache.TryGetValue(containerName, out var repository))
         {
