@@ -2,9 +2,9 @@ using System.Net;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.OpenApi.Models;
@@ -13,9 +13,6 @@ namespace _42.Platform.Storyteller.Api.V1;
 
 public class AnnotationsHttp
 {
-    public const string AnnotationTag = "Annotations";
-    public const string AnnotationRoute = "v1/{organization}/{project}/{view}/annotations";
-
     private readonly IAnnotationService _annotations;
 
     public AnnotationsHttp(IAnnotationService annotations)
@@ -23,26 +20,28 @@ public class AnnotationsHttp
         _annotations = annotations;
     }
 
-    [Function("GetAnnotations")]
-    [OpenApiOperation(AnnotationRoute, AnnotationTag)]
-    [OpenApiSecurity("bearer_auth", SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = "JWT")]
-    [OpenApiSecurity("implicit_auth", SecuritySchemeType.OAuth2, Flows = typeof(ImplicitAuthFlow))]
-    [OpenApiParameter("organization", In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "Target organization.")]
-    [OpenApiParameter("project", In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "Target project.")]
-    [OpenApiParameter("view", In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The used view inside the project.")]
-    [OpenApiParameter("continuationToken", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The continuation token for multi page queries.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, ContentTypes.Json, typeof(Response), Description = "The list of annotations.")]
-    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, ContentTypes.Json, typeof(ErrorResponse), Description = "Poorly worded request.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = "Authentication or authorization issues. Scope(s): " + "{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
-    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, ContentTypes.Json, typeof(ErrorResponse), Description = "Unexpected error occurred on the service.")]
-    public async Task<IActionResult> GetAnnotationsAsync(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = AnnotationRoute)]
+    [Function(nameof(GetAnnotations))]
+    [OpenApiOperation(Definitions.Routes.Annotations.V1.Annotations, Definitions.Tags.Annotations)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Response), Description = "The list of annotations.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> GetAnnotations(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Annotations.V1.Annotations)]
         Continuation token,
-        HttpRequest request,
+        HttpRequestData request,
         string organization = Constants.DefaultTenantName,
         string project = Constants.DefaultProjectName,
         string view = Constants.DefaultViewName)
     {
+        request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
+
         var dataRequest = new Request
         {
             Types = new[]
