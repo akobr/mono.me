@@ -5,7 +5,7 @@
     "AzureWebJobsStorage": "UseDevelopmentStorage=true"
   },
   "Host": {
-    "LocalHttpPort": 7071,
+    "LocalHttpPort": 7073,
     "CORS": "*"
   }
 }
