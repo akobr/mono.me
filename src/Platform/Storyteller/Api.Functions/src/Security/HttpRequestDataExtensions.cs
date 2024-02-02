@@ -35,10 +35,14 @@ public static class HttpRequestDataExtensions
 
     public static void CheckScope(this HttpRequestData @this, params string[] scopes)
     {
+#if NOAUTH
+        return;
+#endif
+
         var allScopes = @this.GetClaims()
             .Where(c => c.Type is "scp" or "roles")
             .SelectMany(c => c.Value.Split(' '))
-            .Select(scope => scope.EndsWith(".All", StringComparison.OrdinalIgnoreCase) ? scope[..^4] : scope)
+            .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
             .ToHashSet();
 
         if (scopes.All(scope => !allScopes.Contains(scope)))
