@@ -1,5 +1,8 @@
+using System.Text.Json.Serialization;
+using System.Text.Json;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Access;
+using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.AzureAd;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Extensions.OpenApi.Extensions;
@@ -8,12 +11,24 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 var host = new HostBuilder()
-    .ConfigureFunctionsWorkerDefaults(worker => worker.UseNewtonsoftJson())
-    //.ConfigureFunctionsWorkerDefaults()
+    .ConfigureFunctionsWebApplication(worker =>
+    {
+        // worker.UseNewtonsoftJson(); // TODO: [P2] not sure if this is needed for OpenAPI
+        worker.UseMiddleware<ExceptionHandlingMiddleware>();
+    })
     .ConfigureServices(services =>
     {
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
+
+        services.Configure<JsonSerializerOptions>(options =>
+        {
+            options.AllowTrailingCommas = true;
+            options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+            options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+            options.PropertyNameCaseInsensitive = true;
+        });
+
         services.Configure<LoggerFilterOptions>(options =>
         {
             // The Application Insights SDK adds a default logging filter that instructs ILogger to capture only Warning and more severe logs. Application Insights requires an explicit override.
