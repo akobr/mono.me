@@ -5,8 +5,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 var host = new HostBuilder()
-    .ConfigureFunctionsWorkerDefaults(worker => worker.UseNewtonsoftJson())
-    //.ConfigureFunctionsWorkerDefaults()
+    //.ConfigureFunctionsWorkerDefaults(worker => worker.UseNewtonsoftJson())
+    .ConfigureFunctionsWebApplication()
     .ConfigureServices(s =>
     {
         s.AddApplicationInsightsTelemetryWorkerService();
