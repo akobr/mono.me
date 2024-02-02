@@ -10,13 +10,13 @@ public static class Definitions
             {
                 public const string Account = $"{VERSION}/access/account";
                 public const string AccessPoints = $"{VERSION}/access/points";
-                public const string AccessPoint = $"{VERSION}/access/points/{Parameters.Key}";
+                public const string AccessPoint = $"{VERSION}/access/points/{{{Parameters.Key}}}";
 
                 public const string Grant = $"{VERSION}/access/grant";
                 public const string Revoke = $"{VERSION}/access/revoke";
 
-                public const string Machines = $"{VERSION}/{Parameters.Organization}/{Parameters.Project}/access/machines";
-                public const string Machine = $"{VERSION}/{Parameters.Organization}/{Parameters.Project}/access/machines/{Parameters.Id}";
+                public const string Machines = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines";
+                public const string Machine = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}";
 
                 private const string VERSION = "v1";
             }
@@ -26,7 +26,16 @@ public static class Definitions
         {
             public static class V1
             {
-                public const string Annotations = $"{VERSION}/{Parameters.Organization}/{Parameters.Project}/{Parameters.View}/annotations";
+                public const string Annotations = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations";
+                public const string AnnotationsSimple = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}/{{{Parameters.View}}}/annotations/simple";
+                public const string Annotation = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}";
+                public const string Descendants = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}/{{{Parameters.Descendants}}}";
+
+                public const string Responsibilities = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/responsibilities";
+                public const string Subjects = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/subjects";
+                public const string Usages = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/usages";
+                public const string Contexts = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/contexts";
+                public const string Executions = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/executions";
 
                 private const string VERSION = "v1";
             }
@@ -40,7 +49,9 @@ public static class Definitions
         public const string View = "view";
         public const string Id = "id";
         public const string Key = "key";
+        public const string NameQuery = "nameQuery";
         public const string ContinuationToken = "continuationToken";
+        public const string Descendants = "descendants";
     }
 
     public static class Tags
@@ -61,6 +72,7 @@ public static class Definitions
         public const string Organization = "Target organization name.";
         public const string Project = "Target project name.";
         public const string View = "The target view inside the project.";
+        public const string NameQuery = "The name query to filter the annotations.";
         public const string ContinuationToken = "The continuation token for multi-page queries.";
         public const string IdMachine = "The id of the machine access.";
     }
