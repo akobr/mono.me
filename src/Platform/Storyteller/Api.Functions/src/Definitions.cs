@@ -27,8 +27,8 @@ public static class Definitions
             public static class V1
             {
                 public const string Annotations = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations";
-                public const string AnnotationsSimple = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}/{{{Parameters.View}}}/annotations/simple";
-                public const string Annotation = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}";
+                public const string AnnotationsSimple = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/simple";
+                public const string Annotation = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}";
                 public const string Descendants = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}/{{{Parameters.Descendants}}}";
 
                 public const string Responsibilities = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/responsibilities";
@@ -72,9 +72,9 @@ public static class Definitions
         public const string Organization = "Target organization name.";
         public const string Project = "Target project name.";
         public const string View = "The target view inside the project.";
-        public const string NameQuery = "The name query to filter the annotations.";
         public const string ContinuationToken = "The continuation token for multi-page queries.";
         public const string IdMachine = "The id of the machine access.";
+        public const string Key = "The key of the requested annotation.";
     }
 
     public static class Errors
