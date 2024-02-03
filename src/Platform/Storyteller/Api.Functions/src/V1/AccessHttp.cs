@@ -104,6 +104,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var pointKey = key.Trim().ToLowerInvariant();
+        await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
         var point = await _accessService.GetAccessPointAsync(pointKey);
         return new OkObjectResult(point);
     }
@@ -182,6 +183,8 @@ public class AccessHttp
         string project)
     {
         request.CheckScope(Scopes.User.Impersonation);
+        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+
         var machineAccesses = await _accessService.GetMachineAccessesAsync(organization, project);
         return new OkObjectResult(machineAccesses);
     }
@@ -203,6 +206,7 @@ public class AccessHttp
         string id)
     {
         request.CheckScope(Scopes.User.Impersonation);
+        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         if (!Guid.TryParse(id, out var machineId))
         {
@@ -231,6 +235,8 @@ public class AccessHttp
         string project)
     {
         request.CheckScope(Scopes.User.Impersonation);
+        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+
         machineModel = machineModel with { Organization = organization, Project = project };
         var machineAccess = await _accessService.CreateMachineAccessAsync(machineModel);
         return new OkObjectResult(machineAccess);
@@ -253,6 +259,7 @@ public class AccessHttp
         string id)
     {
         request.CheckScope(Scopes.User.Impersonation);
+        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         if (!Guid.TryParse(id, out var machineId))
         {
@@ -271,6 +278,7 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdMachine)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The machine access doesn't exist.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
     public async Task<IActionResult> DeleteMachine(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.Access.V1.Machine)]
@@ -280,6 +288,7 @@ public class AccessHttp
         string id)
     {
         request.CheckScope(Scopes.User.Impersonation);
+        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         if (!Guid.TryParse(id, out var machineId))
         {

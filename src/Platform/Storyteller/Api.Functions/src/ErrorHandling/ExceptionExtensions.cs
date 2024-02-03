@@ -1,3 +1,5 @@
+using _42.Platform.Storyteller.Api.Models;
+
 namespace _42.Platform.Storyteller.Api.ErrorHandling;
 
 public static class ExceptionExtensions
@@ -17,5 +19,16 @@ public static class ExceptionExtensions
     public static string? TryGetErrorCode(this Exception @this)
     {
         return null;
+    }
+
+    public static ErrorResponse ToErrorResponse(this Exception @this)
+    {
+        return new ErrorResponse
+        {
+            Error = @this,
+            Message = @this.TryGetErrorMessage(),
+            ErrorCode = @this.TryGetErrorCode(),
+            Hint = @this.TryGetErrorHint(),
+        };
     }
 }
