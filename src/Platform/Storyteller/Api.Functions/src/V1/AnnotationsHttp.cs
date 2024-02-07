@@ -44,7 +44,7 @@ public class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Response), Description = "The list of annotations.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of annotations.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -59,7 +59,7 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
 
-        var dataRequest = new Request
+        var dataRequest = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -129,7 +129,7 @@ public class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiParameter(Definitions.Parameters.Descendants, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The type of descendants to retrieve, possible value is: usages, contexts, executions, or all.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Response), Description = "The list of descendant annotations.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of descendant annotations.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -175,7 +175,7 @@ public class AnnotationsHttp
                 return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {key}"));
         }
 
-        var dataRequest = new Request
+        var dataRequest = new AnnotationsRequest
         {
             ContinuationToken = continuationToken,
             Organization = organization,
@@ -214,21 +214,21 @@ public class AnnotationsHttp
             case AnnotationType.Responsibility:
             {
                 dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
-                dataRequest.Conditions = new Request.ICondition[]
+                dataRequest.Conditions = new AnnotationsRequest.ICondition[]
                 {
-                    new Request.Condition<Usage> { Predicate = u => u.ResponsibilityKey == key, },
-                    new Request.Condition<Execution> { Predicate = e => e.ResponsibilityKey == key, },
+                    new AnnotationsRequest.Condition<Usage> { Predicate = u => u.ResponsibilityKey == key, },
+                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.ResponsibilityKey == key, },
                 };
                 break;
             }
 
             case AnnotationType.Subject:
             {
-                dataRequest.Conditions = new Request.ICondition[]
+                dataRequest.Conditions = new AnnotationsRequest.ICondition[]
                 {
-                    new Request.Condition<Usage> { Predicate = u => u.SubjectKey == key, },
-                    new Request.Condition<Context> { Predicate = c => c.SubjectKey == key, },
-                    new Request.Condition<Execution> { Predicate = e => e.SubjectKey == key, },
+                    new AnnotationsRequest.Condition<Usage> { Predicate = u => u.SubjectKey == key, },
+                    new AnnotationsRequest.Condition<Context> { Predicate = c => c.SubjectKey == key, },
+                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.SubjectKey == key, },
                 };
                 break;
             }
@@ -239,9 +239,9 @@ public class AnnotationsHttp
                 string subjectKey = annotationKey.GetSubjectKey();
                 string responsibilityKey = annotationKey.GetResponsibilityKey();
 
-                dataRequest.Conditions = new Request.ICondition[]
+                dataRequest.Conditions = new AnnotationsRequest.ICondition[]
                 {
-                    new Request.Condition<Execution>
+                    new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.ResponsibilityKey == responsibilityKey && e.SubjectKey == subjectKey,
                     },
@@ -253,9 +253,9 @@ public class AnnotationsHttp
             {
                 string subjectKey = annotationKey.GetSubjectKey();
 
-                dataRequest.Conditions = new Request.ICondition[]
+                dataRequest.Conditions = new AnnotationsRequest.ICondition[]
                 {
-                    new Request.Condition<Execution>
+                    new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.SubjectKey == subjectKey && e.ContextKey == key,
                     },
@@ -425,7 +425,7 @@ public class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.NameQuery, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the responsibilities.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Response), Description = "The list of responsibilities.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of responsibilities.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -441,8 +441,8 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
 
-        var conditions = new List<Request.ICondition>();
-        var dataRequest = new Request
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var dataRequest = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -462,14 +462,14 @@ public class AnnotationsHttp
             if (nameQuery.StartsWith('^') || nameQuery.EndsWith('$'))
             {
                 var regex = new Regex(nameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Responsibility>
+                conditions.Add(new AnnotationsRequest.Condition<Responsibility>
                 {
                     Predicate = r => regex.IsMatch(r.Name),
                 });
             }
             else if (nameQuery.StartsWith('%') || nameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Responsibility>
+                conditions.Add(new AnnotationsRequest.Condition<Responsibility>
                 {
                     Predicate = r => r.Name.Contains(nameQuery),
                 });
@@ -477,7 +477,7 @@ public class AnnotationsHttp
             else
             {
                 dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, nameQuery);
-                conditions.Add(new Request.Condition<Responsibility>
+                conditions.Add(new AnnotationsRequest.Condition<Responsibility>
                 {
                     Predicate = r => r.Name == nameQuery,
                 });
@@ -497,7 +497,7 @@ public class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.NameQuery, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the subjects.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Response), Description = "The list of subjects.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of subjects.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -513,8 +513,8 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
 
-        var conditions = new List<Request.ICondition>();
-        var dataRequest = new Request
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var dataRequest = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -534,14 +534,14 @@ public class AnnotationsHttp
             if (nameQuery.StartsWith('^') || nameQuery.EndsWith('$'))
             {
                 var regex = new Regex(nameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Subject>
+                conditions.Add(new AnnotationsRequest.Condition<Subject>
                 {
                     Predicate = s => regex.IsMatch(s.Name),
                 });
             }
             else if (nameQuery.StartsWith('%') || nameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Subject>
+                conditions.Add(new AnnotationsRequest.Condition<Subject>
                 {
                     Predicate = s => s.Name.Contains(nameQuery),
                 });
@@ -549,7 +549,7 @@ public class AnnotationsHttp
             else
             {
                 dataRequest.PartitionKey = PartitionKeys.GetSubject(project, nameQuery);
-                conditions.Add(new Request.Condition<Subject>
+                conditions.Add(new AnnotationsRequest.Condition<Subject>
                 {
                     Predicate = s => s.Name == nameQuery,
                 });
@@ -570,7 +570,7 @@ public class AnnotationsHttp
     [OpenApiParameter("responsibilityNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the usages by responsibility.")]
     [OpenApiParameter("subjectNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the usages by subject.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Response), Description = "The list of usages.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of usages.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -587,8 +587,8 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
 
-        var conditions = new List<Request.ICondition>();
-        var dataRequest = new Request
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var dataRequest = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -608,14 +608,14 @@ public class AnnotationsHttp
             if (responsibilityNameQuery.StartsWith('^') || responsibilityNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(responsibilityNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => regex.IsMatch(u.ResponsibilityName),
                 });
             }
             else if (responsibilityNameQuery.StartsWith('%') || responsibilityNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => u.ResponsibilityName.Contains(responsibilityNameQuery),
                 });
@@ -623,7 +623,7 @@ public class AnnotationsHttp
             else
             {
                 dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
                 });
@@ -637,14 +637,14 @@ public class AnnotationsHttp
             if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => regex.IsMatch(u.SubjectName),
                 });
             }
             else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => u.SubjectName.Contains(subjectNameQuery),
                 });
@@ -652,7 +652,7 @@ public class AnnotationsHttp
             else
             {
                 string subjectKey = AnnotationKey.CreateSubject(subjectNameQuery);
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => u.SubjectKey == subjectKey,
                 });
@@ -673,7 +673,7 @@ public class AnnotationsHttp
     [OpenApiParameter("subjectNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the contexts by subject.")]
     [OpenApiParameter(Definitions.Parameters.NameQuery, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the contexts.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Response), Description = "The list of usages.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of usages.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -690,8 +690,8 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
 
-        var conditions = new List<Request.ICondition>();
-        var dataRequest = new Request
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var dataRequest = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -711,14 +711,14 @@ public class AnnotationsHttp
             if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => regex.IsMatch(u.SubjectName),
                 });
             }
             else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => u.SubjectName.Contains(subjectNameQuery),
                 });
@@ -726,7 +726,7 @@ public class AnnotationsHttp
             else
             {
                 dataRequest.PartitionKey = PartitionKeys.GetSubject(project, subjectNameQuery);
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => u.SubjectName == subjectNameQuery,
                 });
@@ -740,21 +740,21 @@ public class AnnotationsHttp
             if (nameQuery.StartsWith('^') || nameQuery.EndsWith('$'))
             {
                 var regex = new Regex(nameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => regex.IsMatch(u.Name),
                 });
             }
             else if (nameQuery.StartsWith('%') || nameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => u.Name.Contains(nameQuery),
                 });
             }
             else
             {
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => u.Name == nameQuery,
                 });
@@ -776,7 +776,7 @@ public class AnnotationsHttp
     [OpenApiParameter("subjectNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the executions by subject.")]
     [OpenApiParameter("contextNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the executions by context.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Response), Description = "The list of usages.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of usages.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -794,8 +794,8 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
 
-        var conditions = new List<Request.ICondition>();
-        var dataRequest = new Request
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var dataRequest = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -815,14 +815,14 @@ public class AnnotationsHttp
             if (responsibilityNameQuery.StartsWith('^') || responsibilityNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(responsibilityNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => regex.IsMatch(u.ResponsibilityName),
                 });
             }
             else if (responsibilityNameQuery.StartsWith('%') || responsibilityNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.ResponsibilityName.Contains(responsibilityNameQuery),
                 });
@@ -830,7 +830,7 @@ public class AnnotationsHttp
             else
             {
                 dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
                 });
@@ -844,21 +844,21 @@ public class AnnotationsHttp
             if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => regex.IsMatch(u.SubjectName),
                 });
             }
             else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.SubjectName.Contains(subjectNameQuery),
                 });
             }
             else
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.SubjectName == subjectNameQuery,
                 });
@@ -872,21 +872,21 @@ public class AnnotationsHttp
             if (contextNameQuery.StartsWith('^') || contextNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(contextNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => regex.IsMatch(u.Name),
                 });
             }
             else if (contextNameQuery.StartsWith('%') || contextNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.Name.Contains(contextNameQuery),
                 });
             }
             else
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.Name == contextNameQuery,
                 });

@@ -1,11 +1,11 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using _42.Platform.Storyteller.Entities;
 
 namespace _42.Platform.Storyteller;
 
-public class Response<TAnnotation> : IEnumerable<TAnnotation>
+public class AnnotationsResponse<TAnnotation> : IEnumerable<TAnnotation>
     where TAnnotation : Annotation
 {
     public IEnumerable<TAnnotation> Annotations { get; set; } = Enumerable.Empty<TAnnotation>();
@@ -14,7 +14,7 @@ public class Response<TAnnotation> : IEnumerable<TAnnotation>
 
     public int Count { get; set; }
 
-    public static implicit operator List<TAnnotation>(Response<TAnnotation> response)
+    public static implicit operator List<TAnnotation>(AnnotationsResponse<TAnnotation> response)
     {
         return response.Annotations.ToList();
     }

@@ -29,7 +29,7 @@ public class Program
 
         var service = services.GetRequiredService<IAnnotationService>();
 
-        var response = await service.GetAnnotationsAsync(new Request
+        var response = await service.GetAnnotationsAsync(new AnnotationsRequest
         {
             Types = new[]
             {
@@ -50,7 +50,7 @@ public class Program
             Console.WriteLine(annotation.GetFullKey(organization));
         }
 
-        List<Annotation> responsibilities = await service.GetAnnotationsAsync(new Request
+        List<Annotation> responsibilities = await service.GetAnnotationsAsync(new AnnotationsRequest
         {
             Types = new[]
             {

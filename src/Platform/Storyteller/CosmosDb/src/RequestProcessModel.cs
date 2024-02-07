@@ -7,7 +7,7 @@ namespace _42.Platform.Storyteller;
 
 public class RequestProcessModel
 {
-    public RequestProcessModel(Request request)
+    public RequestProcessModel(AnnotationsRequest request)
     {
         Request = request;
         TypesMap = request.Types.ToHashSet();
@@ -19,7 +19,7 @@ public class RequestProcessModel
         PartitionKey = HasPartitionKey ? new PartitionKey(request.PartitionKey) : null;
     }
 
-    public Request Request { get; }
+    public AnnotationsRequest Request { get; }
 
     public bool HasPartitionKey { get; }
 
