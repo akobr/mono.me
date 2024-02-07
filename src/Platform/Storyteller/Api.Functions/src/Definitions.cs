@@ -8,17 +8,15 @@ public static class Definitions
         {
             public static class V1
             {
-                public const string Account = $"{VERSION}/access/account";
-                public const string AccessPoints = $"{VERSION}/access/points";
-                public const string AccessPoint = $"{VERSION}/access/points/{{{Parameters.Key}}}";
+                public const string Account = "v1/access/account";
+                public const string AccessPoints = "v1/access/points";
+                public const string AccessPoint = $"v1/access/points/{{{Parameters.Key}}}";
 
-                public const string Grant = $"{VERSION}/access/grant";
-                public const string Revoke = $"{VERSION}/access/revoke";
+                public const string Grant = "v1/access/grant";
+                public const string Revoke = "v1/access/revoke";
 
-                public const string Machines = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines";
-                public const string Machine = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}";
-
-                private const string VERSION = "v1";
+                public const string Machines = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines";
+                public const string Machine = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}";
             }
         }
 
@@ -26,18 +24,25 @@ public static class Definitions
         {
             public static class V1
             {
-                public const string Annotations = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations";
-                public const string AnnotationsSimple = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/simple";
-                public const string Annotation = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}";
-                public const string Descendants = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}/{{{Parameters.Descendants}}}";
+                public const string Annotations = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations";
+                public const string AnnotationsSimple = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/simple";
+                public const string Annotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}";
+                public const string Descendants = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}/{{{Parameters.Descendants}}}";
 
-                public const string Responsibilities = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/responsibilities";
-                public const string Subjects = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/subjects";
-                public const string Usages = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/usages";
-                public const string Contexts = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/contexts";
-                public const string Executions = $"{VERSION}/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/executions";
+                public const string Responsibilities = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/responsibilities";
+                public const string Subjects = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/subjects";
+                public const string Usages = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/usages";
+                public const string Contexts = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/contexts";
+                public const string Executions = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/executions";
+            }
+        }
 
-                private const string VERSION = "v1";
+        public static class Configuration
+        {
+            public static class V1
+            {
+                public const string Configuration = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}";
+                public const string ConfigurationResolved = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/resolved";
             }
         }
     }
@@ -56,8 +61,9 @@ public static class Definitions
 
     public static class Tags
     {
-        public const string Access = "Access";
-        public const string Annotations = "Annotations";
+        public const string Access = nameof(Access);
+        public const string Annotations = nameof(Annotations);
+        public const string Configuration = nameof(Configuration);
     }
 
     public static class Descriptions

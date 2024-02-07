@@ -96,4 +96,9 @@ public class FullKey
     {
         return new FullKey(annotationKey, organizationName, projectName, viewName);
     }
+
+    public static FullKey Create(AnnotationKey annotationKey, FullKey parentFullKey)
+    {
+        return new FullKey(annotationKey, parentFullKey.OrganizationName, parentFullKey.ProjectName, parentFullKey.ViewName);
+    }
 }

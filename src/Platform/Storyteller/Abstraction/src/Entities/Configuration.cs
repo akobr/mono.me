@@ -1,11 +1,16 @@
-using System.Collections.Generic;
-using System.Text.Json.Nodes;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Entities;
 
 public record class Configuration : ExtendableStoredItem
 {
-    public required JsonObject Content { get; init; }
+    public bool IsServerSubstitutionDisabled { get; init; }
 
-    public IReadOnlyCollection<string>? Ancestors { get; init; }
+    public bool IsCachingDisabled { get; init; }
+
+    public required JObject Content { get; init; }
+
+    public JObject? CalculatedContent { get; init; }
+
+    public string? CalculatedContentHash { get; init; }
 }

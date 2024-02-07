@@ -1,13 +1,13 @@
-using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller;
 
 public interface IConfigurationService
 {
-    Task<JsonObject?> GetConfigurationAsync(string fullKey);
+    Task<JObject?> GetConfigurationAsync(FullKey key);
 
-    Task<JsonObject> UpdateConfigurationAsync(string fullKey, JsonObject value);
+    Task<JObject> CreateOrUpdateConfigurationAsync(FullKey key, JObject value);
 
-    Task<bool> DeleteConfigurationAsync(string fullKey);
+    Task<bool> DeleteConfigurationAsync(FullKey key);
 }
