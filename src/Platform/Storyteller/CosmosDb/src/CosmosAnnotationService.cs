@@ -46,7 +46,7 @@ public class CosmosAnnotationService : IAnnotationService
         return await GetAnnotationAsync(key);
     }
 
-    public async Task<Response> GetAnnotationsAsync(Request request)
+    public async Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request)
     {
         var model = new RequestProcessModel(request);
 
@@ -69,7 +69,7 @@ public class CosmosAnnotationService : IAnnotationService
             }
         }
 
-        return new Response
+        return new AnnotationsResponse
         {
             ContinuationToken = model.OutputContinuationToken?.ToString(),
             Annotations = model.Annotations,
@@ -117,7 +117,7 @@ public class CosmosAnnotationService : IAnnotationService
 
         var dynamicConditions = model.Request.Conditions
             .Where(b => b.Against == AnnotationType.Responsibility)
-            .Cast<Request.Condition<TAnnotation>>();
+            .Cast<AnnotationsRequest.Condition<TAnnotation>>();
 
         var repository = _repositoryProvider.GetOrganizationContainer(model.Request.Organization);
         var queryable = repository.Container.GetItemLinqQueryable<TAnnotation>(

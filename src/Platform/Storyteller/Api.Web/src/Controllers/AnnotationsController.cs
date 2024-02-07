@@ -30,14 +30,14 @@ public class AnnotationsController : ControllerBase
 
     [HttpGet("{project}/{view}/annotations", Name = "GetAnnotations")]
     [RequiredScope(Scopes.Annotation.Read)]
-    [ProducesResponseType(typeof(Response), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AnnotationsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetAnnotations(
         string project = Constants.DefaultProjectName,
         string view = Constants.DefaultViewName,
         [FromQuery] string? continuationToken = null)
     {
-        var request = new Request
+        var request = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -58,7 +58,7 @@ public class AnnotationsController : ControllerBase
 
     [HttpGet("{project}/{view}/responsibilities", Name = "GetResponsibilities")]
     [RequiredScope(Scopes.Annotation.Read)]
-    [ProducesResponseType(typeof(Response<Responsibility>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AnnotationsResponse<Responsibility>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetResponsibilities(
         [FromQuery] string? nameQuery = null,
@@ -66,7 +66,7 @@ public class AnnotationsController : ControllerBase
         string view = Constants.DefaultViewName,
         [FromQuery] string? continuationToken = null)
     {
-        var request = new Request
+        var request = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -81,7 +81,7 @@ public class AnnotationsController : ControllerBase
         {
             request.Conditions = new[]
             {
-                new Request.Condition<Responsibility>
+                new AnnotationsRequest.Condition<Responsibility>
                 {
                     Predicate = r => r.Name.Contains(nameQuery),
                 },
@@ -94,7 +94,7 @@ public class AnnotationsController : ControllerBase
 
     [HttpGet("{project}/{view}/subjects", Name = "GetSubjects")]
     [RequiredScope(Scopes.Annotation.Read)]
-    [ProducesResponseType(typeof(Response<Subject>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AnnotationsResponse<Subject>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetSubjects(
         [FromQuery] string? nameQuery = null,
@@ -102,7 +102,7 @@ public class AnnotationsController : ControllerBase
         string view = Constants.DefaultViewName,
         [FromQuery] string? continuationToken = null)
     {
-        var request = new Request
+        var request = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -117,7 +117,7 @@ public class AnnotationsController : ControllerBase
         {
             request.Conditions = new[]
             {
-                new Request.Condition<Subject>
+                new AnnotationsRequest.Condition<Subject>
                 {
                     Predicate = s => s.Name.Contains(nameQuery),
                 },
@@ -130,7 +130,7 @@ public class AnnotationsController : ControllerBase
 
     [HttpGet("{project}/{view}/usages", Name = "GetUsages")]
     [RequiredScope(Scopes.Annotation.Read)]
-    [ProducesResponseType(typeof(Response<Usage>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AnnotationsResponse<Usage>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetUsages(
         [FromQuery] string? responsibilityNameQuery = null,
@@ -139,8 +139,8 @@ public class AnnotationsController : ControllerBase
         string view = Constants.DefaultViewName,
         [FromQuery] string? continuationToken = null)
     {
-        var conditions = new List<Request.ICondition>();
-        var request = new Request
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var request = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -158,14 +158,14 @@ public class AnnotationsController : ControllerBase
             if (responsibilityNameQuery.StartsWith('^') || responsibilityNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(responsibilityNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => regex.IsMatch(u.ResponsibilityName),
                 });
             }
             else if (responsibilityNameQuery.StartsWith('%') || responsibilityNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => u.ResponsibilityName.Contains(responsibilityNameQuery),
                 });
@@ -173,7 +173,7 @@ public class AnnotationsController : ControllerBase
             else
             {
                 request.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
                 });
@@ -187,14 +187,14 @@ public class AnnotationsController : ControllerBase
             if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => regex.IsMatch(u.SubjectName),
                 });
             }
             else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => u.SubjectName.Contains(subjectNameQuery),
                 });
@@ -202,7 +202,7 @@ public class AnnotationsController : ControllerBase
             else
             {
                 string subjectKey = AnnotationKey.CreateSubject(subjectNameQuery);
-                conditions.Add(new Request.Condition<Usage>
+                conditions.Add(new AnnotationsRequest.Condition<Usage>
                 {
                     Predicate = u => u.SubjectKey == subjectKey,
                 });
@@ -216,7 +216,7 @@ public class AnnotationsController : ControllerBase
 
     [HttpGet("{project}/{view}/contexts", Name = "GetContexts")]
     [RequiredScope(Scopes.Annotation.Read)]
-    [ProducesResponseType(typeof(Response<Context>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AnnotationsResponse<Context>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetContexts(
     [FromQuery] string? subjectNameQuery = null,
@@ -225,8 +225,8 @@ public class AnnotationsController : ControllerBase
     string view = Constants.DefaultViewName,
     [FromQuery] string? continuationToken = null)
     {
-        var conditions = new List<Request.ICondition>();
-        var request = new Request
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var request = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -244,14 +244,14 @@ public class AnnotationsController : ControllerBase
             if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => regex.IsMatch(u.SubjectName),
                 });
             }
             else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => u.SubjectName.Contains(subjectNameQuery),
                 });
@@ -259,7 +259,7 @@ public class AnnotationsController : ControllerBase
             else
             {
                 request.PartitionKey = PartitionKeys.GetSubject(project, subjectNameQuery);
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => u.SubjectName == subjectNameQuery,
                 });
@@ -273,21 +273,21 @@ public class AnnotationsController : ControllerBase
             if (contextNameQuery.StartsWith('^') || contextNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(contextNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => regex.IsMatch(u.Name),
                 });
             }
             else if (contextNameQuery.StartsWith('%') || contextNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => u.Name.Contains(contextNameQuery),
                 });
             }
             else
             {
-                conditions.Add(new Request.Condition<Context>
+                conditions.Add(new AnnotationsRequest.Condition<Context>
                 {
                     Predicate = u => u.Name == contextNameQuery,
                 });
@@ -301,7 +301,7 @@ public class AnnotationsController : ControllerBase
 
     [HttpGet("{project}/{view}/executions", Name = "GetExecutions")]
     [RequiredScope(Scopes.Annotation.Read)]
-    [ProducesResponseType(typeof(Response<Execution>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AnnotationsResponse<Execution>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetExecutions(
         [FromQuery] string? responsibilityNameQuery = null,
@@ -311,8 +311,8 @@ public class AnnotationsController : ControllerBase
         string view = Constants.DefaultViewName,
         [FromQuery] string? continuationToken = null)
     {
-        var conditions = new List<Request.ICondition>();
-        var request = new Request
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var request = new AnnotationsRequest
         {
             Types = new[]
             {
@@ -330,14 +330,14 @@ public class AnnotationsController : ControllerBase
             if (responsibilityNameQuery.StartsWith('^') || responsibilityNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(responsibilityNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => regex.IsMatch(u.ResponsibilityName),
                 });
             }
             else if (responsibilityNameQuery.StartsWith('%') || responsibilityNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.ResponsibilityName.Contains(responsibilityNameQuery),
                 });
@@ -345,7 +345,7 @@ public class AnnotationsController : ControllerBase
             else
             {
                 request.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
                 });
@@ -359,21 +359,21 @@ public class AnnotationsController : ControllerBase
             if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => regex.IsMatch(u.SubjectName),
                 });
             }
             else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.SubjectName.Contains(subjectNameQuery),
                 });
             }
             else
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.SubjectName == subjectNameQuery,
                 });
@@ -387,21 +387,21 @@ public class AnnotationsController : ControllerBase
             if (contextNameQuery.StartsWith('^') || contextNameQuery.EndsWith('$'))
             {
                 var regex = new Regex(contextNameQuery, RegexOptions.Compiled);
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => regex.IsMatch(u.Name),
                 });
             }
             else if (contextNameQuery.StartsWith('%') || contextNameQuery.EndsWith('%'))
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.Name.Contains(contextNameQuery),
                 });
             }
             else
             {
-                conditions.Add(new Request.Condition<Execution>
+                conditions.Add(new AnnotationsRequest.Condition<Execution>
                 {
                     Predicate = u => u.Name == contextNameQuery,
                 });
@@ -415,7 +415,7 @@ public class AnnotationsController : ControllerBase
 
     [HttpGet("{project}/{view}/annotations/{key}/{descendants}", Name = "GetDescendants")]
     [RequiredScope(Scopes.Annotation.Read)]
-    [ProducesResponseType(typeof(Response), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(AnnotationsResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetDescendants(
         string key,
@@ -453,7 +453,7 @@ public class AnnotationsController : ControllerBase
                 return new BadRequestObjectResult("Invalid annotation key.");
         }
 
-        var request = new Request
+        var request = new AnnotationsRequest
         {
             ContinuationToken = continuationToken,
             Project = project,
@@ -491,13 +491,13 @@ public class AnnotationsController : ControllerBase
             case AnnotationType.Responsibility:
             {
                 request.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
-                request.Conditions = new Request.ICondition[]
+                request.Conditions = new AnnotationsRequest.ICondition[]
                 {
-                    new Request.Condition<Usage>
+                    new AnnotationsRequest.Condition<Usage>
                     {
                         Predicate = u => u.ResponsibilityKey == key,
                     },
-                    new Request.Condition<Execution>
+                    new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.ResponsibilityKey == key,
                     },
@@ -507,17 +507,17 @@ public class AnnotationsController : ControllerBase
 
             case AnnotationType.Subject:
             {
-                request.Conditions = new Request.ICondition[]
+                request.Conditions = new AnnotationsRequest.ICondition[]
                 {
-                    new Request.Condition<Usage>
+                    new AnnotationsRequest.Condition<Usage>
                     {
                         Predicate = u => u.SubjectKey == key,
                     },
-                    new Request.Condition<Context>
+                    new AnnotationsRequest.Condition<Context>
                     {
                         Predicate = c => c.SubjectKey == key,
                     },
-                    new Request.Condition<Execution>
+                    new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.SubjectKey == key,
                     },
@@ -531,9 +531,9 @@ public class AnnotationsController : ControllerBase
                 string subjectKey = annotationKey.GetSubjectKey();
                 string responsibilityKey = annotationKey.GetResponsibilityKey();
 
-                request.Conditions = new Request.ICondition[]
+                request.Conditions = new AnnotationsRequest.ICondition[]
                 {
-                    new Request.Condition<Execution>
+                    new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.ResponsibilityKey == responsibilityKey && e.SubjectKey == subjectKey,
                     },
@@ -545,9 +545,9 @@ public class AnnotationsController : ControllerBase
             {
                 string subjectKey = annotationKey.GetSubjectKey();
 
-                request.Conditions = new Request.ICondition[]
+                request.Conditions = new AnnotationsRequest.ICondition[]
                 {
-                    new Request.Condition<Execution>
+                    new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.SubjectKey == subjectKey && e.ContextKey == key,
                     },

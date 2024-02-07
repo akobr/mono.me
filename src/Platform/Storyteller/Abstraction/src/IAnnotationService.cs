@@ -9,7 +9,7 @@ public interface IAnnotationService
 
     Task<Annotation?> GetAnnotationAsync(string fullKey);
 
-    Task<Response> GetAnnotationsAsync(Request request);
+    Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request);
 
     Task CreateOrUpdateAnnotationAsync(string organization, Annotation annotation);
 }

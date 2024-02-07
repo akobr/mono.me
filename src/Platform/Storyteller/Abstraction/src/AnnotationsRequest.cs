@@ -6,7 +6,7 @@ using _42.Platform.Storyteller.Entities;
 
 namespace _42.Platform.Storyteller;
 
-public class Request
+public class AnnotationsRequest
 {
     public string Organization { get; set; } = Constants.DefaultTenantName;
 
