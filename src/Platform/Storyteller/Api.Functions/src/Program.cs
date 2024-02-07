@@ -45,9 +45,11 @@ var host = new HostBuilder()
         services.AddSingleton<ICosmosClientProvider, CosmosClientProvider>();
         services.AddSingleton<IContainerFactory, ContainerFactory>();
         services.AddSingleton<IContainerRepositoryProvider, ContainerRepositoryProvider>();
-        services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
-        services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IMachineAccessService, AzureAdMachineAccessService>();
+
+        services.AddSingleton<IAccessService, CosmosAccessService>();
+        services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
+        services.AddSingleton<IConfigurationService, CosmosConfigurationService>();
     })
     .Build();
 

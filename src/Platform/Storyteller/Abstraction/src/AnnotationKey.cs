@@ -50,6 +50,8 @@ public class AnnotationKey
             ? _segments[2]
             : string.Empty;
 
+    public string Name => _segments[^1];
+
     internal IReadOnlyList<string> Segments => _segments;
 
     public static implicit operator string(AnnotationKey key)

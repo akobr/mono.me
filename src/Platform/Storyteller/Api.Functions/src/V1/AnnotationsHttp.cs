@@ -213,7 +213,7 @@ public class AnnotationsHttp
         {
             case AnnotationType.Responsibility:
             {
-                dataRequest.PartitionKey = FullKeyExtensions.GetResponsibilityPartitionKey(project, annotationKey.ResponsibilityName);
+                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
                 dataRequest.Conditions = new Request.ICondition[]
                 {
                     new Request.Condition<Usage> { Predicate = u => u.ResponsibilityKey == key, },
@@ -235,7 +235,7 @@ public class AnnotationsHttp
 
             case AnnotationType.Usage:
             {
-                dataRequest.PartitionKey = FullKeyExtensions.GetResponsibilityPartitionKey(project, annotationKey.ResponsibilityName);
+                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
                 string subjectKey = annotationKey.GetSubjectKey();
                 string responsibilityKey = annotationKey.GetResponsibilityKey();
 
@@ -282,7 +282,7 @@ public class AnnotationsHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Annotation), Description = "The annotation to create or update.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), Description = "The created or updated annotation.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetAnnotation(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Definitions.Methods.Put, Route = Definitions.Routes.Annotations.V1.Annotation)]
@@ -344,7 +344,7 @@ public class AnnotationsHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(List<Annotation>), Description = "The annotations to create.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Guid), Description = "The id of the asynchronous create operation.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetAnnotations(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Annotations.V1.Annotations)]
@@ -371,7 +371,7 @@ public class AnnotationsHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(List<Annotation>), Description = "The annotations to create.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Guid), Description = "The id of the asynchronous create operation.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetAnnotationsSimple(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Annotations.V1.AnnotationsSimple)]
@@ -399,7 +399,7 @@ public class AnnotationsHttp
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The annotation doesn't exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteAnnotation(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.Annotations.V1.Annotation)]
@@ -476,7 +476,7 @@ public class AnnotationsHttp
             }
             else
             {
-                dataRequest.PartitionKey = FullKeyExtensions.GetResponsibilityPartitionKey(project, nameQuery);
+                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, nameQuery);
                 conditions.Add(new Request.Condition<Responsibility>
                 {
                     Predicate = r => r.Name == nameQuery,
@@ -548,7 +548,7 @@ public class AnnotationsHttp
             }
             else
             {
-                dataRequest.PartitionKey = FullKeyExtensions.GetSubjectPartitionKey(project, nameQuery);
+                dataRequest.PartitionKey = PartitionKeys.GetSubject(project, nameQuery);
                 conditions.Add(new Request.Condition<Subject>
                 {
                     Predicate = s => s.Name == nameQuery,
@@ -622,7 +622,7 @@ public class AnnotationsHttp
             }
             else
             {
-                dataRequest.PartitionKey = FullKeyExtensions.GetResponsibilityPartitionKey(project, responsibilityNameQuery);
+                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
                 conditions.Add(new Request.Condition<Usage>
                 {
                     Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
@@ -725,7 +725,7 @@ public class AnnotationsHttp
             }
             else
             {
-                dataRequest.PartitionKey = FullKeyExtensions.GetSubjectPartitionKey(project, subjectNameQuery);
+                dataRequest.PartitionKey = PartitionKeys.GetSubject(project, subjectNameQuery);
                 conditions.Add(new Request.Condition<Context>
                 {
                     Predicate = u => u.SubjectName == subjectNameQuery,
@@ -829,7 +829,7 @@ public class AnnotationsHttp
             }
             else
             {
-                dataRequest.PartitionKey = FullKeyExtensions.GetResponsibilityPartitionKey(project, responsibilityNameQuery);
+                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
                 conditions.Add(new Request.Condition<Execution>
                 {
                     Predicate = u => u.ResponsibilityName == responsibilityNameQuery,

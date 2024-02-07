@@ -60,4 +60,9 @@ public static class AnnotationKeyExtensions
     {
         return AnnotationKey.CreateContext(GetSubjectName(@this), GetContextName(@this));
     }
+
+    public static AnnotationKey GetUsageKey(this AnnotationKey @this)
+    {
+        return AnnotationKey.CreateUsage(GetSubjectName(@this), GetResponsibilityName(@this));
+    }
 }

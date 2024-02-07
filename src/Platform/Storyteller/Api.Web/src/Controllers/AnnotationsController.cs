@@ -172,7 +172,7 @@ public class AnnotationsController : ControllerBase
             }
             else
             {
-                request.PartitionKey = FullKeyExtensions.GetResponsibilityPartitionKey(project, responsibilityNameQuery);
+                request.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
                 conditions.Add(new Request.Condition<Usage>
                 {
                     Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
@@ -258,7 +258,7 @@ public class AnnotationsController : ControllerBase
             }
             else
             {
-                request.PartitionKey = FullKeyExtensions.GetSubjectPartitionKey(project, subjectNameQuery);
+                request.PartitionKey = PartitionKeys.GetSubject(project, subjectNameQuery);
                 conditions.Add(new Request.Condition<Context>
                 {
                     Predicate = u => u.SubjectName == subjectNameQuery,
@@ -344,7 +344,7 @@ public class AnnotationsController : ControllerBase
             }
             else
             {
-                request.PartitionKey = FullKeyExtensions.GetResponsibilityPartitionKey(project, responsibilityNameQuery);
+                request.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
                 conditions.Add(new Request.Condition<Execution>
                 {
                     Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
@@ -490,7 +490,7 @@ public class AnnotationsController : ControllerBase
         {
             case AnnotationType.Responsibility:
             {
-                request.PartitionKey = FullKeyExtensions.GetResponsibilityPartitionKey(project, annotationKey.ResponsibilityName);
+                request.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
                 request.Conditions = new Request.ICondition[]
                 {
                     new Request.Condition<Usage>
@@ -527,7 +527,7 @@ public class AnnotationsController : ControllerBase
 
             case AnnotationType.Usage:
             {
-                request.PartitionKey = FullKeyExtensions.GetResponsibilityPartitionKey(project, annotationKey.ResponsibilityName);
+                request.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
                 string subjectKey = annotationKey.GetSubjectKey();
                 string responsibilityKey = annotationKey.GetResponsibilityKey();
 
