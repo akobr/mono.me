@@ -13,7 +13,8 @@ public class AuthenticationService : IAuthenticationService
     private readonly AsyncLazy<IPublicClientApplication> _publicClientApp;
 
     private readonly string[] _scopes = {
-        "api://e1e9d06f-7c67-4acf-8b05-f4413697950f/access_as_user",
+        "api://7f37b203-3599-4c73-9796-39d96883198c/User.Impersonation",
+        "api://7f37b203-3599-4c73-9796-39d96883198c/Default.ReadWrite",
     };
 
     public AuthenticationService(IFileSystem fileSystem)
@@ -55,8 +56,8 @@ public class AuthenticationService : IAuthenticationService
             .Build();
 
         var pca = PublicClientApplicationBuilder
-            .Create("e1e9d06f-7c67-4acf-8b05-f4413697950f")
-            .WithAuthority(AzureCloudInstance.AzurePublic, "common")
+            .Create("7f37b203-3599-4c73-9796-39d96883198c")
+            .WithAuthority(AzureCloudInstance.AzurePublic, "f2b1a691-0cf0-47d2-9b2c-b13cb7b6467e")
             .WithDefaultRedirectUri()
             .Build();
 
