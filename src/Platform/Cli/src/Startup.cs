@@ -1,6 +1,7 @@
 using System.IO.Abstractions;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
 using _42.Testing.System.IO.Abstractions;
 using _42.Testing.System.IO.Abstractions.Tracers;
@@ -35,6 +36,7 @@ namespace _42.Platform.Cli
 #endif
 
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
+            services.AddSingleton<IAuthenticationService, AuthenticationService>();
         }
 
         public void ConfigureApplication(IConfigurationBuilder builder)
