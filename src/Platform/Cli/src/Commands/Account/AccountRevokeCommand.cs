@@ -86,7 +86,7 @@ public class AccountRevokeCommand : BaseCommand
     {
         var projectKey = Console.Select(new SelectOptions<string>
         {
-            Message = "Which point to grant access to",
+            Message = "Which point to revoke access to",
             DefaultValue = _accessDefault.ProjectKey,
             Items = account.AccessMap
                 .Where(access => access.Value >= Sdk.Model.Account.InnerEnum.Administrator)
