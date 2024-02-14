@@ -1,22 +1,43 @@
 using System;
+using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
+using _42.Platform.Cli.Configuration;
+using _42.Platform.Sdk.Api;
 using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Options;
 using Microsoft.Identity.Client;
 
-namespace _42.Platform.Cli.Commands;
+namespace _42.Platform.Cli.Commands.Account;
 
-[Command(CommandNames.ACCOUNT, CommandNames.LOGIN, Description = "Manage account used to communicate with 2S platform services.")]
+[Subcommand(
+    typeof(AccountRegisterCommand),
+    typeof(AccountSetCommand),
+    typeof(AccountListCommand),
+    typeof(AccountGetCommand),
+    typeof(AccountCreateCommand),
+    typeof(AccountGrantCommand),
+    typeof(AccountRevokeCommand))]
+
+[Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage account used to communicate with 2S platform services.")]
 public class AccountCommand : BaseCommand
 {
+    private readonly IAccessApiAsync _accessApi;
     private readonly IAuthenticationService _authentication;
+    private readonly AccessDefaultOptions _accessDefault;
 
-    public AccountCommand(IExtendedConsole console, IAuthenticationService authentication)
+    public AccountCommand(
+        IExtendedConsole console,
+        IAccessApiAsync accessApi,
+        IAuthenticationService authentication,
+        IOptions<AccessDefaultOptions> accessDefaultOptions)
         : base(console)
     {
+        _accessApi = accessApi;
         _authentication = authentication;
+        _accessDefault = accessDefaultOptions.Value;
     }
 
     public override async Task<int> OnExecuteAsync()
@@ -25,12 +46,42 @@ public class AccountCommand : BaseCommand
         {
             var auth = await _authentication.GetAuthenticationAsync();
             Console.WriteImportant($"You are already logged in as {auth?.Account.Username}");
-            return ExitCodes.SUCCESS;
         }
         catch (MsalUiRequiredException exception)
         {
-            return await AcquireByDeviceCodeAsync();
+            var deviceAuthResultCode = await AcquireByDeviceCodeAsync();
+
+            if (deviceAuthResultCode != ExitCodes.SUCCESS)
+            {
+                return deviceAuthResultCode;
+            }
         }
+
+        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+
+        if (accountResponse.StatusCode is HttpStatusCode.NotFound)
+        {
+            Console.Write(
+                "You account is not registered, to create a registration call ",
+                "sform account register ".ThemedHighlight(Console.Theme),
+                "command.");
+            return ExitCodes.INTERACTION_NEEDED;
+        }
+
+        var account = accountResponse.Data;
+        Console.WriteLine($"Has access to {account.AccessMap.Count} organizations or projects.");
+
+        if (string.IsNullOrWhiteSpace(_accessDefault?.ProjectKey))
+        {
+            Console.WriteImportant(
+                "No default project is set, please call ",
+                "sform account set".ThemedHighlight(Console.Theme),
+                " command.");
+            return ExitCodes.INTERACTION_NEEDED;
+        }
+
+        Console.WriteLine("Default project: ", _accessDefault.ProjectKey.ThemedHighlight(Console.Theme));
+        return ExitCodes.SUCCESS;
     }
 
     private async Task<int> AcquireByDeviceCodeAsync()
@@ -54,7 +105,7 @@ public class AccountCommand : BaseCommand
                     //   If this occurs, an OperationCanceledException will be thrown (see catch below for more details).
                     Console.WriteHeader("Sign in");
                     Console.WriteLine(deviceCodeResult.Message);
-                    return Task.FromResult(0);
+                    return Task.FromResult(ExitCodes.INTERACTION_NEEDED);
                 }).ExecuteAsync();
 
             Console.WriteImportant($"You have been logged in as {result.Account.Username}");
