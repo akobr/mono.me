@@ -21,7 +21,7 @@ namespace _42.Platform.Cli.Commands.Account;
     typeof(AccountGrantCommand),
     typeof(AccountRevokeCommand))]
 
-[Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage account used to communicate with 2S platform services.")]
+[Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage account and accesses to communicate with 2S platform services.")]
 public class AccountCommand : BaseCommand
 {
     private readonly IAccessApiAsync _accessApi;

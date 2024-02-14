@@ -54,7 +54,7 @@ public class AccountGetCommand : BaseCommand
 
         if (role < Sdk.Model.Account.InnerEnum.Administrator)
         {
-            Console.WriteLine($"You don't have administrator permissions to the access point '{pointKey}'.");
+            Console.WriteLine($"You don't have administration permissions to the access point '{pointKey}'.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
@@ -77,6 +77,7 @@ public class AccountGetCommand : BaseCommand
             Message = "Which access point would you like to get",
             DefaultValue = _accessDefault.ProjectKey,
             Items = account.AccessMap
+                .Where(access => access.Value >= Sdk.Model.Account.InnerEnum.Administrator)
                 .Select(access => access.Key)
                 .OrderBy(access => access),
         });
