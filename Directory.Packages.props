@@ -50,6 +50,7 @@
     <PackageVersion Include="QuikGraph" Version="2.5.0" />
     <PackageVersion Include="QuikGraph.Serialization" Version="2.5.0" />
     <!-- data formats -->
+    <PackageVersion Include="JsonSubTypes" Version="2.0.1" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageVersion Include="YamlDotNet" Version="13.7.1" />
     <!-- REST API -->
@@ -58,6 +59,8 @@
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="8.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
     <PackageVersion Include="NSwag.AspNetCore" Version="13.20.0" />
+    <PackageVersion Include="Polly" Version="8.3.0" />
+    <PackageVersion Include="RestSharp" Version="110.2.0" />
     <!-- CLI libraries -->
     <PackageVersion Include="Alba.CsConsoleFormat-NoXaml" Version="1.0.0" />
     <PackageVersion Include="Colorful.Console" Version="1.2.15" />
