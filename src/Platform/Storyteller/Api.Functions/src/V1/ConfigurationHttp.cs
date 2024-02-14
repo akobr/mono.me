@@ -33,7 +33,7 @@ public class ConfigurationHttp
     }
 
     [Function(nameof(GetConfiguration))]
-    [OpenApiOperation(Definitions.Routes.Configuration.V1.Configuration, Definitions.Tags.Configuration)]
+    [OpenApiOperation(Definitions.RouteIds.Configuration.GetConfiguration, Definitions.Tags.Configuration)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -73,7 +73,7 @@ public class ConfigurationHttp
     }
 
     [Function(nameof(GetConfigurationResolved))]
-    [OpenApiOperation(Definitions.Routes.Configuration.V1.ConfigurationResolved, Definitions.Tags.Configuration)]
+    [OpenApiOperation(Definitions.RouteIds.Configuration.GetResolvedConfiguration, Definitions.Tags.Configuration)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -113,7 +113,7 @@ public class ConfigurationHttp
     }
 
     [Function(nameof(SetConfiguration))]
-    [OpenApiOperation(Definitions.Routes.Configuration.V1.Configuration, Definitions.Tags.Configuration)]
+    [OpenApiOperation(Definitions.RouteIds.Configuration.SetConfiguration, Definitions.Tags.Configuration)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -161,7 +161,7 @@ public class ConfigurationHttp
     }
 
     [Function(nameof(DeleteConfiguration))]
-    [OpenApiOperation(Definitions.Routes.Configuration.V1.Configuration, Definitions.Tags.Configuration)]
+    [OpenApiOperation(Definitions.RouteIds.Configuration.DeleteConfiguration, Definitions.Tags.Configuration)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
