@@ -24,4 +24,5 @@ public static class CommandNames
     public const string DELETE = "delete";
     public const string LIST = "list";
     public const string CREATE = "create";
+    public const string REMOVE = "remove";
 }

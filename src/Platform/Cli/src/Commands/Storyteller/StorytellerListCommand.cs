@@ -3,12 +3,12 @@ using _42.CLI.Toolkit;
 using McMaster.Extensions.CommandLineUtils;
 using IExtendedConsole = _42.CLI.Toolkit.Output.IExtendedConsole;
 
-namespace _42.Platform.Cli.Commands;
+namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.STORYTELLER, CommandNames.STORY, Description = "Retrieve and manipulate with the story of your platform.")]
-public class StorytellerCommand : BaseCommand
+[Command(CommandNames.LIST, Description = "Retrieve the list of queried annotations.")]
+public class StorytellerListCommand : BaseCommand
 {
-    public StorytellerCommand(IExtendedConsole console)
+    public StorytellerListCommand(IExtendedConsole console)
         : base(console)
     {
     }
