@@ -3,6 +3,7 @@ using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Sdk;
 using _42.Testing.System.IO.Abstractions;
 using _42.Testing.System.IO.Abstractions.Tracers;
 using Microsoft.Extensions.Configuration;
@@ -37,11 +38,14 @@ namespace _42.Platform.Cli
 
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
             services.AddSingleton<IAuthenticationService, AuthenticationService>();
+
+            services.AddPlatformSdk(p => p.GetRequiredService<IAuthenticationService>().GetAuthenticationAsync().Result!.AccessToken);
         }
 
         public void ConfigureApplication(IConfigurationBuilder builder)
         {
             builder.AddJsonFile(Constants.APPLICATION_CONFIG_JSON, false, false);
+            builder.AddJsonFile(Constants.ACCESS_DEFAULT_JSON, true, false);
         }
 
         private void ConfigureLogging(ILoggingBuilder builder, IConfiguration configuration)
@@ -72,6 +76,7 @@ namespace _42.Platform.Cli
         private static void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
         {
             services.Configure<LoggingOptions>(configuration.GetSection(ConfigurationSections.LOGGING));
+            services.Configure<AccessDefaultOptions>(configuration.GetSection(ConfigurationSections.ACCESS));
         }
     }
 }

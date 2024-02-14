@@ -14,4 +14,5 @@ public static class ExitCodes
     // warnings from 40
     public const int WARNING_ABORTED = 40;
     public const int WARNING_NO_WORK_NEEDED = 42;
+    public const int INTERACTION_NEEDED = 43;
 }
