@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
+using _42.Platform.Cli.Commands.Account;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands;
