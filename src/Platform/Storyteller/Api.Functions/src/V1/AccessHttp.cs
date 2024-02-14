@@ -26,7 +26,7 @@ public class AccessHttp
     }
 
     [Function(nameof(GetAccount))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.Account, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetAccount, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Account), Description = Definitions.Descriptions.ResponseAccount)]
@@ -47,7 +47,7 @@ public class AccessHttp
     }
 
     [Function(nameof(PostAccount))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.Account, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.CreateAccount, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AccountCreate), Description = "Organization and project for the new account.")]
@@ -77,7 +77,7 @@ public class AccessHttp
     }
 
     [Function(nameof(GetAccessPoints))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.AccessPoints, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetAccessPoints, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<AccessPoint>), Description = "The list of all manageable organizations and projects. The access points where the account is Admin or Owner.")]
@@ -94,7 +94,7 @@ public class AccessHttp
     }
 
     [Function(nameof(GetAccessPoint))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.AccessPoint, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetAccessPoint, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The key of requested access point.")]
@@ -114,7 +114,7 @@ public class AccessHttp
     }
 
     [Function(nameof(PostAccessPoints))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.AccessPoints, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.CreateAccessPoint, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AccessPointCreate), Description = "An organization or project to create.")]
@@ -134,7 +134,7 @@ public class AccessHttp
     }
 
     [Function(nameof(PostGrantPermission))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.Grant, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.GrantUserAccess, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Permission), Description = "The requested permission to grant.")]
@@ -155,7 +155,7 @@ public class AccessHttp
     }
 
     [Function(nameof(PostRevokePermission))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.Revoke, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.RevokeUserAccess, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Permission), Description = "The requested permission to revoke.")]
@@ -176,7 +176,7 @@ public class AccessHttp
     }
 
     [Function(nameof(GetMachines))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.Machines, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetMachineAccesses, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -198,7 +198,7 @@ public class AccessHttp
     }
 
     [Function(nameof(GetMachine))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.Machine, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetMachineAccess, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -230,7 +230,7 @@ public class AccessHttp
     }
 
     [Function(nameof(PostMachines))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.Machines, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.CreateMachineAccess, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(MachineAccessCreate), Description = "An organization or project to create.")]
@@ -253,7 +253,7 @@ public class AccessHttp
     }
 
     [Function(nameof(PutMachine))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.Machine, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.ResetMachineAccess, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -282,7 +282,7 @@ public class AccessHttp
     }
 
     [Function(nameof(DeleteMachine))]
-    [OpenApiOperation(Definitions.Routes.Access.V1.Machine, Definitions.Tags.Access)]
+    [OpenApiOperation(Definitions.RouteIds.Access.DeleteMachineAccess, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]

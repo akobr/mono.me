@@ -47,6 +47,55 @@ public static class Definitions
         }
     }
 
+    public static class RouteIds
+    {
+        public static class Access
+        {
+            public const string GetAccount = nameof(GetAccount);
+            public const string CreateAccount = nameof(CreateAccount);
+
+            public const string GetAccessPoints = nameof(GetAccessPoints);
+            public const string GetAccessPoint = nameof(GetAccessPoint);
+            public const string CreateAccessPoint = nameof(CreateAccessPoint);
+
+            public const string GrantUserAccess = nameof(GrantUserAccess);
+            public const string RevokeUserAccess = nameof(RevokeUserAccess);
+
+            public const string GetMachineAccesses = nameof(GetMachineAccesses);
+            public const string GetMachineAccess = nameof(GetMachineAccess);
+            public const string CreateMachineAccess = nameof(CreateMachineAccess);
+
+            public const string ResetMachineAccess = nameof(ResetMachineAccess);
+            public const string DeleteMachineAccess = nameof(DeleteMachineAccess);
+        }
+
+        public static class Annotations
+        {
+            public const string GetAnnotations = nameof(GetAnnotations);
+            public const string SetAnnotations = nameof(SetAnnotations);
+            public const string SetAnnotationsSimple = nameof(SetAnnotationsSimple);
+
+            public const string GetAnnotation = nameof(GetAnnotation);
+            public const string SetAnnotation = nameof(SetAnnotation);
+            public const string DeleteAnnotation = nameof(DeleteAnnotation);
+            public const string GetDescendants = nameof(GetDescendants);
+
+            public const string GetResponsibilities = nameof(GetResponsibilities);
+            public const string GetSubjects = nameof(GetSubjects);
+            public const string GetUsages = nameof(GetUsages);
+            public const string GetContexts = nameof(GetContexts);
+            public const string GetExecutions = nameof(GetExecutions);
+        }
+
+        public static class Configuration
+        {
+            public const string GetConfiguration = nameof(GetConfiguration);
+            public const string GetResolvedConfiguration = nameof(GetResolvedConfiguration);
+            public const string SetConfiguration = nameof(SetConfiguration);
+            public const string DeleteConfiguration = nameof(DeleteConfiguration);
+        }
+    }
+
     public static class Parameters
     {
         public const string Organization = "organization";

@@ -37,7 +37,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(GetAnnotations))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Annotations, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetAnnotations, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -80,7 +80,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(GetAnnotation))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Annotation, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetAnnotation, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -120,7 +120,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(GetDescendants))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Descendants, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetDescendants, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -272,7 +272,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(SetAnnotation))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Annotation, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.SetAnnotation, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -335,7 +335,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(SetAnnotations))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Annotations, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.SetAnnotations, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -362,7 +362,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(SetAnnotationsSimple))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.AnnotationsSimple, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.SetAnnotationsSimple, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -389,7 +389,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(DeleteAnnotation))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Annotation, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.DeleteAnnotation, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -417,7 +417,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(GetResponsibilities))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Responsibilities, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetResponsibilities, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -489,7 +489,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(GetSubjects))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Subjects, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetSubjects, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -561,7 +561,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(GetUsages))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Usages, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetUsages, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -664,7 +664,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(GetContexts))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Contexts, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetContexts, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -766,7 +766,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(GetExecutions))]
-    [OpenApiOperation(Definitions.Routes.Annotations.V1.Executions, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetExecutions, Definitions.Tags.Annotations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
