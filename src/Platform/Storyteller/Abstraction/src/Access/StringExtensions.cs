@@ -1,25 +1,16 @@
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace _42.Platform.Storyteller.Access;
 
 public static class StringExtensions
 {
+    private static readonly Regex InvalidCharacterRegex = new(@"[^a-z0-9\-_]", RegexOptions.Compiled);
+
     public static string ToNormalizedKey(this string @this)
     {
         var lowerKey = @this.Trim().ToLowerInvariant();
-        var keyTemp = new StringBuilder(lowerKey);
-
-        for (var i = 0; i < keyTemp.Length; i++)
-        {
-            if (!char.IsLetterOrDigit(keyTemp[i])
-                && keyTemp[i] != '-'
-                && keyTemp[i] != '_')
-            {
-                keyTemp[i] = '_';
-            }
-        }
-
-        var normalizedKey = keyTemp.ToString();
+        var normalizedKey = InvalidCharacterRegex.Replace(lowerKey, "_");
         return normalizedKey;
     }
 }
