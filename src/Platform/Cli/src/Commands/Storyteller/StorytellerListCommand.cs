@@ -1,20 +1,32 @@
 using System.Threading.Tasks;
-using _42.CLI.Toolkit;
+using _42.Platform.Sdk.Api;
 using McMaster.Extensions.CommandLineUtils;
 using IExtendedConsole = _42.CLI.Toolkit.Output.IExtendedConsole;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.LIST, Description = "Retrieve the list of queried annotations.")]
-public class StorytellerListCommand : BaseCommand
+[Subcommand(
+    typeof(StorytellerGetCommand),
+    typeof(StorytellerSetCommand),
+    typeof(StorytellerDeleteCommand))]
+
+[Command(CommandNames.STORYTELLER, CommandNames.STORY, CommandNames.ANNOTATIONS, Description = "Retrieve the story of your platform.")]
+public class StorytellerListCommand : BaseContextCommand
 {
-    public StorytellerListCommand(IExtendedConsole console)
-        : base(console)
+    private readonly IAnnotationsApiAsync _annotationsApi;
+
+    public StorytellerListCommand(
+        IExtendedConsole console,
+        IAnnotationsApiAsync annotationsApi,
+        ICommandContext context)
+        : base(console, context)
     {
+        _annotationsApi = annotationsApi;
     }
 
-    public override Task<int> OnExecuteAsync()
+    protected override async Task<int> ExecuteAsync()
     {
-        throw new System.NotImplementedException();
+        var annotations = await _annotationsApi.GetAnnotationsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName);
+        return ExitCodes.SUCCESS;
     }
 }

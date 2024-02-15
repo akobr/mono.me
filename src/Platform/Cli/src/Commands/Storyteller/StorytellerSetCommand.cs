@@ -13,6 +13,18 @@ public class StorytellerSetCommand : BaseCommand
     {
     }
 
+    [Argument(0, Description = "An annotation key to get.")]
+    public string AnnotationKey { get; set; } = string.Empty;
+
+    [Option("-i|--import", CommandOptionType.SingleValue, Description = "Specify a file from where the annotation(s) will be imported.")]
+    public string? ImportFilePath { get; set; }
+
+    [Option("-c|--custom-properties", CommandOptionType.MultipleValue, Description = "Specify custom properties to be set on the configuration.")]
+    public string[]? CustomProperties { get; set; }
+
+    [Option("-l|--labels", CommandOptionType.MultipleValue, Description = "Specify labels to be set on the configuration.")]
+    public string[]? Labels { get; set; }
+
     public override Task<int> OnExecuteAsync()
     {
         throw new System.NotImplementedException();
