@@ -48,9 +48,13 @@ public class AccountCreateCommand : BaseCommand
             Message = "Name of your new project",
         });
 
-        var projectKey = $"{organizationName}.{projectName}";
         AccountSetCommand.CreateAccessDefaultConfigFile(
-            new AccessDefaultOptions { OrganizationKey = organizationName, ProjectKey = projectKey },
+            new AccessDefaultOptions
+            {
+                OrganizationName = organizationName,
+                ProjectName = projectName,
+                ViewName = Platform.Storyteller.Constants.DefaultViewName,
+            },
             _fileSystem);
         return ExitCodes.SUCCESS;
     }

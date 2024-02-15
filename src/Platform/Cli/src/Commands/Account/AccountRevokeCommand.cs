@@ -30,13 +30,13 @@ public class AccountRevokeCommand : BaseCommand
     }
 
     [Argument(0, Description = "The target account key to whom the permissions are revoked.")]
-    public string AccountKey { get; } = string.Empty;
+    public string AccountKey { get; set; } = string.Empty;
 
     [Option("-p|--point", CommandOptionType.SingleValue, Description = "A point key to which the access is revoked.")]
-    public string? ProjectKey { get; } = string.Empty;
+    public string? ProjectKey { get; set; } = string.Empty;
 
-    [Option("-r|--role", CommandOptionType.SingleValue, Description = "A role which is revoked.")]
-    public string? Role { get; } = string.Empty;
+    [Option("-r|--role", CommandOptionType.SingleValue, Description = "A role which is revoked, can be one of the values: Reader, Contributor, Administrator, or Owner. If not specified all roles will be revoked.")]
+    public string? Role { get; set; } = string.Empty;
 
     public override async Task<int> OnExecuteAsync()
     {
@@ -60,7 +60,7 @@ public class AccountRevokeCommand : BaseCommand
         var account = accountResponse.Data;
         if (Enum.TryParse<Permission.RoleEnum>(Role, true, out var role))
         {
-            role = Permission.RoleEnum.Contributor;
+            role = Permission.RoleEnum.Reader;
         }
 
         var projectKey = string.IsNullOrWhiteSpace(ProjectKey)
@@ -84,15 +84,21 @@ public class AccountRevokeCommand : BaseCommand
 
     private string SelectPossiblePoint(Sdk.Model.Account account)
     {
-        var projectKey = Console.Select(new SelectOptions<string>
+        var selectOptions = new SelectOptions<string>
         {
-            Message = "Which point to revoke access to",
-            DefaultValue = _accessDefault.ProjectKey,
+            Message = "Which access point would you like to revoke",
             Items = account.AccessMap
                 .Where(access => access.Value >= Sdk.Model.Account.InnerEnum.Administrator)
                 .Select(access => access.Key)
                 .OrderBy(access => access),
-        });
+        };
+
+        if (!string.IsNullOrWhiteSpace(_accessDefault.ProjectName))
+        {
+            selectOptions.DefaultValue = $"{_accessDefault.OrganizationName}.{_accessDefault.ProjectName}";
+        }
+
+        var projectKey = Console.Select(selectOptions);
         return projectKey;
     }
 }
