@@ -73,7 +73,12 @@ public class AccountRegisterCommand : BaseCommand
         Console.WriteImportant($"Account {newAccount.Name} has been created.");
         Console.WriteLine("Default project set to ", projectKey.ThemedHighlight(Console.Theme), ".");
         AccountSetCommand.CreateAccessDefaultConfigFile(
-            new AccessDefaultOptions { OrganizationKey = organizationName, ProjectKey = projectKey },
+            new AccessDefaultOptions
+            {
+                OrganizationName = organizationName,
+                ProjectName = projectName,
+                ViewName = Platform.Storyteller.Constants.DefaultViewName,
+            },
             _fileSystem);
         return ExitCodes.SUCCESS;
     }

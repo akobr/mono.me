@@ -71,7 +71,7 @@ public class AccountCommand : BaseCommand
         var account = accountResponse.Data;
         Console.WriteLine($"Has access to {account.AccessMap.Count} organizations or projects.");
 
-        if (string.IsNullOrWhiteSpace(_accessDefault?.ProjectKey))
+        if (string.IsNullOrWhiteSpace(_accessDefault?.ProjectName))
         {
             Console.WriteImportant(
                 "No default project is set, please call ",
@@ -80,7 +80,8 @@ public class AccountCommand : BaseCommand
             return ExitCodes.INTERACTION_NEEDED;
         }
 
-        Console.WriteLine("Default project: ", _accessDefault.ProjectKey.ThemedHighlight(Console.Theme));
+        var projectKey = $"{_accessDefault.OrganizationName}.{_accessDefault.ProjectName}";
+        Console.WriteLine("Default project: ", projectKey.ThemedHighlight(Console.Theme));
         return ExitCodes.SUCCESS;
     }
 

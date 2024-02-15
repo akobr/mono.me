@@ -32,8 +32,11 @@ public class AccountSetCommand : BaseCommand
         _accessDefault = accessDefaultOptions.Value;
     }
 
-    [Argument(0, Description = "A project key to set.")]
-    public string? ProjectKey { get; } = string.Empty;
+    [Option("-p|--projectKey", CommandOptionType.SingleValue, Description = "A project key to set as default.")]
+    public string? ProjectKey { get; set; }
+
+    [Option("-v|--viewName", CommandOptionType.SingleValue, Description = "A view name to set as default.")]
+    public string? ViewName { get; set; }
 
     public override async Task<int> OnExecuteAsync()
     {
@@ -50,18 +53,30 @@ public class AccountSetCommand : BaseCommand
 
         var account = accountResponse.Data;
 
-        if (!string.IsNullOrWhiteSpace(_accessDefault.ProjectKey))
+        if (!string.IsNullOrWhiteSpace(_accessDefault.ProjectName))
         {
-            Console.WriteLine("Currently the default project is set to ", _accessDefault.ProjectKey.ThemedHighlight(Console.Theme), ".");
+            var currentProjectKey = $"{_accessDefault.OrganizationName}.{_accessDefault.ProjectName}";
+            Console.WriteLine(
+                "Currently the default project is set to ",
+                currentProjectKey.ThemedHighlight(Console.Theme),
+                " and view is ",
+                (_accessDefault.ViewName ?? Platform.Storyteller.Constants.DefaultViewName).ThemedHighlight(Console.Theme),
+                ".");
         }
 
         var projectKey = ProjectKey ?? SelectPossibleProject(account);
-        _accessDefault.ProjectKey = projectKey;
-        _accessDefault.OrganizationKey = projectKey[..projectKey.IndexOf('.')];
+        _accessDefault.ProjectName = projectKey;
+        _accessDefault.OrganizationName = projectKey[..projectKey.IndexOf('.')];
+        _accessDefault.ViewName = ViewName ?? _accessDefault.ViewName ?? Platform.Storyteller.Constants.DefaultViewName;
 
         CreateAccessDefaultConfigFile(_accessDefault, _fileSystem);
 
-        Console.WriteLine("Default project set to ", projectKey.ThemedHighlight(Console.Theme), ".");
+        Console.WriteLine(
+            "Default project set to ",
+            projectKey.ThemedHighlight(Console.Theme),
+            " with view ",
+            _accessDefault.ViewName.ThemedHighlight(Console.Theme),
+            ".");
         return ExitCodes.SUCCESS;
     }
 
@@ -76,15 +91,21 @@ public class AccountSetCommand : BaseCommand
 
     private string SelectPossibleProject(Sdk.Model.Account account)
     {
-        var projectKey = Console.Select(new SelectOptions<string>
+        var selectOptions = new SelectOptions<string>
         {
             Message = "Which project would you like to set as default",
-            DefaultValue = _accessDefault.ProjectKey,
             Items = account.AccessMap
                 .Where(access => access.Key.Contains('.'))
                 .Select(access => access.Key)
                 .OrderBy(access => access),
-        });
+        };
+
+        if (!string.IsNullOrWhiteSpace(_accessDefault.ProjectName))
+        {
+            selectOptions.DefaultValue = $"{_accessDefault.OrganizationName}.{_accessDefault.ProjectName}";
+        }
+
+        var projectKey = Console.Select(selectOptions);
         return projectKey;
     }
 }

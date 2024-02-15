@@ -11,7 +11,7 @@ using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.Account;
 
-[Command(CommandNames.GET, Description = "Get an access point with list of user accesses. You need to be admin or owner.")]
+[Command(CommandNames.GET, Description = "Get an access point with list of user accesses. You need to be administrator or owner.")]
 public class AccountGetCommand : BaseCommand
 {
     private readonly IAccessApiAsync _accessApi;
@@ -27,8 +27,8 @@ public class AccountGetCommand : BaseCommand
         _accessDefault = accessDefaultOptions.Value;
     }
 
-    [Argument(0, Description = "An access point key to get.")]
-    public string? ProjectKey { get; } = string.Empty;
+    [Option("-p|--pointKey", CommandOptionType.SingleValue, Description = "An access point key to get.")]
+    public string? PointKey { get; set; } = string.Empty;
 
     public override async Task<int> OnExecuteAsync()
     {
@@ -44,7 +44,7 @@ public class AccountGetCommand : BaseCommand
         }
 
         var account = accountResponse.Data;
-        var pointKey = ProjectKey ?? SelectPossibleProject(account);
+        var pointKey = PointKey ?? SelectPossiblePoint(account);
 
         if (account.AccessMap.TryGetValue(pointKey, out var role))
         {
@@ -70,17 +70,23 @@ public class AccountGetCommand : BaseCommand
         return ExitCodes.SUCCESS;
     }
 
-    private string SelectPossibleProject(Sdk.Model.Account account)
+    private string SelectPossiblePoint(Sdk.Model.Account account)
     {
-        var projectKey = Console.Select(new SelectOptions<string>
+        var selectOptions = new SelectOptions<string>
         {
             Message = "Which access point would you like to get",
-            DefaultValue = _accessDefault.ProjectKey,
             Items = account.AccessMap
                 .Where(access => access.Value >= Sdk.Model.Account.InnerEnum.Administrator)
                 .Select(access => access.Key)
                 .OrderBy(access => access),
-        });
+        };
+
+        if (!string.IsNullOrWhiteSpace(_accessDefault.ProjectName))
+        {
+            selectOptions.DefaultValue = $"{_accessDefault.OrganizationName}.{_accessDefault.ProjectName}";
+        }
+
+        var projectKey = Console.Select(selectOptions);
         return projectKey;
     }
 }

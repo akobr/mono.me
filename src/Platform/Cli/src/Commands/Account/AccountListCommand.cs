@@ -35,12 +35,11 @@ public class AccountListCommand : BaseCommand
         }
 
         var account = accountResponse.Data;
-        var projects = account.AccessMap
-            .Where(access => access.Key.Contains('.'));
+        var accessPoints = account.AccessMap;
 
-        foreach (var project in projects)
+        foreach (var accessPoint in accessPoints)
         {
-            Console.WriteLine($"- {project.Key} ({project.Value:G})");
+            Console.WriteLine($"- {accessPoint.Key} ({accessPoint.Value:G})");
         }
 
         return ExitCodes.SUCCESS;
