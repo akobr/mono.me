@@ -16,8 +16,12 @@ public static class CommandNames
     public const string SCHEDULER = "scheduler";
 
     public const string STORY = "story";
+    public const string ANNOTATIONS = "annotations";
     public const string SUPERVISE = "supervise";
     public const string SCHEDULE = "schedule";
+
+    public const string CONFIG = "config";
+    public const string CONFIGURATION = "configuration";
 
     public const string GET = "get";
     public const string SET = "set";

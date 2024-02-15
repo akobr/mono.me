@@ -13,6 +13,9 @@ public class StorytellerGetCommand : BaseCommand
     {
     }
 
+    [Argument(0, Description = "An annotation key to get.")]
+    public string AnnotationKey { get; set; } = string.Empty;
+
     public override Task<int> OnExecuteAsync()
     {
         throw new System.NotImplementedException();
