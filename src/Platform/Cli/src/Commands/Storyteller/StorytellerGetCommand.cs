@@ -5,7 +5,6 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
 using _42.Platform.Sdk.Api;
 using McMaster.Extensions.CommandLineUtils;
-using Newtonsoft.Json;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
