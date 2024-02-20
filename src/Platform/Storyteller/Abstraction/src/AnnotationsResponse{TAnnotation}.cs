@@ -5,7 +5,7 @@ using _42.Platform.Storyteller.Entities;
 
 namespace _42.Platform.Storyteller;
 
-public class AnnotationsResponse<TAnnotation> : IEnumerable<TAnnotation>
+public class AnnotationsResponse<TAnnotation>
     where TAnnotation : Annotation
 {
     public IEnumerable<TAnnotation> Annotations { get; set; } = Enumerable.Empty<TAnnotation>();
@@ -17,15 +17,5 @@ public class AnnotationsResponse<TAnnotation> : IEnumerable<TAnnotation>
     public static implicit operator List<TAnnotation>(AnnotationsResponse<TAnnotation> response)
     {
         return response.Annotations.ToList();
-    }
-
-    public IEnumerator<TAnnotation> GetEnumerator()
-    {
-        return Annotations.GetEnumerator();
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return Annotations.GetEnumerator();
     }
 }
