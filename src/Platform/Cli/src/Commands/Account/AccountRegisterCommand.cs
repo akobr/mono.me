@@ -38,7 +38,9 @@ public class AccountRegisterCommand : BaseCommand
 
         if (accountResponse.StatusCode is HttpStatusCode.OK)
         {
-            Console.WriteImportant($"You are already registered as {accountResponse.Data.Name}.");
+            Console.WriteImportant(
+                $"You are already registered as {accountResponse.Data.Name} ",
+                $"#{accountResponse.Data.Key}".ThemedLowlight(Console.Theme));
             return ExitCodes.SUCCESS;
         }
 

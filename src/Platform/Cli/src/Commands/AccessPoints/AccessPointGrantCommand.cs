@@ -11,15 +11,15 @@ using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Sharprompt;
 
-namespace _42.Platform.Cli.Commands.Account;
+namespace _42.Platform.Cli.Commands.AccessPoints;
 
-[Command(CommandNames.GRANT, Description = "Grant access to your project to another user.")]
-public class AccountGrantCommand : BaseCommand
+[Command(CommandNames.GRANT, Description = "Grant access to point to another user.")]
+public class AccessPointGrantCommand : BaseCommand
 {
     private readonly IAccessApiAsync _accessApi;
     private readonly AccessDefaultOptions _accessDefault;
 
-    public AccountGrantCommand(
+    public AccessPointGrantCommand(
         IExtendedConsole console,
         IAccessApiAsync accessApi,
         IOptions<AccessDefaultOptions> accessDefaultOptions)
@@ -86,7 +86,7 @@ public class AccountGrantCommand : BaseCommand
     {
         var selectOptions = new SelectOptions<string>
         {
-            Message = "Which access point would you like to grant",
+            Message = "Which access point would you like to grant access to",
             Items = account.AccessMap
                 .Where(access => access.Value >= Sdk.Model.Account.InnerEnum.Administrator)
                 .Select(access => access.Key)

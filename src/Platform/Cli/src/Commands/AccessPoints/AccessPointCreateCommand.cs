@@ -4,20 +4,21 @@ using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Commands.Account;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Sdk.Api;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 
-namespace _42.Platform.Cli.Commands.Account;
+namespace _42.Platform.Cli.Commands.AccessPoints;
 
-[Command(CommandNames.CREATE, Description = "Create a new project.")]
-public class AccountCreateCommand : BaseCommand
+[Command(CommandNames.CREATE, Description = "Create a new project (access point).")]
+public class AccessPointCreateCommand : BaseCommand
 {
     private readonly IAccessApiAsync _accessApi;
     private readonly IFileSystem _fileSystem;
 
-    public AccountCreateCommand(
+    public AccessPointCreateCommand(
         IExtendedConsole console,
         IAccessApiAsync accessApi,
         IFileSystem fileSystem)

@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
+using _42.Platform.Cli.Commands.AccessPoints;
+using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Sdk.Api;
 using McMaster.Extensions.CommandLineUtils;
@@ -15,13 +17,10 @@ namespace _42.Platform.Cli.Commands.Account;
 [Subcommand(
     typeof(AccountRegisterCommand),
     typeof(AccountSetCommand),
-    typeof(AccountListCommand),
-    typeof(AccountGetCommand),
-    typeof(AccountCreateCommand),
-    typeof(AccountGrantCommand),
-    typeof(AccountRevokeCommand))]
+    typeof(AccessPointListCommand),
+    typeof(MachineListCommand))]
 
-[Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage account and accesses to communicate with 2S platform services.")]
+[Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage your account and access to 2S platform services.")]
 public class AccountCommand : BaseCommand
 {
     private readonly IAccessApiAsync _accessApi;
@@ -47,7 +46,7 @@ public class AccountCommand : BaseCommand
             var auth = await _authentication.GetAuthenticationAsync();
             Console.WriteImportant($"You are already logged in as {auth?.Account.Username}");
         }
-        catch (MsalUiRequiredException exception)
+        catch (MsalUiRequiredException)
         {
             var deviceAuthResultCode = await AcquireByDeviceCodeAsync();
 
@@ -69,7 +68,8 @@ public class AccountCommand : BaseCommand
         }
 
         var account = accountResponse.Data;
-        Console.WriteLine($"Has access to {account.AccessMap.Count} organizations or projects.");
+        Console.WriteLine("Account ", $"#{account.Key}".ThemedLowlight(Console.Theme));
+        Console.WriteLine($"Have access to {account.AccessMap.Count} access points.");
 
         if (string.IsNullOrWhiteSpace(_accessDefault?.ProjectName))
         {
@@ -81,7 +81,12 @@ public class AccountCommand : BaseCommand
         }
 
         var projectKey = $"{_accessDefault.OrganizationName}.{_accessDefault.ProjectName}";
-        Console.WriteLine("Default project: ", projectKey.ThemedHighlight(Console.Theme));
+        Console.WriteLine(
+            "Default project set to ",
+            projectKey.ThemedHighlight(Console.Theme),
+            " with view ",
+            (_accessDefault.ViewName ?? Platform.Storyteller.Constants.DefaultViewName).ThemedHighlight(Console.Theme),
+            ".");
         return ExitCodes.SUCCESS;
     }
 
