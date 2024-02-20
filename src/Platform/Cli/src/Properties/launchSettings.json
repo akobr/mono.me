@@ -1,5 +1,9 @@
 {
   "profiles": {
+    "help": {
+      "commandName": "Project",
+      "commandLineArgs": "--help"
+    },
     "version": {
       "commandName": "Project",
       "commandLineArgs": "--version"
@@ -7,6 +11,50 @@
     "login": {
       "commandName": "Project",
       "commandLineArgs": "login"
+    },
+    "account-register": {
+      "commandName": "Project",
+      "commandLineArgs": "account register"
+    },
+    "account-set": {
+      "commandName": "Project",
+      "commandLineArgs": "account set"
+    },
+    "account-points": {
+      "commandName": "Project",
+      "commandLineArgs": "account points"
+    },
+    "account-points-get": {
+      "commandName": "Project",
+      "commandLineArgs": "account points get"
+    },
+    "account-machine": {
+      "commandName": "Project",
+      "commandLineArgs": "account machine"
+    },
+    "account-machine-create": {
+      "commandName": "Project",
+      "commandLineArgs": "account machine create"
+    },
+    "account-machine-reset": {
+      "commandName": "Project",
+      "commandLineArgs": "account machine reset"
+    },
+    "account-machine-delete": {
+      "commandName": "Project",
+      "commandLineArgs": "account machine delete"
+    },
+    "story-get": {
+      "commandName": "Project",
+      "commandLineArgs": "story get rst.storyteller"
+    },
+    "story-config": {
+      "commandName": "Project",
+      "commandLineArgs": "story config rst.storyteller"
+    },
+    "assist-key": {
+      "commandName": "Project",
+      "commandLineArgs": "assist key"
     }
   }
 }
