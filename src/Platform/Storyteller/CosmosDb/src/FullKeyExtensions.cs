@@ -7,8 +7,8 @@ public static class FullKeyExtensions
     public static string GetPartitionKey(this FullKey @this)
     {
         return @this.Annotation.Type is AnnotationType.Subject or AnnotationType.Context
-            ? $"{@this.ProjectName}.{@this.Annotation.SubjectName}"
-            : $"{@this.ProjectName}.{@this.Annotation.ResponsibilityName}";
+            ? $"{@this.ProjectName}.{AnnotationTypeCodes.Subject}.{@this.Annotation.SubjectName}"
+            : $"{@this.ProjectName}.{AnnotationTypeCodes.Responsibility}.{@this.Annotation.ResponsibilityName}";
     }
 
     public static PartitionKey GetCosmosPartitionKey(this FullKey @this)

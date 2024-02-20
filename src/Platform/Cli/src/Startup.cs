@@ -1,15 +1,17 @@
+using System.Globalization;
 using System.IO.Abstractions;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
+using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Sdk;
-using _42.Testing.System.IO.Abstractions;
-using _42.Testing.System.IO.Abstractions.Tracers;
+using _42.Platform.Sdk.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using Serilog;
 
 namespace _42.Platform.Cli
@@ -25,7 +27,7 @@ namespace _42.Platform.Cli
 
         public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
         {
-            services.AddLogging((builder) => ConfigureLogging(builder, configuration));
+            services.AddLogging(builder => ConfigureLogging(builder, configuration));
             ConfigureOptions(configuration, services);
 
 #if !DEBUG || TESTING
@@ -38,12 +40,25 @@ namespace _42.Platform.Cli
 
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
             services.AddSingleton<IAuthenticationService, AuthenticationService>();
+            services.AddSingleton<ICommandContext, CommandContext>();
 
             services.AddPlatformSdk(p => p.GetRequiredService<IAuthenticationService>().GetAuthenticationAsync().Result!.AccessToken);
+
+            var authService = new AuthenticationService(new FileSystem());
+            GlobalConfiguration.Instance = new DynamicConfiguration
+            {
+                AccessTokenFactory = () => authService.GetAuthenticationAsync().Result!.AccessToken,
+            };
         }
 
         public void ConfigureApplication(IConfigurationBuilder builder)
         {
+            JsonConvert.DefaultSettings = () => new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore,
+                Formatting = Formatting.Indented,
+            };
+
             builder.AddJsonFile(Constants.APPLICATION_CONFIG_JSON, false, false);
             builder.AddJsonFile(Constants.ACCESS_DEFAULT_JSON, true, false);
         }

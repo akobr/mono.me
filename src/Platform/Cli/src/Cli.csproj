@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <AssemblyName>42.Platform.Cli</AssemblyName>
@@ -37,6 +37,7 @@
     <ProjectReference Include="..\..\..\Libraries\Utils\Async\src\Async.csproj" />
     <ProjectReference Include="..\..\Sdk\src\Sdk.csproj" />
     <ProjectReference Include="..\..\Storyteller\Abstraction\src\Abstraction.csproj" />
+    <ProjectReference Include="..\..\Storyteller\CosmosDb\src\CosmosDb.csproj" />
   </ItemGroup>
 
   <ItemGroup>
