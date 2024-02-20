@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
@@ -6,14 +5,20 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Sdk.Api;
 using McMaster.Extensions.CommandLineUtils;
 
-namespace _42.Platform.Cli.Commands.Account;
+namespace _42.Platform.Cli.Commands.AccessPoints;
 
-[Command(CommandNames.LIST, Description = "Get a list of all accessible access points.")]
-public class AccountListCommand : BaseCommand
+[Subcommand(
+    typeof(AccessPointGetCommand),
+    typeof(AccessPointCreateCommand),
+    typeof(AccessPointGrantCommand),
+    typeof(AccessPointRevokeCommand))]
+
+[Command(CommandNames.POINTS, Description = "Get and manage access points.")]
+public class AccessPointListCommand : BaseCommand
 {
     private readonly IAccessApiAsync _accessApi;
 
-    public AccountListCommand(
+    public AccessPointListCommand(
         IExtendedConsole console,
         IAccessApiAsync accessApi)
         : base(console)
@@ -37,9 +42,11 @@ public class AccountListCommand : BaseCommand
         var account = accountResponse.Data;
         var accessPoints = account.AccessMap;
 
+        Console.WriteHeader("Access points");
+
         foreach (var accessPoint in accessPoints)
         {
-            Console.WriteLine($"- {accessPoint.Key} ({accessPoint.Value:G})");
+            Console.WriteLine($"- {accessPoint.Key} ", $"[{accessPoint.Value:G}]".ThemedLowlight(Console.Theme));
         }
 
         return ExitCodes.SUCCESS;

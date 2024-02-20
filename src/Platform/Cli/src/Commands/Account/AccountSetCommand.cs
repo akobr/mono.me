@@ -13,7 +13,7 @@ using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.Account;
 
-[Command(CommandNames.SET, Description = "Set default project as a context of the CLI toolkit.")]
+[Command(CommandNames.SET, Description = "Set default project and view of the CLI toolkit.")]
 public class AccountSetCommand : BaseCommand
 {
     private readonly IAccessApiAsync _accessApi;
@@ -65,8 +65,9 @@ public class AccountSetCommand : BaseCommand
         }
 
         var projectKey = ProjectKey ?? SelectPossibleProject(account);
-        _accessDefault.ProjectName = projectKey;
-        _accessDefault.OrganizationName = projectKey[..projectKey.IndexOf('.')];
+        var projectSeparatorIndex = projectKey.IndexOf('.');
+        _accessDefault.ProjectName = projectKey[(projectSeparatorIndex + 1)..];
+        _accessDefault.OrganizationName = projectKey[..projectSeparatorIndex];
         _accessDefault.ViewName = ViewName ?? _accessDefault.ViewName ?? Platform.Storyteller.Constants.DefaultViewName;
 
         CreateAccessDefaultConfigFile(_accessDefault, _fileSystem);

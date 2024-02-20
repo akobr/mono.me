@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -6,20 +5,19 @@ using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Sdk.Api;
-using _42.Platform.Sdk.Model;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Sharprompt;
 
-namespace _42.Platform.Cli.Commands.Account;
+namespace _42.Platform.Cli.Commands.AccessPoints;
 
-[Command(CommandNames.LIST, Description = "Revoke access to your project to another user.")]
-public class AccountRevokeCommand : BaseCommand
+[Command(CommandNames.GET, Description = "Get an access point with list of users and role. You need to be administrator or owner.")]
+public class AccessPointGetCommand : BaseCommand
 {
     private readonly IAccessApiAsync _accessApi;
     private readonly AccessDefaultOptions _accessDefault;
 
-    public AccountRevokeCommand(
+    public AccessPointGetCommand(
         IExtendedConsole console,
         IAccessApiAsync accessApi,
         IOptions<AccessDefaultOptions> accessDefaultOptions)
@@ -29,23 +27,11 @@ public class AccountRevokeCommand : BaseCommand
         _accessDefault = accessDefaultOptions.Value;
     }
 
-    [Argument(0, Description = "The target account key to whom the permissions are revoked.")]
-    public string AccountKey { get; set; } = string.Empty;
-
-    [Option("-p|--point", CommandOptionType.SingleValue, Description = "A point key to which the access is revoked.")]
-    public string? ProjectKey { get; set; } = string.Empty;
-
-    [Option("-r|--role", CommandOptionType.SingleValue, Description = "A role which is revoked, can be one of the values: Reader, Contributor, Administrator, or Owner. If not specified all roles will be revoked.")]
-    public string? Role { get; set; } = string.Empty;
+    [Option("-p|--pointKey", CommandOptionType.SingleValue, Description = "An access point key to get.")]
+    public string? PointKey { get; set; }
 
     public override async Task<int> OnExecuteAsync()
     {
-        if (string.IsNullOrWhiteSpace(AccountKey))
-        {
-            Console.WriteImportant("An account key is required.");
-            return ExitCodes.ERROR_WRONG_INPUT;
-        }
-
         var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
 
         if (accountResponse.StatusCode is not HttpStatusCode.OK)
@@ -58,26 +44,30 @@ public class AccountRevokeCommand : BaseCommand
         }
 
         var account = accountResponse.Data;
-        if (Enum.TryParse<Permission.RoleEnum>(Role, true, out var role))
+        var pointKey = PointKey ?? SelectPossiblePoint(account);
+
+        if (!account.AccessMap.TryGetValue(pointKey, out var role))
         {
-            role = Permission.RoleEnum.Reader;
+            Console.WriteLine($"No access point with key '{pointKey}' has been found.");
+            return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        var projectKey = string.IsNullOrWhiteSpace(ProjectKey)
-            ? SelectPossiblePoint(account)
-            : ProjectKey;
+        if (role < Sdk.Model.Account.InnerEnum.Administrator)
+        {
+            Console.WriteLine($"You don't have administration permissions to the access point '{pointKey}'.");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
 
-        var point = await _accessApi.RevokeUserAccessAsync(
-            new Permission(account.Key, AccountKey, projectKey, role));
+        var point = await _accessApi.GetAccessPointAsync(pointKey);
+        var accesses = point.AccessMap.OrderBy(a => a.Key);
 
-        Console.WriteLine(
-            "Access revoked to ",
-            AccountKey.ThemedHighlight(Console.Theme),
-            " with role ",
-            $"{role:G}".ThemedHighlight(Console.Theme),
-            " to ",
-            projectKey.ThemedHighlight(Console.Theme),
-            ".");
+        Console.WriteLine();
+        Console.WriteHeader("Access point ", pointKey.ThemedHighlight(Console.Theme));
+
+        foreach (var access in accesses)
+        {
+            Console.WriteLine($" - {access.Key} ", $"[{access.Value:G}]".ThemedLowlight(Console.Theme));
+        }
 
         return ExitCodes.SUCCESS;
     }
@@ -86,7 +76,7 @@ public class AccountRevokeCommand : BaseCommand
     {
         var selectOptions = new SelectOptions<string>
         {
-            Message = "Which access point would you like to revoke",
+            Message = "Which access point would you like to get",
             Items = account.AccessMap
                 .Where(access => access.Value >= Sdk.Model.Account.InnerEnum.Administrator)
                 .Select(access => access.Key)
