@@ -1,12 +1,12 @@
 using System.Net;
 using System.Threading.Tasks;
+using _42.CLI.Toolkit.Output;
 using _42.Platform.Sdk.Api;
 using McMaster.Extensions.CommandLineUtils;
-using IExtendedConsole = _42.CLI.Toolkit.Output.IExtendedConsole;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.DELETE, CommandNames.REMOVE, Description = "Delete an annotation.")]
+[Command(CommandNames.DELETE, CommandNames.REMOVE, Description = "Delete an annotation and its descendants.")]
 public class StorytellerDeleteCommand : BaseContextCommand
 {
     private readonly IAnnotationsApiAsync _annotationsApi;
@@ -25,6 +25,12 @@ public class StorytellerDeleteCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
+        if (string.IsNullOrWhiteSpace(AnnotationKey))
+        {
+            Console.WriteImportant("Please specify annotation key.");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
         var response = await _annotationsApi.DeleteAnnotationWithHttpInfoAsync(
             Context.OrganizationName,
             Context.ProjectName,
@@ -37,7 +43,7 @@ public class StorytellerDeleteCommand : BaseContextCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        Console.WriteLine($"The annotation '{AnnotationKey}' has been deleted.");
+        Console.WriteImportant($"The annotation '{AnnotationKey}' has been deleted.");
         return ExitCodes.SUCCESS;
     }
 }

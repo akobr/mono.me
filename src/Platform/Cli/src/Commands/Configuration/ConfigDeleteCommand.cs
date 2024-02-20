@@ -1,9 +1,8 @@
 using System.Net;
 using System.Threading.Tasks;
+using _42.CLI.Toolkit.Output;
 using _42.Platform.Sdk.Api;
-using _42.Platform.Storyteller;
 using McMaster.Extensions.CommandLineUtils;
-using IExtendedConsole = _42.CLI.Toolkit.Output.IExtendedConsole;
 
 namespace _42.Platform.Cli.Commands.Configuration;
 
@@ -38,7 +37,7 @@ public class ConfigDeleteCommand : BaseContextCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        Console.WriteLine($"The configuration for '{AnnotationKey}' has been deleted.");
+        Console.WriteImportant($"The configuration for '{AnnotationKey}' has been deleted.");
         return ExitCodes.SUCCESS;
 
     }
