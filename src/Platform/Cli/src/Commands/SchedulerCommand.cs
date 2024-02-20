@@ -6,7 +6,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands;
 
-[Command(CommandNames.SCHEDULER, CommandNames.SCHEDULE, Description = "Manage time based jobs.")]
+[Command(CommandNames.SCHEDULER, CommandNames.SCHEDULE, Description = "Manage time based jobs / units.")]
 public class SchedulerCommand : BaseCommand
 {
     public SchedulerCommand(IExtendedConsole console)
@@ -16,6 +16,7 @@ public class SchedulerCommand : BaseCommand
 
     public override Task<int> OnExecuteAsync()
     {
-        throw new NotImplementedException();
+        Console.WriteImportant("Under the development, will be implemented in version 1.1");
+        return Task.FromResult(ExitCodes.SUCCESS);
     }
 }

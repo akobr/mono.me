@@ -15,6 +15,7 @@ public class SupervisorCommand : BaseCommand
 
     public override Task<int> OnExecuteAsync()
     {
-        throw new System.NotImplementedException();
+        Console.WriteImportant("Under the development, will be implemented in version 1.0");
+        return Task.FromResult(ExitCodes.SUCCESS);
     }
 }

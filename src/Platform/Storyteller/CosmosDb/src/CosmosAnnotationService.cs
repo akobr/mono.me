@@ -13,6 +13,16 @@ namespace _42.Platform.Storyteller;
 
 public class CosmosAnnotationService : IAnnotationService
 {
+    private static readonly JsonSerializerOptions JsonSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
+    private static readonly JsonNodeOptions JsonNodeOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+    };
+
     private readonly IContainerRepositoryProvider _repositoryProvider;
 
     public CosmosAnnotationService(IContainerRepositoryProvider repositoryProvider)
@@ -24,20 +34,19 @@ public class CosmosAnnotationService : IAnnotationService
     {
         var repository = _repositoryProvider.GetOrganizationContainer(fullKey.OrganizationName);
         using var response = await repository.Container.ReadItemStreamAsync(fullKey.GetCosmosItemKey(), fullKey.GetCosmosPartitionKey());
-        var jData = await JsonNode.ParseAsync(response.Content);
+        var jData = await JsonNode.ParseAsync(response.Content, JsonNodeOptions);
 
         if (jData is null
-            || !jData.IsObject()
             || !jData.AsObject().TryGetPropertyValue(nameof(Annotation.AnnotationType), out var typeProperty)
             || typeProperty is null)
         {
             return null;
         }
 
-        var annotationType = typeProperty.GetValue<AnnotationType>();
+        var annotationType = (AnnotationType)typeProperty.GetValue<int>();
         var annotationTypeDefinition = AnnotationTypeCodes.GetRealType(annotationType);
 
-        return (Annotation)jData.Deserialize(annotationTypeDefinition)!;
+        return (Annotation)jData.Deserialize(annotationTypeDefinition, JsonSerializerOptions)!;
     }
 
     public async Task<Annotation?> GetAnnotationAsync(string fullKey)

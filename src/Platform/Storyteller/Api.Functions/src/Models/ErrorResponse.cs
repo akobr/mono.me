@@ -18,5 +18,5 @@ public class ErrorResponse
 
     public string? ErrorCode { get; set; }
 
-    public Exception? Error { get; set; }
+    public ExceptionWrapper? Error { get; set; }
 }
