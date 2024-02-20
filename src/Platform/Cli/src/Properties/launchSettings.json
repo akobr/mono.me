@@ -44,6 +44,18 @@
       "commandName": "Project",
       "commandLineArgs": "account machine delete"
     },
+    "story": {
+      "commandName": "Project",
+      "commandLineArgs": "story"
+    },
+    "story-tree": {
+      "commandName": "Project",
+      "commandLineArgs": "story --tree"
+    },
+    "story-tree-responsibilities": {
+      "commandName": "Project",
+      "commandLineArgs": "story --tree --tree-root responsibility"
+    },
     "story-get": {
       "commandName": "Project",
       "commandLineArgs": "story get rst.storyteller"
