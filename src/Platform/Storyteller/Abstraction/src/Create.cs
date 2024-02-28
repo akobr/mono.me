@@ -20,8 +20,6 @@ public static class Create
             AnnotationType = AnnotationType.Responsibility,
             AnnotationKey = $"{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
             Name = responsibilityName,
-            SystemId = Guid.NewGuid(),
-            SystemPublicKey = Guid.NewGuid().ToString("N"),
         };
     }
 
@@ -46,8 +44,6 @@ public static class Create
             Contexts = contextNames
                 .Select(name => AnnotationKey.CreateContext(subjectName, name).ToString())
                 .ToList(),
-            SystemId = Guid.NewGuid(),
-            SystemPublicKey = Guid.NewGuid().ToString("N"),
         };
     }
 
@@ -67,8 +63,6 @@ public static class Create
             Name = contextName,
             SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             SubjectName = subjectName,
-            SystemId = Guid.NewGuid(),
-            SystemPublicKey = Guid.NewGuid().ToString("N"),
         };
     }
 
@@ -94,8 +88,6 @@ public static class Create
             Executions = contextNames
                 .Select(name => AnnotationKey.CreateExecution(subjectName, responsibilityName, name).ToString())
                 .ToList(),
-            SystemId = Guid.NewGuid(),
-            SystemPublicKey = Guid.NewGuid().ToString("N"),
         };
     }
 
@@ -120,8 +112,6 @@ public static class Create
             ResponsibilityName = responsibilityName,
             SubjectName = subjectName,
             ContextName = contextName,
-            SystemId = Guid.NewGuid(),
-            SystemPublicKey = Guid.NewGuid().ToString("N"),
         };
     }
 }

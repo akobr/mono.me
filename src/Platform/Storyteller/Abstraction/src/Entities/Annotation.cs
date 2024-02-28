@@ -6,10 +6,6 @@ public record class Annotation : ExtendableStoredItem
 {
     public required AnnotationType AnnotationType { get; init; }
 
-    public required Guid SystemId { get; init; }
-
-    public required string SystemPublicKey { get; init; }
-
     public string? Title { get; init; }
 
     public string? Description { get; init; }

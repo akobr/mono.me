@@ -68,8 +68,6 @@ public class StorytellerSetCommand : BaseContextCommand
             Name = annotationKey.Name,
             ProjectName = fullKey.ProjectName,
             ViewName = fullKey.ViewName,
-            SystemId = Guid.NewGuid(),
-            SystemPublicKey = Guid.NewGuid().ToString("N"),
         };
 
         if (IsImportRequested)
