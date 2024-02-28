@@ -16,7 +16,7 @@ var host = new HostBuilder()
         // worker.UseNewtonsoftJson(); // TODO: [P2] not sure if this is needed for OpenAPI
         worker.UseMiddleware<ExceptionHandlingMiddleware>();
     })
-    .ConfigureServices(services =>
+    .ConfigureServices((context, services) =>
     {
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
@@ -41,6 +41,8 @@ var host = new HostBuilder()
                 options.Rules.Remove(toRemove);
             }
         });
+
+        services.Configure<CosmosDbOptions>(context.Configuration.GetSection(CosmosDbOptions.SectionName));
 
         services.AddSingleton<ICosmosClientProvider, CosmosClientProvider>();
         services.AddSingleton<IContainerFactory, ContainerFactory>();

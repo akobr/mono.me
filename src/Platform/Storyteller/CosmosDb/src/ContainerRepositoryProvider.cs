@@ -14,12 +14,12 @@ public class ContainerRepositoryProvider : IContainerRepositoryProvider
 
     public IContainerRepository GetCore()
     {
-        return GetContainer("core");
+        return GetContainer(CosmosConstants.CoreContainerName);
     }
 
     public IContainerRepository GetOrganizationContainer(string organizationName)
     {
-        return GetContainer($"org.{organizationName}");
+        return GetContainer($"{CosmosConstants.OrganizationContainerNamePrefix}{organizationName}");
     }
 
     private IContainerRepository GetContainer(string containerName)
@@ -29,7 +29,7 @@ public class ContainerRepositoryProvider : IContainerRepositoryProvider
             return repository;
         }
 
-        var container = _clientProvider.Client.GetContainer("42.Platform.2S", containerName);
+        var container = _clientProvider.Client.GetContainer(CosmosConstants.DatabaseName, containerName);
         _cache[containerName] = repository = new ContainerRepository(container);
         return repository;
     }

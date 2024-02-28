@@ -30,7 +30,7 @@ public class ContainerFactory : IContainerFactory
     {
         var databaseResponse = await _cosmosClientProvider.Client.CreateDatabaseIfNotExistsAsync(
             "42.Platform.2S",
-            throughput: 400);
+            ThroughputProperties.CreateAutoscaleThroughput(1000));
         return databaseResponse.Database;
     }
 }
