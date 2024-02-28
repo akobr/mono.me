@@ -7,9 +7,8 @@ namespace _42.Platform.Sdk;
 
 public static class ServicesCollectionExtensions
 {
-    public static IServiceCollection AddPlatformSdk(this IServiceCollection services, Func<IServiceProvider, Configuration> configurationFactory)
+    public static IServiceCollection AddPlatformSdk(this IServiceCollection services)
     {
-        services.AddSingleton<IConfigurationProvider>(p => new ConfigurationProvider(() => configurationFactory(p)));
 
         services.AddSingleton<IAccessApi, AccessApi>();
         services.AddSingleton<IAccessApiAsync>(p => p.GetRequiredService<IAccessApi>());
@@ -24,15 +23,5 @@ public static class ServicesCollectionExtensions
         services.AddSingleton<IConfigurationApiSync>(p => p.GetRequiredService<IConfigurationApi>());
 
         return services;
-    }
-
-    public static IServiceCollection AddPlatformSdk(this IServiceCollection services, Func<IServiceProvider, string> accessTokenFactory)
-    {
-        return AddPlatformSdk(services, p => new DynamicConfiguration { AccessTokenFactory = () => accessTokenFactory(p) });
-    }
-
-    public static IServiceCollection AddPlatformSdk(this IServiceCollection services)
-    {
-        return AddPlatformSdk(services, _ => new Configuration());
     }
 }

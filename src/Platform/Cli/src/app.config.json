@@ -1,4 +1,12 @@
 {
+  "general": {
+    "baseUrl": "http://localhost:7071/api",
+    "userAgent": "42.sform.cli"
+  },
+  "authentication": {
+    "tenantId": "f2b1a691-0cf0-47d2-9b2c-b13cb7b6467e",
+    "clientId": "7f37b203-3599-4c73-9796-39d96883198c"
+  },
   "logging": {
     "logFilePath": "logs/cli.log",
     "sentryDsn": ""

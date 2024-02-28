@@ -1,7 +1,9 @@
 using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
+using _42.Platform.Cli.Configuration;
 using _42.Utils.Async;
+using Microsoft.Extensions.Options;
 using Microsoft.Identity.Client;
 using Microsoft.Identity.Client.Extensions.Msal;
 
@@ -10,17 +12,24 @@ namespace _42.Platform.Cli.Authentication;
 public class AuthenticationService : IAuthenticationService
 {
     private readonly IFileSystem _fileSystem;
+    private readonly AuthenticationOptions _options;
     private readonly AsyncLazy<IPublicClientApplication> _publicClientApp;
 
-    private readonly string[] _scopes = {
-        "api://7f37b203-3599-4c73-9796-39d96883198c/User.Impersonation",
-        "api://7f37b203-3599-4c73-9796-39d96883198c/Default.ReadWrite",
-    };
+    private readonly string[] _scopes;
 
-    public AuthenticationService(IFileSystem fileSystem)
+    public AuthenticationService(
+        IFileSystem fileSystem,
+        IOptions<AuthenticationOptions> options)
     {
         _fileSystem = fileSystem;
+        _options = options.Value;
         _publicClientApp = new AsyncLazy<IPublicClientApplication>(BuildPublicClientApplication);
+
+        _scopes =
+        [
+            $"api://{_options.ClientId}/User.Impersonation",
+            $"api://{_options.ClientId}/Default.ReadWrite"
+        ];
     }
 
     public string[] Scopes => _scopes;
@@ -56,8 +65,8 @@ public class AuthenticationService : IAuthenticationService
             .Build();
 
         var pca = PublicClientApplicationBuilder
-            .Create("7f37b203-3599-4c73-9796-39d96883198c")
-            .WithAuthority(AzureCloudInstance.AzurePublic, "f2b1a691-0cf0-47d2-9b2c-b13cb7b6467e")
+            .Create(_options.ClientId)
+            .WithAuthority(AzureCloudInstance.AzurePublic, _options.TenantId)
             .WithDefaultRedirectUri()
             .Build();
 
