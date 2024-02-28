@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.IO.Abstractions;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
@@ -11,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Serilog;
 
@@ -42,12 +42,17 @@ namespace _42.Platform.Cli
             services.AddSingleton<IAuthenticationService, AuthenticationService>();
             services.AddSingleton<ICommandContext, CommandContext>();
 
-            services.AddPlatformSdk(p => p.GetRequiredService<IAuthenticationService>().GetAuthenticationAsync().Result!.AccessToken);
+            services.AddPlatformSdk();
 
-            var authService = new AuthenticationService(new FileSystem());
+            // TODO: [P2] Make this better
+            var authOptions = configuration.GetSection(ConfigurationSections.AUTHENTICATION).Get<AuthenticationOptions>();
+            var generalOptions = configuration.GetSection(ConfigurationSections.GENERAL).Get<GeneralOptions>();
+            var authService = new AuthenticationService(new FileSystem(), new OptionsWrapper<AuthenticationOptions>(authOptions!));
             GlobalConfiguration.Instance = new DynamicConfiguration
             {
                 AccessTokenFactory = () => authService.GetAuthenticationAsync().Result!.AccessToken,
+                BasePath = generalOptions!.BaseUrl,
+                UserAgent = $"{generalOptions.UserAgent}/{ThisAssembly.AssemblyInformationalVersion} ({System.Environment.OSVersion.Platform:G}; {System.Environment.OSVersion.VersionString})",
             };
         }
 
@@ -92,6 +97,7 @@ namespace _42.Platform.Cli
         {
             services.Configure<LoggingOptions>(configuration.GetSection(ConfigurationSections.LOGGING));
             services.Configure<AccessDefaultOptions>(configuration.GetSection(ConfigurationSections.ACCESS));
+            services.Configure<AuthenticationOptions>(configuration.GetSection(ConfigurationSections.AUTHENTICATION));
         }
     }
 }

@@ -20,9 +20,6 @@ public static class AnnotationExtensions
             IsDisabled = @this.IsDisabled,
             VarTimeZone = @this.TimeZone,
 
-            SystemId = @this.SystemId,
-            SystemPublicKey = @this.SystemPublicKey,
-
             ViewName = @this.ViewName,
             ProjectName = @this.ProjectName,
 
