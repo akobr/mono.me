@@ -118,7 +118,7 @@ public class CosmosAnnotationService : IAnnotationService
 
         model.InputContinuationToken = null;
 
-        if (model.TotalCount >= CosmosConstants.MAX_ITEM_COUNT_PER_PAGE)
+        if (model.TotalCount >= CosmosConstants.MaxItemCountPerPage)
         {
             model.OutputContinuationToken = ContinuationToken.CreateFirstPage(annotationTypeName);
             return;
@@ -134,7 +134,7 @@ public class CosmosAnnotationService : IAnnotationService
             requestOptions: new QueryRequestOptions
             {
                 PartitionKey = partitionKey,
-                MaxItemCount = CosmosConstants.MAX_ITEM_COUNT_PER_PAGE,
+                MaxItemCount = CosmosConstants.MaxItemCountPerPage,
             });
 
         var matches = queryable

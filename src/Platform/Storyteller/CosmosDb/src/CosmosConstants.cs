@@ -2,5 +2,9 @@ namespace _42.Platform.Storyteller;
 
 public class CosmosConstants
 {
-    public const int MAX_ITEM_COUNT_PER_PAGE = 1000;
+    public const string DatabaseName = "42.Platform.2S";
+    public const string CoreContainerName = "core";
+    public const string OrganizationContainerNamePrefix = "org.";
+
+    public const int MaxItemCountPerPage = 1000;
 }

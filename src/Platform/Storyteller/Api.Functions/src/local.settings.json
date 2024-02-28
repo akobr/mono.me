@@ -1,10 +1,13 @@
 {
   "IsEncrypted": false,
   "Values": {
+    "DOTNET_ENVIRONMENT": "Development",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "OpenApiAuthTenantId": "f2b1a691-0cf0-47d2-9b2c-b13cb7b6467e",
-    "OpenApiAuthClientId": "7f37b203-3599-4c73-9796-39d96883198c"
+    "OpenApiAuthClientId": "7f37b203-3599-4c73-9796-39d96883198c",
+    "CosmosDb:Connection": "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==",
+    "CosmosDb:ShouldAcceptAnyCertificate": true
   },
   "Host": {
     "LocalHttpPort": 7071,
