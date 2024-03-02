@@ -23,7 +23,7 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         {
             await next(context);
         }
-        catch (AuthenticationFailureException)
+        catch (AuthenticationFailureException exception)
         {
             var httpReqData = await context.GetHttpRequestDataAsync();
 
@@ -32,6 +32,7 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
                 return;
             }
 
+            _logger.LogWarning(exception, "Authentication failed at: {url}", httpReqData.Url.AbsolutePath);
             var httpUnauthorizedResponse = httpReqData.CreateResponse(HttpStatusCode.Unauthorized);
             context.SetInvocationResult(httpUnauthorizedResponse);
         }
