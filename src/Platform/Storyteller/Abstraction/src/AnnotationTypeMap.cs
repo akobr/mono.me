@@ -10,7 +10,7 @@ public static class AnnotationTypeMap
         return annotationType switch
         {
             AnnotationType.Responsibility => typeof(Responsibility),
-            // AnnotationType.Job => typeof(Job),
+            // AnnotationType.Unit => typeof(Unit),
             AnnotationType.Subject => typeof(Subject),
             AnnotationType.Usage => typeof(Usage),
             AnnotationType.Context => typeof(Context),
@@ -24,7 +24,7 @@ public static class AnnotationTypeMap
         return type switch
         {
             { } when type == typeof(Responsibility) => AnnotationType.Responsibility,
-            // { } t when t == typeof(Job) => AnnotationType.Job,
+            // { } t when t == typeof(Unit) => AnnotationType.Unit,
             { } when type == typeof(Subject) => AnnotationType.Subject,
             { } when type == typeof(Usage) => AnnotationType.Usage,
             { } when type == typeof(Context) => AnnotationType.Context,

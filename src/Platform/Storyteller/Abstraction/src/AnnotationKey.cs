@@ -32,7 +32,7 @@ public class AnnotationKey
     public string ResponsibilityName =>
         Type switch
         {
-            AnnotationType.Responsibility or AnnotationType.Job => _segments[1],
+            AnnotationType.Responsibility or AnnotationType.Unit => _segments[1],
             AnnotationType.Usage or AnnotationType.Execution => _segments[2],
             _ => string.Empty,
         };
@@ -46,7 +46,7 @@ public class AnnotationKey
         };
 
     public string JobName =>
-        Type == AnnotationType.Job
+        Type == AnnotationType.Unit
             ? _segments[2]
             : string.Empty;
 
@@ -111,7 +111,7 @@ public class AnnotationKey
 
     public static AnnotationKey CreateJob(string responsibilityName, string jobName)
     {
-        return new AnnotationKey(AnnotationTypeCodes.Job, responsibilityName, jobName);
+        return new AnnotationKey(AnnotationTypeCodes.Unit, responsibilityName, jobName);
     }
 
     public static AnnotationKey CreateSubject(string subjectName)

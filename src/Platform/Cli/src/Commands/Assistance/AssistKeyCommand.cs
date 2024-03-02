@@ -31,7 +31,7 @@ public class AssistKeyCommand : BaseCommand
             Items = new[]
             {
                 AnnotationType.Responsibility,
-                AnnotationType.Job,
+                AnnotationType.Unit,
                 AnnotationType.Subject,
                 AnnotationType.Usage,
                 AnnotationType.Context,
@@ -52,7 +52,7 @@ public class AssistKeyCommand : BaseCommand
                 break;
                 }
 
-            case AnnotationType.Job:
+            case AnnotationType.Unit:
             {
                 var responsibilityName = GetName("responsibility", "my-application");
                 var jobName = GetName("job", "unique-work");

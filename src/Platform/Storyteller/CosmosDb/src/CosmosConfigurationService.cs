@@ -154,7 +154,7 @@ public class CosmosConfigurationService : IConfigurationService
             case AnnotationType.Subject:
                 break;
 
-            case AnnotationType.Job:
+            case AnnotationType.Unit:
                 targetNode.CreateAncestor(FullKey.Create(annotationKey.GetResponsibilityKey(), key));
                 break;
 
