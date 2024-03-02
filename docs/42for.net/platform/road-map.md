@@ -19,6 +19,12 @@ A road map to version 1.0 and peak to the future.
 
 ## Version 1.2
 
+- powerfull SDK for any .NET application
+- handy toolkit for serverless applications
+- core runtime packages for Azure and Durable functions
+
+## Version 1.3
+
 - accessible and searchable supervisor's stream in the SPA
 - AI for detecting anomalies in the ecosystem runtime events
 - detailed SDKs for all actors
