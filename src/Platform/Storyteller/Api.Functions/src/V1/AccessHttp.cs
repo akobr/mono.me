@@ -10,6 +10,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
+using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
@@ -19,10 +20,14 @@ namespace _42.Platform.Storyteller.Api.V1;
 public class AccessHttp
 {
     private readonly IAccessService _accessService;
+    private readonly ILogger<AccessHttp> _logger;
 
-    public AccessHttp(IAccessService accessService)
+    public AccessHttp(
+        IAccessService accessService,
+        ILogger<AccessHttp> logger)
     {
         _accessService = accessService;
+        _logger = logger;
     }
 
     [Function(nameof(GetAccount))]
@@ -39,6 +44,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
+        _logger.LogInformation("Get api/access/account call with accountKey: {accountKey}", accountKey);
         var account = await _accessService.GetAccountAsync(accountKey);
 
         return account is null
@@ -62,6 +68,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
+        _logger.LogInformation("Post api/access/account call with accountKey: {accountKey}", accountKey);
         var account = await _accessService.GetAccountAsync(accountKey);
 
         if (account is not null)
@@ -89,6 +96,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
+        _logger.LogInformation("Post api/access/points call with accountKey: {accountKey}", accountKey);
         var points = await _accessService.GetAccessPointsAsync(accountKey);
         return new OkObjectResult(points);
     }
@@ -128,6 +136,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
+        _logger.LogInformation("Post api/access/points call with accountKey: {accountKey}", accountKey);
         pointModel = pointModel with { OwnerKey = accountKey };
         var point = await _accessService.CreateAccessPointAsync(pointModel);
         return new OkObjectResult(point);

@@ -5,7 +5,6 @@ using _42.Platform.Storyteller.Access;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.AzureAd;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Extensions.OpenApi.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -41,6 +40,14 @@ var host = new HostBuilder()
                 options.Rules.Remove(toRemove);
             }
         });
+
+        if (context.HostingEnvironment.IsDevelopment())
+        {
+            services.AddLogging(builder =>
+            {
+                builder.AddDebug();
+            });
+        }
 
         services.Configure<CosmosDbOptions>(context.Configuration.GetSection(CosmosDbOptions.SectionName));
 
