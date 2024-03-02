@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <AssemblyName>42.Platform.Cli</AssemblyName>
@@ -9,8 +9,11 @@
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
 
+    <IsPackable>true</IsPackable>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>sform</ToolCommandName>
+    <Description>Command-line interface for managing and control 2S platform.</Description>
+    <PackageTags>$(PackageTags);cli;platform;2S</PackageTags>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -38,10 +41,6 @@
     <ProjectReference Include="..\..\Sdk\src\Sdk.csproj" />
     <ProjectReference Include="..\..\Storyteller\Abstraction\src\Abstraction.csproj" />
     <ProjectReference Include="..\..\Storyteller\CosmosDb\src\CosmosDb.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <None Include="LICENSE.txt" Pack="true" PackagePath="$(PackageLicenseFile)" />
   </ItemGroup>
 
   <ItemGroup>
