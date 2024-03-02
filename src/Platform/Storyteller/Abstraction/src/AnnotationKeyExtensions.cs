@@ -13,7 +13,7 @@ public static class AnnotationKeyExtensions
             AnnotationType.Usage => @this.Segments.Count == 3,
             AnnotationType.Context => @this.Segments.Count == 3,
             AnnotationType.Execution => @this.Segments.Count == 4,
-            AnnotationType.Job => @this.Segments.Count == 3,
+            AnnotationType.Unit => @this.Segments.Count == 3,
             _ => false,
         };
     }
@@ -37,7 +37,7 @@ public static class AnnotationKeyExtensions
     {
         return @this.Type switch
         {
-            AnnotationType.Responsibility or AnnotationType.Job or AnnotationType.Usage or AnnotationType.Execution => @this.ResponsibilityName,
+            AnnotationType.Responsibility or AnnotationType.Unit or AnnotationType.Usage or AnnotationType.Execution => @this.ResponsibilityName,
             _ => throw new ArgumentException("Annotation which is not responsibility specific.", nameof(@this)),
         };
     }

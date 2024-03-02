@@ -11,7 +11,7 @@ public class AnnotationTypeCodes
     public const string Usage = "usg";
     public const string Context = "cnt";
     public const string Execution = "exe";
-    public const string Job = "job";
+    public const string Unit = "unt";
 
     public static readonly IReadOnlyDictionary<string, AnnotationType> ValidCodes
         = new Dictionary<string, AnnotationType>(StringComparer.OrdinalIgnoreCase)
@@ -21,7 +21,7 @@ public class AnnotationTypeCodes
             { Usage, AnnotationType.Usage },
             { Context, AnnotationType.Context },
             { Execution, AnnotationType.Execution },
-            { Job, AnnotationType.Job },
+            { Unit, AnnotationType.Unit },
         };
 
     public static AnnotationType GetType(string code)
@@ -43,7 +43,7 @@ public class AnnotationTypeCodes
             AnnotationType.Usage => typeof(Usage),
             AnnotationType.Context => typeof(Context),
             AnnotationType.Execution => typeof(Execution),
-            AnnotationType.Job => typeof(Unit),
+            AnnotationType.Unit => typeof(Unit),
             _ => throw new ArgumentOutOfRangeException(nameof(type)),
         };
     }
