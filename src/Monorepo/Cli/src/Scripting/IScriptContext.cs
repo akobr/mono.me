@@ -5,7 +5,9 @@ namespace _42.Monorepo.Cli.Scripting
 {
     public interface IScriptContext
     {
-        string ScriptName { get; }
+        string? ScriptName { get; }
+
+        string? Script { get; }
 
         IItem Item { get; }
 

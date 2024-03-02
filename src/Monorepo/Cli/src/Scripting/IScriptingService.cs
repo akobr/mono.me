@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,10 @@ namespace _42.Monorepo.Cli.Scripting
 
         Task<int> ExecuteScriptAsync(IScriptContext context, CancellationToken cancellationToken = default);
 
-        Task<int> ExecuteScriptAsync(string script, string? workingDirectory = null, CancellationToken cancellationToken = default);
+        Task<int> ExecuteScriptAsync(
+            string script,
+            string? workingDirectory = null,
+            Func<IDictionary<string, string?>, Task>? setEnvironmentVariables = null,
+            CancellationToken cancellationToken = default);
     }
 }

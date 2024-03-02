@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace _42.Monorepo.Cli.Extensions
 {
@@ -16,7 +17,7 @@ namespace _42.Monorepo.Cli.Extensions
 
             if (!IsDirectorySeparator(relativeTo[^1]))
             {
-                relativeTo += System.IO.Path.DirectorySeparatorChar;
+                relativeTo += Path.DirectorySeparatorChar;
             }
 
             var folderUri = new Uri(relativeTo);
@@ -25,8 +26,13 @@ namespace _42.Monorepo.Cli.Extensions
 
         public static bool IsDirectorySeparator(this char character)
         {
-            return character == System.IO.Path.DirectorySeparatorChar
-                   || character == System.IO.Path.AltDirectorySeparatorChar;
+            return character == Path.DirectorySeparatorChar
+                   || character == Path.AltDirectorySeparatorChar;
+        }
+
+        public static string NormalizePath(this string? path)
+        {
+            return path?.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar) ?? string.Empty;
         }
     }
 }

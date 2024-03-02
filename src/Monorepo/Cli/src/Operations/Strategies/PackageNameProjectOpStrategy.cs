@@ -44,7 +44,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
             var @namespace = xContent.Root.GetDefaultNamespace();
             var packageNameElement = xContent.Descendants(@namespace + "PackageId").FirstOrDefault()
-                              ?? xContent.Descendants(@namespace + "AssemblyName").FirstOrDefault();
+                                     ?? xContent.Descendants(@namespace + "AssemblyName").FirstOrDefault();
 
             return packageNameElement?.Value ?? _fileSystem.Path.GetFileNameWithoutExtension(projectFilePath);
         }

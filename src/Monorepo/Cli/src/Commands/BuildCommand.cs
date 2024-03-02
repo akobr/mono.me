@@ -175,7 +175,7 @@ namespace _42.Monorepo.Cli.Commands
             // try to run the build operation from traversal target file
             if (useTraversal)
             {
-                var traversalOutput = await TryOperateWithTraversal(operation, fullPath, profile);
+                var traversalOutput = await TryOperateWithTraversal(Context.Item, operation, fullPath, profile);
 
                 if (traversalOutput.HasValue)
                 {
@@ -311,7 +311,8 @@ namespace _42.Monorepo.Cli.Commands
                 }
 
                 var script = $"dotnet run --project {projectFilePath}";
-                var scriptOutput = await _scripting.ExecuteScriptAsync(script, item.Record.Path);
+                var context = new ScriptContext(item, script: script, args: _application.RemainingArguments);
+                var scriptOutput = await _scripting.ExecuteScriptAsync(context);
                 return scriptOutput;
             }
 
@@ -319,7 +320,7 @@ namespace _42.Monorepo.Cli.Commands
             return ExitCodes.ERROR_WRONG_PLACE;
         }
 
-        private async Task<int?> TryOperateWithTraversal(string operation, string fullPath, string profile)
+        private async Task<int?> TryOperateWithTraversal(IItem item, string operation, string fullPath, string profile)
         {
             var buildTarget = GetTraversalTargetFile(operation, fullPath, profile);
 
@@ -328,8 +329,9 @@ namespace _42.Monorepo.Cli.Commands
                 return null;
             }
 
-            var script = $"dotnet {operation} {buildTarget} {string.Join(' ', _application.RemainingArguments)}";
-            var scriptOutput = await _scripting.ExecuteScriptAsync(script, fullPath);
+            var script = $"dotnet {operation} {buildTarget}";
+            var context = new ScriptContext(item, script: script, args: _application.RemainingArguments);
+            var scriptOutput = await _scripting.ExecuteScriptAsync(context);
             return scriptOutput;
         }
 
@@ -368,7 +370,9 @@ namespace _42.Monorepo.Cli.Commands
                 return null;
             }
 
-            var scriptOutput = await _scripting.ExecuteScriptAsync(script, item.Record.Path);
+            // TODO: [P2] this needs to be called through the scripting service (when types are properly included in it)
+            var context = new ScriptContext(item, script: script, args: _application.RemainingArguments);
+            var scriptOutput = await _scripting.ExecuteScriptAsync(context);
             return scriptOutput;
         }
     }
