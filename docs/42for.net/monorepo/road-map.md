@@ -14,7 +14,7 @@ The expected list and the order of new features.
 - performance updates for large repositories
 - extend configurability
 
-## Other features
+## Other planned features
 
 - native support for generating and updating solution filters
 - automatically update solution file on a new content
