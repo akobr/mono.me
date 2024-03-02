@@ -20,8 +20,16 @@ The tool will guide you through the process and help you create a .net mono repo
 
 ## The 2S platform
 
-::: warning
-The platform is under development, and access will be revealed soon.
-:::
+First install the 2S platform command-line interface:
 
-The simplest way is to create an account and build your annotation-based and subscription-based platform today. To integrate it with your application, use our .net SDK.
+``` powershell
+dotnet tool install 42.Platform.Cli --global --prerelease
+```
+
+The simplest way is to create an account and build your annotation-based and subscription-based platform today.
+
+``` powershell
+sform account
+```
+
+To integrate it with your application, use our .net SDK, and learn more about it in this documentation.
