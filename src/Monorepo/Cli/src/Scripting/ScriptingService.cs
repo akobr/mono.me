@@ -6,7 +6,10 @@ using System.IO.Abstractions;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Monorepo.Cli.Configuration;
+using _42.Monorepo.Cli.Extensions;
+using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
+using _42.Monorepo.Cli.Operations.Strategies;
 using Microsoft.Extensions.Options;
 
 namespace _42.Monorepo.Cli.Scripting
@@ -31,6 +34,11 @@ namespace _42.Monorepo.Cli.Scripting
 
         public bool HasScript(IScriptContext context)
         {
+            if (string.IsNullOrWhiteSpace(context.ScriptName))
+            {
+                return !string.IsNullOrWhiteSpace(context.Script);
+            }
+
             return _scriptTree.HasScript(context.Item.Record.RepoRelativePath, context.ScriptName);
         }
 
@@ -41,8 +49,11 @@ namespace _42.Monorepo.Cli.Scripting
 
         public Task<int> ExecuteScriptAsync(IScriptContext context, CancellationToken cancellationToken = default)
         {
-            var record = context.Item.Record;
-            var script = _scriptTree.GetScript(record.RepoRelativePath, context.ScriptName);
+            var item = context.Item;
+            var record = item.Record;
+            var script = string.IsNullOrWhiteSpace(context.ScriptName)
+                ? context.Script
+                : _scriptTree.GetScript(record.RepoRelativePath, context.ScriptName);
 
             if (string.IsNullOrWhiteSpace(script))
             {
@@ -50,13 +61,45 @@ namespace _42.Monorepo.Cli.Scripting
             }
 
             script = PrepareScriptToExecute(script, context);
-            return ExecuteScriptAsync(script, record.Path, cancellationToken);
+            return ExecuteScriptAsync(script, record.Path, SetEnvironment, cancellationToken);
+
+            async Task SetEnvironment(IDictionary<string, string?> variables)
+            {
+                // paths
+                var repoPath = MonorepoDirectoryFunctions.GetMonorepoRootDirectory();
+                variables["MREPO_PATH_REPO"] = repoPath;
+                variables["MREPO_PATH_ARTIFACTS"] = _fileSystem.Path.Combine(repoPath, ".artifacts");
+                variables["MREPO_PATH"] = record.Path.NormalizePath();
+                variables["MREPO_PATH_RELATIVE"] = item.Record.RepoRelativePath.NormalizePath();
+
+                // versions
+                var versions = await item.GetExactVersionsAsync(cancellationToken);
+                variables["MREPO_VERSION"] = versions.SemVersion.ToString();
+                variables["MREPO_VERSION_PACKAGE"] = versions.PackageVersion.ToString();
+                variables["MREPO_VERSION_ASSEMBLY"] = versions.AssemblyVersion.ToString();
+                variables["MREPO_VERSION_INFO"] = versions.AssemblyInformationalVersion;
+
+                // item
+                variables["MREPO_TYPE"] = Enum.GetName(item.Record.Type);
+                variables["MREPO_NAME"] = item.Record.Name;
+                variables["MREPO_FULL_NAME"] = await item.GetFullNameAsync(_itemOptionsProvider, _repositoryOptions);
+                variables["MREPO_WORKSTEAD_NAME"] = item.Record.GetWorksteadName();
+
+                if (item.Record.Type is RecordType.Project)
+                {
+                    variables["MREPO_PROJECT_PATH"] = ProjectStrategyHelper.GetProjectFilePath(item, _fileSystem);
+                }
+            }
         }
 
-        public async Task<int> ExecuteScriptAsync(string script, string? workingDirectory = null, CancellationToken cancellationToken = default)
+        public async Task<int> ExecuteScriptAsync(
+            string script,
+            string? workingDirectory = null,
+            Func<IDictionary<string, string?>, Task>? setEnvironmentVariables = null,
+            CancellationToken cancellationToken = default)
         {
             var arguments = script.Replace("\"", "\"\"\"");
-            workingDirectory = workingDirectory?.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            workingDirectory = workingDirectory.NormalizePath();
 
             ProcessStartInfo startInfo = new(_repositoryOptions.Shell ?? "powershell", arguments)
             {
@@ -64,6 +107,11 @@ namespace _42.Monorepo.Cli.Scripting
                 CreateNoWindow = false,
                 WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory,
             };
+
+            if (setEnvironmentVariables is not null)
+            {
+                await setEnvironmentVariables(startInfo.Environment);
+            }
 
             Console.WriteLine($"{startInfo.WorkingDirectory}> {script}"); // TODO [P2]
             var process = Process.Start(startInfo);
@@ -81,7 +129,7 @@ namespace _42.Monorepo.Cli.Scripting
         private string PrepareScriptToExecute(string script, IScriptContext context)
         {
             // TODO: [P2] Prepare script with arguments (parameter replacement, check for parameters)
-            return script + string.Join(' ', context.Args);
+            return script + ' ' + string.Join(' ', context.Args);
         }
 
         private ScriptTree InitialiseScriptTree()

@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using _42.Monorepo.Cli.Configuration;
 using _42.Monorepo.Cli.Model;
 using _42.Monorepo.Cli.Model.Items;
 using _42.Monorepo.Cli.Model.Records;
@@ -83,9 +86,66 @@ namespace _42.Monorepo.Cli.Extensions
             return char.ToLowerInvariant(Enum.GetName(type)?[0] ?? ' ');
         }
 
+        public static async Task<string> GetFullNameAsync(this IItem @this, IItemFullOptionsProvider optionsProvider, MonoRepoOptions repoOptions)
+        {
+            switch (@this.Record.Type)
+            {
+                case RecordType.TopWorkstead:
+                case RecordType.Workstead:
+                    return GetWorksteadFullName(@this, optionsProvider, repoOptions);
+
+                case RecordType.Project:
+                    return await ((IProject)@this).GetPackageNameAsync();
+
+                // case RecordType.Repository:
+                // case RecordType.RootDirectory:
+                // case RecordType.Special:
+                default:
+                    return @this.Record.Name;
+            }
+        }
+
         public static bool IsWorkstead(this RecordType type)
         {
             return type is RecordType.TopWorkstead or RecordType.Workstead;
+        }
+
+        private static string GetWorksteadFullName(this IItem @this, IItemFullOptionsProvider optionsProvider, MonoRepoOptions repoOptions)
+        {
+            var itemToProcess = @this;
+            var builder = new StringBuilder();
+
+            do
+            {
+                var options = optionsProvider.GetWorksteadOptions(itemToProcess.Record.RepoRelativePath);
+
+                if (!options.IsSuppressed())
+                {
+                    if (builder.Length > 0)
+                    {
+                        builder.Insert(0, '.');
+                    }
+
+                    builder.Insert(0, itemToProcess.Record.Name);
+                }
+
+                itemToProcess = itemToProcess.Parent;
+            }
+            while (itemToProcess is IWorkstead);
+
+            var prefix = (repoOptions.Prefix ?? string.Empty).Trim();
+
+            if (!string.IsNullOrEmpty(prefix))
+            {
+                if (builder.Length > 0)
+                {
+                    builder.Insert(0, '.');
+                }
+
+                builder.Insert(0, prefix);
+            }
+
+            return builder.ToString();
         }
     }
 }
