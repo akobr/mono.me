@@ -1,10 +1,10 @@
 using System.Net;
 using _42.Platform.Storyteller.Api.Models;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.ErrorHandling;
 
@@ -23,18 +23,9 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         {
             await next(context);
         }
-        catch (AuthenticationFailureException exception)
+        catch (SecurityTokenException exception)
         {
-            var httpReqData = await context.GetHttpRequestDataAsync();
-
-            if (httpReqData is null)
-            {
-                return;
-            }
-
-            _logger.LogWarning(exception, "Authentication failed at: {url}", httpReqData.Url.AbsolutePath);
-            var httpUnauthorizedResponse = httpReqData.CreateResponse(HttpStatusCode.Unauthorized);
-            context.SetInvocationResult(httpUnauthorizedResponse);
+            await ProcessSecurityExceptionAsync(context, exception);
         }
         catch (Exception exception)
         {
@@ -61,5 +52,19 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 
             context.SetInvocationResult(httpErrorResponse);
         }
+    }
+
+    private async Task ProcessSecurityExceptionAsync(FunctionContext context, Exception exception)
+    {
+        var httpReqData = await context.GetHttpRequestDataAsync();
+
+        if (httpReqData is null)
+        {
+            return;
+        }
+
+        _logger.LogWarning(exception, "Authentication failed at: {url}", httpReqData.Url.AbsolutePath);
+        var httpUnauthorizedResponse = httpReqData.CreateResponse(HttpStatusCode.Unauthorized);
+        context.SetInvocationResult(httpUnauthorizedResponse);
     }
 }

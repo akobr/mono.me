@@ -1,56 +1,82 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using _42.Platform.Storyteller.Access;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.IdentityModel.Protocols;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Microsoft.IdentityModel.Tokens;
+using HttpRequestData = Microsoft.Azure.Functions.Worker.Http.HttpRequestData;
 
 namespace _42.Platform.Storyteller.Api.Security;
 
 public static class HttpRequestDataExtensions
 {
-    public static IEnumerable<Claim> GetClaims(this HttpRequestData @this)
+    public static IReadOnlyList<Claim> GetClaims(this HttpRequestData @this)
     {
-        // TODO: [P1] create claims map and cache it on the function context
-        // @this.FunctionContext.Items.TryGetValue("ClaimsMap", out var claimMap);
-        foreach (var identity in @this.Identities.Where(i => i.IsAuthenticated))
+        @this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.CachedClaims, out var claimMap);
+
+        if (claimMap is List<Claim> cachedClaims)
         {
-            foreach (var claim in identity.Claims)
-            {
-                yield return claim;
-            }
+            return cachedClaims;
         }
 
-#if DEBUG
+        var claims = new List<Claim>(0);
+        var identity = @this.Identities.FirstOrDefault(i => i.IsAuthenticated);
+        if (identity is not null)
+        {
+            claims = identity.Claims.ToList();
+            @this.FunctionContext.Items[FunctionContextItemKeys.CachedClaims] = claims;
+            return claims;
+        }
+
         var handler = new JwtSecurityTokenHandler();
         @this.Headers.TryGetValues("Authorization", out var values);
+        var bearerValue = values?.FirstOrDefault(v => v.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase));
 
-        foreach (var authorizationHeaderValue in values ?? Enumerable.Empty<string>())
+        if (string.IsNullOrEmpty(bearerValue))
         {
-            var token = handler.ReadJwtToken(authorizationHeaderValue.Split(' ').Last());
-
-            foreach (var claim in token.Claims)
-            {
-                yield return claim;
-            }
+            return claims;
         }
+
+        var rawToken = bearerValue[7..];
+
+        if (!handler.CanReadToken(rawToken))
+        {
+            return claims;
+        }
+
+#if !DEV_AUTH
+        var principal = handler.ValidateAccessToken(rawToken);
+        claims = principal.Claims.ToList();
+#else
+        var token = handler.ReadJwtToken(authorizationHeaderValue.Split(' ').Last());
+        claims = token.Claims.ToList();
 #endif
+
+        @this.FunctionContext.Items[FunctionContextItemKeys.CachedClaims] = claims;
+        return claims;
     }
 
     public static void CheckScope(this HttpRequestData @this, params string[] scopes)
     {
-#if NOAUTH
+#if DEV_AUTH
         return;
 #endif
-
-        var allScopes = @this.GetClaims()
-            .Where(c => c.Type is "scp" or "roles")
+        var claims = @this.GetClaims();
+        var allScopes = claims
+            .Where(c => c.Type is "scp" or "roles" || c.Type.EndsWith("/scope"))
             .SelectMany(c => c.Value.Split(' '))
             .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
             .ToHashSet();
 
         if (scopes.All(scope => !allScopes.Contains(scope)))
         {
-            throw new AuthenticationFailureException("Missing scope(s): " + string.Join(", ", scopes));
+            var allInfo = new StringBuilder();
+            allInfo.AppendLine($"all available scopes: {string.Join(", ", allScopes)}");
+            allInfo.AppendLine($"all claims: {string.Join("; ", claims.Select(c => $"{c.Type}={c.Value}"))}");
+            allInfo.AppendLine($"identities: {string.Join("; ", @this.Identities.Select(i => $"{i.Name}|{i.IsAuthenticated}|{i.AuthenticationType}"))}");
+            allInfo.AppendLine("Missing scope(s): " + string.Join(", ", scopes));
+            throw new SecurityTokenException(allInfo.ToString());
         }
     }
 
@@ -66,7 +92,7 @@ public static class HttpRequestDataExtensions
 
         if (accessRole < minimalRole)
         {
-            throw new UnauthorizedAccessException($"No {minimalRole:G} access to the project {accessPointKey}.");
+            throw new SecurityTokenException($"No {minimalRole:G} access to the project {accessPointKey}.");
         }
     }
 
@@ -91,7 +117,7 @@ public static class HttpRequestDataExtensions
 
     public static string GetUniqueIdentityName(this HttpRequestData @this)
     {
-        return GetRequiredClaim(@this, "unique_name");
+        return GetRequiredClaim(@this, "unique_name", ClaimTypes.Upn);
     }
 
     public static string GetIdentityName(this HttpRequestData @this)
@@ -105,11 +131,57 @@ public static class HttpRequestDataExtensions
         return @this.GetClaims().Any(c => c.Type == "appid");
     }
 
-    public static string GetRequiredClaim(this HttpRequestData @this, string claimType)
+    public static string GetRequiredClaim(this HttpRequestData @this, params string[] claimTypes)
     {
-        var uniqueNameClaim = @this.GetClaims()
-            .FirstOrDefault(c => c.Type == claimType);
+        var claims = @this.GetClaims();
 
-        return uniqueNameClaim?.Value ?? throw new AuthenticationFailureException($"Missing {claimType} claim.");
+        foreach (var claimType in claimTypes)
+        {
+            var uniqueNameClaim = claims.FirstOrDefault(c => c.Type == claimType);
+            if (uniqueNameClaim is not null)
+            {
+                return uniqueNameClaim.Value;
+            }
+        }
+
+        throw new SecurityTokenException($"Missing {claimTypes[0]} claim.");
+    }
+
+    private static ClaimsPrincipal ValidateAccessToken(this ISecurityTokenValidator @this, string accessToken)
+    {
+        var tenantId = Environment.GetEnvironmentVariable("OpenApiAuthTenantId");
+        var clientId = Environment.GetEnvironmentVariable("OpenApiAuthClientId");
+        var audience = $"api://{clientId}";
+        var authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+
+        // Debugging purposes only, set this to false for production
+        Microsoft.IdentityModel.Logging.IdentityModelEventSource.ShowPII = true;
+
+        var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
+            $"{authority}/.well-known/openid-configuration",
+            new OpenIdConnectConfigurationRetriever());
+
+        // Initialize the token validation parameters
+        var validationParameters = new TokenValidationParameters
+        {
+            // App Id URI and AppId of this service application are both valid audiences.
+            ValidAudiences = new[] { audience, clientId },
+
+            // Support Azure AD V1 and V2 endpoints.
+            IssuerValidator = (issuer, _, _) =>
+            {
+                if (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase))
+                {
+                    return issuer;
+                }
+
+                throw new SecurityTokenInvalidIssuerException($"Invalid issuer: {issuer}");
+            },
+            ConfigurationManager = configManager,
+        };
+
+        SecurityToken securityToken;
+        var claimsPrincipal = @this.ValidateToken(accessToken, validationParameters, out securityToken);
+        return claimsPrincipal;
     }
 }
