@@ -8,7 +8,7 @@ public interface IMachineAccessService
 {
     Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model);
 
-    Task<string?> ResetMachineAccessAsync(string appId);
+    Task<string?> ResetMachineAccessAsync(string objectId);
 
-    Task<bool> DeleteMachineAccessAsync(string appId);
+    Task<bool> DeleteMachineAccessAsync(string objectId);
 }

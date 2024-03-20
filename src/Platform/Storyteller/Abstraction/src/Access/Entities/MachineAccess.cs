@@ -6,6 +6,8 @@ public record class MachineAccess
 
     public required string Id { get; init; }
 
+    public required string AuthId { get; init; }
+
     public required string AccessKey { get; init; }
 
     public required MachineAccessScope Scope { get; init; }

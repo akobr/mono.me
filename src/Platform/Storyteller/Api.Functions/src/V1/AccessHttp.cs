@@ -56,7 +56,7 @@ public class AccessHttp
     [OpenApiOperation(Definitions.RouteIds.Access.CreateAccount, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
-    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AccountCreate), Description = "Organization and project for the new account.")]
+    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Models.AccountCreate), Description = "Organization and project for the new account.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Account), Description = "Newly created account.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "The account already exists.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
@@ -64,7 +64,7 @@ public class AccessHttp
     public async Task<IActionResult> PostAccount(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Account)]
         HttpRequestData request,
-        [FromBody] AccountCreate accountModel)
+        [FromBody] Models.AccountCreate accountModel)
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
@@ -77,8 +77,14 @@ public class AccessHttp
         }
 
         var accountName = request.GetIdentityName().Trim();
-        accountModel = accountModel with { Key = accountKey, Name = accountName };
-        account = await _accessService.CreateAccountAsync(accountModel);
+        var internalAccountModel = new AccountCreate
+        {
+            Key = accountKey,
+            Name = accountName,
+            Organization = accountModel.Organization,
+            Project = accountModel.Project,
+        };
+        account = await _accessService.CreateAccountAsync(internalAccountModel);
 
         return new OkObjectResult(account);
     }
@@ -242,6 +248,8 @@ public class AccessHttp
     [OpenApiOperation(Definitions.RouteIds.Access.CreateMachineAccess, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(MachineAccessCreate), Description = "An organization or project to create.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAccess), Description = "The created access point (organization or project).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
@@ -281,7 +289,7 @@ public class AccessHttp
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
-        if (!Guid.TryParse(id, out var machineId))
+        if (!Guid.TryParse(id, out _))
         {
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
@@ -311,7 +319,7 @@ public class AccessHttp
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
-        if (!Guid.TryParse(id, out var machineId))
+        if (!Guid.TryParse(id, out _))
         {
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
