@@ -27,18 +27,18 @@ using OpenAPIDateConverter = _42.Platform.Sdk.Client.OpenAPIDateConverter;
 namespace _42.Platform.Sdk.Model
 {
     /// <summary>
-    /// AnnotationsResponse
+    /// AnnotationsResponseExecution
     /// </summary>
-    [DataContract(Name = "annotationsResponse")]
-    public partial class AnnotationsResponse : IValidatableObject
+    [DataContract(Name = "annotationsResponse_execution")]
+    public partial class AnnotationsResponseExecution : IValidatableObject
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="AnnotationsResponse" /> class.
+        /// Initializes a new instance of the <see cref="AnnotationsResponseExecution" /> class.
         /// </summary>
         /// <param name="annotations">annotations.</param>
         /// <param name="continuationToken">continuationToken.</param>
         /// <param name="count">count.</param>
-        public AnnotationsResponse(List<Annotation> annotations = default(List<Annotation>), string continuationToken = default(string), int count = default(int))
+        public AnnotationsResponseExecution(List<Execution> annotations = default(List<Execution>), string continuationToken = default(string), int count = default(int))
         {
             this.Annotations = annotations;
             this.ContinuationToken = continuationToken;
@@ -49,7 +49,7 @@ namespace _42.Platform.Sdk.Model
         /// Gets or Sets Annotations
         /// </summary>
         [DataMember(Name = "annotations", EmitDefaultValue = false)]
-        public List<Annotation> Annotations { get; set; }
+        public List<Execution> Annotations { get; set; }
 
         /// <summary>
         /// Gets or Sets ContinuationToken
@@ -70,7 +70,7 @@ namespace _42.Platform.Sdk.Model
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append("class AnnotationsResponse {\n");
+            sb.Append("class AnnotationsResponseExecution {\n");
             sb.Append("  Annotations: ").Append(Annotations).Append("\n");
             sb.Append("  ContinuationToken: ").Append(ContinuationToken).Append("\n");
             sb.Append("  Count: ").Append(Count).Append("\n");

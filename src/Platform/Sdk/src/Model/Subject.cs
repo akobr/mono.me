@@ -27,10 +27,10 @@ using OpenAPIDateConverter = _42.Platform.Sdk.Client.OpenAPIDateConverter;
 namespace _42.Platform.Sdk.Model
 {
     /// <summary>
-    /// Annotation
+    /// Subject
     /// </summary>
-    [DataContract(Name = "annotation")]
-    public partial class Annotation : IValidatableObject
+    [DataContract(Name = "subject")]
+    public partial class Subject : IValidatableObject
     {
         /// <summary>
         /// Defines AnnotationType
@@ -38,34 +38,34 @@ namespace _42.Platform.Sdk.Model
         public enum AnnotationTypeEnum
         {
             /// <summary>
-            /// Enum Responsibility for value: 0
+            /// Enum NUMBER_0 for value: 0
             /// </summary>
-            Responsibility = 0,
+            NUMBER_0 = 0,
 
             /// <summary>
-            /// Enum Job for value: 1
+            /// Enum NUMBER_1 for value: 1
             /// </summary>
-            Job = 1,
+            NUMBER_1 = 1,
 
             /// <summary>
-            /// Enum Subject for value: 2
+            /// Enum NUMBER_2 for value: 2
             /// </summary>
-            Subject = 2,
+            NUMBER_2 = 2,
 
             /// <summary>
-            /// Enum Usage for value: 3
+            /// Enum NUMBER_3 for value: 3
             /// </summary>
-            Usage = 3,
+            NUMBER_3 = 3,
 
             /// <summary>
-            /// Enum Context for value: 4
+            /// Enum NUMBER_4 for value: 4
             /// </summary>
-            Context = 4,
+            NUMBER_4 = 4,
 
             /// <summary>
-            /// Enum Execution for value: 5
+            /// Enum NUMBER_5 for value: 5
             /// </summary>
-            Execution = 5
+            NUMBER_5 = 5
         }
 
 
@@ -75,9 +75,11 @@ namespace _42.Platform.Sdk.Model
         [DataMember(Name = "annotationType", EmitDefaultValue = false)]
         public AnnotationTypeEnum? AnnotationType { get; set; }
         /// <summary>
-        /// Initializes a new instance of the <see cref="Annotation" /> class.
+        /// Initializes a new instance of the <see cref="Subject" /> class.
         /// </summary>
-        /// <param name="annotationType">annotationType (default to AnnotationTypeEnum.Responsibility).</param>
+        /// <param name="contexts">contexts.</param>
+        /// <param name="usages">usages.</param>
+        /// <param name="annotationType">annotationType (default to AnnotationTypeEnum.NUMBER_0).</param>
         /// <param name="title">title.</param>
         /// <param name="description">description.</param>
         /// <param name="documentationLink">documentationLink.</param>
@@ -93,8 +95,10 @@ namespace _42.Platform.Sdk.Model
         /// <param name="viewName">viewName.</param>
         /// <param name="annotationKey">annotationKey.</param>
         /// <param name="name">name.</param>
-        public Annotation(AnnotationTypeEnum? annotationType = AnnotationTypeEnum.Responsibility, string title = default(string), string description = default(string), string documentationLink = default(string), bool? isDisabled = default(bool?), DateTime? validFrom = default(DateTime?), DateTime? expiresAt = default(DateTime?), string varTimeZone = default(string), List<string> labels = default(List<string>), Dictionary<string, Object> values = default(Dictionary<string, Object>), string partitionKey = default(string), string id = default(string), string projectName = default(string), string viewName = default(string), string annotationKey = default(string), string name = default(string))
+        public Subject(List<string> contexts = default(List<string>), List<string> usages = default(List<string>), AnnotationTypeEnum? annotationType = AnnotationTypeEnum.NUMBER_0, string title = default(string), string description = default(string), string documentationLink = default(string), bool? isDisabled = default(bool?), DateTime? validFrom = default(DateTime?), DateTime? expiresAt = default(DateTime?), string varTimeZone = default(string), List<string> labels = default(List<string>), Dictionary<string, Object> values = default(Dictionary<string, Object>), string partitionKey = default(string), string id = default(string), string projectName = default(string), string viewName = default(string), string annotationKey = default(string), string name = default(string))
         {
+            this.Contexts = contexts;
+            this.Usages = usages;
             this.AnnotationType = annotationType;
             this.Title = title;
             this.Description = description;
@@ -112,6 +116,18 @@ namespace _42.Platform.Sdk.Model
             this.AnnotationKey = annotationKey;
             this.Name = name;
         }
+
+        /// <summary>
+        /// Gets or Sets Contexts
+        /// </summary>
+        [DataMember(Name = "contexts", EmitDefaultValue = false)]
+        public List<string> Contexts { get; set; }
+
+        /// <summary>
+        /// Gets or Sets Usages
+        /// </summary>
+        [DataMember(Name = "usages", EmitDefaultValue = false)]
+        public List<string> Usages { get; set; }
 
         /// <summary>
         /// Gets or Sets Title
@@ -210,7 +226,9 @@ namespace _42.Platform.Sdk.Model
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append("class Annotation {\n");
+            sb.Append("class Subject {\n");
+            sb.Append("  Contexts: ").Append(Contexts).Append("\n");
+            sb.Append("  Usages: ").Append(Usages).Append("\n");
             sb.Append("  AnnotationType: ").Append(AnnotationType).Append("\n");
             sb.Append("  Title: ").Append(Title).Append("\n");
             sb.Append("  Description: ").Append(Description).Append("\n");

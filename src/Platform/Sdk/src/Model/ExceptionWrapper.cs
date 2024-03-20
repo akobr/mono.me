@@ -27,24 +27,28 @@ using OpenAPIDateConverter = _42.Platform.Sdk.Client.OpenAPIDateConverter;
 namespace _42.Platform.Sdk.Model
 {
     /// <summary>
-    /// ErrorResponse
+    /// ExceptionWrapper
     /// </summary>
-    [DataContract(Name = "errorResponse")]
-    public partial class ErrorResponse : IValidatableObject
+    [DataContract(Name = "exceptionWrapper")]
+    public partial class ExceptionWrapper : IValidatableObject
     {
         /// <summary>
-        /// Initializes a new instance of the <see cref="ErrorResponse" /> class.
+        /// Initializes a new instance of the <see cref="ExceptionWrapper" /> class.
         /// </summary>
         /// <param name="message">message.</param>
-        /// <param name="hint">hint.</param>
-        /// <param name="errorCode">errorCode.</param>
-        /// <param name="error">error.</param>
-        public ErrorResponse(string message = default(string), string hint = default(string), string errorCode = default(string), ExceptionWrapper error = default(ExceptionWrapper))
+        /// <param name="source">source.</param>
+        /// <param name="stackTrace">stackTrace.</param>
+        /// <param name="helpLink">helpLink.</param>
+        /// <param name="hResult">hResult.</param>
+        /// <param name="innerException">innerException.</param>
+        public ExceptionWrapper(string message = default(string), string source = default(string), string stackTrace = default(string), string helpLink = default(string), int hResult = default(int), ExceptionWrapper innerException = default(ExceptionWrapper))
         {
             this.Message = message;
-            this.Hint = hint;
-            this.ErrorCode = errorCode;
-            this.Error = error;
+            this.Source = source;
+            this.StackTrace = stackTrace;
+            this.HelpLink = helpLink;
+            this.HResult = hResult;
+            this.InnerException = innerException;
         }
 
         /// <summary>
@@ -54,22 +58,34 @@ namespace _42.Platform.Sdk.Model
         public string Message { get; set; }
 
         /// <summary>
-        /// Gets or Sets Hint
+        /// Gets or Sets Source
         /// </summary>
-        [DataMember(Name = "hint", EmitDefaultValue = false)]
-        public string Hint { get; set; }
+        [DataMember(Name = "source", EmitDefaultValue = false)]
+        public string Source { get; set; }
 
         /// <summary>
-        /// Gets or Sets ErrorCode
+        /// Gets or Sets StackTrace
         /// </summary>
-        [DataMember(Name = "errorCode", EmitDefaultValue = false)]
-        public string ErrorCode { get; set; }
+        [DataMember(Name = "stackTrace", EmitDefaultValue = false)]
+        public string StackTrace { get; set; }
 
         /// <summary>
-        /// Gets or Sets Error
+        /// Gets or Sets HelpLink
         /// </summary>
-        [DataMember(Name = "error", EmitDefaultValue = false)]
-        public ExceptionWrapper Error { get; set; }
+        [DataMember(Name = "helpLink", EmitDefaultValue = false)]
+        public string HelpLink { get; set; }
+
+        /// <summary>
+        /// Gets or Sets HResult
+        /// </summary>
+        [DataMember(Name = "hResult", EmitDefaultValue = false)]
+        public int HResult { get; set; }
+
+        /// <summary>
+        /// Gets or Sets InnerException
+        /// </summary>
+        [DataMember(Name = "innerException", EmitDefaultValue = false)]
+        public ExceptionWrapper InnerException { get; set; }
 
         /// <summary>
         /// Returns the string presentation of the object
@@ -78,11 +94,13 @@ namespace _42.Platform.Sdk.Model
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
-            sb.Append("class ErrorResponse {\n");
+            sb.Append("class ExceptionWrapper {\n");
             sb.Append("  Message: ").Append(Message).Append("\n");
-            sb.Append("  Hint: ").Append(Hint).Append("\n");
-            sb.Append("  ErrorCode: ").Append(ErrorCode).Append("\n");
-            sb.Append("  Error: ").Append(Error).Append("\n");
+            sb.Append("  Source: ").Append(Source).Append("\n");
+            sb.Append("  StackTrace: ").Append(StackTrace).Append("\n");
+            sb.Append("  HelpLink: ").Append(HelpLink).Append("\n");
+            sb.Append("  HResult: ").Append(HResult).Append("\n");
+            sb.Append("  InnerException: ").Append(InnerException).Append("\n");
             sb.Append("}\n");
             return sb.ToString();
         }
