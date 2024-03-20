@@ -100,6 +100,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Api.Functions", "src\Platfo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AzureAd", "src\Platform\Storyteller\AzureAd\src\AzureAd.csproj", "{0C161367-1212-402A-A49F-E53526C34E59}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{68FB165B-9682-4727-9460-BFD6DF559CDA}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomClientApp", "src\Platform\Examples\CustomClientApp\src\CustomClientApp.csproj", "{C45B41B9-0B9E-403A-9678-C29699D09F14}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -222,6 +226,10 @@ Global
 		{0C161367-1212-402A-A49F-E53526C34E59}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0C161367-1212-402A-A49F-E53526C34E59}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0C161367-1212-402A-A49F-E53526C34E59}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C45B41B9-0B9E-403A-9678-C29699D09F14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C45B41B9-0B9E-403A-9678-C29699D09F14}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C45B41B9-0B9E-403A-9678-C29699D09F14}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C45B41B9-0B9E-403A-9678-C29699D09F14}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -265,6 +273,8 @@ Global
 		{ABE61959-99DE-4AA7-84D1-5151EF3A32A7} = {F93F9553-7F20-44FB-BF00-C120EFA0F029}
 		{F2E74DA3-AC5C-473E-89B8-EC841408F3A6} = {2B232D13-0087-4EF0-B630-1AB21FB353EF}
 		{0C161367-1212-402A-A49F-E53526C34E59} = {1F8DA45A-60A4-41DA-B1F9-55EA8DC3BC19}
+		{68FB165B-9682-4727-9460-BFD6DF559CDA} = {75D0ACA4-6F4C-4CE8-874D-5F582A29CAEC}
+		{C45B41B9-0B9E-403A-9678-C29699D09F14} = {68FB165B-9682-4727-9460-BFD6DF559CDA}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F82BF58F-3E50-4150-BD21-CA489E5CCF93}
