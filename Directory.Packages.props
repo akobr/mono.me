@@ -84,10 +84,10 @@
     <PackageVersion Include="Microsoft.Build" Version="17.8.3" />
     <PackageVersion Include="Microsoft.Build.Locator" Version="1.6.10" />
     <!-- NuGet -->
-    <PackageVersion Include="NuGet.Frameworks" Version="6.8.0" />
-    <PackageVersion Include="NuGet.Packaging" Version="6.8.0" />
-    <PackageVersion Include="NuGet.ProjectModel" Version="6.8.0" />
-    <PackageVersion Include="NuGet.Versioning" Version="6.8.0" />
+    <PackageVersion Include="NuGet.Frameworks" Version="6.9.1" />
+    <PackageVersion Include="NuGet.Packaging" Version="6.9.1" />
+    <PackageVersion Include="NuGet.ProjectModel" Version="6.9.1" />
+    <PackageVersion Include="NuGet.Versioning" Version="6.9.1" />
     <!-- unit testing -->
     <PackageVersion Include="Bogus" Version="34.0.2" />
     <PackageVersion Include="coverlet.collector" Version="6.0.0" />
