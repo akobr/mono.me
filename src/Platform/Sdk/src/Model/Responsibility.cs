@@ -38,34 +38,34 @@ namespace _42.Platform.Sdk.Model
         public enum AnnotationTypeEnum
         {
             /// <summary>
-            /// Enum NUMBER_0 for value: 0
+            /// Enum Responsibility for value: 0
             /// </summary>
-            NUMBER_0 = 0,
+            Responsibility = 0,
 
             /// <summary>
-            /// Enum NUMBER_1 for value: 1
+            /// Enum Job for value: 1
             /// </summary>
-            NUMBER_1 = 1,
+            Job = 1,
 
             /// <summary>
-            /// Enum NUMBER_2 for value: 2
+            /// Enum Subject for value: 2
             /// </summary>
-            NUMBER_2 = 2,
+            Subject = 2,
 
             /// <summary>
-            /// Enum NUMBER_3 for value: 3
+            /// Enum Usage for value: 3
             /// </summary>
-            NUMBER_3 = 3,
+            Usage = 3,
 
             /// <summary>
-            /// Enum NUMBER_4 for value: 4
+            /// Enum Context for value: 4
             /// </summary>
-            NUMBER_4 = 4,
+            Context = 4,
 
             /// <summary>
-            /// Enum NUMBER_5 for value: 5
+            /// Enum Execution for value: 5
             /// </summary>
-            NUMBER_5 = 5
+            Execution = 5
         }
 
 
@@ -77,7 +77,7 @@ namespace _42.Platform.Sdk.Model
         /// <summary>
         /// Initializes a new instance of the <see cref="Responsibility" /> class.
         /// </summary>
-        /// <param name="annotationType">annotationType (default to AnnotationTypeEnum.NUMBER_0).</param>
+        /// <param name="annotationType">annotationType (default to AnnotationTypeEnum.Responsibility).</param>
         /// <param name="title">title.</param>
         /// <param name="description">description.</param>
         /// <param name="documentationLink">documentationLink.</param>
@@ -93,7 +93,7 @@ namespace _42.Platform.Sdk.Model
         /// <param name="viewName">viewName.</param>
         /// <param name="annotationKey">annotationKey.</param>
         /// <param name="name">name.</param>
-        public Responsibility(AnnotationTypeEnum? annotationType = AnnotationTypeEnum.NUMBER_0, string title = default(string), string description = default(string), string documentationLink = default(string), bool? isDisabled = default(bool?), DateTime? validFrom = default(DateTime?), DateTime? expiresAt = default(DateTime?), string varTimeZone = default(string), List<string> labels = default(List<string>), Dictionary<string, Object> values = default(Dictionary<string, Object>), string partitionKey = default(string), string id = default(string), string projectName = default(string), string viewName = default(string), string annotationKey = default(string), string name = default(string))
+        public Responsibility(AnnotationTypeEnum? annotationType = AnnotationTypeEnum.Responsibility, string title = default(string), string description = default(string), string documentationLink = default(string), bool? isDisabled = default(bool?), DateTime? validFrom = default(DateTime?), DateTime? expiresAt = default(DateTime?), string varTimeZone = default(string), List<string> labels = default(List<string>), Dictionary<string, Object> values = default(Dictionary<string, Object>), string partitionKey = default(string), string id = default(string), string projectName = default(string), string viewName = default(string), string annotationKey = default(string), string name = default(string))
         {
             this.AnnotationType = annotationType;
             this.Title = title;
