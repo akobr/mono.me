@@ -41,7 +41,7 @@ public class StorytellerGetCommand : BaseContextCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        var response = await _annotationsApi.GetAnnotationWithHttpInfoAsync(
+        var response = await _annotationsApi.GetAnnotationWithHttpInfoSafeAsync(
             Context.OrganizationName,
             Context.ProjectName,
             Context.ViewName,

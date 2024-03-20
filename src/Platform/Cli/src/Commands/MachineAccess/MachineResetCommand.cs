@@ -25,12 +25,20 @@ public class MachineResetCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
+        if (string.IsNullOrWhiteSpace(MachineId))
+        {
+            Console.WriteImportant("The machine id parameter is required.");
+            return ExitCodes.ERROR_INPUT_PARSING;
+        }
+
         var machine = await _accessApi.ResetMachineAccessAsync(
             Context.OrganizationName,
             Context.ProjectName,
             MachineId);
 
         Console.WriteJson(machine);
+        Console.WriteLine();
+        Console.WriteImportant("Please copy the access key (secret), it is not stored anywhere.");
         return ExitCodes.SUCCESS;
     }
 }

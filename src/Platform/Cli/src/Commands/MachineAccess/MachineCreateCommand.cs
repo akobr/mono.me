@@ -24,7 +24,7 @@ public class MachineCreateCommand : BaseContextCommand
     [Option("-a|--annotation", CommandOptionType.SingleValue, Description = "An annotation key where the access is restricted.")]
     public string? AnnotationKey { get; set; }
 
-    [Option("-r|--read-only", CommandOptionType.NoValue, Description = "Scope will be read-only.")]
+    [Option("-r|--read-only", CommandOptionType.NoValue, Description = "Scope will be read-only. (default)")]
     public bool IsScopeReadOnly { get; set; }
 
     [Option("-w|--write", CommandOptionType.NoValue, Description = "Scope will be read and write.")]
@@ -38,6 +38,8 @@ public class MachineCreateCommand : BaseContextCommand
         }
 
         var machine = await _accessApi.CreateMachineAccessAsync(
+            Context.OrganizationName,
+            Context.ProjectName,
             new MachineAccessCreate
             {
                 Organization = Context.OrganizationName,
@@ -49,6 +51,8 @@ public class MachineCreateCommand : BaseContextCommand
             });
 
         Console.WriteJson(machine);
+        Console.WriteLine();
+        Console.WriteImportant("Please copy the access key (secret), it is not stored anywhere.");
         return ExitCodes.SUCCESS;
     }
 }
