@@ -67,7 +67,6 @@ public class AuthenticationService : IAuthenticationService
         var pca = PublicClientApplicationBuilder
             .Create(_options.ClientId)
             .WithAuthority(AzureCloudInstance.AzurePublic, _options.TenantId)
-            .WithDefaultRedirectUri()
             .Build();
 
         var cacheHelper = await MsalCacheHelper.CreateAsync(storageProperties);

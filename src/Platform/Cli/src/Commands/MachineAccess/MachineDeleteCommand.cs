@@ -24,10 +24,18 @@ public class MachineDeleteCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
+        if (string.IsNullOrWhiteSpace(MachineId))
+        {
+            Console.WriteImportant("The machine id parameter is required.");
+            return ExitCodes.ERROR_INPUT_PARSING;
+        }
+
         await _accessApi.DeleteMachineAccessAsync(
             Context.OrganizationName,
             Context.ProjectName,
             MachineId);
+
+        Console.WriteImportant($"The machine access {MachineId} has been deleted.");
         return ExitCodes.SUCCESS;
     }
 }

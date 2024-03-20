@@ -56,7 +56,7 @@ public class AccountCommand : BaseCommand
             }
         }
 
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
 
         if (accountResponse.StatusCode is HttpStatusCode.NotFound)
         {

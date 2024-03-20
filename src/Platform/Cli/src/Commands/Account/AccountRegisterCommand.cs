@@ -1,5 +1,9 @@
+using System;
+using System.Collections.Generic;
 using System.IO.Abstractions;
+using System.Linq;
 using System.Net;
+using System.Security.Claims;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
@@ -34,7 +38,7 @@ public class AccountRegisterCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
 
         if (accountResponse.StatusCode is HttpStatusCode.OK)
         {
@@ -56,7 +60,8 @@ public class AccountRegisterCommand : BaseCommand
             return ExitCodes.INTERACTION_NEEDED;
         }
 
-        var identifier = auth.Account.HomeAccountId?.Identifier ?? "live#john.doe@outlook.com";
+        var uniqueName = GetRequiredClaim(auth.ClaimsPrincipal.Claims.ToList(), "unique_name", "upn", "preferred_username");
+        var identifier = uniqueName ?? "live#john.doe@outlook.com";
 
         var organizationName = Console.Input(new InputOptions<string>
         {
@@ -83,5 +88,19 @@ public class AccountRegisterCommand : BaseCommand
             },
             _fileSystem);
         return ExitCodes.SUCCESS;
+    }
+
+    private static string? GetRequiredClaim(IReadOnlyCollection<Claim> claims, params string[] claimTypes)
+    {
+        foreach (var claimType in claimTypes)
+        {
+            var uniqueNameClaim = claims.FirstOrDefault(c => c.Type == claimType);
+            if (uniqueNameClaim is not null)
+            {
+                return uniqueNameClaim.Value;
+            }
+        }
+
+        return null;
     }
 }

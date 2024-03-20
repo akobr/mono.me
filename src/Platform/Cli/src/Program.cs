@@ -70,7 +70,7 @@ public class Program
                 Console.WriteLine($"    {_loggingOptions.GetTodayLogFullPath()}", Color.DarkGray);
             }
 
-            await Task.Run(() => LogWithSentry(() => _logger.LogError(exception, "Unhandled exception occurred at input: {args}", new object[] { args })));
+            await Task.Run(() => LogWithSentry(() => _logger?.LogError(exception, "Unhandled exception occurred at input: {args}", new object[] { args })));
             return ExitCodes.ERROR_CRASH;
         }
     }

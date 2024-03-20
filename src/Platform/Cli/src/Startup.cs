@@ -1,3 +1,4 @@
+using System;
 using System.IO.Abstractions;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
@@ -50,7 +51,18 @@ namespace _42.Platform.Cli
             var authService = new AuthenticationService(new FileSystem(), new OptionsWrapper<AuthenticationOptions>(authOptions!));
             GlobalConfiguration.Instance = new DynamicConfiguration
             {
-                AccessTokenFactory = () => authService.GetAuthenticationAsync().Result!.AccessToken,
+                AccessTokenFactory = () =>
+                {
+                    try
+                    {
+                        var authResult = authService.GetAuthenticationAsync().GetAwaiter().GetResult();
+                        return authResult?.AccessToken ?? string.Empty;
+                    }
+                    catch (Exception)
+                    {
+                        return string.Empty;
+                    }
+                },
                 BasePath = generalOptions!.BaseUrl,
                 UserAgent = $"{generalOptions.UserAgent}/{ThisAssembly.AssemblyInformationalVersion} ({System.Environment.OSVersion.Platform:G}; {System.Environment.OSVersion.VersionString})",
             };

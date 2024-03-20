@@ -46,7 +46,7 @@ public class AccessPointRevokeCommand : BaseCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
 
         if (accountResponse.StatusCode is not HttpStatusCode.OK)
         {
