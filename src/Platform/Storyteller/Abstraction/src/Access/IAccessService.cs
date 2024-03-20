@@ -31,5 +31,5 @@ public interface IAccessService
 
     Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id);
 
-    Task<bool> DeleteMachineAccessAsync(string organization, string project, string id);
+    Task<bool> DeleteMachineAccessAsync(string organization, string project, string authId);
 }

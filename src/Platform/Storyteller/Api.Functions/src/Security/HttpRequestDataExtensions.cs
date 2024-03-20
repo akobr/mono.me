@@ -49,7 +49,7 @@ public static class HttpRequestDataExtensions
         var principal = handler.ValidateAccessToken(rawToken);
         claims = principal.Claims.ToList();
 #else
-        var token = handler.ReadJwtToken(authorizationHeaderValue.Split(' ').Last());
+        var token = handler.ReadJwtToken(rawToken);
         claims = token.Claims.ToList();
 #endif
 
@@ -64,13 +64,14 @@ public static class HttpRequestDataExtensions
 #endif
         var claims = @this.GetClaims();
         var allScopes = claims
-            .Where(c => c.Type is "scp" or "roles" || c.Type.EndsWith("/scope"))
+            .Where(c => c.Type is "scp" or "roles" or ClaimTypes.Role || c.Type.EndsWith("/scope"))
             .SelectMany(c => c.Value.Split(' '))
             .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
             .ToHashSet();
 
         if (scopes.All(scope => !allScopes.Contains(scope)))
         {
+            // TODO: [P2] remove details from the exception message
             var allInfo = new StringBuilder();
             allInfo.AppendLine($"all available scopes: {string.Join(", ", allScopes)}");
             allInfo.AppendLine($"all claims: {string.Join("; ", claims.Select(c => $"{c.Type}={c.Value}"))}");
@@ -149,8 +150,8 @@ public static class HttpRequestDataExtensions
 
     private static ClaimsPrincipal ValidateAccessToken(this ISecurityTokenValidator @this, string accessToken)
     {
-        var tenantId = Environment.GetEnvironmentVariable("OpenApiAuthTenantId");
-        var clientId = Environment.GetEnvironmentVariable("OpenApiAuthClientId");
+        var tenantId = Environment.GetEnvironmentVariable("Auth:TenantId");
+        var clientId = Environment.GetEnvironmentVariable("Auth:ClientId");
         var audience = $"api://{clientId}";
         var authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
 

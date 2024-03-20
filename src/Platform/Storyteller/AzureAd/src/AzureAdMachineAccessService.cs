@@ -12,6 +12,8 @@ namespace _42.Platform.Storyteller.AzureAd;
 // TODO: [P2] add support of certificate for better security
 public class AzureAdMachineAccessService : IMachineAccessService
 {
+    private const int DefaultPasswordExpiracyInYears = 1000;
+
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
         var application = new Application
@@ -20,83 +22,99 @@ public class AzureAdMachineAccessService : IMachineAccessService
             DisplayName = $"42.sform.{model.Organization}.{model.Project}.{Guid.NewGuid():N}",
             SignInAudience = "AzureADMyOrg",
             Tags = new List<string> { "42", "sform", "machine" },
-            AdditionalData =
-            {
-                ["sform:organization"] = model.Organization,
-                ["sform:project"] = model.Project,
-                ["sform:scope"] = $"{model.Scope:G}",
-            },
-            PasswordCredentials = new List<PasswordCredential>
-            {
-                new()
-                {
-                    StartDateTime = DateTimeOffset.UtcNow,
-                    DisplayName = "Default secret, never expires",
-                    AdditionalData =
-                    {
-                        ["sform:isGenerated"] = true,
-                    },
-                },
-            },
+            Notes = $"organization={model.Organization}|project={model.Project}|scope={model.Scope:G}",
         };
 
         if (model.AnnotationKey is not null)
         {
-            application.AdditionalData["sform:annotation"] = model.AnnotationKey;
+            application.Notes += $"|annotation={model.AnnotationKey}";
         }
 
-        // TODO: [P2] Make support for all roles
+        var clientId = Environment.GetEnvironmentVariable("Auth:ClientId");
+
+        // TODO: [P2] Make support for all roles and make it configurable in easier way
         switch (model.Scope)
         {
             case MachineAccessScope.DefaultReadWrite:
             case MachineAccessScope.AnnotationReadWrite:
             case MachineAccessScope.ConfigurationReadWrite:
+            {
+                var roleId = Environment.GetEnvironmentVariable("Auth:AppRoles:DefaultReadWrite")
+                             ?? throw new InvalidOperationException("Missing Auth:AppRoles:DefaultReadWrite environment variable.");
+
                 application.RequiredResourceAccess = new List<RequiredResourceAccess>
                 {
                     new()
                     {
-                        ResourceAppId = "7f37b203-3599-4c73-9796-39d96883198c",
+                        ResourceAppId = clientId,
                         ResourceAccess = new List<ResourceAccess>
                         {
-                            new() { Id = new Guid("628499e7-e732-4c9e-927b-107395d67e2e"), Type = "Role" },
+                            new() { Id = new Guid(roleId), Type = "Role" },
                         },
                     },
                 };
                 break;
+            }
 
             // case MachineAccessScope.DefaultRead:
             // case MachineAccessScope.AnnotationRead:
             // case MachineAccessScope.ConfigurationRead:
             default:
+            {
+                var roleId = Environment.GetEnvironmentVariable("Auth:AppRoles:DefaultRead")
+                             ?? throw new InvalidOperationException("Missing Auth:AppRoles:DefaultReadWrite environment variable.");
+
                 application.RequiredResourceAccess = new List<RequiredResourceAccess>
                 {
                     new()
                     {
-                        ResourceAppId = "7f37b203-3599-4c73-9796-39d96883198c",
+                        ResourceAppId = clientId,
                         ResourceAccess = new List<ResourceAccess>
                         {
-                            new() { Id = new Guid("659db1ff-e899-4dde-880e-028912428fc2"), Type = "Role" },
+                            new() { Id = new Guid(roleId), Type = "Role" },
                         },
                     },
                 };
                 break;
+            }
         }
 
         // Create a new instance of the ApplicationClient class using the client secret credential.
-        var client = new GraphServiceClient(new DefaultAzureCredential());
+        // TODO: [P1] pass correct tenant id
+        var credentials = new DefaultAzureCredential(new DefaultAzureCredentialOptions { TenantId = "8ddd03c1-fe1f-48c7-a7dc-26d22dd42310" });
+        var client = new GraphServiceClient(credentials);
         var createdApplication = await client.Applications.PostAsync(application);
 
         if (createdApplication?.AppId is null
-            || createdApplication.PasswordCredentials is null
-            || createdApplication.PasswordCredentials.Count < 1)
+            || createdApplication.Id is null)
+        {
+            throw new InvalidOperationException("The machine registration in Azure AD failed.");
+        }
+
+        var appId = createdApplication.AppId!;
+        var objectId = createdApplication.Id!;
+
+        var createdSecret = await client.Applications[objectId].AddPassword.PostAsync(
+            new AddPasswordPostRequestBody
+            {
+                PasswordCredential = new PasswordCredential
+                {
+                    StartDateTime = DateTimeOffset.UtcNow,
+                    EndDateTime = DateTimeOffset.UtcNow.AddYears(DefaultPasswordExpiracyInYears),
+                    DisplayName = "Default secret, never expires. (42.sform.generated)",
+                },
+            });
+
+        if (createdSecret?.SecretText is null)
         {
             throw new InvalidOperationException("The machine registration in Azure AD failed.");
         }
 
         return new MachineAccess
         {
-            Id = createdApplication.AppId,
-            AccessKey = createdApplication.PasswordCredentials.First().SecretText,
+            Id = objectId,
+            AuthId = appId,
+            AccessKey = createdSecret.SecretText,
             PartitionKey = $"{model.Project}.access",
             AnnotationKey = model.AnnotationKey,
             Scope = model.Scope <= MachineAccessScope.ConfigurationRead
@@ -105,12 +123,12 @@ public class AzureAdMachineAccessService : IMachineAccessService
         };
     }
 
-    public async Task<string?> ResetMachineAccessAsync(string appId)
+    public async Task<string?> ResetMachineAccessAsync(string objectId)
     {
         // Create a new instance of the ApplicationClient class using the client secret credential.
         var client = new GraphServiceClient(new DefaultAzureCredential());
 
-        var application = await client.Applications[appId].GetAsync();
+        var application = await client.Applications[objectId].GetAsync();
 
         if (application is null)
         {
@@ -118,31 +136,31 @@ public class AzureAdMachineAccessService : IMachineAccessService
         }
 
         foreach (var secret in (application.PasswordCredentials ?? Enumerable.Empty<PasswordCredential>())
-                     .Where(pc => pc.AdditionalData.ContainsKey("sform:isGenerated")))
+                     .Where(pc => (pc.DisplayName ?? string.Empty).Contains("42.sform.generated", StringComparison.OrdinalIgnoreCase)))
         {
-            await client.Applications[appId].RemovePassword
+            await client.Applications[objectId].RemovePassword
                 .PostAsync(new RemovePasswordPostRequestBody { KeyId = secret.KeyId });
         }
 
-        var createdSecret = await client.Applications[appId].AddPassword.PostAsync(
+        var createdSecret = await client.Applications[objectId].AddPassword.PostAsync(
             new AddPasswordPostRequestBody
             {
                 PasswordCredential = new PasswordCredential
                 {
                     StartDateTime = DateTimeOffset.UtcNow,
-                    DisplayName = "Default secret, never expires",
-                    AdditionalData = { ["sform:isGenerated"] = true, },
+                    EndDateTime = DateTimeOffset.UtcNow.AddYears(DefaultPasswordExpiracyInYears),
+                    DisplayName = "Default secret, never expires. (42.sform.generated)",
                 },
             });
 
         return createdSecret?.SecretText;
     }
 
-    public async Task<bool> DeleteMachineAccessAsync(string appId)
+    public async Task<bool> DeleteMachineAccessAsync(string objectId)
     {
         // Create a new instance of the ApplicationClient class using the client secret credential.
         var client = new GraphServiceClient(new DefaultAzureCredential());
-        await client.Applications[appId].DeleteAsync();
+        await client.Applications[objectId].DeleteAsync();
         return true;
     }
 }

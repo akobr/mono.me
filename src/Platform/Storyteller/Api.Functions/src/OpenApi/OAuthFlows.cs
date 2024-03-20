@@ -11,8 +11,8 @@ public class OAuthFlows : OpenApiOAuthSecurityFlows
 
     public OAuthFlows()
     {
-        var tenantId = Environment.GetEnvironmentVariable("OpenApiAuthTenantId");
-        var clientId = Environment.GetEnvironmentVariable("OpenApiAuthClientId");
+        var tenantId = Environment.GetEnvironmentVariable("Auth:TenantId");
+        var clientId = Environment.GetEnvironmentVariable("Auth:ClientId");
 
         Implicit = new OpenApiOAuthFlow
         {

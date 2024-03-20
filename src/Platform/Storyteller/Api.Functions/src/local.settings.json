@@ -4,8 +4,10 @@
     "DOTNET_ENVIRONMENT": "Development",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "OpenApiAuthTenantId": "f2b1a691-0cf0-47d2-9b2c-b13cb7b6467e",
-    "OpenApiAuthClientId": "7f37b203-3599-4c73-9796-39d96883198c",
+    "Auth:TenantId": "common",
+    "Auth:ClientId": "303a7632-ecfd-4eb7-af9b-be2043eaf25d",
+    "Auth:AppRoles:DefaultRead": "008029ec-407f-48b2-8618-f38b8e03eebf",
+    "Auth:AppRoles:DefaultReadWrite": "6eb2cfb3-a936-4077-8a58-620896871d32",
     "CosmosDb:Connection": "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==",
     "CosmosDb:ShouldAcceptAnyCertificate": true
   },
