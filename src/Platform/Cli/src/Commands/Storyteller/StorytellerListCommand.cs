@@ -123,6 +123,11 @@ public class StorytellerListCommand : BaseContextCommand
 
         Console.WriteHeader("Subjects");
 
+        if (response.Annotations.Count < 1)
+        {
+            Console.WriteLine("No subject exists yet.".ThemedLowlight(Console.Theme));
+        }
+
         foreach (var annotation in response.Annotations)
         {
             Console.WriteLine($"- {annotation.AnnotationKey}");
@@ -148,6 +153,11 @@ public class StorytellerListCommand : BaseContextCommand
             ContinuationToken);
 
         Console.WriteHeader("Responsibilities");
+
+        if (response.Annotations.Count < 1)
+        {
+            Console.WriteLine("No responsibility exists yet.".ThemedLowlight(Console.Theme));
+        }
 
         foreach (var annotation in response.Annotations)
         {
@@ -176,6 +186,11 @@ public class StorytellerListCommand : BaseContextCommand
 
         Console.WriteHeader("Usages");
 
+        if (response.Annotations.Count < 1)
+        {
+            Console.WriteLine("No usage exists yet.".ThemedLowlight(Console.Theme));
+        }
+
         foreach (var annotation in response.Annotations)
         {
             Console.WriteLine($"- {annotation.AnnotationKey}");
@@ -202,6 +217,11 @@ public class StorytellerListCommand : BaseContextCommand
             continuationToken: ContinuationToken);
 
         Console.WriteHeader("Contexts");
+
+        if (response.Annotations.Count < 1)
+        {
+            Console.WriteLine("No context exists yet.".ThemedLowlight(Console.Theme));
+        }
 
         foreach (var annotation in response.Annotations)
         {
@@ -231,6 +251,11 @@ public class StorytellerListCommand : BaseContextCommand
 
         Console.WriteHeader("Executions");
 
+        if (response.Annotations.Count < 1)
+        {
+            Console.WriteLine("No execution exists yet.".ThemedLowlight(Console.Theme));
+        }
+
         foreach (var annotation in response.Annotations)
         {
             Console.WriteLine($"- {annotation.AnnotationKey}");
@@ -258,6 +283,11 @@ public class StorytellerListCommand : BaseContextCommand
 
         Console.WriteHeader("All descendants");
 
+        if (response.Annotations.Count < 1)
+        {
+            Console.WriteLine("No descendant exists yet.".ThemedLowlight(Console.Theme));
+        }
+
         foreach (var annotation in response.Annotations)
         {
             Console.WriteLine($"- {annotation.AnnotationKey}");
@@ -275,6 +305,11 @@ public class StorytellerListCommand : BaseContextCommand
     {
         var response = await _annotationsApi.GetAnnotationsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName);
         Console.WriteHeader("Annotations");
+
+        if (response.Annotations.Count < 1)
+        {
+            Console.WriteLine("No annotation exists yet.".ThemedLowlight(Console.Theme));
+        }
 
         foreach (var annotation in response.Annotations)
         {
@@ -305,7 +340,7 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderResponsibilityTreeAsync()
     {
-        var responsibilitiesResponse = await _annotationsApi.GetResponsibilitiesAsync(
+        var response = await _annotationsApi.GetResponsibilitiesAsync(
             Context.OrganizationName,
             Context.ProjectName,
             Context.ViewName,
@@ -314,7 +349,14 @@ public class StorytellerListCommand : BaseContextCommand
 
         var root = new Composition("Tree of responsibilities");
 
-        foreach (var responsibility in responsibilitiesResponse.Annotations)
+        if (response.Annotations.Count < 1)
+        {
+            root.Children.Add(new Composition(new ConsoleOutputThemedText(
+                "No responsibility exists yet.",
+                t => t.LowlightColor)));
+        }
+
+        foreach (var responsibility in response.Annotations)
         {
             var mapOfSubjects = new Dictionary<string, Composition>();
 
@@ -359,17 +401,17 @@ public class StorytellerListCommand : BaseContextCommand
 
         Console.WriteTree(root, node => node);
 
-        if (!string.IsNullOrWhiteSpace(responsibilitiesResponse.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More responsibilities available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
-            Console.WriteLine($"  {responsibilitiesResponse.ContinuationToken}");
+            Console.WriteLine($"  {response.ContinuationToken}");
         }
     }
 
     private async Task RenderSubjectTreeAsync()
     {
-        var subjectsResponse = await _annotationsApi.GetSubjectsAsync(
+        var response = await _annotationsApi.GetSubjectsAsync(
             Context.OrganizationName,
             Context.ProjectName,
             Context.ViewName,
@@ -378,7 +420,14 @@ public class StorytellerListCommand : BaseContextCommand
 
         var root = new Composition("Tree of subjects");
 
-        foreach (var subject in subjectsResponse.Annotations)
+        if (response.Annotations.Count < 1)
+        {
+            root.Children.Add(new Composition(new ConsoleOutputThemedText(
+                "No subject exists yet.",
+                t => t.LowlightColor)));
+        }
+
+        foreach (var subject in response.Annotations)
         {
             var mapOfContexts = new Dictionary<string, Composition>();
             var subjectNode = new Composition(new ConsoleOutputComposition(
@@ -416,11 +465,11 @@ public class StorytellerListCommand : BaseContextCommand
 
         Console.WriteTree(root, node => node);
 
-        if (!string.IsNullOrWhiteSpace(subjectsResponse.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More subjects available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
-            Console.WriteLine($"  {subjectsResponse.ContinuationToken}");
+            Console.WriteLine($"  {response.ContinuationToken}");
         }
     }
 }
