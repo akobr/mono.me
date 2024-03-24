@@ -8,6 +8,7 @@ using _42.Platform.Cli.Commands.AccessPoints;
 using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Sdk.Api;
+using _42.Platform.Sdk.Client;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Microsoft.Identity.Client;
@@ -18,7 +19,8 @@ namespace _42.Platform.Cli.Commands.Account;
     typeof(AccountRegisterCommand),
     typeof(AccountSetCommand),
     typeof(AccessPointListCommand),
-    typeof(MachineListCommand))]
+    typeof(MachineListCommand),
+    typeof(AccountLogoutCommand))]
 
 [Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage your account and access to 2S platform services.")]
 public class AccountCommand : BaseCommand
@@ -44,7 +46,13 @@ public class AccountCommand : BaseCommand
         try
         {
             var auth = await _authentication.GetAuthenticationAsync();
-            Console.WriteImportant($"You are already logged in as {auth?.Account.Username}");
+
+            if (auth is null)
+            {
+                throw new MsalUiRequiredException("NoAccount", "No account is logged in this CLI instance.");
+            }
+
+            Console.WriteImportant($"You are already logged in as {auth.Account.Username}");
         }
         catch (MsalUiRequiredException)
         {
@@ -56,6 +64,7 @@ public class AccountCommand : BaseCommand
             }
         }
 
+        _accessApi.Configuration = GlobalConfiguration.Instance;
         var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
 
         if (accountResponse.StatusCode is HttpStatusCode.NotFound)
