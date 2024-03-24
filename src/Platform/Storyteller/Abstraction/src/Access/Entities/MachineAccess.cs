@@ -1,3 +1,4 @@
+
 namespace _42.Platform.Storyteller.Access.Entities;
 
 public record class MachineAccess
@@ -6,7 +7,7 @@ public record class MachineAccess
 
     public required string Id { get; init; }
 
-    public required string AuthId { get; init; }
+    public required string ObjectId { get; init; }
 
     public required string AccessKey { get; init; }
 

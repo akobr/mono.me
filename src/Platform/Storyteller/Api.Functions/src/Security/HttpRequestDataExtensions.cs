@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -11,6 +12,8 @@ namespace _42.Platform.Storyteller.Api.Security;
 
 public static class HttpRequestDataExtensions
 {
+    private static readonly string ClientId = Environment.GetEnvironmentVariable("Auth:ClientId");
+
     public static IReadOnlyList<Claim> GetClaims(this HttpRequestData @this)
     {
         @this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.CachedClaims, out var claimMap);
@@ -83,8 +86,20 @@ public static class HttpRequestDataExtensions
 
     public static async Task CheckAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole = AccountRole.Reader)
     {
-        if (@this.IsApplicationIdentity())
+        if (@this.TryGetApplicationIdentity(out var appId))
         {
+            var segments = accessPointKey.Split('.', StringSplitOptions.None);
+
+            if (segments.Length < 2)
+            {
+                throw new SecurityTokenException("An application can never access an organization.");
+            }
+
+            if (!await accessService.VerifyAccessForMachineAsync(segments[0], segments[1], appId))
+            {
+                throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
+            }
+
             return;
         }
 
@@ -130,6 +145,16 @@ public static class HttpRequestDataExtensions
     {
         // TODO: [P1] find how to best detect application identity
         return @this.GetClaims().Any(c => c.Type == "appid");
+    }
+
+    public static bool TryGetApplicationIdentity(this HttpRequestData @this, [MaybeNullWhen(false)]out string appId)
+    {
+        var claims = @this.GetClaims();
+        var appClaim = claims.FirstOrDefault(c => c.Type == "appid");
+        appId = appClaim?.Value;
+
+        return appId is not null
+               && !string.Equals(appId, ClientId, StringComparison.OrdinalIgnoreCase);
     }
 
     public static string GetRequiredClaim(this HttpRequestData @this, params string[] claimTypes)

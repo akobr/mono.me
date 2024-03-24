@@ -112,8 +112,8 @@ public class AzureAdMachineAccessService : IMachineAccessService
 
         return new MachineAccess
         {
-            Id = objectId,
-            AuthId = appId,
+            Id = appId,
+            ObjectId = objectId,
             AccessKey = createdSecret.SecretText,
             PartitionKey = $"{model.Project}.access",
             AnnotationKey = model.AnnotationKey,

@@ -7,7 +7,6 @@ using _42.Platform.Storyteller.Access;
 using _42.Platform.Storyteller.Access.Entities;
 using _42.Platform.Storyteller.Access.Models;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Cosmos.Linq;
 using Permission = _42.Platform.Storyteller.Access.Models.Permission;
 
 namespace _42.Platform.Storyteller;
@@ -81,9 +80,7 @@ public class CosmosAccessService : IAccessService
             return AccountRole.None;
         }
 
-        return account.AccessMap.TryGetValue(accessPointKey, out var role)
-            ? role
-            : AccountRole.None;
+        return account.AccessMap.GetValueOrDefault(accessPointKey, AccountRole.None);
     }
 
     public async Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountKey)
@@ -326,32 +323,22 @@ public class CosmosAccessService : IAccessService
         return machineAccess;
     }
 
-    public async Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string authId)
+    public async Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = new PartitionKey($"{project}.access");
-        var queryable = repository.Container.GetItemLinqQueryable<MachineAccess>(
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey($"{project}.access") });
-        var iterator = queryable
-            .Where(access => access.AuthId == authId)
-            .ToFeedIterator();
+        var machineAccess = await repository.Container.TryReadItem<MachineAccess>(appId, partitionKey);
 
-        if (!iterator.HasMoreResults)
-        {
-            throw new InvalidOperationException($"The machine access {authId} has not been found.");
-        }
-
-        var machineAccess = (await iterator.ReadNextAsync()).FirstOrDefault();
         if (machineAccess is null)
         {
-            throw new InvalidOperationException($"The machine access {authId} has not been found.");
+            throw new InvalidOperationException($"The machine access {appId} has not been found.");
         }
 
         var accessKey = await _machineAccessService.ResetMachineAccessAsync(machineAccess.Id);
 
         if (accessKey is null)
         {
-            throw new InvalidOperationException($"The machine access {authId} reset failed.");
+            throw new InvalidOperationException($"The machine access {appId} reset failed.");
         }
 
         machineAccess = machineAccess with { AccessKey = $"{accessKey[..3]}***" };
@@ -360,35 +347,39 @@ public class CosmosAccessService : IAccessService
         return machineAccess;
     }
 
-    public async Task<bool> DeleteMachineAccessAsync(string organization, string project, string authId)
+    public async Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var queryable = repository.Container.GetItemLinqQueryable<MachineAccess>(
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey($"{project}.access") });
-        var iterator = queryable
-            .Where(access => access.AuthId == authId)
-            .ToFeedIterator();
+        var partitionKey = new PartitionKey($"{project}.access");
+        var machineAccess = await repository.Container.TryReadItem<MachineAccess>(appId, partitionKey);
 
-        if (!iterator.HasMoreResults)
-        {
-            return false;
-        }
-
-        var machineAccess = (await iterator.ReadNextAsync()).FirstOrDefault();
         if (machineAccess is null)
         {
             return false;
         }
 
-        var response = await repository.Container.DeleteItemAsync<MachineAccess>(
-            machineAccess.Id,
-            new PartitionKey($"{project}.access"));
+        var response = await repository.Container.DeleteItemAsync<MachineAccess>(appId, partitionKey);
 
         if (response.StatusCode != HttpStatusCode.NotFound)
         {
-            await _machineAccessService.DeleteMachineAccessAsync(machineAccess.Id);
+            await _machineAccessService.DeleteMachineAccessAsync(machineAccess.ObjectId);
         }
 
         return response.StatusCode != HttpStatusCode.NotFound;
+    }
+
+    public async Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId)
+    {
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var response = await repository.Container.ReadContainerStreamAsync();
+
+        if (response.StatusCode is HttpStatusCode.NotFound
+            || response.Content is null)
+        {
+            return false;
+        }
+
+        var machineAccess = await repository.Container.TryReadItem<MachineAccess>(appId, new PartitionKey($"{project}.access"));
+        return machineAccess is not null;
     }
 }
