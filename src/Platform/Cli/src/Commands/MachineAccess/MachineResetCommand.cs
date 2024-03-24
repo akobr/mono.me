@@ -38,7 +38,7 @@ public class MachineResetCommand : BaseContextCommand
 
         Console.WriteJson(machine);
         Console.WriteLine();
-        Console.WriteImportant("Please copy the access key (secret), it is not stored anywhere.");
+        Console.WriteImportant("Make sure to copy the access key (secret), it is not stored anywhere.");
         return ExitCodes.SUCCESS;
     }
 }
