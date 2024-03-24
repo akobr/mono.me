@@ -43,11 +43,25 @@ public class AuthenticationService : IAuthenticationService
     {
         var pca = await _publicClientApp;
         var accounts = await pca.GetAccountsAsync();
+        var account = accounts.FirstOrDefault();
 
-        return await pca.AcquireTokenSilent(
-                _scopes,
-                accounts.FirstOrDefault())
-            .ExecuteAsync();
+        return account is null
+            ? null
+            : await pca.AcquireTokenSilent(_scopes, account).ExecuteAsync();
+    }
+
+    public async Task ClearAuthenticationAsync()
+    {
+        var pca = await _publicClientApp;
+        var accounts = await pca.GetAccountsAsync();
+        var account = accounts.FirstOrDefault();
+
+        if (account is null)
+        {
+            return;
+        }
+
+        await pca.RemoveAsync(account);
     }
 
     private async Task<IPublicClientApplication> BuildPublicClientApplication()
