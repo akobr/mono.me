@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -34,6 +35,13 @@ public class CosmosAnnotationService : IAnnotationService
     {
         var repository = _repositoryProvider.GetOrganizationContainer(fullKey.OrganizationName);
         using var response = await repository.Container.ReadItemStreamAsync(fullKey.GetCosmosItemKey(), fullKey.GetCosmosPartitionKey());
+
+        if (response.StatusCode == HttpStatusCode.NotFound
+            || response.Content is null)
+        {
+            return null;
+        }
+
         var jData = await JsonNode.ParseAsync(response.Content, JsonNodeOptions);
 
         if (jData is null
