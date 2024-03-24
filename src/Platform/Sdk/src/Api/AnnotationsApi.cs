@@ -791,8 +791,12 @@ namespace _42.Platform.Sdk.Api
         /// Initializes a new instance of the <see cref="AnnotationsApi"/> class.
         /// </summary>
         /// <returns></returns>
-        public AnnotationsApi() : this((string)null)
+        public AnnotationsApi()
         {
+            Configuration = GlobalConfiguration.Instance;
+            Client = new ApiClient(Configuration.BasePath);
+            AsynchronousClient = new ApiClient(Configuration.BasePath);
+            ExceptionFactory = Sdk.Client.Configuration.DefaultExceptionFactory;
         }
 
         /// <summary>
