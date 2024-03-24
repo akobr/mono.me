@@ -627,8 +627,12 @@ namespace _42.Platform.Sdk.Api
         /// Initializes a new instance of the <see cref="AccessApi"/> class.
         /// </summary>
         /// <returns></returns>
-        public AccessApi() : this((string)null)
+        public AccessApi()
         {
+            Configuration = GlobalConfiguration.Instance;
+            Client = new ApiClient(Configuration.BasePath);
+            AsynchronousClient = new ApiClient(Configuration.BasePath);
+            ExceptionFactory = Sdk.Client.Configuration.DefaultExceptionFactory;
         }
 
         /// <summary>

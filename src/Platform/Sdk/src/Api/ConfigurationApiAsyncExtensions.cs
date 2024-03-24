@@ -1,3 +1,4 @@
+using System;
 using System.Net;
 using System.Threading.Tasks;
 using _42.Platform.Sdk.Client;
@@ -17,6 +18,11 @@ public static class ConfigurationApiAsyncExtensions
             if (exception.ErrorCode == 404)
             {
                 return new ApiResponse<object>(HttpStatusCode.NotFound, null);
+            }
+
+            if (exception.ErrorCode == 401)
+            {
+                throw new UnauthorizedAccessException("Unauthorized access.", exception);
             }
 
             throw;
