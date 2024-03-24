@@ -57,7 +57,7 @@ public class AccountRegisterCommand : BaseCommand
                 "sform login".ThemedHighlight(Console.Theme),
                 " first.");
 
-            return ExitCodes.INTERACTION_NEEDED;
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         var uniqueName = GetRequiredClaim(auth.ClaimsPrincipal.Claims.ToList(), "unique_name", "upn", "preferred_username");

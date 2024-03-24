@@ -54,7 +54,7 @@ public class AccessPointRevokeCommand : BaseCommand
                 "You account is not registered, to create a registration call ",
                 "sform account register ".ThemedHighlight(Console.Theme),
                 "command.");
-            return ExitCodes.INTERACTION_NEEDED;
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         var account = accountResponse.Data;
