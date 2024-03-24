@@ -29,7 +29,9 @@ public interface IAccessService
 
     Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model);
 
-    Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id);
+    Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId);
 
-    Task<bool> DeleteMachineAccessAsync(string organization, string project, string authId);
+    Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId);
+
+    Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId);
 }

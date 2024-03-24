@@ -2,10 +2,10 @@ namespace _42.Platform.Storyteller.Access;
 
 public enum MachineAccessScope
 {
-    DefaultRead = 0,
-    AnnotationRead,
+    AnnotationRead = 0,
     ConfigurationRead,
-    DefaultReadWrite,
+    DefaultRead,
     AnnotationReadWrite,
     ConfigurationReadWrite,
+    DefaultReadWrite,
 }
