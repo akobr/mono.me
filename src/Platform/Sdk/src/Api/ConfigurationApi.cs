@@ -29,7 +29,7 @@ namespace _42.Platform.Sdk.Api
     {
         #region Synchronous Operations
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -41,10 +41,10 @@ namespace _42.Platform.Sdk.Api
         void DeleteConfiguration(string organization, string project, string view, string key, int operationIndex = 0);
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -55,7 +55,7 @@ namespace _42.Platform.Sdk.Api
         /// <returns>ApiResponse of Object(void)</returns>
         ApiResponse<Object> DeleteConfigurationWithHttpInfo(string organization, string project, string view, string key, int operationIndex = 0);
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -67,10 +67,10 @@ namespace _42.Platform.Sdk.Api
         Object GetConfiguration(string organization, string project, string view, string key, int operationIndex = 0);
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -81,7 +81,7 @@ namespace _42.Platform.Sdk.Api
         /// <returns>ApiResponse of Object</returns>
         ApiResponse<Object> GetConfigurationWithHttpInfo(string organization, string project, string view, string key, int operationIndex = 0);
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -93,10 +93,10 @@ namespace _42.Platform.Sdk.Api
         Object GetResolvedConfiguration(string organization, string project, string view, string key, int operationIndex = 0);
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -107,7 +107,7 @@ namespace _42.Platform.Sdk.Api
         /// <returns>ApiResponse of Object</returns>
         ApiResponse<Object> GetResolvedConfigurationWithHttpInfo(string organization, string project, string view, string key, int operationIndex = 0);
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -120,10 +120,10 @@ namespace _42.Platform.Sdk.Api
         Object SetConfiguration(string organization, string project, string view, string key, Object? body = default(Object?), int operationIndex = 0);
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -144,10 +144,10 @@ namespace _42.Platform.Sdk.Api
     {
         #region Asynchronous Operations
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -160,10 +160,10 @@ namespace _42.Platform.Sdk.Api
         System.Threading.Tasks.Task DeleteConfigurationAsync(string organization, string project, string view, string key, int operationIndex = 0, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -175,10 +175,10 @@ namespace _42.Platform.Sdk.Api
         /// <returns>Task of ApiResponse</returns>
         System.Threading.Tasks.Task<ApiResponse<Object>> DeleteConfigurationWithHttpInfoAsync(string organization, string project, string view, string key, int operationIndex = 0, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -191,10 +191,10 @@ namespace _42.Platform.Sdk.Api
         System.Threading.Tasks.Task<Object> GetConfigurationAsync(string organization, string project, string view, string key, int operationIndex = 0, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -206,10 +206,10 @@ namespace _42.Platform.Sdk.Api
         /// <returns>Task of ApiResponse (Object)</returns>
         System.Threading.Tasks.Task<ApiResponse<Object>> GetConfigurationWithHttpInfoAsync(string organization, string project, string view, string key, int operationIndex = 0, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -222,10 +222,10 @@ namespace _42.Platform.Sdk.Api
         System.Threading.Tasks.Task<Object> GetResolvedConfigurationAsync(string organization, string project, string view, string key, int operationIndex = 0, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -237,10 +237,10 @@ namespace _42.Platform.Sdk.Api
         /// <returns>Task of ApiResponse (Object)</returns>
         System.Threading.Tasks.Task<ApiResponse<Object>> GetResolvedConfigurationWithHttpInfoAsync(string organization, string project, string view, string key, int operationIndex = 0, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -254,10 +254,10 @@ namespace _42.Platform.Sdk.Api
         System.Threading.Tasks.Task<Object> SetConfigurationAsync(string organization, string project, string view, string key, Object? body = default(Object?), int operationIndex = 0, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken));
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <remarks>
-        /// 
+        ///
         /// </remarks>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -291,8 +291,12 @@ namespace _42.Platform.Sdk.Api
         /// Initializes a new instance of the <see cref="ConfigurationApi"/> class.
         /// </summary>
         /// <returns></returns>
-        public ConfigurationApi() : this((string)null)
+        public ConfigurationApi()
         {
+            Configuration = GlobalConfiguration.Instance;
+            Client = new ApiClient(Configuration.BasePath);
+            AsynchronousClient = new ApiClient(Configuration.BasePath);
+            ExceptionFactory = Sdk.Client.Configuration.DefaultExceptionFactory;
         }
 
         /// <summary>
@@ -390,7 +394,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -405,7 +409,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -524,7 +528,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -540,7 +544,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -662,7 +666,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -678,7 +682,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -797,7 +801,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -814,7 +818,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -936,7 +940,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -952,7 +956,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -1071,7 +1075,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -1088,7 +1092,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -1210,7 +1214,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -1227,7 +1231,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -1349,7 +1353,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
@@ -1367,7 +1371,7 @@ namespace _42.Platform.Sdk.Api
         }
 
         /// <summary>
-        ///  
+        ///
         /// </summary>
         /// <exception cref="_42.Platform.Sdk.Client.ApiException">Thrown when fails to make API call</exception>
         /// <param name="organization">Target organization name.</param>
