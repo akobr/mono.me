@@ -44,7 +44,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
-        _logger.LogInformation("Get api/access/account call with accountKey: {accountKey}", accountKey);
+        _logger.LogWarning("Get api/access/account call with accountKey: {accountKey}", accountKey);
         var account = await _accessService.GetAccountAsync(accountKey);
 
         return account is null
@@ -68,7 +68,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
-        _logger.LogInformation("Post api/access/account call with accountKey: {accountKey}", accountKey);
+        _logger.LogWarning("Post api/access/account call with accountKey: {accountKey}", accountKey);
         var account = await _accessService.GetAccountAsync(accountKey);
 
         if (account is not null)
@@ -102,7 +102,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
-        _logger.LogInformation("Post api/access/points call with accountKey: {accountKey}", accountKey);
+        _logger.LogWarning("Post api/access/points call with accountKey: {accountKey}", accountKey);
         var points = await _accessService.GetAccessPointsAsync(accountKey);
         return new OkObjectResult(points);
     }
@@ -122,6 +122,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var pointKey = key.Trim().ToLowerInvariant();
+        // TODO: [P2] check if pointKey is valid and expected format
         await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
         var point = await _accessService.GetAccessPointAsync(pointKey);
         return new OkObjectResult(point);
