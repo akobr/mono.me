@@ -64,7 +64,7 @@ public class AccountCommand : BaseCommand
                 "You account is not registered, to create a registration call ",
                 "sform account register ".ThemedHighlight(Console.Theme),
                 "command.");
-            return ExitCodes.INTERACTION_NEEDED;
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         var account = accountResponse.Data;
@@ -77,7 +77,7 @@ public class AccountCommand : BaseCommand
                 "No default project is set, please call ",
                 "sform account set".ThemedHighlight(Console.Theme),
                 " command.");
-            return ExitCodes.INTERACTION_NEEDED;
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         var projectKey = $"{_accessDefault.OrganizationName}.{_accessDefault.ProjectName}";
@@ -111,7 +111,7 @@ public class AccountCommand : BaseCommand
                     //   If this occurs, an OperationCanceledException will be thrown (see catch below for more details).
                     Console.WriteHeader("Sign in");
                     Console.WriteLine(deviceCodeResult.Message);
-                    return Task.FromResult(ExitCodes.INTERACTION_NEEDED);
+                    return Task.FromResult(ExitCodes.WARNING_INTERACTION_NEEDED);
                 }).ExecuteAsync();
 
             Console.WriteImportant($"You have been logged in as {result.Account.Username}");
