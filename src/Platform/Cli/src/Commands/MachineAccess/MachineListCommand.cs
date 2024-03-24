@@ -40,7 +40,7 @@ public class MachineListCommand : BaseContextCommand
 
         Console.WriteTable(
             accesses,
-            machine => new[] { machine.AuthId, $"{machine.Scope:G}", machine.AccessKey, machine.AnnotationKey },
+            machine => new[] { machine.Id, $"{machine.Scope:G}", machine.AccessKey, machine.AnnotationKey },
             new[] { "Id", "Role", "Secret", "RestrictionTo" });
         return ExitCodes.SUCCESS;
     }
