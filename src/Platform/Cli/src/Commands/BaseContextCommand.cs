@@ -14,7 +14,7 @@ public abstract class BaseContextCommand : BaseCommand
         Context = context;
     }
 
-    [Option("-p|--projectKey", CommandOptionType.SingleValue, Description = "Explicitly targeted project.")]
+    [Option("-p|--projectKey", CommandOptionType.SingleValue, Description = "Explicitly targeted organization and project. Use full key in format: <organizationName>.<projectName>")]
     public string? ProjectKey { get; }
 
     [Option("-v|--view", CommandOptionType.SingleValue, Description = "Explicitly targeted view.")]
