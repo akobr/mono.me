@@ -68,6 +68,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountKey = request.GetIdentityUniqueName().ToNormalizedKey();
+        var accountId = request.GetIdentityUniqueId().Trim();
         _logger.LogWarning("Post api/access/account call with accountKey: {accountKey}", accountKey);
         var account = await _accessService.GetAccountAsync(accountKey);
 
@@ -81,6 +82,7 @@ public class AccessHttp
         {
             Key = accountKey,
             Name = accountName,
+            SystemId = accountId,
             Organization = accountModel.Organization,
             Project = accountModel.Project,
         };
