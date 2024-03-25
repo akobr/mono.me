@@ -72,6 +72,12 @@ public static class HttpRequestDataExtensions
             .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
             .ToHashSet();
 
+        // TODO: [P1] hot fix for un-approved admin consents in programmatically generated machine accesses (Azure app registrations)
+        if (allScopes.Count < 1 && @this.IsApplicationIdentity())
+        {
+            allScopes.Add("Default.Read");
+        }
+
         if (scopes.All(scope => !allScopes.Contains(scope)))
         {
             // TODO: [P2] remove details from the exception message
@@ -103,7 +109,7 @@ public static class HttpRequestDataExtensions
             return;
         }
 
-        var accountKey = @this.GetUniqueIdentityName().ToNormalizedKey();
+        var accountKey = @this.GetIdentityUniqueName().ToNormalizedKey();
         var accessRole = await accessService.GetAccountRoleAsync(accountKey, accessPointKey);
 
         if (accessRole < minimalRole)
@@ -131,9 +137,9 @@ public static class HttpRequestDataExtensions
         return CheckAccessToAsync(@this, accessService, $"{organization}.{project}", minimalRole);
     }
 
-    public static string GetUniqueIdentityName(this HttpRequestData @this)
+    public static string GetIdentityUniqueName(this HttpRequestData @this)
     {
-        return GetRequiredClaim(@this, "unique_name", ClaimTypes.Upn);
+        return GetRequiredClaim(@this, "unique_name", ClaimTypes.Upn, "preferred_username");
     }
 
     public static string GetIdentityName(this HttpRequestData @this)
@@ -141,20 +147,40 @@ public static class HttpRequestDataExtensions
         return GetRequiredClaim(@this, "name");
     }
 
+    public static string GetIdentityUniqueId(this HttpRequestData @this)
+    {
+        return GetRequiredClaim(@this, "sub");
+    }
+
     public static bool IsApplicationIdentity(this HttpRequestData @this)
     {
         // TODO: [P1] find how to best detect application identity
-        return @this.GetClaims().Any(c => c.Type == "appid");
+        var appId = @this.GetClaim("azp", "appid");
+        return appId is not null
+               && !string.Equals(appId, ClientId, StringComparison.OrdinalIgnoreCase);
     }
 
     public static bool TryGetApplicationIdentity(this HttpRequestData @this, [MaybeNullWhen(false)]out string appId)
     {
-        var claims = @this.GetClaims();
-        var appClaim = claims.FirstOrDefault(c => c.Type == "appid");
-        appId = appClaim?.Value;
-
+        appId = @this.GetClaim("azp", "appid");
         return appId is not null
                && !string.Equals(appId, ClientId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static string? GetClaim(this HttpRequestData @this, params string[] claimTypes)
+    {
+        var claims = @this.GetClaims();
+
+        foreach (var claimType in claimTypes)
+        {
+            var claim = claims.FirstOrDefault(c => c.Type == claimType);
+            if (claim is not null)
+            {
+                return claim.Value;
+            }
+        }
+
+        return null;
     }
 
     public static string GetRequiredClaim(this HttpRequestData @this, params string[] claimTypes)
@@ -163,10 +189,10 @@ public static class HttpRequestDataExtensions
 
         foreach (var claimType in claimTypes)
         {
-            var uniqueNameClaim = claims.FirstOrDefault(c => c.Type == claimType);
-            if (uniqueNameClaim is not null)
+            var claim = claims.FirstOrDefault(c => c.Type == claimType);
+            if (claim is not null)
             {
-                return uniqueNameClaim.Value;
+                return claim.Value;
             }
         }
 
