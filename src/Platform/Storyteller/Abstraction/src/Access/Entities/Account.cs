@@ -8,6 +8,8 @@ public record class Account
 
     public string Id => $"act.{Key}";
 
+    public required string SystemId { get; init; }
+
     public required string Key { get; init; }
 
     public required string Name { get; init; }

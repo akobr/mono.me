@@ -6,6 +6,8 @@ public record class AccountCreate
 
     public required string Key { get; init; }
 
+    public required string SystemId { get; init; }
+
     public required string Organization { get; init; }
 
     public required string Project { get; init; }

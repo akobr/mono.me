@@ -41,6 +41,7 @@ public class CosmosAccessService : IAccessService
     {
         var accountName = model.Name.Trim();
         var accountKey = model.Key.ToNormalizedKey();
+        var accountId = model.SystemId.Trim();
         var account = await GetAccountAsync(accountKey);
 
         if (account is not null)
@@ -59,6 +60,7 @@ public class CosmosAccessService : IAccessService
         {
             Key = accountKey,
             Name = accountName,
+            SystemId = accountId,
             AccessMap = new()
             {
                 { model.Organization, AccountRole.Owner },
