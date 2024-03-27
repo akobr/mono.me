@@ -12,6 +12,7 @@ namespace _42.Platform.Storyteller.Api.Security;
 
 public static class HttpRequestDataExtensions
 {
+    // TODO: [P2] make this configurable in better way
     private static readonly string ClientId = Environment.GetEnvironmentVariable("Auth:ClientId");
 
     public static IReadOnlyList<Claim> GetClaims(this HttpRequestData @this)
@@ -109,8 +110,8 @@ public static class HttpRequestDataExtensions
             return;
         }
 
-        var accountKey = @this.GetIdentityUniqueName().ToNormalizedKey();
-        var accessRole = await accessService.GetAccountRoleAsync(accountKey, accessPointKey);
+        var accountId = @this.GetIdentityUniqueId();
+        var accessRole = await accessService.GetAccountRoleAsync(accountId, accessPointKey);
 
         if (accessRole < minimalRole)
         {
@@ -139,17 +140,17 @@ public static class HttpRequestDataExtensions
 
     public static string GetIdentityUniqueName(this HttpRequestData @this)
     {
-        return GetRequiredClaim(@this, "unique_name", ClaimTypes.Upn, "preferred_username");
+        return GetRequiredClaim(@this, "preferred_username", "unique_name", ClaimTypes.Upn).Trim();
     }
 
     public static string GetIdentityName(this HttpRequestData @this)
     {
-        return GetRequiredClaim(@this, "name");
+        return GetRequiredClaim(@this, "name").Trim();
     }
 
     public static string GetIdentityUniqueId(this HttpRequestData @this)
     {
-        return GetRequiredClaim(@this, "sub");
+        return GetRequiredClaim(@this, "sub", ClaimTypes.NameIdentifier).Trim();
     }
 
     public static bool IsApplicationIdentity(this HttpRequestData @this)
@@ -222,7 +223,8 @@ public static class HttpRequestDataExtensions
             // Support Azure AD V1 and V2 endpoints.
             IssuerValidator = (issuer, _, _) =>
             {
-                if (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase))
+                if (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase)
+                    || issuer.StartsWith("https://login.microsoftonline.com/", StringComparison.OrdinalIgnoreCase))
                 {
                     return issuer;
                 }
@@ -232,8 +234,7 @@ public static class HttpRequestDataExtensions
             ConfigurationManager = configManager,
         };
 
-        SecurityToken securityToken;
-        var claimsPrincipal = @this.ValidateToken(accessToken, validationParameters, out securityToken);
+        var claimsPrincipal = @this.ValidateToken(accessToken, validationParameters, out _);
         return claimsPrincipal;
     }
 }
