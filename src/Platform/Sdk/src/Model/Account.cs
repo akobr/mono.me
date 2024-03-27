@@ -68,14 +68,14 @@ namespace _42.Platform.Sdk.Model
         /// </summary>
         /// <param name="partitionKey">partitionKey.</param>
         /// <param name="id">id.</param>
-        /// <param name="key">key.</param>
+        /// <param name="userName">userName.</param>
         /// <param name="name">name.</param>
         /// <param name="accessMap">accessMap.</param>
-        public Account(string partitionKey = default(string), string id = default(string), string key = default(string), string name = default(string), Dictionary<string, InnerEnum> accessMap = default(Dictionary<string, InnerEnum>))
+        public Account(string partitionKey = default(string), string id = default(string), string userName = default(string), string name = default(string), Dictionary<string, InnerEnum> accessMap = default(Dictionary<string, InnerEnum>))
         {
             this.PartitionKey = partitionKey;
             this.Id = id;
-            this.Key = key;
+            this.UserName = userName;
             this.Name = name;
             this.AccessMap = accessMap;
         }
@@ -93,10 +93,10 @@ namespace _42.Platform.Sdk.Model
         public string Id { get; set; }
 
         /// <summary>
-        /// Gets or Sets Key
+        /// Gets or Sets UserName
         /// </summary>
-        [DataMember(Name = "key", EmitDefaultValue = false)]
-        public string Key { get; set; }
+        [DataMember(Name = "userName", EmitDefaultValue = false)]
+        public string UserName { get; set; }
 
         /// <summary>
         /// Gets or Sets Name
@@ -120,7 +120,7 @@ namespace _42.Platform.Sdk.Model
             sb.Append("class Account {\n");
             sb.Append("  PartitionKey: ").Append(PartitionKey).Append("\n");
             sb.Append("  Id: ").Append(Id).Append("\n");
-            sb.Append("  Key: ").Append(Key).Append("\n");
+            sb.Append("  UserName: ").Append(UserName).Append("\n");
             sb.Append("  Name: ").Append(Name).Append("\n");
             sb.Append("  AccessMap: ").Append(AccessMap).Append("\n");
             sb.Append("}\n");

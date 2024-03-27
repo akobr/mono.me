@@ -43,8 +43,8 @@ public class AccountRegisterCommand : BaseCommand
         if (accountResponse.StatusCode is HttpStatusCode.OK)
         {
             Console.WriteImportant(
-                $"You are already registered as {accountResponse.Data.Name} ",
-                $"#{accountResponse.Data.Key}".ThemedLowlight(Console.Theme));
+                $"You are already registered as {accountResponse.Data.UserName} ",
+                $"#{accountResponse.Data.Id}".ThemedLowlight(Console.Theme));
             return ExitCodes.SUCCESS;
         }
 
@@ -77,8 +77,14 @@ public class AccountRegisterCommand : BaseCommand
 
         var projectKey = $"{organizationName}.{projectName}";
         var newAccount = await _accessApi.CreateAccountAsync(new AccountCreate(organization: organizationName, project: projectName));
-        Console.WriteImportant($"Account {newAccount.Name} has been created.");
-        Console.WriteLine("Default project set to ", projectKey.ThemedHighlight(Console.Theme), ".");
+        Console.WriteImportant($"Account {newAccount.UserName} ({newAccount.Name}) has been created.");
+        Console.WriteLine(
+            "Default project set to ",
+            projectKey.ThemedHighlight(Console.Theme),
+            " with ",
+            Platform.Storyteller.Constants.DefaultViewName.ThemedHighlight(Console.Theme),
+            " view.");
+
         AccountSetCommand.CreateAccessDefaultConfigFile(
             new AccessDefaultOptions
             {

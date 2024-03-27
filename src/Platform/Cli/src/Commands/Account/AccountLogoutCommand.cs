@@ -35,14 +35,19 @@ public class AccountLogoutCommand : BaseCommand
         }
 
         var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
+        await _authentication.ClearAuthenticationAsync();
+
         if (accountResponse.StatusCode is HttpStatusCode.OK)
         {
             Console.WriteImportant(
                 "You have been logged out from account: ",
                 accountResponse.Data.Name.ThemedHighlight(Console.Theme));
         }
+        else
+        {
+            Console.WriteImportant("You have been logged out.");
+        }
 
-        await _authentication.ClearAuthenticationAsync();
         return ExitCodes.SUCCESS;
     }
 }
