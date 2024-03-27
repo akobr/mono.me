@@ -7,13 +7,13 @@ namespace _42.Platform.Storyteller.Access;
 
 public interface IAccessService
 {
-    Task<Account?> GetAccountAsync(string key);
+    Task<Account?> GetAccountAsync(string id);
 
     Task<Account> CreateAccountAsync(AccountCreate model);
 
-    Task<AccountRole> GetAccountRoleAsync(string accountKey, string accessPointKey);
+    Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey);
 
-    Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountKey);
+    Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId);
 
     Task<AccessPoint?> GetAccessPointAsync(string key);
 
@@ -29,7 +29,9 @@ public interface IAccessService
 
     Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model);
 
-    Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string id);
+    Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId);
 
-    Task<bool> DeleteMachineAccessAsync(string organization, string project, string authId);
+    Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId);
+
+    Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId);
 }

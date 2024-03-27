@@ -7,7 +7,6 @@ using _42.Platform.Storyteller.Access;
 using _42.Platform.Storyteller.Access.Entities;
 using _42.Platform.Storyteller.Access.Models;
 using Microsoft.Azure.Cosmos;
-using Microsoft.Azure.Cosmos.Linq;
 using Permission = _42.Platform.Storyteller.Access.Models.Permission;
 
 namespace _42.Platform.Storyteller;
@@ -30,36 +29,37 @@ public class CosmosAccessService : IAccessService
         _containerFactory = containerFactory;
     }
 
-    public async Task<Account?> GetAccountAsync(string key)
+    public async Task<Account?> GetAccountAsync(string id)
     {
-        var accountId = $"act.{key}";
         var repository = _repositoryProvider.GetCore();
-        var account = await repository.Container.TryReadItem<Account>(accountId, new PartitionKey(MAIN_PARTITION_KEY));
+        var account = await repository.Container.TryReadItem<Account>(id, new PartitionKey(MAIN_PARTITION_KEY));
         return account;
     }
 
     public async Task<Account> CreateAccountAsync(AccountCreate model)
     {
-        var accountName = model.Name.Trim();
-        var accountKey = model.Key.ToNormalizedKey();
-        var account = await GetAccountAsync(accountKey);
+        var name = model.Name.Trim();
+        var userName = model.UserName.Trim();
+        var accountId = model.IdentityId.Trim();
+        var account = await GetAccountAsync(userName);
 
         if (account is not null)
         {
-            throw new InvalidOperationException($"The account '{accountKey}' already exists.");
+            throw new InvalidOperationException($"The account {userName}#{accountId}' already exists.");
         }
 
         var point = await CreateAccessPointAsync(new AccessPointCreate
         {
-            OwnerKey = accountKey,
+            OwnerId = accountId,
             Organization = model.Organization,
             Project = model.Project,
         });
 
         account = new Account
         {
-            Key = accountKey,
-            Name = accountName,
+            Id = accountId,
+            UserName = userName,
+            Name = name,
             AccessMap = new()
             {
                 { model.Organization, AccountRole.Owner },
@@ -72,27 +72,25 @@ public class CosmosAccessService : IAccessService
         return response.Resource;
     }
 
-    public async Task<AccountRole> GetAccountRoleAsync(string accountKey, string accessPointKey)
+    public async Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey)
     {
-        var account = await GetAccountAsync(accountKey);
+        var account = await GetAccountAsync(accountId);
 
         if (account is null)
         {
             return AccountRole.None;
         }
 
-        return account.AccessMap.TryGetValue(accessPointKey, out var role)
-            ? role
-            : AccountRole.None;
+        return account.AccessMap.GetValueOrDefault(accessPointKey, AccountRole.None);
     }
 
-    public async Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountKey)
+    public async Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId)
     {
-        var account = await GetAccountAsync(accountKey);
+        var account = await GetAccountAsync(accountId);
 
         if (account is null)
         {
-            throw new InvalidOperationException($"The owner '{accountKey}' doesn't exist.");
+            throw new InvalidOperationException($"The owner '{accountId}' doesn't exist.");
         }
 
         var accessPointIds = account.AccessMap
@@ -134,10 +132,10 @@ public class CosmosAccessService : IAccessService
         var organizationAccessPoint = await GetAccessPointAsync(model.Organization);
 
         if (organizationAccessPoint is not null
-            && (!organizationAccessPoint.AccessMap.TryGetValue(model.OwnerKey, out var role)
+            && (!organizationAccessPoint.AccessMap.TryGetValue(model.OwnerId, out var role)
             || role != AccountRole.Owner))
         {
-            throw new InvalidOperationException($"The account '{model.OwnerKey}' doesn't have owner rights to the organization.");
+            throw new InvalidOperationException($"The account '{model.OwnerId}' doesn't have owner rights to the organization.");
         }
 
         if (organizationAccessPoint is null)
@@ -147,7 +145,7 @@ public class CosmosAccessService : IAccessService
             organizationAccessPoint = new AccessPoint
             {
                 Key = model.Organization,
-                AccessMap = { { model.OwnerKey, AccountRole.Owner } },
+                AccessMap = new() { { model.OwnerId, AccountRole.Owner } },
             };
             await repository.Container.CreateItemAsync(organizationAccessPoint, partitionKey);
         }
@@ -163,11 +161,11 @@ public class CosmosAccessService : IAccessService
         accessPoint = new AccessPoint
         {
             Key = accessPointKey,
-            AccessMap = { { model.OwnerKey, AccountRole.Owner } },
+            AccessMap = new() { { model.OwnerId, AccountRole.Owner } },
         };
 
         var response = await repository.Container.CreateItemAsync(accessPoint, partitionKey);
-        var account = await GetAccountAsync(model.OwnerKey);
+        var account = await GetAccountAsync(model.OwnerId);
 
         if (account is not null)
         {
@@ -186,17 +184,17 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException("The no role can't be allowed.");
         }
 
-        var creator = await GetAccountAsync(model.CreatedByKey);
-        var account = await GetAccountAsync(model.AccountKey);
+        var creator = await GetAccountAsync(model.CreatedById);
+        var account = await GetAccountAsync(model.AccountId);
 
         if (creator is null)
         {
-            throw new InvalidOperationException($"The creator '{model.CreatedByKey}' doesn't exist.");
+            throw new InvalidOperationException($"The creator '{model.CreatedById}' doesn't exist.");
         }
 
         if (account is null)
         {
-            throw new InvalidOperationException($"The target account '{model.AccountKey}' doesn't exist.");
+            throw new InvalidOperationException($"The target account '{model.AccountId}' doesn't exist.");
         }
 
         if (!creator.AccessMap.TryGetValue(model.AccessPointKey, out var creatorRole))
@@ -207,7 +205,7 @@ public class CosmosAccessService : IAccessService
         if (creatorRole < AccountRole.Administrator
             || (model.Role == AccountRole.Owner && creatorRole != AccountRole.Owner))
         {
-            throw new InvalidOperationException($"The creator '{model.CreatedByKey}' doesn't have privileges to grant this access permission.");
+            throw new InvalidOperationException($"The creator '{model.CreatedById}' doesn't have privileges to grant this access permission.");
         }
 
         var accessPoint = await GetAccessPointAsync(model.AccessPointKey);
@@ -217,7 +215,7 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The access point '{model.AccessPointKey}' doesn't exist.");
         }
 
-        if (accessPoint.AccessMap.TryGetValue(model.AccountKey, out var accountRole)
+        if (accessPoint.AccessMap.TryGetValue(model.AccountId, out var accountRole)
             && accountRole >= model.Role)
         {
             return false;
@@ -225,7 +223,7 @@ public class CosmosAccessService : IAccessService
 
         var repository = _repositoryProvider.GetCore();
         var mainPartitionKey = new PartitionKey(MAIN_PARTITION_KEY);
-        accessPoint.AccessMap[model.AccountKey] = model.Role;
+        accessPoint.AccessMap[model.AccountId] = model.Role;
         await repository.Container.UpsertItemAsync(accessPoint, mainPartitionKey);
         account.AccessMap[model.AccessPointKey] = model.Role;
         await repository.Container.UpsertItemAsync(account, mainPartitionKey);
@@ -234,17 +232,17 @@ public class CosmosAccessService : IAccessService
 
     public async Task<bool> RevokePermissionAsync(Permission model)
     {
-        var creator = await GetAccountAsync(model.CreatedByKey);
-        var account = await GetAccountAsync(model.AccountKey);
+        var creator = await GetAccountAsync(model.CreatedById);
+        var account = await GetAccountAsync(model.AccountId);
 
         if (creator is null)
         {
-            throw new InvalidOperationException($"The creator '{model.CreatedByKey}' doesn't exist.");
+            throw new InvalidOperationException($"The creator '{model.CreatedById}' doesn't exist.");
         }
 
         if (account is null)
         {
-            throw new InvalidOperationException($"The target account '{model.AccountKey}' doesn't exist.");
+            throw new InvalidOperationException($"The target account '{model.AccountId}' doesn't exist.");
         }
 
         if (creator.AccessMap.TryGetValue(model.AccessPointKey, out _))
@@ -259,7 +257,7 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The access point '{model.AccessPointKey}' doesn't exist.");
         }
 
-        if (!accessPoint.AccessMap.TryGetValue(model.AccountKey, out var accountRole)
+        if (!accessPoint.AccessMap.TryGetValue(model.AccountId, out var accountRole)
             || accountRole < model.Role)
         {
             return false;
@@ -267,12 +265,12 @@ public class CosmosAccessService : IAccessService
 
         if (accountRole > model.Role)
         {
-            throw new InvalidOperationException($"The target account '{model.AccountKey}' has elevated role.");
+            throw new InvalidOperationException($"The target account '{model.AccountId}' has elevated role.");
         }
 
         var mainPartitionKey = new PartitionKey(MAIN_PARTITION_KEY);
         var repository = _repositoryProvider.GetCore();
-        accessPoint.AccessMap.Remove(model.AccountKey);
+        accessPoint.AccessMap.Remove(model.AccountId);
         await repository.Container.UpsertItemAsync(accessPoint, mainPartitionKey);
         account.AccessMap.Remove(model.AccessPointKey);
         await repository.Container.UpsertItemAsync(account, mainPartitionKey);
@@ -326,32 +324,22 @@ public class CosmosAccessService : IAccessService
         return machineAccess;
     }
 
-    public async Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string authId)
+    public async Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = new PartitionKey($"{project}.access");
-        var queryable = repository.Container.GetItemLinqQueryable<MachineAccess>(
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey($"{project}.access") });
-        var iterator = queryable
-            .Where(access => access.AuthId == authId)
-            .ToFeedIterator();
+        var machineAccess = await repository.Container.TryReadItem<MachineAccess>(appId, partitionKey);
 
-        if (!iterator.HasMoreResults)
-        {
-            throw new InvalidOperationException($"The machine access {authId} has not been found.");
-        }
-
-        var machineAccess = (await iterator.ReadNextAsync()).FirstOrDefault();
         if (machineAccess is null)
         {
-            throw new InvalidOperationException($"The machine access {authId} has not been found.");
+            throw new InvalidOperationException($"The machine access {appId} has not been found.");
         }
 
         var accessKey = await _machineAccessService.ResetMachineAccessAsync(machineAccess.Id);
 
         if (accessKey is null)
         {
-            throw new InvalidOperationException($"The machine access {authId} reset failed.");
+            throw new InvalidOperationException($"The machine access {appId} reset failed.");
         }
 
         machineAccess = machineAccess with { AccessKey = $"{accessKey[..3]}***" };
@@ -360,35 +348,39 @@ public class CosmosAccessService : IAccessService
         return machineAccess;
     }
 
-    public async Task<bool> DeleteMachineAccessAsync(string organization, string project, string authId)
+    public async Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var queryable = repository.Container.GetItemLinqQueryable<MachineAccess>(
-            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey($"{project}.access") });
-        var iterator = queryable
-            .Where(access => access.AuthId == authId)
-            .ToFeedIterator();
+        var partitionKey = new PartitionKey($"{project}.access");
+        var machineAccess = await repository.Container.TryReadItem<MachineAccess>(appId, partitionKey);
 
-        if (!iterator.HasMoreResults)
-        {
-            return false;
-        }
-
-        var machineAccess = (await iterator.ReadNextAsync()).FirstOrDefault();
         if (machineAccess is null)
         {
             return false;
         }
 
-        var response = await repository.Container.DeleteItemAsync<MachineAccess>(
-            machineAccess.Id,
-            new PartitionKey($"{project}.access"));
+        var response = await repository.Container.DeleteItemAsync<MachineAccess>(appId, partitionKey);
 
         if (response.StatusCode != HttpStatusCode.NotFound)
         {
-            await _machineAccessService.DeleteMachineAccessAsync(machineAccess.Id);
+            await _machineAccessService.DeleteMachineAccessAsync(machineAccess.ObjectId);
         }
 
         return response.StatusCode != HttpStatusCode.NotFound;
+    }
+
+    public async Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId)
+    {
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var response = await repository.Container.ReadContainerStreamAsync();
+
+        if (response.StatusCode is HttpStatusCode.NotFound
+            || response.Content is null)
+        {
+            return false;
+        }
+
+        var machineAccess = await repository.Container.TryReadItem<MachineAccess>(appId, new PartitionKey($"{project}.access"));
+        return machineAccess is not null;
     }
 }

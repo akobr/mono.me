@@ -43,9 +43,9 @@ public class AccessHttp
         HttpRequestData request)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
-        _logger.LogInformation("Get api/access/account call with accountKey: {accountKey}", accountKey);
-        var account = await _accessService.GetAccountAsync(accountKey);
+        var accountId = request.GetIdentityUniqueId();
+        _logger.LogWarning("GET api/access/account call with accountId: {accountId}", accountId);
+        var account = await _accessService.GetAccountAsync(accountId);
 
         return account is null
             ? new NotFoundResult()
@@ -67,20 +67,22 @@ public class AccessHttp
         [FromBody] Models.AccountCreate accountModel)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
-        _logger.LogInformation("Post api/access/account call with accountKey: {accountKey}", accountKey);
-        var account = await _accessService.GetAccountAsync(accountKey);
+        var accountId = request.GetIdentityUniqueId();
+        _logger.LogWarning("POST api/access/account call with accountId: {accountId}", accountId);
+        var account = await _accessService.GetAccountAsync(accountId);
 
         if (account is not null)
         {
             return new BadRequestResult();
         }
 
-        var accountName = request.GetIdentityName().Trim();
+        var userName = request.GetIdentityUniqueName();
+        var name = request.GetIdentityName();
         var internalAccountModel = new AccountCreate
         {
-            Key = accountKey,
-            Name = accountName,
+            IdentityId = accountId,
+            UserName = userName,
+            Name = name,
             Organization = accountModel.Organization,
             Project = accountModel.Project,
         };
@@ -101,9 +103,9 @@ public class AccessHttp
         HttpRequestData request)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
-        _logger.LogInformation("Post api/access/points call with accountKey: {accountKey}", accountKey);
-        var points = await _accessService.GetAccessPointsAsync(accountKey);
+        var accountId = request.GetIdentityUniqueId();
+        _logger.LogWarning("GET api/access/points call with accountId: {accountId}", accountId);
+        var points = await _accessService.GetAccessPointsAsync(accountId);
         return new OkObjectResult(points);
     }
 
@@ -122,6 +124,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         var pointKey = key.Trim().ToLowerInvariant();
+        // TODO: [P2] check if pointKey is valid and expected format
         await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
         var point = await _accessService.GetAccessPointAsync(pointKey);
         return new OkObjectResult(point);
@@ -141,9 +144,9 @@ public class AccessHttp
         [FromBody] AccessPointCreate pointModel)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
-        _logger.LogInformation("Post api/access/points call with accountKey: {accountKey}", accountKey);
-        pointModel = pointModel with { OwnerKey = accountKey };
+        var accountId = request.GetIdentityUniqueId();
+        _logger.LogInformation("POST api/access/points call with accountId: {accountId}", accountId);
+        pointModel = pointModel with { OwnerId = accountId };
         var point = await _accessService.CreateAccessPointAsync(pointModel);
         return new OkObjectResult(point);
     }
@@ -162,8 +165,8 @@ public class AccessHttp
         [FromBody] Permission permissionModel)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
-        permissionModel = permissionModel with { CreatedByKey = accountKey };
+        var accountId = request.GetIdentityUniqueId();
+        permissionModel = permissionModel with { CreatedById = accountId };
         await _accessService.GrantPermissionAsync(permissionModel);
         var point = await _accessService.GetAccessPointAsync(permissionModel.AccessPointKey);
         return new OkObjectResult(point);
@@ -183,8 +186,8 @@ public class AccessHttp
         [FromBody] Permission permissionModel)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var accountKey = request.GetUniqueIdentityName().ToNormalizedKey();
-        permissionModel = permissionModel with { CreatedByKey = accountKey };
+        var accountId = request.GetIdentityUniqueId();
+        permissionModel = permissionModel with { CreatedById = accountId };
         await _accessService.RevokePermissionAsync(permissionModel);
         var point = await _accessService.GetAccessPointAsync(permissionModel.AccessPointKey);
         return new OkObjectResult(point);

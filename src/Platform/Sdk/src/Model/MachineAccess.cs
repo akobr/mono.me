@@ -38,34 +38,34 @@ namespace _42.Platform.Sdk.Model
         public enum ScopeEnum
         {
             /// <summary>
-            /// Enum DefaultRead for value: 0
+            /// Enum AnnotationRead for value: 0
             /// </summary>
-            DefaultRead = 0,
+            AnnotationRead = 0,
 
             /// <summary>
-            /// Enum AnnotationRead for value: 1
+            /// Enum ConfigurationRead for value: 1
             /// </summary>
-            AnnotationRead = 1,
+            ConfigurationRead = 1,
 
             /// <summary>
-            /// Enum ConfigurationRead for value: 2
+            /// Enum DefaultRead for value: 2
             /// </summary>
-            ConfigurationRead = 2,
+            DefaultRead = 2,
 
             /// <summary>
-            /// Enum DefaultReadWrite for value: 3
+            /// Enum AnnotationReadWrite for value: 3
             /// </summary>
-            DefaultReadWrite = 3,
+            AnnotationReadWrite = 3,
 
             /// <summary>
-            /// Enum AnnotationReadWrite for value: 4
+            /// Enum ConfigurationReadWrite for value: 4
             /// </summary>
-            AnnotationReadWrite = 4,
+            ConfigurationReadWrite = 4,
 
             /// <summary>
-            /// Enum ConfigurationReadWrite for value: 5
+            /// Enum DefaultReadWrite for value: 5
             /// </summary>
-            ConfigurationReadWrite = 5
+            DefaultReadWrite = 5
         }
 
 
@@ -82,11 +82,11 @@ namespace _42.Platform.Sdk.Model
         /// <param name="accessKey">accessKey.</param>
         /// <param name="scope">scope (default to ScopeEnum.DefaultRead).</param>
         /// <param name="annotationKey">annotationKey.</param>
-        public MachineAccess(string partitionKey = default(string), string id = default(string), string authId = default(string), string accessKey = default(string), ScopeEnum? scope = ScopeEnum.DefaultRead, string annotationKey = default(string))
+        public MachineAccess(string partitionKey = default(string), string id = default(string), string objectId = default(string), string accessKey = default(string), ScopeEnum? scope = ScopeEnum.DefaultRead, string annotationKey = default(string))
         {
             this.PartitionKey = partitionKey;
             this.Id = id;
-            this.AuthId = authId;
+            this.ObjectId = objectId;
             this.AccessKey = accessKey;
             this.Scope = scope;
             this.AnnotationKey = annotationKey;
@@ -105,10 +105,10 @@ namespace _42.Platform.Sdk.Model
         public string Id { get; set; }
 
         /// <summary>
-        /// Gets or Sets AuthId
+        /// Gets or Sets ObjectId
         /// </summary>
-        [DataMember(Name = "authId", EmitDefaultValue = false)]
-        public string AuthId { get; set; }
+        [DataMember(Name = "objectId", EmitDefaultValue = false)]
+        public string ObjectId { get; set; }
 
         /// <summary>
         /// Gets or Sets AccessKey
@@ -132,7 +132,7 @@ namespace _42.Platform.Sdk.Model
             sb.Append("class MachineAccess {\n");
             sb.Append("  PartitionKey: ").Append(PartitionKey).Append("\n");
             sb.Append("  Id: ").Append(Id).Append("\n");
-            sb.Append("  AuthId: ").Append(AuthId).Append("\n");
+            sb.Append("  ObjectId: ").Append(ObjectId).Append("\n");
             sb.Append("  AccessKey: ").Append(AccessKey).Append("\n");
             sb.Append("  Scope: ").Append(Scope).Append("\n");
             sb.Append("  AnnotationKey: ").Append(AnnotationKey).Append("\n");

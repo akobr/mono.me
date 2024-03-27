@@ -29,8 +29,8 @@ public class AccessPointGrantCommand : BaseCommand
         _accessDefault = accessDefaultOptions.Value;
     }
 
-    [Argument(0, Description = "The target account key to whom the permissions are granted.")]
-    public string AccountKey { get; set; } = string.Empty;
+    [Argument(0, Description = "The target account ID to whom the permissions are granted. The account ID can be retrieved by 'sform account' command.")]
+    public string AccountId { get; set; } = string.Empty;
 
     [Option("-p|--point", CommandOptionType.SingleValue, Description = "A point key to which the access is granted.")]
     public string? ProjectKey { get; set; } = string.Empty;
@@ -40,10 +40,15 @@ public class AccessPointGrantCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        if (string.IsNullOrWhiteSpace(AccountKey))
+        if (string.IsNullOrWhiteSpace(AccountId))
         {
-            Console.WriteImportant("An account key is required.");
+            Console.WriteImportant("An account ID is required. Ask the person to call 'sform account' command and he will see his account ID.");
             return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
+        if (AccountId.StartsWith('#'))
+        {
+            AccountId = AccountId[1..];
         }
 
         var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
@@ -54,7 +59,7 @@ public class AccessPointGrantCommand : BaseCommand
                 "You account is not registered, to create a registration call ",
                 "sform account register ".ThemedHighlight(Console.Theme),
                 "command.");
-            return ExitCodes.INTERACTION_NEEDED;
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         var account = accountResponse.Data;
@@ -68,11 +73,11 @@ public class AccessPointGrantCommand : BaseCommand
             : ProjectKey;
 
         var point = await _accessApi.GrantUserAccessAsync(
-            new Permission(account.Key, AccountKey, projectKey, role));
+            new Permission(account.Id, AccountId, projectKey, role));
 
         Console.WriteLine(
             "Access granted to ",
-            AccountKey.ThemedHighlight(Console.Theme),
+            AccountId.ThemedHighlight(Console.Theme),
             " with role ",
             $"{role:G}".ThemedHighlight(Console.Theme),
             " to ",

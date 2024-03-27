@@ -10,5 +10,5 @@ public record class AccessPoint
 
     public required string Key { get; init; }
 
-    public Dictionary<string, AccountRole> AccessMap { get; init; } = new();
+    public required Dictionary<string, AccountRole> AccessMap { get; init; } = new();
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -11,6 +12,9 @@ namespace _42.Platform.Storyteller.Api.Security;
 
 public static class HttpRequestDataExtensions
 {
+    // TODO: [P2] make this configurable in better way
+    private static readonly string ClientId = Environment.GetEnvironmentVariable("Auth:ClientId");
+
     public static IReadOnlyList<Claim> GetClaims(this HttpRequestData @this)
     {
         @this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.CachedClaims, out var claimMap);
@@ -69,6 +73,12 @@ public static class HttpRequestDataExtensions
             .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
             .ToHashSet();
 
+        // TODO: [P1] hot fix for un-approved admin consents in programmatically generated machine accesses (Azure app registrations)
+        if (allScopes.Count < 1 && @this.IsApplicationIdentity())
+        {
+            allScopes.Add("Default.Read");
+        }
+
         if (scopes.All(scope => !allScopes.Contains(scope)))
         {
             // TODO: [P2] remove details from the exception message
@@ -83,13 +93,25 @@ public static class HttpRequestDataExtensions
 
     public static async Task CheckAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole = AccountRole.Reader)
     {
-        if (@this.IsApplicationIdentity())
+        if (@this.TryGetApplicationIdentity(out var appId))
         {
+            var segments = accessPointKey.Split('.', StringSplitOptions.None);
+
+            if (segments.Length < 2)
+            {
+                throw new SecurityTokenException("An application can never access an organization.");
+            }
+
+            if (!await accessService.VerifyAccessForMachineAsync(segments[0], segments[1], appId))
+            {
+                throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
+            }
+
             return;
         }
 
-        var accountKey = @this.GetUniqueIdentityName().ToNormalizedKey();
-        var accessRole = await accessService.GetAccountRoleAsync(accountKey, accessPointKey);
+        var accountId = @this.GetIdentityUniqueId();
+        var accessRole = await accessService.GetAccountRoleAsync(accountId, accessPointKey);
 
         if (accessRole < minimalRole)
         {
@@ -116,20 +138,50 @@ public static class HttpRequestDataExtensions
         return CheckAccessToAsync(@this, accessService, $"{organization}.{project}", minimalRole);
     }
 
-    public static string GetUniqueIdentityName(this HttpRequestData @this)
+    public static string GetIdentityUniqueName(this HttpRequestData @this)
     {
-        return GetRequiredClaim(@this, "unique_name", ClaimTypes.Upn);
+        return GetRequiredClaim(@this, "preferred_username", "unique_name", ClaimTypes.Upn).Trim();
     }
 
     public static string GetIdentityName(this HttpRequestData @this)
     {
-        return GetRequiredClaim(@this, "name");
+        return GetRequiredClaim(@this, "name").Trim();
+    }
+
+    public static string GetIdentityUniqueId(this HttpRequestData @this)
+    {
+        return GetRequiredClaim(@this, "sub", ClaimTypes.NameIdentifier).Trim();
     }
 
     public static bool IsApplicationIdentity(this HttpRequestData @this)
     {
         // TODO: [P1] find how to best detect application identity
-        return @this.GetClaims().Any(c => c.Type == "appid");
+        var appId = @this.GetClaim("azp", "appid");
+        return appId is not null
+               && !string.Equals(appId, ClientId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static bool TryGetApplicationIdentity(this HttpRequestData @this, [MaybeNullWhen(false)]out string appId)
+    {
+        appId = @this.GetClaim("azp", "appid");
+        return appId is not null
+               && !string.Equals(appId, ClientId, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public static string? GetClaim(this HttpRequestData @this, params string[] claimTypes)
+    {
+        var claims = @this.GetClaims();
+
+        foreach (var claimType in claimTypes)
+        {
+            var claim = claims.FirstOrDefault(c => c.Type == claimType);
+            if (claim is not null)
+            {
+                return claim.Value;
+            }
+        }
+
+        return null;
     }
 
     public static string GetRequiredClaim(this HttpRequestData @this, params string[] claimTypes)
@@ -138,10 +190,10 @@ public static class HttpRequestDataExtensions
 
         foreach (var claimType in claimTypes)
         {
-            var uniqueNameClaim = claims.FirstOrDefault(c => c.Type == claimType);
-            if (uniqueNameClaim is not null)
+            var claim = claims.FirstOrDefault(c => c.Type == claimType);
+            if (claim is not null)
             {
-                return uniqueNameClaim.Value;
+                return claim.Value;
             }
         }
 
@@ -171,7 +223,8 @@ public static class HttpRequestDataExtensions
             // Support Azure AD V1 and V2 endpoints.
             IssuerValidator = (issuer, _, _) =>
             {
-                if (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase))
+                if (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase)
+                    || issuer.StartsWith("https://login.microsoftonline.com/", StringComparison.OrdinalIgnoreCase))
                 {
                     return issuer;
                 }
@@ -181,8 +234,7 @@ public static class HttpRequestDataExtensions
             ConfigurationManager = configManager,
         };
 
-        SecurityToken securityToken;
-        var claimsPrincipal = @this.ValidateToken(accessToken, validationParameters, out securityToken);
+        var claimsPrincipal = @this.ValidateToken(accessToken, validationParameters, out _);
         return claimsPrincipal;
     }
 }

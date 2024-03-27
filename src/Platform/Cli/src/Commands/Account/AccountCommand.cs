@@ -8,6 +8,7 @@ using _42.Platform.Cli.Commands.AccessPoints;
 using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Sdk.Api;
+using _42.Platform.Sdk.Client;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Microsoft.Identity.Client;
@@ -18,7 +19,8 @@ namespace _42.Platform.Cli.Commands.Account;
     typeof(AccountRegisterCommand),
     typeof(AccountSetCommand),
     typeof(AccessPointListCommand),
-    typeof(MachineListCommand))]
+    typeof(MachineListCommand),
+    typeof(AccountLogoutCommand))]
 
 [Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage your account and access to 2S platform services.")]
 public class AccountCommand : BaseCommand
@@ -44,7 +46,14 @@ public class AccountCommand : BaseCommand
         try
         {
             var auth = await _authentication.GetAuthenticationAsync();
-            Console.WriteImportant($"You are already logged in as {auth?.Account.Username}");
+
+            if (auth is null)
+            {
+                throw new MsalUiRequiredException("NoAccount", "No account is logged in this CLI instance.");
+            }
+
+            Console.WriteImportant($"You are already logged in as {auth.Account.Username}");
+            Console.WriteLine();
         }
         catch (MsalUiRequiredException)
         {
@@ -56,6 +65,7 @@ public class AccountCommand : BaseCommand
             }
         }
 
+        _accessApi.Configuration = GlobalConfiguration.Instance;
         var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
 
         if (accountResponse.StatusCode is HttpStatusCode.NotFound)
@@ -64,12 +74,13 @@ public class AccountCommand : BaseCommand
                 "You account is not registered, to create a registration call ",
                 "sform account register ".ThemedHighlight(Console.Theme),
                 "command.");
-            return ExitCodes.INTERACTION_NEEDED;
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         var account = accountResponse.Data;
-        Console.WriteLine("Account ", $"#{account.Key}".ThemedLowlight(Console.Theme));
-        Console.WriteLine($"Have access to {account.AccessMap.Count} access points.");
+        Console.WriteHeader($"{account.Name} @ {account.UserName}");
+        Console.WriteLine("Account ID: ", $"#{account.Id}".ThemedLowlight(Console.Theme));
+        Console.WriteLine($"You have access to {account.AccessMap.Count} access points.");
 
         if (string.IsNullOrWhiteSpace(_accessDefault?.ProjectName))
         {
@@ -77,16 +88,17 @@ public class AccountCommand : BaseCommand
                 "No default project is set, please call ",
                 "sform account set".ThemedHighlight(Console.Theme),
                 " command.");
-            return ExitCodes.INTERACTION_NEEDED;
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         var projectKey = $"{_accessDefault.OrganizationName}.{_accessDefault.ProjectName}";
         Console.WriteLine(
             "Default project set to ",
             projectKey.ThemedHighlight(Console.Theme),
-            " with view ",
+            " with ",
             (_accessDefault.ViewName ?? Platform.Storyteller.Constants.DefaultViewName).ThemedHighlight(Console.Theme),
-            ".");
+            " view.");
+        Console.WriteLine("You can change it by command sform account set.".ThemedLowlight(Console.Theme));
         return ExitCodes.SUCCESS;
     }
 
@@ -111,7 +123,7 @@ public class AccountCommand : BaseCommand
                     //   If this occurs, an OperationCanceledException will be thrown (see catch below for more details).
                     Console.WriteHeader("Sign in");
                     Console.WriteLine(deviceCodeResult.Message);
-                    return Task.FromResult(ExitCodes.INTERACTION_NEEDED);
+                    return Task.FromResult(ExitCodes.WARNING_INTERACTION_NEEDED);
                 }).ExecuteAsync();
 
             Console.WriteImportant($"You have been logged in as {result.Account.Username}");

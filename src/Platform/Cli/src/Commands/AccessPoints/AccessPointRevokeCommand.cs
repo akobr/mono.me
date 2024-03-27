@@ -30,7 +30,7 @@ public class AccessPointRevokeCommand : BaseCommand
     }
 
     [Argument(0, Description = "The target account key to whom the permissions are revoked.")]
-    public string AccountKey { get; set; } = string.Empty;
+    public string AccountId { get; set; } = string.Empty;
 
     [Option("-p|--point", CommandOptionType.SingleValue, Description = "A point key to which the access is revoked.")]
     public string? ProjectKey { get; set; } = string.Empty;
@@ -40,10 +40,15 @@ public class AccessPointRevokeCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        if (string.IsNullOrWhiteSpace(AccountKey))
+        if (string.IsNullOrWhiteSpace(AccountId))
         {
-            Console.WriteImportant("An account key is required.");
+            Console.WriteImportant("An account ID is required.");
             return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
+        if (AccountId.StartsWith('#'))
+        {
+            AccountId = AccountId[1..];
         }
 
         var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
@@ -54,7 +59,7 @@ public class AccessPointRevokeCommand : BaseCommand
                 "You account is not registered, to create a registration call ",
                 "sform account register ".ThemedHighlight(Console.Theme),
                 "command.");
-            return ExitCodes.INTERACTION_NEEDED;
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         var account = accountResponse.Data;
@@ -68,11 +73,11 @@ public class AccessPointRevokeCommand : BaseCommand
             : ProjectKey;
 
         var point = await _accessApi.RevokeUserAccessAsync(
-            new Permission(account.Key, AccountKey, projectKey, role));
+            new Permission(account.Id, AccountId, projectKey, role));
 
         Console.WriteLine(
             "Access revoked to ",
-            AccountKey.ThemedHighlight(Console.Theme),
+            AccountId.ThemedHighlight(Console.Theme),
             " with role ",
             $"{role:G}".ThemedHighlight(Console.Theme),
             " to ",
