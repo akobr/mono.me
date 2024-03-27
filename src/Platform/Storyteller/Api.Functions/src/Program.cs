@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Access;
 using _42.Platform.Storyteller.Api.ErrorHandling;
+using _42.Platform.Storyteller.Api.Json;
 using _42.Platform.Storyteller.AzureAd;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +26,7 @@ var host = new HostBuilder()
             options.AllowTrailingCommas = true;
             options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
             options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+            options.DictionaryKeyPolicy = new NoChangeNamingPolicy();
             options.PropertyNameCaseInsensitive = true;
         });
 

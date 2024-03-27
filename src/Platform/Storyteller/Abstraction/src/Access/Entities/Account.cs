@@ -6,11 +6,9 @@ public record class Account
 {
     public string PartitionKey => "access";
 
-    public string Id => $"act.{Key}";
+    public required string Id { get; init; }
 
-    public required string SystemId { get; init; }
-
-    public required string Key { get; init; }
+    public required string UserName { get; init; }
 
     public required string Name { get; init; }
 

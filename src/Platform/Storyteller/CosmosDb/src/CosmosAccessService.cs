@@ -29,38 +29,37 @@ public class CosmosAccessService : IAccessService
         _containerFactory = containerFactory;
     }
 
-    public async Task<Account?> GetAccountAsync(string key)
+    public async Task<Account?> GetAccountAsync(string id)
     {
-        var accountId = $"act.{key}";
         var repository = _repositoryProvider.GetCore();
-        var account = await repository.Container.TryReadItem<Account>(accountId, new PartitionKey(MAIN_PARTITION_KEY));
+        var account = await repository.Container.TryReadItem<Account>(id, new PartitionKey(MAIN_PARTITION_KEY));
         return account;
     }
 
     public async Task<Account> CreateAccountAsync(AccountCreate model)
     {
-        var accountName = model.Name.Trim();
-        var accountKey = model.Key.ToNormalizedKey();
-        var accountId = model.SystemId.Trim();
-        var account = await GetAccountAsync(accountKey);
+        var name = model.Name.Trim();
+        var userName = model.UserName.Trim();
+        var accountId = model.IdentityId.Trim();
+        var account = await GetAccountAsync(userName);
 
         if (account is not null)
         {
-            throw new InvalidOperationException($"The account '{accountKey}' already exists.");
+            throw new InvalidOperationException($"The account {userName}#{accountId}' already exists.");
         }
 
         var point = await CreateAccessPointAsync(new AccessPointCreate
         {
-            OwnerKey = accountKey,
+            OwnerId = accountId,
             Organization = model.Organization,
             Project = model.Project,
         });
 
         account = new Account
         {
-            Key = accountKey,
-            Name = accountName,
-            SystemId = accountId,
+            Id = accountId,
+            UserName = userName,
+            Name = name,
             AccessMap = new()
             {
                 { model.Organization, AccountRole.Owner },
@@ -73,9 +72,9 @@ public class CosmosAccessService : IAccessService
         return response.Resource;
     }
 
-    public async Task<AccountRole> GetAccountRoleAsync(string accountKey, string accessPointKey)
+    public async Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey)
     {
-        var account = await GetAccountAsync(accountKey);
+        var account = await GetAccountAsync(accountId);
 
         if (account is null)
         {
@@ -85,13 +84,13 @@ public class CosmosAccessService : IAccessService
         return account.AccessMap.GetValueOrDefault(accessPointKey, AccountRole.None);
     }
 
-    public async Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountKey)
+    public async Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId)
     {
-        var account = await GetAccountAsync(accountKey);
+        var account = await GetAccountAsync(accountId);
 
         if (account is null)
         {
-            throw new InvalidOperationException($"The owner '{accountKey}' doesn't exist.");
+            throw new InvalidOperationException($"The owner '{accountId}' doesn't exist.");
         }
 
         var accessPointIds = account.AccessMap
@@ -133,10 +132,10 @@ public class CosmosAccessService : IAccessService
         var organizationAccessPoint = await GetAccessPointAsync(model.Organization);
 
         if (organizationAccessPoint is not null
-            && (!organizationAccessPoint.AccessMap.TryGetValue(model.OwnerKey, out var role)
+            && (!organizationAccessPoint.AccessMap.TryGetValue(model.OwnerId, out var role)
             || role != AccountRole.Owner))
         {
-            throw new InvalidOperationException($"The account '{model.OwnerKey}' doesn't have owner rights to the organization.");
+            throw new InvalidOperationException($"The account '{model.OwnerId}' doesn't have owner rights to the organization.");
         }
 
         if (organizationAccessPoint is null)
@@ -146,7 +145,7 @@ public class CosmosAccessService : IAccessService
             organizationAccessPoint = new AccessPoint
             {
                 Key = model.Organization,
-                AccessMap = { { model.OwnerKey, AccountRole.Owner } },
+                AccessMap = new() { { model.OwnerId, AccountRole.Owner } },
             };
             await repository.Container.CreateItemAsync(organizationAccessPoint, partitionKey);
         }
@@ -162,11 +161,11 @@ public class CosmosAccessService : IAccessService
         accessPoint = new AccessPoint
         {
             Key = accessPointKey,
-            AccessMap = { { model.OwnerKey, AccountRole.Owner } },
+            AccessMap = new() { { model.OwnerId, AccountRole.Owner } },
         };
 
         var response = await repository.Container.CreateItemAsync(accessPoint, partitionKey);
-        var account = await GetAccountAsync(model.OwnerKey);
+        var account = await GetAccountAsync(model.OwnerId);
 
         if (account is not null)
         {
@@ -185,17 +184,17 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException("The no role can't be allowed.");
         }
 
-        var creator = await GetAccountAsync(model.CreatedByKey);
-        var account = await GetAccountAsync(model.AccountKey);
+        var creator = await GetAccountAsync(model.CreatedById);
+        var account = await GetAccountAsync(model.AccountId);
 
         if (creator is null)
         {
-            throw new InvalidOperationException($"The creator '{model.CreatedByKey}' doesn't exist.");
+            throw new InvalidOperationException($"The creator '{model.CreatedById}' doesn't exist.");
         }
 
         if (account is null)
         {
-            throw new InvalidOperationException($"The target account '{model.AccountKey}' doesn't exist.");
+            throw new InvalidOperationException($"The target account '{model.AccountId}' doesn't exist.");
         }
 
         if (!creator.AccessMap.TryGetValue(model.AccessPointKey, out var creatorRole))
@@ -206,7 +205,7 @@ public class CosmosAccessService : IAccessService
         if (creatorRole < AccountRole.Administrator
             || (model.Role == AccountRole.Owner && creatorRole != AccountRole.Owner))
         {
-            throw new InvalidOperationException($"The creator '{model.CreatedByKey}' doesn't have privileges to grant this access permission.");
+            throw new InvalidOperationException($"The creator '{model.CreatedById}' doesn't have privileges to grant this access permission.");
         }
 
         var accessPoint = await GetAccessPointAsync(model.AccessPointKey);
@@ -216,7 +215,7 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The access point '{model.AccessPointKey}' doesn't exist.");
         }
 
-        if (accessPoint.AccessMap.TryGetValue(model.AccountKey, out var accountRole)
+        if (accessPoint.AccessMap.TryGetValue(model.AccountId, out var accountRole)
             && accountRole >= model.Role)
         {
             return false;
@@ -224,7 +223,7 @@ public class CosmosAccessService : IAccessService
 
         var repository = _repositoryProvider.GetCore();
         var mainPartitionKey = new PartitionKey(MAIN_PARTITION_KEY);
-        accessPoint.AccessMap[model.AccountKey] = model.Role;
+        accessPoint.AccessMap[model.AccountId] = model.Role;
         await repository.Container.UpsertItemAsync(accessPoint, mainPartitionKey);
         account.AccessMap[model.AccessPointKey] = model.Role;
         await repository.Container.UpsertItemAsync(account, mainPartitionKey);
@@ -233,17 +232,17 @@ public class CosmosAccessService : IAccessService
 
     public async Task<bool> RevokePermissionAsync(Permission model)
     {
-        var creator = await GetAccountAsync(model.CreatedByKey);
-        var account = await GetAccountAsync(model.AccountKey);
+        var creator = await GetAccountAsync(model.CreatedById);
+        var account = await GetAccountAsync(model.AccountId);
 
         if (creator is null)
         {
-            throw new InvalidOperationException($"The creator '{model.CreatedByKey}' doesn't exist.");
+            throw new InvalidOperationException($"The creator '{model.CreatedById}' doesn't exist.");
         }
 
         if (account is null)
         {
-            throw new InvalidOperationException($"The target account '{model.AccountKey}' doesn't exist.");
+            throw new InvalidOperationException($"The target account '{model.AccountId}' doesn't exist.");
         }
 
         if (creator.AccessMap.TryGetValue(model.AccessPointKey, out _))
@@ -258,7 +257,7 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The access point '{model.AccessPointKey}' doesn't exist.");
         }
 
-        if (!accessPoint.AccessMap.TryGetValue(model.AccountKey, out var accountRole)
+        if (!accessPoint.AccessMap.TryGetValue(model.AccountId, out var accountRole)
             || accountRole < model.Role)
         {
             return false;
@@ -266,12 +265,12 @@ public class CosmosAccessService : IAccessService
 
         if (accountRole > model.Role)
         {
-            throw new InvalidOperationException($"The target account '{model.AccountKey}' has elevated role.");
+            throw new InvalidOperationException($"The target account '{model.AccountId}' has elevated role.");
         }
 
         var mainPartitionKey = new PartitionKey(MAIN_PARTITION_KEY);
         var repository = _repositoryProvider.GetCore();
-        accessPoint.AccessMap.Remove(model.AccountKey);
+        accessPoint.AccessMap.Remove(model.AccountId);
         await repository.Container.UpsertItemAsync(accessPoint, mainPartitionKey);
         account.AccessMap.Remove(model.AccessPointKey);
         await repository.Container.UpsertItemAsync(account, mainPartitionKey);

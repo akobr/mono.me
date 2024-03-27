@@ -72,29 +72,29 @@ namespace _42.Platform.Sdk.Model
         /// <summary>
         /// Initializes a new instance of the <see cref="Permission" /> class.
         /// </summary>
-        /// <param name="createdByKey">createdByKey.</param>
-        /// <param name="accountKey">accountKey.</param>
+        /// <param name="createdById">createdById.</param>
+        /// <param name="accountId">accountId.</param>
         /// <param name="accessPointKey">accessPointKey.</param>
         /// <param name="role">role (default to RoleEnum.None).</param>
-        public Permission(string createdByKey = default(string), string accountKey = default(string), string accessPointKey = default(string), RoleEnum? role = RoleEnum.None)
+        public Permission(string createdById = default(string), string accountId = default(string), string accessPointKey = default(string), RoleEnum? role = RoleEnum.None)
         {
-            this.CreatedByKey = createdByKey;
-            this.AccountKey = accountKey;
+            this.CreatedById = createdById;
+            this.AccountId = accountId;
             this.AccessPointKey = accessPointKey;
             this.Role = role;
         }
 
         /// <summary>
-        /// Gets or Sets CreatedByKey
+        /// Gets or Sets CreatedById
         /// </summary>
-        [DataMember(Name = "createdByKey", EmitDefaultValue = false)]
-        public string CreatedByKey { get; set; }
+        [DataMember(Name = "createdById", EmitDefaultValue = false)]
+        public string CreatedById { get; set; }
 
         /// <summary>
-        /// Gets or Sets AccountKey
+        /// Gets or Sets AccountId
         /// </summary>
-        [DataMember(Name = "accountKey", EmitDefaultValue = false)]
-        public string AccountKey { get; set; }
+        [DataMember(Name = "accountId", EmitDefaultValue = false)]
+        public string AccountId { get; set; }
 
         /// <summary>
         /// Gets or Sets AccessPointKey
@@ -110,8 +110,8 @@ namespace _42.Platform.Sdk.Model
         {
             StringBuilder sb = new StringBuilder();
             sb.Append("class Permission {\n");
-            sb.Append("  CreatedByKey: ").Append(CreatedByKey).Append("\n");
-            sb.Append("  AccountKey: ").Append(AccountKey).Append("\n");
+            sb.Append("  CreatedById: ").Append(CreatedById).Append("\n");
+            sb.Append("  AccountId: ").Append(AccountId).Append("\n");
             sb.Append("  AccessPointKey: ").Append(AccessPointKey).Append("\n");
             sb.Append("  Role: ").Append(Role).Append("\n");
             sb.Append("}\n");

@@ -53,6 +53,7 @@ public class AccountCommand : BaseCommand
             }
 
             Console.WriteImportant($"You are already logged in as {auth.Account.Username}");
+            Console.WriteLine();
         }
         catch (MsalUiRequiredException)
         {
@@ -77,8 +78,9 @@ public class AccountCommand : BaseCommand
         }
 
         var account = accountResponse.Data;
-        Console.WriteLine("Account ", $"#{account.Key}".ThemedLowlight(Console.Theme));
-        Console.WriteLine($"Have access to {account.AccessMap.Count} access points.");
+        Console.WriteHeader($"{account.Name} @ {account.UserName}");
+        Console.WriteLine("Account ID: ", $"#{account.Id}".ThemedLowlight(Console.Theme));
+        Console.WriteLine($"You have access to {account.AccessMap.Count} access points.");
 
         if (string.IsNullOrWhiteSpace(_accessDefault?.ProjectName))
         {
@@ -93,9 +95,10 @@ public class AccountCommand : BaseCommand
         Console.WriteLine(
             "Default project set to ",
             projectKey.ThemedHighlight(Console.Theme),
-            " with view ",
+            " with ",
             (_accessDefault.ViewName ?? Platform.Storyteller.Constants.DefaultViewName).ThemedHighlight(Console.Theme),
-            ".");
+            " view.");
+        Console.WriteLine("You can change it by command sform account set.".ThemedLowlight(Console.Theme));
         return ExitCodes.SUCCESS;
     }
 

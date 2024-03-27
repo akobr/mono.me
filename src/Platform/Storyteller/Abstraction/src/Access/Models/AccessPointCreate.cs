@@ -6,5 +6,5 @@ public record class AccessPointCreate
 
     public string? Project { get; init; }
 
-    public required string OwnerKey { get; init; }
+    public required string OwnerId { get; init; }
 }
