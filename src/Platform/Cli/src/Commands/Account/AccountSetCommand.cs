@@ -1,6 +1,8 @@
+using System;
 using System.IO.Abstractions;
 using System.Linq;
 using System.Net;
+using System.Reflection;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
@@ -85,7 +87,9 @@ public class AccountSetCommand : BaseCommand
     {
         var config = new { access = options };
         var serializer = JsonSerializer.Create(new JsonSerializerSettings { Formatting = Formatting.Indented });
-        using var fileWriter = fileSystem.File.CreateText(Constants.ACCESS_DEFAULT_JSON);
+        var appDirectory = fileSystem.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? Environment.CurrentDirectory;
+        var fullPath = fileSystem.Path.Combine(appDirectory, Constants.ACCESS_DEFAULT_JSON);
+        using var fileWriter = fileSystem.File.CreateText(fullPath);
         var jWriter = new JsonTextWriter(fileWriter);
         serializer.Serialize(jWriter, config);
     }
