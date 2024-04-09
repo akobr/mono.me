@@ -1,6 +1,6 @@
 using Newtonsoft.Json.Linq;
 
-namespace _42.Platform.Storyteller.Backend.Configuring;
+namespace _42.Platform.Storyteller.Configuring;
 
 public interface IConfigurationService
 {

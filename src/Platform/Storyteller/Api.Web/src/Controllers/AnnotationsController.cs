@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.Security;
-using _42.Platform.Storyteller.Backend.Annotating;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

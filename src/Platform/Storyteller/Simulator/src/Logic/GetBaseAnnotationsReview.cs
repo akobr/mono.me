@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
-using _42.Platform.Storyteller.Backend.Annotating;
 using Colorful;
 
 namespace _42.Platform.Storyteller.Simulator.Logic;

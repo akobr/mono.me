@@ -3,7 +3,6 @@ using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.AzureAd;
-using _42.Platform.Storyteller.Backend;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

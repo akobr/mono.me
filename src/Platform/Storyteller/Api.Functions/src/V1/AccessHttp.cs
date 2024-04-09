@@ -1,10 +1,10 @@
 using System.Net;
 using _42.Platform.Storyteller.Access;
+using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
-using _42.Platform.Storyteller.Backend.Accessing;
-using _42.Platform.Storyteller.Backend.Accessing.Model;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;

@@ -1,7 +1,6 @@
 using System;
 using System.Net;
 using System.Threading.Tasks;
-using _42.Platform.Storyteller.Backend.Configuring;
 using _42.Platform.Storyteller.Entities.Configurations;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json.Linq;

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace _42.Platform.Storyteller.Backend;
+namespace _42.Platform.Storyteller;
 
 public class NoChangeNamingPolicy : JsonNamingPolicy
 {
