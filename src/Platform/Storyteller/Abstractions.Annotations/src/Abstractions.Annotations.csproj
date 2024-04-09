@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.Platform.Storyteller.Abstraction</AssemblyName>
+    <AssemblyName>42.Platform.Storyteller.Abstractions.Annotations</AssemblyName>
     <RootNamespace>_42.Platform.Storyteller</RootNamespace>
 
     <TargetFramework>net9.0</TargetFramework>

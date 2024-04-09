@@ -19,7 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Libraries\Utils\Async\src\Async.csproj" />
-    <ProjectReference Include="..\..\Abstraction\src\Abstraction.csproj" />
+    <ProjectReference Include="..\..\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
     <ProjectReference Include="..\..\Backend.Core\src\Backend.Core.csproj" />
   </ItemGroup>
 
