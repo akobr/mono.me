@@ -5,7 +5,7 @@ namespace _42.Platform.Storyteller;
 
 public class Data
 {
-    public static async Task CreateCore(Container container)
+    public static async Task CreateCoreAnnotations(Container container)
     {
         // responsibilities
         await container.UpsertItemAsync(Create.Responsibility("storyteller"));
@@ -30,5 +30,26 @@ public class Data
         await container.UpsertItemAsync(Create.Execution("42", "storyteller", "system"));
         await container.UpsertItemAsync(Create.Execution("42", "supervisor", "system"));
         await container.UpsertItemAsync(Create.Execution("42", "scheduler", "system"));
+    }
+
+    public static async Task CreateCoreAccess(
+        Container container,
+        string organizationName,
+        string accountId,
+        string accountUserName,
+        string accountName)
+    {
+        await container.UpsertItemAsync(
+            Create.BaseAccount(
+                organizationName,
+                accountId,
+                accountUserName,
+                accountName));
+
+        var accessPoints = Create.BaseAccessPoints(organizationName, accountId);
+        foreach (var accessPoint in accessPoints)
+        {
+            await container.UpsertItemAsync(accessPoint);
+        }
     }
 }

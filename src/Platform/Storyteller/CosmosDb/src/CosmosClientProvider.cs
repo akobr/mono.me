@@ -2,8 +2,6 @@ using System;
 using System.Net.Http;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 
 namespace _42.Platform.Storyteller
 {
@@ -33,19 +31,19 @@ namespace _42.Platform.Storyteller
         {
             CosmosClientOptions options = new()
             {
-                //SerializerOptions = new()
-                //{
-                //    PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase,
-                //    IgnoreNullValues = true,
-                //},
-                Serializer = new CosmosDefaultJsonSerializer(new JsonSerializerSettings
+                SerializerOptions = new()
                 {
-                    NullValueHandling = NullValueHandling.Ignore,
-                    ContractResolver = new CamelCasePropertyNamesContractResolver
-                    {
-                        NamingStrategy = new CamelCaseNamingStrategy(false, true, false),
-                    },
-                }),
+                    PropertyNamingPolicy = CosmosPropertyNamingPolicy.Default,
+                    IgnoreNullValues = true,
+                },
+                //Serializer = new CosmosDefaultJsonSerializer(new JsonSerializerSettings
+                //{
+                //    NullValueHandling = NullValueHandling.Ignore,
+                //    ContractResolver = new CamelCasePropertyNamesContractResolver
+                //    {
+                //        NamingStrategy = new CamelCaseNamingStrategy(false, true, false),
+                //    },
+                //}),
             };
 
             // Needed when certificate on server is not valid

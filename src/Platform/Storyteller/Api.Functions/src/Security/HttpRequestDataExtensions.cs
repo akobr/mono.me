@@ -3,6 +3,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using _42.Platform.Storyteller.Access;
+using _42.Platform.Storyteller.Backend.Accessing;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
@@ -93,6 +94,9 @@ public static class HttpRequestDataExtensions
 
     public static async Task CheckAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole = AccountRole.Reader)
     {
+#if DEV_AUTH
+        return;
+#else
         if (@this.TryGetApplicationIdentity(out var appId))
         {
             var segments = accessPointKey.Split('.', StringSplitOptions.None);
@@ -117,6 +121,7 @@ public static class HttpRequestDataExtensions
         {
             throw new SecurityTokenException($"No {minimalRole:G} access to the project {accessPointKey}.");
         }
+#endif
     }
 
     public static Task CheckAccessToOrganizationAsync(

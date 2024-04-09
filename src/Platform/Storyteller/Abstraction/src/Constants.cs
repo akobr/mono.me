@@ -11,5 +11,5 @@ public static class Constants
     public const string DefaultKeySeparator = ".";
     public const char DefaultKeySeparatorChar = '.';
 
-    public static readonly char[] KeySeparators = { '.' };
+    public static readonly char[] KeySeparators = ['.'];
 }

@@ -6,7 +6,6 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Sdk;
-using _42.Platform.Sdk.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Serilog;
+using IConfigurationBuilder = Microsoft.Extensions.Configuration.IConfigurationBuilder;
 
 namespace _42.Platform.Cli
 {
@@ -43,29 +43,7 @@ namespace _42.Platform.Cli
             services.AddSingleton<IAuthenticationService, AuthenticationService>();
             services.AddSingleton<ICommandContext, CommandContext>();
 
-            services.AddPlatformSdk();
-
-            // TODO: [P2] Make this better
-            var authOptions = configuration.GetSection(ConfigurationSections.AUTHENTICATION).Get<AuthenticationOptions>();
-            var generalOptions = configuration.GetSection(ConfigurationSections.GENERAL).Get<GeneralOptions>();
-            var authService = new AuthenticationService(new FileSystem(), new OptionsWrapper<AuthenticationOptions>(authOptions!));
-            GlobalConfiguration.Instance = new DynamicConfiguration
-            {
-                AccessTokenFactory = () =>
-                {
-                    try
-                    {
-                        var authResult = authService.GetAuthenticationAsync().GetAwaiter().GetResult();
-                        return authResult?.AccessToken ?? string.Empty;
-                    }
-                    catch (Exception)
-                    {
-                        return string.Empty;
-                    }
-                },
-                BasePath = generalOptions!.BaseUrl,
-                UserAgent = $"{generalOptions.UserAgent}/{ThisAssembly.AssemblyInformationalVersion} ({System.Environment.OSVersion.Platform:G}; {System.Environment.OSVersion.VersionString})",
-            };
+            ConfigurePlatformSdk(services, configuration);
         }
 
         public void ConfigureApplication(IConfigurationBuilder builder)
@@ -109,6 +87,32 @@ namespace _42.Platform.Cli
             services.Configure<LoggingOptions>(configuration.GetSection(ConfigurationSections.LOGGING));
             services.Configure<AccessDefaultOptions>(configuration.GetSection(ConfigurationSections.ACCESS));
             services.Configure<AuthenticationOptions>(configuration.GetSection(ConfigurationSections.AUTHENTICATION));
+        }
+
+        private static void ConfigurePlatformSdk(IServiceCollection services, IConfiguration configuration)
+        {
+            // TODO: [P2] Make this better
+            var authOptions = configuration.GetSection(ConfigurationSections.AUTHENTICATION).Get<AuthenticationOptions>();
+            var generalOptions = configuration.GetSection(ConfigurationSections.GENERAL).Get<GeneralOptions>();
+            var authService = new AuthenticationService(new FileSystem(), new OptionsWrapper<AuthenticationOptions>(authOptions!));
+
+            services.AddPlatformSdk(() => new SdkConfiguration
+            {
+                AccessTokenFactory = () =>
+                {
+                    try
+                    {
+                        var authResult = authService.GetAuthenticationAsync().GetAwaiter().GetResult();
+                        return authResult?.AccessToken ?? string.Empty;
+                    }
+                    catch (Exception)
+                    {
+                        return string.Empty;
+                    }
+                },
+                BasePath = generalOptions!.BaseUrl,
+                UserAgent = $"{generalOptions.UserAgent}/{ThisAssembly.AssemblyInformationalVersion} ({System.Environment.OSVersion.Platform:G}; {System.Environment.OSVersion.VersionString})",
+            });
         }
     }
 }

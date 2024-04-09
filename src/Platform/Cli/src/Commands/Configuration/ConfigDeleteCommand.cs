@@ -25,7 +25,7 @@ public class ConfigDeleteCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
-        var response = await _configurationApi.DeleteConfigurationWithHttpInfoSafeAsync(
+        var response = await _configurationApi.DeleteConfigurationWithHttpInfoAsync(
             Context.OrganizationName,
             Context.ProjectName,
             Context.ViewName,

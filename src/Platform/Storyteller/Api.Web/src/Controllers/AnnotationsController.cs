@@ -1,11 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.Security;
-using _42.Platform.Storyteller.Entities;
+using _42.Platform.Storyteller.Backend.Annotating;
 using Asp.Versioning;
-using Azure;
-using Azure.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Identity.Web.Resource;
@@ -601,7 +600,7 @@ public class AnnotationsController : ControllerBase
         string project = Constants.DefaultProjectName,
         string view = Constants.DefaultViewName)
     {
-        var annotationType = AnnotationTypeMap.GetSystemType(annotation.AnnotationType);
+        var annotationType = AnnotationTypes.GetRuntimeType(annotation.AnnotationType);
         using var reader = new StreamReader(Request.Body);
         var deserializedObject = await JsonSerializer.DeserializeAsync(
             Request.Body,
