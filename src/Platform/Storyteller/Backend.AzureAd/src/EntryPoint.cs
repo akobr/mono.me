@@ -1,7 +1,7 @@
 using _42.Platform.Storyteller.Accessing;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace _42.Platform.Storyteller.AzureAd;
+namespace _42.Platform.Storyteller;
 
 public static class EntryPoint
 {

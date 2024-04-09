@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.Platform.Storyteller.AzureAd</AssemblyName>
-    <RootNamespace>_42.Platform.Storyteller.AzureAd</RootNamespace>
+    <AssemblyName>42.Platform.Storyteller.Backend.AzureAd</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller</RootNamespace>
 
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
