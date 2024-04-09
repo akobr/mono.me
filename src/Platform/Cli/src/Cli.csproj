@@ -40,7 +40,7 @@
     <ProjectReference Include="..\..\..\Libraries\Utils\Async\src\Async.csproj" />
     <ProjectReference Include="..\..\Sdk\src\Sdk.csproj" />
     <ProjectReference Include="..\..\Storyteller\Abstraction\src\Abstraction.csproj" />
-    <ProjectReference Include="..\..\Storyteller\CosmosDb\src\CosmosDb.csproj" />
+    <ProjectReference Include="..\..\Storyteller\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
   </ItemGroup>
 
   <ItemGroup>

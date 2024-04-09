@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.Platform.Storyteller.CosmosDb</AssemblyName>
+    <AssemblyName>42.Platform.Storyteller.Backend.CosmosDb</AssemblyName>
     <RootNamespace>_42.Platform.Storyteller</RootNamespace>
 
     <TargetFramework>net9.0</TargetFramework>
