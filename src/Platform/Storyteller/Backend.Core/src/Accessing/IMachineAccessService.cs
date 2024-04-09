@@ -1,4 +1,3 @@
-using _42.Platform.Storyteller.Access;
 using _42.Platform.Storyteller.Accessing.Model;
 
 namespace _42.Platform.Storyteller.Accessing;

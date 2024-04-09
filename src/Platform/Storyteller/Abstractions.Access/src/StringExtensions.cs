@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace _42.Platform.Storyteller.Access;
+namespace _42.Platform.Storyteller;
 
 // TODO: remove from here
 public static class StringExtensions

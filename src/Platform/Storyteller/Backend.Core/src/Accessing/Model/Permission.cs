@@ -1,5 +1,3 @@
-using _42.Platform.Storyteller.Access;
-
 namespace _42.Platform.Storyteller.Accessing.Model;
 
 public record class Permission

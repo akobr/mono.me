@@ -1,4 +1,4 @@
-namespace _42.Platform.Storyteller.Access;
+namespace _42.Platform.Storyteller;
 
 public interface IMachineAccess
 {
