@@ -3,9 +3,8 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
-using _42.Platform.Cli;
-using _42.Platform.Storyteller.Simulator.Commands;
-using _42.Platform.Storyteller.Simulator.Configuration;
+using _42.Platform.Storyteller.DbCreator.Commands;
+using _42.Platform.Storyteller.DbCreator.Configuration;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,7 +13,7 @@ using Microsoft.Extensions.Options;
 using Sentry;
 using Console = Colorful.Console;
 
-namespace _42.Platform.Storyteller.Simulator;
+namespace _42.Platform.Storyteller.DbCreator;
 
 public class Program
 {

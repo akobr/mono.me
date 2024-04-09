@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using Colorful;
 
-namespace _42.Platform.Storyteller.Simulator.Logic;
+namespace _42.Platform.Storyteller.DbCreator.Logic;
 
 public class CoreDbStructureBuilder(IContainerFactory containerFactory)
 {

@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using Colorful;
 
-namespace _42.Platform.Storyteller.Simulator.Logic;
+namespace _42.Platform.Storyteller.DbCreator.Logic;
 
 public class GetBaseAnnotationsReview(IAnnotationService annotations)
 {
