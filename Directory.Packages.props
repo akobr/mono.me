@@ -7,6 +7,7 @@
     <PackageVersion Include="42.Monorepo.GitVersioning.Core" Version="1.2.3" />
     <PackageVersion Include="Alba.CsConsoleFormat-NoXaml" Version="1.0.0" />
     <PackageVersion Include="Asp.Versioning.Http" Version="8.1.0" />
+    <PackageVersion Include="AutoMapper" Version="13.0.1" />
     <PackageVersion Include="Azure.Identity" Version="1.13.2" />
     <PackageVersion Include="Bogus" Version="35.6.2" />
     <PackageVersion Include="Colorful.Console" Version="1.2.15" />
@@ -54,6 +55,7 @@
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="9.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.3" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="9.0.3" />
     <PackageVersion Include="Microsoft.Graph" Version="5.75.0" />
     <PackageVersion Include="Microsoft.Identity.Client" Version="4.70.1" />
     <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.70.1" />
