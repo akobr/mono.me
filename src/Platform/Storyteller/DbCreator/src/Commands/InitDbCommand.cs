@@ -1,9 +1,9 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
-using _42.Platform.Storyteller.Simulator.Logic;
+using _42.Platform.Storyteller.DbCreator.Logic;
 using McMaster.Extensions.CommandLineUtils;
 
-namespace _42.Platform.Storyteller.Simulator.Commands;
+namespace _42.Platform.Storyteller.DbCreator.Commands;
 
 [Command("2sInitDb", Description = "Initialize database for 2S platform.")]
 public class InitDbCommand : IAsyncCommand

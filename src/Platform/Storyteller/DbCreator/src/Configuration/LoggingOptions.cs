@@ -2,7 +2,7 @@ using System;
 using System.IO.Abstractions;
 using System.Reflection;
 
-namespace _42.Platform.Storyteller.Simulator.Configuration;
+namespace _42.Platform.Storyteller.DbCreator.Configuration;
 
 public class LoggingOptions
 {
