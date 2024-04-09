@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
-using _42.Platform.Storyteller.Access;
 using Newtonsoft.Json;
 
 namespace _42.Platform.Storyteller.Entities.Access;
