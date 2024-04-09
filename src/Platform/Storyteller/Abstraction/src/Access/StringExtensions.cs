@@ -1,8 +1,8 @@
-using System.Text;
 using System.Text.RegularExpressions;
 
 namespace _42.Platform.Storyteller.Access;
 
+// TODO: remove from here
 public static class StringExtensions
 {
     private static readonly Regex InvalidCharacterRegex = new(@"[^a-z0-9\-_]", RegexOptions.Compiled);

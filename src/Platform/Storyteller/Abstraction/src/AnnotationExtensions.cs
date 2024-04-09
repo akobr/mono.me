@@ -1,5 +1,3 @@
-using _42.Platform.Storyteller.Entities;
-
 namespace _42.Platform.Storyteller
 {
     public static class AnnotationExtensions

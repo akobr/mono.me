@@ -1,5 +1,5 @@
 using System.Linq;
-using CoreAnnotation = _42.Platform.Storyteller.Entities.Annotation;
+using CoreAnnotation = _42.Platform.Storyteller.Annotation;
 using SdkAnnotation = _42.Platform.Sdk.Model.Annotation;
 
 namespace _42.Platform.Cli.Model;
@@ -12,7 +12,6 @@ public static class AnnotationExtensions
         {
             AnnotationType = (SdkAnnotation.AnnotationTypeEnum)@this.AnnotationType,
             Name = @this.Name,
-            PartitionKey = @this.PartitionKey,
 
             Title = @this.Title,
             ValidFrom = @this.ValidFrom?.UtcDateTime,

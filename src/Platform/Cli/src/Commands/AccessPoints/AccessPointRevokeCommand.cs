@@ -51,7 +51,7 @@ public class AccessPointRevokeCommand : BaseCommand
             AccountId = AccountId[1..];
         }
 
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
+        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
 
         if (accountResponse.StatusCode is not HttpStatusCode.OK)
         {

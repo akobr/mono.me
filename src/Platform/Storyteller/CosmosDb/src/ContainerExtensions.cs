@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Backend;
 using Microsoft.Azure.Cosmos;
 
 using Container = Microsoft.Azure.Cosmos.Container;
@@ -15,10 +16,11 @@ public static class ContainerExtensions
     // TODO: [P2] use default serializer same like Azure Function runtime is using
     private static readonly JsonSerializerOptions Options = new(JsonSerializerOptions.Default)
     {
-        AllowTrailingCommas = true,
+        PropertyNamingPolicy = new NoChangeNamingPolicy(),
+        Converters = { new JsonStringEnumConverter() },
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
+        AllowTrailingCommas = true,
     };
 
     public static async Task<TItem?> TryReadItem<TItem>(
