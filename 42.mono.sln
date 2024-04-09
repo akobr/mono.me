@@ -108,6 +108,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DbCreator", "src\Platform\S
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Abstractions.Annotations", "src\Platform\Storyteller\Abstractions.Annotations\src\Abstractions.Annotations.csproj", "{FE24ACA6-68CF-4926-B6E6-524AF37242DA}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Abstractions.Access", "src\Platform\Storyteller\Abstractions.Access\src\Abstractions.Access.csproj", "{23CD6D25-E499-4F2E-9F13-49F7DC891EDD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -244,6 +246,10 @@ Global
 		{FE24ACA6-68CF-4926-B6E6-524AF37242DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FE24ACA6-68CF-4926-B6E6-524AF37242DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FE24ACA6-68CF-4926-B6E6-524AF37242DA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{23CD6D25-E499-4F2E-9F13-49F7DC891EDD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{23CD6D25-E499-4F2E-9F13-49F7DC891EDD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{23CD6D25-E499-4F2E-9F13-49F7DC891EDD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{23CD6D25-E499-4F2E-9F13-49F7DC891EDD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -291,6 +297,7 @@ Global
 		{A04BB3EA-B3D4-4521-A09C-9CC446169B42} = {1F8DA45A-60A4-41DA-B1F9-55EA8DC3BC19}
 		{5F878BE5-7A1A-4BC2-9A83-490BE9FD6263} = {1F8DA45A-60A4-41DA-B1F9-55EA8DC3BC19}
 		{FE24ACA6-68CF-4926-B6E6-524AF37242DA} = {1F8DA45A-60A4-41DA-B1F9-55EA8DC3BC19}
+		{23CD6D25-E499-4F2E-9F13-49F7DC891EDD} = {1F8DA45A-60A4-41DA-B1F9-55EA8DC3BC19}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F82BF58F-3E50-4150-BD21-CA489E5CCF93}

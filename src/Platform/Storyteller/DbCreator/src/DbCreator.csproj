@@ -27,7 +27,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Libraries\CLI\Toolkit\src\Toolkit.csproj" />
     <ProjectReference Include="..\..\..\..\Libraries\Testing\System.IO.Abstractions.Trace\src\System.IO.Abstractions.Trace.csproj" />
-    <ProjectReference Include="..\..\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
     <ProjectReference Include="..\..\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
   </ItemGroup>
 

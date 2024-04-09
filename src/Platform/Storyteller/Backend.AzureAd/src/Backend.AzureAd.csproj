@@ -17,7 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
     <ProjectReference Include="..\..\Backend.Core\src\Backend.Core.csproj" />
   </ItemGroup>
 
