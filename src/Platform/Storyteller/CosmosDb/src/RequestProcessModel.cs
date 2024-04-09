@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using _42.Platform.Storyteller.Entities;
+using _42.Platform.Storyteller.Backend.Annotating;
 using Microsoft.Azure.Cosmos;
 
 namespace _42.Platform.Storyteller;

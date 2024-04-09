@@ -3,11 +3,13 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using _42.Platform.Storyteller.Access;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
-using _42.Platform.Storyteller.Entities;
+using _42.Platform.Storyteller.Backend.Accessing;
+using _42.Platform.Storyteller.Backend.Annotating;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -76,7 +78,8 @@ public class AnnotationsHttp
         };
 
         var response = await _annotations.GetAnnotationsAsync(dataRequest);
-        return new OkObjectResult(response);
+        var result = new OkObjectResult(response);
+        return result;
     }
 
     [Function(nameof(GetAnnotation))]
@@ -296,7 +299,7 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
-        var annotationType = AnnotationTypeMap.GetSystemType(annotation.AnnotationType);
+        var annotationType = AnnotationTypes.GetRuntimeType(annotation.AnnotationType);
         using var reader = new StreamReader(request.Body);
         var deserializedObject = await JsonSerializer.DeserializeAsync(
             request.Body,

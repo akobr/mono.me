@@ -10,13 +10,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AutoMapper" />
     <PackageReference Include="Microsoft.Azure.Cosmos" />
-    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\..\Libraries\Utils\Async\src\Async.csproj" />
     <ProjectReference Include="..\..\Abstraction\src\Abstraction.csproj" />
+    <ProjectReference Include="..\..\Backend.Core\src\Backend.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Storing\" />
   </ItemGroup>
 
 </Project>

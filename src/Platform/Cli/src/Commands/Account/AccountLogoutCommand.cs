@@ -34,7 +34,7 @@ public class AccountLogoutCommand : BaseCommand
             return ExitCodes.SUCCESS;
         }
 
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
+        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
         await _authentication.ClearAuthenticationAsync();
 
         if (accountResponse.StatusCode is HttpStatusCode.OK)

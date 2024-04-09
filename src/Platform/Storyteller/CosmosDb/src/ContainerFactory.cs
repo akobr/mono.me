@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Entities;
 using _42.Utils.Async;
 using Microsoft.Azure.Cosmos;
 
@@ -21,7 +22,7 @@ public class ContainerFactory : IContainerFactory
 
         var containerResult = await database.CreateContainerIfNotExistsAsync(
             id: containerName,
-            partitionKeyPath: "/partitionKey");
+            partitionKeyPath: $"/{nameof(Entity.PartitionKey)}");
 
         return containerResult.Container;
     }

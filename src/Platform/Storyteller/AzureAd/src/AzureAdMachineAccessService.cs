@@ -1,6 +1,6 @@
 using _42.Platform.Storyteller.Access;
-using _42.Platform.Storyteller.Access.Entities;
-using _42.Platform.Storyteller.Access.Models;
+using _42.Platform.Storyteller.Backend.Accessing;
+using _42.Platform.Storyteller.Backend.Accessing.Model;
 using Azure.Identity;
 using Microsoft.Graph;
 using Microsoft.Graph.Applications.Item.AddPassword;
@@ -115,7 +115,6 @@ public class AzureAdMachineAccessService : IMachineAccessService
             Id = appId,
             ObjectId = objectId,
             AccessKey = createdSecret.SecretText,
-            PartitionKey = $"{model.Project}.access",
             AnnotationKey = model.AnnotationKey,
             Scope = model.Scope <= MachineAccessScope.ConfigurationRead
                 ? MachineAccessScope.DefaultRead

@@ -9,7 +9,6 @@ using _42.Platform.Cli.Model;
 using _42.Platform.Cli.Output;
 using _42.Platform.Sdk.Api;
 using _42.Platform.Storyteller;
-using _42.Platform.Storyteller.Entities;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -62,7 +61,6 @@ public class StorytellerSetCommand : BaseContextCommand
 
         var annotation = new Annotation
         {
-            PartitionKey = fullKey.GetPartitionKey(),
             AnnotationKey = annotationKey,
             AnnotationType = annotationKey.Type,
             Name = annotationKey.Name,
@@ -89,7 +87,7 @@ public class StorytellerSetCommand : BaseContextCommand
                     LineInfoHandling = LineInfoHandling.Ignore,
                 });
 
-            var annotationType = AnnotationTypeCodes.GetRealType(annotationKey.Type);
+            var annotationType = AnnotationTypes.GetRuntimeType(annotationKey.Type);
             var serializedAnnotation = fileContent.ToObject(annotationType, JsonSerializer.CreateDefault());
 
             if (serializedAnnotation is not Annotation castedAnnotation)
@@ -103,7 +101,6 @@ public class StorytellerSetCommand : BaseContextCommand
 
         annotation = annotation with
         {
-            PartitionKey = fullKey.GetPartitionKey(),
             AnnotationKey = annotationKey,
             AnnotationType = annotationKey.Type,
             Name = annotationKey.Name,
@@ -154,20 +151,15 @@ public class StorytellerSetCommand : BaseContextCommand
                 labels.Add(label);
             }
 
-            if (annotation.Labels is null)
+            if (annotation.Labels is not null)
             {
-                annotation = annotation with
-                {
-                    Labels = labels,
-                };
+                labels.UnionWith(annotation.Labels);
             }
-            else
+
+            annotation = annotation with
             {
-                annotation = annotation with
-                {
-                    Labels = new HashSet<string>(annotation.Labels.Concat(labels)),
-                };
-            }
+                Labels = labels.ToList(),
+            };
         }
 
         var resultAnnotation = await _annotationsApi.SetAnnotationAsync(

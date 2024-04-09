@@ -65,8 +65,7 @@ public class AccountCommand : BaseCommand
             }
         }
 
-        _accessApi.Configuration = GlobalConfiguration.Instance;
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
+        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
 
         if (accountResponse.StatusCode is HttpStatusCode.NotFound)
         {

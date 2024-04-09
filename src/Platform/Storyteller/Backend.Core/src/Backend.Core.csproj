@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.Backend.Core</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller.Backend</RootNamespace>
+
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Abstraction\src\Abstraction.csproj" />
+  </ItemGroup>
+
+</Project>

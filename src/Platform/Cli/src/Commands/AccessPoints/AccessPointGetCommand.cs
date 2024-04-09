@@ -32,7 +32,7 @@ public class AccessPointGetCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
+        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
 
         if (accountResponse.StatusCode is not HttpStatusCode.OK)
         {

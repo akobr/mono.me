@@ -1,4 +1,5 @@
 using _42.Platform.Storyteller;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.Security;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

@@ -12,11 +12,13 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Graph" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Abstraction\src\Abstraction.csproj" />
+    <ProjectReference Include="..\..\Backend.Core\src\Backend.Core.csproj" />
   </ItemGroup>
 
 </Project>

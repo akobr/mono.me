@@ -11,7 +11,7 @@ public class AnnotationKey
     internal AnnotationKey(ArraySegment<string> segments)
     {
         _segments = segments;
-        Type = AnnotationTypeCodes.GetType(TypeCode);
+        Type = AnnotationTypes.GetType(TypeCode);
     }
 
     internal AnnotationKey(params string[] segments)

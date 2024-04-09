@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using _42.Platform.Storyteller.Entities;
 
 namespace _42.Platform.Storyteller;
 

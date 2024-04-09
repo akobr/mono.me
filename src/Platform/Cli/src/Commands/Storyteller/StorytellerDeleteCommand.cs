@@ -31,7 +31,7 @@ public class StorytellerDeleteCommand : BaseContextCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        var response = await _annotationsApi.DeleteAnnotationWithHttpInfoSafeAsync(
+        var response = await _annotationsApi.DeleteAnnotationWithHttpInfoAsync(
             Context.OrganizationName,
             Context.ProjectName,
             Context.ViewName,

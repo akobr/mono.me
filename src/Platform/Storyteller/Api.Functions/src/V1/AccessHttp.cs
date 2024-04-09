@@ -1,10 +1,10 @@
 using System.Net;
 using _42.Platform.Storyteller.Access;
-using _42.Platform.Storyteller.Access.Entities;
-using _42.Platform.Storyteller.Access.Models;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
+using _42.Platform.Storyteller.Backend.Accessing;
+using _42.Platform.Storyteller.Backend.Accessing.Model;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -267,6 +267,7 @@ public class AccessHttp
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
+        // TODO: [P1] hide the model from the client
         machineModel = machineModel with { Organization = organization, Project = project };
         var machineAccess = await _accessService.CreateMachineAccessAsync(machineModel);
         return new OkObjectResult(machineAccess);
