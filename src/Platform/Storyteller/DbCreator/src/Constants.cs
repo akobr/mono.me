@@ -1,4 +1,4 @@
-namespace _42.Platform.Storyteller.Simulator;
+namespace _42.Platform.Storyteller.DbCreator;
 
 public static class Constants
 {

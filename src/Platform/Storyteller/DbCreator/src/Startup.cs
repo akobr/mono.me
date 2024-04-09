@@ -1,20 +1,17 @@
 using System.IO.Abstractions;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
-using _42.Platform.Storyteller;
-using _42.Platform.Storyteller.Simulator.Configuration;
-using _42.Platform.Storyteller.Simulator.Logic;
+using _42.Platform.Storyteller.DbCreator.Configuration;
+using _42.Platform.Storyteller.DbCreator.Logic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Serilog;
-
-using Constants = _42.Platform.Storyteller.Simulator.Constants;
 using IConfigurationBuilder = Microsoft.Extensions.Configuration.IConfigurationBuilder;
 
-namespace _42.Platform.Cli
+namespace _42.Platform.Storyteller.DbCreator
 {
     public class Startup : IStartup
     {
