@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <AssemblyName>42.Platform.Storyteller.Backend.Core</AssemblyName>
-    <RootNamespace>_42.Platform.Storyteller.Backend</RootNamespace>
+    <RootNamespace>_42.Platform.Storyteller</RootNamespace>
 
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>

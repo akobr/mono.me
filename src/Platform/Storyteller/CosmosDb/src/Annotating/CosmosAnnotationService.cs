@@ -6,8 +6,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
-using _42.Platform.Storyteller.Backend;
-using _42.Platform.Storyteller.Backend.Annotating;
 using _42.Platform.Storyteller.Entities.Annotations;
 using AutoMapper;
 using Microsoft.Azure.Cosmos;

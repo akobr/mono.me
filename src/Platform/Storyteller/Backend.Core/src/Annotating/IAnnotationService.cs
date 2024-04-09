@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-using _42.Platform.Storyteller.Backend.Annotating;
 
 namespace _42.Platform.Storyteller.Annotating;
 

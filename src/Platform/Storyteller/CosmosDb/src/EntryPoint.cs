@@ -1,10 +1,7 @@
 using _42.Platform.Storyteller.Access;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
-using _42.Platform.Storyteller.Backend.Accessing;
-using _42.Platform.Storyteller.Backend.Configuring;
 using _42.Platform.Storyteller.Configuring;
-using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Access;
 using _42.Platform.Storyteller.Entities.Annotations;
 using Microsoft.Extensions.Configuration;

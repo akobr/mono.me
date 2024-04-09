@@ -1,4 +1,3 @@
-
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller.Access;
 using Newtonsoft.Json;
