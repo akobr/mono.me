@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <AssemblyName>42.Platform.Storyteller.Api.Web</AssemblyName>
@@ -27,7 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Abstraction\src\Abstraction.csproj" />
-    <ProjectReference Include="..\..\CosmosDb\src\CosmosDb.csproj" />
+    <ProjectReference Include="..\..\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
   </ItemGroup>
 
 </Project>
