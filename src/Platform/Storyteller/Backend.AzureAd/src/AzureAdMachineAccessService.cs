@@ -7,7 +7,7 @@ using Microsoft.Graph.Applications.Item.AddPassword;
 using Microsoft.Graph.Applications.Item.RemovePassword;
 using Microsoft.Graph.Models;
 
-namespace _42.Platform.Storyteller.AzureAd;
+namespace _42.Platform.Storyteller;
 
 // TODO: [P2] add support of certificate for better security
 public class AzureAdMachineAccessService : IMachineAccessService
