@@ -23,8 +23,4 @@
     <ProjectReference Include="..\..\Backend.Core\src\Backend.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Storing\" />
-  </ItemGroup>
-
 </Project>

@@ -4,12 +4,11 @@ using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Access;
-using _42.Platform.Storyteller.Backend.Accessing;
-using _42.Platform.Storyteller.Backend.Accessing.Model;
+using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Entities.Access;
 using AutoMapper;
 using Microsoft.Azure.Cosmos;
-using Permission = _42.Platform.Storyteller.Backend.Accessing.Model.Permission;
+using Permission = _42.Platform.Storyteller.Accessing.Model.Permission;
 
 namespace _42.Platform.Storyteller.Accessing;
 

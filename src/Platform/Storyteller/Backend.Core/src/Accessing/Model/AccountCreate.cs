@@ -1,4 +1,4 @@
-namespace _42.Platform.Storyteller.Backend.Accessing.Model;
+namespace _42.Platform.Storyteller.Accessing.Model;
 
 public record class AccountCreate
 {

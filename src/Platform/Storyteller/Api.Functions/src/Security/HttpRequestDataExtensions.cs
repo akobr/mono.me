@@ -3,7 +3,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using _42.Platform.Storyteller.Access;
-using _42.Platform.Storyteller.Backend.Accessing;
+using _42.Platform.Storyteller.Accessing;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;

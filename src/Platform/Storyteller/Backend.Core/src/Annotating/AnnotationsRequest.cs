@@ -1,6 +1,6 @@
 using System.Linq.Expressions;
 
-namespace _42.Platform.Storyteller.Backend.Annotating;
+namespace _42.Platform.Storyteller.Annotating;
 
 public class AnnotationsRequest
 {

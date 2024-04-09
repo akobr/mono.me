@@ -1,4 +1,4 @@
-using _42.Platform.Storyteller.Backend.Accessing;
+using _42.Platform.Storyteller.Accessing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace _42.Platform.Storyteller.AzureAd;
