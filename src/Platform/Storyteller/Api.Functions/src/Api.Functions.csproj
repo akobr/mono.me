@@ -35,7 +35,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Abstraction\src\Abstraction.csproj" />
-    <ProjectReference Include="..\..\AzureAd\src\AzureAd.csproj" />
+    <ProjectReference Include="..\..\Backend.AzureAd\src\Backend.AzureAd.csproj" />
     <ProjectReference Include="..\..\CosmosDb\src\CosmosDb.csproj" />
   </ItemGroup>
 
