@@ -11,7 +11,7 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Sdk.Api;
 using _42.Platform.Sdk.Model;
-using _42.Platform.Storyteller.Access;
+using _42.Platform.Storyteller;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 

@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
-using _42.Platform.Storyteller.Access;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Entities.Access;
 using AutoMapper;

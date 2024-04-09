@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace _42.Platform.Storyteller.Access;
+namespace _42.Platform.Storyteller;
 
 public record class AccessPoint : IAccessPoint
 {

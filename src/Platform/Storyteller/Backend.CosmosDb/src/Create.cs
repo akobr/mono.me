@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using _42.Platform.Storyteller.Access;
 using _42.Platform.Storyteller.Entities.Access;
 using _42.Platform.Storyteller.Entities.Annotations;
 
