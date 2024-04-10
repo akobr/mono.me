@@ -30,7 +30,7 @@ public class AccessPointCreateCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoSafeAsync();
+        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
 
         if (accountResponse.StatusCode is not HttpStatusCode.OK)
         {
@@ -38,7 +38,7 @@ public class AccessPointCreateCommand : BaseCommand
                 "You account is not registered, to create a registration call ",
                 "sform account register ".ThemedHighlight(Console.Theme),
                 "command.");
-            return ExitCodes.INTERACTION_NEEDED;
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
         var account = accountResponse.Data;
