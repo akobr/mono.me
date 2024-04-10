@@ -2,7 +2,7 @@
   "name": "sdk.typescript",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "api.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc --build",
@@ -17,5 +17,8 @@
     "@typescript-eslint/parser": "^7.6.0",
     "eslint": "^8.57.0",
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "request": "^2.88.2"
   }
 }

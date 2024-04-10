@@ -36,6 +36,9 @@ let defaultBasePath = 'http://localhost:7071/api';
 // ===============================================
 
 export enum AccessApiApiKeys {
+    default,
+    manual,
+    integrated
 }
 
 export class AccessApi {
@@ -46,7 +49,6 @@ export class AccessApi {
     protected authentications = {
         'default': <Authentication>new VoidAuth(),
         'manual': new HttpBearerAuth(),
-        'integrated': new OAuth(),
         'integrated': new OAuth(),
     }
 
@@ -97,11 +99,7 @@ export class AccessApi {
         this.authentications.manual.accessToken = accessToken;
     }
 
-    set accessToken(token: string) {
-        this.authentications.integrated.accessToken = token;
-    }
-
-    set accessToken(token: string) {
+    set integratedAccessToken(token: string) {
         this.authentications.integrated.accessToken = token;
     }
 
@@ -110,7 +108,7 @@ export class AccessApi {
     }
 
     /**
-     * 
+     *
      * @param accessPointCreate An organization or project to create.
      */
     public async createAccessPoint (accessPointCreate?: AccessPointCreate, options: {headers: {[name: string]: string}} = {headers: {}}) : Promise<{ response: http.IncomingMessage; body: AccessPoint;  }> {
@@ -182,7 +180,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      * @param accountCreate Organization and project for the new account.
      */
     public async createAccount (accountCreate?: AccountCreate, options: {headers: {[name: string]: string}} = {headers: {}}) : Promise<{ response: http.IncomingMessage; body: Account;  }> {
@@ -254,7 +252,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param machineAccessCreate An organization or project to create.
@@ -340,7 +338,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param id The id of the machine access.
@@ -430,7 +428,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      * @param key The key of requested access point.
      */
     public async getAccessPoint (key: string, options: {headers: {[name: string]: string}} = {headers: {}}) : Promise<{ response: http.IncomingMessage; body: AccessPoint;  }> {
@@ -507,7 +505,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      */
     public async getAccessPoints (options: {headers: {[name: string]: string}} = {headers: {}}) : Promise<{ response: http.IncomingMessage; body: Array<AccessPoint>;  }> {
         const localVarPath = this.basePath + '/v1/access/points';
@@ -577,7 +575,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      */
     public async getAccount (options: {headers: {[name: string]: string}} = {headers: {}}) : Promise<{ response: http.IncomingMessage; body: Account;  }> {
         const localVarPath = this.basePath + '/v1/access/account';
@@ -647,7 +645,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param id The id of the machine access.
@@ -738,7 +736,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      */
@@ -822,7 +820,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      * @param permission The requested permission to grant.
      */
     public async grantUserAccess (permission?: Permission, options: {headers: {[name: string]: string}} = {headers: {}}) : Promise<{ response: http.IncomingMessage; body: AccessPoint;  }> {
@@ -894,7 +892,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param id The id of the machine access.
@@ -985,7 +983,7 @@ export class AccessApi {
         });
     }
     /**
-     * 
+     *
      * @param permission The requested permission to revoke.
      */
     public async revokeUserAccess (permission?: Permission, options: {headers: {[name: string]: string}} = {headers: {}}) : Promise<{ response: http.IncomingMessage; body: AccessPoint;  }> {

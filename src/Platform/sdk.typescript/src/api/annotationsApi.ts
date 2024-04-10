@@ -36,6 +36,9 @@ let defaultBasePath = 'http://localhost:7071/api';
 // ===============================================
 
 export enum AnnotationsApiApiKeys {
+    default,
+    manual,
+    integrated
 }
 
 export class AnnotationsApi {
@@ -46,7 +49,6 @@ export class AnnotationsApi {
     protected authentications = {
         'default': <Authentication>new VoidAuth(),
         'manual': new HttpBearerAuth(),
-        'integrated': new OAuth(),
         'integrated': new OAuth(),
     }
 
@@ -97,11 +99,7 @@ export class AnnotationsApi {
         this.authentications.manual.accessToken = accessToken;
     }
 
-    set accessToken(token: string) {
-        this.authentications.integrated.accessToken = token;
-    }
-
-    set accessToken(token: string) {
+    set integratedAccessToken(token: string) {
         this.authentications.integrated.accessToken = token;
     }
 
@@ -110,7 +108,7 @@ export class AnnotationsApi {
     }
 
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -207,7 +205,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -305,7 +303,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -401,7 +399,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -507,7 +505,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -617,7 +615,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -728,7 +726,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -829,7 +827,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -930,7 +928,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -1036,7 +1034,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -1136,7 +1134,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
@@ -1229,7 +1227,7 @@ export class AnnotationsApi {
         });
     }
     /**
-     * 
+     *
      * @param organization Target organization name.
      * @param project Target project name.
      * @param view The target view inside the project.
