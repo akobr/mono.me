@@ -1,9 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
 using System.Net;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
@@ -11,7 +11,6 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Sdk.Api;
 using _42.Platform.Sdk.Model;
-using _42.Platform.Storyteller;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 
@@ -20,6 +19,8 @@ namespace _42.Platform.Cli.Commands.Account;
 [Command(CommandNames.REGISTER, Description = "Register new account with 2S platform.")]
 public class AccountRegisterCommand : BaseCommand
 {
+    private static readonly Regex InvalidCharacterRegex = new(@"[^a-z0-9\-_]", RegexOptions.Compiled);
+
     private readonly IAccessApiAsync _accessApi;
     private readonly IAuthenticationService _authentication;
     private readonly IFileSystem _fileSystem;
@@ -66,7 +67,7 @@ public class AccountRegisterCommand : BaseCommand
         var organizationName = Console.Input(new InputOptions<string>
         {
             Message = "Name of your organization",
-            DefaultValue = identifier.ToNormalizedKey(),
+            DefaultValue = GetPossibleOrganizationName(identifier),
         });
 
         var projectName = Console.Input(new InputOptions<string>
@@ -108,5 +109,12 @@ public class AccountRegisterCommand : BaseCommand
         }
 
         return null;
+    }
+
+    private static string GetPossibleOrganizationName(string text)
+    {
+        var lowerKey = text.Trim().ToLowerInvariant();
+        var normalizedKey = InvalidCharacterRegex.Replace(lowerKey, "_");
+        return normalizedKey;
     }
 }
