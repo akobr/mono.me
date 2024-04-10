@@ -39,7 +39,8 @@
     <ProjectReference Include="..\..\..\Libraries\Testing\System.IO.Abstractions.Trace\src\System.IO.Abstractions.Trace.csproj" />
     <ProjectReference Include="..\..\..\Libraries\Utils\Async\src\Async.csproj" />
     <ProjectReference Include="..\..\Sdk\src\Sdk.csproj" />
-    <ProjectReference Include="..\..\Storyteller\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
+    <ProjectReference Include="..\..\Storyteller\Abstractions.Access\src\Abstractions.Access.csproj" />
+    <ProjectReference Include="..\..\Storyteller\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
   </ItemGroup>
 
   <ItemGroup>
