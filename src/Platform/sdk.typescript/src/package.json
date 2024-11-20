@@ -1,16 +1,23 @@
 {
-  "name": "sdk.typescript",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@42for.net/2splatform.sdk",
+  "version": "0.8.2",
+  "description": "Sdk for managing and control 2S platform.",
   "main": "api.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsc --build",
-    "clean": "tsc --build --clean"
+  "exports": {
+    ".": "./api.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean",
+    "publish": "npm publish --access public"
+  },
+  "keywords": [
+    "platform",
+    "2s",
+    "sdk"
+  ],
+  "author": "Ales Kobr",
+  "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.12.7",
     "@typescript-eslint/eslint-plugin": "^7.6.0",

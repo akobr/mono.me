@@ -1,9 +1,19 @@
 using System;
+using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
 namespace _42.Platform.Storyteller.Entities.Annotations;
 
 public record class AnnotationEntity : ExtendableEntity
 {
+    [JsonProperty("id")]
+    [JsonPropertyName("id")]
+    public override required string Id
+    {
+        get => $"{ViewName}.{AnnotationKey}";
+        init { }
+    }
+
     public required AnnotationType AnnotationType { get; init; }
 
     public string? Title { get; init; }

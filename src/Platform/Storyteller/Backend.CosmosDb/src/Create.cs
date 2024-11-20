@@ -14,6 +14,7 @@ public static class Create
     {
         return new ResponsibilityEntity
         {
+            Id = string.Empty,
             PartitionKey = PartitionKeys.GetResponsibility(projectName, responsibilityName),
             ProjectName = projectName,
             ViewName = viewName,
@@ -32,29 +33,28 @@ public static class Create
     {
         return new SubjectEntity
         {
+            Id = string.Empty,
             PartitionKey = PartitionKeys.GetSubject(projectName, subjectName),
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Subject,
             AnnotationKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             Name = subjectName,
-            Usages = responsibilityNames
-                .Select(name => AnnotationKey.CreateUsage(subjectName, name).ToString())
-                .ToList(),
-            Contexts = contextNames
-                .Select(name => AnnotationKey.CreateContext(subjectName, name).ToString())
-                .ToList(),
+            Usages = responsibilityNames.ToList(),
+            Contexts = contextNames.ToList(),
         };
     }
 
     public static ContextEntity Context(
         string subjectName,
         string contextName,
+        IEnumerable<string> responsibilityNames,
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
         return new ContextEntity
         {
+            Id = string.Empty,
             PartitionKey = PartitionKeys.GetSubject(projectName, subjectName),
             ProjectName = projectName,
             ViewName = viewName,
@@ -63,6 +63,7 @@ public static class Create
             Name = contextName,
             SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             SubjectName = subjectName,
+            Executions = responsibilityNames.ToList(),
         };
     }
 
@@ -75,6 +76,7 @@ public static class Create
     {
         return new UsageEntity
         {
+            Id = string.Empty,
             PartitionKey = PartitionKeys.GetResponsibility(projectName, responsibilityName),
             ProjectName = projectName,
             ViewName = viewName,
@@ -85,9 +87,7 @@ public static class Create
             SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             ResponsibilityName = responsibilityName,
             SubjectName = subjectName,
-            Executions = contextNames
-                .Select(name => AnnotationKey.CreateExecution(subjectName, responsibilityName, name).ToString())
-                .ToList(),
+            Executions = contextNames.ToList(),
         };
     }
 
@@ -100,6 +100,7 @@ public static class Create
     {
         return new ExecutionEntity
         {
+            Id = string.Empty,
             PartitionKey = PartitionKeys.GetResponsibility(projectName, responsibilityName),
             ProjectName = projectName,
             ViewName = viewName,

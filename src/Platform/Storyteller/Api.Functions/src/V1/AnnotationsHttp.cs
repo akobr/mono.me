@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -34,6 +35,7 @@ public class AnnotationsHttp
         _annotations = annotations;
         _access = access;
         _logger = logger;
+        Expression
     }
 
     [Function(nameof(GetAnnotations))]
@@ -292,21 +294,24 @@ public class AnnotationsHttp
         string project,
         string view,
         string key,
-        [FromBody] Annotation annotation)
+        [FromBody] Annotation? annotation)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
-        var annotationType = AnnotationTypes.GetRuntimeType(annotation.AnnotationType);
-        using var reader = new StreamReader(request.Body);
-        var deserializedObject = await JsonSerializer.DeserializeAsync(
-            request.Body,
-            annotationType,
-            new JsonSerializerOptions
-            {
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                PropertyNameCaseInsensitive = true,
-            });
+        if (annotation is not null)
+        {
+            var annotationType = AnnotationTypes.GetRuntimeType(annotation.AnnotationType);
+            using var reader = new StreamReader(request.Body);
+            var deserializedObject = await JsonSerializer.DeserializeAsync(
+                request.Body,
+                annotationType,
+                new JsonSerializerOptions
+                {
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                    PropertyNameCaseInsensitive = true,
+                });
+        }
 
         if (deserializedObject is null)
         {
@@ -324,7 +329,14 @@ public class AnnotationsHttp
 
         try
         {
-            await _annotations.CreateOrUpdateAnnotationAsync(organization, typedAnnotation);
+            if (request.Method == Definitions.Methods.Post)
+            {
+                await _annotations.CreateAnnotationAsync(organization, typedAnnotation);
+            }
+            else
+            {
+                await _annotations.UpdateAnnotationAsync(organization, typedAnnotation);
+            }
         }
         catch (Exception exception)
         {
@@ -413,8 +425,21 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
-        // TODO: [P1] implement
-        throw new NotImplementedException();
+        if (!AnnotationKey.TryParse(key, out var annotationKey))
+        {
+            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {key}"));
+        }
+
+        var fullKey = FullKey.Create(annotationKey, organization, project, view);
+        var annotation = await _annotations.GetAnnotationAsync(fullKey);
+
+        if (annotation is null)
+        {
+            return new NotFoundResult();
+        }
+
+        await _annotations.DeleteAnnotationAsync(fullKey);
+        return new OkObjectResult(annotation);
     }
 
     [Function(nameof(GetResponsibilities))]

@@ -11,6 +11,7 @@ public static class AnnotationTypeCodes
     public const string Context = "cnt";
     public const string Execution = "exe";
     public const string Unit = "unt";
+    public const string UnitOfExecution = "uxe";
 
     public static readonly IReadOnlyDictionary<string, AnnotationType> ValidCodes
         = new Dictionary<string, AnnotationType>(StringComparer.OrdinalIgnoreCase)

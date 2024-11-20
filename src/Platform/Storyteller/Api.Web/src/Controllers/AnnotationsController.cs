@@ -621,7 +621,7 @@ public class AnnotationsController : ControllerBase
 
         try
         {
-            await _annotations.CreateOrUpdateAnnotationAsync(tenant, typedAnnotation);
+            await _annotations.CreateAnnotationAsync(tenant, typedAnnotation);
         }
         catch (Exception e)
         {

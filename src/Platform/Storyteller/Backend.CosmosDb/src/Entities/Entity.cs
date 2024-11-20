@@ -9,7 +9,11 @@ public record class Entity
 
     [JsonProperty("id")]
     [JsonPropertyName("id")]
-    public string Id => $"{ViewName}.{AnnotationKey}";
+    public virtual required string Id { get; init; }
+
+    [JsonProperty("_ts")]
+    [JsonPropertyName("_ts")]
+    public uint LastUpdatedEpochTimestamp { get; }
 
     public required string ProjectName { get; init; }
 
