@@ -15,16 +15,19 @@ public class Data
         // subjects
         await container.UpsertItemAsync(Create.Subject(
             "42",
-            new[] { "storyteller", "supervisor", "scheduler" },
-            new[] { "system" }));
+            ["storyteller", "supervisor", "scheduler"],
+            ["system"]));
 
         // contexts
-        await container.UpsertItemAsync(Create.Context("42", "system"));
+        await container.UpsertItemAsync(Create.Context(
+            "42",
+            "system",
+            ["storyteller", "supervisor", "scheduler"]));
 
         // usages
-        await container.UpsertItemAsync(Create.Usage("42", "storyteller", new[] { "system" }));
-        await container.UpsertItemAsync(Create.Usage("42", "supervisor", new[] { "system" }));
-        await container.UpsertItemAsync(Create.Usage("42", "scheduler", new[] { "system" }));
+        await container.UpsertItemAsync(Create.Usage("42", "storyteller", ["system"]));
+        await container.UpsertItemAsync(Create.Usage("42", "supervisor", ["system"]));
+        await container.UpsertItemAsync(Create.Usage("42", "scheduler", ["system"]));
 
         // executions
         await container.UpsertItemAsync(Create.Execution("42", "storyteller", "system"));
