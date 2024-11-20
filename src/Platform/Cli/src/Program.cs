@@ -39,12 +39,24 @@ public class Program
         {
             parsingException.WriteOutput();
 
-            await Task.Run(() => LogWithSentry(() => _logger.LogWarning(
+            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
                 "Unrecognized input at {command}; Arguments: {args}; NearestMatches: {nearestMatches}",
                 parsingException.Command.Name,
                 args,
                 parsingException.NearestMatches.ToList())));
             return ExitCodes.ERROR_INPUT_PARSING;
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            var reportedException = exception.InnerException ?? exception;
+            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
+                reportedException,
+                "Unauthorized access; Arguments: {args}",
+                [args])));
+
+            Console.Write("! ", Color.Magenta);
+            Console.WriteLine("You are not authorized to execute the command or you don't have access to requested resources.");
+            return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
         }
         catch (Exception exception)
         {

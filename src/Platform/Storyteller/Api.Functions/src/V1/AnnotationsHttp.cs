@@ -1,13 +1,14 @@
+using System.Linq.Expressions;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using _42.Platform.Storyteller.Access;
+using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
-using _42.Platform.Storyteller.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -34,6 +35,7 @@ public class AnnotationsHttp
         _annotations = annotations;
         _access = access;
         _logger = logger;
+        Expression
     }
 
     [Function(nameof(GetAnnotations))]
@@ -76,7 +78,8 @@ public class AnnotationsHttp
         };
 
         var response = await _annotations.GetAnnotationsAsync(dataRequest);
-        return new OkObjectResult(response);
+        var result = new OkObjectResult(response);
+        return result;
     }
 
     [Function(nameof(GetAnnotation))]
@@ -291,21 +294,24 @@ public class AnnotationsHttp
         string project,
         string view,
         string key,
-        [FromBody] Annotation annotation)
+        [FromBody] Annotation? annotation)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
-        var annotationType = AnnotationTypeMap.GetSystemType(annotation.AnnotationType);
-        using var reader = new StreamReader(request.Body);
-        var deserializedObject = await JsonSerializer.DeserializeAsync(
-            request.Body,
-            annotationType,
-            new JsonSerializerOptions
-            {
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                PropertyNameCaseInsensitive = true,
-            });
+        if (annotation is not null)
+        {
+            var annotationType = AnnotationTypes.GetRuntimeType(annotation.AnnotationType);
+            using var reader = new StreamReader(request.Body);
+            var deserializedObject = await JsonSerializer.DeserializeAsync(
+                request.Body,
+                annotationType,
+                new JsonSerializerOptions
+                {
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                    PropertyNameCaseInsensitive = true,
+                });
+        }
 
         if (deserializedObject is null)
         {
@@ -323,7 +329,14 @@ public class AnnotationsHttp
 
         try
         {
-            await _annotations.CreateOrUpdateAnnotationAsync(organization, typedAnnotation);
+            if (request.Method == Definitions.Methods.Post)
+            {
+                await _annotations.CreateAnnotationAsync(organization, typedAnnotation);
+            }
+            else
+            {
+                await _annotations.UpdateAnnotationAsync(organization, typedAnnotation);
+            }
         }
         catch (Exception exception)
         {
@@ -412,8 +425,21 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
-        // TODO: [P1] implement
-        throw new NotImplementedException();
+        if (!AnnotationKey.TryParse(key, out var annotationKey))
+        {
+            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {key}"));
+        }
+
+        var fullKey = FullKey.Create(annotationKey, organization, project, view);
+        var annotation = await _annotations.GetAnnotationAsync(fullKey);
+
+        if (annotation is null)
+        {
+            return new NotFoundResult();
+        }
+
+        await _annotations.DeleteAnnotationAsync(fullKey);
+        return new OkObjectResult(annotation);
     }
 
     [Function(nameof(GetResponsibilities))]

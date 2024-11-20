@@ -10,4 +10,6 @@ public interface IAuthenticationService
     Task<IPublicClientApplication> GetPublicClientApplicationAsync();
 
     Task<AuthenticationResult?> GetAuthenticationAsync();
+
+    Task ClearAuthenticationAsync();
 }

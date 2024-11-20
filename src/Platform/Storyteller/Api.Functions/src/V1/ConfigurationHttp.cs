@@ -1,9 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using _42.Platform.Storyteller.Access;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
+using _42.Platform.Storyteller.Configuring;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -156,7 +157,9 @@ public class ConfigurationHttp
             return new BadRequestObjectResult(new ErrorResponse($"Invalid input configuration model: {e.Message}"));
         }
 
-        var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel);
+
+        var author = request.GetAuthor();
+        var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author);
         return new OkObjectResult(outputModel);
     }
 
@@ -190,9 +193,14 @@ public class ConfigurationHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        return await _configuration.DeleteConfigurationAsync(fullKey)
-            ? new OkResult()
-            : new NotFoundResult();
+
+        if (!await _configuration.HasConfigurationContentAsync(fullKey))
+        {
+            return new NotFoundResult();
+        }
+
+        await _configuration.ClearConfigurationAsync(fullKey);
+        return new OkResult();
     }
 
     private bool TryParseAnnotationKey(

@@ -7,6 +7,7 @@ public static class CommandNames
     public const string ACCOUNT = "account";
     public const string ACCESS = "access";
     public const string LOGIN = "login";
+    public const string LOGOUT = "logout";
     public const string REGISTER = "register";
     public const string GRANT = "grant";
     public const string REVOKE = "revoke";

@@ -1,18 +1,25 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
-using _42.Platform.Storyteller.Access;
 using _42.Platform.Storyteller.Api.ErrorHandling;
-using _42.Platform.Storyteller.AzureAd;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
+using JsonConverter = Newtonsoft.Json.JsonConverter;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>
     {
-        // worker.UseNewtonsoftJson(); // TODO: [P2] not sure if this is needed for OpenAPI
+        // worker.UseNewtonsoftJson(new JsonSerializerSettings
+        // {
+        //     NullValueHandling = NullValueHandling.Ignore,
+        //     ContractResolver = new DefaultContractResolver { NamingStrategy = new DefaultNamingStrategy() },
+        //     Converters = new List<JsonConverter> { new StringEnumConverter(new DefaultNamingStrategy()) },
+        // });
         worker.UseMiddleware<ExceptionHandlingMiddleware>();
     })
     .ConfigureServices((context, services) =>
@@ -20,12 +27,15 @@ var host = new HostBuilder()
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
 
-        services.Configure<JsonSerializerOptions>(options =>
+        // This is required to make the default JSON serializer in Azure Functions to use the same settings as the one in ASP.NET Core
+        // Needed is you want to use IActionResult
+        services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
         {
-            options.AllowTrailingCommas = true;
-            options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-            options.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-            options.PropertyNameCaseInsensitive = true;
+            options.JsonSerializerOptions.PropertyNamingPolicy = new NoChangeNamingPolicy();
+            options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()); // JsonNamingPolicy.CamelCase
+            options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+            options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+            options.JsonSerializerOptions.AllowTrailingCommas = true;
         });
 
         services.Configure<LoggerFilterOptions>(options =>
@@ -49,16 +59,8 @@ var host = new HostBuilder()
             });
         }
 
-        services.Configure<CosmosDbOptions>(context.Configuration.GetSection(CosmosDbOptions.SectionName));
-
-        services.AddSingleton<ICosmosClientProvider, CosmosClientProvider>();
-        services.AddSingleton<IContainerFactory, ContainerFactory>();
-        services.AddSingleton<IContainerRepositoryProvider, ContainerRepositoryProvider>();
-        services.AddSingleton<IMachineAccessService, AzureAdMachineAccessService>();
-
-        services.AddSingleton<IAccessService, CosmosAccessService>();
-        services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
-        services.AddSingleton<IConfigurationService, CosmosConfigurationService>();
+        services.AddCosmosDbAnnotations(context.Configuration);
+        services.AddAzureAdMachineAccess();
     })
     .Build();
 

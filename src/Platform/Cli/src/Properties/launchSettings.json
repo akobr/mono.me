@@ -12,6 +12,10 @@
       "commandName": "Project",
       "commandLineArgs": "login"
     },
+    "logout": {
+      "commandName": "Project",
+      "commandLineArgs": "access logout"
+    },
     "account-register": {
       "commandName": "Project",
       "commandLineArgs": "account register"
