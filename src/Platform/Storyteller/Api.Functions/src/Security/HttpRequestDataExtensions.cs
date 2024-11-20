@@ -91,6 +91,17 @@ public static class HttpRequestDataExtensions
         }
     }
 
+    public static string GetAuthor(this HttpRequestData @this)
+    {
+        if (@this.TryGetApplicationIdentity(out var appId))
+        {
+            return $"application: {appId}";
+        }
+
+        var accountId = @this.GetIdentityUniqueId();
+        return $"account: {accountId}";
+    }
+
     public static async Task CheckAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole = AccountRole.Reader)
     {
 #if DEV_AUTH

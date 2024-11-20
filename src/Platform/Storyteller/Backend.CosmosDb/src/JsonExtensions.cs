@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
@@ -58,5 +59,45 @@ public static class JsonExtensions
     public static void MergeInto(this JObject @this, JObject jObject)
     {
         @this.Merge(jObject, MergeSettings);
+    }
+
+    public static JObject RemoveRequested(this JObject @this)
+    {
+        const string removePropertyName = "$remove";
+        var removeProp = @this.Property(removePropertyName);
+
+        if (removeProp is null)
+        {
+            return @this;
+        }
+
+        if (removeProp.Value.Type == JTokenType.Array)
+        {
+            var removePaths = (JArray)removeProp.Value;
+
+            foreach (var path in removePaths
+                         .Where(prop => prop.Type == JTokenType.String)
+                         .Select(prop => prop.ToString()))
+            {
+                var tokens = @this.SelectTokens(path);
+
+                foreach (var token in tokens)
+                {
+                    var container = token.Parent;
+                    if (container is not null
+                        && container.Type == JTokenType.Property)
+                    {
+                        container.Remove();
+                    }
+                    else
+                    {
+                        token.Remove();
+                    }
+                }
+            }
+        }
+
+        @this.Remove(removePropertyName);
+        return @this;
     }
 }

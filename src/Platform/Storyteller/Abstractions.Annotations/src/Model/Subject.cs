@@ -4,6 +4,8 @@ namespace _42.Platform.Storyteller;
 
 public record Subject : Annotation, ISubject
 {
-    public required IReadOnlySet<string> Contexts { get; init; }
-    public required IReadOnlySet<string> Usages { get; init; }
+
+    public IReadOnlySet<string> Contexts { get; init; } = new HashSet<string>(0);
+
+    public IReadOnlySet<string> Usages { get; init; } = new HashSet<string>(0);
 }

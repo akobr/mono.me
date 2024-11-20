@@ -10,7 +10,7 @@ namespace _42.Platform.Storyteller;
 public class CosmosDefaultJsonSerializer : CosmosSerializer
 {
     private static readonly Encoding DefaultEncoding = new UTF8Encoding(false, true);
-    private readonly JsonSerializerSettings SerializerSettings;
+    private readonly JsonSerializerSettings _serializerSettings;
 
     /// <summary>
     /// Create a serializer that uses the JSON.net serializer
@@ -21,7 +21,7 @@ public class CosmosDefaultJsonSerializer : CosmosSerializer
     /// </remarks>
     internal CosmosDefaultJsonSerializer()
     {
-        this.SerializerSettings = null;
+        this._serializerSettings = new();
     }
 
     /// <summary>
@@ -31,15 +31,15 @@ public class CosmosDefaultJsonSerializer : CosmosSerializer
     /// This is internal to reduce exposure of JSON.net types so
     /// it is easier to convert to System.Text.Json
     /// </remarks>
-    internal CosmosDefaultJsonSerializer(CosmosSerializationOptions cosmosSerializerOptions)
+    internal CosmosDefaultJsonSerializer(CosmosSerializationOptions? cosmosSerializerOptions)
     {
         if (cosmosSerializerOptions == null)
         {
-            this.SerializerSettings = null;
+            this._serializerSettings = new();
             return;
         }
 
-        JsonSerializerSettings jsonSerializerSettings = new JsonSerializerSettings()
+        var jsonSerializerSettings = new JsonSerializerSettings
         {
             NullValueHandling = cosmosSerializerOptions.IgnoreNullValues ? NullValueHandling.Ignore : NullValueHandling.Include,
             Formatting = cosmosSerializerOptions.Indented ? Formatting.Indented : Formatting.None,
@@ -49,7 +49,7 @@ public class CosmosDefaultJsonSerializer : CosmosSerializer
             MaxDepth = 64, // https://github.com/advisories/GHSA-5crp-9r3c-p9vr
         };
 
-        this.SerializerSettings = jsonSerializerSettings;
+        this._serializerSettings = jsonSerializerSettings;
     }
 
     /// <summary>
@@ -61,7 +61,7 @@ public class CosmosDefaultJsonSerializer : CosmosSerializer
     /// </remarks>
     internal CosmosDefaultJsonSerializer(JsonSerializerSettings jsonSerializerSettings)
     {
-        this.SerializerSettings = jsonSerializerSettings ?? throw new ArgumentNullException(nameof(jsonSerializerSettings));
+        this._serializerSettings = jsonSerializerSettings ?? throw new ArgumentNullException(nameof(jsonSerializerSettings));
     }
 
     /// <summary>
@@ -79,11 +79,11 @@ public class CosmosDefaultJsonSerializer : CosmosSerializer
                 return (T)(object)stream;
             }
 
-            using (StreamReader sr = new StreamReader(stream))
+            using (var sr = new StreamReader(stream))
             {
-                using (JsonTextReader jsonTextReader = new JsonTextReader(sr))
+                using (var jsonTextReader = new JsonTextReader(sr))
                 {
-                    JsonSerializer jsonSerializer = this.GetSerializer();
+                    var jsonSerializer = this.GetSerializer();
                     return jsonSerializer.Deserialize<T>(jsonTextReader);
                 }
             }
@@ -98,13 +98,13 @@ public class CosmosDefaultJsonSerializer : CosmosSerializer
     /// <returns>An open readable stream containing the JSON of the serialized object</returns>
     public override Stream ToStream<T>(T input)
     {
-        MemoryStream streamPayload = new MemoryStream();
-        using (StreamWriter streamWriter = new StreamWriter(streamPayload, encoding: CosmosDefaultJsonSerializer.DefaultEncoding, bufferSize: 1024, leaveOpen: true))
+        var streamPayload = new MemoryStream();
+        using (var streamWriter = new StreamWriter(streamPayload, encoding: CosmosDefaultJsonSerializer.DefaultEncoding, bufferSize: 1024, leaveOpen: true))
         {
             using (JsonWriter writer = new JsonTextWriter(streamWriter))
             {
                 writer.Formatting = Newtonsoft.Json.Formatting.None;
-                JsonSerializer jsonSerializer = this.GetSerializer();
+                var jsonSerializer = this.GetSerializer();
                 jsonSerializer.Serialize(writer, input);
                 writer.Flush();
                 streamWriter.Flush();
@@ -121,6 +121,6 @@ public class CosmosDefaultJsonSerializer : CosmosSerializer
     /// </summary>
     private JsonSerializer GetSerializer()
     {
-        return JsonSerializer.Create(this.SerializerSettings);
+        return JsonSerializer.Create(this._serializerSettings);
     }
 }

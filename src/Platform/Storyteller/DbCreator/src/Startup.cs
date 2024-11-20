@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Serilog;
+
 using IConfigurationBuilder = Microsoft.Extensions.Configuration.IConfigurationBuilder;
 
 namespace _42.Platform.Storyteller.DbCreator

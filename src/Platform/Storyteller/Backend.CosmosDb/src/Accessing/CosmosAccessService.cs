@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Entities.Access;
 using AutoMapper;
 using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.Options;
 using Permission = _42.Platform.Storyteller.Accessing.Model.Permission;
 
 namespace _42.Platform.Storyteller.Accessing;
@@ -19,23 +21,29 @@ public class CosmosAccessService : IAccessService
     private readonly IMachineAccessService _machineAccessService;
     private readonly IContainerFactory _containerFactory;
     private readonly IMapper _mapper;
+    private readonly JsonSerializerOptions _serializerOptions;
 
     public CosmosAccessService(
         IContainerRepositoryProvider repositoryProvider,
         IMachineAccessService machineAccessService,
         IContainerFactory containerFactory,
-        IMapper mapper)
+        IMapper mapper,
+        IOptions<JsonSerializerOptions> serializerOptions)
     {
         _repositoryProvider = repositoryProvider;
         _machineAccessService = machineAccessService;
         _containerFactory = containerFactory;
         _mapper = mapper;
+        _serializerOptions = serializerOptions.Value;
     }
 
     public async Task<Account?> GetAccountAsync(string id)
     {
         var repository = _repositoryProvider.GetCore();
-        var account = await repository.Container.TryReadItem<AccountEntity>(id, new PartitionKey(MAIN_PARTITION_KEY));
+        var account = await repository.Container.TryReadItemAsync(
+            id,
+            new PartitionKey(MAIN_PARTITION_KEY),
+            stream => stream.DeserializeSystemTextJson<AccountEntity>(_serializerOptions));
         return account is not null
             ? _mapper.Map<AccountEntity, Account>(account)
             : null;
@@ -126,7 +134,10 @@ public class CosmosAccessService : IAccessService
     {
         var accessPointId = $"apt.{key}";
         var repository = _repositoryProvider.GetCore();
-        var accessPoint = await repository.Container.TryReadItem<AccessPointEntity>(accessPointId, new PartitionKey(MAIN_PARTITION_KEY));
+        var accessPoint = await repository.Container.TryReadItemAsync(
+            accessPointId,
+            new PartitionKey(MAIN_PARTITION_KEY),
+            stream => stream.DeserializeSystemTextJson<AccessPointEntity>(_serializerOptions));
         return accessPoint is not null
             ? _mapper.Map<AccessPointEntity, AccessPoint>(accessPoint)
             : null;
@@ -343,7 +354,10 @@ public class CosmosAccessService : IAccessService
     public async Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var machineAccess = await repository.Container.TryReadItem<MachineAccessEntity>(id, new PartitionKey(project));
+        var machineAccess = await repository.Container.TryReadItemAsync(
+            id,
+            new PartitionKey(project),
+            stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
         return machineAccess is not null
             ? _mapper.Map<MachineAccessEntity, MachineAccess>(machineAccess)
             : null;
@@ -371,7 +385,10 @@ public class CosmosAccessService : IAccessService
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = new PartitionKey($"{project}.access");
-        var machineAccess = await repository.Container.TryReadItem<MachineAccessEntity>(appId, partitionKey);
+        var machineAccess = await repository.Container.TryReadItemAsync(
+            appId,
+            partitionKey,
+            stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
 
         if (machineAccess is null)
         {
@@ -395,7 +412,10 @@ public class CosmosAccessService : IAccessService
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = new PartitionKey($"{project}.access");
-        var machineAccess = await repository.Container.TryReadItem<MachineAccessEntity>(appId, partitionKey);
+        var machineAccess = await repository.Container.TryReadItemAsync(
+            appId,
+            partitionKey,
+            stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
 
         if (machineAccess is null)
         {
@@ -423,7 +443,10 @@ public class CosmosAccessService : IAccessService
             return false;
         }
 
-        var machineAccess = await repository.Container.TryReadItem<MachineAccessEntity>(appId, new PartitionKey($"{project}.access"));
+        var machineAccess = await repository.Container.TryReadItemAsync(
+            appId,
+            new PartitionKey($"{project}.access"),
+            stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
         return machineAccess is not null;
     }
 }

@@ -12,5 +12,5 @@ public record Usage : Annotation, IUsage
 
     public required string ResponsibilityName { get; init; }
 
-    public required IReadOnlySet<string> Executions { get; init; }
+    public IReadOnlySet<string> Executions { get; init; } = new HashSet<string>(0);
 }

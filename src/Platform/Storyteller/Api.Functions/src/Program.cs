@@ -6,6 +6,10 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Serialization;
+using JsonConverter = Newtonsoft.Json.JsonConverter;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>
@@ -22,15 +26,6 @@ var host = new HostBuilder()
     {
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
-
-        services.Configure<JsonSerializerOptions>(options =>
-        {
-            options.PropertyNamingPolicy = new NoChangeNamingPolicy();
-            options.Converters.Add(new JsonStringEnumConverter()); // JsonNamingPolicy.CamelCase
-            options.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-            options.PropertyNameCaseInsensitive = true;
-            options.AllowTrailingCommas = true;
-        });
 
         // This is required to make the default JSON serializer in Azure Functions to use the same settings as the one in ASP.NET Core
         // Needed is you want to use IActionResult

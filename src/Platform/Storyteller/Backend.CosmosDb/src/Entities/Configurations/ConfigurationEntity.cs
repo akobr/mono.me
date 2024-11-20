@@ -8,7 +8,13 @@ public record class ConfigurationEntity : ExtendableEntity
 
     public bool IsCachingDisabled { get; init; }
 
+    public ulong Version { get; init; }
+
+    public ulong AffectedCounter { get; init; }
+
     public required JObject Content { get; init; }
+
+    public required string Author { get; init; }
 
     public JObject? CalculatedContent { get; init; }
 

@@ -6,9 +6,14 @@ public static class FullKeyExtensions
 {
     public static string GetPartitionKey(this FullKey @this)
     {
-        return @this.Annotation.Type is AnnotationType.Subject or AnnotationType.Context
-            ? $"{@this.ProjectName}.{AnnotationTypeCodes.Subject}.{@this.Annotation.SubjectName}"
-            : $"{@this.ProjectName}.{AnnotationTypeCodes.Responsibility}.{@this.Annotation.ResponsibilityName}";
+        return GetPartitionKey(@this, @this.Annotation);
+    }
+
+    public static string GetPartitionKey(this FullKey @this, AnnotationKey annotationKey)
+    {
+        return annotationKey.Type is AnnotationType.Subject or AnnotationType.Context
+            ? $"{@this.ProjectName}.{AnnotationTypeCodes.Subject}.{annotationKey.SubjectName}"
+            : $"{@this.ProjectName}.{AnnotationTypeCodes.Responsibility}.{annotationKey.ResponsibilityName}";
     }
 
     public static PartitionKey GetCosmosPartitionKey(this FullKey @this)
@@ -16,8 +21,13 @@ public static class FullKeyExtensions
         return new PartitionKey(GetPartitionKey(@this));
     }
 
-    public static string GetCosmosItemKey(this FullKey @this)
+    public static string GetCosmosItemId(this FullKey @this)
     {
-        return $"{@this.ViewName}.{@this.Annotation}";
+        return GetCosmosItemId(@this, @this.Annotation);
+    }
+
+    public static string GetCosmosItemId(this FullKey @this, AnnotationKey annotationKey)
+    {
+        return $"{@this.ViewName}.{annotationKey}";
     }
 }

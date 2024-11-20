@@ -12,4 +12,5 @@ public enum AnnotationType
     Usage,
     Context,
     Execution,
+    UnitOfExecution,
 }
