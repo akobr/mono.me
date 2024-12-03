@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.nHolistic.Runner.VisualStudio.TestAdapter</AssemblyName>
+    <RootNamespace>_42.nHolistic.Runner.VisualStudio</RootNamespace>
+
+    <IsPackable>true</IsPackable>
+    <PackageId>42.nHolistic.Runner.VisualStudio</PackageId>
+    <AssemblyTitle>42.nHolistic test runner for Visual Studio (.net)</AssemblyTitle>
+    <Description>42.nHolistic test runner for Visual Studio (.net)</Description>
+    <PackageTags>$(PackageTags);test;testing</PackageTags>
+
+    <TargetFramework>net8.0</TargetFramework>
+    <DebugType>embedded</DebugType>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.TestPlatform.ObjectModel" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\nHolistic\src\nHolistic.csproj" />
+  </ItemGroup>
+
+</Project>

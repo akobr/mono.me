@@ -46,8 +46,12 @@
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" Version="4.3.0" />
     <PackageVersion Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.16.4" />
     <PackageVersion Include="Microsoft.ApplicationInsights.WorkerService" Version="2.22.0" />
+    <!-- communication -->
+    <PackageVersion Include="MediatR" Version="12.4.1" />
+    <PackageVersion Include="MediatR.Contracts" Version="2.0.1" />
     <!-- data structures -->
     <PackageVersion Include="QuikGraph" Version="2.5.0" />
+    <PackageVersion Include="QuikGraph.Graphviz" Version="2.5.0" />
     <PackageVersion Include="QuikGraph.Serialization" Version="2.5.0" />
     <!-- data formats -->
     <PackageVersion Include="JsonSubTypes" Version="2.0.1" />
@@ -71,6 +75,9 @@
     <PackageVersion Include="Sharprompt" Version="2.4.5" />
     <PackageVersion Include="ShellProgressBar" Version="5.2.0" />
     <!-- C# code -->
+    <PackageVersion Include="Castle.Core" Version="5.1.1" />
+    <PackageVersion Include="Metalama.Framework" Version="2024.2.30" />
+    <PackageVersion Include="Metalama.Framework.Redist" Version="2024.2.30" />
     <PackageVersion Include="Microsoft.CodeAnalysis" Version="4.7.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.7.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.7.0" />
@@ -93,6 +100,7 @@
     <PackageVersion Include="coverlet.collector" Version="6.0.0" />
     <PackageVersion Include="FluentAssertions" Version="6.12.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+    <PackageVersion Include="Microsoft.TestPlatform.ObjectModel" Version="17.12.0" />
     <PackageVersion Include="Moq" Version="4.20.69" />
     <PackageVersion Include="NBuilder" Version="6.1.0" />
     <PackageVersion Include="Shouldly" Version="4.2.1" />

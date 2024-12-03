@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.nHolistic</AssemblyName>
+    <RootNamespace>_42.nHolistic</RootNamespace>
+
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Castle.Core" />
+    <PackageReference Include="MediatR" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="QuikGraph" />
+    <PackageReference Include="QuikGraph.Graphviz" />
+    <PackageReference Include="QuikGraph.Serialization" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\nHolistic.Abstractions\src\nHolistic.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

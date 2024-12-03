@@ -86,6 +86,14 @@
       }
     },
     {
+      "path": "src/nHolistic",
+      "name": "nHolistic",
+      "description": "nHolistic is a holistic approach to software testing.",
+      "custom": {
+        "isSuppressed": true
+      }
+    },
+    {
       "path": "src/Texo",
       "name": "Texo",
       "description": "Powerful text base UI framework."

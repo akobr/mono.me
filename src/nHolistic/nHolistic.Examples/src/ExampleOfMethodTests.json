@@ -1,0 +1,29 @@
+{
+  "Test1": [
+    {
+      "Text": "First test",
+      "Number": 1
+    },
+    {
+      "$name": "Second",
+      "Text": "Second test",
+      "Number": 2
+    }
+  ],
+  "Test2": {
+    "$name": "Named",
+    "$labels": [ "ExtraLabel" ],
+    "$priority": 42,
+    "Text": "Named test",
+    "Number": 10
+  },
+  "Test3": [
+    "First test",
+    "Second test",
+    "Third test"
+  ],
+  "Test7": {
+    "Text": "Test 7",
+    "Number": 7
+  }
+}

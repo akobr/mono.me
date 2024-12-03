@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.nHolistic.Examples</AssemblyName>
+    <RootNamespace>_42.nHolistic.Examples</RootNamespace>
+
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ExampleClassTest.json">
+      <DependentUpon>ExampleClassTest.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="ExampleOfMethodTests.json">
+      <DependentUpon>ExampleOfMethodTests.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\nHolistic\src\nHolistic.csproj" />
+    <ProjectReference Include="..\..\nHolistic.Runner.VisualStudio\src\nHolistic.Runner.VisualStudio.csproj" />
+  </ItemGroup>
+
+</Project>
