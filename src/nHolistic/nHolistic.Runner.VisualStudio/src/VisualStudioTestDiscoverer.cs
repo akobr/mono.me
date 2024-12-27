@@ -14,7 +14,7 @@ public class VisualStudioTestDiscoverer(
     private CancellationTokenSource? _cancellationSource;
     private Task? _task;
 
-    public bool KeepApplicationRunning { get; set; }
+    public bool IsSecondaryService { get; set; }
 
     public Task? DiscoveringProcess => _task;
 
@@ -38,7 +38,7 @@ public class VisualStudioTestDiscoverer(
         {
             await _task;
         }
-        catch (OperationCanceledException)
+        catch (TaskCanceledException)
         {
             await publisher.Publish(
                 new LogNotification { Message = "The discovering process has been canceled." },
@@ -48,9 +48,12 @@ public class VisualStudioTestDiscoverer(
 
     private async Task DiscoverTests(CancellationToken cancellationToken)
     {
-        await publisher.Publish(
-            new LogNotification { Message = "Initialization done." },
-            CancellationToken.None);
+        if (!IsSecondaryService)
+        {
+            await publisher.Publish(
+                new LogNotification { Message = "Initialization done." },
+                CancellationToken.None);
+        }
 
         var sources = sourcesProvider.GetSources().ToArray();
 
@@ -58,21 +61,33 @@ public class VisualStudioTestDiscoverer(
             new LogNotification { Message = $"Number of sources to search: {sources.Length}" },
             CancellationToken.None);
 
-        var tasks = sources
-            .Select(source => Task.Run(() => DiscoverTestsInSource(source, cancellationToken), cancellationToken))
-            .ToArray();
-
-        await Task.WhenAll(tasks);
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        await publisher.Publish(
-            new LogNotification { Message = "The discovering process ended." },
-            CancellationToken.None);
-
-        if (!KeepApplicationRunning)
+        try
         {
-            appLifetime.StopApplication();
+            var tasks = sources
+                .Select(source => Task.Run(() => DiscoverTestsInSource(source, cancellationToken), cancellationToken))
+                .ToArray();
+
+            await Task.WhenAll(tasks);
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            await publisher.Publish(
+                new LogNotification { Message = "The discovering process ended." },
+                CancellationToken.None);
+
+            if (!IsSecondaryService)
+            {
+                appLifetime.StopApplication();
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // TODO: [P2] Log the unhandled exception
+            throw;
         }
     }
 

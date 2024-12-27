@@ -24,4 +24,8 @@
     <ProjectReference Include="..\..\nHolistic.Abstractions\src\nHolistic.Abstractions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Graphs\" />
+  </ItemGroup>
+
 </Project>

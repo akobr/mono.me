@@ -4,6 +4,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
@@ -41,21 +42,21 @@ public class VsTestRunner : IVsTestDiscoverer, IVsTestExecutor
             services.AddSingleton<ITestCaseDiscoverySink>(discoverySink);
             services.AddSingleton<IMessageLogger>(logger);
             services.AddSingleton<ITestDiscoverer, TestDiscoverer>();
-            services.AddSingleton<IVisualStudioTestDiscoverer, VisualStudioTestDiscoverer>();
-            services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<IVisualStudioTestDiscoverer>());
+            services.AddHostedService<VisualStudioTestDiscoverer>();
 
             // MediatR registrations and overrides
             services.AddMediatR(config => config.RegisterServicesFromAssembly(thisAssembly));
+            services.RemoveAll<INotificationHandler<LogNotification>>();
+            services.RemoveAll<INotificationHandler<TestCaseDiscoveredNotification>>();
             services.AddSingleton<LogNotificationHandler>();
             services.AddSingleton<TestCaseNotificationHandler>();
-            services.Replace(ServiceDescriptor.Singleton<INotificationHandler<LogNotification>>(
-                provider => provider.GetRequiredService<LogNotificationHandler>()));
-            services.Replace(ServiceDescriptor.Singleton<INotificationHandler<TestCaseDiscoveredNotification>>(
-                provider => provider.GetRequiredService<TestCaseNotificationHandler>()));
+            services.AddSingletonFromOtherService<INotificationHandler<LogNotification>, LogNotificationHandler>();
+            services.AddSingletonFromOtherService<INotificationHandler<TestCaseDiscoveredNotification>, TestCaseNotificationHandler>();
         });
 
         _host = builder.Build();
         _host.Run();
+        logger.SendMessage(TestMessageLevel.Informational, $"{Constants.RunnerName} is finished.");
     }
 
     public void RunTests(
@@ -77,35 +78,76 @@ public class VsTestRunner : IVsTestDiscoverer, IVsTestExecutor
             throw new InvalidOperationException(errorMessage);
         }
 
-        var builder = new HostBuilder();
-        builder.ConfigureServices((context, services) =>
+        if (frameworkHandle is null)
         {
-            services.AddSingleton<ITestCasesProvider>(new StaticTestCasesProvider(tests));
+            const string errorMessage = "An instance of IFrameworkHandle is missing.";
 
-            if (runContext is not null)
+            frameworkHandle?.SendMessage(
+                TestMessageLevel.Error,
+                $"[{Constants.RunnerName} 00:00.00] {errorMessage}");
+
+            throw new InvalidOperationException(errorMessage);
+        }
+
+        var testList = tests.ToList();
+        frameworkHandle?.SendMessage(
+            TestMessageLevel.Error,
+            $"[{Constants.RunnerName} 00:00.00] Number of test cases to run: {testList.Count}");
+
+        try
+        {
+            var builder = new HostBuilder();
+            builder.ConfigureServices((context, services) =>
             {
-                services.AddSingleton<IRunContext>(runContext);
-            }
+                services.AddSingleton<ITestCasesProvider>(new StaticTestCasesProvider(testList));
+                services.AddSingleton<IFrameworkHandle>(frameworkHandle!);
+                services.AddSingletonFromOtherService<IMessageLogger, IFrameworkHandle>();
+                services.AddSingletonFromOtherService<ITestExecutionRecorder, IFrameworkHandle>();
 
-            if (frameworkHandle is not null)
-            {
-                services.AddSingleton<IFrameworkHandle>(frameworkHandle);
-            }
+                if (runContext is not null)
+                {
+                    services.AddSingleton<IRunContext>(runContext);
+                    services.AddSingletonFromOtherService<IDiscoveryContext, IRunContext>();
+                }
 
-            // nHolistic services
-            services.AddSingleton<ITestExecutor, TestExecutor>();
-            services.AddSingleton<IVisualStudioTestExecutor, VisualStudioTestExecutor>();
-            services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<IVisualStudioTestExecutor>());
+                // nHolistic services
+                services.AddSingleton<ITestRunScopeFactory, TestRunScopeFactory>();
+                services.AddSingleton<ITestRunContextProvider, TestRunContextProvider>();
+                services.AddScoped<ITestRunContext>(provider => provider.GetRequiredService<ITestRunContextProvider>().GetContext());
+                services.AddSingleton<IProxyFactory, ProxyFactory>();
+                services.AddSingleton<ISynchronizationService, SynchronizationService>();
+                services.AddSingleton<IFixtureStorage, FixtureStorage>();
+                services.AddSingletonFromOtherService<IFixtureProvider, IFixtureStorage>();
+                services.AddSingleton<Lazy<IFixtureProvider>>(
+                    provider => new Lazy<IFixtureProvider>(provider.GetRequiredService<IFixtureStorage>));
+                services.AddSingleton<IFixturesProcessingService, FixturesProcessingService>();
+                services.AddSingleton<ITypeActivator, TypeActivator>();
+                services.AddSingleton<IRunDirectoryProvider, VisualStudioRunDirectoryProvider>();
+                services.AddSingleton<ITestCasesMapper, TestCasesMapper>();
+                services.AddSingleton<IResultAttachmentsService, ResultAttachmentsService>();
+                services.AddSingleton<IExecutionContextBuilder, ExecutionContextBuilder>();
+                services.AddSingleton<ITestExecutor, TestExecutor>();
+                services.AddHostedService<VisualStudioTestExecutor>();
 
-            // MediatR registrations and overrides
-            services.AddMediatR(config => config.RegisterServicesFromAssembly(typeof(VsTestRunner).Assembly));
-            services.AddSingleton<LogNotificationHandler>();
-            services.Replace(ServiceDescriptor.Singleton<INotificationHandler<LogNotification>>(
-                provider => provider.GetRequiredService<LogNotificationHandler>()));
-        });
+                // MediatR registrations and overrides
+                services.AddMediatR(config => config.RegisterServicesFromAssembly(typeof(VsTestRunner).Assembly));
+                services.RemoveAll<INotificationHandler<LogNotification>>();
+                services.AddSingleton<LogNotificationHandler>();
+                services.AddSingletonFromOtherService<INotificationHandler<LogNotification>, LogNotificationHandler>();
+            });
 
-        _host = builder.Build();
-        _host.Run();
+            frameworkHandle?.SendMessage(TestMessageLevel.Informational, $"{Constants.RunnerName} is about to build the host.");
+            _host = builder.Build();
+            frameworkHandle?.SendMessage(TestMessageLevel.Informational, $"{Constants.RunnerName} is about to run the host.");
+            _host.Run();
+            frameworkHandle?.SendMessage(TestMessageLevel.Informational, $"{Constants.RunnerName} is finished.");
+        }
+        catch (Exception ex)
+        {
+            frameworkHandle?.SendMessage(TestMessageLevel.Error, ex.GetType().FullName);
+            frameworkHandle?.SendMessage(TestMessageLevel.Error, ex.Message);
+            throw;
+        }
     }
 
     public void RunTests(
@@ -136,35 +178,55 @@ public class VsTestRunner : IVsTestDiscoverer, IVsTestExecutor
             if (runContext is not null)
             {
                 services.AddSingleton<IRunContext>(runContext);
+                services.AddSingletonFromOtherService<IDiscoveryContext, IRunContext>();
             }
 
             if (frameworkHandle is not null)
             {
                 services.AddSingleton<IFrameworkHandle>(frameworkHandle);
+                services.AddSingletonFromOtherService<IMessageLogger, IFrameworkHandle>();
+                services.AddSingletonFromOtherService<ITestExecutionRecorder, IFrameworkHandle>();
             }
 
             // nHolistic services
+            services.AddSingleton<ITestRunScopeFactory, TestRunScopeFactory>();
+            services.AddSingleton<ITestRunContextProvider, TestRunContextProvider>();
+            services.AddScoped<ITestRunContext>(provider => provider.GetRequiredService<ITestRunContextProvider>().GetContext());
+            services.AddSingleton<IProxyFactory, ProxyFactory>();
+            services.AddSingleton<ISynchronizationService, SynchronizationService>();
+            services.AddSingleton<IFixtureStorage, FixtureStorage>();
+            services.AddSingletonFromOtherService<IFixtureProvider, IFixtureStorage>();
+            services.AddSingleton<Lazy<IFixtureProvider>>(
+                provider => new Lazy<IFixtureProvider>(provider.GetRequiredService<IFixtureStorage>));
+            services.AddSingleton<IFixturesProcessingService, FixturesProcessingService>();
+            services.AddSingleton<ITypeActivator, TypeActivator>();
+            services.AddSingleton<IRunDirectoryProvider, VisualStudioRunDirectoryProvider>();
+            services.AddSingleton<ITestCasesMapper, TestCasesMapper>();
+            services.AddSingleton<IResultAttachmentsService, ResultAttachmentsService>();
+            services.AddSingleton<IExecutionContextBuilder, ExecutionContextBuilder>();
             services.AddSingleton<ITestExecutor, TestExecutor>();
+            services.AddSingleton<ITestDiscoverer, TestDiscoverer>();
             services.AddSingleton<IVisualStudioTestDiscoverer, VisualStudioTestDiscoverer>();
             services.AddSingleton<TestCasesProviderFromDiscoverer>();
-            services.AddSingleton<ITestCasesProvider>(provider => provider.GetRequiredService<TestCasesProviderFromDiscoverer>());
-            services.AddSingleton<ITestCasesRegister>(provider => provider.GetRequiredService<TestCasesProviderFromDiscoverer>());
-            services.AddSingleton<IVisualStudioTestExecutor, VisualStudioTestExecutor>();
-            services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<IVisualStudioTestDiscoverer>());
-            services.AddSingleton<IHostedService>(provider => provider.GetRequiredService<IVisualStudioTestExecutor>());
+            services.AddSingletonFromOtherService<ITestCasesProvider, TestCasesProviderFromDiscoverer>();
+            services.AddSingletonFromOtherService<ITestCasesRegister, TestCasesProviderFromDiscoverer>();
+            services.AddHostedService(provider => provider.GetRequiredService<IVisualStudioTestDiscoverer>());
+            services.AddHostedService<VisualStudioTestExecutor>();
+            //services.AddHostedService<TestHostedService>();
 
             // MediatR registrations and overrides
             services.AddMediatR(config => config.RegisterServicesFromAssembly(typeof(VsTestRunner).Assembly));
             services.AddSingleton<LogNotificationHandler>();
             services.AddSingleton<TestCaseNotificationForRunnerHandler>();
-            services.Replace(ServiceDescriptor.Singleton<INotificationHandler<LogNotification>>(
-                provider => provider.GetRequiredService<LogNotificationHandler>()));
-            services.Replace(ServiceDescriptor.Singleton<INotificationHandler<TestCaseDiscoveredNotification>>(
-                provider => provider.GetRequiredService<TestCaseNotificationForRunnerHandler>()));
+            services.RemoveAll<INotificationHandler<LogNotification>>();
+            services.RemoveAll<INotificationHandler<TestCaseDiscoveredNotification>>();
+            services.AddSingletonFromOtherService<INotificationHandler<LogNotification>, LogNotificationHandler>();
+            services.AddSingletonFromOtherService<INotificationHandler<TestCaseDiscoveredNotification>, TestCaseNotificationForRunnerHandler>();
         });
 
         _host = builder.Build();
         _host.Run();
+        frameworkHandle?.SendMessage(TestMessageLevel.Informational, $"{Constants.RunnerName} is finished.");
     }
 
     public void Cancel()

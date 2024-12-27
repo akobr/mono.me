@@ -23,4 +23,17 @@ public class VsTestRunnerTests
         // Act
         vsTestRunner.DiscoverTests(sources, discoveryContext.Object, logger, discoverySink);
     }
+
+    [Fact]
+    public void ExecuteTests()
+    {
+        // Arrange
+        var sources = new List<string> { "D:\\work\\mono.me.second\\src\\nHolistic\\nHolistic.Examples\\src\\bin\\Debug\\net8.0\\42.nHolistic.Examples.dll" };
+        var runContext = new DebugRunContext();
+        var frameworkHandle = new DebugFrameworkHandle();
+        var vsTestRunner = new VsTestRunner();
+
+        // Act
+        vsTestRunner.RunTests(sources, runContext, frameworkHandle);
+    }
 }

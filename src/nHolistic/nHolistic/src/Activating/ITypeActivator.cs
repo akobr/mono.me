@@ -1,8 +1,10 @@
+using System.Reflection;
+
 namespace _42.nHolistic;
 
 public interface ITypeActivator
 {
-    TType Activate<TType>(TestCase testCase);
+    object Activate(Type type, TestCase? testCase);
 
-    object Activate(TestCase testCase, Type type);
+    object[] ResolveParameters(ParameterInfo[] parameters, TestCase? testCase);
 }

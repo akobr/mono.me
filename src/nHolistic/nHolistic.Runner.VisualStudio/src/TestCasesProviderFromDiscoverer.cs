@@ -13,7 +13,7 @@ public class TestCasesProviderFromDiscoverer : ITestCasesProvider, ITestCasesReg
         IPublisher publisher)
     {
         _discoverer = discoverer;
-        _discoverer.KeepApplicationRunning = true;
+        _discoverer.IsSecondaryService = true;
         _publisher = publisher;
     }
 

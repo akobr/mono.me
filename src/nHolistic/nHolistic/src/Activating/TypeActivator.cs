@@ -7,18 +7,19 @@ namespace _42.nHolistic;
 
 public class TypeActivator(
     IServiceProvider services,
-    IFixtureProvider fixtures,
+    Lazy<IFixtureProvider> fixturesLazy,
     IProxyFactory proxyFactory)
     : ITypeActivator
 {
-    public TType Activate<TType>(TestCase testCase)
-    {
-        var type = typeof(TType);
-        return (TType)Activate(testCase, type);
-    }
+    private IFixtureProvider Fixtures => fixturesLazy.Value;
 
-    public object Activate(TestCase testCase, Type type)
+    public object Activate(Type type, TestCase? testCase)
     {
+        if (!type.IsClass || type.IsAbstract)
+        {
+            throw new InvalidOperationException($"Type '{type.FullName}' is not instantiable type.");
+        }
+
         var constructors = type.GetConstructors();
 
         switch (constructors.Length)
@@ -31,23 +32,24 @@ public class TypeActivator(
         }
 
         var constructor = constructors[0];
-        var arguments = ResolveParameters(testCase, constructor.GetParameters());
-        return constructor.Invoke(arguments);
+        var arguments = ResolveParameters(constructor.GetParameters(), testCase);
+        var instance = constructor.Invoke(arguments);
+        return TryProxySteps(instance, type, arguments);
     }
 
-    public object[] ResolveParameters(TestCase testCase, ParameterInfo[] parameters)
+    public object[] ResolveParameters(ParameterInfo[] parameters, TestCase? testCase)
     {
         var resultParameters = new object[parameters.Length];
 
         foreach (var parameter in parameters)
         {
-            resultParameters[parameter.Position] = ResolveParameter(testCase, parameter);
+            resultParameters[parameter.Position] = ResolveParameter(parameter, testCase);
         }
 
         return resultParameters;
     }
 
-    public object ResolveParameter(TestCase testCase, ParameterInfo parameter)
+    public object ResolveParameter(ParameterInfo parameter, TestCase? testCase)
     {
         var fromAttributes = parameter.GetCustomAttributes<InjectionAttribute>().ToArray();
 
@@ -59,50 +61,61 @@ public class TypeActivator(
 
         if (fromAttributes.Length == 0)
         {
-            return ResolveGenericParameter(testCase, parameter);
+            return ResolveGenericParameter(parameter, testCase);
         }
 
         return fromAttributes[0].InjectionType switch
         {
             InjectionType.Container => ResolveParameterFromContainer(parameter, (FromContainerAttribute)fromAttributes[0]),
-            InjectionType.Model => ResolveParameterFromModel(testCase, parameter, (FromModelAttribute)fromAttributes[0]),
-            InjectionType.Fixture => ResolveParameterFromFixture(testCase, parameter, (FromFixtureAttribute)fromAttributes[0]),
+            InjectionType.Model => ResolveParameterFromModel(parameter, (FromModelAttribute)fromAttributes[0], testCase),
+            InjectionType.Fixture => ResolveParameterFromFixture(parameter, (FromFixtureAttribute)fromAttributes[0], testCase),
             _ => throw new InvalidOperationException($"Parameter '{parameter.Name}' has unsupported injection attribute '{fromAttributes[0].InjectionType}'."),
         };
     }
 
-    private object ResolveGenericParameter(TestCase testCase, ParameterInfo parameter)
+    private object ResolveGenericParameter(ParameterInfo parameter, TestCase? testCase)
     {
+        var isBasicType = parameter.ParameterType.IsValueType || parameter.ParameterType == typeof(string);
+
+        if (isBasicType)
+        {
+            if (testCase?.Model is null)
+            {
+                throw new InvalidOperationException($"Parameter '{parameter.Name}' is a basic value type which can be used only with model source.");
+            }
+
+            var basicValue = testCase.Model.ToObject(parameter.ParameterType);
+
+            if (basicValue is null)
+            {
+                throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from model, but the value could not be created.");
+            }
+
+            return basicValue;
+        }
+
         var service = services.GetService(parameter.ParameterType);
 
         if (service is not null)
         {
-            return service;
+            // TODO: [P1] it won't work for types without empty constructor!
+            return TryProxySteps(service, parameter.ParameterType, null);
         }
 
-        var fixtureObjects = fixtures.GetFixtures(testCase.FullyQualifiedName);
-        var fixture = fixtureObjects.FirstOrDefault(parameter.ParameterType.IsInstanceOfType);
-
-        if (fixture is not null)
+        if (testCase is not null)
         {
-            return fixture;
-        }
+            var fixtureObjects = Fixtures.GetFixtures(testCase.FullyQualifiedName);
+            var fixture = fixtureObjects.FirstOrDefault(parameter.ParameterType.IsInstanceOfType);
 
-        if (testCase.Model is not null)
-        {
-            if (parameter.ParameterType is { IsClass: true, IsAbstract: false })
+            if (fixture is not null)
             {
-                var modelClass = testCase.Model.ToObject(parameter.ParameterType);
-
-                if (modelClass is not null)
-                {
-                    return modelClass;
-                }
+                return fixture;
             }
 
-            if (parameter.ParameterType.IsInterface)
+            if (parameter.ParameterType.IsInterface
+                && testCase.Model is not null)
             {
-                var serializer = JsonSerializer.CreateDefault();
+                var serializer = JsonSerializer.CreateDefault(); // TODO: [P2] use configurable serializer with null rules
                 serializer.Converters.Add(new NewtonsoftProxyJsonConverter(proxyFactory, parameter.ParameterType));
                 var modelInterface = testCase.Model.ToObject(parameter.ParameterType, serializer);
 
@@ -115,8 +128,17 @@ public class TypeActivator(
             }
         }
 
-        throw new InvalidOperationException(
-            $"Parameter '{parameter.Name}' of type '{parameter.ParameterType.FullName}' could not be resolved.");
+        try
+        {
+            var activation = Activate(parameter.ParameterType, testCase);
+            return activation;
+        }
+        catch (Exception exception)
+        {
+            throw new InvalidOperationException(
+                $"Parameter '{parameter.Name}' of type '{parameter.ParameterType.FullName}' could not be resolved.",
+                exception);
+        }
     }
 
     private object ResolveParameterFromContainer(ParameterInfo parameter, FromContainerAttribute attribute)
@@ -149,14 +171,19 @@ public class TypeActivator(
         }
     }
 
-    private object ResolveParameterFromModel(TestCase testCase, ParameterInfo parameter, FromModelAttribute attribute)
+    private object ResolveParameterFromModel(ParameterInfo parameter, FromModelAttribute attribute, TestCase? testCase)
     {
-        if (testCase.Model is null)
+        if (testCase is null)
         {
-            throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from model, but no model is provider.");
+            throw new InvalidOperationException($"Parameter '{parameter.Name}' is suppose to be created from model, but the activation is without test case context.");
         }
 
-        var sourceJObject = testCase.Model;
+        if (testCase.Model is null)
+        {
+            throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from model, but no model is provided.");
+        }
+
+        var sourceJToken = testCase.Model;
 
         if (!string.IsNullOrWhiteSpace(attribute.JQuery))
         {
@@ -167,23 +194,39 @@ public class TypeActivator(
                 throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from model by JPath query, but no token found for the query '{attribute.JQuery}'.");
             }
 
-            if (token.Type != JTokenType.Object)
+            if (token.Type is JTokenType.Array or JTokenType.Bytes or JTokenType.Constructor or JTokenType.Comment)
             {
-                throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from model, but the token found for the JPath query '{attribute.JQuery}' is not an object.");
+                throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from model, but the token found for the JPath query '{attribute.JQuery}' is not a supported type.");
             }
 
-            sourceJObject = (JObject)token;
+            sourceJToken = token.Type == JTokenType.Property
+                ? ((JProperty)token).Value
+                : (JObject)token;
         }
 
-        var modelObject = sourceJObject.ToObject(parameter.ParameterType);
-        return modelObject ?? throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from model, but the model object could not be created.");
+        if (parameter.ParameterType.IsInterface)
+        {
+            var serializer = JsonSerializer.CreateDefault(); // TODO: [P2] use configurable serializer with null rules
+            serializer.Converters.Add(new NewtonsoftProxyJsonConverter(proxyFactory, parameter.ParameterType));
+            var modelInterface = testCase.Model.ToObject(parameter.ParameterType, serializer);
+
+            if (modelInterface is null)
+            {
+                throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from model, but the interface proxy could not be created.");
+            }
+
+            return modelInterface;
+        }
+
+        var value = sourceJToken.ToObject(parameter.ParameterType);
+        return value ?? throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from model, but the object/value could not be created.");
     }
 
-    private object ResolveParameterFromFixture(TestCase testCase, ParameterInfo parameter, FromFixtureAttribute attribute)
+    private object ResolveParameterFromFixture(ParameterInfo parameter, FromFixtureAttribute attribute, TestCase? testCase)
     {
         if (!string.IsNullOrWhiteSpace(attribute.Label))
         {
-            if (!fixtures.TryGetFixture(attribute.Label, out var specificFixture))
+            if (!Fixtures.TryGetFixture(attribute.Label, out var specificFixture))
             {
                 throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from fixture, but no fixture with label '{attribute.Label}' is found.");
             }
@@ -196,8 +239,24 @@ public class TypeActivator(
             return specificFixture;
         }
 
-        var fixtureObjects = fixtures.GetFixtures(testCase.FullyQualifiedName);
+        if (testCase is null)
+        {
+            throw new InvalidOperationException($"Parameter '{parameter.Name}' is suppose to be created from fixture without specific label, but the activation is without test case context.");
+        }
+
+        var fixtureObjects = Fixtures.GetFixtures(testCase.FullyQualifiedName);
         var fixture = fixtureObjects.FirstOrDefault(parameter.ParameterType.IsInstanceOfType);
-        return fixture ?? throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from fixture, but no fixture has been found.");
+        return fixture ?? throw new InvalidOperationException($"Parameter '{parameter.Name}' should be activated from fixture, but no fixture with compatible type has been found.");
+    }
+
+    private object TryProxySteps(object target, Type targetType, object[] constructorArguments)
+    {
+        if (!targetType.IsTypeWithSteps())
+        {
+            return target;
+        }
+
+        var proxy = proxyFactory.CreateStepsProxy(targetType, target, constructorArguments);
+        return proxy;
     }
 }

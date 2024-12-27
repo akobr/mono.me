@@ -26,6 +26,13 @@ public static class TestCaseExtensions
             vsTestCase.SetPropertyValue(vsProperty, property.Value);
         }
 
+        //vsTestCase.SetPropertyValue(TestProperty.Find("TestCase.ManagedType")!, testCase.TypeFullyQualifiedName);
+
+        //if (testCase.MethodName is not null)
+        //{
+        //    vsTestCase.SetPropertyValue(TestProperty.Find("TestCase.ManagedMethod")!, testCase.MethodName);
+        //}
+
         return vsTestCase;
     }
 }

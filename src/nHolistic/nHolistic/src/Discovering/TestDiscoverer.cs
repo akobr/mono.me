@@ -1,7 +1,5 @@
-using System;
 using System.Globalization;
 using System.Reflection;
-using System.Reflection.Metadata.Ecma335;
 using MediatR;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -20,11 +18,12 @@ public class TestDiscoverer(IPublisher publisher) : ITestDiscoverer
 
     private void ProcessType(Type type, Assembly assembly, string sourceName)
     {
-        if (!type.IsClass)
+        if (!type.IsClass || type.IsAbstract)
         {
             return;
         }
 
+        // TODO: [P1] Move this to separated library, by default it should not to be supported (same for Order attribute)
         var classAttribute = type.GetCustomAttribute<TestAttribute>();
 
         if (classAttribute is not null)
@@ -58,19 +57,22 @@ public class TestDiscoverer(IPublisher publisher) : ITestDiscoverer
                 : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         });
 
+        var typeFullName = type.FullName ?? type.Name;
         var firstMethod = stepMethods[0];
         var resourceName = $"{type.Namespace}.{type.Name}";
         using var stream = assembly.GetManifestResourceStream(resourceName);
 
         if (stream is null)
         {
+
             var classTestCase = BuildTestCase(
-                $"{type.FullName ?? type.Name}.{firstMethod.Name}",
+                $"{typeFullName}.{firstMethod.Name}",
                 $"{type.Name} [{stepMethods.Count} steps]",
                 attribute,
                 null,
                 type.Namespace ?? "Global",
-                sourceName);
+                sourceName,
+                typeFullName);
 
             publisher.Publish(new TestCaseDiscoveredNotification { TestCase = classTestCase });
             return;
@@ -85,12 +87,13 @@ public class TestDiscoverer(IPublisher publisher) : ITestDiscoverer
         {
             hasModel = true;
             var classTestCase = BuildTestCase(
-                $"{type.FullName ?? type.Name}.{firstMethod.Name}(model: {model.Name})",
+                $"{typeFullName}.{firstMethod.Name}(model: {model.Name})",
                 $"{model.Name} ({stepMethods.Count} steps)",
                 attribute,
                 model.Model,
                 type.Namespace ?? "Global",
-                sourceName);
+                sourceName,
+                typeFullName);
 
             publisher.Publish(new TestCaseDiscoveredNotification { TestCase = classTestCase });
         }
@@ -119,6 +122,7 @@ public class TestDiscoverer(IPublisher publisher) : ITestDiscoverer
         }
 
         var resourceName = $"{type.Namespace}.{type.Name}";
+        var typeFullName = type.FullName ?? type.Name;
         using var stream = assembly.GetManifestResourceStream(resourceName);
         JToken modelRoot = new JObject();
         var hasValidModel = stream is not null;
@@ -153,12 +157,14 @@ public class TestDiscoverer(IPublisher publisher) : ITestDiscoverer
                     foreach (var model in GetModels(methodModelRoot))
                     {
                         var methodTestCase = BuildTestCase(
-                            $"{type.FullName ?? type.Name}.{pair.Method.Name}(model: {model.Name})",
+                            $"{typeFullName}.{pair.Method.Name}(model: {model.Name})",
                             $"{pair.Method.Name}(model: {model.Name})",
                             pair.Attribute!,
                             model.Model,
                             type.FullName ?? type.Namespace ?? type.Name,
-                            sourceName);
+                            sourceName,
+                            typeFullName,
+                            pair.Method.Name);
                         publisher.Publish(new TestCaseDiscoveredNotification { TestCase = methodTestCase });
                     }
                 }
@@ -174,12 +180,14 @@ public class TestDiscoverer(IPublisher publisher) : ITestDiscoverer
             else
             {
                 var methodTestCase = BuildTestCase(
-                    $"{type.FullName ?? type.Name}.{pair.Method.Name}",
+                    $"{typeFullName}.{pair.Method.Name}",
                     pair.Method.Name,
                     pair.Attribute!,
                     null,
                     type.FullName ?? type.Namespace ?? type.Name,
-                    sourceName);
+                    sourceName,
+                    typeFullName,
+                    pair.Method.Name);
                 publisher.Publish(new TestCaseDiscoveredNotification { TestCase = methodTestCase });
             }
         }
@@ -244,14 +252,26 @@ public class TestDiscoverer(IPublisher publisher) : ITestDiscoverer
         TestAttribute testAttribute,
         JToken? model,
         string labelPath,
-        string source)
+        string source,
+        string typeFullName,
+        string? methodName = null)
     {
         var testCase = new TestCase
         {
             FullyQualifiedName = fullQualifiedName,
+            TypeFullyQualifiedName = typeFullName,
+            MethodName = methodName,
             DisplayName = name,
             Source = source,
+            Model = model,
         };
+
+        testCase.Properties.Add(new TestCaseProperty { Name = nameof(TestCase.TypeFullyQualifiedName), Value = testCase.TypeFullyQualifiedName });
+
+        if (testCase.MethodName is not null)
+        {
+            testCase.Properties.Add(new TestCaseProperty { Name = nameof(TestCase.MethodName), Value = testCase.MethodName });
+        }
 
         testCase.Dependencies.UnionWith(testAttribute.Dependencies ?? []);
 
@@ -271,16 +291,28 @@ public class TestDiscoverer(IPublisher publisher) : ITestDiscoverer
 
         if (testAttribute.Labels is not null && testAttribute.Labels.Length > 0)
         {
+            testCase.Labels.UnionWith(testAttribute.Labels);
             testCase.Traits.AddRange(testAttribute.Labels
                 .Select(label => new TestCaseProperty { Name = "Label", Value = label }));
         }
 
         if (!string.IsNullOrEmpty(labelPath))
         {
-
             var segments = labelPath.Split('.', StringSplitOptions.RemoveEmptyEntries);
             testCase.Traits.AddRange(segments.Select(
-                    segment => new TestCaseProperty { Name = "Label", Value = segment }));
+                segment => new TestCaseProperty { Name = "Label", Value = segment }));
+            testCase.Labels.UnionWith(segments);
+
+            var labelCut = labelPath;
+            var lastIndexOfDot = labelCut.Length;
+
+            while (lastIndexOfDot > 0)
+            {
+                labelCut = labelCut[..lastIndexOfDot];
+                lastIndexOfDot = labelCut.LastIndexOf('.');
+                testCase.Traits.Add(new TestCaseProperty { Name = "Label", Value = labelCut });
+                testCase.Labels.Add(labelCut);
+            }
         }
 
         return testCase;

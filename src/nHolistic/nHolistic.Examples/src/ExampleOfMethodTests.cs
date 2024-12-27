@@ -42,7 +42,7 @@ public class ExampleOfMethodTests(ExampleTestSteps steps)
         Debug.WriteLine("Test6 with parameter from fixture.");
     }
 
-    [Test]
+    [Test(Labels = ["CustomFixture"])]
     public void Test7(
         [FromContainer]IExampleService service,
         [FromFixture]ExampleLabelFixture fixture,

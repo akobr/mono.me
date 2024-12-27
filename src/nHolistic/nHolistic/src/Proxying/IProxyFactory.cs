@@ -12,4 +12,8 @@ public interface IProxyFactory
         where TImplementation : TInterface, new();
 
     object CreateInterfaceProxy(Type interfaceType, object target);
+
+    object CreateStepsProxy(Type classType, object[] constructorArguments);
+
+    object CreateStepsProxy(Type classType, object target, object[] constructorArguments);
 }

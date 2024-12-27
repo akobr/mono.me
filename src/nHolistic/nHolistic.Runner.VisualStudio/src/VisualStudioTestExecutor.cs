@@ -21,7 +21,7 @@ public class VisualStudioTestExecutor(
 
     private void OnApplicationStarted()
     {
-        _task = Task.Run(() => ExecuteTestCases(_cancellationSource.Token), _cancellationSource.Token);
+       _task = Task.Run(() => ExecuteTestCases(_cancellationSource.Token), _cancellationSource.Token);
     }
 
     private async Task ExecuteTestCases(CancellationToken cancellationToken)
@@ -30,12 +30,19 @@ public class VisualStudioTestExecutor(
             new LogNotification { Message = "Initialization done." },
             CancellationToken.None);
 
-        var testCases = await testCasesProvider.GetTestCasesAsync();
-        await executor.ExecuteTestCasesAsync(testCases, cancellationToken);
+        try
+        {
+            var testCases = await testCasesProvider.GetTestCasesAsync();
+            await executor.ExecuteTestCasesAsync(testCases, cancellationToken);
 
-        await publisher.Publish(
-            new LogNotification { Message = "The execution process ended." },
-            CancellationToken.None);
+            await publisher.Publish(
+                new LogNotification { Message = "The execution process ended." },
+                CancellationToken.None);
+        }
+        finally
+        {
+            appLifetime.StopApplication();
+        }
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
@@ -51,7 +58,7 @@ public class VisualStudioTestExecutor(
         {
             await _task;
         }
-        catch (OperationCanceledException)
+        catch (TaskCanceledException)
         {
             await publisher.Publish(
                 new LogNotification { Message = "The execution process has been canceled." },

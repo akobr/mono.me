@@ -2,7 +2,7 @@ using Castle.DynamicProxy;
 
 namespace _42.nHolistic;
 
-public class ProxyFactory : IProxyFactory
+public class ProxyFactory(ITestRunContextProvider provider) : IProxyFactory
 {
     private readonly ProxyGenerator _proxyGenerator = new();
 
@@ -31,5 +31,19 @@ public class ProxyFactory : IProxyFactory
     {
         var interceptor = new PropertyStorageInterceptor();
         return _proxyGenerator.CreateInterfaceProxyWithTarget(interfaceType, target, interceptor);
+    }
+
+    public object CreateStepsProxy(Type classType, object[] constructorArguments)
+    {
+        var runContext = provider.GetContext();
+        var interceptor = new ClassStepsInterceptor(runContext);
+        return _proxyGenerator.CreateClassProxy(classType, constructorArguments, interceptor);
+    }
+
+    public object CreateStepsProxy(Type classType, object target, object[] constructorArguments)
+    {
+        var runContext = provider.GetContext();
+        var interceptor = new ClassStepsInterceptor(runContext);
+        return _proxyGenerator.CreateClassProxyWithTarget(classType, target, constructorArguments, interceptor);
     }
 }
