@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\nHolistic.csproj" />
+    <ProjectReference Include="..\src\tHolistic.csproj" />
   </ItemGroup>
 
 </Project>

@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\nHolistic.Runner.VisualStudio.csproj" />
+    <ProjectReference Include="..\src\tHolistic.Runner.VisualStudio.csproj" />
   </ItemGroup>
 
 </Project>

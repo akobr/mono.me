@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\nHolistic\src\nHolistic.csproj" />
+    <ProjectReference Include="..\..\nHolistic\src\tHolistic.csproj" />
   </ItemGroup>
 
 </Project>
