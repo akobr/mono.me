@@ -1,4 +1,4 @@
-using _42.nHolistic.Runner.VisualStudio;
+using _42.tHolistic.Runner.VisualStudio;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Moq;
 using Xunit;

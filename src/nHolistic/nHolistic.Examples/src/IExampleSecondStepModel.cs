@@ -1,4 +1,4 @@
-namespace _42.nHolistic.Examples;
+namespace _42.tHolistic.Examples;
 
 public interface IExampleSecondStepModel
 {

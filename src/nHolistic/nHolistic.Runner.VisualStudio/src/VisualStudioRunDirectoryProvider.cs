@@ -1,6 +1,6 @@
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 
-namespace _42.nHolistic.Runner.VisualStudio;
+namespace _42.tHolistic.Runner.VisualStudio;
 
 public class VisualStudioRunDirectoryProvider(IRunContext runContext) : IRunDirectoryProvider
 {

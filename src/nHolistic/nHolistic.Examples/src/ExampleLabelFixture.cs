@@ -1,4 +1,4 @@
-namespace _42.nHolistic.Examples;
+namespace _42.tHolistic.Examples;
 
 [Label("CustomFixture")]
 public class ExampleLabelFixture : IFixture<ExampleLabelFixture>, IAsyncLifetime

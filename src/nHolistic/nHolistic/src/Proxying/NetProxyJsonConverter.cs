@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 public class NetProxyJsonConverter<T>(ProxyFactory proxyFactory) : JsonConverter<T>
     where T : class

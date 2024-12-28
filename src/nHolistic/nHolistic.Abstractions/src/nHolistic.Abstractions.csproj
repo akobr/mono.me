@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.nHolistic.Abstractions</AssemblyName>
-    <RootNamespace>_42.nHolistic</RootNamespace>
+    <AssemblyName>42.tHolistic.Abstractions</AssemblyName>
+    <RootNamespace>_42.tHolistic</RootNamespace>
 
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>

@@ -1,4 +1,4 @@
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 // TODO: [P1] move out of core
 [AttributeUsage(AttributeTargets.Method, Inherited = false)]

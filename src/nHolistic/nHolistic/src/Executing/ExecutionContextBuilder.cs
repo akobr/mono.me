@@ -1,12 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Text;
 using MediatR;
 using QuikGraph;
 using QuikGraph.Algorithms.ConnectedComponents;
 using QuikGraph.Graphviz;
 
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 public class ExecutionContextBuilder(
     ITestCasesMapper mapper,

@@ -2,7 +2,7 @@ using System.Reflection;
 using MediatR;
 using Microsoft.Extensions.Hosting;
 
-namespace _42.nHolistic.Runner.VisualStudio;
+namespace _42.tHolistic.Runner.VisualStudio;
 
 public class VisualStudioTestDiscoverer(
     ISourcesProvider sourcesProvider,

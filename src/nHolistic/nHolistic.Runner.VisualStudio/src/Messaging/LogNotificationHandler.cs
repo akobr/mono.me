@@ -1,7 +1,7 @@
 using MediatR;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
 
-namespace _42.nHolistic.Runner.VisualStudio;
+namespace _42.tHolistic.Runner.VisualStudio;
 
 public class LogNotificationHandler(IMessageLogger logger) : INotificationHandler<LogNotification>
 {

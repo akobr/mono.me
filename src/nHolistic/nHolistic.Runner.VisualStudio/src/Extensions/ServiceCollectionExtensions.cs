@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 
-namespace _42.nHolistic.Runner.VisualStudio;
+namespace _42.tHolistic.Runner.VisualStudio;
 
 public static class ServiceCollectionExtensions
 {

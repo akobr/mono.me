@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 public class ResultAttachmentsService(IRunDirectoryProvider runDirectory) : IResultAttachmentsService
 {

@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.nHolistic.Examples</AssemblyName>
-    <RootNamespace>_42.nHolistic.Examples</RootNamespace>
+    <AssemblyName>42.tHolistic.Examples</AssemblyName>
+    <RootNamespace>_42.tHolistic.Examples</RootNamespace>
 
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>

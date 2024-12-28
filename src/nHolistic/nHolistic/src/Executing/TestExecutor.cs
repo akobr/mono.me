@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using MediatR;
 
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 public class TestExecutor(
     ITestCasesMapper testCasesMapper,
@@ -19,7 +19,7 @@ public class TestExecutor(
         // TODO: [P3] don't ToList the test cases, just iterate over them
         var testCaseList = testCases.Select(testCase => testCase.CreateContext()).ToList();
         await publisher.Publish(
-            new LogNotification { Level = LogMessageLevel.Informational, Message = $"nHolistic executor started with {testCaseList.Count} test case(s)." },
+            new LogNotification { Level = LogMessageLevel.Informational, Message = $"tHolistic executor started with {testCaseList.Count} test case(s)." },
             cancellationToken);
 
         var context = await PrepareForExecutionAsync(testCaseList);

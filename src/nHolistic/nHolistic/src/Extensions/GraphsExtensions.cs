@@ -1,6 +1,6 @@
 using QuikGraph;
 
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 public static class GraphsExtensions
 {

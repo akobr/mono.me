@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 public class SynchronizationService : ISynchronizationService
 {

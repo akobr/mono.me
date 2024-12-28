@@ -4,16 +4,14 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
-
 using IVsTestDiscoverer = Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter.ITestDiscoverer;
 using IVsTestExecutor = Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter.ITestExecutor;
 using VsTestCase = Microsoft.VisualStudio.TestPlatform.ObjectModel.TestCase;
 
-namespace _42.nHolistic.Runner.VisualStudio;
+namespace _42.tHolistic.Runner.VisualStudio;
 
 [FileExtension(".dll")]
 [FileExtension(".exe")]

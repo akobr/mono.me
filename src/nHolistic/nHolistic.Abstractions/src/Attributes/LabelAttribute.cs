@@ -1,4 +1,4 @@
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 [AttributeUsage(AttributeTargets.Class)]
 public sealed class LabelAttribute(string label) : Attribute

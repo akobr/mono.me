@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using _42.tHolistic;
+using _42.tHolistic.Examples;
 
 namespace _42.nHolistic.Examples;
 

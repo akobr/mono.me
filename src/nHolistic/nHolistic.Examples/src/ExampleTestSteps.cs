@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace _42.nHolistic.Examples;
+namespace _42.tHolistic.Examples;
 
 [Steps]
 public class ExampleTestSteps

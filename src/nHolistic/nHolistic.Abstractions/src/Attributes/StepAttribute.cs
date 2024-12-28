@@ -1,4 +1,4 @@
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class StepAttribute : Attribute

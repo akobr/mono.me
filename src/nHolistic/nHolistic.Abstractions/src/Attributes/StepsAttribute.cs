@@ -1,4 +1,4 @@
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 // TODO: [P1] not sure about this one? how expensive it ti use only step on methods?
 [AttributeUsage(AttributeTargets.Class)]

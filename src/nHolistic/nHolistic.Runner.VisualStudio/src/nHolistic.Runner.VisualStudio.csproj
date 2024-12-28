@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.nHolistic.Runner.VisualStudio.TestAdapter</AssemblyName>
-    <RootNamespace>_42.nHolistic.Runner.VisualStudio</RootNamespace>
+    <AssemblyName>42.tHolistic.Runner.VisualStudio.TestAdapter</AssemblyName>
+    <RootNamespace>_42.tHolistic.Runner.VisualStudio</RootNamespace>
 
     <IsPackable>true</IsPackable>
-    <PackageId>42.nHolistic.Runner.VisualStudio</PackageId>
-    <AssemblyTitle>42.nHolistic test runner for Visual Studio (.net)</AssemblyTitle>
-    <Description>42.nHolistic test runner for Visual Studio (.net)</Description>
+    <PackageId>42.tHolistic.Runner.VisualStudio</PackageId>
+    <AssemblyTitle>42.tHolistic test runner for Visual Studio (.net)</AssemblyTitle>
+    <Description>42.tHolistic test runner for Visual Studio (.net)</Description>
     <PackageTags>$(PackageTags);test;testing</PackageTags>
 
     <TargetFramework>net8.0</TargetFramework>

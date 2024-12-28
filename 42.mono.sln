@@ -104,7 +104,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Examples", "Examples", "{68
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomClientApp", "src\Platform\Examples\CustomClientApp\src\CustomClientApp.csproj", "{C45B41B9-0B9E-403A-9678-C29699D09F14}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "nHolistic", "nHolistic", "{15F34EE7-1AEB-4E29-9A7D-B9647DA32789}"
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tHolistic", "tHolistic", "{15F34EE7-1AEB-4E29-9A7D-B9647DA32789}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "nHolistic.Abstractions", "src\nHolistic\nHolistic.Abstractions\src\nHolistic.Abstractions.csproj", "{AD94D3C2-ED5F-42F2-99F1-1E325483E5F2}"
 EndProject

@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using _42.nHolistic;
+using _42.tHolistic;
 
 namespace nHolistic.Tests;
 

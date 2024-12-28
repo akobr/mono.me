@@ -1,4 +1,4 @@
-using _42.nHolistic;
+using _42.tHolistic;
 using Xunit;
 
 namespace nHolistic.Tests;

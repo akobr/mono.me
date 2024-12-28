@@ -1,6 +1,6 @@
 using MediatR;
 
-namespace _42.nHolistic.Runner.VisualStudio;
+namespace _42.tHolistic.Runner.VisualStudio;
 
 public class TestCaseNotificationForRunnerHandler(ITestCasesRegister testCaseRegister) : INotificationHandler<TestCaseDiscoveredNotification>
 {

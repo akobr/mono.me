@@ -4,7 +4,7 @@ using MediatR;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace _42.nHolistic;
+namespace _42.tHolistic;
 
 public class TestDiscoverer(IPublisher publisher) : ITestDiscoverer
 {
