@@ -106,17 +106,17 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CustomClientApp", "src\Plat
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tHolistic", "tHolistic", "{15F34EE7-1AEB-4E29-9A7D-B9647DA32789}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Abstractions", "src\nHolistic\nHolistic.Abstractions\src\tHolistic.Abstractions.csproj", "{AD94D3C2-ED5F-42F2-99F1-1E325483E5F2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Abstractions", "src\tHolistic\tHolistic.Abstractions\src\tHolistic.Abstractions.csproj", "{AD94D3C2-ED5F-42F2-99F1-1E325483E5F2}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic", "src\nHolistic\nHolistic\src\tHolistic.csproj", "{77D12E8D-64CB-48D7-8085-18A789D669F7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic", "src\tHolistic\tHolistic\src\tHolistic.csproj", "{77D12E8D-64CB-48D7-8085-18A789D669F7}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Tests", "src\nHolistic\nHolistic\test\tHolistic.Tests.csproj", "{62720055-BF12-45E9-9522-9011DA0356BF}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Tests", "src\tHolistic\tHolistic\test\tHolistic.Tests.csproj", "{62720055-BF12-45E9-9522-9011DA0356BF}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Runner.VisualStudio", "src\nHolistic\nHolistic.Runner.VisualStudio\src\tHolistic.Runner.VisualStudio.csproj", "{3C0912F1-3F8E-47B6-9A73-96355A291C52}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Runner.VisualStudio", "src\tHolistic\tHolistic.Runner.VisualStudio\src\tHolistic.Runner.VisualStudio.csproj", "{3C0912F1-3F8E-47B6-9A73-96355A291C52}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Examples", "src\nHolistic\nHolistic.Examples\src\tHolistic.Examples.csproj", "{353D8D7E-2FC3-4730-AD22-832938D278F0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Examples", "src\tHolistic\tHolistic.Examples\src\tHolistic.Examples.csproj", "{353D8D7E-2FC3-4730-AD22-832938D278F0}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Runner.VisualStudio.Tests", "src\nHolistic\nHolistic.Runner.VisualStudio\test\tHolistic.Runner.VisualStudio.Tests.csproj", "{3EF53707-C80A-4637-9F9D-D282C59AF03C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "tHolistic.Runner.VisualStudio.Tests", "src\tHolistic\tHolistic.Runner.VisualStudio\test\tHolistic.Runner.VisualStudio.Tests.csproj", "{3EF53707-C80A-4637-9F9D-D282C59AF03C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -13,7 +13,7 @@ public class VsTestRunnerTests
         // Arrange
         var workingFolder = Environment.CurrentDirectory;
 
-        var sources = new List<string> { "D:\\work\\mono.me.second\\src\\nHolistic\\nHolistic.Examples\\src\\bin\\Debug\\net8.0\\42.nHolistic.Examples.dll" };
+        var sources = new List<string> { "D:\\work\\mono.me.second\\src\\tHolistic\\tHolistic.Examples\\src\\bin\\Debug\\net8.0\\42.tHolistic.Examples.dll" };
         var discoveryContext = new Mock<IDiscoveryContext>();
         var logger = new DebugMessageLogger();
         var discoverySink = new DebugTestCaseDiscoverySink();
@@ -28,7 +28,7 @@ public class VsTestRunnerTests
     public void ExecuteTests()
     {
         // Arrange
-        var sources = new List<string> { "D:\\work\\mono.me.second\\src\\nHolistic\\nHolistic.Examples\\src\\bin\\Debug\\net8.0\\42.nHolistic.Examples.dll" };
+        var sources = new List<string> { "D:\\work\\mono.me.second\\src\\tHolistic\\tHolistic.Examples\\src\\bin\\Debug\\net8.0\\42.tHolistic.Examples.dll" };
         var runContext = new DebugRunContext();
         var frameworkHandle = new DebugFrameworkHandle();
         var vsTestRunner = new VsTestRunner();

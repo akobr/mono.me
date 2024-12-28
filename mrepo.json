@@ -86,9 +86,9 @@
       }
     },
     {
-      "path": "src/nHolistic",
-      "name": "nHolistic",
-      "description": "nHolistic is a holistic approach to software testing.",
+      "path": "src/tHolistic",
+      "name": "tHolistic",
+      "description": "tHolistic is a holistic approach to software testing.",
       "custom": {
         "isSuppressed": true
       }

@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\nHolistic.Abstractions\src\tHolistic.Abstractions.csproj" />
+    <ProjectReference Include="..\..\tHolistic.Abstractions\src\tHolistic.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
