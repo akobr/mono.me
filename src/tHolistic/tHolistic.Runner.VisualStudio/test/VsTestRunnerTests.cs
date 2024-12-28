@@ -3,7 +3,7 @@ using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Moq;
 using Xunit;
 
-namespace nHolistic.Runner.VisualStudio.Tests;
+namespace tHolistic.Runner.VisualStudio.Tests;
 
 public class VsTestRunnerTests
 {

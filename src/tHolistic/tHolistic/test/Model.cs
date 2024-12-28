@@ -1,4 +1,4 @@
-namespace nHolistic.Tests;
+namespace tHolistic.Tests;
 
 public class Model
 {

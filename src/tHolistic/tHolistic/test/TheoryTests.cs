@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Xunit;
 
-namespace nHolistic.Tests;
+namespace tHolistic.Tests;
 
 public class TheoryTests
 {

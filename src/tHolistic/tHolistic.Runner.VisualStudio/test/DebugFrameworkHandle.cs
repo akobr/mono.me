@@ -3,7 +3,7 @@ using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
 
-namespace nHolistic.Runner.VisualStudio.Tests;
+namespace tHolistic.Runner.VisualStudio.Tests;
 
 public class DebugFrameworkHandle : IFrameworkHandle
 {

@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Logging;
 
-namespace nHolistic.Runner.VisualStudio.Tests;
+namespace tHolistic.Runner.VisualStudio.Tests;
 
 public class DebugMessageLogger : IMessageLogger
 {

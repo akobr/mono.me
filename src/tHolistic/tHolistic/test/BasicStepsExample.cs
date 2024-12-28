@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using _42.tHolistic;
 
-namespace nHolistic.Tests;
+namespace tHolistic.Tests;
 
 public class BasicStepsExample
 {

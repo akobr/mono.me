@@ -103,7 +103,7 @@ public class VisualStudioTestDiscoverer(
         // lots of warnings into the test output window as Test Explorer asks you to enumerate tests for every
         // assembly you build in your solution, not just the ones with references to this runner.
         if (!assembly.GetReferencedAssemblies().Any(name =>
-                string.Equals(name.Name, "42.nHolistic.Abstractions", StringComparison.OrdinalIgnoreCase)))
+                string.Equals(name.Name, "42.tHolistic.Abstractions", StringComparison.OrdinalIgnoreCase)))
         {
             await publisher.Publish(
                 new LogNotification { Message = $"Skipped: {fileNameOnly}" },

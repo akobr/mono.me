@@ -1,7 +1,7 @@
 using Microsoft.VisualStudio.TestPlatform.ObjectModel;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 
-namespace nHolistic.Runner.VisualStudio.Tests;
+namespace tHolistic.Runner.VisualStudio.Tests;
 
 public class DebugRunContext : IRunContext
 {

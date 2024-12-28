@@ -1,7 +1,7 @@
 using _42.tHolistic;
 using Xunit;
 
-namespace nHolistic.Tests;
+namespace tHolistic.Tests;
 
 public class ExecutionTests
 {
