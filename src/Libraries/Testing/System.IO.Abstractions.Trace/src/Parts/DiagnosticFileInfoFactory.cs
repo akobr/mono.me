@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Abstractions;
 
@@ -20,13 +20,6 @@ public class DiagnosticFileInfoFactory : IFileInfoFactory
     }
 
     public IFileSystem FileSystem { get; }
-
-    [Obsolete("Use `IFileInfoFactory.New(string)` instead")]
-    public IFileInfo FromFileName(string fileName)
-    {
-        _processor.Process(new object?[] { fileName });
-        return _executingFactory.FromFileName(fileName);
-    }
 
     public IFileInfo New(string fileName)
     {

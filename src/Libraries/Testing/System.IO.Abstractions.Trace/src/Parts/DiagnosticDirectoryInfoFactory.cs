@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Abstractions;
 
@@ -20,13 +20,6 @@ public class DiagnosticDirectoryInfoFactory : IDirectoryInfoFactory
     }
 
     public IFileSystem FileSystem { get; }
-
-    [Obsolete("Use `IDirectoryInfoFactory.New(string)` instead")]
-    public IDirectoryInfo FromDirectoryName(string directoryName)
-    {
-        _processor.Process(new object?[] { directoryName });
-        return _executingFactory.FromDirectoryName(directoryName);
-    }
 
     public IDirectoryInfo New(string path)
     {

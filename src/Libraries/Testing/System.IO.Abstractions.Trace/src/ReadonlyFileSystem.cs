@@ -1,4 +1,5 @@
-﻿using System.IO.Abstractions;
+using System.Diagnostics;
+using System.IO.Abstractions;
 using _42.Testing.System.IO.Abstractions.Parts;
 
 namespace _42.Testing.System.IO.Abstractions;
@@ -14,6 +15,7 @@ public class ReadonlyFileSystem : IFileSystem
         FileInfo = executingSystem.FileInfo;
         FileStream = new ReadonlyFileStreamFactory(this);
         FileSystemWatcher = executingSystem.FileSystemWatcher;
+        FileVersionInfo = executingSystem.FileVersionInfo;
         Path = executingSystem.Path;
     }
 
@@ -30,6 +32,8 @@ public class ReadonlyFileSystem : IFileSystem
     public IFileStreamFactory FileStream { get; }
 
     public IFileSystemWatcherFactory FileSystemWatcher { get; }
+
+    public IFileVersionInfoFactory FileVersionInfo { get; }
 
     public IPath Path { get; }
 }

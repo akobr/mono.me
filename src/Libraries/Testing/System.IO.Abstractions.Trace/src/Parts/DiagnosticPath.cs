@@ -86,6 +86,12 @@ public class DiagnosticPath : IPath
         return _executingPath.Combine(paths);
     }
 
+    public string Combine(scoped ReadOnlySpan<string> paths)
+    {
+        _processor.Process(new object?[] { paths.ToArray() });
+        return _executingPath.Combine(paths);
+    }
+
     public bool EndsInDirectorySeparator(ReadOnlySpan<char> path)
     {
         _processor.Process(new object?[] { path.ToArray() });
@@ -296,6 +302,12 @@ public class DiagnosticPath : IPath
     public string Join(params string?[] paths)
     {
         _processor.Process(new object?[] { paths });
+        return _executingPath.Join(paths);
+    }
+
+    public string Join(scoped ReadOnlySpan<string?> paths)
+    {
+        _processor.Process(new object?[] { paths.ToArray() });
         return _executingPath.Join(paths);
     }
 

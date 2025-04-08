@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Abstractions;
 
@@ -20,27 +20,6 @@ public class DiagnosticFileSystemWatcherFactory : IFileSystemWatcherFactory
     }
 
     public IFileSystem FileSystem { get; }
-
-    [Obsolete("Use `IFileSystemWatcherFactory.New()` instead")]
-    public IFileSystemWatcher CreateNew()
-    {
-        _processor.Process();
-        return _executingFactory.CreateNew();
-    }
-
-    [Obsolete("Use `IFileSystemWatcherFactory.New(string)` instead")]
-    public IFileSystemWatcher CreateNew(string path)
-    {
-        _processor.Process(new object?[] { path });
-        return _executingFactory.CreateNew(path);
-    }
-
-    [Obsolete("Use `IFileSystemWatcherFactory.New(string, string)` instead")]
-    public IFileSystemWatcher CreateNew(string path, string filter)
-    {
-        _processor.Process(new object?[] { path, filter });
-        return _executingFactory.CreateNew(path, filter);
-    }
 
     public IFileSystemWatcher New()
     {

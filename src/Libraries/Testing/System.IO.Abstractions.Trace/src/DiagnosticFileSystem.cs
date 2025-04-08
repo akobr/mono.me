@@ -1,4 +1,4 @@
-﻿using System.IO.Abstractions;
+using System.IO.Abstractions;
 using _42.Testing.System.IO.Abstractions.Parts;
 
 namespace _42.Testing.System.IO.Abstractions;
@@ -14,6 +14,7 @@ public class DiagnosticFileSystem : IFileSystem
         FileInfo = new DiagnosticFileInfoFactory(executingSystem.FileInfo, this, processor);
         FileStream = new DiagnosticFileStreamFactory(executingSystem.FileStream, this, processor);
         FileSystemWatcher = new DiagnosticFileSystemWatcherFactory(executingSystem.FileSystemWatcher, this, processor);
+        FileVersionInfo = new DiagnosticFileVersionInfoFactory(executingSystem.FileVersionInfo, this, processor);
         Path = new DiagnosticPath(executingSystem.Path, this, processor);
     }
 
@@ -30,6 +31,8 @@ public class DiagnosticFileSystem : IFileSystem
     public IFileStreamFactory FileStream { get; }
 
     public IFileSystemWatcherFactory FileSystemWatcher { get; }
+
+    public IFileVersionInfoFactory FileVersionInfo { get; }
 
     public IPath Path { get; }
 }
