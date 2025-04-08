@@ -4,7 +4,7 @@
     <AssemblyName>42.CLI.Toolkit</AssemblyName>
     <RootNamespace>_42.CLI.Toolkit</RootNamespace>
 
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <DebugType>embedded</DebugType>

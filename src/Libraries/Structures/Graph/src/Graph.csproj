@@ -4,7 +4,7 @@
     <AssemblyName>42.Structures.Graph</AssemblyName>
     <RootNamespace>_42.Structures.Graph</RootNamespace>
 
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <IsPackable>true</IsPackable>
     <LangVersion>8.0</LangVersion>
     <Nullable>enable</Nullable>

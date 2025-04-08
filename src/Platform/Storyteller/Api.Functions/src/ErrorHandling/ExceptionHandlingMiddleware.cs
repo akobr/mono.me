@@ -47,8 +47,7 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
                     Message = exception.TryGetErrorMessage(),
                     Hint = exception.TryGetErrorHint(),
                     ErrorCode = exception.TryGetErrorCode(),
-                },
-                httpErrorResponse.StatusCode);
+                });
 
             context.SetInvocationResult(httpErrorResponse);
         }
