@@ -48,6 +48,11 @@ public class ReadonlyFile : IFile
         return Task.CompletedTask;
     }
 
+    public void AppendAllText(string path, ReadOnlySpan<char> contents, Encoding encoding)
+    {
+        // TODO: simulate it by in memory map
+    }
+
     public Task AppendAllTextAsync(
         string path,
         string? contents,
@@ -62,6 +67,20 @@ public class ReadonlyFile : IFile
         string? contents,
         Encoding encoding,
         CancellationToken cancellationToken = default)
+    {
+        // TODO: simulate it by in memory map
+        return Task.CompletedTask;
+    }
+
+    public Task AppendAllTextAsync(string path, ReadOnlyMemory<char> contents,
+        CancellationToken cancellationToken = new CancellationToken())
+    {
+        // TODO: simulate it by in memory map
+        return Task.CompletedTask;
+    }
+
+    public Task AppendAllTextAsync(string path, ReadOnlyMemory<char> contents, Encoding encoding,
+        CancellationToken cancellationToken = new CancellationToken())
     {
         // TODO: simulate it by in memory map
         return Task.CompletedTask;
@@ -102,7 +121,19 @@ public class ReadonlyFile : IFile
         return _executingFile.ReadLinesAsync(path, encoding, cancellationToken);
     }
 
+    public void WriteAllBytes(string path, ReadOnlySpan<byte> bytes)
+    {
+        // TODO: simulate it by in memory map
+    }
+
     public Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken = default)
+    {
+        // TODO: simulate it by in memory map
+        return Task.CompletedTask;
+    }
+
+    public Task WriteAllBytesAsync(string path, ReadOnlyMemory<byte> bytes,
+        CancellationToken cancellationToken = new CancellationToken())
     {
         // TODO: simulate it by in memory map
         return Task.CompletedTask;
@@ -125,6 +156,11 @@ public class ReadonlyFile : IFile
     {
         // TODO: simulate it by in memory map
         return Task.CompletedTask;
+    }
+
+    public void WriteAllText(string path, ReadOnlySpan<char> contents, Encoding encoding)
+    {
+        // TODO: simulate it by in memory map
     }
 
     public Task WriteAllTextAsync(string path, string? contents, CancellationToken cancellationToken = default)
@@ -138,6 +174,43 @@ public class ReadonlyFile : IFile
         string? contents,
         Encoding encoding,
         CancellationToken cancellationToken = default)
+    {
+        // TODO: simulate it by in memory map
+        return Task.CompletedTask;
+    }
+
+    public Task WriteAllTextAsync(string path, ReadOnlyMemory<char> contents,
+        CancellationToken cancellationToken = new CancellationToken())
+    {
+        // TODO: simulate it by in memory map
+        return Task.CompletedTask;
+    }
+
+    public Task WriteAllTextAsync(string path, ReadOnlyMemory<char> contents, Encoding encoding,
+        CancellationToken cancellationToken = new CancellationToken())
+    {
+        // TODO: simulate it by in memory map
+        return Task.CompletedTask;
+    }
+
+    public void AppendAllBytes(string path, byte[] bytes)
+    {
+        // TODO: simulate it by in memory map
+    }
+
+    public void AppendAllBytes(string path, ReadOnlySpan<byte> bytes)
+    {
+        // TODO: simulate it by in memory map
+    }
+
+    public Task AppendAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken = new CancellationToken())
+    {
+        // TODO: simulate it by in memory map
+        return Task.CompletedTask;
+    }
+
+    public Task AppendAllBytesAsync(string path, ReadOnlyMemory<byte> bytes,
+        CancellationToken cancellationToken = new CancellationToken())
     {
         // TODO: simulate it by in memory map
         return Task.CompletedTask;
@@ -159,6 +232,11 @@ public class ReadonlyFile : IFile
     }
 
     public void AppendAllText(string path, string? contents, Encoding encoding)
+    {
+        // TODO: simulate it by in memory map
+    }
+
+    public void AppendAllText(string path, ReadOnlySpan<char> contents)
     {
         // TODO: simulate it by in memory map
     }
@@ -540,6 +618,11 @@ public class ReadonlyFile : IFile
     }
 
     public void WriteAllText(string path, string? contents, Encoding encoding)
+    {
+        // TODO: simulate it by in memory map
+    }
+
+    public void WriteAllText(string path, ReadOnlySpan<char> contents)
     {
         // TODO: simulate it by in memory map
     }

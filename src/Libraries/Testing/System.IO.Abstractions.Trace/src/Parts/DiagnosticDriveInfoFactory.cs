@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.IO.Abstractions;
 
@@ -20,13 +20,6 @@ public class DiagnosticDriveInfoFactory : IDriveInfoFactory
     }
 
     public IFileSystem FileSystem { get; }
-
-    [Obsolete("Use `IDriveInfoFactory.New(string)` instead")]
-    public IDriveInfo FromDriveName(string driveName)
-    {
-        _processor.Process(new object?[] { driveName });
-        return _executingFactory.FromDriveName(driveName);
-    }
 
     public IDriveInfo[] GetDrives()
     {

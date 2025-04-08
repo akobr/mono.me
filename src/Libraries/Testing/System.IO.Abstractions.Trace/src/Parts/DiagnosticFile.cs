@@ -46,6 +46,12 @@ public class DiagnosticFile : IFile
         return _executingFile.AppendAllLinesAsync(path, contents, encoding, cancellationToken);
     }
 
+    public void AppendAllText(string path, ReadOnlySpan<char> contents, Encoding encoding)
+    {
+        _processor.Process(new object?[] { path, contents.ToArray(), encoding });
+        _executingFile.AppendAllText(path, contents, encoding);
+    }
+
     public Task AppendAllTextAsync(
         string path,
         string? contents,
@@ -60,6 +66,20 @@ public class DiagnosticFile : IFile
         string? contents,
         Encoding encoding,
         CancellationToken cancellationToken = default)
+    {
+        _processor.Process(new object?[] { path, contents, encoding, cancellationToken });
+        return _executingFile.AppendAllTextAsync(path, contents, encoding, cancellationToken);
+    }
+
+    public Task AppendAllTextAsync(string path, ReadOnlyMemory<char> contents,
+        CancellationToken cancellationToken = new CancellationToken())
+    {
+        _processor.Process(new object?[] { path, contents, cancellationToken });
+        return _executingFile.AppendAllTextAsync(path, contents, cancellationToken);
+    }
+
+    public Task AppendAllTextAsync(string path, ReadOnlyMemory<char> contents, Encoding encoding,
+        CancellationToken cancellationToken = new CancellationToken())
     {
         _processor.Process(new object?[] { path, contents, encoding, cancellationToken });
         return _executingFile.AppendAllTextAsync(path, contents, encoding, cancellationToken);
@@ -107,7 +127,20 @@ public class DiagnosticFile : IFile
         return _executingFile.ReadLinesAsync(path, encoding, cancellationToken);
     }
 
+    public void WriteAllBytes(string path, ReadOnlySpan<byte> bytes)
+    {
+        _processor.Process(new object?[] { path, bytes.ToArray() });
+        _executingFile.WriteAllBytes(path, bytes);
+    }
+
     public Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken = default)
+    {
+        _processor.Process(new object?[] { path, bytes, cancellationToken });
+        return _executingFile.WriteAllBytesAsync(path, bytes, cancellationToken);
+    }
+
+    public Task WriteAllBytesAsync(string path, ReadOnlyMemory<byte> bytes,
+        CancellationToken cancellationToken = new CancellationToken())
     {
         _processor.Process(new object?[] { path, bytes, cancellationToken });
         return _executingFile.WriteAllBytesAsync(path, bytes, cancellationToken);
@@ -132,6 +165,12 @@ public class DiagnosticFile : IFile
         return _executingFile.WriteAllLinesAsync(path, contents, encoding, cancellationToken);
     }
 
+    public void WriteAllText(string path, ReadOnlySpan<char> contents, Encoding encoding)
+    {
+        _processor.Process(new object?[] { path, contents.ToArray(), encoding });
+        _executingFile.WriteAllText(path, contents, encoding);
+    }
+
     public Task WriteAllTextAsync(string path, string? contents, CancellationToken cancellationToken = default)
     {
         _processor.Process(new object?[] { path, contents, cancellationToken });
@@ -146,6 +185,45 @@ public class DiagnosticFile : IFile
     {
         _processor.Process(new object?[] { path, contents, encoding, cancellationToken });
         return _executingFile.WriteAllTextAsync(path, contents, encoding, cancellationToken);
+    }
+
+    public Task WriteAllTextAsync(string path, ReadOnlyMemory<char> contents,
+        CancellationToken cancellationToken = new CancellationToken())
+    {
+        _processor.Process(new object?[] { path, contents, cancellationToken });
+        return _executingFile.WriteAllTextAsync(path, contents, cancellationToken);
+    }
+
+    public Task WriteAllTextAsync(string path, ReadOnlyMemory<char> contents, Encoding encoding,
+        CancellationToken cancellationToken = new CancellationToken())
+    {
+        _processor.Process(new object?[] { path, contents, encoding, cancellationToken });
+        return _executingFile.WriteAllTextAsync(path, contents, encoding, cancellationToken);
+    }
+
+    public void AppendAllBytes(string path, byte[] bytes)
+    {
+        _processor.Process(new object?[] { path, bytes });
+        _executingFile.AppendAllBytes(path, bytes);
+    }
+
+    public void AppendAllBytes(string path, ReadOnlySpan<byte> bytes)
+    {
+        _processor.Process(new object?[] { path, bytes.ToArray() });
+        _executingFile.AppendAllBytes(path, bytes);
+    }
+
+    public Task AppendAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken = new CancellationToken())
+    {
+        _processor.Process(new object?[] { path, bytes, cancellationToken });
+        return _executingFile.AppendAllBytesAsync(path, bytes, cancellationToken);
+    }
+
+    public Task AppendAllBytesAsync(string path, ReadOnlyMemory<byte> bytes,
+        CancellationToken cancellationToken = new CancellationToken())
+    {
+        _processor.Process(new object?[] { path, bytes, cancellationToken });
+        return _executingFile.AppendAllBytesAsync(path, bytes, cancellationToken);
     }
 
     public void AppendAllLines(string path, IEnumerable<string> contents)
@@ -170,6 +248,12 @@ public class DiagnosticFile : IFile
     {
         _processor.Process(new object?[] { path, contents });
         _executingFile.AppendAllText(path, contents, encoding);
+    }
+
+    public void AppendAllText(string path, ReadOnlySpan<char> contents)
+    {
+        _processor.Process(new object?[] { path, contents.ToArray() });
+        _executingFile.AppendAllText(path, contents);
     }
 
     public StreamWriter AppendText(string path)
@@ -596,5 +680,11 @@ public class DiagnosticFile : IFile
     {
         _processor.Process(new object?[] { path, contents, encoding });
         _executingFile.WriteAllText(path, contents, encoding);
+    }
+
+    public void WriteAllText(string path, ReadOnlySpan<char> contents)
+    {
+        _processor.Process(new object?[] { path, contents.ToArray() });
+        _executingFile.WriteAllText(path, contents);
     }
 }
