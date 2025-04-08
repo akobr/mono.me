@@ -66,7 +66,7 @@ namespace _42.Monorepo.Cli.NuGet
         {
             public int Compare(SemVersion? x, SemVersion? y)
             {
-                return SemVersion.Compare(y, x);
+                return SemVersion.CompareSortOrder(y, x);
             }
         }
     }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using _42.Monorepo.Cli.Model;
+using Semver;
 
 namespace _42.Monorepo.Cli.Operations
 {
@@ -22,7 +23,7 @@ namespace _42.Monorepo.Cli.Operations
                 return -1;
             }
 
-            return b.Version.CompareTo(a.Version);
+            return SemVersion.CompareSortOrder(b.Version, a.Version);
         }
     }
 }
