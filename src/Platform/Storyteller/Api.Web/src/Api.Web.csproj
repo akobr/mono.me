@@ -3,7 +3,7 @@
   <PropertyGroup>
     <AssemblyName>42.Platform.Storyteller.Api.Web</AssemblyName>
     <RootNamespace>_42.Platform.Storyteller.Api</RootNamespace>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
