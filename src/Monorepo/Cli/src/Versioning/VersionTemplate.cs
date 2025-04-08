@@ -15,13 +15,13 @@ namespace _42.Monorepo.Cli.Versioning
         public VersionTemplate(SemVersion version)
         {
             Template = version.ToTemplate();
-            Version = version.Change();
+            Version = version.With();
         }
 
         public VersionTemplate(string template, SemVersion version)
         {
             Template = template;
-            Version = version.Change();
+            Version = version.With();
         }
 
         public string Template { get; }

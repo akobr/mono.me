@@ -88,7 +88,7 @@ namespace _42.Monorepo.Cli.Commands.Update
                 else if (hasPatchChange)
                 {
                     var newPatch = currentVersion.Version.Patch + 1;
-                    newVersion = new(new SemVersion(currentVersion.Version.Major, currentVersion.Version.Minor, newPatch, currentVersion.Version.Prerelease));
+                    newVersion = new(new SemVersion(currentVersion.Version.Major, currentVersion.Version.Minor, newPatch, [currentVersion.Version.Prerelease]));
                 }
 
                 if (someChanges)

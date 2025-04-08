@@ -15,17 +15,22 @@ namespace _42.Monorepo.Cli.Extensions
 
         public static Version ToVersion(this SemVersion @this)
         {
-            int.TryParse(@this.Build, NumberStyles.Integer, CultureInfo.InvariantCulture, out var build);
-            return new Version(@this.Major, @this.Minor, @this.Patch, build);
+            if (!int.TryParse(@this.Metadata, NumberStyles.Integer, CultureInfo.InvariantCulture, out var revision))
+            {
+                revision = -1;
+            }
+
+            return new Version((int)@this.Major, (int)@this.Minor, (int)@this.Patch, revision);
         }
 
         public static SemVersion ToSemVersion(this Version @this)
         {
-            var build = @this.Revision > 0
-                ? @this.Revision.ToString(CultureInfo.InvariantCulture)
-                : string.Empty;
+            var patch = @this.Build > 0 ? @this.Build : 0;
+            var metadata = @this.Revision > 0
+                ? new string[] { @this.Revision.ToString(CultureInfo.InvariantCulture) }
+                : null;
 
-            return new SemVersion(@this.Major, @this.Minor, @this.Build, build: build);
+            return new SemVersion(@this.Major, @this.Minor, patch, metadata: metadata);
         }
     }
 }

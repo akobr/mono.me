@@ -56,7 +56,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
 
             var packageVersion = SemVersion.TryParse(oracle.SemVer2, out var parsedVersion)
                 ? parsedVersion
-                : new SemVersion(oracle.Version);
+                : oracle.Version.ToSemVersion();
 
             return new ExactVersions
             {
@@ -115,12 +115,12 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             else if (versionPrefix is not null
                      && Version.TryParse(versionPrefix.Value, out var parsedPrefix))
             {
-                version = new SemVersion(parsedPrefix);
+                version = parsedPrefix.ToSemVersion();
 
                 if (versionSuffix is not null
                     && Regex.IsMatch(versionSuffix.Value, "[0-9A-Za-z-]*"))
                 {
-                    version = version.Change(prerelease: versionSuffix.Value);
+                    version = version.WithPrerelease(versionSuffix.Value);
                 }
             }
 
@@ -131,7 +131,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             }
             else
             {
-                assemblyVersion = new Version(version.Major, version.Minor, version.Patch, int.TryParse(version.Build, out var parsedBuild) ? parsedBuild : 0);
+                assemblyVersion = version.ToVersion();
             }
 
             if (fileVersionElement is not null
@@ -164,7 +164,7 @@ namespace _42.Monorepo.Cli.Operations.Strategies
             }
             else
             {
-                packageVersion = version.Change();
+                packageVersion = version.With();
             }
 
             return new ExactVersions

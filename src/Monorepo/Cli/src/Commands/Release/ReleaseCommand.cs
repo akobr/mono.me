@@ -200,7 +200,7 @@ namespace _42.Monorepo.Cli.Commands.Release
                 else if (hasPatchChange)
                 {
                     var newPatch = previousVersion.Patch + 1;
-                    newVersion = new(new SemVersion(previousVersion.Major, previousVersion.Minor, newPatch, previousVersion.Prerelease));
+                    newVersion = new(new SemVersion(previousVersion.Major, previousVersion.Minor, newPatch, [previousVersion.Prerelease]));
                 }
                 else
                 {

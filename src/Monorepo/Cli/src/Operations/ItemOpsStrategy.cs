@@ -246,7 +246,7 @@ namespace _42.Monorepo.Cli.Operations
             }
             else
             {
-                informationalVersion = new SemVersion(version);
+                informationalVersion = version.ToSemVersion();
             }
 
             if (packageVersionElement is not null
@@ -256,7 +256,7 @@ namespace _42.Monorepo.Cli.Operations
             }
             else
             {
-                packageVersion = new SemVersion(version);
+                packageVersion = version.ToSemVersion();
             }
 
             return new ExactVersions
@@ -283,7 +283,7 @@ namespace _42.Monorepo.Cli.Operations
 
             var packageVersion = SemVersion.TryParse(oracle.SemVer2, out var parsedVersion)
                 ? parsedVersion
-                : new SemVersion(oracle.Version);
+                : oracle.Version.ToSemVersion();
 
             return new ExactVersions
             {
