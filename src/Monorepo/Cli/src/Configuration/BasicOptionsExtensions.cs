@@ -28,6 +28,18 @@ public static class BasicOptionsExtensions
         return startupProject ?? string.Empty;
     }
 
+    public static int GetDotNetVersion(this IBasicOptions @this)
+    {
+        if (@this.Custom.TryGetValue(CustomProperties.DOTNET_VERSION, out var dotnetVersion) &&
+            int.TryParse(dotnetVersion, out var version))
+        {
+            return version;
+        }
+
+        // Default to .NET 9 if not specified
+        return 9;
+    }
+
     public static bool IsVersioned(this IBasicOptions options)
     {
         return !options.Exclude.Contains(Excludes.VERSION);

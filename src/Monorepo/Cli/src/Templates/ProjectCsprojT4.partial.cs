@@ -17,5 +17,7 @@ namespace _42.Monorepo.Cli.Templates
         public string RootNamespace { get; set; } = string.Empty;
 
         public bool HasCustomName { get; set; }
+
+        public int DotNetVersion { get; set; }
     }
 }
