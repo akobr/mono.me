@@ -131,6 +131,11 @@
       "path": "src/Games/Cetris",
       "name": "Cetris",
       "description": "The intersection of the legendary game Tetris + Command line = Cetris."
+    },
+    {
+      "path": "src/Lines",
+      "name": "42 lines of code",
+      "description": "Learn .net, c#, and its libraries by examples."
     }
   ]
 }
