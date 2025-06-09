@@ -6,11 +6,13 @@ namespace _42.Monorepo.Cli.Templates
     {
         private readonly IFeatureProvider _featureProvider;
         private readonly string _testsType;
+        private readonly int _dotNetVersion;
 
-        public ProjectTestCsprojT4(IFeatureProvider featureProvider, string testType)
+        public ProjectTestCsprojT4(IFeatureProvider featureProvider, string testType, int dotNetVersion)
         {
             _featureProvider = featureProvider;
             _testsType = testType;
+            _dotNetVersion = dotNetVersion;
         }
     }
 }

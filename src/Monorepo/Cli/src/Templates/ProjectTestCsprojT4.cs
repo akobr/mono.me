@@ -22,15 +22,11 @@ namespace _42.Monorepo.Cli.Templates
         /// </summary>
         public virtual string TransformText()
         {
-            this.Write(@"<Project Sdk=""Microsoft.NET.Sdk"">
-
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <IsPackable>false</IsPackable>
-");
+            this.Write("<Project Sdk=\"Microsoft.NET.Sdk\">\r\n\r\n  <PropertyGroup>\r\n    <TargetFramework>net");
+            this.Write(this.ToStringHelper.ToStringWithCulture(_dotNetVersion));
+            this.Write(".0</TargetFramework>\r\n    <LangVersion>latest</LangVersion>\r\n    <Nullable>enable" +
+                    "</Nullable>\r\n    <ImplicitUsings>enable</ImplicitUsings>\r\n    <IsPackable>false<" +
+                    "/IsPackable>\r\n");
  if (_featureProvider.IsEnabled("git-version")) { 
             this.Write("    <EnableGitVersioning>false</EnableGitVersioning>\r\n");
  } 

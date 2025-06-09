@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net<#= _dotNetVersion #>.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -20,9 +20,12 @@
     <PackageReference Include="NUnit" />
     <PackageReference Include="NUnit3TestAdapter" />
 <# } #>
-<# else { #>
+<# else if (_testsType == "xunit") { #>
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
+<# } #>
+<# else { #>
+    <PackageReference Include="TUnit " />
 <# } #>
   </ItemGroup>
 

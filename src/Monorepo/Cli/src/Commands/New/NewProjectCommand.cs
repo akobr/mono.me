@@ -104,6 +104,7 @@ namespace _42.Monorepo.Cli.Commands.New
                 RootNamespace = !string.IsNullOrWhiteSpace(worksteadNamespace)
                     ? $"{worksteadNamespace}.{name.ToValidItemName()}"
                     : name.ToValidItemName(),
+                DotNetVersion = projectOptions.GetDotNetVersion(),
             });
 
             if (!_fileSystem.File.Exists(projectFilePath))
@@ -145,7 +146,7 @@ namespace _42.Monorepo.Cli.Commands.New
 
             if (testType != "none")
             {
-                var testProjectTemplate = new ProjectTestCsprojT4(_featureProvider, testType);
+                var testProjectTemplate = new ProjectTestCsprojT4(_featureProvider, testType, projectOptions.GetDotNetVersion());
                 _fileSystem.Directory.CreateDirectory(_fileSystem.Path.Combine(path, Constants.TEST_DIRECTORY_NAME));
 
                 if (!_fileSystem.File.Exists(projectTestFilePath))
