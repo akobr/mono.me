@@ -22,7 +22,9 @@
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="Moq" Version="4.20.72" />
-<# if (_featureProvider.IsEnabled("tests-xunit")) { #>
+<# if (_featureProvider.IsEnabled("tests-tunit")) { #>
+    <PackageVersion Include="TUnit" Version="0.25.6" />
+<# } #><# if (_featureProvider.IsEnabled("tests-xunit")) { #>
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.1" />
 <# } #><# if (_featureProvider.IsEnabled("tests-nunit")) { #>

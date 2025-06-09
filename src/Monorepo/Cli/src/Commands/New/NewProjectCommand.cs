@@ -114,6 +114,11 @@ namespace _42.Monorepo.Cli.Commands.New
             var testTypes = new List<string>();
             var testType = "none";
 
+            if (_featureProvider.IsEnabled(FeatureNames.TestsTunit))
+            {
+                testTypes.Add("tunit");
+            }
+
             if (_featureProvider.IsEnabled(FeatureNames.TestsXunit))
             {
                 testTypes.Add("xunit");

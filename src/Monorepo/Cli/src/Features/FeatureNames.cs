@@ -11,6 +11,7 @@ namespace _42.Monorepo.Cli.Features
         public const string Tests = "tests";
         public const string TestsXunit = "tests-xunit";
         public const string TestsNunit = "tests-nunit";
+        public const string TestsTunit = "tests-tunit";
 
         public const string Iac = "iac";
         public const string IacPulumi = "iac-pulumi";
