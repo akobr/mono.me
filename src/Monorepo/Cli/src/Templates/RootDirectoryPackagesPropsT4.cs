@@ -46,6 +46,9 @@ namespace _42.Monorepo.Cli.Templates
     <PackageVersion Include=""Microsoft.NET.Test.Sdk"" Version=""17.14.1"" />
     <PackageVersion Include=""Moq"" Version=""4.20.72"" />
 ");
+ if (_featureProvider.IsEnabled("tests-tunit")) { 
+            this.Write("    <PackageVersion Include=\"TUnit\" Version=\"0.25.6\" />\r\n");
+ } 
  if (_featureProvider.IsEnabled("tests-xunit")) { 
             this.Write("    <PackageVersion Include=\"xunit\" Version=\"2.9.3\" />\r\n    <PackageVersion Inclu" +
                     "de=\"xunit.runner.visualstudio\" Version=\"3.1.1\" />\r\n");

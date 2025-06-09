@@ -259,10 +259,10 @@ namespace _42.Monorepo.Cli.Commands.New
                 Console.WriteLine("  - Microsoft.Build.Traversal for simple building by tools");
             }
 
+            featureList.Add(FeatureNames.TestsTunit);
             featureList.Add(FeatureNames.TestsXunit);
             featureList.Add(FeatureNames.TestsNunit);
-            Console.WriteLine("  - Add support for famous unit testing frameworks: xUnit, NUnit");
-
+            Console.WriteLine("  - Add support for famous unit testing frameworks: TUnit, xUnit, NUnit");
 
             if (useCommitLint)
             {

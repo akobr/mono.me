@@ -41,9 +41,12 @@ namespace _42.Monorepo.Cli.Templates
             this.Write("    <PackageReference Include=\"NUnit\" />\r\n    <PackageReference Include=\"NUnit3Te" +
                     "stAdapter\" />\r\n");
  } 
- else { 
+ else if (_testsType == "xunit") { 
             this.Write("    <PackageReference Include=\"xunit\" />\r\n    <PackageReference Include=\"xunit.ru" +
                     "nner.visualstudio\" />\r\n");
+ } 
+ else { 
+            this.Write("    <PackageReference Include=\"TUnit \" />\r\n");
  } 
             this.Write("  </ItemGroup>\r\n\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
