@@ -30,7 +30,7 @@ namespace _42.Monorepo.Cli.Templates
             this.Write(this.ToStringHelper.ToStringWithCulture(Model.RootNamespace));
             this.Write("</RootNamespace>\r\n\r\n");
  } 
-            this.Write("    <TargetFramework>net8.0</TargetFramework>\r\n    <LangVersion>latest</LangVersi" +
+            this.Write("    <TargetFramework>net9.0</TargetFramework>\r\n    <LangVersion>latest</LangVersi" +
                     "on>\r\n    <Nullable>enable</Nullable>\r\n    <ImplicitUsings>enable</ImplicitUsings" +
                     ">\r\n  </PropertyGroup>\r\n\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();

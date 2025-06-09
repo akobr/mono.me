@@ -30,30 +30,29 @@ namespace _42.Monorepo.Cli.Templates
     <!-- <PackageVersion Include=""package-name"" Version=""package-version"" /> -->
 
     <!-- abstractions for .NET libraries -->
-    <PackageVersion Include=""Microsoft.Extensions.Configuration.Abstractions"" Version=""8.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.DependencyInjection.Abstractions"" Version=""8.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.Hosting.Abstractions"" Version=""8.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.Logging.Abstractions"" Version=""8.0.0"" />
+    <PackageVersion Include=""Microsoft.Extensions.Configuration.Abstractions"" Version=""9.0.5"" />
+    <PackageVersion Include=""Microsoft.Extensions.DependencyInjection.Abstractions"" Version=""9.0.5"" />
+    <PackageVersion Include=""Microsoft.Extensions.Hosting.Abstractions"" Version=""9.0.5"" />
+    <PackageVersion Include=""Microsoft.Extensions.Logging.Abstractions"" Version=""9.0.5"" />
 
     <!-- .NET libraries -->
-    <PackageVersion Include=""Microsoft.Extensions.Configuration"" Version=""8.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.DependencyInjection"" Version=""8.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.Hosting"" Version=""8.0.0"" />
-    <PackageVersion Include=""Microsoft.Extensions.Logging"" Version=""8.0.0"" />
+    <PackageVersion Include=""Microsoft.Extensions.Configuration"" Version=""9.0.5"" />
+    <PackageVersion Include=""Microsoft.Extensions.DependencyInjection"" Version=""9.0.5"" />
+    <PackageVersion Include=""Microsoft.Extensions.Hosting"" Version=""9.0.5"" />
+    <PackageVersion Include=""Microsoft.Extensions.Logging"" Version=""9.0.5"" />
 
     <!-- unit testing -->
-    <PackageVersion Include=""coverlet.collector"" Version=""6.0.0"" />
-    <PackageVersion Include=""FluentAssertions"" Version=""6.12.0"" />
-    <PackageVersion Include=""Microsoft.NET.Test.Sdk"" Version=""17.8.0"" />
-    <PackageVersion Include=""Moq"" Version=""4.20.69"" />
+    <PackageVersion Include=""coverlet.collector"" Version=""6.0.4"" />
+    <PackageVersion Include=""Microsoft.NET.Test.Sdk"" Version=""17.14.1"" />
+    <PackageVersion Include=""Moq"" Version=""4.20.72"" />
 ");
  if (_featureProvider.IsEnabled("tests-xunit")) { 
-            this.Write("    <PackageVersion Include=\"xunit\" Version=\"2.6.1\" />\r\n    <PackageVersion Inclu" +
-                    "de=\"xunit.runner.visualstudio\" Version=\"2.5.3\" />\r\n");
+            this.Write("    <PackageVersion Include=\"xunit\" Version=\"2.9.3\" />\r\n    <PackageVersion Inclu" +
+                    "de=\"xunit.runner.visualstudio\" Version=\"3.1.1\" />\r\n");
  } 
  if (_featureProvider.IsEnabled("tests-nunit")) { 
-            this.Write("    <PackageVersion Include=\"NUnit\" Version=\"4.0.1\" />\r\n    <PackageVersion Inclu" +
-                    "de=\"NUnit3TestAdapter\" Version=\"4.5.0\" />\r\n");
+            this.Write("    <PackageVersion Include=\"NUnit\" Version=\"4.3.2\" />\r\n    <PackageVersion Inclu" +
+                    "de=\"NUnit3TestAdapter\" Version=\"5.0.0\" />\r\n");
  } 
  if (_featureProvider.IsEnabled("git-version")) { 
             this.Write("\r\n    <!-- versioning -->\r\n    <PackageVersion Include=\"42.Monorepo.GitVersioning" +
@@ -64,7 +63,7 @@ namespace _42.Monorepo.Cli.Templates
             this.Write("    <PackageVersion Include=\"StyleCop.Analyzers\" Version=\"1.2.0-beta.556\" />\r\n");
  } 
  if (_featureProvider.IsEnabled("sonar")) { 
-            this.Write("    <PackageVersion Include=\"SonarAnalyzer.CSharp\" Version=\"9.16.0.82469\" />\r\n");
+            this.Write("    <PackageVersion Include=\"SonarAnalyzer.CSharp\" Version=\"10.11.0.117924\" />\r\n");
  } 
             this.Write("  </ItemGroup>\r\n</Project>\r\n");
             return this.GenerationEnvironment.ToString();
