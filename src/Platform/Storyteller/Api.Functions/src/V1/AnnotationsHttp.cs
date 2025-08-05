@@ -35,7 +35,6 @@ public class AnnotationsHttp
         _annotations = annotations;
         _access = access;
         _logger = logger;
-        Expression
     }
 
     [Function(nameof(GetAnnotations))]
@@ -303,6 +302,7 @@ public class AnnotationsHttp
         {
             var annotationType = AnnotationTypes.GetRuntimeType(annotation.AnnotationType);
             using var reader = new StreamReader(request.Body);
+
             var deserializedObject = await JsonSerializer.DeserializeAsync(
                 request.Body,
                 annotationType,
@@ -311,31 +311,36 @@ public class AnnotationsHttp
                     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
                     PropertyNameCaseInsensitive = true,
                 });
+
+            if (deserializedObject is null)
+            {
+                return new BadRequestObjectResult(new ErrorResponse("Invalid annotation object in body."));
+            }
+
+            // TODO: [P1] set system properties and validate the annotation
+            annotation = (Annotation)deserializedObject;
+            annotation = annotation with
+            {
+                ProjectName = project,
+                ViewName = view,
+                AnnotationKey = key,
+            };
         }
 
-        if (deserializedObject is null)
+        if (annotation is null)
         {
-            return new BadRequestObjectResult(new ErrorResponse("Invalid annotation object in body."));
+            return new BadRequestObjectResult(new ErrorResponse("No annotation object in body."));
         }
-
-        // TODO: [P1] set system properties and validate the annotation
-        var typedAnnotation = (Annotation)deserializedObject;
-        typedAnnotation = typedAnnotation with
-        {
-            ProjectName = project,
-            ViewName = view,
-            AnnotationKey = key,
-        };
 
         try
         {
             if (request.Method == Definitions.Methods.Post)
             {
-                await _annotations.CreateAnnotationAsync(organization, typedAnnotation);
+                await _annotations.CreateAnnotationAsync(organization, annotation);
             }
             else
             {
-                await _annotations.UpdateAnnotationAsync(organization, typedAnnotation);
+                await _annotations.UpdateAnnotationAsync(organization, annotation);
             }
         }
         catch (Exception exception)
@@ -344,7 +349,7 @@ public class AnnotationsHttp
             return new BadRequestObjectResult(exception.ToErrorResponse());
         }
 
-        return new OkObjectResult(typedAnnotation);
+        return new OkObjectResult(annotation);
     }
 
     [Function(nameof(SetAnnotations))]
