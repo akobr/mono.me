@@ -3,7 +3,7 @@
   <PropertyGroup>
     <AssemblyName>42.Platform.Storyteller.Backend.CosmosDb.UnitTests</AssemblyName>
     <RootNamespace>_42.Platform.Storyteller.Backend.CosmosDb.UnitTests</RootNamespace>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>

@@ -64,7 +64,6 @@ namespace _42.Platform.Storyteller.DbCreator
                     .MinimumLevel.Information()
                     .Enrich.FromLogContext()
                     .WriteTo.Sentry(
-                        initializeSdk: false,
                         minimumEventLevel: Serilog.Events.LogEventLevel.Warning)
                     .WriteTo.File(
                         options?.GetTemplateLogFullPath() ?? "logs/cli.log",
