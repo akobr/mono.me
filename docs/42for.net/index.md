@@ -26,9 +26,9 @@ features:
     details: Transparency, visibility, standards, and tooling for your code.
   - title: Modulith
     details: A powerful compromise between monolith and microservices. Flexible scalability without complexness.
+  - title: Pure distributed system
+    details: Use lightweight and true distributed system rather then heavy and messy microservices. Clean self-hostable serverless solution without compromises.
   - title: 2S platform
     details: A subscription-based platform for your product and all applications around.
-  - title: CLI tools
-    details: Simple but valuable tooling around your codebase and platform.
 
 ---
