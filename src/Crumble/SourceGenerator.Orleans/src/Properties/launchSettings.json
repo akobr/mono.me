@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "SourceGenerator.Orleans": {
+      "commandName": "Project"
+    },
+    "RoslynGen.Examples": {
+      "commandName": "DebugRoslynComponent",
+      "targetProject": "..\\..\\Playground\\Crumble\\src\\Examples.csproj"
+    }
+  }
+}
