@@ -20,16 +20,10 @@ public class CrumbExecutor(AsyncServiceScope scope) : ICrumbExecutor
     public ICrumbExecutionContext PrepareExecutionContext(Grain crumbGrain)
     {
         var contextKey = crumbGrain.GetPrimaryKeyString();
-        var flagsRaw = RequestContext.Get("#Crumble.Flags");
-        var propertiesRaw = RequestContext.Get("#Crumble.Properties");
-
-        // TODO: [P1] work with flags and properties in a better way
-        return new CrumbExecutionContext()
-        {
-            ContextKey = contextKey,
-            Flags = new HashSet<string>((IEnumerable<string>)flagsRaw ?? [], StringComparer.Ordinal),
-            Properties = new Dictionary<string, object>((IEnumerable<KeyValuePair<string, object>>)propertiesRaw ?? [], StringComparer.Ordinal),
-        };
+        // TODO: [P2] work with flags and properties in a better way if possible
+        var context = OrleansCrumbExecutionContext.FromRequestContext();
+        context.ContextKey = contextKey;
+        return context;
     }
 
     public TCrumbInstance CreateCrumbInstance<TCrumbInstance>()
@@ -41,6 +35,7 @@ public class CrumbExecutor(AsyncServiceScope scope) : ICrumbExecutor
     {
         var middlewaresProvider = _services.GetRequiredService<IMiddlewaresProvider>();
         using var logger = _services.GetRequiredService<ICrumbLogger>();
+        Exception? crumbException = null;
 
         var middlewaresChain = middlewaresProvider.GetMiddlewareFullChain(async ctx =>
         {
@@ -52,6 +47,7 @@ public class CrumbExecutor(AsyncServiceScope scope) : ICrumbExecutor
             catch (Exception exception)
             {
                 logger.LogException(exception, ctx);
+                crumbException = exception;
                 throw;
             }
             finally
@@ -67,7 +63,11 @@ public class CrumbExecutor(AsyncServiceScope scope) : ICrumbExecutor
         }
         catch (Exception exception)
         {
-            logger.LogException(exception, context);
+            if (crumbException != exception)
+            {
+                logger.LogException(exception, context);
+            }
+
             throw;
         }
         finally

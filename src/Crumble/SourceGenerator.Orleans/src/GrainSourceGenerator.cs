@@ -137,7 +137,7 @@ internal sealed class GrainSourceGenerator : IIncrementalGenerator
             {
                 // language=c#
                 source.WriteLine($$"""
-                                       Task{{(crumb.HasOutput ? $"<{crumb.OutputTypeName}>" : string.Empty)}} {{crumb.Method.Name}}({{(crumb.HasInput ? crumb.InputTypeName + " input, " : string.Empty)}}string? contextKey = null);
+                                       Task{{(crumb.HasOutput ? $"<{crumb.OutputTypeName}>" : string.Empty)}} {{crumb.Method.Name}}({{(crumb.HasInput ? crumb.InputTypeName + " input" : string.Empty)}});
                                    """);
             }
 
@@ -145,17 +145,22 @@ internal sealed class GrainSourceGenerator : IIncrementalGenerator
             source.WriteLine($$"""
                                }
 
-                               public partial class {{firstGrain.Class.Name}}Executor(global::Orleans.IGrainFactory grainFactory) : I{{firstGrain.Class.Name}}Executor
+                               public partial class {{firstGrain.Class.Name}}Executor(
+                                   global::Orleans.IGrainFactory grainFactory,
+                                   global::_42.Crumble.ICrumbExecutionContextProvider? contextProvider)
+                                   : I{{firstGrain.Class.Name}}Executor
                                {
+                                   private string ContextKey => contextProvider?.ContextKey ?? "default";
+
                                """);
 
             foreach (var crumb in classGroup)
             {
                 // language=c#
                 source.WriteLine($$"""
-                                       public Task{{(crumb.HasOutput ? $"<{crumb.OutputTypeName}>" : string.Empty)}} {{crumb.Method.Name}}({{(crumb.HasInput ? crumb.InputTypeName + " input, " : string.Empty)}}string? contextKey = null)
+                                       public Task{{(crumb.HasOutput ? $"<{crumb.OutputTypeName}>" : string.Empty)}} {{crumb.Method.Name}}({{(crumb.HasInput ? crumb.InputTypeName + " input" : string.Empty)}})
                                        {
-                                            var grain = grainFactory.GetGrain<I{{crumb.CrumbName}}Grain>(contextKey ?? "default");
+                                            var grain = grainFactory.GetGrain<I{{crumb.CrumbName}}Grain>(ContextKey);
                                             return grain.ExecuteCrumb({{(crumb.HasInput ? "input" : string.Empty)}});
                                        }
 
