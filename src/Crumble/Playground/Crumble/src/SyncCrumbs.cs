@@ -1,10 +1,10 @@
 namespace _42.Crumble.Playground.Examples;
 
-public class FirstCrumbs
+public class SyncCrumbs
 {
     private readonly IServiceProvider _services;
 
-    public FirstCrumbs(IServiceProvider services)
+    public SyncCrumbs(IServiceProvider services)
     {
         this._services = services;
     }
