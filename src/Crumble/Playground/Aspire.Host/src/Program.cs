@@ -6,7 +6,7 @@ var redis = builder
     .AddRedis("redis")
     .WithRedisInsight(b => b
         .WithLifetime(ContainerLifetime.Persistent)
-        .WithHostPort(60719));
+        .WithHostPort(42150));
 
 var orleans = builder
     .AddOrleans("orleans")
