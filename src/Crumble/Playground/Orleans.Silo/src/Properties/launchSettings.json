@@ -2,11 +2,11 @@
   "profiles": {
     "silo": {
       "commandName": "Project",
-      "launchBrowser": true,
+      "launchBrowser": false,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "https://localhost:55549;http://localhost:55550"
+      "applicationUrl": "https://localhost:42149;http://localhost:42158"
     }
   }
 }
