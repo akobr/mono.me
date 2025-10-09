@@ -1,6 +1,6 @@
 ﻿namespace _42.Crumble.Playground.Examples;
 
-public class TaskCrumbs
+public class AsyncCrumbs
 {
     [Crumb]
     public Task SimpleTask() => Task.CompletedTask;
