@@ -5,7 +5,7 @@ namespace _42.Crumble;
 
 public static class EntryPoint
 {
-    public static IServiceCollection AddCrumbsByOrleans(this IServiceCollection @this)
+    public static IServiceCollection AddCrumble(this IServiceCollection @this)
     {
         // crumbs registry
         @this.TryAddSingleton<CrumbToGrainRegistry>();
