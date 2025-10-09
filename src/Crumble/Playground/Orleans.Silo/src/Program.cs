@@ -1,3 +1,5 @@
+using _42.Crumble;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddOrleansServiceDefaults();
@@ -7,6 +9,8 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder.UseDashboard(options => { options.HostSelf = false; });
 });
+
+builder.Services.AddCrumble();
 
 var app = builder.Build();
 
