@@ -6,7 +6,7 @@ public class HelloWorldWithOutputGrain(ICrumbExecutorFactory executorFactory) : 
     {
         await using var executor = executorFactory.CreateExecutor();
         var executionContext = executor.PrepareExecutionContext(this);
-        var instance = executor.CreateCrumbInstance<FirstCrumbs>();
+        var instance = executor.CreateCrumbInstance<SyncCrumbs>();
         string output = null;
 
         var context = new CrumbInnerExecutionContext()
