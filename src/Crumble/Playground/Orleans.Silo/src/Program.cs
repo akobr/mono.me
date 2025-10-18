@@ -10,6 +10,7 @@ builder.UseOrleans(siloBuilder =>
     siloBuilder.UseDashboard(options => { options.HostSelf = false; });
 });
 
+builder.Services.AddSingleton<IIncomingGrainCallFilter, TelemetryIncomingGrainCallFilter>();
 builder.Services.AddCrumble();
 
 var app = builder.Build();
