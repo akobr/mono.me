@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Crumble.OpenTelemetry</AssemblyName>
+    <RootNamespace>_42.Crumble.OpenTelemetry</RootNamespace>
+
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenTelemetry.Api" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Orleans\src\Orleans.csproj" />
+  </ItemGroup>
+
+</Project>
