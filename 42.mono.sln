@@ -140,6 +140,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Development", "src\Crumble\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SourceGenerator.Orleans", "src\Crumble\SourceGenerator.Orleans\src\SourceGenerator.Orleans.csproj", "{C03027C0-9598-4A70-AF75-BD3DA3DC850E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenTelemetry", "src\Crumble\OpenTelemetry\src\OpenTelemetry.csproj", "{9FBC3FC1-3305-40C6-9320-1620343BC679}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -334,6 +336,10 @@ Global
 		{C03027C0-9598-4A70-AF75-BD3DA3DC850E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C03027C0-9598-4A70-AF75-BD3DA3DC850E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C03027C0-9598-4A70-AF75-BD3DA3DC850E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9FBC3FC1-3305-40C6-9320-1620343BC679}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FBC3FC1-3305-40C6-9320-1620343BC679}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FBC3FC1-3305-40C6-9320-1620343BC679}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FBC3FC1-3305-40C6-9320-1620343BC679}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -396,6 +402,7 @@ Global
 		{DE51360A-8C1B-463F-A2E9-ECD70C5499D1} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
 		{30AD5DD0-0C8E-477C-8D88-D7A05766065C} = {1F1D8958-877A-4323-A66B-F5F44F179EDC}
 		{C03027C0-9598-4A70-AF75-BD3DA3DC850E} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
+		{9FBC3FC1-3305-40C6-9320-1620343BC679} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F82BF58F-3E50-4150-BD21-CA489E5CCF93}

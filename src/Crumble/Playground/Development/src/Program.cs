@@ -1,3 +1,5 @@
+using _42.Crumble;
+using _42.Crumble.Playground.Examples;
 using _42.Crumble.Playground.Examples.Implementation;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,6 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.AddKeyedRedisClient("redis");
 builder.UseOrleansClient();
+
+builder.Services.AddSingleton<IOutgoingGrainCallFilter, TelemetryOutgoingGrainCallFilter>();
 
 var app = builder.Build();
 
@@ -15,7 +19,8 @@ app.UseStaticFiles();
 app.MapGet("/dev", () =>
 {
     var factory = app.Services.GetRequiredService<IGrainFactory>();
-    var grain = factory.GetGrain<IHelloWorldWithOutputGrain>("_42.Crumble.Playground.Examples.FirstCrumbs.HelloWorldWithOutput");
+    var grain = factory.GetGrain<IHelloWorldWithOutputGrain>("default");
+    //var grain = factory.GetGrain<ISyncCrumbsHelloWorldGrain>("default");
     return grain.ExecuteCrumb();
 });
 

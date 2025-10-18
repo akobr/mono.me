@@ -34,7 +34,11 @@ public static class Extensions
     {
         Action<MeterProviderBuilder>[] metrics =
         [
-            metrics => metrics.AddMeter("Microsoft.Orleans")
+            metrics =>
+            {
+                metrics.AddMeter("Microsoft.Orleans");
+                metrics.AddMeter("42.Crumble");
+            }
         ];
 
         Action<TracerProviderBuilder>[] traces =
@@ -43,6 +47,7 @@ public static class Extensions
             {
                 traces.AddSource("Microsoft.Orleans.Runtime");
                 traces.AddSource("Microsoft.Orleans.Application");
+                traces.AddSource("42.Crumble");
             }
         ];
 
