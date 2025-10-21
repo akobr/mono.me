@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace _42.Crumble;
 
-public class DebugCrumbLogger : ICrumbLogger
+public class DebugCrumbTracer : ICrumbTracer
 {
     /*private readonly Stopwatch _stopwatch = new();*/
 
