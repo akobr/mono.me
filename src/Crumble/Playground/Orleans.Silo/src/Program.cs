@@ -1,4 +1,5 @@
 using _42.Crumble;
+using _42.Crumble.Playground.Examples;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,7 @@ builder.UseOrleans(siloBuilder =>
 });
 
 builder.Services.AddSingleton<IIncomingGrainCallFilter, TelemetryIncomingGrainCallFilter>();
+builder.Services.AddTransient<IChainedCrumbsExecutor, ChainedCrumbsExecutor>();
 builder.Services.AddCrumble();
 
 var app = builder.Build();

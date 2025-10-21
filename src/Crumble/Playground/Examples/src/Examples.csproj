@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Crumble.Playground.Examples</AssemblyName>
+    <RootNamespace>_42.Crumble.Playground.Examples</RootNamespace>
+
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Sdk" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Orleans\src\Orleans.csproj" />
+    <!-- Build dependency only -->
+    <ProjectReference Include="..\..\Examples.Crumble\src\Examples.Crumble.csproj" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Examples.Crumble\src\obj\Generated\42.Crumble.SourceGenerator*\**\*.cs" Visible="false" AutoGen="true" />
+    <Compile Include="..\..\Examples.Crumble\src\*.cs" />
+  </ItemGroup>
+
+</Project>

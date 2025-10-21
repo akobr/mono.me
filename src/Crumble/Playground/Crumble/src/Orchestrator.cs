@@ -1,8 +1,8 @@
 ﻿namespace _42.Crumble.Playground.Examples;
 
-[Crumbler]
-public class ExampleCrumbler
+public class Orchestrator
 {
+    [Crumb]
     public List<InputData> GetInputData()
     {
         return new List<InputData>()
@@ -12,6 +12,7 @@ public class ExampleCrumbler
         };
     }
 
+    [Crumb]
     public string GenerateGreeting(List<InputData> inputData)
     {
         var name = inputData.FirstOrDefault(x => x.Key == "Name")?.value ?? "World";
@@ -19,6 +20,7 @@ public class ExampleCrumbler
         return $"{greeting}, {name}!";
     }
 
+    [Crumb]
     public async Task Orchestrate(IFlowClient flow)
     {
         var data = await flow.ExecuteCrumbAsync<List<InputData>>(GetInputData);

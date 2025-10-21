@@ -1,5 +1,7 @@
 ﻿using OpenTelemetry;
 using OpenTelemetry.Context.Propagation;
+using Orleans;
+using Orleans.Runtime;
 
 namespace _42.Crumble;
 

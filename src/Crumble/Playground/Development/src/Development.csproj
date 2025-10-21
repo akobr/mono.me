@@ -14,11 +14,12 @@
     <PackageReference Include="Aspire.StackExchange.Redis" />
     <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" />
+    <PackageReference Include="Microsoft.Orleans.Streaming" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Aspire.ServiceDefaults\src\Aspire.ServiceDefaults.csproj" />
-    <ProjectReference Include="..\..\Crumble\src\Examples.csproj" />
+    <ProjectReference Include="..\..\Examples\src\Examples.csproj" />
   </ItemGroup>
 
 </Project>
