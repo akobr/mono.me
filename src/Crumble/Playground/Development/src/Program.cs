@@ -1,6 +1,5 @@
 using _42.Crumble;
 using _42.Crumble.Playground.Examples;
-using _42.Crumble.Playground.Examples.Implementation;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,8 +18,7 @@ app.UseStaticFiles();
 app.MapGet("/dev", () =>
 {
     var factory = app.Services.GetRequiredService<IGrainFactory>();
-    var grain = factory.GetGrain<IHelloWorldWithOutputGrain>("default");
-    //var grain = factory.GetGrain<ISyncCrumbsHelloWorldGrain>("default");
+    var grain = factory.GetGrain<IChainedCrumbsFirstGrain>("default");
     return grain.ExecuteCrumb();
 });
 

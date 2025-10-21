@@ -1,5 +1,7 @@
 ﻿using System.Diagnostics;
 using OpenTelemetry.Context.Propagation;
+using Orleans;
+using Orleans.Runtime;
 
 namespace _42.Crumble;
 
@@ -21,17 +23,6 @@ public class TelemetryIncomingGrainCallFilter : IIncomingGrainCallFilter
 
         var parent = Propagator.Extract(default, carrier, (c, k) =>
             c.TryGetValue(k, out var val) ? new[] { val } : Array.Empty<string>());
-
-        /*using var activity =
-            Telemetry.ActivitySource.StartActivity(
-                $"{context.Grain.GetType().Name}.{context.InterfaceMethod.Name}",
-                ActivityKind.Server,
-                parent.ActivityContext);
-
-        // (optional) add useful tags
-        activity?.SetTag("orleans.grain", context.Grain.GetType().FullName);
-        activity?.SetTag("orleans.interface", context.InterfaceMethod.DeclaringType?.FullName);
-        activity?.SetTag("orleans.method", context.InterfaceMethod.Name);*/
 
         await context.Invoke();
     }

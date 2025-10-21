@@ -1,4 +1,6 @@
-﻿namespace _42.Crumble;
+﻿using Orleans;
+
+namespace _42.Crumble;
 
 public interface ICrumbGrain : IGrainWithStringKey
 {

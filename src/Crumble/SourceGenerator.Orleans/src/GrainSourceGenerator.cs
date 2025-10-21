@@ -64,7 +64,7 @@ internal sealed class GrainSourceGenerator : IIncrementalGenerator
         var hasOutput = !methodSymbol.ReturnsVoid;
         var outputType = hasOutput ? methodSymbol.ReturnType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) : "void";
         var isAsync = false;
-        var hasInput = methodSymbol.Parameters.Length > 0; // TODO: params by DI?
+        var hasInput = methodSymbol.Parameters.Length > 0; // TODO: [P2] params by DI directly in crumb method
         var inputType = hasInput ? methodSymbol.Parameters[0].Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat) : "void";
 
         // unwrapped output if Task or ValueTask is used
@@ -262,7 +262,7 @@ internal sealed class GrainSourceGenerator : IIncrementalGenerator
 
         // language=c#
         source.WriteLine($$"""
-                           public partial class {{model.CrumbName}}Grain(ICrumbExecutorFactory executorFactory) : Grain, I{{model.CrumbName}}Grain
+                           public class {{model.CrumbName}}Grain(ICrumbExecutorFactory executorFactory) : Grain, I{{model.CrumbName}}Grain
                            {
                                public async {{executeMethodDefinition}}
                                {
