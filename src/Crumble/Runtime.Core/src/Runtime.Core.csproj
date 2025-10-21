@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.Crumble.Orleans</AssemblyName>
+    <AssemblyName>42.Crumble.Runtime.Core</AssemblyName>
     <RootNamespace>_42.Crumble</RootNamespace>
 
     <TargetFramework>net9.0</TargetFramework>
@@ -11,11 +11,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Core.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="OpenTelemetry.Api" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Runtime.Core\src\Runtime.Core.csproj" />
+    <ProjectReference Include="..\..\Abstractions\src\Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

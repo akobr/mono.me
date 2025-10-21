@@ -4,37 +4,37 @@ namespace _42.Crumble;
 
 public class DebugCrumbLogger : ICrumbLogger
 {
-    private readonly Stopwatch _stopwatch = new();
+    /*private readonly Stopwatch _stopwatch = new();*/
 
     public void LogBeforeCrumbExecution(ICrumbInnerExecutionContext context)
     {
-        Debug.WriteLine("Started", context.CrumbKey);
+        /*Debug.WriteLine("Started", context.CrumbKey);
         Debug.WriteLine($"Elapsed: {_stopwatch.ElapsedMilliseconds} ms", context.CrumbKey);
-        Debug.WriteLineIf(context.Input != null, $"Input: {context.Input}", context.CrumbKey);
+        Debug.WriteLineIf(context.Input != null, $"Input: {context.Input}", context.CrumbKey);*/
     }
 
     public void LogAfterCrumbExecution(ICrumbInnerExecutionContext context)
     {
-        Debug.WriteLine("Finished", context.CrumbKey);
+        /*Debug.WriteLine("Finished", context.CrumbKey);
         Debug.WriteLine($"Elapsed: {_stopwatch.ElapsedMilliseconds} ms", context.CrumbKey);
-        Debug.WriteLineIf(context.Output != null, $"Output: {context.Output}", context.CrumbKey);
+        Debug.WriteLineIf(context.Output != null, $"Output: {context.Output}", context.CrumbKey);*/
     }
 
     public void LogBeforeMiddlewares(ICrumbInnerExecutionContext context)
     {
-        Debug.WriteLine("Middlewares started", context.CrumbKey);
-        _stopwatch.Start();
+        /*Debug.WriteLine("Middlewares started", context.CrumbKey);
+        _stopwatch.Start();*/
     }
 
     public void LogAfterMiddlewares(ICrumbInnerExecutionContext context)
     {
-        Debug.WriteLine("Middlewares finished", context.CrumbKey);
-        Debug.WriteLine($"Elapsed: {_stopwatch.ElapsedMilliseconds} ms", context.CrumbKey);
+        /*Debug.WriteLine("Middlewares finished", context.CrumbKey);
+        Debug.WriteLine($"Elapsed: {_stopwatch.ElapsedMilliseconds} ms", context.CrumbKey)*/;
     }
 
     public void LogException(Exception exception, ICrumbInnerExecutionContext context)
     {
-        Debug.WriteLine($"Error: {exception.Message}", context.CrumbKey);
+        /*Debug.WriteLine($"Error: {exception.Message}", context.CrumbKey);*/
     }
 
     public void Dispose()
