@@ -146,6 +146,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples.Crumble", "src\Cru
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples", "src\Crumble\Playground\Examples\src\Examples.csproj", "{CC1290B3-135B-43C0-9326-B84847A3EB28}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime.Core", "src\Crumble\Runtime.Core\src\Runtime.Core.csproj", "{7A2C5045-48A8-4589-97D3-C0E26C80864F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -352,6 +354,10 @@ Global
 		{CC1290B3-135B-43C0-9326-B84847A3EB28}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CC1290B3-135B-43C0-9326-B84847A3EB28}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CC1290B3-135B-43C0-9326-B84847A3EB28}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7A2C5045-48A8-4589-97D3-C0E26C80864F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A2C5045-48A8-4589-97D3-C0E26C80864F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A2C5045-48A8-4589-97D3-C0E26C80864F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A2C5045-48A8-4589-97D3-C0E26C80864F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -417,6 +423,7 @@ Global
 		{9FBC3FC1-3305-40C6-9320-1620343BC679} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
 		{39A5802B-5A62-49F0-950E-4F5AE9E1ED6C} = {1F1D8958-877A-4323-A66B-F5F44F179EDC}
 		{CC1290B3-135B-43C0-9326-B84847A3EB28} = {1F1D8958-877A-4323-A66B-F5F44F179EDC}
+		{7A2C5045-48A8-4589-97D3-C0E26C80864F} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F82BF58F-3E50-4150-BD21-CA489E5CCF93}
