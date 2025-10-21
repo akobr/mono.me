@@ -2,7 +2,11 @@
 
 public interface IVolumeClient
 {
-    Task<Stream> GetFileContentAsync(string filePath, CancellationToken cancellationToken = default);
+    Task<Stream> GetContent(string path, CancellationToken cancellationToken = default);
 
-    Task WriteFileContentAsync(string filePath, Stream content, CancellationToken cancellationToken = default);
+    Task WriteContent(string path, Stream content, CancellationToken cancellationToken = default);
+
+    Task<TModel> GetModel<TModel>(string path, CancellationToken cancellationToken = default);
+
+    Task WriteModel<TModel>(string path, TModel model, CancellationToken cancellationToken = default);
 }

@@ -1,12 +1,8 @@
-using System.Linq.Expressions;
-
 namespace _42.Crumble;
 
 public interface IFlowClient
 {
     Task ExecuteCrumbAsync(Delegate crumb);
-
-    // Task ExecuteCrumbAsync(Expression crumb);
 
     Task ExecuteCrumbAsync(string crumbKey);
 
