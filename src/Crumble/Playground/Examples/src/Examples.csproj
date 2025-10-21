@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Orleans\src\Orleans.csproj" />
+    <ProjectReference Include="..\..\..\Runtime.Orleans\src\Runtime.Orleans.csproj" />
     <!-- Build dependency only -->
     <ProjectReference Include="..\..\Examples.Crumble\src\Examples.Crumble.csproj" ReferenceOutputAssembly="false" />
     </ItemGroup>
