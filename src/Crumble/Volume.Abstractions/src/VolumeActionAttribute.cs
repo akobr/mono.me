@@ -2,7 +2,7 @@
 
 [System.AttributeUsage(AttributeTargets.Method, Inherited = false, AllowMultiple = true)]
 
-public sealed class FileActionAttribute : Attribute
+public sealed class VolumeActionAttribute : Attribute
 {
     public string? FilePathFilter { get; set; } = string.Empty;
 }
