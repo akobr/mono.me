@@ -128,7 +128,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Silo", "src\Crumble
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aspire.Host", "src\Crumble\Playground\Aspire.Host\src\Aspire.Host.csproj", "{5738A79B-9F4D-41B1-9845-5D10FCD37FEC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples", "src\Crumble\Playground\Crumble\src\Examples.csproj", "{67643034-B235-42C8-8D5A-55938C34FFEA}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples.Full", "src\Crumble\Playground\Crumble\src\Examples.Full.csproj", "{67643034-B235-42C8-8D5A-55938C34FFEA}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Volume.Abstractions", "src\Crumble\Volume.Abstractions\src\Volume.Abstractions.csproj", "{6995A369-D66E-4BC6-8B67-7F9BD0672B0E}"
 EndProject
@@ -141,6 +141,10 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SourceGenerator.Orleans", "src\Crumble\SourceGenerator.Orleans\src\SourceGenerator.Orleans.csproj", "{C03027C0-9598-4A70-AF75-BD3DA3DC850E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenTelemetry", "src\Crumble\OpenTelemetry\src\OpenTelemetry.csproj", "{9FBC3FC1-3305-40C6-9320-1620343BC679}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples.Crumble", "src\Crumble\Playground\Examples.Crumble\src\Examples.Crumble.csproj", "{39A5802B-5A62-49F0-950E-4F5AE9E1ED6C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples", "src\Crumble\Playground\Examples\src\Examples.csproj", "{CC1290B3-135B-43C0-9326-B84847A3EB28}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -340,6 +344,14 @@ Global
 		{9FBC3FC1-3305-40C6-9320-1620343BC679}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9FBC3FC1-3305-40C6-9320-1620343BC679}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9FBC3FC1-3305-40C6-9320-1620343BC679}.Release|Any CPU.Build.0 = Release|Any CPU
+		{39A5802B-5A62-49F0-950E-4F5AE9E1ED6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{39A5802B-5A62-49F0-950E-4F5AE9E1ED6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{39A5802B-5A62-49F0-950E-4F5AE9E1ED6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{39A5802B-5A62-49F0-950E-4F5AE9E1ED6C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC1290B3-135B-43C0-9326-B84847A3EB28}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC1290B3-135B-43C0-9326-B84847A3EB28}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC1290B3-135B-43C0-9326-B84847A3EB28}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC1290B3-135B-43C0-9326-B84847A3EB28}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -403,6 +415,8 @@ Global
 		{30AD5DD0-0C8E-477C-8D88-D7A05766065C} = {1F1D8958-877A-4323-A66B-F5F44F179EDC}
 		{C03027C0-9598-4A70-AF75-BD3DA3DC850E} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
 		{9FBC3FC1-3305-40C6-9320-1620343BC679} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
+		{39A5802B-5A62-49F0-950E-4F5AE9E1ED6C} = {1F1D8958-877A-4323-A66B-F5F44F179EDC}
+		{CC1290B3-135B-43C0-9326-B84847A3EB28} = {1F1D8958-877A-4323-A66B-F5F44F179EDC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F82BF58F-3E50-4150-BD21-CA489E5CCF93}

@@ -19,6 +19,9 @@ public static class EntryPoint
         @this.TryAddScoped<ICrumbExecutor>(
             services => services.GetRequiredService<ICrumbExecutorFactory>().CreateExecutor());
 
+        // crumbs context
+        @this.TryAddSingleton<ICrumbExecutionContextProvider, OrleansCrumbExecutionContextProvider>();
+
         // inner logging (tracing of crumb execution)
         @this.TryAddSingleton<ICrumbLoggerFactory, CrumbLoggerFactory>();
         @this.TryAddScoped<ICrumbLogger>(
