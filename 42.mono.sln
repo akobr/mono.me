@@ -118,7 +118,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Crumble", "Crumble", "{53FA
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Abstractions", "src\Crumble\Abstractions\src\Abstractions.csproj", "{5CEE6793-DCBA-4A9C-8BD8-2111BD825DC0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans", "src\Crumble\Orleans\src\Orleans.csproj", "{EDEB4F36-1091-480A-AF0A-652DA6C2007E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime.Orleans", "src\Crumble\Runtime.Orleans\src\Runtime.Orleans.csproj", "{EDEB4F36-1091-480A-AF0A-652DA6C2007E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Playground", "Playground", "{1F1D8958-877A-4323-A66B-F5F44F179EDC}"
 EndProject

@@ -23,7 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\..\Abstractions\src\Abstractions.csproj" />
     <ProjectReference Include="..\..\..\Actions.Time.Abstractions\src\Actions.Time.Abstractions.csproj" />
-    <ProjectReference Include="..\..\..\Orleans\src\Orleans.csproj" />
+    <ProjectReference Include="..\..\..\Runtime.Orleans\src\Runtime.Orleans.csproj" />
     <ProjectReference Include="..\..\..\SourceGenerator.Orleans\src\SourceGenerator.Orleans.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" OutputItemType="Analyzer" SetTargetFramework="TargetFramework=netstandard2.0" />
   </ItemGroup>
 
