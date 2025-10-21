@@ -1,6 +1,6 @@
 ﻿namespace _42.Crumble;
 
-public interface ICrumbLogger : IDisposable
+public interface ICrumbTracer : IDisposable
 {
     void LogBeforeCrumbExecution(ICrumbInnerExecutionContext context);
 

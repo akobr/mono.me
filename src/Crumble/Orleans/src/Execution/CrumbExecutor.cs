@@ -40,7 +40,7 @@ public class CrumbExecutor(AsyncServiceScope scope) : ICrumbExecutor
         using var activity = Telemetry.ActivitySource.StartActivity("crumble.crumb.execution");
         var stopwatch = new PhaseStopwatch();
         var middlewaresProvider = _services.GetRequiredService<IMiddlewaresProvider>();
-        using var logger = _services.GetRequiredService<ICrumbLogger>();
+        using var logger = _services.GetRequiredService<ICrumbTracer>();
         Exception? crumbException = null;
 
         var middlewaresChain = middlewaresProvider.GetMiddlewareFullChain(async ctx =>
