@@ -4,5 +4,7 @@
 
 public sealed class VolumeActionAttribute : Attribute
 {
-    public string? FilePathFilter { get; set; } = string.Empty;
+    public string? VolumeKey { get; set; }
+
+    public string? FilePathFilter { get; set; }
 }

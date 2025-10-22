@@ -10,3 +10,9 @@ public interface IVolumeClient
 
     Task WriteModel<TModel>(string path, TModel model, CancellationToken cancellationToken = default);
 }
+
+public interface IVolumeClient<TContext> : IVolumeClient
+    where TContext : IVolumeContext
+{
+    // no member
+}
