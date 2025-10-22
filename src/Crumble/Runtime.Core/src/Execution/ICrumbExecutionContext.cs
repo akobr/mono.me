@@ -2,6 +2,8 @@
 
 public interface ICrumbExecutionContext
 {
+    Guid Id { get; }
+
     public string ContextKey { get; }
 
     public ISet<string> Flags { get; }
