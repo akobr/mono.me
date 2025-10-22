@@ -23,6 +23,8 @@ public class OrleansCrumbExecutionContext : ICrumbExecutionContext
         InitializeRequestContextHandlers();
     }
 
+    public Guid Id { get; } = Guid.CreateVersion7();
+
     public string ContextKey { get; set; } = "default";
 
     public ISet<string> Flags => _flags;

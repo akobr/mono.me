@@ -13,6 +13,8 @@
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="9.5.1" />
     <PackageVersion Include="AutoMapper" Version="15.0.1" />
     <PackageVersion Include="Azure.Identity" Version="1.17.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.26.0" />
+    <PackageVersion Include="Azure.Storage.Queues" Version="12.24.0" />
     <PackageVersion Include="Bogus" Version="35.6.4" />
     <PackageVersion Include="Colorful.Console" Version="1.2.15" />
     <PackageVersion Include="ConsoleTableExt" Version="3.3.0" />

@@ -23,7 +23,7 @@ public static class EntryPoint
         @this.TryAddSingleton<ICrumbExecutionContextProvider, OrleansCrumbExecutionContextProvider>();
 
         // inner logging (tracing of crumb execution)
-        @this.TryAddSingleton<ICrumbTracerFactory, CrumbTracerFactory>();
+        @this.TryAddSingleton<ICrumbTracerFactory, DefaultCrumbTracerFactory>();
         @this.TryAddScoped<ICrumbTracer>(
             services => services.GetRequiredService<ICrumbTracerFactory>().CreateLogger());
 

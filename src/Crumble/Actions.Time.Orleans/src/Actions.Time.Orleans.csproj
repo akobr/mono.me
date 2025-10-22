@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.Crumble.Volume.Abstractions</AssemblyName>
+    <AssemblyName>42.Crumble.Actions.Time.Orleans</AssemblyName>
     <RootNamespace>_42.Crumble</RootNamespace>
 
     <TargetFramework>net9.0</TargetFramework>
@@ -9,5 +9,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Actions.Time.Abstractions\src\Actions.Time.Abstractions.csproj" />
+  </ItemGroup>
 
 </Project>

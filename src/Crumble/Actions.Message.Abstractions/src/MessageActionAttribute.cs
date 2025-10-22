@@ -4,5 +4,7 @@
 
 public sealed class MessageActionAttribute : Attribute
 {
-    public string? MessageFilter { get; set; } = string.Empty;
+    public string? MessageQueueKey { get; set; }
+
+    public string? MessageFilter { get; set; }
 }
