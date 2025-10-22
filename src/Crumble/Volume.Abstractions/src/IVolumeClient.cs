@@ -9,6 +9,8 @@ public interface IVolumeClient
     Task<TModel> GetModel<TModel>(string path, CancellationToken cancellationToken = default);
 
     Task WriteModel<TModel>(string path, TModel model, CancellationToken cancellationToken = default);
+
+    IAsyncEnumerable<string> GetItems(string path, CancellationToken cancellationToken = default);
 }
 
 public interface IVolumeClient<TContext> : IVolumeClient

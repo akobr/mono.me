@@ -2,5 +2,7 @@
 
 public interface IVolumeContext
 {
-    // no member
+    string? RootPath { get; }
+
+    string? ItemPath { get; }
 }
