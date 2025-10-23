@@ -80,6 +80,7 @@
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="9.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="9.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Persistence.Redis" Version="9.2.1" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="9.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Reminders.Redis" Version="9.2.1" />
     <PackageVersion Include="Microsoft.Orleans.Runtime.Abstractions" Version="3.8.0" />
     <PackageVersion Include="Microsoft.Orleans.Sdk" Version="9.2.1" />
