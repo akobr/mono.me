@@ -1,10 +1,9 @@
 ﻿namespace _42.Crumble;
 
-[System.AttributeUsage(AttributeTargets.All, Inherited = false, AllowMultiple = true)]
-
-public sealed class MessageActionAttribute : Attribute
+[AttributeUsage(AttributeTargets.All, Inherited = false, AllowMultiple = true)]
+public sealed class MessageActionAttribute : ActionAttribute
 {
-    public string? MessageQueueKey { get; set; }
+    public string? QueueKey { get; set; }
 
     public string? MessageFilter { get; set; }
 }
