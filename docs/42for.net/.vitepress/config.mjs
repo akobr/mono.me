@@ -44,7 +44,10 @@ export default withMermaid({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Documentation', link: '/introduction' },
-      { text: 'Platform', link: '/platform/introduction'}
+      { text: 'Monorepo', link: '/monorepo/introduction' },
+      { text: '2S Platform', link: '/platform/introduction'},
+      { text: 'Crumble', link: '/crumble/introduction'},
+      { text: 'Codedoc', link: '/codedoc/introduction'},
     ],
     sidebar: [
       {
@@ -60,6 +63,7 @@ export default withMermaid({
         items: [
           { text: 'Modulith', link: '/architecture/modulith' },
           { text: 'No microservices', link: '/architecture/no-microservices' },
+          { text: 'Pure distributed system', link: 'architecture/pure-distributed-system' },
           { text: 'Which one to pick?', link: '/architecture/which-one-to-pick' },
         ]
       },
@@ -72,7 +76,7 @@ export default withMermaid({
         ]
       },
       {
-        text: 'Platform',
+        text: '2S Platform',
         items: [
           { text: 'Introduction', link: '/platform/introduction' },
           { text: 'Overview', link: '/platform/overview' },
@@ -81,10 +85,24 @@ export default withMermaid({
         ]
       },
       {
+        text: 'Crumble',
+        items: [
+          { text: 'Introduction', link: '/crumble/introduction' },
+          { text: 'Road map', link: '/crumble/road-map' },
+        ]
+      },
+      {
+        text: 'Codedoc',
+        items: [
+          { text: 'Introduction', link: '/codedoc/introduction' },
+          { text: 'Road map', link: '/codedoc/road-map' },
+        ]
+      },
+      {
         text: 'CLI',
         items: [
           { text: 'mrepo', link: '/cli/mrepo' },
-          { text: 'sform', link: '/cli/sform' }
+          { text: 'sform', link: '/cli/sform' },
         ]
       }/*,
       {
@@ -94,12 +112,13 @@ export default withMermaid({
           { text: 'Hell of dependencies', link: '/articles/dependency-hell' },
           { text: 'Infrastructure', link: '/articles/infrastructure' },
           { text: 'Technical decisions', link: '/articles/technical-decisions' },
-          { text: 'Scarecrow of contracting', link: '/articles/contractors' }
+          { text: 'Scarecrow of contracting', link: '/articles/contractors' },
         ]
       }*/
     ],
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/akobr/mono.me' }
+      { icon: 'github', link: 'https://github.com/akobr/mono.me' },
+      { icon: 'linkedin', link: 'https://www.linkedin.com/in/kobrales' },
     ],
     footer: {
       message: 'Released under the MIT License.',
