@@ -1,14 +1,18 @@
-# Road map of Splatform
+# Road map of 2S platform
 
 A road map to version 1.0 and peak to the future.
 
-## Version 1.0
+## Version 0.9
 
 - basic annotations and configuration
 - serverless API for two main actors: storyteller, supervisor
 - simple command-line interface as the primary UI
 - SPA with graph visualization of the ecosystem
 - async message queue for supervisor
+
+## Version 1.0
+
+- built-in initial support for managing quotas and payments of subscriptions
 
 ## Version 1.1
 
@@ -28,3 +32,4 @@ A road map to version 1.0 and peak to the future.
 - accessible and searchable supervisor's stream in the SPA
 - AI for detecting anomalies in the ecosystem runtime events
 - detailed SDKs for all actors
+

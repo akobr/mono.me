@@ -13,11 +13,8 @@ The expected list and the order of new features.
 - performance updates for large repositories
 - extend configurability
 
-## Version 1.3
-
-- native support for infrastructure in [Pulumi](https://www.pulumi.com/)
-
 ## Other planned features
 
+- native support for infrastructure in [Pulumi](https://www.pulumi.com/)
 - native support for generating and updating solution filters
-- automatically update solution file on a new content
+- automatically update solution file on a new content (.slnx)

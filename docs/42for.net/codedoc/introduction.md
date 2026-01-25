@@ -1,6 +1,6 @@
-# Introduction to codedoc (codɵboↄ) <Badge type="danger" text="10% done" />
+# Introduction to codedoc <Badge type="danger" text="15% done" />
 
-**Codedoc** transforms your .NET project into a **self-contained, AI-ready documentation and knowledge package**.
+**codɵboↄ** transforms your .NET project into a **self-contained, AI-ready documentation and knowledge package**.
 
 Think of it as a NuGet-like metadata companion for your codebase: it stores structured code intelligence, technical documentation, diagrams, and insights about your system's health.
 

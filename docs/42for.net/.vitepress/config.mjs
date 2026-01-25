@@ -62,8 +62,8 @@ export default withMermaid({
         text: 'Architecture',
         items: [
           { text: 'Modulith', link: '/architecture/modulith' },
-          { text: 'No microservices', link: '/architecture/no-microservices' },
           { text: 'Pure distributed system', link: 'architecture/pure-distributed-system' },
+          { text: 'No microservices', link: '/architecture/no-microservices' },
           { text: 'Which one to pick?', link: '/architecture/which-one-to-pick' },
         ]
       },
@@ -88,6 +88,10 @@ export default withMermaid({
         text: 'Crumble',
         items: [
           { text: 'Introduction', link: '/crumble/introduction' },
+          { text: 'Overview', link: '/crumble/overview' },
+          { text: 'Deployment', link: '/crumble/deployment' },
+          { text: 'Crumbs', link: '/crumble/crumbs' },
+          { text: 'Events', link: '/crumble/events' },
           { text: 'Road map', link: '/crumble/road-map' },
         ]
       },

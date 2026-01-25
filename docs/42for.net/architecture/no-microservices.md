@@ -20,4 +20,6 @@ Don't make a mistake with decentralizing your knowledge base and codebase. When 
 Here is an excellent and funny [blog post](https://renegadeotter.com/2023/09/10/death-by-a-thousand-microservices.html) about the dark side of microservices by *Andrei Toranchenko*.
 :::
 
+For some, this can be harsh, but my recommendation is to **place microservices on a list of architectural anti-patterns**. I saw too many over-engineered solutions just because microservices are a famous buzzword in IT pop culture, and I hope I mentioned enough references in previous texts to show that much simpler approaches are available in every case.
+
 The next page is a simple decision flow about which architecture to pick.
