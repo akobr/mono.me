@@ -2,5 +2,5 @@
 
 public interface IMiddlewaresProvider
 {
-    IMiddleware GetMiddlewareFullChain(Func<ICrumbInnerExecutionContext, Task> lastMiddleware);
+    IMiddleware GetChainOfMiddlewares(Func<ICrumbInnerExecutionContext, Task> lastMiddleware);
 }

@@ -8,12 +8,14 @@ builder.AddOrleansServiceDefaults();
 builder.AddKeyedRedisClient("redis");
 builder.UseOrleans(siloBuilder =>
 {
+    siloBuilder.AddActivityPropagation();
     siloBuilder.UseDashboard(options => { options.HostSelf = false; });
 });
 
-builder.Services.AddSingleton<IIncomingGrainCallFilter, TelemetryIncomingGrainCallFilter>();
-builder.Services.AddTransient<IChainedCrumbsExecutor, ChainedCrumbsExecutor>();
-builder.Services.AddCrumble();
+/*builder.Services.AddSingleton<IIncomingGrainCallFilter, TelemetryIncomingGrainCallFilter>();
+builder.Services.AddTransient<IChainedCrumbsExecutor, ChainedCrumbsExecutor>();*/
+
+builder.Services.AddCrumble().AddCrumbs();
 
 var app = builder.Build();
 

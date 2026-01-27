@@ -14,6 +14,9 @@ public static class Telemetry
     public static readonly Counter<long> Crumbs =
         Meter.CreateCounter<long>("crumble.crumbs", unit: "1", description: "Number of processed crumbs");
 
+    public static readonly Counter<long> Actions =
+        Meter.CreateCounter<long>("crumble.actions", unit: "1", description: "Number of processed actions");
+
     public static readonly Histogram<double> CrumbDurationMs =
         Meter.CreateHistogram<double>("crumble.crumb.duration", unit: "ms", description: "End-to-end and phase durations of crumb");
 }

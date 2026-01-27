@@ -12,10 +12,13 @@
 
   <ItemGroup>
     <PackageReference Include="Azure.Storage.Blobs" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" />
+    <PackageReference Include="Microsoft.Orleans.Reminders" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Actions.Volume.Abstractions\src\Actions.Volume.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Abstractions\src\Abstractions.csproj" />
+    <ProjectReference Include="..\..\Runtime.Orleans\src\Runtime.Orleans.csproj" />
   </ItemGroup>
 
 </Project>

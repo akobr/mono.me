@@ -4,9 +4,9 @@ public interface ICrumbExecutionContext
 {
     Guid Id { get; }
 
-    public string ContextKey { get; }
+    string ContextKey { get; }
 
-    public ISet<string> Flags { get; }
+    ISet<string> Flags { get; }
 
-    public IDictionary<string, object> Properties { get; }
+    IDictionary<string, object> Properties { get; }
 }

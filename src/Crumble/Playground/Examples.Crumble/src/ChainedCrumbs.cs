@@ -1,4 +1,4 @@
-﻿namespace _42.Crumble.Playground.Examples;
+namespace _42.Crumble.Playground.Examples;
 
 public class ChainedCrumbs(IChainedCrumbsExecutor executor)
 {

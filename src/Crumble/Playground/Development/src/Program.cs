@@ -5,9 +5,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
 builder.AddKeyedRedisClient("redis");
-builder.UseOrleansClient();
+builder.UseOrleansClient(builder =>
+{
+    builder.AddActivityPropagation();
+});
 
-builder.Services.AddSingleton<IOutgoingGrainCallFilter, TelemetryOutgoingGrainCallFilter>();
+/*builder.Services.AddSingleton<IOutgoingGrainCallFilter, TelemetryOutgoingGrainCallFilter>();*/
 
 var app = builder.Build();
 

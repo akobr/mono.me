@@ -29,4 +29,26 @@ public record class CrumbGrainGenerateModel
     public string InputTypeName { get; set; }
 
     public string OutputTypeName { get; set; }
+
+    public IReadOnlyCollection<ActionModel> Actions { get; set; }
+}
+
+public record class ActionModel
+{
+    public ActionType Type { get; set; }
+
+    public string? ContextKey { get; set; }
+
+    public string? Filter { get; set; }
+
+    public string? Cron { get; set; }
+
+    public string? TimeZone { get; set; }
+}
+
+public enum ActionType
+{
+    Time,
+    Message,
+    Volume
 }

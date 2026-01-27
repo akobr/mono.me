@@ -26,7 +26,7 @@
     </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\Examples.Crumble\src\obj\Generated\42.Crumble.SourceGenerator*\**\*.cs" Visible="false" AutoGen="true" />
+    <Compile Include="..\..\Examples.Crumble\src\obj\Generated\42.Crumble.SourceGenerator*\**\*.cs" AutoGen="true" />
     <Compile Include="..\..\Examples.Crumble\src\*.cs" />
   </ItemGroup>
 

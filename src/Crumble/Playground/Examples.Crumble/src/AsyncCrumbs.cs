@@ -1,8 +1,8 @@
-﻿namespace _42.Crumble.Playground.Examples;
+namespace _42.Crumble.Playground.Examples;
 
 public class AsyncCrumbs
 {
-    [Crumb]
+    [Crumb(Key = "AsyncCrumbs.CustomAndUniqueCrumbKey")]
     public Task SimpleTask() => Task.CompletedTask;
 
     [Crumb]

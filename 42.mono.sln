@@ -170,6 +170,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Actions.Volume.AzureStorage
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Volume.AzureStorageBlobs", "src\Crumble\Volume.AzureStorageBlobs\src\Volume.AzureStorageBlobs.csproj", "{0ACF653A-EC05-46A7-8947-3D1692E3D2E8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Journal.AzureStorageTables", "src\Crumble\Journal.AzureStorageTables\src\Journal.AzureStorageTables.csproj", "{EBB6B54F-5573-4B87-816D-8E08725B3C6C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -424,6 +426,10 @@ Global
 		{0ACF653A-EC05-46A7-8947-3D1692E3D2E8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0ACF653A-EC05-46A7-8947-3D1692E3D2E8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0ACF653A-EC05-46A7-8947-3D1692E3D2E8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EBB6B54F-5573-4B87-816D-8E08725B3C6C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EBB6B54F-5573-4B87-816D-8E08725B3C6C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EBB6B54F-5573-4B87-816D-8E08725B3C6C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EBB6B54F-5573-4B87-816D-8E08725B3C6C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -501,6 +507,7 @@ Global
 		{23B4EDF7-6B64-4505-9B9D-42035F0A268B} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
 		{6E23722A-806E-49A9-8E44-D348A610D088} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
 		{0ACF653A-EC05-46A7-8947-3D1692E3D2E8} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
+		{EBB6B54F-5573-4B87-816D-8E08725B3C6C} = {53FA4D9B-376E-4EAC-A9F7-38E139A867BC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F82BF58F-3E50-4150-BD21-CA489E5CCF93}

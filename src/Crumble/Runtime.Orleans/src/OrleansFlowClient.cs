@@ -7,15 +7,7 @@ public class OrleansFlowClient(IGrainFactory factory, ICrumbToGrainProvider regi
     public Task ExecuteCrumbAsync(Delegate crumb)
     {
         ArgumentNullException.ThrowIfNull(crumb);
-
-        if (crumb.Method is { DeclaringType: null })
-        {
-            throw new ArgumentException(
-                "The delegate must be a valid method which represent a crumb, has [Crumb] attribute.",
-                nameof(crumb));
-        }
-
-        var crumbKey = $"{crumb.Method.DeclaringType!.FullName}.{crumb.Method.Name}";
+        var crumbKey = crumb.Method.GetCrumbKey();
         return ExecuteCrumbAsync(crumbKey);
     }
 
@@ -28,7 +20,9 @@ public class OrleansFlowClient(IGrainFactory factory, ICrumbToGrainProvider regi
 
     public Task<TOutput> ExecuteCrumbAsync<TOutput>(Delegate crumb)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(crumb);
+        var crumbKey = crumb.Method.GetCrumbKey();
+        return ExecuteCrumbAsync<TOutput>(crumbKey);
     }
 
     public Task<TOutput> ExecuteCrumbAsync<TOutput>(string crumbKey)
@@ -40,7 +34,9 @@ public class OrleansFlowClient(IGrainFactory factory, ICrumbToGrainProvider regi
 
     public Task<TOutput> ExecuteCrumbAsync<TInput, TOutput>(Delegate crumb, TInput input)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(crumb);
+        var crumbKey = crumb.Method.GetCrumbKey();
+        return ExecuteCrumbAsync<TInput, TOutput>(crumbKey, input);
     }
 
     public Task<TOutput> ExecuteCrumbAsync<TInput, TOutput>(string crumbKey, TInput input)
@@ -52,7 +48,9 @@ public class OrleansFlowClient(IGrainFactory factory, ICrumbToGrainProvider regi
 
     public string StartCrumb(Delegate crumb)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(crumb);
+        var crumbKey = crumb.Method.GetCrumbKey();
+        return StartCrumb(crumbKey);
     }
 
     public string StartCrumb(string crumbKey)
@@ -65,7 +63,9 @@ public class OrleansFlowClient(IGrainFactory factory, ICrumbToGrainProvider regi
 
     public string StartCrumb<TInput>(Delegate crumb, TInput input)
     {
-        throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(crumb);
+        var crumbKey = crumb.Method.GetCrumbKey();
+        return StartCrumb(crumbKey, input);
     }
 
     public string StartCrumb<TInput>(string crumbKey, TInput input)

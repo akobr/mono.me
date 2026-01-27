@@ -2,7 +2,9 @@
 
 public interface IVolumeContext
 {
+    string? VolumeKey { get; }
+
     string? RootPath { get; }
 
-    string? ItemPath { get; }
+    string? SubPath { get; }
 }

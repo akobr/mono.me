@@ -58,6 +58,6 @@ public class BlobVolumeClient<TContext>(BlobContainerClient client, IVolumeConte
             return $"{context.RootPath}/{path[1..]}";
         }
 
-        return $"{context.RootPath}/{context.ItemPath}/{path}";
+        return $"{context.RootPath}/{context.SubPath}/{path}";
     }
 }

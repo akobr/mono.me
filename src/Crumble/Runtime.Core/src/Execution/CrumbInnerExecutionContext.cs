@@ -10,6 +10,10 @@ public class CrumbInnerExecutionContext : ICrumbInnerExecutionContext
 
     public object? Output { get; set; }
 
+    public DateTimeOffset StartTime { get; } = DateTimeOffset.UtcNow;
+
+    public Exception? Exception { get; set; }
+
     public ICrumbExecutionContext ExecutionContext { get; set; }
 
     public required ICrumbExecutionSetting Settings { get; set; }

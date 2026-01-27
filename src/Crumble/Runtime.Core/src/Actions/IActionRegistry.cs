@@ -1,9 +1,7 @@
 ﻿namespace _42.Crumble;
 
-public interface IActionRegistry
+public interface IActionRegistry : IActionRegister
 {
-    void RegisterAction(ActionAttribute model, Action executor);
-
-    IEnumerable<(TAction Model, Action Executor)> GetActions<TAction>()
-    where TAction : ActionAttribute;
+    IEnumerable<ActionModel<TAction, TInput>> GetActions<TAction, TInput>()
+        where TAction : ActionAttribute;
 }

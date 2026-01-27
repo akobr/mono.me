@@ -26,6 +26,17 @@ public static class EntryPoint
         @this.TryAddSingleton<ICrumbTracerFactory, DefaultCrumbTracerFactory>();
         @this.TryAddScoped<ICrumbTracer>(
             services => services.GetRequiredService<ICrumbTracerFactory>().CreateLogger());
+        @this.TryAddSingleton<IJournalClient, NullJournalClient>();
+
+        // volume
+        @this.TryAddSingleton<IVolumeClientFactory, NullVolumeClientFactory>();
+        @this.AddTransient<IVolumeClient>(provider =>
+        {
+            var contextProvider = provider.GetRequiredService<ICrumbExecutionContextProvider>();
+            var clientFactory = provider.GetRequiredService<IVolumeClientFactory>();
+            var context = contextProvider.GetExecutionContext();
+            return clientFactory.CreateClient(context);
+        });
 
         // middlewares
         @this.TryAddSingleton<IMiddlewaresProvider, BlankMiddlewaresProvider>();

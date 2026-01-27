@@ -2,6 +2,7 @@ using System.CodeDom.Compiler;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -26,6 +27,10 @@ internal sealed class GrainSourceGenerator : IIncrementalGenerator
 
         var allGrains = crumbGrain.Collect();
         context.RegisterSourceOutput(allGrains, GenerateGrainExecutors);
+        context.RegisterSourceOutput(allGrains, GenerateGrainsRegistration);
+        context.RegisterSourceOutput(allGrains, GenerateActionsRegistration);
+        context.RegisterSourceOutput(allGrains, GenerateTypesRegistration);
+        context.RegisterSourceOutput(allGrains, GenerateEntryPoint);
     }
 
     private static bool CrumbMethodPredicate(SyntaxNode n, CancellationToken _)
@@ -53,10 +58,32 @@ internal sealed class GrainSourceGenerator : IIncrementalGenerator
             return default;
         }
 
+        var methodNameSuffix = methodSymbol.TypeParameters.IsEmpty
+            ? string.Empty
+            : $"~{methodSymbol.TypeParameters.Length}";
+
+        var methodArguments = methodSymbol.Parameters.IsEmpty
+            ? string.Empty
+            : string.Join(",", methodSymbol.Parameters.Select(p => p.Type.ToDisplayString(FullyQualifiedWithoutGlobalFormat)));
+
         var classSymbol = methodSymbol.ContainingType;
         var namespaceSymbol = classSymbol.ContainingNamespace;
         var namespaceFullName = namespaceSymbol.ToDisplayString(FullyQualifiedWithoutGlobalFormat);
-        var crumbKey = $"{classSymbol.ToDisplayString(FullyQualifiedWithoutGlobalFormat)}.{methodSymbol.Name}";
+
+        var keyArg = (attribute.ArgumentList?.Arguments ?? []).FirstOrDefault(arg
+            => (arg.NameEquals?.Name.ToString() ?? string.Empty) == nameof(CrumbAttribute.Key));
+        var crumbKey = keyArg?.Expression is LiteralExpressionSyntax { RawKind: (int)SyntaxKind.StringLiteralExpression } keyLiteral
+            ? keyLiteral.Token.ValueText
+            : null;
+
+        if (string.IsNullOrWhiteSpace(crumbKey))
+        {
+            var keyFromMethod = $"{classSymbol.ToDisplayString(FullyQualifiedWithoutGlobalFormat)}.{methodSymbol.Name}{methodNameSuffix}({methodArguments})";
+            var hashOfKey = MurmurHash3.Hash32(Encoding.UTF8.GetBytes(keyFromMethod), 4242424243U);
+            crumbKey = $"{classSymbol.Name}.{methodSymbol.Name}.{hashOfKey:x8}";
+        }
+
+        //var crumbKey = $"{classSymbol.ToDisplayString(FullyQualifiedWithoutGlobalFormat)}.{methodSymbol.Name}{methodNameSuffix}({methodArguments})";
         var crumbName = classSymbol.Name + methodSymbol.Name;
         var isSingleton = (attribute.ArgumentList?.Arguments ?? []).Any(arg
             => (arg.NameEquals?.Name.ToString() ?? string.Empty) == nameof(CrumbAttribute.IsSingleAndSynchronized)
@@ -84,7 +111,12 @@ internal sealed class GrainSourceGenerator : IIncrementalGenerator
             }
         }
 
-        return new CrumbGrainGenerateModel()
+        var actions = method.AttributeLists.SelectMany(list => list.Attributes)
+            .Where(att => att.Name.ToString().Contains("Action"))
+            .Select(BuildAction)
+            .ToArray();
+
+        return new CrumbGrainGenerateModel
         {
             CrumbKey = crumbKey,
             CrumbName = crumbName,
@@ -99,7 +131,358 @@ internal sealed class GrainSourceGenerator : IIncrementalGenerator
             OutputTypeName = outputType,
             IsAsync = isAsync,
             ParameterCount = methodSymbol.Parameters.Length,
+            Actions = actions,
         };
+    }
+
+    private static ActionModel BuildAction(AttributeSyntax syntax)
+    {
+        switch (syntax.Name.ToString())
+        {
+            case "TimeAction":
+            {
+                var cronArg = (syntax.ArgumentList?.Arguments ?? []).FirstOrDefault(arg
+                    => arg.NameEquals is null);
+                var cron = cronArg?.Expression is LiteralExpressionSyntax { RawKind: (int)SyntaxKind.StringLiteralExpression } volumeLiteral
+                    ? volumeLiteral.Token.ValueText
+                    : "0 * * * *";
+                var timeZoneArg = (syntax.ArgumentList?.Arguments ?? []).FirstOrDefault(arg
+                    => (arg.NameEquals?.Name.ToString() ?? string.Empty) == nameof(TimeActionAttribute.TimeZone));
+                var timeZone = timeZoneArg?.Expression is LiteralExpressionSyntax { RawKind: (int)SyntaxKind.StringLiteralExpression } pathLiteral
+                    ? pathLiteral.Token.ValueText
+                    : null;
+
+                return new ActionModel
+                {
+                    Type = ActionType.Time,
+                    Cron = cron,
+                    TimeZone = timeZone,
+                };
+            }
+
+            case "MessageAction":
+            {
+                var queueKeyArg = (syntax.ArgumentList?.Arguments ?? []).FirstOrDefault(arg
+                    => (arg.NameEquals?.Name.ToString() ?? string.Empty) == nameof(MessageActionAttribute.QueueKey));
+                var queueKey = queueKeyArg?.Expression is LiteralExpressionSyntax { RawKind: (int)SyntaxKind.StringLiteralExpression } queueLiteral
+                    ? queueLiteral.Token.ValueText
+                    : null;
+
+                return new ActionModel
+                {
+                    Type = ActionType.Message,
+                    ContextKey = queueKey,
+                };
+            }
+
+            case "VolumeAction":
+            {
+                var volumeKeyArg = (syntax.ArgumentList?.Arguments ?? []).FirstOrDefault(arg
+                    => (arg.NameEquals?.Name.ToString() ?? string.Empty) == nameof(VolumeActionAttribute.VolumeKey));
+                var volumeKey = volumeKeyArg?.Expression is LiteralExpressionSyntax { RawKind: (int)SyntaxKind.StringLiteralExpression } volumeLiteral
+                    ? volumeLiteral.Token.ValueText
+                    : null;
+                var pathFilterArg = (syntax.ArgumentList?.Arguments ?? []).FirstOrDefault(arg
+                    => (arg.NameEquals?.Name.ToString() ?? string.Empty) == nameof(VolumeActionAttribute.PathFilter));
+                var pathFilter = pathFilterArg?.Expression is LiteralExpressionSyntax { RawKind: (int)SyntaxKind.StringLiteralExpression } pathLiteral
+                    ? pathLiteral.Token.ValueText
+                    : null;
+
+                return new ActionModel
+                {
+                    Type = ActionType.Volume,
+                    ContextKey = volumeKey,
+                    Filter = pathFilter,
+                };
+            }
+
+            default:
+                throw new InvalidOperationException($"Unknown action attribute: {syntax.Name}");
+        }
+    }
+
+    private void GenerateEntryPoint(SourceProductionContext context, ImmutableArray<CrumbGrainGenerateModel> all)
+    {
+        if (all.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        using StringWriter writer = new(CultureInfo.InvariantCulture);
+        using IndentedTextWriter source = new(writer);
+        var firstGrain = all.First(); // TODO: [P1] this needs to be more robust
+        var namespaceFull = firstGrain.NamespaceFullName;
+        var namespaceHash = MurmurHash3.Hash32(Encoding.UTF8.GetBytes(namespaceFull), 4242424243U);
+        var classNameSuffix = $"{namespaceHash:x8}";
+
+        // language=c#
+        source.WriteLine($$"""
+                           // <auto-generated/>
+                           // Do not edit this file manually. Changes to this file may cause incorrect behavior and will be lost if the code is regenerated.
+                           // Generated by Crumble.SourceGenerator version 0.9
+                           // Generated on {{DateTime.UtcNow.ToString("u", CultureInfo.InvariantCulture)}} UTC
+                           #nullable enable
+
+                           using global::Microsoft.Extensions.DependencyInjection;
+
+                           namespace {{namespaceFull}};
+
+                           [global::System.CodeDom.Compiler.GeneratedCode("Crumble.SourceGenerator", "0.9")]
+
+                           public static class CrumblesEntryPoint_{{classNameSuffix}}
+                           {
+                               public static IServiceCollection AddCrumbs(this IServiceCollection @this)
+                               {
+                                   @this.RegisterExecutors();
+                                   @this.Configure<CrumbToGrainRegistryOptions>(config => config.RegisterCrumbs());
+                                   @this.Configure<ActionRegistryOptions>(config => config.RegisterActions());
+                                   return @this;
+                               }
+                           }
+                           """);
+
+        var code = writer.ToString();
+        context.AddSource($"CrumblesEntryPoint.g.cs", code);
+    }
+
+    private void GenerateTypesRegistration(SourceProductionContext context, ImmutableArray<CrumbGrainGenerateModel> all)
+    {
+        if (all.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        using StringWriter writer = new(CultureInfo.InvariantCulture);
+        using IndentedTextWriter source = new(writer);
+        var firstGrain = all.First(); // TODO: [P1] this needs to be more robust
+        var namespaceFull = firstGrain.NamespaceFullName;
+        var namespaceHash = MurmurHash3.Hash32(Encoding.UTF8.GetBytes(namespaceFull), 4242424243U);
+        var classNameSuffix = $"{namespaceHash:x8}";
+        var executorsSet = new HashSet<string>();
+
+        // language=c#
+        source.WriteLine($$"""
+                           // <auto-generated/>
+                           // Do not edit this file manually. Changes to this file may cause incorrect behavior and will be lost if the code is regenerated.
+                           // Generated by Crumble.SourceGenerator version 0.9
+                           // Generated on {{DateTime.UtcNow.ToString("u", CultureInfo.InvariantCulture)}} UTC
+                           #nullable enable
+
+                           using global::System;
+                           using global::System.Threading.Tasks;
+                           using global::_42.Crumble;
+                           using global::Microsoft.Extensions.DependencyInjection;
+                           using global::Microsoft.Extensions.DependencyInjection.Extensions;
+
+                           namespace {{namespaceFull}};
+
+                           [global::System.CodeDom.Compiler.GeneratedCode("Crumble.SourceGenerator", "0.9")]
+
+                           public static class ExecutorsTypeRegistryExtensions_{{classNameSuffix}}
+                           {
+                               public static IServiceCollection RegisterExecutors(this IServiceCollection @this)
+                               {
+                           """);
+
+        foreach (var grain in all)
+        {
+            var executorServiceTypeName = $"I{grain.Class.Name}Executor";
+
+            if (!executorsSet.Add(executorServiceTypeName))
+            {
+                continue;
+            }
+
+            // language=c#
+            source.WriteLine($$"""
+                                       @this.AddTransient<{{executorServiceTypeName}}, {{grain.Class.Name}}Executor>();
+                               """);
+        }
+
+        // language=c#
+        source.WriteLine($$"""
+                                   return @this;
+                               }
+                           }
+                           """);
+
+        var code = writer.ToString();
+        context.AddSource($"ExecutorTypeRegistrations.g.cs", code);
+    }
+
+    private void GenerateActionsRegistration(SourceProductionContext context, ImmutableArray<CrumbGrainGenerateModel> all)
+    {
+        if (all.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        using StringWriter writer = new(CultureInfo.InvariantCulture);
+        using IndentedTextWriter source = new(writer);
+        var firstGrain = all.First(); // TODO: [P1] this needs to be more robust
+        var namespaceFull = firstGrain.NamespaceFullName;
+        var namespaceHash = MurmurHash3.Hash32(Encoding.UTF8.GetBytes(namespaceFull), 4242424243U);
+        var classNameSuffix = $"{namespaceHash:x8}";
+
+        // language=c#
+        source.WriteLine($$"""
+                           // <auto-generated/>
+                           // Do not edit this file manually. Changes to this file may cause incorrect behavior and will be lost if the code is regenerated.
+                           // Generated by Crumble.SourceGenerator version 0.9
+                           // Generated on {{DateTime.UtcNow.ToString("u", CultureInfo.InvariantCulture)}} UTC
+                           #nullable enable
+
+                           using global::System;
+                           using global::System.Threading.Tasks;
+                           using global::_42.Crumble;
+                           using global::Orleans;
+                           using global::Microsoft.Extensions.DependencyInjection;
+
+                           namespace {{namespaceFull}};
+
+                           [global::System.CodeDom.Compiler.GeneratedCode("Crumble.SourceGenerator", "0.9")]
+
+                           public static class ActionRegistryExtensions_{{classNameSuffix}}
+                           {
+                               public static IActionRegister RegisterActions(this IActionRegister @this)
+                               {
+                           """);
+
+        foreach (var grain in all)
+        {
+            if (grain.Actions.Count < 1)
+            {
+                continue;
+            }
+
+            var executorType = $"I{grain.Class.Name}Executor";
+            var methodName = grain.Method.Name;
+
+            foreach (var action in grain.Actions)
+            {
+                var actionType = $"{action.Type:G}ActionAttribute";
+                var inputType = string.Empty;
+                var actionInit = string.Empty;
+                var inputParam = "input";
+
+                switch (action.Type)
+                {
+                    case ActionType.Time:
+                    {
+                        inputType = "DateTime";
+                        var timeZoneArg = action.TimeZone is not null ? $"\"{action.TimeZone}\"" : "null";
+                        actionInit = $"{actionType}(\"{action.Cron}\") {{ {nameof(TimeActionAttribute.TimeZone)} = {timeZoneArg} }}";
+                        break;
+                    }
+
+                    case ActionType.Message:
+                    {
+                        inputType = "global::_42.Crumble.MessageModel";
+                        var queueKeyArg = action.ContextKey is not null ? $"\"{action.ContextKey}\"" : "null";
+                        actionInit = $"{actionType}() {{ {nameof(MessageActionAttribute.QueueKey)} = {queueKeyArg} }}";
+
+                        if (grain.InputTypeName.Equals(nameof(String), StringComparison.OrdinalIgnoreCase))
+                        {
+                            inputParam = "input.MessageText";
+                        }
+
+                        break;
+                    }
+
+                    case ActionType.Volume:
+                    {
+                        inputType = "string";
+                        var volumeArg = action.ContextKey is not null ? $"\"{action.ContextKey}\"" : "null";
+                        var pathFilterArg = action.Filter is not null ? $"\"{action.Filter}\"" : "null";
+                        actionInit = $"{actionType}() {{ {nameof(VolumeActionAttribute.VolumeKey)} = {volumeArg}, {nameof(VolumeActionAttribute.PathFilter)} = {pathFilterArg} }}";
+                        break;
+                    }
+
+                    default:
+                        continue;
+                }
+
+                // language=c#
+                source.WriteLine($$"""
+                                           @this.RegisterAction(new ActionModel<{{actionType}}, {{inputType}}>()
+                                           {
+                                               Action = new {{actionInit}},
+                                               CrumbKey = "{{grain.CrumbKey}}",
+                                               Executor = (services, input) =>
+                                               {
+                                                   var executor = services.GetRequiredService<{{executorType}}>();
+                                                   return executor.{{methodName}}({{inputParam}});
+                                               }
+                                           });
+                                   """);
+            }
+        }
+
+        // language=c#
+        source.WriteLine($$"""
+                                   return @this;
+                               }
+                           }
+                           """);
+
+        var code = writer.ToString();
+        context.AddSource($"ActionRegistrations.g.cs", code);
+    }
+
+    private void GenerateGrainsRegistration(SourceProductionContext context, ImmutableArray<CrumbGrainGenerateModel> all)
+    {
+        if (all.IsDefaultOrEmpty)
+        {
+            return;
+        }
+
+        using StringWriter writer = new(CultureInfo.InvariantCulture);
+        using IndentedTextWriter source = new(writer);
+        var firstGrain = all.First(); // TODO: [P1] this needs to be more robust
+        var namespaceFull = firstGrain.NamespaceFullName;
+        var namespaceHash = MurmurHash3.Hash32(Encoding.UTF8.GetBytes(namespaceFull), 4242424243U);
+        var classNameSuffix = $"{namespaceHash:x8}";
+
+        // language=c#
+        source.WriteLine($$"""
+                           // <auto-generated/>
+                           // Do not edit this file manually. Changes to this file may cause incorrect behavior and will be lost if the code is regenerated.
+                           // Generated by Crumble.SourceGenerator version 0.9
+                           // Generated on {{DateTime.UtcNow.ToString("u", CultureInfo.InvariantCulture)}} UTC
+                           #nullable enable
+
+                           using global::System;
+                           using global::System.Threading.Tasks;
+                           using global::_42.Crumble;
+                           using global::Orleans;
+
+                           namespace {{namespaceFull}};
+
+                           [global::System.CodeDom.Compiler.GeneratedCode("Crumble.SourceGenerator", "0.9")]
+
+                           public static class CrumbToGrainRegisterExtensions_{{classNameSuffix}}
+                           {
+                               public static ICrumbToGrainRegister RegisterCrumbs(this ICrumbToGrainRegister @this)
+                               {
+                           """);
+
+        foreach (var grain in all)
+        {
+            // language=c#
+            source.WriteLine($$"""
+                                       @this.RegisterCrumb("{{grain.CrumbKey}}", typeof({{grain.NamespaceFullName}}.I{{grain.CrumbName}}Grain));
+                               """);
+        }
+
+        // language=c#
+        source.WriteLine($$"""
+                                   return @this;
+                               }
+                           }
+                           """);
+
+        var code = writer.ToString();
+        context.AddSource($"CrumbToGrainRegistrations.g.cs", code);
     }
 
     private void GenerateGrainExecutors(SourceProductionContext context, ImmutableArray<CrumbGrainGenerateModel> all)
