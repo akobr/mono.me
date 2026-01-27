@@ -1,24 +1,27 @@
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.Options;
 
 namespace _42.Crumble;
 
-public class CrumbToGrainRegistry : ICrumbToGrainProvider, ICrumbToGrainRegister
+public class CrumbToGrainRegistry(IOptions<CrumbToGrainRegistryOptions> options)
+    : ICrumbToGrainProvider, ICrumbToGrainRegister
 {
-    private readonly Dictionary<string, Type> _typesMap = new(StringComparer.Ordinal);
+    private readonly CrumbToGrainRegistryOptions _registry = options.Value;
 
     public Type? GetCrumbTypeByKey(string crumbKey)
     {
-        _typesMap.TryGetValue(crumbKey, out var type);
+        _registry.Types.TryGetValue(crumbKey, out var type);
         return type;
     }
 
     public bool TryGetCrumbTypeByKey(string crumbKey, [MaybeNullWhen(false)]out Type type)
     {
-        return _typesMap.TryGetValue(crumbKey, out type);
+        return _registry.Types.TryGetValue(crumbKey, out type);
     }
 
-    public void RegisterCrumb(string crumbKey, Type grainType)
+    public ICrumbToGrainRegister RegisterCrumb(string crumbKey, Type grainType)
     {
-        _typesMap.TryAdd(crumbKey, grainType);
+        _registry.Types.TryAdd(crumbKey, grainType);
+        return this;
     }
 }

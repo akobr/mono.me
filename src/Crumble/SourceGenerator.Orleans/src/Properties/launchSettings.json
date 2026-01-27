@@ -3,9 +3,9 @@
     "SourceGenerator.Orleans": {
       "commandName": "Project"
     },
-    "RoslynGen.Examples": {
+    "Examples.Crumble": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "..\\..\\Playground\\Crumble\\src\\Examples.csproj"
+      "targetProject": "..\\..\\Playground\\Examples.Crumble\\src\\Examples.Crumble.csproj"
     }
   }
 }

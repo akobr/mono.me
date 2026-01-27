@@ -43,7 +43,7 @@ public class CrumbExecutor(AsyncServiceScope scope) : ICrumbExecutor
         using var logger = _services.GetRequiredService<ICrumbTracer>();
         Exception? crumbException = null;
 
-        var middlewaresChain = middlewaresProvider.GetMiddlewareFullChain(async ctx =>
+        var middlewaresChain = middlewaresProvider.GetChainOfMiddlewares(async ctx =>
         {
             var stopwatch = Stopwatch.StartNew();
 
@@ -58,6 +58,7 @@ public class CrumbExecutor(AsyncServiceScope scope) : ICrumbExecutor
                 Telemetry.Crumbs.Add(1, new KeyValuePair<string, object?>("outcome", "failure"));
                 logger.LogException(exception, ctx);
                 crumbException = exception;
+                context.Exception = exception;
                 throw;
             }
             finally
