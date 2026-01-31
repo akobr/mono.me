@@ -6,6 +6,10 @@ public record class CrumbGrainGenerateModel
 {
     public string CrumbKey { get; set; }
 
+    public string CrumbFullName { get; set; }
+
+    public string CrumbFullNameHash { get; set; }
+
     public string CrumbName { get; set; }
 
     public INamedTypeSymbol Class { get; set; }

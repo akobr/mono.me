@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 
-namespace _42.Crumble.SourceGenerator;
+namespace _42.Crumble;
 
 public static class MurmurHash3
 {
