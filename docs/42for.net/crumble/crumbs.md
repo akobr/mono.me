@@ -2,7 +2,7 @@
 
 Crumbs are created by decorating a method with `[Crumb]` attribute. By default, a crumb is designed as a unit of work, with each execution totally isolated and unrelated to the others. Crumbs can be grouped logically by defining them in the same class. Each crumb is asynchronous by design, and they can have input and output.
 
-## Crumb identification
+## Crumb identification (key)
 
 Each crumb has a unique identifier that can be used for lossecoupling execution and be included in observability logs. The identification is calculated by default based on the full qualified name and parameter types. If you want to manage your crumb keys yourself, you can do it by `Key` property on the attribute. It is important to make sure the keys are globally unique.
 
@@ -25,13 +25,13 @@ public interface IAsyncCrumbsExecutor
 }
 ```
 
-The second way is more loosely coupled, where you need to know the key and use the generic interface `IFlowClient`. There are multiple methods to call a crumb with/without input and output. Another possibility is to fire-and-forget.
+The second way is more loosely coupled, where you need to know the key and use the generic interface `IFlowClient`. There are multiple methods to call a crumb with/without input and output. Another possibility is to fire-and-forget. To simplify the management of the crumb keys, each library of them contains generated list of all keys in the static class `CrumbKeys`.
 
 ```csharp
 public async Task Orchestrate(IFlowClient flow)
 {
-    var data = await flow.ExecuteCrumbAsync<List<InputData>>("InputCrumbKey");
-    await flow.ExecuteCrumbAsync<List<InputData>, string>("ProcessingCrumbKey", data);
+    var data = await flow.ExecuteCrumbAsync<List<InputData>>(CrumbKeys.MyCrumbs.Input);
+    await flow.ExecuteCrumbAsync<List<InputData>, string>(CrumbKeys.MyCrumbs.Process, data);
 }
 ```
 
