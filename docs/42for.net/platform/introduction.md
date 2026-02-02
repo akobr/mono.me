@@ -14,9 +14,9 @@ The platform is used to describe the relationships and the building blocks in yo
 
 - Storyteller
 - Supervisor
-- Scheduler
+- Scheduler & Initiator
 
-The storyteller describes the entire business structure and dependencies in the ecosystem, and it acts as documentation and the subscription service for the runtime. The second part, the supervisor, is a clever and real-time system watcher. The last and most specific actor is a flexible scheduler of jobs or work units if a lot of time-based processing is needed and monitoring of them in a sustainable way is required.
+The storyteller describes the entire business structure and dependencies in the ecosystem, and it acts as documentation and the subscription service for the runtime. The second part, the supervisor, is a clever and real-time system watcher. The last and most specific actor is a flexible scheduler & initiator of jobs or work units if a lot of time-based or event-based processing is needed and monitoring of them in a sustainable way is required.
 
 ::: tip
 The platform is designed in a way that should help you understand the modeled ecosystem and act as documentation. That is extremely handy when you bring new faces to your team. Another superior concept is to speed up reverse engineering and debugging in case of an incident. As I mentioned many times **transparency and visibility** are some of the most fundamental properties of a healthy product.

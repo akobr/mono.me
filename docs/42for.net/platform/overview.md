@@ -118,11 +118,11 @@ The supervisor comes with a simple SDK library, and it's implemented on top of s
 Try AI to detect anomalies in your ecosystem. <Badge type="warning" text="under the development" />
 :::
 
-## Scheduler
+## Scheduler & Initiator
 
-The last actor for managing time-based and recurrent jobs. It can be handy when you have many of them and want to describe smaller units than just responsibilities (satellites) in the ecosystem. Imagine how convenient it is to know: *what and when is running per each customer?*
+The last actor for not only managing time-based and recurrent jobs, but it is the heart of event-driven part of the ecosystem. It can be handy when you have many of background jobs and want to describe smaller units than just responsibilities (satellites) in the ecosystem. Imagine how convenient it is to know: *what and when is running per each customer or user?*
 
-The scheduler uses a more granular view of responsibilities, called units. These units represent jobs; each job can be triggered at any desired time controlled by CRON expression.
+The scheduler uses a more granular view of responsibilities, called units. These units represent jobs and events. Each job can be triggered at any desired time controlled by CRON expression, or is described by how the event is triggered. E.g. event in data storage, new file in sFTP, or a received message on a communication channel.
 
 <div id="tooltip-modal" class="modal">
 
@@ -157,12 +157,12 @@ The scheduler uses a more granular view of responsibilities, called units. These
       <div id="modal-content-unit" class="invisible">
         <h3>Unit</h3>
         <p>The unit allows you to go deeper below responsibility. <i>(optional)</i></p>
-        <p>It is often used for modeling time-triggered jobs under a satellite. It can represent any practical unit inside a responsibility, e.g., a job, function, or workflow step.</p>
+        <p>It is often used for modeling time-triggered jobs under a satellite. It can represent any practical unit inside a responsibility, e.g., a job, an event, a function, or a workflow step.</p>
       </div>
       <div id="modal-content-unit-of-execution" class="invisible">
         <h3>Unit of execution</h3>
         <p>A concrete unit of a single execution. <i>(virtual)</i></p>
-        <p>A runtime entity of a unit. A satellite will receive an execution request for the unit at the scheduled time.</p>
+        <p>A runtime entity of a unit. A satellite will receive an execution request for the unit at the scheduled time or at an event trigger.</p>
       </div>
     </div>
   </div>
