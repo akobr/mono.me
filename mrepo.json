@@ -3,7 +3,16 @@
     "name": "mono.me",
     "description": "My personal mono-repository with most of my projects.",
     "prefix": "42",
-    "features": [ "git-version", "packages", "build-traversal", "tests-xunit", "tests-nunit", "stylecop", "sonar" ],
+    "features": [
+      "git-version",
+      "packages",
+      "build-traversal",
+      "tests-xunit",
+      "tests-nunit",
+      "tests-tunit",
+      "stylecop",
+      "sonar"
+    ],
     "scripts": {
       "rock": "echo \"There's no wrong time to rock! 🎸\"",
       "truth": "echo 'Simplicity is the ultimate sophistication.'",
@@ -15,14 +24,12 @@
     }
   },
   "release": {
-    "branches": [
-      "^refs/heads/main$"
-    ],
+    "branches": ["^refs/heads/main$"],
     "changes": {
       "major": [],
-      "minor": [ "feat" ],
-      "patch": [ "fix", "perf", "refactor" ],
-      "harmless": [ "style", "test", "build", "ci", "docs", "chore" ]
+      "minor": ["feat"],
+      "patch": ["fix", "perf", "refactor"],
+      "harmless": ["style", "test", "build", "ci", "docs", "chore"]
     },
     "createReleaseBranch": true,
     "issueUrlTemplate": "https://app.clickup.com/t/{0}"
@@ -31,7 +38,8 @@
     "dotnet-project": {
       "custom": {
         "filePattern": "*.*?proj",
-        "useFullProjectName": false
+        "useFullProjectName": false,
+        "dotnetVersion": 9
       },
       "scripts": {
         "build": "dotnet build src",
