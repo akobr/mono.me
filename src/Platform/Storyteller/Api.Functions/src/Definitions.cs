@@ -45,7 +45,8 @@ public static class Definitions
                 public const string ConfigurationResolved = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/resolved";
                 public const string Versions = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions";
                 public const string Version = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Id}}}";
-                public const string VersionChanges = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Id}}}/changes";
+                public const string VersionDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Id}}}/diff";
+                public const string VersionDiffCustom = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Id}}}/diff/{{{Parameters.DiffPreviousVersion}}}";
             }
         }
     }
@@ -109,6 +110,7 @@ public static class Definitions
         public const string NameQuery = "nameQuery";
         public const string ContinuationToken = "continuationToken";
         public const string Descendants = "descendants";
+        public const string DiffPreviousVersion = "idFrom";
     }
 
     public static class Tags

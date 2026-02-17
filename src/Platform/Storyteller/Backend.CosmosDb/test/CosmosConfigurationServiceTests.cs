@@ -19,7 +19,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
 
         var annotationKey = AnnotationKey.CreateResponsibility("non-exist");
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
-        var configuration = await configs.GetConfigurationAsync(key);
+        var configuration = await configs.GetRawConfigurationAsync(key);
 
         configuration.Should().BeNull();
     }
@@ -41,7 +41,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
 
         var annotationKey = AnnotationKey.CreateResponsibility("empty");
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
-        var configuration = await configs.GetConfigurationAsync(key);
+        var configuration = await configs.GetRawConfigurationAsync(key);
 
         configuration.Should().NotBeNull();
         configuration.Should().BeEmpty();
@@ -77,7 +77,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system");
         var hasContent = await configs.HasConfigurationContentAsync(key);
-        var retrieveConfig = await configs.GetConfigurationAsync(key);
+        var retrieveConfig = await configs.GetRawConfigurationAsync(key);
 
         hasContent.Should().BeTrue();
         retrieveConfig.Should().NotBeNull();
@@ -116,7 +116,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var hasContentBefore = await configs.HasConfigurationContentAsync(key);
         await configs.ClearConfigurationAsync(key);
         var hasContentAfter = await configs.HasConfigurationContentAsync(key);
-        var retrieveConfig = await configs.GetConfigurationAsync(key);
+        var retrieveConfig = await configs.GetRawConfigurationAsync(key);
 
         hasContentBefore.Should().BeTrue();
         hasContentAfter.Should().BeFalse();
@@ -152,7 +152,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
         await configs.DeleteAsync(key);
         await annotations.DeleteAnnotationAsync(key);
         var hasContentAfter = await configs.HasConfigurationContentAsync(key);
-        var retrieveConfig = await configs.GetConfigurationAsync(key);
+        var retrieveConfig = await configs.GetRawConfigurationAsync(key);
 
         hasContentBefore.Should().BeTrue();
         hasContentAfter.Should().BeFalse();
@@ -285,11 +285,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
 
         var subjectKey = FullKey.Create(subjectAnnotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(subjectKey, configuration, "system");
-        var executionConfigBeforeDelete = await configs.GetConfigurationAsync(executionKey);
+        var executionConfigBeforeDelete = await configs.GetRawConfigurationAsync(executionKey);
 
         // TODO: [P3] replace it with just calling config service
         await annotations.DeleteAnnotationAsync(subjectKey); // this will delete configuration with descendants
-        var executionConfigAfterDelete = await configs.GetConfigurationAsync(executionKey);
+        var executionConfigAfterDelete = await configs.GetRawConfigurationAsync(executionKey);
 
         executionConfigBeforeDelete.Should().NotBeEmpty();
         executionConfigBeforeDelete.Should().ContainKey("reason");
@@ -339,7 +339,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var version1 = await configs.GetConfigurationVersionContentAsync(key, 1);
         var version2 = await configs.GetConfigurationVersionContentAsync(key, 2);
         var version3 = await configs.GetConfigurationVersionContentAsync(key, 3);
-        var currentConfiguration = await configs.GetConfigurationAsync(key);
+        var currentConfiguration = await configs.GetRawConfigurationAsync(key);
 
         var changes1 = await configs.GetConfigurationVersionChangesAsync(key, 1);
         var changes2 = await configs.GetConfigurationVersionChangesAsync(key, 2);

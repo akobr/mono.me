@@ -91,6 +91,21 @@ public static class HttpRequestDataExtensions
         }
     }
 
+    public static bool TryCheckScope(this HttpRequestData @this, string scope)
+    {
+#if DEV_AUTH
+        return true;
+#endif
+        var claims = @this.GetClaims();
+        var allScopes = claims
+            .Where(c => c.Type is "scp" or "roles" or ClaimTypes.Role || c.Type.EndsWith("/scope"))
+            .SelectMany(c => c.Value.Split(' '))
+            .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
+            .ToHashSet();
+
+        return allScopes.Contains(scope);
+    }
+
     public static string GetAuthor(this HttpRequestData @this)
     {
         if (@this.TryGetApplicationIdentity(out var appId))

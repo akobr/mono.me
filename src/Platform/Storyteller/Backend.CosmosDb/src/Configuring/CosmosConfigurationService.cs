@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Json;
@@ -21,6 +22,7 @@ namespace _42.Platform.Storyteller.Configuring;
 public class CosmosConfigurationService : IConfigurationService
 {
     private readonly IContainerRepositoryProvider _repositoryProvider;
+    private readonly IBindingExecutor? _bindingExecutor;
     private readonly IJsonSerializationSettingsProvider _jsonSettingsProvider;
     private readonly IMapper _mapper;
     private readonly JsonSerializerSettings _serializerOptions;
@@ -29,9 +31,11 @@ public class CosmosConfigurationService : IConfigurationService
         IContainerRepositoryProvider repositoryProvider,
         IJsonSerializationSettingsProvider jsonSettingsProvider,
         IMapper mapper,
-        IOptions<JsonSerializerSettings> serializerOptions)
+        IOptions<JsonSerializerSettings> serializerOptions,
+        IBindingExecutor bindingExecutor = null)
     {
         _repositoryProvider = repositoryProvider;
+        _bindingExecutor = bindingExecutor;
         _jsonSettingsProvider = jsonSettingsProvider;
         _mapper = mapper;
         _serializerOptions = serializerOptions.Value;
@@ -50,7 +54,7 @@ public class CosmosConfigurationService : IConfigurationService
         return configuration is not null && configuration.Content.HasValues;
     }
 
-    public async Task<JObject?> GetConfigurationAsync(FullKey key)
+    public async Task<JObject?> GetRawConfigurationAsync(FullKey key)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var configurationKey = $"{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
@@ -81,58 +85,19 @@ public class CosmosConfigurationService : IConfigurationService
         return calculatedConfig;
     }
 
-    public async Task<JObject?> GetResolvedConfigurationAsync(FullKey key)
+    public Task<JObject?> GetResolvedConfigurationAsync(FullKey key, bool includeSecrets = false)
     {
-        var content = await GetConfigurationAsync(key);
+        return GetResolvedConfigurationInternalAsync(key, includeSecrets);
+    }
 
-        if (content is null)
-        {
-            return null;
-        }
+    public Task<JObject?> GetResolvedConfigurationWithSecretsAsync(FullKey key)
+    {
+        return GetResolvedConfigurationInternalAsync(key, true);
+    }
 
-        var queue = new Queue<JObject>();
-        queue.Enqueue(content);
-
-        while (queue.Count > 0)
-        {
-            var current = queue.Dequeue();
-
-            foreach (var property in current.Properties())
-            {
-                switch (property.Type)
-                {
-                    case JTokenType.String:
-                        // TODO: try to detect replacement and execute it
-                        break;
-
-                    case JTokenType.Object:
-                        queue.Enqueue((JObject)property.Value);
-                        break;
-
-                    case JTokenType.Array:
-                    {
-                        var array = (JArray)property.Value;
-                        foreach (var item in array)
-                        {
-                            switch (item.Type)
-                            {
-                                case JTokenType.String:
-                                    // TODO: try to detect replacement and execute it
-                                    break;
-
-                                case JTokenType.Object:
-                                    queue.Enqueue((JObject)item);
-                                    break;
-                            }
-                        }
-
-                        break;
-                    }
-                }
-            }
-        }
-
-        return content;
+    public Task<JObject?> GetResolvedConfigurationWithoutSecretsAsync(FullKey key)
+    {
+        return GetResolvedConfigurationInternalAsync(key, false);
     }
 
     public async Task<IReadOnlyCollection<ConfigurationVersion>> GetConfigurationVersionsAsync(FullKey key)
@@ -483,6 +448,79 @@ public class CosmosConfigurationService : IConfigurationService
                 throw new ArgumentOutOfRangeException(nameof(key.Annotation.Type));
             }
         }
+    }
+
+    private async Task<JObject?> GetResolvedConfigurationInternalAsync(FullKey key, bool includeSecrets)
+    {
+        var content = await GetRawConfigurationAsync(key);
+
+        if (content is null)
+        {
+            return null;
+        }
+
+        if (_bindingExecutor is null)
+        {
+            return content;
+        }
+
+        var queue = new Queue<JObject>();
+        queue.Enqueue(content);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+
+            foreach (var property in current.Properties())
+            {
+                switch (property.Type)
+                {
+                    case JTokenType.String:
+                        await TryProcessDataBinding(property, includeSecrets);
+                        break;
+
+                    case JTokenType.Object:
+                        // TODO: [P3] logic operations and templates processing
+                        queue.Enqueue((JObject)property.Value);
+                        break;
+
+                    case JTokenType.Array:
+                    {
+                        var array = (JArray)property.Value;
+                        foreach (var item in array)
+                        {
+                            switch (item.Type)
+                            {
+                                case JTokenType.String:
+                                    await TryProcessDataBinding(property, includeSecrets);
+                                    break;
+
+                                case JTokenType.Object:
+                                    queue.Enqueue((JObject)item);
+                                    break;
+                            }
+                        }
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        return content;
+    }
+
+    private ValueTask<bool> TryProcessDataBinding(JProperty property, bool includeSecrets)
+    {
+        if (property.Type != JTokenType.String)
+        {
+            return ValueTask.FromResult(false);
+        }
+
+        var rawValue = (string)property.Value;
+        return rawValue[0] != '@'
+            ? ValueTask.FromResult(false)
+            : _bindingExecutor!.TryBinding(property, includeSecrets);
     }
 
     private async Task TryAutogeneratePropertiesAsync(JObject config, FullKey key, IContainerRepository repository)

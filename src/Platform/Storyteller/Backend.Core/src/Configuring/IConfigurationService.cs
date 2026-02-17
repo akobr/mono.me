@@ -6,9 +6,13 @@ public interface IConfigurationService
 {
     Task<bool> HasConfigurationContentAsync(FullKey key);
 
-    Task<JObject?> GetConfigurationAsync(FullKey key);
+    Task<JObject?> GetRawConfigurationAsync(FullKey key);
 
-    Task<JObject?> GetResolvedConfigurationAsync(FullKey key);
+    Task<JObject?> GetResolvedConfigurationAsync(FullKey key, bool includeSecrets = false);
+
+    Task<JObject?> GetResolvedConfigurationWithSecretsAsync(FullKey key);
+
+    Task<JObject?> GetResolvedConfigurationWithoutSecretsAsync(FullKey key);
 
     Task<JObject> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author);
 

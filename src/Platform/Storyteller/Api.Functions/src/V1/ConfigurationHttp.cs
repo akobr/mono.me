@@ -63,7 +63,7 @@ public class ConfigurationHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        var configurationModel = await _configuration.GetConfigurationAsync(fullKey);
+        var configurationModel = await _configuration.GetRawConfigurationAsync(fullKey);
 
         if (configurationModel is null)
         {
@@ -95,15 +95,23 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
+        await request.CheckAccessToProjectAsync(_access, organization, project);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
             return badRequestResult;
         }
 
+        var hasRightsForSecrets = request.TryCheckScope(Scopes.Configuration.Secrets);
+        if (!hasRightsForSecrets && request.TryCheckScope(Scopes.User.Impersonation))
+        {
+            var accountId = request.GetIdentityUniqueId();
+            var accessRole = await _access.GetAccountRoleAsync(accountId, $"{organization}.{project}");
+            hasRightsForSecrets = accessRole >= AccountRole.ContributorWithSecrets;
+        }
+
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        var configurationModel = await _configuration.GetConfigurationAsync(fullKey);
+        var configurationModel = await _configuration.GetResolvedConfigurationAsync(fullKey, hasRightsForSecrets);
 
         if (configurationModel is null)
         {
@@ -156,7 +164,6 @@ public class ConfigurationHttp
             _logger.LogError(e, "Error occurred while parsing input configuration.");
             return new BadRequestObjectResult(new ErrorResponse($"Invalid input configuration model: {e.Message}"));
         }
-
 
         var author = request.GetAuthor();
         var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author);
