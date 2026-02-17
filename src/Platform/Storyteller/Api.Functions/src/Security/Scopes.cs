@@ -23,5 +23,6 @@ public static class Scopes
     {
         public const string Read = "Configuration.Read";
         public const string Write = "Configuration.ReadWrite";
+        public const string Secrets = "Configuration.Secrets";
     }
 }

@@ -17,18 +17,23 @@ namespace _42.Platform.Storyteller
         Reader = 1,
 
         /// <summary>
-        /// Role of a contributor, able to read, create, modify and remove annotations.
+        /// Role of a contributor, able to read, create, modify, and remove annotations.
         /// </summary>
         Contributor = 2,
 
         /// <summary>
-        /// Role of an administrator, able to read, create, modify and remove annotations, as well as manage accessibility.
+        /// Role of a contributor with secrets, able to read, create, modify and remove annotations, as well as access secrets.
         /// </summary>
-        Administrator = 3,
+        ContributorWithSecrets = 3,
+
+        /// <summary>
+        /// Role of an administrator, able to read, create, modify and remove annotations, access secrets, as well as manage accessibility.
+        /// </summary>
+        Administrator = 4,
 
         /// <summary>
         /// Role of an owner, full control, can revoke ownership.
         /// </summary>
-        Owner = 4,
+        Owner = 5,
     }
 }

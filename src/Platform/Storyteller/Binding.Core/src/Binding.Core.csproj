@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <AssemblyName>42.Platform.Storyteller.Backend.Core</AssemblyName>
-    <RootNamespace>_42.Platform.Storyteller</RootNamespace>
+    <AssemblyName>42.Platform.Storyteller.Binding.Core</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller.Binding</RootNamespace>
 
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
@@ -11,8 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Abstractions.Access\src\Abstractions.Access.csproj" />
-    <ProjectReference Include="..\..\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\Binding.Abstractions\src\Binding.Abstractions.csproj" />
   </ItemGroup>
 

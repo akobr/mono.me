@@ -11,7 +11,7 @@ namespace _42.Platform.Storyteller;
 // TODO: [P2] add support of certificate for better security
 public class AzureAdMachineAccessService : IMachineAccessService
 {
-    private const int DefaultPasswordExpiracyInYears = 1000;
+    private const int DefaultPasswordExpirationYears = 1000;
 
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
@@ -99,7 +99,7 @@ public class AzureAdMachineAccessService : IMachineAccessService
                 PasswordCredential = new PasswordCredential
                 {
                     StartDateTime = DateTimeOffset.UtcNow,
-                    EndDateTime = DateTimeOffset.UtcNow.AddYears(DefaultPasswordExpiracyInYears),
+                    EndDateTime = DateTimeOffset.UtcNow.AddYears(DefaultPasswordExpirationYears),
                     DisplayName = "Default secret, never expires. (42.sform.generated)",
                 },
             });
@@ -146,7 +146,7 @@ public class AzureAdMachineAccessService : IMachineAccessService
                 PasswordCredential = new PasswordCredential
                 {
                     StartDateTime = DateTimeOffset.UtcNow,
-                    EndDateTime = DateTimeOffset.UtcNow.AddYears(DefaultPasswordExpiracyInYears),
+                    EndDateTime = DateTimeOffset.UtcNow.AddYears(DefaultPasswordExpirationYears),
                     DisplayName = "Default secret, never expires. (42.sform.generated)",
                 },
             });

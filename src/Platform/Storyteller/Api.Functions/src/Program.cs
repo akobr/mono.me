@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Api.ErrorHandling;
+using _42.Platform.Storyteller.Binding;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -28,7 +29,7 @@ var host = new HostBuilder()
         services.ConfigureFunctionsApplicationInsights();
 
         // This is required to make the default JSON serializer in Azure Functions to use the same settings as the one in ASP.NET Core
-        // Needed is you want to use IActionResult
+        // Needed if you want to use IActionResult
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
         {
             options.JsonSerializerOptions.PropertyNamingPolicy = new NoChangeNamingPolicy();
@@ -59,8 +60,18 @@ var host = new HostBuilder()
             });
         }
 
+        // Add persistant and logic layer
         services.AddCosmosDbAnnotations(context.Configuration);
+
+        // Add authentication by Azure Entra
         services.AddAzureAdMachineAccess();
+
+        // Add data-bindings for configurations
+        services
+            .AddConfigurationBindings()
+            .AddAzureKeyVaultBindings(
+                context.Configuration,
+                context.HostingEnvironment);
     })
     .Build();
 
