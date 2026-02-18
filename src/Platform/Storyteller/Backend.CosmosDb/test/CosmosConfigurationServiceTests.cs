@@ -364,5 +364,21 @@ public class CosmosConfigurationServiceTests(Startup startup)
 
         version3.Should().BeEmpty();
         currentConfiguration.Should().BeEmpty();
+
+        var diff1To3 = await configs.GetConfigurationVersionChangesAsync(key, 1, 3);
+        diff1To3.Count(line => line.StartsWith("- ")).Should().Be(5);
+        diff1To3.Count(line => line.StartsWith("+ ")).Should().Be(1);
+
+        var diff3To2 = await configs.GetConfigurationVersionChangesAsync(key, 3, 2);
+        diff3To2.Count(line => line.StartsWith("+ ")).Should().Be(12);
+        diff3To2.Count(line => line.StartsWith("- ")).Should().Be(1);
+
+        var diff2To1 = await configs.GetConfigurationDiffAsync(key, 2, 1);
+        diff2To1.Count(line => line.StartsWith("- ")).Should().Be(8);
+        diff2To1.Count(line => line.StartsWith("+ ")).Should().Be(1);
+
+        var diff3To0 = await configs.GetConfigurationDiffAsync(key, 3, 0);
+        diff3To0.Count(line => line.StartsWith("- ")).Should().Be(1);
+        diff3To0.Count(line => line.StartsWith("+ ")).Should().Be(0);
     }
 }

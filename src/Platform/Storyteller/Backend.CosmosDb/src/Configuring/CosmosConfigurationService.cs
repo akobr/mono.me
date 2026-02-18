@@ -169,39 +169,37 @@ public class CosmosConfigurationService : IConfigurationService
         return configEntity.Content;
     }
 
-    // TODO: [P2] put this into different library
-    public async Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint version)
+    public Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint version)
     {
-        var afterJson = await GetConfigurationVersionContentAsync(key, version);
+        return GetConfigurationVersionChangesAsync(key, version - 1, version);
+    }
 
-        if (afterJson is null)
+    // TODO: [P2] put this into different library
+    public async Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion)
+    {
+        var fromJson = fromVersion == 0
+            ? new JObject()
+            : await GetConfigurationVersionContentAsync(key, fromVersion);
+
+        if (fromJson is null && fromVersion != 0)
         {
-            var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
-            var id = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
-            var partitionKey = key.GetCosmosPartitionKey();
-            var configuration = await repository.Container.TryReadItemAsync(
-                id,
-                partitionKey,
-                stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
-
-            if (configuration is null
-                || configuration.Version != version)
-            {
-                throw new InvalidOperationException($"Unknown version {version} of the configuration for {key.Annotation}.");
-            }
-
-            afterJson = configuration.Content;
+            throw new InvalidOperationException($"Unknown version {fromVersion} of the configuration for {key.Annotation}.");
         }
 
-        var beforeJson = version <= 1
+        var toJson = toVersion == 0
             ? new JObject()
-            : await GetConfigurationVersionContentAsync(key, version - 1);
+            : await GetConfigurationVersionContentAsync(key, toVersion);
+
+        if (toJson is null && toVersion != 0)
+        {
+            throw new InvalidOperationException($"Unknown version {toVersion} of the configuration for {key.Annotation}.");
+        }
 
         var serializerSettings = _jsonSettingsProvider.GetSettings(JsonSettingNames.Unique);
-        var beforeText = version <= 1 ? string.Empty : JsonConvert.SerializeObject(beforeJson, Formatting.Indented, serializerSettings);
-        var afterText = JsonConvert.SerializeObject(afterJson, Formatting.Indented, serializerSettings);
+        var fromText = fromVersion == 0 ? string.Empty : JsonConvert.SerializeObject(fromJson, Formatting.Indented, serializerSettings);
+        var toText = toVersion == 0 ? string.Empty : JsonConvert.SerializeObject(toJson, Formatting.Indented, serializerSettings);
 
-        var diff = InlineDiffBuilder.Diff(beforeText, afterText);
+        var diff = InlineDiffBuilder.Diff(fromText, toText);
         var lines = new List<string>();
 
         foreach (var line in diff.Lines)
