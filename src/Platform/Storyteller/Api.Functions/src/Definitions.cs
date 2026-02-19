@@ -43,10 +43,11 @@ public static class Definitions
             {
                 public const string Configuration = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}";
                 public const string ConfigurationResolved = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/resolved";
+
                 public const string Versions = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions";
-                public const string Version = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Id}}}";
-                public const string VersionDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Id}}}/diff";
-                public const string VersionDiffCustom = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Id}}}/diff/{{{Parameters.DiffPreviousVersion}}}";
+                public const string Version = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}";
+                public const string VersionDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}/diff";
+                public const string VersionDiffCustom = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}/diff/{{{Parameters.VersionFrom}}}";
             }
         }
     }
@@ -97,6 +98,11 @@ public static class Definitions
             public const string GetResolvedConfiguration = nameof(GetResolvedConfiguration);
             public const string SetConfiguration = nameof(SetConfiguration);
             public const string DeleteConfiguration = nameof(DeleteConfiguration);
+
+            public const string GetConfigurationVersions = nameof(GetConfigurationVersions);
+            public const string GetConfigurationVersion = nameof(GetConfigurationVersion);
+            public const string GetConfigurationVersionDiff = nameof(GetConfigurationVersionDiff);
+            public const string GetConfigurationVersionDiffCustom = nameof(GetConfigurationVersionDiffCustom);
         }
     }
 
@@ -110,7 +116,8 @@ public static class Definitions
         public const string NameQuery = "nameQuery";
         public const string ContinuationToken = "continuationToken";
         public const string Descendants = "descendants";
-        public const string DiffPreviousVersion = "idFrom";
+        public const string Version = "version";
+        public const string VersionFrom = "versionFrom";
     }
 
     public static class Tags
