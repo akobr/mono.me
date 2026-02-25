@@ -30,6 +30,7 @@ public class AzureAdMachineAccessService : IMachineAccessService
         }
 
         var clientId = Environment.GetEnvironmentVariable("Auth:ClientId");
+        string roleId;
 
         // TODO: [P2] Make support for all roles and make it configurable in easier way
         switch (model.Scope)
@@ -38,7 +39,7 @@ public class AzureAdMachineAccessService : IMachineAccessService
             case MachineAccessScope.AnnotationReadWrite:
             case MachineAccessScope.ConfigurationReadWrite:
             {
-                var roleId = Environment.GetEnvironmentVariable("Auth:AppRoles:DefaultReadWrite")
+                roleId = Environment.GetEnvironmentVariable("Auth:AppRoles:DefaultReadWrite")
                              ?? throw new InvalidOperationException("Missing Auth:AppRoles:DefaultReadWrite environment variable.");
 
                 application.RequiredResourceAccess = new List<RequiredResourceAccess>
@@ -60,7 +61,7 @@ public class AzureAdMachineAccessService : IMachineAccessService
             // case MachineAccessScope.ConfigurationRead:
             default:
             {
-                var roleId = Environment.GetEnvironmentVariable("Auth:AppRoles:DefaultRead")
+                roleId = Environment.GetEnvironmentVariable("Auth:AppRoles:DefaultRead")
                              ?? throw new InvalidOperationException("Missing Auth:AppRoles:DefaultReadWrite environment variable.");
 
                 application.RequiredResourceAccess = new List<RequiredResourceAccess>
@@ -107,6 +108,32 @@ public class AzureAdMachineAccessService : IMachineAccessService
         if (createdSecret?.SecretText is null)
         {
             throw new InvalidOperationException("The machine registration in Azure AD failed.");
+        }
+
+        // Grant admin consent programmatically (service principal
+        var servicePrincipal = new ServicePrincipal
+        {
+            AppId = appId,
+        };
+        var createdSp = await client.ServicePrincipals.PostAsync(servicePrincipal);
+
+        var resourceSpList = await client.ServicePrincipals
+            .GetAsync(requestConfiguration =>
+            {
+                requestConfiguration.QueryParameters.Filter = $"appId eq '{clientId}'";
+            });
+        var resourceSp = resourceSpList?.Value?.FirstOrDefault();
+
+        if (resourceSp?.Id is not null && createdSp?.Id is not null)
+        {
+            var appRoleAssignment = new AppRoleAssignment
+            {
+                PrincipalId = Guid.Parse(createdSp.Id),
+                ResourceId = Guid.Parse(resourceSp.Id),
+                AppRoleId = Guid.Parse(roleId),
+            };
+
+            await client.ServicePrincipals[createdSp.Id].AppRoleAssignments.PostAsync(appRoleAssignment);
         }
 
         return new MachineAccess

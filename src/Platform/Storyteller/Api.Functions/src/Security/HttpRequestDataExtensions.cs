@@ -73,12 +73,6 @@ public static class HttpRequestDataExtensions
             .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
             .ToHashSet();
 
-        // TODO: [P1] hot fix for un-approved admin consents in programmatically generated machine accesses (Azure app registrations)
-        if (allScopes.Count < 1 && @this.IsApplicationIdentity())
-        {
-            allScopes.Add("Default.Read");
-        }
-
         if (scopes.All(scope => !allScopes.Contains(scope)))
         {
             // TODO: [P2] remove details from the exception message
