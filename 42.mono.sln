@@ -124,6 +124,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Binding.Azure.KeyVault", "s
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Binding.Core", "src\Platform\Storyteller\Binding.Core\src\Binding.Core.csproj", "{66855D09-DF82-4D1A-B2CF-BD9121638131}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backend.Keycloak", "src\Platform\Storyteller\Backend.Keycloak\src\Backend.Keycloak.csproj", "{8D700700-8236-41B0-99D6-8A61E0ED14C6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -294,6 +296,10 @@ Global
 		{66855D09-DF82-4D1A-B2CF-BD9121638131}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{66855D09-DF82-4D1A-B2CF-BD9121638131}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{66855D09-DF82-4D1A-B2CF-BD9121638131}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8D700700-8236-41B0-99D6-8A61E0ED14C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8D700700-8236-41B0-99D6-8A61E0ED14C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8D700700-8236-41B0-99D6-8A61E0ED14C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8D700700-8236-41B0-99D6-8A61E0ED14C6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -349,6 +355,7 @@ Global
 		{9A74C610-5356-4E24-97B0-E6AC708D3092} = {1F8DA45A-60A4-41DA-B1F9-55EA8DC3BC19}
 		{18CF74A7-4EFE-4496-919B-740E2A790281} = {1F8DA45A-60A4-41DA-B1F9-55EA8DC3BC19}
 		{66855D09-DF82-4D1A-B2CF-BD9121638131} = {1F8DA45A-60A4-41DA-B1F9-55EA8DC3BC19}
+		{8D700700-8236-41B0-99D6-8A61E0ED14C6} = {1F8DA45A-60A4-41DA-B1F9-55EA8DC3BC19}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F82BF58F-3E50-4150-BD21-CA489E5CCF93}
