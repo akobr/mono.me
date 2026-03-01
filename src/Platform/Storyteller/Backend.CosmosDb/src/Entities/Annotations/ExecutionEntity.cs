@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace _42.Platform.Storyteller.Entities.Annotations;
 
 public record class ExecutionEntity : AnnotationEntity
@@ -13,4 +15,6 @@ public record class ExecutionEntity : AnnotationEntity
     public required string ResponsibilityName { get; init; }
 
     public required string ContextName { get; init; }
+
+    public required IReadOnlyCollection<string> Units { get; init; }
 }

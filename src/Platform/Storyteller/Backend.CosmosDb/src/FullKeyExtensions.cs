@@ -6,7 +6,7 @@ public static class FullKeyExtensions
 {
     public static string GetPartitionKey(this FullKey @this)
     {
-        return GetPartitionKey(@this, @this.Annotation);
+        return @this.GetPartitionKey(@this.Annotation);
     }
 
     public static string GetPartitionKey(this FullKey @this, AnnotationKey annotationKey)
@@ -18,12 +18,12 @@ public static class FullKeyExtensions
 
     public static PartitionKey GetCosmosPartitionKey(this FullKey @this)
     {
-        return new PartitionKey(GetPartitionKey(@this));
+        return new PartitionKey(@this.GetPartitionKey());
     }
 
     public static string GetCosmosItemId(this FullKey @this)
     {
-        return GetCosmosItemId(@this, @this.Annotation);
+        return @this.GetCosmosItemId(@this.Annotation);
     }
 
     public static string GetCosmosItemId(this FullKey @this, AnnotationKey annotationKey)

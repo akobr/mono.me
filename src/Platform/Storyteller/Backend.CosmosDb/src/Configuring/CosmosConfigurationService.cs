@@ -237,7 +237,7 @@ public class CosmosConfigurationService : IConfigurationService
 
         if (existingConfiguration is null)
         {
-            // create new configuration if there is nothing yet
+            // create a new configuration if there is nothing yet
             value.RemoveRequested();
 
             var maxVersionResponse = await repository.Container.GetItemLinqQueryable<ConfigurationHistoryEntity>(
@@ -304,11 +304,13 @@ public class CosmosConfigurationService : IConfigurationService
         // invalidate all ancestor configurations
         await InvalidateConfigurationsAsync(key, repository);
 
-        // save new version of the configuration
+        // save a new version of the configuration
         var newConfiguration = existingConfiguration with
         {
             Version = existingConfiguration.Version + 1,
             Content = newContent,
+            CalculatedContent = null,
+            CalculatedContentHash = null,
         };
         await repository.Container.UpsertItemAsync(newConfiguration, partitionKey);
 
@@ -373,21 +375,29 @@ public class CosmosConfigurationService : IConfigurationService
 
         switch (key.Annotation.Type)
         {
-            case AnnotationType.Execution:
-            {
-                await ForceDeleteConfigurationAsync(key, repository);
-                return;
-            }
-
             case AnnotationType.Responsibility:
             {
+                // delete all units, usages, executions, unit-of-executions, and the responsibility (one responsibility partition)
+                // delete all configuration in one responsibility partition
                 await DeleteConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Usage}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}.")
+                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}."),
+                    key.GetCosmosPartitionKey());
+                return;
+            }
+
+            case AnnotationType.Unit:
+            {
+                // delete all unit-of-executions, and the unit (one responsibility partition)
+                await DeleteConfigurationsAsync(
+                    repository,
+                    config =>
+                        config.ProjectName == key.ProjectName
+                        && config.ViewName == key.ViewName
+                        && ((config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.") && config.Id.EndsWith($".{key.Annotation.UnitName}"))
                             || config.Id == key.Annotation.ToString()),
                     key.GetCosmosPartitionKey());
                 return;
@@ -395,12 +405,14 @@ public class CosmosConfigurationService : IConfigurationService
 
             case AnnotationType.Usage:
             {
+                // delete all executions, unit-of-executions, and the usage (one responsibility partition)
                 await DeleteConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}.")
+                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
+                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.")
                             || config.Id == key.Annotation.ToString()),
                     key.GetCosmosPartitionKey());
                 return;
@@ -408,20 +420,24 @@ public class CosmosConfigurationService : IConfigurationService
 
             case AnnotationType.Subject:
             {
+                // delete all usages, contexts, executions, unit-of-executions, and the subject
+                // delete the configurations in the responsibility partitions
                 await DeleteConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
                         && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Usage}.{key.Annotation.SubjectName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")));
+                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
+                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.")));
 
+                // delete the configurations in the subject partition
                 await DeleteConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Context}.{key.Annotation.SubjectName}.")
+                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Context}.")
                             || config.Id == key.Annotation.ToString()),
                     key.GetCosmosPartitionKey());
                 return;
@@ -429,18 +445,41 @@ public class CosmosConfigurationService : IConfigurationService
 
             case AnnotationType.Context:
             {
+                // delete all executions, unit-of-executions, and the context
+                // delete the configurations in the responsibility partitions
                 await DeleteConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
-                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
-                        && config.Id.EndsWith($".{key.Annotation.ContextName}"));
+                        && ((config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.") && config.Id.EndsWith($".{key.Annotation.ContextName}"))
+                            || (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.") && config.Id.Contains($".{key.Annotation.ContextName}."))));
+                // delete the context (in subject partition)
                 await ForceDeleteConfigurationAsync(key, repository);
                 return;
             }
 
-            case AnnotationType.Unit:
+            case AnnotationType.Execution:
+            {
+                // delete all unit-of-executions and the execution (one responsibility partition)
+                await DeleteConfigurationsAsync(
+                    repository,
+                    config =>
+                        config.ProjectName == key.ProjectName
+                        && config.ViewName == key.ViewName
+                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}.{key.Annotation.ContextName}.")
+                            || config.Id == key.Annotation.ToString()),
+                    key.GetCosmosPartitionKey());
+                return;
+            }
+
+            case AnnotationType.UnitOfExecution:
+            {
+                // delete only the unit-of-execution (it is the deepest configuration)
+                await ForceDeleteConfigurationAsync(key, repository);
+                return;
+            }
+
             default:
             {
                 throw new ArgumentOutOfRangeException(nameof(key.Annotation.Type));
@@ -530,12 +569,27 @@ public class CosmosConfigurationService : IConfigurationService
     private async Task<JObject?> CalculateAndCacheConfigurationAsync(InheritanceGraphNode node, IContainerRepository repository)
     {
         var key = node.Key;
+        var partitionKeyValue = key.GetPartitionKey();
+        var partitionKey = new PartitionKey(partitionKeyValue);
+        var annotationKeyString = key.Annotation.ToString();
+        var configEntryId = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKeyString}";
+        var configEntry = await repository.Container.TryReadItemAsync(
+            configEntryId,
+            partitionKey,
+            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        // If the configuration is already calculated, return it directly (cached in DB)
+        if (configEntry.CalculatedContent is not null)
+        {
+            return configEntry.CalculatedContent;
+        }
+
         var config = new JObject();
 
-        // Fill auto-generated properties (if any)
+        // Fill auto-generated properties (if any) [not implemented yet]
         await TryAutogeneratePropertiesAsync(config, key, repository);
 
-        // Inherit parent configuration (responsibility <|- unit <|- subject <|- usage <|- instance <|- execution) as graph
+        // Inherit parent configurations (responsibility <|- unit <|- subject <|- usage <|- context <|- execution <|- unit-of-execution) as graph
         foreach (var ancestorNode in node.GetAncestors())
         {
             var parentConfig = await CalculateAndCacheConfigurationAsync(ancestorNode, repository);
@@ -546,13 +600,6 @@ public class CosmosConfigurationService : IConfigurationService
         }
 
         // The most specific configuration has precedence, is merged last
-        var partitionKeyValue = key.GetPartitionKey();
-        var partitionKey = new PartitionKey(partitionKeyValue);
-        var configEntryId = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
-        var configEntry = await repository.Container.TryReadItemAsync(
-            configEntryId,
-            partitionKey,
-            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
         var exist = configEntry is not null;
 
         if (exist)
@@ -565,7 +612,7 @@ public class CosmosConfigurationService : IConfigurationService
                 configEntry = configEntry with
                 {
                     CalculatedContent = config,
-                    CalculatedContentHash = $"{hash:D}",
+                    CalculatedContentHash = $"{hash:x8}",
                 };
                 await repository.Container.UpsertItemAsync(configEntry, partitionKey);
             }
@@ -573,21 +620,19 @@ public class CosmosConfigurationService : IConfigurationService
         else if (config.HasValues)
         {
             var hash = config.CalculateMurmurHash32Bits(_jsonSettingsProvider.GetSettings(JsonSettingNames.Unique));
-            var annotationKey = key.Annotation.ToString();
-            var configId = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKey}";
             await repository.Container.CreateItemAsync(
                 new ConfigurationEntity
                 {
-                    Id = configId,
+                    Id = configEntryId,
                     PartitionKey = partitionKeyValue,
-                    AnnotationKey = annotationKey,
+                    AnnotationKey = annotationKeyString,
                     IsServerSubstitutionDisabled = false,
                     Name = key.Annotation.Name,
                     ProjectName = key.ProjectName,
                     ViewName = key.ViewName,
                     Content = new JObject(),
                     CalculatedContent = config,
-                    CalculatedContentHash = $"{hash:D}",
+                    CalculatedContentHash = $"{hash:x8}",
                     Author = "system",
                 },
                 partitionKey);
@@ -600,67 +645,103 @@ public class CosmosConfigurationService : IConfigurationService
     {
         switch (key.Annotation.Type)
         {
-            case AnnotationType.Execution:
-                break; // nothing to do execution is the lower configuration (not after units)
-
             case AnnotationType.Responsibility:
             {
+                // invalidate all units, usages, executions, and unit-of-executions (one responsibility partition)
+                // invalidate all configuration in one responsibility partition
                 await InvalidateConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Usage}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}.")),
+                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}."),
                     key.GetCosmosPartitionKey());
                 break;
             }
 
-            case AnnotationType.Usage:
+            case AnnotationType.Unit:
             {
+                // invalidate all unit-of-executions (one responsibility partition)
                 await InvalidateConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
-                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}."),
+                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.") && config.Id.EndsWith($".{key.Annotation.UnitName}")),
+                    key.GetCosmosPartitionKey());
+                return;
+            }
+
+            case AnnotationType.Usage:
+            {
+                // invalidate all executions, unit-of-executions (one responsibility partition)
+                await InvalidateConfigurationsAsync(
+                    repository,
+                    config =>
+                        config.ProjectName == key.ProjectName
+                        && config.ViewName == key.ViewName
+                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
+                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.")),
                     key.GetCosmosPartitionKey());
                 break;
             }
 
             case AnnotationType.Subject:
             {
+                // invalidate all usages, contexts, executions, unit-of-executions
+                // invalidate the context configurations in the subject partitions
                 await InvalidateConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
-                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Context}.{key.Annotation.SubjectName}."),
+                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Context}."),
                     key.GetCosmosPartitionKey());
 
+                // invalidate usages, executions, unit-of-executions in the responsibility partitions
                 await InvalidateConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
                         && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Usage}.{key.Annotation.SubjectName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")));
+                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
+                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.")));
                 break;
             }
 
             case AnnotationType.Context:
             {
+                // invalidate executions, and unit-of-executions configurations in the responsibility partitions
                 await InvalidateConfigurationsAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
                         && config.ViewName == key.ViewName
-                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
-                        && config.Id.EndsWith($".{key.Annotation.ContextName}"));
+                        && ((config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.") && config.Id.EndsWith($".{key.Annotation.ContextName}"))
+                            || (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.") && config.Id.Contains($".{key.Annotation.ContextName}."))));
                 break;
             }
 
-            case AnnotationType.Unit:
+            case AnnotationType.Execution:
+            {
+                // invalidate unit-of-executions (one responsibility partition)
+                await InvalidateConfigurationsAsync(
+                    repository,
+                    config =>
+                        config.ProjectName == key.ProjectName
+                        && config.ViewName == key.ViewName
+                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}.{key.Annotation.ContextName}."),
+                    key.GetCosmosPartitionKey());
+                return;
+            }
+
+            case AnnotationType.UnitOfExecution:
+            {
+                // nothing to invalidate (it is the deepest configuration)
+                return;
+            }
+
             default:
             {
                 throw new ArgumentOutOfRangeException(nameof(key.Annotation.Type));
@@ -923,27 +1004,50 @@ public class CosmosConfigurationService : IConfigurationService
         {
             case AnnotationType.Responsibility:
             case AnnotationType.Subject:
+                // top notes
                 break;
 
             case AnnotationType.Unit:
+            {
                 targetNode.CreateAncestor(FullKey.Create(annotationKey.GetResponsibilityKey(), key));
                 break;
+            }
 
             case AnnotationType.Usage:
+            {
                 targetNode.CreateAncestor(FullKey.Create(annotationKey.GetResponsibilityKey(), key));
                 targetNode.CreateAncestor(FullKey.Create(annotationKey.GetSubjectKey(), key));
                 break;
+            }
 
             case AnnotationType.Context:
+            {
                 targetNode.CreateAncestor(FullKey.Create(annotationKey.GetSubjectKey(), key));
                 break;
+            }
 
             case AnnotationType.Execution:
-                var responsibilityNode = targetNode.CreateAncestor(FullKey.Create(annotationKey.GetResponsibilityKey(), key));
-                responsibilityNode.SetDescendant(FullKey.Create(annotationKey.GetUsageKey(), key));
-                var subjectNode = targetNode.CreateAncestor(FullKey.Create(annotationKey.GetSubjectKey(), key));
-                subjectNode.SetDescendant(FullKey.Create(annotationKey.GetContextKey(), key));
+            {
+                var usageNode = targetNode.CreateAncestor(FullKey.Create(annotationKey.GetUsageKey(), key));
+                usageNode.CreateAncestor(FullKey.Create(annotationKey.GetResponsibilityKey(), key));
+                var subjectNode = usageNode.CreateAncestor(FullKey.Create(annotationKey.GetSubjectKey(), key));
+                var contextNode = targetNode.CreateAncestor(FullKey.Create(annotationKey.GetContextKey(), key));
+                contextNode.AddAncestor(subjectNode);
                 break;
+            }
+
+            case AnnotationType.UnitOfExecution:
+            {
+                var executionNode = targetNode.CreateAncestor(FullKey.Create(annotationKey.GetExecutionKey(), key));
+                var unitNode = targetNode.CreateAncestor(FullKey.Create(annotationKey.GetUnitKey(), key));
+                var usageNode = executionNode.CreateAncestor(FullKey.Create(annotationKey.GetUsageKey(), key));
+                var responsibilityNode = usageNode.CreateAncestor(FullKey.Create(annotationKey.GetResponsibilityKey(), key));
+                var subjectNode = usageNode.CreateAncestor(FullKey.Create(annotationKey.GetSubjectKey(), key));
+                var contextNode = executionNode.CreateAncestor(FullKey.Create(annotationKey.GetContextKey(), key));
+                contextNode.AddAncestor(subjectNode);
+                unitNode.AddAncestor(responsibilityNode);
+                break;
+            }
 
             default:
                 throw new InvalidOperationException("Configuration of an unknown annotation type.");

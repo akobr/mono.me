@@ -9,6 +9,7 @@ public static class Create
 {
     public static ResponsibilityEntity Responsibility(
         string responsibilityName,
+        IEnumerable<string>? unitNames = null,
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
@@ -21,13 +22,14 @@ public static class Create
             AnnotationType = AnnotationType.Responsibility,
             AnnotationKey = $"{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
             Name = responsibilityName,
+            Units = unitNames?.ToList() ?? [],
         };
     }
 
     public static SubjectEntity Subject(
         string subjectName,
-        IEnumerable<string> responsibilityNames,
-        IEnumerable<string> contextNames,
+        IEnumerable<string>? responsibilityNames = null,
+        IEnumerable<string>? contextNames = null,
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
@@ -40,15 +42,15 @@ public static class Create
             AnnotationType = AnnotationType.Subject,
             AnnotationKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             Name = subjectName,
-            Usages = responsibilityNames.ToList(),
-            Contexts = contextNames.ToList(),
+            Usages = responsibilityNames?.ToList() ?? [],
+            Contexts = contextNames?.ToList() ?? [],
         };
     }
 
     public static ContextEntity Context(
         string subjectName,
         string contextName,
-        IEnumerable<string> responsibilityNames,
+        IEnumerable<string>? responsibilityNames = null,
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
@@ -63,14 +65,14 @@ public static class Create
             Name = contextName,
             SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             SubjectName = subjectName,
-            Executions = responsibilityNames.ToList(),
+            Executions = responsibilityNames?.ToList() ?? [],
         };
     }
 
     public static UsageEntity Usage(
         string subjectName,
         string responsibilityName,
-        IEnumerable<string> contextNames,
+        IEnumerable<string>? contextNames = null,
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
@@ -87,7 +89,7 @@ public static class Create
             SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             ResponsibilityName = responsibilityName,
             SubjectName = subjectName,
-            Executions = contextNames.ToList(),
+            Executions = contextNames?.ToList() ?? [],
         };
     }
 
@@ -95,6 +97,7 @@ public static class Create
         string subjectName,
         string responsibilityName,
         string contextName,
+        IEnumerable<string>? unitNames = null,
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
@@ -113,6 +116,7 @@ public static class Create
             ResponsibilityName = responsibilityName,
             SubjectName = subjectName,
             ContextName = contextName,
+            Units = unitNames?.ToList() ?? [],
         };
     }
 
@@ -140,8 +144,8 @@ public static class Create
         string userId,
         string projectName = Constants.DefaultProjectName)
     {
-        return new[]
-        {
+        return
+        [
             new AccessPointEntity
             {
                 Key = organizationName,
@@ -157,7 +161,7 @@ public static class Create
                 {
                     { userId, AccountRole.Owner },
                 },
-            },
-        };
+            }
+        ];
     }
 }

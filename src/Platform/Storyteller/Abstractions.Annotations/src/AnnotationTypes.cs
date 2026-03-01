@@ -24,6 +24,7 @@ public static class AnnotationTypes
             AnnotationType.Context => typeof(Context),
             AnnotationType.Execution => typeof(Execution),
             AnnotationType.Unit => typeof(Unit),
+            AnnotationType.UnitOfExecution => typeof(UnitOfExecution),
             _ => throw new ArgumentOutOfRangeException(nameof(type)),
         };
     }
@@ -38,6 +39,7 @@ public static class AnnotationTypes
             { } when runtimeType == typeof(Context) => AnnotationType.Context,
             { } when runtimeType == typeof(Execution) => AnnotationType.Execution,
             { } when runtimeType == typeof(Unit) => AnnotationType.Unit,
+            { } when runtimeType == typeof(UnitOfExecution) => AnnotationType.UnitOfExecution,
             _ => throw new ArgumentOutOfRangeException(nameof(runtimeType), runtimeType, null),
         };
     }

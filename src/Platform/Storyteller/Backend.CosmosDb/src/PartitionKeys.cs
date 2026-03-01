@@ -25,6 +25,7 @@ public static class PartitionKeys
             ISubject subject => GetSubject(subject.ProjectName, subject.Name),
             IContext context => GetSubject(context.ProjectName, context.SubjectName),
             IUnit unit => GetResponsibility(unit.ProjectName, unit.ResponsibilityName),
+            IUnitOfExecution unitOfExecution => GetResponsibility(unitOfExecution.ProjectName, unitOfExecution.ResponsibilityName),
             _ => throw new NotSupportedException($"Unknown annotation type: {annotation.GetType().Name}"),
         };
     }

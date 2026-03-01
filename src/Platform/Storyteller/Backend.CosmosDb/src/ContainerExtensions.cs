@@ -60,12 +60,29 @@ public static class ContainerExtensions
             @params);
     }
 
-    public static Task DeleteUsageAndExecutionsAsync(this Container @this, string usageId, string executionIdPrefix, PartitionKey partitionKey)
+    public static async Task DeleteUsageAndExecutionsAsync(this Container @this, string usageId, string executionIdPrefix, string unitOfExecutionIdPrefix, PartitionKey partitionKey)
     {
-        var @params = new dynamic[] { usageId, executionIdPrefix };
-        return @this.Scripts.ExecuteStoredProcedureAsync<string>(
-            CosmosStoredProcedureNames.DeleteUsageAndExecutions,
-            partitionKey,
-            @params);
+        var @params = new dynamic[] { usageId, executionIdPrefix, unitOfExecutionIdPrefix };
+        var finished = false;
+
+        while (!finished)
+        {
+            var response = await @this.Scripts.ExecuteStoredProcedureAsync<DeleteResponse>(
+                CosmosStoredProcedureNames.DeleteUsageAndExecutions,
+                partitionKey,
+                @params);
+
+            finished = response.Resource.Finished;
+
+            // Optional: Add a small delay if needed, though usually not necessary for SP continuations
+            // if (!finished) await Task.Delay(10);
+        }
+    }
+
+    private class DeleteResponse
+    {
+        public bool Finished { get; set; }
+
+        public int Count { get; set; }
     }
 }

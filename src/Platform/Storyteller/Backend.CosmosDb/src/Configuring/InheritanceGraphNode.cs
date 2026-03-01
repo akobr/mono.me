@@ -14,6 +14,7 @@ public class InheritanceGraphNode
 
     public FullKey Key { get; }
 
+    // TODO: [P3] why a descendant is needed (looks like the tree is traversed only from bottom up)
     internal InheritanceGraphNode? Descendant { get; private set; }
 
     public IEnumerable<InheritanceGraphNode> GetAncestors()
@@ -36,7 +37,7 @@ public class InheritanceGraphNode
         Descendant = descendant;
     }
 
-    private void AddAncestor(InheritanceGraphNode ancestor)
+    public void AddAncestor(InheritanceGraphNode ancestor)
     {
         _ancestors.Add(ancestor);
     }

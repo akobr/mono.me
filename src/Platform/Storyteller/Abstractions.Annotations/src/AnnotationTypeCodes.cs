@@ -22,5 +22,6 @@ public static class AnnotationTypeCodes
             { Context, AnnotationType.Context },
             { Execution, AnnotationType.Execution },
             { Unit, AnnotationType.Unit },
+            { UnitOfExecution, AnnotationType.UnitOfExecution },
         };
 }
