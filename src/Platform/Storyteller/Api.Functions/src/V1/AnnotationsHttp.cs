@@ -69,6 +69,8 @@ public class AnnotationsHttp
                 AnnotationType.Usage,
                 AnnotationType.Context,
                 AnnotationType.Execution,
+                AnnotationType.Unit,
+                AnnotationType.UnitOfExecution,
             },
             ContinuationToken = continuationToken,
             Organization = organization,
@@ -129,7 +131,7 @@ public class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
-    [OpenApiParameter(Definitions.Parameters.Descendants, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The type of descendants to retrieve, possible value is: usages, contexts, executions, or all.")]
+    [OpenApiParameter(Definitions.Parameters.Descendants, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The type of descendants to retrieve, possible value is: usages, contexts, executions, units, unit-of-executions, or all.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of descendant annotations.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
@@ -156,22 +158,48 @@ public class AnnotationsHttp
         switch (annotationKey.Type)
         {
             case AnnotationType.Responsibility:
-            case AnnotationType.Subject:
+            {
+                if (descendants == "contexts")
+                {
+                    return new BadRequestObjectResult(new ErrorResponse("A responsibility has no contexts as descendants."));
+                }
+
                 break;
+            }
+
+            case AnnotationType.Subject:
+            {
+                if (descendants == "units")
+                {
+                    return new BadRequestObjectResult(new ErrorResponse("A subject has no units as descendants."));
+                }
+
+                break;
+            }
 
             case AnnotationType.Usage:
             case AnnotationType.Context:
             {
-                if (descendants != "executions" && descendants != "all")
+                if (descendants != "executions" && descendants != "units-of-executions" && descendants != "all")
                 {
-                    return new BadRequestObjectResult(new ErrorResponse("An usage has only executions as descendants."));
+                    return new BadRequestObjectResult(new ErrorResponse("An usage has only executions or units-of-executions as descendants."));
                 }
 
                 break;
             }
 
             case AnnotationType.Execution:
-                return new BadRequestObjectResult(new ErrorResponse("An execution has no descendants."));
+            {
+                if (descendants != "units-of-executions" && descendants != "all")
+                {
+                    return new BadRequestObjectResult(new ErrorResponse("An execution has only units-of-executions as descendants."));
+                }
+
+                break;
+            }
+
+            case AnnotationType.UnitOfExecution:
+                return new BadRequestObjectResult(new ErrorResponse("An unit of execution has no descendants."));
 
             default:
                 return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {key}"));
@@ -188,27 +216,36 @@ public class AnnotationsHttp
         switch (descendants)
         {
             case "usages":
-                dataRequest.Types = new[] { AnnotationType.Usage };
+                dataRequest.Types = [AnnotationType.Usage];
                 break;
 
             case "contexts":
-                dataRequest.Types = new[] { AnnotationType.Context };
+                dataRequest.Types = [AnnotationType.Context];
                 break;
 
             case "executions":
-                dataRequest.Types = new[] { AnnotationType.Execution };
+                dataRequest.Types = [AnnotationType.Execution];
+                break;
+
+            case "units":
+                dataRequest.Types = [AnnotationType.Unit];
+                break;
+
+            case "unit-of-executions":
+                dataRequest.Types = [AnnotationType.UnitOfExecution];
                 break;
 
             case "all":
-                dataRequest.Types = new[]
-                {
+                dataRequest.Types =
+                [
                     AnnotationType.Usage,
                     AnnotationType.Execution,
-                };
+                    AnnotationType.UnitOfExecution
+                ];
                 break;
 
             default:
-                return new BadRequestObjectResult(new ErrorResponse("Invalid type of descendants, allowed types are: usages, contexts, executions, or all."));
+                return new BadRequestObjectResult(new ErrorResponse("Invalid type of descendants, allowed types are: usages, contexts, executions, units, unit-of-executions, or all."));
         }
 
         switch (annotationKey.Type)
@@ -216,22 +253,22 @@ public class AnnotationsHttp
             case AnnotationType.Responsibility:
             {
                 dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
-                dataRequest.Conditions = new AnnotationsRequest.ICondition[]
-                {
+                dataRequest.Conditions =
+                [
                     new AnnotationsRequest.Condition<Usage> { Predicate = u => u.ResponsibilityKey == key, },
-                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.ResponsibilityKey == key, },
-                };
+                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.ResponsibilityKey == key, }
+                ];
                 break;
             }
 
             case AnnotationType.Subject:
             {
-                dataRequest.Conditions = new AnnotationsRequest.ICondition[]
-                {
+                dataRequest.Conditions =
+                [
                     new AnnotationsRequest.Condition<Usage> { Predicate = u => u.SubjectKey == key, },
                     new AnnotationsRequest.Condition<Context> { Predicate = c => c.SubjectKey == key, },
-                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.SubjectKey == key, },
-                };
+                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.SubjectKey == key, }
+                ];
                 break;
             }
 
@@ -241,13 +278,13 @@ public class AnnotationsHttp
                 string subjectKey = annotationKey.GetSubjectKey();
                 string responsibilityKey = annotationKey.GetResponsibilityKey();
 
-                dataRequest.Conditions = new AnnotationsRequest.ICondition[]
-                {
+                dataRequest.Conditions =
+                [
                     new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.ResponsibilityKey == responsibilityKey && e.SubjectKey == subjectKey,
-                    },
-                };
+                    }
+                ];
                 break;
             }
 
@@ -255,13 +292,13 @@ public class AnnotationsHttp
             {
                 string subjectKey = annotationKey.GetSubjectKey();
 
-                dataRequest.Conditions = new AnnotationsRequest.ICondition[]
-                {
+                dataRequest.Conditions =
+                [
                     new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.SubjectKey == subjectKey && e.ContextKey == key,
-                    },
-                };
+                    }
+                ];
                 break;
             }
 

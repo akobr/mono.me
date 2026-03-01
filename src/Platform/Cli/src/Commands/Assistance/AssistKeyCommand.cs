@@ -36,6 +36,7 @@ public class AssistKeyCommand : BaseCommand
                 AnnotationType.Usage,
                 AnnotationType.Context,
                 AnnotationType.Execution,
+                AnnotationType.UnitOfExecution,
             },
             DefaultValue = AnnotationType.Responsibility,
             TextSelector = item => $"{item:G}",
@@ -55,8 +56,8 @@ public class AssistKeyCommand : BaseCommand
             case AnnotationType.Unit:
             {
                 var responsibilityName = GetName("responsibility", "my-application");
-                var jobName = GetName("job", "unique-work");
-                key = AnnotationKey.CreateJob(responsibilityName, jobName);
+                var unitName = GetName("job", "unique-work");
+                key = AnnotationKey.CreateUnit(responsibilityName, unitName);
                 break;
             }
 
@@ -89,6 +90,16 @@ public class AssistKeyCommand : BaseCommand
                 var responsibilityName = GetName("responsibility", "service");
                 var contextName = GetName("context", "variant");
                 key = AnnotationKey.CreateExecution(subjectName, responsibilityName, contextName);
+                break;
+            }
+
+            case AnnotationType.UnitOfExecution:
+            {
+                var subjectName = GetName("subject", "customer");
+                var responsibilityName = GetName("responsibility", "service");
+                var contextName = GetName("context", "variant");
+                var unitName = GetName("unit", "job");
+                key = AnnotationKey.CreateUnitOfExecution(subjectName, responsibilityName, contextName, unitName);
                 break;
             }
         }

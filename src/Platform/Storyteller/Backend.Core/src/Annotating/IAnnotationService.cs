@@ -10,7 +10,7 @@ public interface IAnnotationService
 
     Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request);
 
-    Task CreateAnnotationAsync(string organization, Annotation annotation);
+    Task<IEnumerable<Annotation>> CreateAnnotationAsync(string organization, Annotation annotation);
 
     Task UpdateAnnotationAsync(string organization, Annotation annotation);
 

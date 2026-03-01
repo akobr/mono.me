@@ -33,7 +33,7 @@ public class AnnotationKey
         Type switch
         {
             AnnotationType.Responsibility or AnnotationType.Unit => _segments[1],
-            AnnotationType.Usage or AnnotationType.Execution => _segments[2],
+            AnnotationType.Usage or AnnotationType.Execution or AnnotationType.UnitOfExecution => _segments[2],
             _ => string.Empty,
         };
 
@@ -41,14 +41,17 @@ public class AnnotationKey
         Type switch
         {
             AnnotationType.Context => _segments[2],
-            AnnotationType.Execution => _segments[3],
+            AnnotationType.Execution or AnnotationType.UnitOfExecution => _segments[3],
             _ => string.Empty,
         };
 
-    public string JobName =>
-        Type == AnnotationType.Unit
-            ? _segments[2]
-            : string.Empty;
+    public string UnitName =>
+        Type switch
+        {
+            AnnotationType.Unit => _segments[2],
+            AnnotationType.UnitOfExecution => _segments[4],
+            _ => string.Empty,
+        };
 
     public string Name => _segments[^1];
 
@@ -74,7 +77,7 @@ public class AnnotationKey
 
         var segments = text.Split(Constants.KeySeparators, StringSplitOptions.RemoveEmptyEntries);
 
-        if (segments.Length is < 2 or > 4
+        if (segments.Length is < 2 or > 5
             || !AnnotationTypeCodes.ValidCodes.ContainsKey(segments[0]))
         {
             key = null;
@@ -95,7 +98,7 @@ public class AnnotationKey
         var segments = text.Split(Constants.KeySeparators, StringSplitOptions.RemoveEmptyEntries);
         var key = new AnnotationKey(segments);
 
-        if (segments.Length is < 2 or > 4
+        if (segments.Length is < 2 or > 5
             || !key.IsValid())
         {
             throw new ArgumentOutOfRangeException(nameof(text), "Invalid annotation key.");
@@ -109,9 +112,9 @@ public class AnnotationKey
         return new AnnotationKey(AnnotationTypeCodes.Responsibility, responsibilityName);
     }
 
-    public static AnnotationKey CreateJob(string responsibilityName, string jobName)
+    public static AnnotationKey CreateUnit(string responsibilityName, string unitName)
     {
-        return new AnnotationKey(AnnotationTypeCodes.Unit, responsibilityName, jobName);
+        return new AnnotationKey(AnnotationTypeCodes.Unit, responsibilityName, unitName);
     }
 
     public static AnnotationKey CreateSubject(string subjectName)
@@ -132,5 +135,10 @@ public class AnnotationKey
     public static AnnotationKey CreateExecution(string subjectName, string responsibilityName, string contextName)
     {
         return new AnnotationKey(AnnotationTypeCodes.Execution, subjectName, responsibilityName, contextName);
+    }
+
+    public static AnnotationKey CreateUnitOfExecution(string subjectName, string responsibilityName, string contextName, string unitName)
+    {
+        return new AnnotationKey(AnnotationTypeCodes.UnitOfExecution, subjectName, responsibilityName, contextName, unitName);
     }
 }
