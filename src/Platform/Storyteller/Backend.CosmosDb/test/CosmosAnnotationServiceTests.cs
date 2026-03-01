@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using FluentAssertions;
@@ -288,5 +289,89 @@ public class CosmosAnnotationServiceTests(Startup startup)
 
         returnedUsage.Executions.Should().HaveCount(1);
         returnedUsage.Executions.Should().Contain("context-for-execution");
+    }
+
+    [Fact]
+    public async Task SetAnnotationsBulk()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+
+        var subjectKey = AnnotationKey.CreateSubject("bulk-subject");
+        var responsibilityKey = AnnotationKey.CreateResponsibility("bulk-responsibility");
+        var contextKey = AnnotationKey.CreateContext("bulk-subject", "bulk-context");
+        var usageKey = AnnotationKey.CreateUsage("bulk-subject", "bulk-responsibility");
+        var executionKey = AnnotationKey.CreateExecution("bulk-subject", "bulk-responsibility", "bulk-context");
+
+        var list = new List<Annotation>
+        {
+            new Execution
+            {
+                AnnotationKey = executionKey,
+                AnnotationType = AnnotationType.Execution,
+                Name = "bulk-context",
+                SubjectKey = subjectKey,
+                SubjectName = "bulk-subject",
+                ResponsibilityKey = responsibilityKey,
+                ResponsibilityName = "bulk-responsibility",
+                ContextKey = contextKey,
+                ContextName = "bulk-context",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            },
+            new Context
+            {
+                AnnotationKey = contextKey,
+                AnnotationType = AnnotationType.Context,
+                Name = "bulk-context",
+                SubjectKey = subjectKey,
+                SubjectName = "bulk-subject",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            },
+            new Usage
+            {
+                AnnotationKey = usageKey,
+                AnnotationType = AnnotationType.Usage,
+                Name = "bulk-responsibility",
+                SubjectKey = subjectKey,
+                SubjectName = "bulk-subject",
+                ResponsibilityKey = responsibilityKey,
+                ResponsibilityName = "bulk-responsibility",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            },
+            new Subject
+            {
+                AnnotationKey = subjectKey,
+                AnnotationType = AnnotationType.Subject,
+                Name = "bulk-subject",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            },
+            new Responsibility
+            {
+                AnnotationKey = responsibilityKey,
+                AnnotationType = AnnotationType.Responsibility,
+                Name = "bulk-responsibility",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            },
+        };
+
+        // This should succeed because SetAnnotationsAsync should sort them correctly
+        await annotations.CreateAnnotationsAsync(TestConstants.Organization, list);
+
+        var returnedSubject = (Subject)await annotations.GetAnnotationAsync(
+            FullKey.Create(subjectKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName));
+        var returnedContext = (Context)await annotations.GetAnnotationAsync(
+            FullKey.Create(contextKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName));
+        var returnedUsage = (Usage)await annotations.GetAnnotationAsync(
+            FullKey.Create(usageKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName));
+
+        returnedSubject.Should().NotBeNull();
+        returnedSubject.Contexts.Should().Contain("bulk-context");
+        returnedSubject.Usages.Should().Contain("bulk-responsibility");
+        returnedContext.Executions.Should().Contain("bulk-responsibility");
+        returnedUsage.Executions.Should().Contain("bulk-context");
     }
 }

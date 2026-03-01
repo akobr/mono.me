@@ -269,6 +269,39 @@ public class CosmosAnnotationService : IAnnotationService
         await UpsertAnnotationEntityAsync(annotation, repository);
     }
 
+    public async Task<IEnumerable<Annotation>> CreateAnnotationsAsync(string organization, IEnumerable<Annotation> annotations)
+    {
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+
+        var annotationsInOrder = annotations
+            .OrderBy(a => a.AnnotationType)
+            .ToList();
+
+        var createdAnnotations = new List<Annotation>();
+
+        for (var index = 0; index < annotationsInOrder.Count; index++)
+        {
+            var annotation = annotationsInOrder[index];
+            var key = annotation.GetFullKey(organization);
+
+            if (await repository.Container.ExistsAsync(key))
+            {
+                annotationsInOrder.RemoveAt(index);
+                index--;
+                continue;
+            }
+
+            createdAnnotations.AddRange(await CreateAnnotationAsync(organization, annotation));
+        }
+
+        return createdAnnotations;
+    }
+
+    public Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, IEnumerable<string> annotations)
+    {
+        throw new NotImplementedException();
+    }
+
     public async Task DeleteAnnotationAsync(FullKey fullKey)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(fullKey.OrganizationName);
