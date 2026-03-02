@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace _42.Platform.Storyteller;
 
 public record Execution : Annotation, IExecution
@@ -13,4 +15,6 @@ public record Execution : Annotation, IExecution
     public required string ResponsibilityName { get; init; }
 
     public required string ContextName { get; init; }
+
+    public IReadOnlySet<string> Units { get; init; } = new HashSet<string>(0);
 }

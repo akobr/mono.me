@@ -577,9 +577,10 @@ public class CosmosConfigurationService : IConfigurationService
             configEntryId,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+        var exist = configEntry is not null;
 
         // If the configuration is already calculated, return it directly (cached in DB)
-        if (configEntry.CalculatedContent is not null)
+        if (exist && configEntry.CalculatedContent is not null)
         {
             return configEntry.CalculatedContent;
         }
@@ -600,8 +601,6 @@ public class CosmosConfigurationService : IConfigurationService
         }
 
         // The most specific configuration has precedence, is merged last
-        var exist = configEntry is not null;
-
         if (exist)
         {
             config.MergeInto(configEntry!.Content);

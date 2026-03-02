@@ -6,6 +6,7 @@ using _42.Platform.Storyteller.DbCreator.Logic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Testcontainers.CosmosDb;
 using Xunit;
 
@@ -60,6 +61,7 @@ public class Startup : IAsyncLifetime, ITestContext
 
     private void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
+        services.AddLogging(builder => builder.AddConsole());
         services.AddCosmosDbAnnotations(configuration);
         services.AddSingleton<CoreDbStructureBuilder>();
     }
