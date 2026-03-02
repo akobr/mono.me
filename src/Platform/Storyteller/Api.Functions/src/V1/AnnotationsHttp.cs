@@ -255,8 +255,10 @@ public class AnnotationsHttp
                 dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
                 dataRequest.Conditions =
                 [
+                    new AnnotationsRequest.Condition<Unit> { Predicate = u => u.ResponsibilityKey == key, },
                     new AnnotationsRequest.Condition<Usage> { Predicate = u => u.ResponsibilityKey == key, },
-                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.ResponsibilityKey == key, }
+                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.ResponsibilityKey == key, },
+                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.ResponsibilityKey == key, },
                 ];
                 break;
             }
@@ -267,7 +269,8 @@ public class AnnotationsHttp
                 [
                     new AnnotationsRequest.Condition<Usage> { Predicate = u => u.SubjectKey == key, },
                     new AnnotationsRequest.Condition<Context> { Predicate = c => c.SubjectKey == key, },
-                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.SubjectKey == key, }
+                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.SubjectKey == key, },
+                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.SubjectKey == key, },
                 ];
                 break;
             }
@@ -283,7 +286,11 @@ public class AnnotationsHttp
                     new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.ResponsibilityKey == responsibilityKey && e.SubjectKey == subjectKey,
-                    }
+                    },
+                    new AnnotationsRequest.Condition<UnitOfExecution>
+                    {
+                        Predicate = u => u.ResponsibilityKey == responsibilityKey && u.SubjectKey == subjectKey,
+                    },
                 ];
                 break;
             }
@@ -297,7 +304,11 @@ public class AnnotationsHttp
                     new AnnotationsRequest.Condition<Execution>
                     {
                         Predicate = e => e.SubjectKey == subjectKey && e.ContextKey == key,
-                    }
+                    },
+                    new AnnotationsRequest.Condition<UnitOfExecution>
+                    {
+                        Predicate = u => u.SubjectKey == subjectKey && u.ContextKey == key,
+                    },
                 ];
                 break;
             }
@@ -521,10 +532,10 @@ public class AnnotationsHttp
         var conditions = new List<AnnotationsRequest.ICondition>();
         var dataRequest = new AnnotationsRequest
         {
-            Types = new[]
-            {
-                AnnotationType.Responsibility,
-            },
+            Types =
+            [
+                AnnotationType.Responsibility
+            ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
             Organization = organization,
@@ -593,10 +604,10 @@ public class AnnotationsHttp
         var conditions = new List<AnnotationsRequest.ICondition>();
         var dataRequest = new AnnotationsRequest
         {
-            Types = new[]
-            {
-                AnnotationType.Subject,
-            },
+            Types =
+            [
+                AnnotationType.Subject
+            ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
             Organization = organization,
@@ -667,10 +678,10 @@ public class AnnotationsHttp
         var conditions = new List<AnnotationsRequest.ICondition>();
         var dataRequest = new AnnotationsRequest
         {
-            Types = new[]
-            {
-                AnnotationType.Usage,
-            },
+            Types =
+            [
+                AnnotationType.Usage
+            ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
             Organization = organization,
@@ -770,10 +781,10 @@ public class AnnotationsHttp
         var conditions = new List<AnnotationsRequest.ICondition>();
         var dataRequest = new AnnotationsRequest
         {
-            Types = new[]
-            {
-                AnnotationType.Context,
-            },
+            Types =
+            [
+                AnnotationType.Context
+            ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
             Organization = organization,
@@ -874,10 +885,10 @@ public class AnnotationsHttp
         var conditions = new List<AnnotationsRequest.ICondition>();
         var dataRequest = new AnnotationsRequest
         {
-            Types = new[]
-            {
-                AnnotationType.Execution,
-            },
+            Types =
+            [
+                AnnotationType.Execution
+            ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
             Organization = organization,
