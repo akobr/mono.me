@@ -131,16 +131,17 @@ public class CosmosAnnotationService : IAnnotationService
 
             case AnnotationType.Unit:
             {
-                var responsibilityKey = key.Annotation.GetResponsibilityKey();
-                var unitName = key.Annotation.GetUnitName();
-
                 var responsibilityTransaction = repository.Container.CreateTransactionalBatch(key.GetCosmosPartitionKey());
 
-                await TryCheckAndCreateResponsibilityAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations);
+                if (!await TryCheckAndCreateResponsibilityAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations))
+                {
+                    var responsibilityKey = key.Annotation.GetResponsibilityKey();
+                    var unitName = key.Annotation.GetUnitName();
 
-                responsibilityTransaction.PatchItem(
-                    key.GetCosmosItemId(responsibilityKey),
-                    [PatchOperation.Add($"/{nameof(ResponsibilityEntity.Units)}/-", unitName)]);
+                    responsibilityTransaction.PatchItem(
+                        key.GetCosmosItemId(responsibilityKey),
+                        [PatchOperation.Add($"/{nameof(ResponsibilityEntity.Units)}/-", unitName)]);
+                }
 
                 await UpsertAnnotationEntityAsync(annotation, responsibilityTransaction, disposable);
                 await responsibilityTransaction.ExecuteAsync();
@@ -156,13 +157,14 @@ public class CosmosAnnotationService : IAnnotationService
                 var subjectTransaction = repository.Container.CreateTransactionalBatch(subjectPartitionKey);
 
                 await TryCheckAndCreateResponsibilityAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations);
-                await TryCheckAndCreateSubjectAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations);
 
-                subjectTransaction.PatchItem(
-                    key.GetCosmosItemId(subjectKey),
-                    [PatchOperation.Add($"/{nameof(SubjectEntity.Usages)}/-", key.Annotation.GetResponsibilityName())],
-                    new TransactionalBatchPatchItemRequestOptions { EnableContentResponseOnWrite = false });
-
+                if (!await TryCheckAndCreateSubjectAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations))
+                {
+                    subjectTransaction.PatchItem(
+                        key.GetCosmosItemId(subjectKey),
+                        [PatchOperation.Add($"/{nameof(SubjectEntity.Usages)}/-", key.Annotation.GetResponsibilityName())],
+                        new TransactionalBatchPatchItemRequestOptions { EnableContentResponseOnWrite = false });
+                }
                 await UpsertAnnotationEntityAsync(annotation, responsibilityTransaction, disposable);
                 await Task.WhenAll(responsibilityTransaction.ExecuteAsync(), subjectTransaction.ExecuteAsync());
                 break;
@@ -172,14 +174,15 @@ public class CosmosAnnotationService : IAnnotationService
             {
                 var subjectKey = key.Annotation.GetSubjectKey();
                 var subjectPartitionKey = new PartitionKey(key.GetPartitionKey(subjectKey));
-
+                var contextName = key.Annotation.GetContextName();
                 var subjectTransaction = repository.Container.CreateTransactionalBatch(subjectPartitionKey);
 
-                await TryCheckAndCreateSubjectAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations);
-
-                subjectTransaction.PatchItem(
-                    key.GetCosmosItemId(subjectKey),
-                    [PatchOperation.Add($"/{nameof(SubjectEntity.Contexts)}/-", key.Annotation.GetContextName())]);
+                if (!await TryCheckAndCreateSubjectAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations, [contextName]))
+                {
+                    subjectTransaction.PatchItem(
+                        key.GetCosmosItemId(subjectKey),
+                        [PatchOperation.Add($"/{nameof(SubjectEntity.Contexts)}/-", contextName)]);
+                }
 
                 await UpsertAnnotationEntityAsync(annotation, subjectTransaction, disposable);
                 await subjectTransaction.ExecuteAsync();
@@ -191,27 +194,29 @@ public class CosmosAnnotationService : IAnnotationService
                 var contextKey = key.Annotation.GetContextKey();
                 var subjectPartitionKey = new PartitionKey(key.GetPartitionKey(contextKey));
                 var responsibilityName = key.Annotation.GetResponsibilityName();
-
+                var contextName = key.Annotation.GetContextName();
                 var responsibilityTransaction = repository.Container.CreateTransactionalBatch(key.GetCosmosPartitionKey());
                 var subjectTransaction = repository.Container.CreateTransactionalBatch(subjectPartitionKey);
 
                 await TryCheckAndCreateResponsibilityAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations);
-                await TryCheckAndCreateSubjectAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations, [ key.Annotation.GetContextName() ], [ responsibilityName] );
-                await TryCheckAndCreateUsageAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations, [ key.Annotation.GetContextName() ]);
-                await TryCheckAndCreateContextAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations);
+                await TryCheckAndCreateSubjectAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations, [ contextName ], [ responsibilityName] );
+                if (!await TryCheckAndCreateUsageAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations, [contextName]))
+                {
+                    var usageKey = key.Annotation.GetUsageKey();
 
-                subjectTransaction.PatchItem(
-                    key.GetCosmosItemId(contextKey),
-                    [PatchOperation.Add($"/{nameof(ContextEntity.Executions)}/-", responsibilityName)],
-                    new TransactionalBatchPatchItemRequestOptions { EnableContentResponseOnWrite = false });
+                    responsibilityTransaction.PatchItem(
+                        key.GetCosmosItemId(usageKey),
+                        [PatchOperation.Add($"/{nameof(UsageEntity.Executions)}/-", contextName)],
+                        new TransactionalBatchPatchItemRequestOptions { EnableContentResponseOnWrite = false });
+                }
 
-                var usageKey = key.Annotation.GetUsageKey();
-                var contextName = key.Annotation.GetContextName();
-
-                responsibilityTransaction.PatchItem(
-                    key.GetCosmosItemId(usageKey),
-                    [PatchOperation.Add($"/{nameof(UsageEntity.Executions)}/-", contextName)],
-                    new TransactionalBatchPatchItemRequestOptions { EnableContentResponseOnWrite = false });
+                if (!await TryCheckAndCreateContextAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations))
+                {
+                    subjectTransaction.PatchItem(
+                        key.GetCosmosItemId(contextKey),
+                        [PatchOperation.Add($"/{nameof(ContextEntity.Executions)}/-", responsibilityName)],
+                        new TransactionalBatchPatchItemRequestOptions { EnableContentResponseOnWrite = false });
+                }
 
                 await UpsertAnnotationEntityAsync(annotation, responsibilityTransaction, disposable);
                 await Task.WhenAll(responsibilityTransaction.ExecuteAsync(), subjectTransaction.ExecuteAsync());
@@ -222,6 +227,7 @@ public class CosmosAnnotationService : IAnnotationService
             {
                 var executionKey = key.Annotation.GetExecutionKey();
                 var unitName = key.Annotation.GetUnitName();
+                var contextName = key.Annotation.GetContextName();
                 var subjectPartitionKey = new PartitionKey(key.GetPartitionKey(key.Annotation.GetSubjectKey()));
 
                 var responsibilityTransaction = repository.Container.CreateTransactionalBatch(key.GetCosmosPartitionKey());
@@ -229,14 +235,16 @@ public class CosmosAnnotationService : IAnnotationService
 
                 await TryCheckAndCreateResponsibilityAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations, [ unitName ]);
                 await TryCheckAndCreateUnitAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations);
-                await TryCheckAndCreateSubjectAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations, [ key.Annotation.GetContextName() ]);
-                await TryCheckAndCreateUsageAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations, [ key.Annotation.GetContextName() ]);
+                await TryCheckAndCreateSubjectAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations, [ contextName ]);
+                await TryCheckAndCreateUsageAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations, [ contextName ]);
                 await TryCheckAndCreateContextAsync(key, annotation, repository, subjectTransaction, disposable, newAnnotations, [ key.Annotation.GetResponsibilityName() ]);
-                await TryCheckAndCreateExecutionAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations);
 
-                responsibilityTransaction.PatchItem(
-                    key.GetCosmosItemId(executionKey),
-                    [PatchOperation.Add($"/{nameof(ExecutionEntity.Units)}/-", unitName)]);
+                if (!await TryCheckAndCreateExecutionAsync(key, annotation, repository, responsibilityTransaction, disposable, newAnnotations))
+                {
+                    responsibilityTransaction.PatchItem(
+                        key.GetCosmosItemId(executionKey),
+                        [PatchOperation.Add($"/{nameof(ExecutionEntity.Units)}/-", unitName)]);
+                }
 
                 await UpsertAnnotationEntityAsync(annotation, responsibilityTransaction, disposable);
                 await Task.WhenAll(responsibilityTransaction.ExecuteAsync(), subjectTransaction.ExecuteAsync());
@@ -616,7 +624,7 @@ public class CosmosAnnotationService : IAnnotationService
         disposable.AddAsync(memoryStream);
     }
 
-    private async Task TryCheckAndCreateResponsibilityAsync(
+    private async Task<bool> TryCheckAndCreateResponsibilityAsync(
         FullKey key,
         Annotation annotation,
         IContainerRepository repository,
@@ -628,31 +636,34 @@ public class CosmosAnnotationService : IAnnotationService
         var newKey = key.Annotation.GetResponsibilityKey();
         var partitionKey = new PartitionKey(key.GetPartitionKey(newKey));
 
-        if (!await repository.Container.ExistsAsync(newKey, partitionKey))
+        if (await repository.Container.ExistsAsync(newKey, partitionKey))
         {
-            var newAnnotation = new Responsibility()
-            {
-                AnnotationType = AnnotationType.Responsibility,
-                AnnotationKey = newKey,
-                Name = newKey.ResponsibilityName,
-                Units = new HashSet<string>(units ?? []),
-                ProjectName = annotation.ProjectName,
-                ViewName = annotation.ViewName,
-                ValidFrom = annotation.ValidFrom,
-                ExpiresAt = annotation.ExpiresAt,
-                TimeZone = annotation.TimeZone,
-                IsDisabled = annotation.IsDisabled,
-                Labels = annotation.Labels,
-            };
-
-            if (!string.IsNullOrEmpty(key.Annotation.UnitName))
-            {
-                newAnnotation = newAnnotation with { Units = new HashSet<string>([key.Annotation.UnitName]) };
-            }
-
-            await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
-            newAnnotations.Add(newAnnotation);
+            return false;
         }
+
+        var newAnnotation = new Responsibility()
+        {
+            AnnotationType = AnnotationType.Responsibility,
+            AnnotationKey = newKey,
+            Name = newKey.ResponsibilityName,
+            Units = new HashSet<string>(units ?? []),
+            ProjectName = annotation.ProjectName,
+            ViewName = annotation.ViewName,
+            ValidFrom = annotation.ValidFrom,
+            ExpiresAt = annotation.ExpiresAt,
+            TimeZone = annotation.TimeZone,
+            IsDisabled = annotation.IsDisabled,
+            Labels = annotation.Labels,
+        };
+
+        if (!string.IsNullOrEmpty(key.Annotation.UnitName))
+        {
+            newAnnotation = newAnnotation with { Units = new HashSet<string>([key.Annotation.UnitName]) };
+        }
+
+        await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
+        newAnnotations.Add(newAnnotation);
+        return true;
     }
 
     private async Task TryCheckAndCreateUnitAsync(
@@ -666,30 +677,32 @@ public class CosmosAnnotationService : IAnnotationService
         var newKey = key.Annotation.GetUnitKey();
         var partitionKey = new PartitionKey(key.GetPartitionKey(newKey));
 
-        if (!await repository.Container.ExistsAsync(newKey, partitionKey))
+        if (await repository.Container.ExistsAsync(newKey, partitionKey))
         {
-            var newAnnotation = new Unit()
-            {
-                AnnotationType = AnnotationType.Unit,
-                AnnotationKey = newKey,
-                Name = newKey.UnitName,
-                ResponsibilityKey = newKey.GetResponsibilityKey(),
-                ResponsibilityName = newKey.GetResponsibilityName(),
-                ProjectName = annotation.ProjectName,
-                ViewName = annotation.ViewName,
-                ValidFrom = annotation.ValidFrom,
-                ExpiresAt = annotation.ExpiresAt,
-                TimeZone = annotation.TimeZone,
-                IsDisabled = annotation.IsDisabled,
-                Labels = annotation.Labels,
-            };
-
-            await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
-            newAnnotations.Add(newAnnotation);
+            return;
         }
+
+        var newAnnotation = new Unit()
+        {
+            AnnotationType = AnnotationType.Unit,
+            AnnotationKey = newKey,
+            Name = newKey.UnitName,
+            ResponsibilityKey = newKey.GetResponsibilityKey(),
+            ResponsibilityName = newKey.GetResponsibilityName(),
+            ProjectName = annotation.ProjectName,
+            ViewName = annotation.ViewName,
+            ValidFrom = annotation.ValidFrom,
+            ExpiresAt = annotation.ExpiresAt,
+            TimeZone = annotation.TimeZone,
+            IsDisabled = annotation.IsDisabled,
+            Labels = annotation.Labels,
+        };
+
+        await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
+        newAnnotations.Add(newAnnotation);
     }
 
-    private async Task TryCheckAndCreateSubjectAsync(
+    private async Task<bool> TryCheckAndCreateSubjectAsync(
         FullKey key,
         Annotation annotation,
         IContainerRepository repository,
@@ -702,30 +715,33 @@ public class CosmosAnnotationService : IAnnotationService
             var newKey = key.Annotation.GetSubjectKey();
             var partitionKey = new PartitionKey(key.GetPartitionKey(newKey));
 
-            if (!await repository.Container.ExistsAsync(newKey, partitionKey))
+            if (await repository.Container.ExistsAsync(newKey, partitionKey))
             {
-                var newAnnotation = new Subject()
-                {
-                    AnnotationType = AnnotationType.Subject,
-                    AnnotationKey = newKey,
-                    Name = newKey.SubjectName,
-                    Contexts = new HashSet<string>(contexts ?? []),
-                    Usages = new HashSet<string>(responsibilities ?? []),
-                    ProjectName = annotation.ProjectName,
-                    ViewName = annotation.ViewName,
-                    ValidFrom = annotation.ValidFrom,
-                    ExpiresAt = annotation.ExpiresAt,
-                    TimeZone = annotation.TimeZone,
-                    IsDisabled = annotation.IsDisabled,
-                    Labels = annotation.Labels,
-                };
-
-                await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
-                newAnnotations.Add(newAnnotation);
+                return false;
             }
+
+            var newAnnotation = new Subject()
+            {
+                AnnotationType = AnnotationType.Subject,
+                AnnotationKey = newKey,
+                Name = newKey.SubjectName,
+                Contexts = new HashSet<string>(contexts ?? []),
+                Usages = new HashSet<string>(responsibilities ?? []),
+                ProjectName = annotation.ProjectName,
+                ViewName = annotation.ViewName,
+                ValidFrom = annotation.ValidFrom,
+                ExpiresAt = annotation.ExpiresAt,
+                TimeZone = annotation.TimeZone,
+                IsDisabled = annotation.IsDisabled,
+                Labels = annotation.Labels,
+            };
+
+            await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
+            newAnnotations.Add(newAnnotation);
+            return true;
     }
 
-    private async Task TryCheckAndCreateUsageAsync(
+    private async Task<bool> TryCheckAndCreateUsageAsync(
         FullKey key,
         Annotation annotation,
         IContainerRepository repository,
@@ -737,33 +753,36 @@ public class CosmosAnnotationService : IAnnotationService
         var newKey = key.Annotation.GetUsageKey();
         var partitionKey = new PartitionKey(key.GetPartitionKey(newKey));
 
-        if (!await repository.Container.ExistsAsync(newKey, partitionKey))
+        if (await repository.Container.ExistsAsync(newKey, partitionKey))
         {
-            var newAnnotation = new Usage()
-            {
-                AnnotationType = AnnotationType.Usage,
-                AnnotationKey = newKey,
-                Name = newKey.ResponsibilityName,
-                ResponsibilityKey = newKey.GetResponsibilityKey(),
-                ResponsibilityName = newKey.GetResponsibilityName(),
-                SubjectKey = newKey.GetSubjectKey(),
-                SubjectName = newKey.GetSubjectName(),
-                Executions = new HashSet<string>(contexts ?? []),
-                ProjectName = annotation.ProjectName,
-                ViewName = annotation.ViewName,
-                ValidFrom = annotation.ValidFrom,
-                ExpiresAt = annotation.ExpiresAt,
-                TimeZone = annotation.TimeZone,
-                IsDisabled = annotation.IsDisabled,
-                Labels = annotation.Labels,
-            };
-
-            await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
-            newAnnotations.Add(newAnnotation);
+            return false;
         }
+
+        var newAnnotation = new Usage()
+        {
+            AnnotationType = AnnotationType.Usage,
+            AnnotationKey = newKey,
+            Name = newKey.ResponsibilityName,
+            ResponsibilityKey = newKey.GetResponsibilityKey(),
+            ResponsibilityName = newKey.GetResponsibilityName(),
+            SubjectKey = newKey.GetSubjectKey(),
+            SubjectName = newKey.GetSubjectName(),
+            Executions = new HashSet<string>(contexts ?? []),
+            ProjectName = annotation.ProjectName,
+            ViewName = annotation.ViewName,
+            ValidFrom = annotation.ValidFrom,
+            ExpiresAt = annotation.ExpiresAt,
+            TimeZone = annotation.TimeZone,
+            IsDisabled = annotation.IsDisabled,
+            Labels = annotation.Labels,
+        };
+
+        await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
+        newAnnotations.Add(newAnnotation);
+        return true;
     }
 
-    private async Task TryCheckAndCreateContextAsync(
+    private async Task<bool> TryCheckAndCreateContextAsync(
         FullKey key,
         Annotation annotation,
         IContainerRepository repository,
@@ -775,31 +794,34 @@ public class CosmosAnnotationService : IAnnotationService
         var newKey = key.Annotation.GetContextKey();
         var partitionKey = new PartitionKey(key.GetPartitionKey(newKey));
 
-        if (!await repository.Container.ExistsAsync(newKey, partitionKey))
+        if (await repository.Container.ExistsAsync(newKey, partitionKey))
         {
-            var newAnnotation = new Context()
-            {
-                AnnotationType = AnnotationType.Context,
-                AnnotationKey = newKey,
-                Name = newKey.ContextName,
-                SubjectKey = newKey.GetSubjectKey(),
-                SubjectName = newKey.GetSubjectName(),
-                Executions = new HashSet<string>(responsibilities ?? []),
-                ProjectName = annotation.ProjectName,
-                ViewName = annotation.ViewName,
-                ValidFrom = annotation.ValidFrom,
-                ExpiresAt = annotation.ExpiresAt,
-                TimeZone = annotation.TimeZone,
-                IsDisabled = annotation.IsDisabled,
-                Labels = annotation.Labels,
-            };
-
-            await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
-            newAnnotations.Add(newAnnotation);
+            return false;
         }
+
+        var newAnnotation = new Context()
+        {
+            AnnotationType = AnnotationType.Context,
+            AnnotationKey = newKey,
+            Name = newKey.ContextName,
+            SubjectKey = newKey.GetSubjectKey(),
+            SubjectName = newKey.GetSubjectName(),
+            Executions = new HashSet<string>(responsibilities ?? []),
+            ProjectName = annotation.ProjectName,
+            ViewName = annotation.ViewName,
+            ValidFrom = annotation.ValidFrom,
+            ExpiresAt = annotation.ExpiresAt,
+            TimeZone = annotation.TimeZone,
+            IsDisabled = annotation.IsDisabled,
+            Labels = annotation.Labels,
+        };
+
+        await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
+        newAnnotations.Add(newAnnotation);
+        return true;
     }
 
-    private async Task TryCheckAndCreateExecutionAsync(
+    private async Task<bool> TryCheckAndCreateExecutionAsync(
         FullKey key,
         Annotation annotation,
         IContainerRepository repository,
@@ -810,31 +832,36 @@ public class CosmosAnnotationService : IAnnotationService
         var newKey = key.Annotation.GetExecutionKey();
         var partitionKey = new PartitionKey(key.GetPartitionKey(newKey));
 
-        if (!await repository.Container.ExistsAsync(newKey, partitionKey))
+        if (await repository.Container.ExistsAsync(newKey, partitionKey))
         {
-            var newAnnotation = new Execution()
-            {
-                AnnotationType = AnnotationType.Execution,
-                AnnotationKey = newKey,
-                Name = newKey.ContextName,
-                ResponsibilityKey = newKey.GetResponsibilityKey(),
-                ResponsibilityName = newKey.GetResponsibilityName(),
-                SubjectKey = newKey.GetSubjectKey(),
-                SubjectName = newKey.GetSubjectName(),
-                ContextKey = newKey.GetContextKey(),
-                ContextName = newKey.GetContextName(),
-                ProjectName = annotation.ProjectName,
-                ViewName = annotation.ViewName,
-                ValidFrom = annotation.ValidFrom,
-                ExpiresAt = annotation.ExpiresAt,
-                TimeZone = annotation.TimeZone,
-                IsDisabled = annotation.IsDisabled,
-                Labels = annotation.Labels,
-            };
-
-            await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
-            newAnnotations.Add(newAnnotation);
+            return false;
         }
+
+        var newAnnotation = new Execution()
+        {
+            AnnotationType = AnnotationType.Execution,
+            AnnotationKey = newKey,
+            Name = newKey.ContextName,
+            ResponsibilityKey = newKey.GetResponsibilityKey(),
+            ResponsibilityName = newKey.GetResponsibilityName(),
+            SubjectKey = newKey.GetSubjectKey(),
+            SubjectName = newKey.GetSubjectName(),
+            ContextKey = newKey.GetContextKey(),
+            ContextName = newKey.GetContextName(),
+            ProjectName = annotation.ProjectName,
+            ViewName = annotation.ViewName,
+            ValidFrom = annotation.ValidFrom,
+            ExpiresAt = annotation.ExpiresAt,
+            TimeZone = annotation.TimeZone,
+            IsDisabled = annotation.IsDisabled,
+            Labels = annotation.Labels,
+        };
+
+        await UpsertAnnotationEntityAsync(newAnnotation, transaction, disposable);
+        newAnnotations.Add(newAnnotation);
+
+        return true;
+
     }
 
     private static Task DeleteAnnotationEntityAsync(FullKey fullKey, IContainerRepository repository)
