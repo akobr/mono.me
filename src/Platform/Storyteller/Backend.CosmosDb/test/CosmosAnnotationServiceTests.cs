@@ -168,6 +168,8 @@ public class CosmosAnnotationServiceTests(Startup startup)
                 Name = "only-unit",
                 ResponsibilityKey = responsibilityKey,
                 ResponsibilityName = "responsibility-for-only-unit",
+                UnitType = "event",
+                UnitDefinition = "unknown",
                 ProjectName = Constants.DefaultProjectName,
                 ViewName = Constants.DefaultViewName,
             })).ToList();
@@ -475,6 +477,42 @@ public class CosmosAnnotationServiceTests(Startup startup)
 
         returnedUsage.Executions.Should().HaveCount(1);
         returnedUsage.Executions.Should().Contain("context-for-execution");
+    }
+
+    [Fact]
+    public async Task CreateAnnotationsFromString()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+
+        var input = new List<string>
+        {
+            "sbt.subject-explicit",
+            "rst.responsibility-explicit",
+            "subject-default",
+            "subject-default.responsibility-default",
+            "subject-default.responsibility-default.context-default",
+            "subject-default.responsibility-default.context-default.unit-default",
+            "too.many.segments.in.this.input.should.be.ignored",
+        };
+
+        var created = (await annotations.CreateAnnotationsFromStringAsync(TestConstants.Organization, input)).ToList();
+
+        created.Any(a => a.AnnotationKey.ToString() == "sbt.subject-explicit").Should().BeTrue();
+        created.Any(a => a.AnnotationKey.ToString() == "rst.responsibility-explicit").Should().BeTrue();
+        created.Any(a => a.AnnotationKey.ToString() == "sbt.subject-default").Should().BeTrue();
+        created.Any(a => a.AnnotationKey.ToString() == "usg.subject-default.responsibility-default").Should().BeTrue();
+        created.Any(a => a.AnnotationKey.ToString() == "exe.subject-default.responsibility-default.context-default").Should().BeTrue();
+        created.Any(a => a.AnnotationKey.ToString() == "uxe.subject-default.responsibility-default.context-default.unit-default").Should().BeTrue();
+
+        // Check that ancestors are created (via service as they might be created via patches and not returned in the list)
+        var responsibilityDefault = await annotations.GetAnnotationAsync(FullKey.Create(AnnotationKey.Parse("rst.responsibility-default"), TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName));
+        responsibilityDefault.Should().NotBeNull();
+
+        var contextDefault = await annotations.GetAnnotationAsync(FullKey.Create(AnnotationKey.Parse("cnt.subject-default.context-default"), TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName));
+        contextDefault.Should().NotBeNull();
+
+        var unitDefault = await annotations.GetAnnotationAsync(FullKey.Create(AnnotationKey.Parse("unt.responsibility-default.unit-default"), TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName));
+        unitDefault.Should().NotBeNull();
     }
 
     [Fact]

@@ -305,9 +305,140 @@ public class CosmosAnnotationService : IAnnotationService
         return createdAnnotations;
     }
 
-    public Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, IEnumerable<string> annotations)
+    public async Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, IEnumerable<string> annotations)
     {
-        throw new NotImplementedException();
+        var annotationsToProcess = new List<Annotation>();
+
+        foreach (var input in annotations)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                continue;
+            }
+
+            var segments = input.Split(Constants.KeySeparators, StringSplitOptions.RemoveEmptyEntries);
+            AnnotationKey? annotationKey = null;
+
+            if (segments.Length > 0
+                && segments[0].Length == 3
+                && AnnotationTypeCodes.ValidCodes.ContainsKey(segments[0]))
+            {
+                if (AnnotationKey.TryParse(input, out var parsedKey))
+                {
+                    annotationKey = parsedKey;
+                }
+            }
+
+            annotationKey ??= segments.Length switch
+            {
+                1 => AnnotationKey.CreateSubject(segments[0]),
+                2 => AnnotationKey.CreateUsage(segments[0], segments[1]),
+                3 => AnnotationKey.CreateExecution(segments[0], segments[1], segments[2]),
+                4 => AnnotationKey.CreateUnitOfExecution(segments[0], segments[1], segments[2], segments[3]),
+                _ => null,
+            };
+
+            if (annotationKey is null)
+            {
+                continue;
+            }
+
+            var newAnnotation = annotationKey.Type switch
+            {
+                AnnotationType.Subject => new Subject
+                {
+                    ProjectName = Constants.DefaultProjectName,
+                    ViewName = Constants.DefaultViewName,
+                    AnnotationKey = annotationKey,
+                    Name = annotationKey.Name,
+                    AnnotationType = annotationKey.Type,
+                },
+                AnnotationType.Usage => new Usage
+                {
+                    ProjectName = Constants.DefaultProjectName,
+                    ViewName = Constants.DefaultViewName,
+                    AnnotationKey = annotationKey,
+                    Name = annotationKey.Name,
+                    AnnotationType = annotationKey.Type,
+                    SubjectKey = annotationKey.GetSubjectKey(),
+                    ResponsibilityKey = annotationKey.GetResponsibilityKey(),
+                    SubjectName = annotationKey.GetSubjectName(),
+                    ResponsibilityName = annotationKey.GetResponsibilityName(),
+                },
+                AnnotationType.Execution => new Execution
+                {
+                    ProjectName = Constants.DefaultProjectName,
+                    ViewName = Constants.DefaultViewName,
+                    AnnotationKey = annotationKey,
+                    Name = annotationKey.Name,
+                    AnnotationType = annotationKey.Type,
+                    SubjectKey = annotationKey.GetSubjectKey(),
+                    ResponsibilityKey = annotationKey.GetResponsibilityKey(),
+                    ContextKey = annotationKey.GetContextKey(),
+                    SubjectName = annotationKey.GetSubjectName(),
+                    ResponsibilityName = annotationKey.GetResponsibilityName(),
+                    ContextName = annotationKey.GetContextName(),
+                },
+                AnnotationType.UnitOfExecution => new UnitOfExecution
+                {
+                    ProjectName = Constants.DefaultProjectName,
+                    ViewName = Constants.DefaultViewName,
+                    AnnotationKey = annotationKey,
+                    Name = annotationKey.Name,
+                    AnnotationType = annotationKey.Type,
+                    SubjectKey = annotationKey.GetSubjectKey(),
+                    ResponsibilityKey = annotationKey.GetResponsibilityKey(),
+                    ContextKey = annotationKey.GetContextKey(),
+                    UnitKey = annotationKey.GetUnitKey(),
+                    SubjectName = annotationKey.GetSubjectName(),
+                    ResponsibilityName = annotationKey.GetResponsibilityName(),
+                    ContextName = annotationKey.GetContextName(),
+                    UnitName = annotationKey.GetUnitName(),
+                },
+                AnnotationType.Responsibility => new Responsibility
+                {
+                    ProjectName = Constants.DefaultProjectName,
+                    ViewName = Constants.DefaultViewName,
+                    AnnotationKey = annotationKey,
+                    Name = annotationKey.Name,
+                    AnnotationType = annotationKey.Type,
+                },
+                AnnotationType.Context => new Context
+                {
+                    ProjectName = Constants.DefaultProjectName,
+                    ViewName = Constants.DefaultViewName,
+                    AnnotationKey = annotationKey,
+                    Name = annotationKey.Name,
+                    AnnotationType = annotationKey.Type,
+                    SubjectKey = annotationKey.GetSubjectKey(),
+                    SubjectName = annotationKey.GetSubjectName(),
+                },
+                AnnotationType.Unit => new Unit
+                {
+                    ProjectName = Constants.DefaultProjectName,
+                    ViewName = Constants.DefaultViewName,
+                    AnnotationKey = annotationKey,
+                    Name = annotationKey.Name,
+                    AnnotationType = annotationKey.Type,
+                    ResponsibilityKey = annotationKey.GetResponsibilityKey(),
+                    ResponsibilityName = annotationKey.GetResponsibilityName(),
+                    UnitType = "event",
+                    UnitDefinition = "unknown",
+                },
+                _ => new Annotation
+                {
+                    ProjectName = Constants.DefaultProjectName,
+                    ViewName = Constants.DefaultViewName,
+                    AnnotationKey = annotationKey,
+                    Name = annotationKey.Name,
+                    AnnotationType = annotationKey.Type,
+                },
+            };
+
+            annotationsToProcess.Add(newAnnotation);
+        }
+
+        return await CreateAnnotationsAsync(organization, annotationsToProcess);
     }
 
     public async Task DeleteAnnotationAsync(FullKey fullKey)
@@ -693,6 +824,8 @@ public class CosmosAnnotationService : IAnnotationService
             Name = newKey.UnitName,
             ResponsibilityKey = newKey.GetResponsibilityKey(),
             ResponsibilityName = newKey.GetResponsibilityName(),
+            UnitType = "event",
+            UnitDefinition = "unknown",
             ProjectName = annotation.ProjectName,
             ViewName = annotation.ViewName,
             ValidFrom = annotation.ValidFrom,
