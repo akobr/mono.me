@@ -459,8 +459,13 @@ public class AnnotationsHttp
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
-        // TODO: [P1] implement
-        throw new NotImplementedException();
+        if (annotations.Count > ApiConstants.MaxInputItems)
+        {
+            return new BadRequestObjectResult(new ErrorResponse($"The number of annotations to create is too large, maximum allowed is {ApiConstants.MaxInputItems}."));
+        }
+
+        var createdAnnotations = await _annotations.CreateAnnotationsFromStringAsync(organization, annotations);
+        return new OkObjectResult(createdAnnotations);
     }
 
     [Function(nameof(DeleteAnnotation))]
