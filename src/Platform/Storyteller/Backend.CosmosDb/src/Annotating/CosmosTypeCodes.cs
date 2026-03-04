@@ -15,6 +15,7 @@ public static class CosmosTypeCodes
             AnnotationType.Context => typeof(ContextEntity),
             AnnotationType.Execution => typeof(ExecutionEntity),
             AnnotationType.Unit => typeof(UnitEntity),
+            AnnotationType.UnitOfExecution => typeof(UnitOfExecutionEntity),
             _ => throw new ArgumentOutOfRangeException(nameof(type)),
         };
     }
@@ -29,6 +30,7 @@ public static class CosmosTypeCodes
             AnnotationType.Context => (typeof(ContextEntity), typeof(Context)),
             AnnotationType.Execution => (typeof(ExecutionEntity), typeof(Execution)),
             AnnotationType.Unit => (typeof(UnitEntity), typeof(Unit)),
+            AnnotationType.UnitOfExecution => (typeof(UnitOfExecutionEntity), typeof(UnitOfExecution)),
             _ => throw new ArgumentOutOfRangeException(nameof(type)),
         };
     }
@@ -43,6 +45,7 @@ public static class CosmosTypeCodes
             { } when type == typeof(ContextEntity) => AnnotationType.Context,
             { } when type == typeof(ExecutionEntity) => AnnotationType.Execution,
             { } when type == typeof(UnitEntity) => AnnotationType.Unit,
+            { } when type == typeof(UnitOfExecutionEntity) => AnnotationType.UnitOfExecution,
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
         };
     }

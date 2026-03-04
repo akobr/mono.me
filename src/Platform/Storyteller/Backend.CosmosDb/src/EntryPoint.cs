@@ -82,6 +82,7 @@ public static class EntryPoint
             config.CreateMap<Context, ContextEntity>().ReverseMap();
             config.CreateMap<Usage, UsageEntity>().ReverseMap();
             config.CreateMap<Execution, ExecutionEntity>().ReverseMap();
+            config.CreateMap<UnitOfExecution, UnitOfExecutionEntity>().ReverseMap();
 
             config.CreateMap<Account, AccountEntity>().ReverseMap();
             config.CreateMap<AccessPoint, AccessPointEntity>().ReverseMap();
