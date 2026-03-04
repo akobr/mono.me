@@ -153,6 +153,161 @@ public class CosmosAnnotationServiceTests(Startup startup)
     }
 
     [Fact]
+    public async Task UnitOnlyAnnotation()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var unitKey = AnnotationKey.CreateUnit("responsibility-for-only-unit", "only-unit");
+        var responsibilityKey = AnnotationKey.CreateResponsibility("responsibility-for-only-unit");
+
+        var createdAnnotations = (await annotations.CreateAnnotationAsync(
+            TestConstants.Organization,
+            new Unit
+            {
+                AnnotationKey = unitKey,
+                AnnotationType = AnnotationType.Unit,
+                Name = "only-unit",
+                ResponsibilityKey = responsibilityKey,
+                ResponsibilityName = "responsibility-for-only-unit",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            })).ToList();
+
+        createdAnnotations.Should().HaveCount(2);
+        createdAnnotations[0].AnnotationKey.Should().Be(responsibilityKey);
+        createdAnnotations[0].AnnotationType.Should().Be(AnnotationType.Responsibility);
+        createdAnnotations[1].AnnotationKey.Should().Be(unitKey);
+        createdAnnotations[1].AnnotationType.Should().Be(AnnotationType.Unit);
+        var responsibility = (Responsibility)createdAnnotations[0];
+        responsibility.Units.Should().HaveCount(1);
+        responsibility.Units.Should().Contain("only-unit");
+    }
+
+    [Fact]
+    public async Task UsageOnlyAnnotation()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var usageKey = AnnotationKey.CreateUsage("subject-for-only-usage", "responsibility-for-only-usage");
+        var subjectKey = AnnotationKey.CreateSubject("subject-for-only-usage");
+        var responsibilityKey = AnnotationKey.CreateResponsibility("responsibility-for-only-usage");
+
+        var createdAnnotations = (await annotations.CreateAnnotationAsync(
+            TestConstants.Organization,
+            new Usage
+            {
+                AnnotationKey = usageKey,
+                AnnotationType = AnnotationType.Usage,
+                Name = "responsibility-for-only-usage",
+                SubjectKey = subjectKey,
+                SubjectName = "subject-for-only-usage",
+                ResponsibilityKey = responsibilityKey,
+                ResponsibilityName = "responsibility-for-only-usage",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            })).ToList();
+
+        createdAnnotations.Should().HaveCount(3);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == responsibilityKey && a.AnnotationType == AnnotationType.Responsibility);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == subjectKey && a.AnnotationType == AnnotationType.Subject);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == usageKey && a.AnnotationType == AnnotationType.Usage);
+
+        var subject = (Subject)createdAnnotations.First(a => a.AnnotationKey == subjectKey);
+        subject.Usages.Should().HaveCount(1);
+        subject.Usages.Should().Contain("responsibility-for-only-usage");
+    }
+
+    [Fact]
+    public async Task ExecutionOnlyAnnotation()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var executionKey = AnnotationKey.CreateExecution("subject-for-only-execution", "responsibility-for-only-execution", "context-for-only-execution");
+        var subjectKey = AnnotationKey.CreateSubject("subject-for-only-execution");
+        var responsibilityKey = AnnotationKey.CreateResponsibility("responsibility-for-only-execution");
+        var contextKey = AnnotationKey.CreateContext("subject-for-only-execution", "context-for-only-execution");
+        var usageKey = AnnotationKey.CreateUsage("subject-for-only-execution", "responsibility-for-only-execution");
+
+        var createdAnnotations = (await annotations.CreateAnnotationAsync(
+            TestConstants.Organization,
+            new Execution
+            {
+                AnnotationKey = executionKey,
+                AnnotationType = AnnotationType.Execution,
+                Name = "context-for-only-execution",
+                SubjectKey = subjectKey,
+                SubjectName = "subject-for-only-execution",
+                ResponsibilityKey = responsibilityKey,
+                ResponsibilityName = "responsibility-for-only-execution",
+                ContextKey = contextKey,
+                ContextName = "context-for-only-execution",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            })).ToList();
+
+        createdAnnotations.Should().HaveCount(5);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == responsibilityKey && a.AnnotationType == AnnotationType.Responsibility);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == subjectKey && a.AnnotationType == AnnotationType.Subject);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == usageKey && a.AnnotationType == AnnotationType.Usage);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == contextKey && a.AnnotationType == AnnotationType.Context);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == executionKey && a.AnnotationType == AnnotationType.Execution);
+
+        var subject = (Subject)createdAnnotations.First(a => a.AnnotationKey == subjectKey);
+        subject.Contexts.Should().Contain("context-for-only-execution");
+        subject.Usages.Should().Contain("responsibility-for-only-execution");
+
+        var context = (Context)createdAnnotations.First(a => a.AnnotationKey == contextKey);
+        context.Executions.Should().Contain("responsibility-for-only-execution");
+
+        var usage = (Usage)createdAnnotations.First(a => a.AnnotationKey == usageKey);
+        usage.Executions.Should().Contain("context-for-only-execution");
+    }
+
+    [Fact]
+    public async Task UnitOfExecutionOnlyAnnotation()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var unitOfExecutionKey = AnnotationKey.CreateUnitOfExecution("subject-for-only-uoe", "responsibility-for-only-uoe", "context-for-only-uoe", "only-uoe");
+        var subjectKey = AnnotationKey.CreateSubject("subject-for-only-uoe");
+        var responsibilityKey = AnnotationKey.CreateResponsibility("responsibility-for-only-uoe");
+        var contextKey = AnnotationKey.CreateContext("subject-for-only-uoe", "context-for-only-uoe");
+        var usageKey = AnnotationKey.CreateUsage("subject-for-only-uoe", "responsibility-for-only-uoe");
+        var executionKey = AnnotationKey.CreateExecution("subject-for-only-uoe", "responsibility-for-only-uoe", "context-for-only-uoe");
+        var unitKey = AnnotationKey.CreateUnit("responsibility-for-only-uoe", "only-uoe");
+
+        var createdAnnotations = (await annotations.CreateAnnotationAsync(
+            TestConstants.Organization,
+            new UnitOfExecution
+            {
+                AnnotationKey = unitOfExecutionKey,
+                AnnotationType = AnnotationType.UnitOfExecution,
+                Name = "only-uoe",
+                SubjectKey = subjectKey,
+                SubjectName = "subject-for-only-uoe",
+                ResponsibilityKey = responsibilityKey,
+                ResponsibilityName = "responsibility-for-only-uoe",
+                ContextKey = contextKey,
+                ContextName = "context-for-only-uoe",
+                UnitKey = unitKey,
+                UnitName = "only-uoe",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            })).ToList();
+
+        createdAnnotations.Should().HaveCount(7);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == responsibilityKey && a.AnnotationType == AnnotationType.Responsibility);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == subjectKey && a.AnnotationType == AnnotationType.Subject);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == usageKey && a.AnnotationType == AnnotationType.Usage);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == contextKey && a.AnnotationType == AnnotationType.Context);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == executionKey && a.AnnotationType == AnnotationType.Execution);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == unitKey && a.AnnotationType == AnnotationType.Unit);
+        createdAnnotations.Should().Contain(a => a.AnnotationKey == unitOfExecutionKey && a.AnnotationType == AnnotationType.UnitOfExecution);
+
+        var execution = (Execution)createdAnnotations.First(a => a.AnnotationKey == executionKey);
+        execution.Units.Should().Contain("only-uoe");
+
+        var responsibility = (Responsibility)createdAnnotations.First(a => a.AnnotationKey == responsibilityKey);
+        responsibility.Units.Should().Contain("only-uoe");
+    }
+
+    [Fact]
     public async Task UsageAnnotation()
     {
         var annotations = Context.Services.GetRequiredService<IAnnotationService>();
