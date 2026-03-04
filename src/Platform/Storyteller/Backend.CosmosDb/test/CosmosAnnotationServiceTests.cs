@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using FluentAssertions;
@@ -119,6 +120,36 @@ public class CosmosAnnotationServiceTests(Startup startup)
 
         returnedSubject.Contexts.Should().HaveCount(1);
         returnedSubject.Contexts.Should().Contain("simple-context");
+    }
+
+    [Fact]
+    public async Task ContextOnlyAnnotation()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var contextKey = AnnotationKey.CreateContext("subject-for-only-context", "only-context");
+        var subjectKey = AnnotationKey.CreateSubject("subject-for-only-context");
+
+        var createdAnnotations = (await annotations.CreateAnnotationAsync(
+            TestConstants.Organization,
+            new Context
+            {
+                AnnotationKey = contextKey,
+                AnnotationType = AnnotationType.Context,
+                Name = "only-context",
+                SubjectKey = subjectKey,
+                SubjectName = "subject-for-only-context",
+                ProjectName = Constants.DefaultProjectName,
+                ViewName = Constants.DefaultViewName,
+            })).ToList();
+
+        createdAnnotations.Should().HaveCount(2);
+        createdAnnotations[0].AnnotationKey.Should().Be(subjectKey);
+        createdAnnotations[0].AnnotationType.Should().Be(AnnotationType.Subject);
+        createdAnnotations[1].AnnotationKey.Should().Be(contextKey);
+        createdAnnotations[1].AnnotationType.Should().Be(AnnotationType.Context);
+        var subject = (Subject)createdAnnotations[0];
+        subject.Contexts.Should().HaveCount(1);
+        subject.Contexts.Should().Contain("only-context");
     }
 
     [Fact]
