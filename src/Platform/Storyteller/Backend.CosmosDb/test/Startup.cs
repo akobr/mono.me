@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.DbCreator.Logic;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +25,7 @@ public class Startup : IAsyncLifetime, ITestContext
     {
         DbContainer = new CosmosDbBuilder()
             .WithImage("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
+            .WithReuse(true)
             .Build();
 
         var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(5));
@@ -37,13 +39,30 @@ public class Startup : IAsyncLifetime, ITestContext
         ConfigureServices(services, Configuration);
         Services = services.BuildServiceProvider();
 
+        await CleanupDatabaseAsync();
+
         var dbBuilder = Services.GetRequiredService<CoreDbStructureBuilder>();
         await dbBuilder.BuildAsync();
     }
 
     public Task DisposeAsync()
     {
-        return DbContainer.StopAsync();
+        return Task.CompletedTask;
+    }
+
+    private async Task CleanupDatabaseAsync()
+    {
+        var clientProvider = Services.GetRequiredService<ICosmosClientProvider>();
+        var client = clientProvider.Client;
+        var iterator = client.GetDatabaseQueryIterator<DatabaseProperties>();
+
+        while (iterator.HasMoreResults)
+        {
+            foreach (var database in await iterator.ReadNextAsync())
+            {
+                await client.GetDatabase(database.Id).DeleteAsync();
+            }
+        }
     }
 
     private void Configure(IConfigurationBuilder builder)
