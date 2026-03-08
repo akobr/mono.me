@@ -175,29 +175,48 @@ public class CosmosConfigurationService : IConfigurationService
     }
 
     // TODO: [P2] put this into different library
-    public async Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion)
+    public Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion)
     {
-        var fromJson = fromVersion == 0
-            ? new JObject()
-            : await GetConfigurationVersionContentAsync(key, fromVersion);
+        return GetConfigurationChangesAsync(
+            () => fromVersion == 0 ? Task.FromResult<JObject?>(new JObject()) : GetConfigurationVersionContentAsync(key, fromVersion),
+            () => toVersion == 0 ? Task.FromResult<JObject?>(new JObject()) : GetConfigurationVersionContentAsync(key, toVersion),
+            $"Unknown version {fromVersion} of the configuration for {key.Annotation}.",
+            $"Unknown version {toVersion} of the configuration for {key.Annotation}.");
+    }
 
-        if (fromJson is null && fromVersion != 0)
+    public Task<IReadOnlyCollection<string>> GetConfigurationViewChangesAsync(FullKey sourceKey, string toView)
+    {
+        var targetKey = FullKey.Create(sourceKey.Annotation, sourceKey.OrganizationName, sourceKey.ProjectName, toView);
+        return GetConfigurationChangesAsync(
+            () => GetRawConfigurationAsync(sourceKey),
+            () => GetRawConfigurationAsync(targetKey),
+            $"Unknown configuration for {sourceKey.Annotation} in view {sourceKey.ViewName}.",
+            $"Unknown configuration for {sourceKey.Annotation} in view {toView}.");
+    }
+
+    private async Task<IReadOnlyCollection<string>> GetConfigurationChangesAsync(
+        Func<Task<JObject?>> fromProvider,
+        Func<Task<JObject?>> toProvider,
+        string fromErrorMessage,
+        string toErrorMessage)
+    {
+        var fromJson = await fromProvider();
+
+        if (fromJson is null)
         {
-            throw new InvalidOperationException($"Unknown version {fromVersion} of the configuration for {key.Annotation}.");
+            throw new InvalidOperationException(fromErrorMessage);
         }
 
-        var toJson = toVersion == 0
-            ? new JObject()
-            : await GetConfigurationVersionContentAsync(key, toVersion);
+        var toJson = await toProvider();
 
-        if (toJson is null && toVersion != 0)
+        if (toJson is null)
         {
-            throw new InvalidOperationException($"Unknown version {toVersion} of the configuration for {key.Annotation}.");
+            throw new InvalidOperationException(toErrorMessage);
         }
 
         var serializerSettings = _jsonSettingsProvider.GetSettings(JsonSettingNames.Unique);
-        var fromText = fromVersion == 0 ? string.Empty : JsonConvert.SerializeObject(fromJson, Formatting.Indented, serializerSettings);
-        var toText = toVersion == 0 ? string.Empty : JsonConvert.SerializeObject(toJson, Formatting.Indented, serializerSettings);
+        var fromText = !fromJson.HasValues ? string.Empty : JsonConvert.SerializeObject(fromJson, Formatting.Indented, serializerSettings);
+        var toText = !toJson.HasValues ? string.Empty : JsonConvert.SerializeObject(toJson, Formatting.Indented, serializerSettings);
 
         var diff = InlineDiffBuilder.Diff(fromText, toText);
         var lines = new List<string>();

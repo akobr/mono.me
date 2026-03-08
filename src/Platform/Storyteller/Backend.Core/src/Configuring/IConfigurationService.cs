@@ -29,4 +29,6 @@ public interface IConfigurationService
     Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint version);
 
     Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion);
+
+    Task<IReadOnlyCollection<string>> GetConfigurationViewChangesAsync(FullKey sourceKey, string toView);
 }

@@ -358,7 +358,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
         changes2.Count(line => line.StartsWith("- ")).Should().Be(1);
         changes2.Count(line => line.StartsWith("  ")).Should().Be(4);
 
-        changes3.Count(line => line.StartsWith("+ ")).Should().Be(1);
+        changes3.Count(line => line.StartsWith("+ ")).Should().Be(0);
         changes3.Count(line => line.StartsWith("- ")).Should().Be(12);
         changes3.Count(line => line.StartsWith("  ")).Should().Be(0);
 
@@ -367,18 +367,80 @@ public class CosmosConfigurationServiceTests(Startup startup)
 
         var diff1To3 = await configs.GetConfigurationVersionChangesAsync(key, 1, 3);
         diff1To3.Count(line => line.StartsWith("- ")).Should().Be(5);
-        diff1To3.Count(line => line.StartsWith("+ ")).Should().Be(1);
+        diff1To3.Count(line => line.StartsWith("+ ")).Should().Be(0);
 
         var diff3To2 = await configs.GetConfigurationVersionChangesAsync(key, 3, 2);
         diff3To2.Count(line => line.StartsWith("+ ")).Should().Be(12);
-        diff3To2.Count(line => line.StartsWith("- ")).Should().Be(1);
+        diff3To2.Count(line => line.StartsWith("- ")).Should().Be(0);
 
         var diff2To1 = await configs.GetConfigurationVersionChangesAsync(key, 2, 1);
         diff2To1.Count(line => line.StartsWith("- ")).Should().Be(8);
         diff2To1.Count(line => line.StartsWith("+ ")).Should().Be(1);
 
         var diff3To0 = await configs.GetConfigurationVersionChangesAsync(key, 3, 0);
-        diff3To0.Count(line => line.StartsWith("- ")).Should().Be(1);
+        diff3To0.Count(line => line.StartsWith("- ")).Should().Be(0);
         diff3To0.Count(line => line.StartsWith("+ ")).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task GetConfigurationViewChanges()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("view-diff");
+        var viewA = "view-a";
+        var viewB = "view-b";
+
+        // Create annotation in both views
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "view-diff",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = viewA,
+        });
+
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "view-diff",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = viewB,
+        });
+
+        var configA = JObject.Parse("""
+                                    {
+                                        "key": "value-a",
+                                        "common": "same"
+                                    }
+                                    """);
+
+        var configB = JObject.Parse("""
+                                    {
+                                        "key": "value-b",
+                                        "common": "same"
+                                    }
+                                    """);
+
+        var fullKeyA = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, viewA);
+        var fullKeyB = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, viewB);
+
+        await configs.CreateOrUpdateConfigurationAsync(fullKeyA, configA, "system");
+        await configs.CreateOrUpdateConfigurationAsync(fullKeyB, configB, "system");
+
+        var diff = await configs.GetConfigurationViewChangesAsync(fullKeyA, viewB);
+
+        diff.Should().NotBeNull();
+        // expect - "key": "value-a"
+        // expect + "key": "value-b"
+        // expect   "common": "same" (and brackets)
+        diff.Count(line => line.StartsWith("- ")).Should().Be(1);
+        diff.Count(line => line.StartsWith("+ ")).Should().Be(1);
+        diff.Count(line => line.StartsWith("  ")).Should().BeGreaterThan(0);
+        diff.Should().Contain(line => line.Contains("value-a") && line.StartsWith("- "));
+        diff.Should().Contain(line => line.Contains("value-b") && line.StartsWith("+ "));
     }
 }
