@@ -48,6 +48,7 @@ public static class Definitions
                 public const string Version = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}";
                 public const string VersionDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}/diff";
                 public const string VersionDiffCustom = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}/diff/{{{Parameters.VersionFrom}}}";
+                public const string ViewDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/diff/{{{Parameters.ViewTo}}}";
             }
         }
     }
@@ -103,6 +104,7 @@ public static class Definitions
             public const string GetConfigurationVersion = nameof(GetConfigurationVersion);
             public const string GetConfigurationVersionDiff = nameof(GetConfigurationVersionDiff);
             public const string GetConfigurationVersionDiffCustom = nameof(GetConfigurationVersionDiffCustom);
+            public const string GetConfigurationViewDiff = nameof(GetConfigurationViewDiff);
         }
     }
 
@@ -118,6 +120,7 @@ public static class Definitions
         public const string Descendants = "descendants";
         public const string Version = "version";
         public const string VersionFrom = "versionFrom";
+        public const string ViewTo = "viewTo";
     }
 
     public static class Tags
