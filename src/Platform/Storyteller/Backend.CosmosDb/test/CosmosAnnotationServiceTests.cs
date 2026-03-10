@@ -45,8 +45,8 @@ public class CosmosAnnotationServiceTests(Startup startup)
         returned.Should().BeOfType<Subject>();
         var returnedTyped = (Subject)returned;
         returnedTyped.Name.Should().Be("simple-subject");
-        returnedTyped.Contexts.Should().BeEmpty();
-        returnedTyped.Usages.Should().BeEmpty();
+        returnedTyped.ContextNames.Should().BeEmpty();
+        returnedTyped.ResponsibilityNames.Should().BeEmpty();
     }
 
     [Fact]
@@ -118,8 +118,8 @@ public class CosmosAnnotationServiceTests(Startup startup)
         returnedTyped.Name.Should().Be("simple-context");
         returnedTyped.SubjectKey.Should().Be(subjectKey);
 
-        returnedSubject.Contexts.Should().HaveCount(1);
-        returnedSubject.Contexts.Should().Contain("simple-context");
+        returnedSubject.ContextNames.Should().HaveCount(1);
+        returnedSubject.ContextNames.Should().Contain("simple-context");
     }
 
     [Fact]
@@ -148,8 +148,8 @@ public class CosmosAnnotationServiceTests(Startup startup)
         createdAnnotations[1].AnnotationKey.Should().Be(contextKey);
         createdAnnotations[1].AnnotationType.Should().Be(AnnotationType.Context);
         var subject = (Subject)createdAnnotations[0];
-        subject.Contexts.Should().HaveCount(1);
-        subject.Contexts.Should().Contain("only-context");
+        subject.ContextNames.Should().HaveCount(1);
+        subject.ContextNames.Should().Contain("only-context");
     }
 
     [Fact]
@@ -180,8 +180,8 @@ public class CosmosAnnotationServiceTests(Startup startup)
         createdAnnotations[1].AnnotationKey.Should().Be(unitKey);
         createdAnnotations[1].AnnotationType.Should().Be(AnnotationType.Unit);
         var responsibility = (Responsibility)createdAnnotations[0];
-        responsibility.Units.Should().HaveCount(1);
-        responsibility.Units.Should().Contain("only-unit");
+        responsibility.UnitNames.Should().HaveCount(1);
+        responsibility.UnitNames.Should().Contain("only-unit");
     }
 
     [Fact]
@@ -213,8 +213,8 @@ public class CosmosAnnotationServiceTests(Startup startup)
         createdAnnotations.Should().Contain(a => a.AnnotationKey == usageKey && a.AnnotationType == AnnotationType.Usage);
 
         var subject = (Subject)createdAnnotations.First(a => a.AnnotationKey == subjectKey);
-        subject.Usages.Should().HaveCount(1);
-        subject.Usages.Should().Contain("responsibility-for-only-usage");
+        subject.ResponsibilityNames.Should().HaveCount(1);
+        subject.ResponsibilityNames.Should().Contain("responsibility-for-only-usage");
     }
 
     [Fact]
@@ -252,14 +252,14 @@ public class CosmosAnnotationServiceTests(Startup startup)
         createdAnnotations.Should().Contain(a => a.AnnotationKey == executionKey && a.AnnotationType == AnnotationType.Execution);
 
         var subject = (Subject)createdAnnotations.First(a => a.AnnotationKey == subjectKey);
-        subject.Contexts.Should().Contain("context-for-only-execution");
-        subject.Usages.Should().Contain("responsibility-for-only-execution");
+        subject.ContextNames.Should().Contain("context-for-only-execution");
+        subject.ResponsibilityNames.Should().Contain("responsibility-for-only-execution");
 
         var context = (Context)createdAnnotations.First(a => a.AnnotationKey == contextKey);
-        context.Executions.Should().Contain("responsibility-for-only-execution");
+        context.ResponsibilityNames.Should().Contain("responsibility-for-only-execution");
 
         var usage = (Usage)createdAnnotations.First(a => a.AnnotationKey == usageKey);
-        usage.Executions.Should().Contain("context-for-only-execution");
+        usage.ContextNames.Should().Contain("context-for-only-execution");
     }
 
     [Fact]
@@ -303,10 +303,10 @@ public class CosmosAnnotationServiceTests(Startup startup)
         createdAnnotations.Should().Contain(a => a.AnnotationKey == unitOfExecutionKey && a.AnnotationType == AnnotationType.UnitOfExecution);
 
         var execution = (Execution)createdAnnotations.First(a => a.AnnotationKey == executionKey);
-        execution.Units.Should().Contain("only-uoe");
+        execution.UnitNames.Should().Contain("only-uoe");
 
         var responsibility = (Responsibility)createdAnnotations.First(a => a.AnnotationKey == responsibilityKey);
-        responsibility.Units.Should().Contain("only-uoe");
+        responsibility.UnitNames.Should().Contain("only-uoe");
     }
 
     [Fact]
@@ -369,8 +369,8 @@ public class CosmosAnnotationServiceTests(Startup startup)
         returnedTyped.SubjectKey.Should().Be(subjectKey);
         returnedTyped.ResponsibilityKey.Should().Be(responsibilityKey);
 
-        returnedSubject.Usages.Should().HaveCount(1);
-        returnedSubject.Usages.Should().Contain("responsibility-for-usage");
+        returnedSubject.ResponsibilityNames.Should().HaveCount(1);
+        returnedSubject.ResponsibilityNames.Should().Contain("responsibility-for-usage");
 
     }
 
@@ -467,16 +467,16 @@ public class CosmosAnnotationServiceTests(Startup startup)
         returnedTyped.ResponsibilityKey.Should().Be(responsibilityKey);
         returnedTyped.ContextKey.Should().Be(contextKey);
 
-        returnedSubject.Contexts.Should().HaveCount(1);
-        returnedSubject.Contexts.Should().Contain("context-for-execution");
-        returnedSubject.Usages.Should().HaveCount(1);
-        returnedSubject.Usages.Should().Contain("responsibility-for-execution");
+        returnedSubject.ContextNames.Should().HaveCount(1);
+        returnedSubject.ContextNames.Should().Contain("context-for-execution");
+        returnedSubject.ResponsibilityNames.Should().HaveCount(1);
+        returnedSubject.ResponsibilityNames.Should().Contain("responsibility-for-execution");
 
-        returnedContext.Executions.Should().HaveCount(1);
-        returnedContext.Executions.Should().Contain("responsibility-for-execution");
+        returnedContext.ResponsibilityNames.Should().HaveCount(1);
+        returnedContext.ResponsibilityNames.Should().Contain("responsibility-for-execution");
 
-        returnedUsage.Executions.Should().HaveCount(1);
-        returnedUsage.Executions.Should().Contain("context-for-execution");
+        returnedUsage.ContextNames.Should().HaveCount(1);
+        returnedUsage.ContextNames.Should().Contain("context-for-execution");
     }
 
     [Fact]
@@ -593,9 +593,9 @@ public class CosmosAnnotationServiceTests(Startup startup)
             FullKey.Create(usageKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName));
 
         returnedSubject.Should().NotBeNull();
-        returnedSubject.Contexts.Should().Contain("bulk-context");
-        returnedSubject.Usages.Should().Contain("bulk-responsibility");
-        returnedContext.Executions.Should().Contain("bulk-responsibility");
-        returnedUsage.Executions.Should().Contain("bulk-context");
+        returnedSubject.ContextNames.Should().Contain("bulk-context");
+        returnedSubject.ResponsibilityNames.Should().Contain("bulk-responsibility");
+        returnedContext.ResponsibilityNames.Should().Contain("bulk-responsibility");
+        returnedUsage.ContextNames.Should().Contain("bulk-context");
     }
 }

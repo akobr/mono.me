@@ -1,6 +1,6 @@
 ﻿namespace _42.Platform.Storyteller;
 
-public record UnitOfExecution : Annotation, IExecution
+public record UnitOfExecution : Annotation, IUnitOfExecution
 {
     public required string ResponsibilityKey { get; init; }
 

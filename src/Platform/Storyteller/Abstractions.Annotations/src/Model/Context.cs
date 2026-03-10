@@ -8,5 +8,5 @@ public record class Context : Annotation, IContext
 
     public required string SubjectName { get; init; }
 
-    public IReadOnlySet<string> Executions { get; init; } = new HashSet<string>(0);
+    public IReadOnlySet<string> ResponsibilityNames { get; init; } = new HashSet<string>(0);
 }

@@ -12,5 +12,5 @@ public record class UsageEntity : AnnotationEntity
 
     public required string ResponsibilityName { get; init; }
 
-    public required IReadOnlyCollection<string> Executions { get; init; }
+    public required IReadOnlyCollection<string> ContextNames { get; init; }
 }

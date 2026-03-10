@@ -148,7 +148,7 @@ public class CosmosAnnotationService : IAnnotationService
 
                     responsibilityTransaction.PatchItem(
                         key.GetCosmosItemId(responsibilityKey),
-                        [PatchOperation.Add($"/{nameof(ResponsibilityEntity.Units)}/-", unitName)]);
+                        [PatchOperation.Add($"/{nameof(ResponsibilityEntity.UnitNames)}/-", unitName)]);
                 }
 
                 await UpsertAnnotationEntityAsync(annotation, responsibilityTransaction, disposable);
@@ -172,7 +172,7 @@ public class CosmosAnnotationService : IAnnotationService
                 {
                     subjectTransaction.PatchItem(
                         key.GetCosmosItemId(subjectKey),
-                        [PatchOperation.Add($"/{nameof(SubjectEntity.Usages)}/-", responsibilityName)],
+                        [PatchOperation.Add($"/{nameof(SubjectEntity.ResponsibilityNames)}/-", responsibilityName)],
                         new TransactionalBatchPatchItemRequestOptions { EnableContentResponseOnWrite = false });
                 }
 
@@ -193,7 +193,7 @@ public class CosmosAnnotationService : IAnnotationService
                 {
                     subjectTransaction.PatchItem(
                         key.GetCosmosItemId(subjectKey),
-                        [PatchOperation.Add($"/{nameof(SubjectEntity.Contexts)}/-", contextName)]);
+                        [PatchOperation.Add($"/{nameof(SubjectEntity.ContextNames)}/-", contextName)]);
                 }
 
                 await UpsertAnnotationEntityAsync(annotation, subjectTransaction, disposable);
@@ -220,7 +220,7 @@ public class CosmosAnnotationService : IAnnotationService
 
                     responsibilityTransaction.PatchItem(
                         key.GetCosmosItemId(usageKey),
-                        [PatchOperation.Add($"/{nameof(UsageEntity.Executions)}/-", contextName)],
+                        [PatchOperation.Add($"/{nameof(UsageEntity.ContextNames)}/-", contextName)],
                         new TransactionalBatchPatchItemRequestOptions { EnableContentResponseOnWrite = false });
                 }
 
@@ -228,7 +228,7 @@ public class CosmosAnnotationService : IAnnotationService
                 {
                     subjectTransaction.PatchItem(
                         key.GetCosmosItemId(contextKey),
-                        [PatchOperation.Add($"/{nameof(ContextEntity.Executions)}/-", responsibilityName)],
+                        [PatchOperation.Add($"/{nameof(ContextEntity.ResponsibilityNames)}/-", responsibilityName)],
                         new TransactionalBatchPatchItemRequestOptions { EnableContentResponseOnWrite = false });
                 }
 
@@ -266,7 +266,7 @@ public class CosmosAnnotationService : IAnnotationService
                 {
                     responsibilityTransaction.PatchItem(
                         key.GetCosmosItemId(executionKey),
-                        [PatchOperation.Add($"/{nameof(ExecutionEntity.Units)}/-", unitName)]);
+                        [PatchOperation.Add($"/{nameof(ExecutionEntity.UnitNames)}/-", unitName)]);
                 }
 
                 await UpsertAnnotationEntityAsync(annotation, responsibilityTransaction, disposable);
@@ -489,7 +489,7 @@ public class CosmosAnnotationService : IAnnotationService
                 var usageTasks = new List<Task>();
 
                 // delete usage and its executions
-                foreach (var responsibilityName in subject.Usages)
+                foreach (var responsibilityName in subject.ResponsibilityNames)
                 {
                     var usageKey = FullKey.Create(AnnotationKey.CreateUsage(subject.Name, responsibilityName), fullKey);
                     usageTasks.Add(
@@ -503,7 +503,7 @@ public class CosmosAnnotationService : IAnnotationService
                 // delete contexts and the subject
                 // TODO: [P3] this could use delete all items by partition key
                 await DeleteAnnotationEntitiesAsync(
-                    subject.Contexts
+                    subject.ContextNames
                         .Select(name => FullKey.Create(AnnotationKey.CreateContext(subject.Name, name), fullKey))
                         .Concat([fullKey]),
                     fullKey.GetCosmosPartitionKey(),
@@ -550,13 +550,13 @@ public class CosmosAnnotationService : IAnnotationService
             {
                 var usage = (Usage)annotation;
                 var subjectKey = FullKey.Create(fullKey.Annotation.GetSubjectKey(), fullKey);
-                await repository.Container.RemoveArrayValueAsync(subjectKey.GetCosmosItemId(), nameof(SubjectEntity.Usages), usage.ResponsibilityName, subjectKey.GetCosmosPartitionKey());
+                await repository.Container.RemoveArrayValueAsync(subjectKey.GetCosmosItemId(), nameof(SubjectEntity.ResponsibilityNames), usage.ResponsibilityName, subjectKey.GetCosmosPartitionKey());
 
                 // remove executions from contexts
-                foreach (var contextName in usage.Executions)
+                foreach (var contextName in usage.ContextNames)
                 {
                     var contextKey = FullKey.Create(AnnotationKey.CreateContext(usage.SubjectName, contextName), fullKey);
-                    await repository.Container.RemoveArrayValueAsync(contextKey.GetCosmosItemId(), nameof(ContextEntity.Executions), usage.ResponsibilityName, contextKey.GetCosmosPartitionKey());
+                    await repository.Container.RemoveArrayValueAsync(contextKey.GetCosmosItemId(), nameof(ContextEntity.ResponsibilityNames), usage.ResponsibilityName, contextKey.GetCosmosPartitionKey());
                 }
 
                 var queryable = repository.Container.GetItemLinqQueryable<Entity>(
@@ -589,18 +589,18 @@ public class CosmosAnnotationService : IAnnotationService
             {
                 var context = (Context)annotation;
                 var subjectKey = FullKey.Create(fullKey.Annotation.GetSubjectKey(), fullKey);
-                await repository.Container.RemoveArrayValueAsync(subjectKey.GetCosmosItemId(), nameof(SubjectEntity.Contexts), context.Name, subjectKey.GetCosmosPartitionKey());
+                await repository.Container.RemoveArrayValueAsync(subjectKey.GetCosmosItemId(), nameof(SubjectEntity.ContextNames), context.Name, subjectKey.GetCosmosPartitionKey());
 
                 // remove executions from usages
-                foreach (var responsibilityName in context.Executions)
+                foreach (var responsibilityName in context.ResponsibilityNames)
                 {
                     var usageKey = FullKey.Create(AnnotationKey.CreateUsage(context.SubjectName, responsibilityName), fullKey);
-                    await repository.Container.RemoveArrayValueAsync(usageKey.GetCosmosItemId(), nameof(UsageEntity.Executions), context.Name, usageKey.GetCosmosPartitionKey());
+                    await repository.Container.RemoveArrayValueAsync(usageKey.GetCosmosItemId(), nameof(UsageEntity.ContextNames), context.Name, usageKey.GetCosmosPartitionKey());
                 }
 
                 // delete executions and the context
                 await DeleteAnnotationEntitiesAsync(
-                    context.Executions
+                    context.ResponsibilityNames
                         .Select(name => FullKey.Create(AnnotationKey.CreateExecution(context.SubjectName, name, context.Name), fullKey))
                         .Concat([fullKey]),
                     repository);
@@ -615,10 +615,10 @@ public class CosmosAnnotationService : IAnnotationService
                 var contextKey = FullKey.Create(fullKey.Annotation.GetContextKey(), fullKey);
 
                 // remove execution from usage
-                await repository.Container.RemoveArrayValueAsync(usageKey.GetCosmosItemId(), nameof(UsageEntity.Executions), execution.Name, usageKey.GetCosmosPartitionKey());
+                await repository.Container.RemoveArrayValueAsync(usageKey.GetCosmosItemId(), nameof(UsageEntity.ContextNames), execution.Name, usageKey.GetCosmosPartitionKey());
 
                 // remove execution from context
-                await repository.Container.RemoveArrayValueAsync(contextKey.GetCosmosItemId(), nameof(ContextEntity.Executions), execution.ResponsibilityName, contextKey.GetCosmosPartitionKey());
+                await repository.Container.RemoveArrayValueAsync(contextKey.GetCosmosItemId(), nameof(ContextEntity.ResponsibilityNames), execution.ResponsibilityName, contextKey.GetCosmosPartitionKey());
 
                 // delete the execution
                 await DeleteAnnotationEntityAsync(fullKey, repository);
@@ -632,7 +632,7 @@ public class CosmosAnnotationService : IAnnotationService
                 var responsibilityKey = FullKey.Create(fullKey.Annotation.GetResponsibilityKey(), fullKey);
 
                 // remove unit from responsibility
-                await repository.Container.RemoveArrayValueAsync(responsibilityKey.GetCosmosItemId(), nameof(ResponsibilityEntity.Units), unit.Name, responsibilityKey.GetCosmosPartitionKey());
+                await repository.Container.RemoveArrayValueAsync(responsibilityKey.GetCosmosItemId(), nameof(ResponsibilityEntity.UnitNames), unit.Name, responsibilityKey.GetCosmosPartitionKey());
 
                 var queryable = repository.Container.GetItemLinqQueryable<Entity>(
                     requestOptions: new QueryRequestOptions() { PartitionKey = fullKey.GetCosmosPartitionKey(), },
@@ -665,7 +665,7 @@ public class CosmosAnnotationService : IAnnotationService
                 var executionKey = FullKey.Create(fullKey.Annotation.GetExecutionKey(), fullKey);
 
                 // remove unit from execution
-                await repository.Container.RemoveArrayValueAsync(executionKey.GetCosmosItemId(), nameof(ExecutionEntity.Units), unitOfExecution.Name, executionKey.GetCosmosPartitionKey());
+                await repository.Container.RemoveArrayValueAsync(executionKey.GetCosmosItemId(), nameof(ExecutionEntity.UnitNames), unitOfExecution.Name, executionKey.GetCosmosPartitionKey());
 
                 // delete the unit of execution
                 await DeleteAnnotationEntityAsync(fullKey, repository);
@@ -816,7 +816,7 @@ public class CosmosAnnotationService : IAnnotationService
             AnnotationType = AnnotationType.Responsibility,
             AnnotationKey = newKey,
             Name = newKey.ResponsibilityName,
-            Units = new HashSet<string>(units ?? []),
+            UnitNames = new HashSet<string>(units ?? []),
             ProjectName = context.Annotation.ProjectName,
             ViewName = context.Annotation.ViewName,
             ValidFrom = context.Annotation.ValidFrom,
@@ -828,7 +828,7 @@ public class CosmosAnnotationService : IAnnotationService
 
         if (!string.IsNullOrEmpty(context.Key.Annotation.UnitName))
         {
-            newAnnotation = newAnnotation with { Units = new HashSet<string>([context.Key.Annotation.UnitName]) };
+            newAnnotation = newAnnotation with { UnitNames = new HashSet<string>([context.Key.Annotation.UnitName]) };
         }
 
         await UpsertAnnotationEntityAsync(newAnnotation, context.Transaction, context.Disposable);
@@ -890,8 +890,8 @@ public class CosmosAnnotationService : IAnnotationService
                 AnnotationType = AnnotationType.Subject,
                 AnnotationKey = newKey,
                 Name = newKey.SubjectName,
-                Contexts = new HashSet<string>(contexts ?? []),
-                Usages = new HashSet<string>(responsibilities ?? []),
+                ContextNames = new HashSet<string>(contexts ?? []),
+                ResponsibilityNames = new HashSet<string>(responsibilities ?? []),
                 ProjectName = context.Annotation.ProjectName,
                 ViewName = context.Annotation.ViewName,
                 ValidFrom = context.Annotation.ValidFrom,
@@ -929,7 +929,7 @@ public class CosmosAnnotationService : IAnnotationService
             ResponsibilityName = newKey.GetResponsibilityName(),
             SubjectKey = newKey.GetSubjectKey(),
             SubjectName = newKey.GetSubjectName(),
-            Executions = new HashSet<string>(contexts ?? []),
+            ContextNames = new HashSet<string>(contexts ?? []),
             ProjectName = context.Annotation.ProjectName,
             ViewName = context.Annotation.ViewName,
             ValidFrom = context.Annotation.ValidFrom,
@@ -965,7 +965,7 @@ public class CosmosAnnotationService : IAnnotationService
             Name = newKey.ContextName,
             SubjectKey = newKey.GetSubjectKey(),
             SubjectName = newKey.GetSubjectName(),
-            Executions = new HashSet<string>(responsibilities ?? []),
+            ResponsibilityNames = new HashSet<string>(responsibilities ?? []),
             ProjectName = context.Annotation.ProjectName,
             ViewName = context.Annotation.ViewName,
             ValidFrom = context.Annotation.ValidFrom,
@@ -1005,7 +1005,7 @@ public class CosmosAnnotationService : IAnnotationService
             SubjectName = newKey.GetSubjectName(),
             ContextKey = newKey.GetContextKey(),
             ContextName = newKey.GetContextName(),
-            Units = new HashSet<string>(units ?? []),
+            UnitNames = new HashSet<string>(units ?? []),
             ProjectName = context.Annotation.ProjectName,
             ViewName = context.Annotation.ViewName,
             ValidFrom = context.Annotation.ValidFrom,

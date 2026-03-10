@@ -16,5 +16,5 @@ public record class ExecutionEntity : AnnotationEntity
 
     public required string ContextName { get; init; }
 
-    public required IReadOnlyCollection<string> Units { get; init; }
+    public required IReadOnlyCollection<string> UnitNames { get; init; }
 }

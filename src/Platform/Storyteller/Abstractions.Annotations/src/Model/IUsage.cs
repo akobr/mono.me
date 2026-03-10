@@ -12,5 +12,5 @@ public interface IUsage : IAnnotation
 
     string ResponsibilityName { get; }
 
-    IReadOnlySet<string> Executions { get; }
+    IReadOnlySet<string> ContextNames { get; }
 }
