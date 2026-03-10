@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace _42.Platform.Storyteller;
 
 public interface IExecution : IAnnotation
@@ -13,4 +15,6 @@ public interface IExecution : IAnnotation
     string ResponsibilityName { get; }
 
     string ContextName { get; }
+
+    IReadOnlySet<string> UnitNames { get; }
 }

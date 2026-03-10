@@ -22,7 +22,7 @@ public static class Create
             AnnotationType = AnnotationType.Responsibility,
             AnnotationKey = $"{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
             Name = responsibilityName,
-            Units = unitNames?.ToList() ?? [],
+            UnitNames = unitNames?.ToList() ?? [],
         };
     }
 
@@ -42,8 +42,8 @@ public static class Create
             AnnotationType = AnnotationType.Subject,
             AnnotationKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             Name = subjectName,
-            Usages = responsibilityNames?.ToList() ?? [],
-            Contexts = contextNames?.ToList() ?? [],
+            ResponsibilityNames = responsibilityNames?.ToList() ?? [],
+            ContextNames = contextNames?.ToList() ?? [],
         };
     }
 
@@ -65,7 +65,7 @@ public static class Create
             Name = contextName,
             SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             SubjectName = subjectName,
-            Executions = responsibilityNames?.ToList() ?? [],
+            ResponsibilityNames = responsibilityNames?.ToList() ?? [],
         };
     }
 
@@ -89,7 +89,7 @@ public static class Create
             SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             ResponsibilityName = responsibilityName,
             SubjectName = subjectName,
-            Executions = contextNames?.ToList() ?? [],
+            ContextNames = contextNames?.ToList() ?? [],
         };
     }
 
@@ -116,7 +116,7 @@ public static class Create
             ResponsibilityName = responsibilityName,
             SubjectName = subjectName,
             ContextName = contextName,
-            Units = unitNames?.ToList() ?? [],
+            UnitNames = unitNames?.ToList() ?? [],
         };
     }
 

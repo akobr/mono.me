@@ -4,7 +4,7 @@ namespace _42.Platform.Storyteller;
 
 public interface ISubject : IAnnotation
 {
-    IReadOnlySet<string> Contexts { get; }
+    IReadOnlySet<string> ContextNames { get; }
 
-    IReadOnlySet<string> Usages { get; }
+    IReadOnlySet<string> ResponsibilityNames { get; }
 }

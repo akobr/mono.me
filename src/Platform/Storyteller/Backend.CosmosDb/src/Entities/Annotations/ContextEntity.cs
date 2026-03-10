@@ -8,5 +8,5 @@ public record class ContextEntity : AnnotationEntity
 
     public required string SubjectName { get; init; }
 
-    public required IReadOnlyCollection<string> Executions { get; init; }
+    public required IReadOnlyCollection<string> ResponsibilityNames { get; init; }
 }

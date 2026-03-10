@@ -1,6 +1,8 @@
+using System.Collections.Generic;
+
 namespace _42.Platform.Storyteller;
 
 public interface IResponsibility : IAnnotation
 {
-    // no member
+    IReadOnlySet<string> UnitNames { get; }
 }
