@@ -7,7 +7,7 @@
     <PackageVersion Include="42.Monorepo.GitVersioning.Core" Version="1.2.3" />
     <PackageVersion Include="Alba.CsConsoleFormat-NoXaml" Version="1.0.0" />
     <PackageVersion Include="Asp.Versioning.Http" Version="8.1.0" />
-    <PackageVersion Include="AutoMapper" Version="15.0.1" />
+    <PackageVersion Include="AutoMapper" Version="14.0.0" />
     <PackageVersion Include="Azure.Identity" Version="1.17.1" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.8.0" />
     <PackageVersion Include="Bogus" Version="35.6.3" />
