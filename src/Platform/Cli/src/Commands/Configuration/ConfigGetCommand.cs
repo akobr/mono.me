@@ -37,7 +37,7 @@ public class ConfigGetCommand : BaseContextCommand
 
     public bool IsExportRequested => !string.IsNullOrWhiteSpace(ExportFilePath);
 
-    [Option("-r|--resolved", CommandOptionType.NoValue, Description = "Retrieve resolved configuration, administrator permission is needed.")]
+    [Option("-r|--resolved", CommandOptionType.NoValue, Description = "Retrieve resolved configuration, corresponding permission is needed.")]
     public bool IsResolvedRetrievalRequested { get; set; }
 
     protected override async Task<int> ExecuteAsync()
