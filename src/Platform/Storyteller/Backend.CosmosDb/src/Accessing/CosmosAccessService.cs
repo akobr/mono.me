@@ -18,17 +18,16 @@ public class CosmosAccessService : IAccessService
     private const string MAIN_PARTITION_KEY = "access";
 
     private readonly IContainerRepositoryProvider _repositoryProvider;
-    private readonly IMachineAccessService _machineAccessService;
     private readonly IContainerFactory _containerFactory;
     private readonly IMapper _mapper;
     private readonly JsonSerializerOptions _serializerOptions;
+    private readonly IMachineAccessService? _machineAccessService;
 
-    public CosmosAccessService(
-        IContainerRepositoryProvider repositoryProvider,
-        IMachineAccessService machineAccessService,
+    public CosmosAccessService(IContainerRepositoryProvider repositoryProvider,
         IContainerFactory containerFactory,
         IMapper mapper,
-        IOptions<JsonSerializerOptions> serializerOptions)
+        IOptions<JsonSerializerOptions> serializerOptions,
+        IMachineAccessService? machineAccessService = null)
     {
         _repositoryProvider = repositoryProvider;
         _machineAccessService = machineAccessService;
@@ -36,6 +35,9 @@ public class CosmosAccessService : IAccessService
         _mapper = mapper;
         _serializerOptions = serializerOptions.Value;
     }
+
+    private IMachineAccessService MachineAccessService =>
+        _machineAccessService ?? throw new InvalidOperationException("IMachineAccessService is not registered. Please register it in the DI container.");
 
     public async Task<Account?> GetAccountAsync(string id)
     {
@@ -368,7 +370,7 @@ public class CosmosAccessService : IAccessService
         var repository = _repositoryProvider.GetOrganizationContainer(model.Organization);
         var partitionKey = new PartitionKey($"{model.Project}.access");
 
-        var machineAccess = await _machineAccessService.CreateMachineAccessAsync(model);
+        var machineAccess = await MachineAccessService.CreateMachineAccessAsync(model);
 
         var accessKey = machineAccess.AccessKey;
         machineAccess = machineAccess with
@@ -395,7 +397,7 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The machine access {appId} has not been found.");
         }
 
-        var accessKey = await _machineAccessService.ResetMachineAccessAsync(machineAccess.Id);
+        var accessKey = await MachineAccessService.ResetMachineAccessAsync(machineAccess.Id);
 
         if (accessKey is null)
         {
@@ -426,7 +428,7 @@ public class CosmosAccessService : IAccessService
 
         if (response.StatusCode != HttpStatusCode.NotFound)
         {
-            await _machineAccessService.DeleteMachineAccessAsync(machineAccess.ObjectId);
+            await MachineAccessService.DeleteMachineAccessAsync(machineAccess.ObjectId);
         }
 
         return response.StatusCode != HttpStatusCode.NotFound;
