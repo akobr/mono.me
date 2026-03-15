@@ -37,7 +37,7 @@ public class ConfigSetCommand : BaseContextCommand
     [Argument(0, Description = "An annotation key to set the configuration for.")]
     public string AnnotationKey { get; set; } = string.Empty;
 
-    [Option("-r|--resolved", CommandOptionType.NoValue, Description = "Retrieve resolved configuration, administrator permission is needed.")]
+    [Option("-r|--resolved", CommandOptionType.NoValue, Description = "Retrieve resolved configuration, corresponding permission is needed.")]
     public bool IsResolvedRetrievalRequested { get; set; }
 
     [Option("-i|--import", CommandOptionType.SingleValue, Description = "Specify a file from where the configuration(s) will be imported.")]
