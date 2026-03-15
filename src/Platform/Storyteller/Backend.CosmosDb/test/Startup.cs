@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Polly;
 using Testcontainers.CosmosDb;
 using Xunit;
 
@@ -51,6 +52,22 @@ public class Startup : IAsyncLifetime, ITestContext
     }
 
     private async Task CleanupDatabaseAsync()
+    {
+        var pipeline = new ResiliencePipelineBuilder()
+            .AddRetry(new()
+            {
+                MaxRetryAttempts = 3,
+                Delay = TimeSpan.FromSeconds(1),
+            })
+            .Build();
+
+        await pipeline.ExecuteAsync(async _ =>
+        {
+            await DeleteDatabasesAsync();
+        });
+    }
+
+    private async Task DeleteDatabasesAsync()
     {
         var clientProvider = Services.GetRequiredService<ICosmosClientProvider>();
         var client = clientProvider.Client;

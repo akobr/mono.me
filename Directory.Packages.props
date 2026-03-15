@@ -79,7 +79,7 @@
     <PackageVersion Include="NuGet.Packaging" Version="6.14.0" />
     <PackageVersion Include="NuGet.ProjectModel" Version="6.14.0" />
     <PackageVersion Include="NuGet.Versioning" Version="6.14.0" />
-    <PackageVersion Include="Polly" Version="8.6.2" />
+    <PackageVersion Include="Polly" Version="8.6.6" />
     <PackageVersion Include="QuikGraph" Version="2.5.0" />
     <PackageVersion Include="QuikGraph.Serialization" Version="2.5.0" />
     <PackageVersion Include="RestSharp" Version="112.1.0" />
