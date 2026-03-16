@@ -11,6 +11,7 @@ public interface ICrumbInnerExecutionContext
     object? Output { get; }
 
     DateTimeOffset StartTime { get; }
+
     Exception? Exception { get; set; }
 
     ICrumbExecutionContext ExecutionContext { get; }
