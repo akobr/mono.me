@@ -1,3 +1,4 @@
+using System.Net;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Entities;
 using _42.Utils.Async;
@@ -25,7 +26,7 @@ public class ContainerFactory : IContainerFactory
             id: containerName,
             partitionKeyPath: $"/{nameof(Entity.PartitionKey)}");
 
-        await containerResult.Container.Scripts.CreateStoredProcedureAsync(new StoredProcedureProperties
+        await containerResult.Container.UpsertStoredProcedureAsync(new StoredProcedureProperties
         {
             Id = CosmosStoredProcedureNames.RemoveValueFromArray,
             Body = """
@@ -68,7 +69,8 @@ public class ContainerFactory : IContainerFactory
                    }
                    """
         });
-        await containerResult.Container.Scripts.CreateStoredProcedureAsync(new StoredProcedureProperties
+
+        await containerResult.Container.UpsertStoredProcedureAsync(new StoredProcedureProperties
         {
             Id = CosmosStoredProcedureNames.DeleteUsageAndExecutions,
             Body = """

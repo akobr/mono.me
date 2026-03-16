@@ -5,7 +5,7 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
-
+using Microsoft.Azure.Cosmos.Scripts;
 using Container = Microsoft.Azure.Cosmos.Container;
 using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
@@ -49,6 +49,18 @@ public static class ContainerExtensions
 
         var item = serialization(response.Content);
         return item;
+    }
+
+    public static async Task UpsertStoredProcedureAsync(this Container @this, StoredProcedureProperties props)
+    {
+        try
+        {
+            await @this.Scripts.CreateStoredProcedureAsync(props);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            await @this.Scripts.ReplaceStoredProcedureAsync(props);
+        }
     }
 
     public static async Task RemoveArrayValueAsync(this Container @this, string id, string propertyName, string valueToRemove, PartitionKey partitionKey)
