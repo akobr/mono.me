@@ -649,7 +649,7 @@ internal sealed class GrainSourceGenerator : IIncrementalGenerator
     {
         if (model.Method.IsStatic)
         {
-            // TODO: static method
+            // TODO [P1]: static method
             return;
         }
 
