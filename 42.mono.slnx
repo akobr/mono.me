@@ -30,8 +30,8 @@
     <Project Path="src/Crumble/Volume.AzureStorageBlobs/src/Volume.AzureStorageBlobs.csproj" />
   </Folder>
   <Folder Name="/Crumble/Playground/">
-    <Project Path="src/Crumble/Playground/Crumble.Aspire.Host/src/Aspire.Host.Crumble.csproj" />
-    <Project Path="src/Crumble/Playground/Crumble.Aspire.ServiceDefaults/src/Aspire.ServiceDefaults.csproj" />
+    <Project Path="src/Crumble/Playground/Aspire.Host/src/Aspire.Host.Crumble.csproj" />
+    <Project Path="src/Crumble/Playground/Aspire.ServiceDefaults/src/Aspire.ServiceDefaults.csproj" />
     <Project Path="src/Crumble/Playground/Crumble/src/Examples.Full.csproj" />
     <Project Path="src/Crumble/Playground/Development/src/Development.csproj" />
     <Project Path="src/Crumble/Playground/Examples.Crumble/src/Examples.Crumble.csproj" />
