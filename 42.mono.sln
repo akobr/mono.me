@@ -134,11 +134,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime.Orleans", "src\Crum
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Playground", "Playground", "{1F1D8958-877A-4323-A66B-F5F44F179EDC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aspire.ServiceDefaults", "src\Crumble\Playground\Aspire.ServiceDefaults\src\Aspire.ServiceDefaults.csproj", "{DF1780CD-5037-4E30-B04F-0A3C410113B7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Crumble.Aspire.ServiceDefaults", "src\Crumble\Playground\Aspire.ServiceDefaults\src\Crumble.Aspire.ServiceDefaults.csproj", "{DF1780CD-5037-4E30-B04F-0A3C410113B7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Silo", "src\Crumble\Playground\Orleans.Silo\src\Orleans.Silo.csproj", "{C71EF748-9C93-49C5-9E12-4BEEEBDBB079}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Aspire.Host", "src\Crumble\Playground\Aspire.Host\src\Aspire.Host.csproj", "{5738A79B-9F4D-41B1-9845-5D10FCD37FEC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Crumble.Aspire.Host", "src\Crumble\Playground\Aspire.Host\src\Crumble.Aspire.Host.csproj", "{5738A79B-9F4D-41B1-9845-5D10FCD37FEC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples.Full", "src\Crumble\Playground\Crumble\src\Examples.Full.csproj", "{67643034-B235-42C8-8D5A-55938C34FFEA}"
 EndProject
