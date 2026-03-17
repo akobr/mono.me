@@ -28,7 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Aspire.ServiceDefaults\src\Crumble.Aspire.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Crumble.Aspire.ServiceDefaults\src\Crumble.Aspire.ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\Examples\src\Examples.csproj" />
   </ItemGroup>
 
