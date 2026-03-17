@@ -126,7 +126,7 @@ public class VolumeActionPoolingGrain : IGrainBase, IVolumeActionPoolingGrain, I
             matcher.AddInclude(normalizedFilter);
 
             var paging = _volume.GetBlobsAsync(
-                prefix: literalPrefix,
+                new GetBlobsOptions { Prefix = literalPrefix },
                 cancellationToken: cancellationToken);
 
             await foreach (var blob in paging)
