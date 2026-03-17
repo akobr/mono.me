@@ -13,7 +13,9 @@ public interface IProxyFactory
 
     object CreateInterfaceProxy(Type interfaceType, object target);
 
-    object CreateStepsProxy(Type classType, object[] constructorArguments);
+    object CreateStepsProxy(Type outputType, object[]? constructorArguments = null);
 
-    object CreateStepsProxy(Type classType, object target, object[] constructorArguments);
+    object CreateStepsProxy(Type outputType, object target, object[]? constructorArguments = null);
+
+    object CreateStepsProxy(object target);
 }

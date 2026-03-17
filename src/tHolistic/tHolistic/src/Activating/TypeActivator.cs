@@ -34,7 +34,8 @@ public class TypeActivator(
         var constructor = constructors[0];
         var arguments = ResolveParameters(constructor.GetParameters(), testCase);
         var instance = constructor.Invoke(arguments);
-        return TryProxySteps(instance, type, arguments);
+        var proxy = TryProxySteps(instance, type, arguments);
+        return proxy;
     }
 
     public object[] ResolveParameters(ParameterInfo[] parameters, TestCase? testCase)
@@ -98,8 +99,7 @@ public class TypeActivator(
 
         if (service is not null)
         {
-            // TODO: [P1] it won't work for types without empty constructor!
-            return TryProxySteps(service, parameter.ParameterType, null);
+            return TryProxySteps(service);
         }
 
         if (testCase is not null)
@@ -201,7 +201,7 @@ public class TypeActivator(
 
             sourceJToken = token.Type == JTokenType.Property
                 ? ((JProperty)token).Value
-                : (JObject)token;
+                : token;
         }
 
         if (parameter.ParameterType.IsInterface)
@@ -257,6 +257,17 @@ public class TypeActivator(
         }
 
         var proxy = proxyFactory.CreateStepsProxy(targetType, target, constructorArguments);
+        return proxy;
+    }
+
+    private object TryProxySteps(object target)
+    {
+        if (!target.GetType().IsTypeWithSteps())
+        {
+            return target;
+        }
+
+        var proxy = proxyFactory.CreateStepsProxy(target);
         return proxy;
     }
 }

@@ -1,3 +1,4 @@
+using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -31,9 +32,9 @@ public class NewtonsoftProxyJsonConverter(
 
         foreach (var property in jsonObject.Properties())
         {
-            var propInfo = interfaceType.GetProperty(property.Name);
+            var propInfo = GetPropertyWithSetter(interfaceType, property.Name);
 
-            if (propInfo is not null && propInfo.CanWrite)
+            if (propInfo is not null)
             {
                 var value = property.Value.ToObject(propInfo.PropertyType, serializer);
                 propInfo.SetValue(proxy, value);
@@ -47,4 +48,27 @@ public class NewtonsoftProxyJsonConverter(
     {
         serializer.Serialize(writer, value, interfaceType);
     }
+
+    private static PropertyInfo? GetPropertyWithSetter(Type type, string propertyName)
+    {
+        var propertyInfo = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+
+        if (propertyInfo is not null && propertyInfo.CanWrite)
+        {
+            return propertyInfo;
+        }
+
+        foreach (var interfaceType in type.GetInterfaces())
+        {
+            propertyInfo = GetPropertyWithSetter(interfaceType, propertyName);
+
+            if (propertyInfo is not null)
+            {
+                return propertyInfo;
+            }
+        }
+
+        return null;
+    }
+
 }

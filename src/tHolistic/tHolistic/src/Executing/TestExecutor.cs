@@ -85,14 +85,13 @@ public class TestExecutor(
     {
         var timeStamp = DateTimeOffset.UtcNow;
         var stopwatch = Stopwatch.StartNew();
-        var outcome = TestRunOutcome.Failed;
+        var outcome = TestRunOutcome.None;
+        using var servicesScope = scopeFactory.CreateScope();
 
         try
         {
             testCase.State = TestCaseExecutionState.Executing;
             await publisher.Publish(new ReportTestRunStartedNotification { TestCase = testCase.Case }, cancellationToken);
-
-            using var servicesScope = scopeFactory.CreateScope();
 
             // TODO: [P1] should this be part of a test execution?
             fixtures.PrepareFixtures(testCase.TargetType);
@@ -103,12 +102,26 @@ public class TestExecutor(
                 var method = testCase.TargetMethod;
                 var synchronizedAttribute = method.GetCustomAttribute<SynchronizedAttribute>();
 
-                if (synchronizedAttribute is not null
-                    && !string.IsNullOrWhiteSpace(synchronizedAttribute.SynchronizationKey))
+                if (synchronizedAttribute is not null)
                 {
-                    lock (synchronization.GetOrCreateLock(synchronizedAttribute.SynchronizationKey))
+                    // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                    if (synchronizedAttribute.SynchronizationKey is not null)
                     {
-                        outcome = InvokeTestMethodAsync(method, testClassInstance, testCase, cancellationToken).Result;
+                        // TODO: [P1] migrate to SemaphoreSlim (possibly to Semaphore when used in multiple processes)
+                        lock (synchronization.GetOrCreateLock(synchronizedAttribute.SynchronizationKey))
+                        {
+                            outcome = InvokeTestMethodAsync(method, testClassInstance, testCase, cancellationToken).Result;
+                        }
+                    }
+                    else
+                    {
+                        await publisher.Publish(
+                            new LogNotification
+                            {
+                                Level = LogMessageLevel.Warning,
+                                Message = $"Test method '{testCase.Case.FullyQualifiedName}' has Synchronized attribute, but no synchronization key is provided. Test will be executed without synchronization.",
+                            },
+                            cancellationToken);
                     }
                 }
 
@@ -122,7 +135,11 @@ public class TestExecutor(
         }
         catch (Exception exception)
         {
-            // TODO: [P1] log exception
+            await publisher.Publish(
+                new LogNotification { Level = LogMessageLevel.Error, Message = exception.Message, },
+                cancellationToken);
+
+            // TODO: [P1] report error into test result
             outcome = TestRunOutcome.Failed;
         }
         finally

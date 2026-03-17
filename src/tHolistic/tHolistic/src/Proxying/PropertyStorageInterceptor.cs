@@ -18,14 +18,20 @@ public class PropertyStorageInterceptor : IInterceptor
 
         if (invocation.Method.Name.StartsWith("get_"))
         {
-            if (_propertyValues.TryGetValue(propertyName, out var value))
-            {
-                invocation.ReturnValue = value;
-            }
+            invocation.ReturnValue = _propertyValues.TryGetValue(propertyName, out var value)
+                ? value
+                : GetDefaultValue(invocation.Method.ReturnType);
         }
         else if (invocation.Method.Name.StartsWith("set_"))
         {
             _propertyValues[propertyName] = invocation.Arguments[0];
         }
+    }
+
+    private static object? GetDefaultValue(Type type)
+    {
+        return type.IsValueType
+            ? Activator.CreateInstance(type)
+            : null;
     }
 }
