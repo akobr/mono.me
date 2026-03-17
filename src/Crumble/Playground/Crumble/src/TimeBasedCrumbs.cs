@@ -4,7 +4,7 @@ public class TimeBasedCrumbs
 {
     [TimeAction("5 * * * *")] // Every 5 minutes
     [Crumb]
-    public void TimedBased()
+    public void TimedBased(DateTime triggerUtcTime)
     {
         Console.WriteLine("Timed based crumb executed at: " + DateTime.Now);
     }
