@@ -4,7 +4,7 @@
     <AssemblyName>42.Utils.Configuration.Substitute</AssemblyName>
     <RootNamespace>_42.Utils.Configuration.Substitute</RootNamespace>
 
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
   </PropertyGroup>

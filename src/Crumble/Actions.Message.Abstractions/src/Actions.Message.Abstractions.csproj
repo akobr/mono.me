@@ -4,7 +4,7 @@
     <AssemblyName>42.Crumble.Actions.Message.Abstractions</AssemblyName>
     <RootNamespace>_42.Crumble</RootNamespace>
 
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
