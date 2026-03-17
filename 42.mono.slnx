@@ -1,0 +1,112 @@
+<Solution>
+  <Folder Name="/.configuration/">
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="mrepo.json" />
+    <File Path="version.json" />
+  </Folder>
+  <Folder Name="/c0ded0c/">
+    <Project Path="src/c0ded0c/Cli/src/Cli.csproj" />
+    <Project Path="src/c0ded0c/Core.Yaml/src/Core.Yaml.csproj" />
+    <Project Path="src/c0ded0c/Core/src/Core.csproj" />
+    <Project Path="src/c0ded0c/MsBuild/src/MsBuild.csproj" />
+    <Project Path="src/c0ded0c/PlantUml/src/PlantUml.csproj" />
+  </Folder>
+  <Folder Name="/Crumble/">
+    <Project Path="src/Crumble/Abstractions/src/Abstractions.csproj" />
+    <Project Path="src/Crumble/Actions.Message.Abstractions/src/Actions.Message.Abstractions.csproj" />
+    <Project Path="src/Crumble/Actions.Message.AzureStorageQueue.Orleans/src/Actions.Message.AzureStorageQueue.Orleans.csproj" />
+    <Project Path="src/Crumble/Actions.Time.Abstractions/src/Actions.Time.Abstractions.csproj" />
+    <Project Path="src/Crumble/Actions.Time.Orleans/src/Actions.Time.Orleans.csproj" />
+    <Project Path="src/Crumble/Actions.Volume.Abstractions/src/Actions.Volume.Abstractions.csproj" />
+    <Project Path="src/Crumble/Actions.Volume.AzureStorageBlobs.Orleans/src/Actions.Volume.AzureStorageBlobs.Orleans.csproj" />
+    <Project Path="src/Crumble/Journal.AzureStorageTables/src/Journal.AzureStorageTables.csproj" />
+    <Project Path="src/Crumble/OpenTelemetry/src/OpenTelemetry.csproj" />
+    <Project Path="src/Crumble/Runtime.Core/src/Runtime.Core.csproj" />
+    <Project Path="src/Crumble/Runtime.Orleans/src/Runtime.Orleans.csproj" />
+    <Project Path="src/Crumble/SourceGenerator.Orleans/src/SourceGenerator.Orleans.csproj" />
+    <Project Path="src/Crumble/Volume.Abstractions/src/Volume.Abstractions.csproj" />
+    <Project Path="src/Crumble/Volume.AzureStorageBlobs/src/Volume.AzureStorageBlobs.csproj" />
+  </Folder>
+  <Folder Name="/Crumble/Playground/">
+    <Project Path="src/Crumble/Playground/Crumble.Aspire.Host/src/Crumble.Aspire.Host.csproj" />
+    <Project Path="src/Crumble/Playground/Crumble.Aspire.ServiceDefaults/src/Crumble.Aspire.ServiceDefaults.csproj" />
+    <Project Path="src/Crumble/Playground/Crumble/src/Examples.Full.csproj" />
+    <Project Path="src/Crumble/Playground/Development/src/Development.csproj" />
+    <Project Path="src/Crumble/Playground/Examples.Crumble/src/Examples.Crumble.csproj" />
+    <Project Path="src/Crumble/Playground/Examples/src/Examples.csproj" />
+    <Project Path="src/Crumble/Playground/Orleans.Silo/src/Orleans.Silo.csproj" />
+  </Folder>
+  <Folder Name="/Games/">
+    <Project Path="src/Games/Cetris/src/Cetris.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/" />
+  <Folder Name="/Libraries/CLI/">
+    <Project Path="src/Libraries/CLI/Toolkit.Example/src/Toolkit.Example.csproj" />
+    <Project Path="src/Libraries/CLI/Toolkit/src/Toolkit.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Functional/">
+    <Project Path="src/Libraries/Functional/Monads.Trees/src/Monads.Trees.csproj" />
+    <Project Path="src/Libraries/Functional/Monads/src/Monads.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Roslyn/">
+    <Project Path="src/Libraries/Roslyn/Compose/src/Compose.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Structures/">
+    <Project Path="src/Libraries/Structures/Graph/src/Graph.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Testing/">
+    <Project Path="src/Libraries/Testing/System.IO.Abstractions.Trace/src/System.IO.Abstractions.Trace.csproj" />
+  </Folder>
+  <Folder Name="/Libraries/Utils/">
+    <Project Path="src/Libraries/Utils/Async/src/Async.csproj" />
+    <Project Path="src/Libraries/Utils/Async/test/Async.UnitTests.csproj" />
+    <Project Path="src/Libraries/Utils/Configuration.Substitute.KeyVault/src/Configuration.Substitute.KeyVault.csproj" />
+    <Project Path="src/Libraries/Utils/Configuration.Substitute/src/Configuration.Substitute.csproj" />
+  </Folder>
+  <Folder Name="/Monorepo/">
+    <Project Path="src/Monorepo/Cli/src/Cli.csproj" />
+    <Project Path="src/Monorepo/Repo.Generator/src/Repo.Generator.csproj" />
+  </Folder>
+  <Folder Name="/Platform/">
+    <Project Path="src/Platform/Cli/src/Cli.csproj" />
+    <Project Path="src/Platform/sdk.typescript/src/sdk.typescript.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+    <Project Path="src/Platform/Sdk/src/Sdk.csproj" />
+    <Project Path="src/Platform/ui.admin/src/ui.admin.esproj">
+      <Build />
+      <Deploy />
+    </Project>
+  </Folder>
+  <Folder Name="/Platform/Examples/">
+    <Project Path="src/Platform/Examples/CustomClientApp/src/CustomClientApp.csproj" />
+  </Folder>
+  <Folder Name="/Platform/Scheduler/">
+    <Project Path="src/Platform/Scheduler/Api.Functions/src/Api.Functions.csproj" />
+  </Folder>
+  <Folder Name="/Platform/Storyteller/">
+    <Project Path="src/Platform/Storyteller/Abstractions.Access/src/Abstractions.Access.csproj" />
+    <Project Path="src/Platform/Storyteller/Abstractions.Annotations/src/Abstractions.Annotations.csproj" />
+    <Project Path="src/Platform/Storyteller/Api.Functions/src/Api.Functions.csproj" />
+    <Project Path="src/Platform/Storyteller/Api.Web/src/Api.Web.csproj" />
+    <Project Path="src/Platform/Storyteller/Backend.AzureAd/src/Backend.AzureAd.csproj" />
+    <Project Path="src/Platform/Storyteller/Backend.Core/src/Backend.Core.csproj" />
+    <Project Path="src/Platform/Storyteller/Backend.CosmosDb/src/Backend.CosmosDb.csproj" />
+    <Project Path="src/Platform/Storyteller/Backend.CosmosDb/test/Backend.CosmosDb.UnitTests.csproj" />
+    <Project Path="src/Platform/Storyteller/Backend.Keycloak/src/Backend.Keycloak.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.Abstractions/src/Binding.Abstractions.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.Azure.KeyVault/src/Binding.Azure.KeyVault.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.Core/src/Binding.Core.csproj" />
+    <Project Path="src/Platform/Storyteller/DbCreator/src/DbCreator.csproj" />
+  </Folder>
+  <Folder Name="/Platform/Supervisor/">
+    <Project Path="src/Platform/Supervisor/Abstraction/src/Abstraction.csproj" />
+    <Project Path="src/Platform/Supervisor/Api.Functions/src/Api.Functions.csproj" />
+  </Folder>
+  <Folder Name="/Texo/">
+    <Project Path="src/Texo/Core.Markdown/src/Core.Markdown.csproj" />
+  </Folder>
+</Solution>
