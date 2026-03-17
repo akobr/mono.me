@@ -70,6 +70,8 @@
     <Project Path="src/Monorepo/Repo.Generator/src/Repo.Generator.csproj" />
   </Folder>
   <Folder Name="/Platform/">
+    <Project Path="src/Platform/Aspire.Host/src/Aspire.Host.Platform.csproj" />
+    <Project Path="src/Platform/Aspire.ServiceDefaults/src/Aspire.ServiceDefaults.csproj" />
     <Project Path="src/Platform/Cli/src/Cli.csproj" />
     <Project Path="src/Platform/sdk.typescript/src/sdk.typescript.esproj">
       <Build />
