@@ -14,6 +14,8 @@ public interface IConfigurationService
 
     Task<JObject?> GetResolvedConfigurationWithoutSecretsAsync(FullKey key);
 
+    Task<JObject?> GetConfigurationHierarchyViewAsync(FullKey key);
+
     Task<JObject> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author);
 
     Task ClearConfigurationAsync(FullKey key);

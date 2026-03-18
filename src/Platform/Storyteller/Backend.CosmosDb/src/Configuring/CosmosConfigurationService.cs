@@ -100,6 +100,21 @@ public class CosmosConfigurationService : IConfigurationService
         return GetResolvedConfigurationInternalAsync(key, false);
     }
 
+    public async Task<JObject?> GetConfigurationHierarchyViewAsync(FullKey key)
+    {
+        var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
+        var annotationExist = await repository.Container.ExistsAsync(key);
+        if (!annotationExist)
+        {
+            return null;
+        }
+
+        var node = BuildInheritanceGraph(key);
+        var result = new JObject();
+        await CollectHierarchyNodesAsync(node, repository, result, new HashSet<string>());
+        return result;
+    }
+
     public async Task<IReadOnlyCollection<ConfigurationVersion>> GetConfigurationVersionsAsync(FullKey key)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
@@ -583,6 +598,37 @@ public class CosmosConfigurationService : IConfigurationService
     {
         // TODO: [P2] Implement auto-generation of properties per type of annotation
         await Task.CompletedTask;
+    }
+
+    private async Task CollectHierarchyNodesAsync(
+        InheritanceGraphNode node,
+        IContainerRepository repository,
+        JObject result,
+        HashSet<string> visited)
+    {
+        var keyString = node.Key.ToString();
+        if (!visited.Add(keyString))
+        {
+            return;
+        }
+
+        foreach (var ancestorNode in node.GetAncestors())
+        {
+            await CollectHierarchyNodesAsync(ancestorNode, repository, result, visited);
+        }
+
+        var key = node.Key;
+        var id = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
+        var partitionKey = key.GetCosmosPartitionKey();
+        var configuration = await repository.Container.TryReadItemAsync(
+            id,
+            partitionKey,
+            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        if (configuration is not null)
+        {
+            result[keyString] = configuration.Content;
+        }
     }
 
     private async Task<JObject?> CalculateAndCacheConfigurationAsync(InheritanceGraphNode node, IContainerRepository repository)
