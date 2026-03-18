@@ -457,22 +457,22 @@ public class CosmosConfigurationServiceTests(Startup startup)
         hierarchy.Should().NotBeNull();
         hierarchy.Should().HaveCount(7);
 
-        hierarchy.Should().ContainKey(responsibilityKey.ToString());
-        hierarchy.Should().ContainKey(subjectKey.ToString());
-        hierarchy.Should().ContainKey(usageKey.ToString());
-        hierarchy.Should().ContainKey(contextKey.ToString());
-        hierarchy.Should().ContainKey(executionKey.ToString());
-        hierarchy.Should().ContainKey(unitKey.ToString());
-        hierarchy.Should().ContainKey(uoeKey.ToString());
+        hierarchy.Should().ContainKey(responsibilityAnnotationKey.ToString());
+        hierarchy.Should().ContainKey(subjectAnnotationKey.ToString());
+        hierarchy.Should().ContainKey(usageAnnotationKey.ToString());
+        hierarchy.Should().ContainKey(contextAnnotationKey.ToString());
+        hierarchy.Should().ContainKey(executionAnnotationKey.ToString());
+        hierarchy.Should().ContainKey(unitAnnotationKey.ToString());
+        hierarchy.Should().ContainKey(uoeAnnotationKey.ToString());
 
         // Each entry must contain only its own raw content — no merging from ancestors
-        var respEntry = (JObject)hierarchy[responsibilityKey.ToString()]!;
-        var subjectEntry = (JObject)hierarchy[subjectKey.ToString()]!;
-        var usageEntry = (JObject)hierarchy[usageKey.ToString()]!;
-        var contextEntry = (JObject)hierarchy[contextKey.ToString()]!;
-        var executionEntry = (JObject)hierarchy[executionKey.ToString()]!;
-        var unitEntry = (JObject)hierarchy[unitKey.ToString()]!;
-        var uoeEntry = (JObject)hierarchy[uoeKey.ToString()]!;
+        var respEntry = (JObject)hierarchy[responsibilityAnnotationKey.ToString()]!;
+        var subjectEntry = (JObject)hierarchy[subjectAnnotationKey.ToString()]!;
+        var usageEntry = (JObject)hierarchy[usageAnnotationKey.ToString()]!;
+        var contextEntry = (JObject)hierarchy[contextAnnotationKey.ToString()]!;
+        var executionEntry = (JObject)hierarchy[executionAnnotationKey.ToString()]!;
+        var unitEntry = (JObject)hierarchy[unitAnnotationKey.ToString()]!;
+        var uoeEntry = (JObject)hierarchy[uoeAnnotationKey.ToString()]!;
 
         respEntry.Should().HaveCount(1);
         subjectEntry.Should().HaveCount(1);
@@ -541,13 +541,13 @@ public class CosmosConfigurationServiceTests(Startup startup)
 
         hierarchy.Should().NotBeNull();
         hierarchy.Should().HaveCount(3);
-        hierarchy.Should().ContainKey(responsibilityKey.ToString());
-        hierarchy.Should().ContainKey(subjectKey.ToString());
-        hierarchy.Should().ContainKey(uoeKey.ToString());
-        hierarchy.Should().NotContainKey(FullKey.Create(AnnotationKey.CreateUsage(subjectName, responsibilityName), org, project, view).ToString());
-        hierarchy.Should().NotContainKey(FullKey.Create(AnnotationKey.CreateContext(subjectName, contextName), org, project, view).ToString());
-        hierarchy.Should().NotContainKey(FullKey.Create(AnnotationKey.CreateExecution(subjectName, responsibilityName, contextName), org, project, view).ToString());
-        hierarchy.Should().NotContainKey(FullKey.Create(AnnotationKey.CreateUnit(responsibilityName, unitName), org, project, view).ToString());
+        hierarchy.Should().ContainKey(responsibilityAnnotationKey.ToString());
+        hierarchy.Should().ContainKey(subjectAnnotationKey.ToString());
+        hierarchy.Should().ContainKey(uoeAnnotationKey.ToString());
+        hierarchy.Should().NotContainKey(AnnotationKey.CreateUsage(subjectName, responsibilityName).ToString());
+        hierarchy.Should().NotContainKey(AnnotationKey.CreateContext(subjectName, contextName).ToString());
+        hierarchy.Should().NotContainKey(AnnotationKey.CreateExecution(subjectName, responsibilityName, contextName).ToString());
+        hierarchy.Should().NotContainKey(AnnotationKey.CreateUnit(responsibilityName, unitName).ToString());
     }
 
     [Fact]

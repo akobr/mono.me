@@ -606,8 +606,8 @@ public class CosmosConfigurationService : IConfigurationService
         JObject result,
         HashSet<string> visited)
     {
-        var keyString = node.Key.ToString();
-        if (!visited.Add(keyString))
+        var annotationKeyString = node.Key.Annotation.ToString();
+        if (!visited.Add(annotationKeyString))
         {
             return;
         }
@@ -627,7 +627,7 @@ public class CosmosConfigurationService : IConfigurationService
 
         if (configuration is not null)
         {
-            result[keyString] = configuration.Content;
+            result[annotationKeyString] = configuration.Content;
         }
     }
 
