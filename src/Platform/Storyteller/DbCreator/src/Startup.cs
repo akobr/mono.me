@@ -31,7 +31,7 @@ namespace _42.Platform.Storyteller.DbCreator
             services.AddSingleton<IFileSystem, FileSystem>();
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
 
-            services.AddCosmosDbAnnotations(configuration);
+            services.AddCosmosDbAnnotations(configuration, "cosmos");
 
             services.AddSingleton<CoreDbStructureBuilder>();
             services.AddSingleton<GetBaseAnnotationsReview>();
@@ -46,6 +46,7 @@ namespace _42.Platform.Storyteller.DbCreator
             };
 
             builder.AddJsonFile(Constants.APPLICATION_CONFIG_JSON, false, false);
+            builder.AddEnvironmentVariables();
         }
 
         private void ConfigureLogging(ILoggingBuilder builder, IConfiguration configuration)

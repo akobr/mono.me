@@ -105,7 +105,7 @@ namespace _42.Platform.Cli
                         var authResult = authService.GetAuthenticationAsync().GetAwaiter().GetResult();
                         return authResult?.AccessToken ?? string.Empty;
                     }
-                    catch (Exception)
+                    catch (Exception ex)
                     {
                         return string.Empty;
                     }

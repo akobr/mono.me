@@ -8,6 +8,9 @@
     <PackageVersion Include="Alba.CsConsoleFormat-NoXaml" Version="1.0.0" />
     <PackageVersion Include="Asp.Versioning.Http" Version="8.1.1" />
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.2" />
+    <PackageVersion Include="Aspire.Hosting.Azure.CosmosDB" Version="13.1.2" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Functions" Version="13.1.2" />
+    <PackageVersion Include="Aspire.Hosting.Azure.Storage" Version="13.1.2" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.2" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.2" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.1.2" />
@@ -29,7 +32,7 @@
     <PackageVersion Include="LibGit2Sharp" Version="0.31.0" />
     <PackageVersion Include="McMaster.Extensions.CommandLineUtils" Version="5.0.1" />
     <PackageVersion Include="McMaster.Extensions.Hosting.CommandLine" Version="5.0.1" />
-    <PackageVersion Include="Microsoft.ApplicationInsights.WorkerService" Version="3.0.0" />
+    <PackageVersion Include="Microsoft.ApplicationInsights.WorkerService" Version="2.22.0" />
     <PackageVersion Include="Microsoft.AspNetCore.App" Version="2.2.8" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.5" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.5" />

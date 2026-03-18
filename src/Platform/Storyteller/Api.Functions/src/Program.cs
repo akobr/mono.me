@@ -61,7 +61,7 @@ var host = new HostBuilder()
         }
 
         // Add persistant and logic layer
-        services.AddCosmosDbAnnotations(context.Configuration);
+        services.AddCosmosDbAnnotations(context.Configuration, "cosmos");
 
         // Add authentication by Azure Entra
         services.AddAzureAdMachineAccess();
