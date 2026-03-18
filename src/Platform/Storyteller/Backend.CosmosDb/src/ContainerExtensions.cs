@@ -61,6 +61,10 @@ public static class ContainerExtensions
         {
             await @this.Scripts.ReplaceStoredProcedureAsync(props);
         }
+        catch (CosmosException ex)
+        {
+            throw;
+        }
     }
 
     public static async Task RemoveArrayValueAsync(this Container @this, string id, string propertyName, string valueToRemove, PartitionKey partitionKey)

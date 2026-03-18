@@ -22,9 +22,33 @@ namespace _42.Platform.Storyteller;
 
 public static class EntryPoint
 {
-    public static IServiceCollection AddCosmosDbAnnotations(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddCosmosDbAnnotations(this IServiceCollection services, IConfiguration configuration, string? connectionName = null)
     {
-        services.Configure<CosmosDbOptions>(configuration.GetSection(CosmosDbOptions.SectionName));
+        services.Configure<CosmosDbOptions>(options =>
+        {
+            configuration.GetSection(CosmosDbOptions.SectionName).Bind(options);
+
+            if (!string.IsNullOrWhiteSpace(connectionName))
+            {
+                var connectionString = configuration.GetConnectionString(connectionName);
+
+                if (!string.IsNullOrWhiteSpace(connectionString))
+                {
+                    options.Connection = connectionString;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(options.Connection))
+            {
+                options.Connection = configuration.GetConnectionString("cosmos") ?? string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.Connection)
+                && (options.Connection.Contains("localhost") || options.Connection.Contains("127.0.0.1")))
+            {
+                options.ShouldAcceptAnyCertificate ??= true;
+            }
+        });
 
         services.Configure<JsonSerializerOptions>(options =>
         {

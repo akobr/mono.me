@@ -30,7 +30,7 @@ public class ContainerFactory : IContainerFactory
         {
             Id = CosmosStoredProcedureNames.RemoveValueFromArray,
             Body = """
-                   function removeValueFromArray(itemId, partitionKey, propertyName, valueToRemove) {
+                   function removeValueFromArray(itemId, propertyName, valueToRemove) {
                        var context = getContext();
                        var collection = context.getCollection();
 
