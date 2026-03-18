@@ -383,6 +383,174 @@ public class CosmosConfigurationServiceTests(Startup startup)
     }
 
     [Fact]
+    public async Task HierarchyView_NonExistingAnnotation_ReturnsNull()
+    {
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var key = FullKey.Create(
+            AnnotationKey.CreateUnitOfExecution("hv-ne-subject", "hv-ne-resp", "hv-ne-ctx", "hv-ne-unit"),
+            TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+
+        var result = await configs.GetConfigurationHierarchyViewAsync(key);
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task HierarchyView_FullUnitOfExecutionTree_ReturnsAllSevenLevels()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        const string subjectName = "hv-full-subject";
+        const string responsibilityName = "hv-full-resp";
+        const string contextName = "hv-full-ctx";
+        const string unitName = "hv-full-unit";
+
+        var uoeAnnotationKey = AnnotationKey.CreateUnitOfExecution(subjectName, responsibilityName, contextName, unitName);
+        var subjectAnnotationKey = AnnotationKey.CreateSubject(subjectName);
+        var responsibilityAnnotationKey = AnnotationKey.CreateResponsibility(responsibilityName);
+        var usageAnnotationKey = AnnotationKey.CreateUsage(subjectName, responsibilityName);
+        var contextAnnotationKey = AnnotationKey.CreateContext(subjectName, contextName);
+        var executionAnnotationKey = AnnotationKey.CreateExecution(subjectName, responsibilityName, contextName);
+        var unitAnnotationKey = AnnotationKey.CreateUnit(responsibilityName, unitName);
+
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new UnitOfExecution
+        {
+            AnnotationKey = uoeAnnotationKey,
+            AnnotationType = AnnotationType.UnitOfExecution,
+            Name = unitName,
+            SubjectKey = subjectAnnotationKey,
+            SubjectName = subjectName,
+            ResponsibilityKey = responsibilityAnnotationKey,
+            ResponsibilityName = responsibilityName,
+            ContextKey = contextAnnotationKey,
+            ContextName = contextName,
+            UnitKey = unitAnnotationKey,
+            UnitName = unitName,
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var org = TestConstants.Organization;
+        var project = Constants.DefaultProjectName;
+        var view = Constants.DefaultViewName;
+
+        var uoeKey = FullKey.Create(uoeAnnotationKey, org, project, view);
+        var subjectKey = FullKey.Create(subjectAnnotationKey, org, project, view);
+        var responsibilityKey = FullKey.Create(responsibilityAnnotationKey, org, project, view);
+        var usageKey = FullKey.Create(usageAnnotationKey, org, project, view);
+        var contextKey = FullKey.Create(contextAnnotationKey, org, project, view);
+        var executionKey = FullKey.Create(executionAnnotationKey, org, project, view);
+        var unitKey = FullKey.Create(unitAnnotationKey, org, project, view);
+
+        await configs.CreateOrUpdateConfigurationAsync(responsibilityKey, JObject.Parse("""{ "level": "responsibility" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(subjectKey, JObject.Parse("""{ "level": "subject" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(usageKey, JObject.Parse("""{ "level": "usage" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(contextKey, JObject.Parse("""{ "level": "context" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(executionKey, JObject.Parse("""{ "level": "execution" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(unitKey, JObject.Parse("""{ "level": "unit" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(uoeKey, JObject.Parse("""{ "level": "unit-of-execution" }"""), "system");
+
+        var hierarchy = await configs.GetConfigurationHierarchyViewAsync(uoeKey);
+
+        hierarchy.Should().NotBeNull();
+        hierarchy.Should().HaveCount(7);
+
+        hierarchy.Should().ContainKey(responsibilityKey.ToString());
+        hierarchy.Should().ContainKey(subjectKey.ToString());
+        hierarchy.Should().ContainKey(usageKey.ToString());
+        hierarchy.Should().ContainKey(contextKey.ToString());
+        hierarchy.Should().ContainKey(executionKey.ToString());
+        hierarchy.Should().ContainKey(unitKey.ToString());
+        hierarchy.Should().ContainKey(uoeKey.ToString());
+
+        // Each entry must contain only its own raw content — no merging from ancestors
+        var respEntry = (JObject)hierarchy[responsibilityKey.ToString()]!;
+        var subjectEntry = (JObject)hierarchy[subjectKey.ToString()]!;
+        var usageEntry = (JObject)hierarchy[usageKey.ToString()]!;
+        var contextEntry = (JObject)hierarchy[contextKey.ToString()]!;
+        var executionEntry = (JObject)hierarchy[executionKey.ToString()]!;
+        var unitEntry = (JObject)hierarchy[unitKey.ToString()]!;
+        var uoeEntry = (JObject)hierarchy[uoeKey.ToString()]!;
+
+        respEntry.Should().HaveCount(1);
+        subjectEntry.Should().HaveCount(1);
+        usageEntry.Should().HaveCount(1);
+        contextEntry.Should().HaveCount(1);
+        executionEntry.Should().HaveCount(1);
+        unitEntry.Should().HaveCount(1);
+        uoeEntry.Should().HaveCount(1);
+
+        respEntry["level"]!.Value<string>().Should().Be("responsibility");
+        subjectEntry["level"]!.Value<string>().Should().Be("subject");
+        usageEntry["level"]!.Value<string>().Should().Be("usage");
+        contextEntry["level"]!.Value<string>().Should().Be("context");
+        executionEntry["level"]!.Value<string>().Should().Be("execution");
+        unitEntry["level"]!.Value<string>().Should().Be("unit");
+        uoeEntry["level"]!.Value<string>().Should().Be("unit-of-execution");
+    }
+
+    [Fact]
+    public async Task HierarchyView_SomeLevelsWithoutConfiguration_ExcludesThoseLevels()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        const string subjectName = "hv-partial-subject";
+        const string responsibilityName = "hv-partial-resp";
+        const string contextName = "hv-partial-ctx";
+        const string unitName = "hv-partial-unit";
+
+        var uoeAnnotationKey = AnnotationKey.CreateUnitOfExecution(subjectName, responsibilityName, contextName, unitName);
+        var subjectAnnotationKey = AnnotationKey.CreateSubject(subjectName);
+        var responsibilityAnnotationKey = AnnotationKey.CreateResponsibility(responsibilityName);
+        var unitAnnotationKey = AnnotationKey.CreateUnit(responsibilityName, unitName);
+
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new UnitOfExecution
+        {
+            AnnotationKey = uoeAnnotationKey,
+            AnnotationType = AnnotationType.UnitOfExecution,
+            Name = unitName,
+            SubjectKey = subjectAnnotationKey,
+            SubjectName = subjectName,
+            ResponsibilityKey = responsibilityAnnotationKey,
+            ResponsibilityName = responsibilityName,
+            ContextKey = AnnotationKey.CreateContext(subjectName, contextName),
+            ContextName = contextName,
+            UnitKey = unitAnnotationKey,
+            UnitName = unitName,
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var org = TestConstants.Organization;
+        var project = Constants.DefaultProjectName;
+        var view = Constants.DefaultViewName;
+
+        var uoeKey = FullKey.Create(uoeAnnotationKey, org, project, view);
+        var subjectKey = FullKey.Create(subjectAnnotationKey, org, project, view);
+        var responsibilityKey = FullKey.Create(responsibilityAnnotationKey, org, project, view);
+
+        // Only configure 3 of the 7 levels
+        await configs.CreateOrUpdateConfigurationAsync(responsibilityKey, JObject.Parse("""{ "from": "responsibility" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(subjectKey, JObject.Parse("""{ "from": "subject" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(uoeKey, JObject.Parse("""{ "from": "unit-of-execution" }"""), "system");
+
+        var hierarchy = await configs.GetConfigurationHierarchyViewAsync(uoeKey);
+
+        hierarchy.Should().NotBeNull();
+        hierarchy.Should().HaveCount(3);
+        hierarchy.Should().ContainKey(responsibilityKey.ToString());
+        hierarchy.Should().ContainKey(subjectKey.ToString());
+        hierarchy.Should().ContainKey(uoeKey.ToString());
+        hierarchy.Should().NotContainKey(FullKey.Create(AnnotationKey.CreateUsage(subjectName, responsibilityName), org, project, view).ToString());
+        hierarchy.Should().NotContainKey(FullKey.Create(AnnotationKey.CreateContext(subjectName, contextName), org, project, view).ToString());
+        hierarchy.Should().NotContainKey(FullKey.Create(AnnotationKey.CreateExecution(subjectName, responsibilityName, contextName), org, project, view).ToString());
+        hierarchy.Should().NotContainKey(FullKey.Create(AnnotationKey.CreateUnit(responsibilityName, unitName), org, project, view).ToString());
+    }
+
+    [Fact]
     public async Task GetConfigurationViewChanges()
     {
         var annotations = Context.Services.GetRequiredService<IAnnotationService>();
