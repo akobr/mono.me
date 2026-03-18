@@ -16,6 +16,8 @@ namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
 public class Startup : IAsyncLifetime, ITestContext
 {
+    private const bool UseContainer = false;
+
     public IConfiguration Configuration { get; private set; }
 
     public IServiceProvider Services { get; private set; }
@@ -30,7 +32,7 @@ public class Startup : IAsyncLifetime, ITestContext
             .Build();
 
         var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(5));
-        var containerTask = DbContainer.StartAsync(cancellation.Token);
+        var containerTask = UseContainer ? DbContainer.StartAsync(cancellation.Token) : Task.CompletedTask;
         var services = new ServiceCollection();
         var configurationBuilder = new ConfigurationBuilder();
 
@@ -84,7 +86,9 @@ public class Startup : IAsyncLifetime, ITestContext
 
     private void Configure(IConfigurationBuilder builder)
     {
-        var connectionString = DbContainer.GetConnectionString();
+        var connectionString = UseContainer
+            ? DbContainer.GetConnectionString()
+            : "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==";
 
         builder.Add(new MemoryConfigurationSource
         {
