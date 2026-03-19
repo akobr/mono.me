@@ -122,8 +122,7 @@ public class StorytellerSetCommand : BaseContextCommand
                     return ExitCodes.ERROR_WRONG_INPUT;
                 }
 
-                // TODO: [P2] try to parse the value to a proper type (double, int, bool)
-                customProperties[parts[0]] = parts[1];
+                customProperties[parts[0]] = PropertyValueParser.ParseValue(parts[1]);
             }
 
             if (annotation.Values is null)
