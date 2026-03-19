@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using _42.Platform.Storyteller.Entities.Access;
 using _42.Platform.Storyteller.Entities.Annotations;
+using _42.Platform.Storyteller.Entities.Configurations;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller;
 
@@ -117,6 +119,22 @@ public static class Create
             SubjectName = subjectName,
             ContextName = contextName,
             UnitNames = unitNames?.ToList() ?? [],
+        };
+    }
+
+    public static ConfigurationEntity Configuration(AnnotationKey annotationKey, JObject content, string author = "system", string viewName = Constants.DefaultViewName, string projectName = Constants.DefaultProjectName)
+    {
+        return new ConfigurationEntity
+        {
+            Id = $"{viewName}.cnf.{annotationKey}",
+            PartitionKey = PartitionKeys.GetKey(annotationKey, projectName),
+            AnnotationKey = annotationKey,
+            Name = annotationKey.Name,
+            Content = content,
+            Version = 1,
+            Author = author,
+            ViewName = viewName,
+            ProjectName = projectName,
         };
     }
 

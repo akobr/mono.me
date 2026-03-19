@@ -30,6 +30,16 @@ public static class PartitionKeys
         };
     }
 
+    public static string GetKey(AnnotationKey annotationKey, string projectName)
+    {
+        return annotationKey.Type switch
+        {
+            AnnotationType.Responsibility or AnnotationType.Unit or AnnotationType.Usage or AnnotationType.Execution or AnnotationType.UnitOfExecution => GetResponsibility(projectName, annotationKey.ResponsibilityName),
+            AnnotationType.Subject or AnnotationType.Context => GetSubject(projectName, annotationKey.SubjectName),
+            _ => throw new NotSupportedException($"Unknown annotation type: {annotationKey.Type}"),
+        };
+    }
+
     public static PartitionKey GetCosmosKey(IAnnotation annotation)
     {
         return new PartitionKey(GetKey(annotation));
