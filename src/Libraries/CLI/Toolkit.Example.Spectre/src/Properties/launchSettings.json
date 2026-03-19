@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "example": {
+      "commandName": "Project",
+      "commandLineArgs": "example"
+    },
+    "version": {
+      "commandName": "Project",
+      "commandLineArgs": "--version"
+    },
+    "help": {
+      "commandName": "Project",
+      "commandLineArgs": "--help"
+    },
+    "invalid-command": {
+      "commandName": "Project",
+      "commandLineArgs": "example test"
+    },
+  }
+}

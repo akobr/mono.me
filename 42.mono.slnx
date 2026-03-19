@@ -44,7 +44,9 @@
   <Folder Name="/Libraries/" />
   <Folder Name="/Libraries/CLI/">
     <Project Path="src/Libraries/CLI/Toolkit.Example/src/Toolkit.Example.csproj" />
+    <Project Path="src/Libraries/CLI/Toolkit.Example.Spectre/src/Toolkit.Example.Spectre.csproj" />
     <Project Path="src/Libraries/CLI/Toolkit/src/Toolkit.csproj" />
+    <Project Path="src/Libraries/CLI/Toolkit.Spectre/src/Toolkit.Spectre.csproj" />
   </Folder>
   <Folder Name="/Libraries/Functional/">
     <Project Path="src/Libraries/Functional/Monads.Trees/src/Monads.Trees.csproj" />
