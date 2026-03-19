@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Microsoft.Azure.Cosmos;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller;
 
@@ -33,6 +34,11 @@ public class Data
         await container.UpsertItemAsync(Create.Execution("42", "storyteller", "system"));
         await container.UpsertItemAsync(Create.Execution("42", "supervisor", "system"));
         await container.UpsertItemAsync(Create.Execution("42", "scheduler", "system"));
+
+        // configurations
+        await container.UpsertItemAsync(Create.Configuration(
+            AnnotationKey.CreateContext("42", "system"),
+            JObject.Parse("""{ "IsSystem": true }""")));
     }
 
     public static async Task CreateCoreAccess(
