@@ -100,7 +100,7 @@ public class ConfigSetCommand : BaseContextCommand
                     return ExitCodes.ERROR_WRONG_INPUT;
                 }
 
-                inlineContent[parts[0]] = parts[1];
+                inlineContent[parts[0]] = new JValue(PropertyValueParser.ParseValue(parts[1]));
             }
 
             config.Merge(inlineContent, JsonMergeOptions);
