@@ -62,7 +62,7 @@
     },
     "story-get": {
       "commandName": "Project",
-      "commandLineArgs": "story get rst.storyteller"
+      "commandLineArgs": "story get exe.42.storyteller.system"
     },
     "story-config": {
       "commandName": "Project",
