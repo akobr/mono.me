@@ -38,7 +38,7 @@ public class Data
         // configurations
         await container.UpsertItemAsync(Create.Configuration(
             AnnotationKey.CreateContext("42", "system"),
-            JObject.Parse("""{ "IsSystem": true }""")));
+            JObject.Parse("""{ "IsSystem": true, "Number": 42, "Text": "system" }""")));
     }
 
     public static async Task CreateCoreAccess(
