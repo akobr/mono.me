@@ -70,7 +70,7 @@ public class ConfigurationHttp
             return new NotFoundResult();
         }
 
-        return new OkObjectResult(configurationModel);
+        return new OkObjectResult(await configurationModel.ToJsonObjectAsync());
     }
 
     [Function(nameof(GetConfigurationResolved))]
@@ -118,7 +118,7 @@ public class ConfigurationHttp
             return new NotFoundResult();
         }
 
-        return new OkObjectResult(configurationModel);
+        return new OkObjectResult(await configurationModel.ToJsonObjectAsync());
     }
 
     [Function(nameof(SetConfiguration))]
@@ -167,7 +167,7 @@ public class ConfigurationHttp
 
         var author = request.GetAuthor();
         var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author);
-        return new OkObjectResult(outputModel);
+        return new OkObjectResult(await outputModel.ToJsonObjectAsync());
     }
 
     [Function(nameof(DeleteConfiguration))]
@@ -282,7 +282,7 @@ public class ConfigurationHttp
             return new NotFoundResult();
         }
 
-        return new OkObjectResult(configurationModel);
+        return new OkObjectResult(await configurationModel.ToJsonObjectAsync());
     }
 
     [Function(nameof(GetConfigurationVersionDiff))]

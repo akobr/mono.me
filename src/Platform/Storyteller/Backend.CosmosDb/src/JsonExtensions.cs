@@ -29,6 +29,7 @@ public static class JsonExtensions
         await using var writer = new Utf8JsonWriter(memoryStream);
 
         @this.WriteTo(writer, JsonSerializerOptions.Default);
+        await writer.FlushAsync();
         memoryStream.Seek(0, SeekOrigin.Begin);
 
         using var reader = new StreamReader(memoryStream);
@@ -44,6 +45,7 @@ public static class JsonExtensions
         await using var jsonWriter = new JsonTextWriter(writer);
 
         await @this.WriteToAsync(jsonWriter);
+        await jsonWriter.FlushAsync();
         memoryStream.Seek(0, SeekOrigin.Begin);
 
         var jsonNode = await JsonNode.ParseAsync(memoryStream);
