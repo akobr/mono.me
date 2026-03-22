@@ -10,6 +10,8 @@ public interface IExecution : IAnnotation
 
     string ContextKey { get; }
 
+    string UsageKey { get; init; }
+
     string SubjectName { get; }
 
     string ResponsibilityName { get; }

@@ -10,6 +10,10 @@ public record UnitOfExecutionEntity : AnnotationEntity
 
     public required string ContextKey { get; init; }
 
+    public required string UsageKey { get; init; }
+
+    public required string ExecutionKey { get; init; }
+
     public required string ResponsibilityName { get; init; }
 
     public required string UnitName { get; init; }

@@ -115,10 +115,42 @@ public static class Create
             ResponsibilityKey = $"{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
             SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             ContextKey = $"{AnnotationTypeCodes.Context}.{subjectName}.{contextName}",
+            UsageKey = $"{AnnotationTypeCodes.Usage}.{subjectName}.{responsibilityName}",
             ResponsibilityName = responsibilityName,
             SubjectName = subjectName,
             ContextName = contextName,
             UnitNames = unitNames?.ToList() ?? [],
+        };
+    }
+
+    public static UnitOfExecutionEntity UnitOfExecution(
+        string subjectName,
+        string responsibilityName,
+        string unitName,
+        string contextName,
+        string viewName = Constants.DefaultViewName,
+        string projectName = Constants.DefaultProjectName)
+    {
+        return new UnitOfExecutionEntity
+        {
+            Id = string.Empty,
+            PartitionKey = PartitionKeys.GetResponsibility(projectName,
+                responsibilityName),
+            ProjectName = projectName,
+            ViewName = viewName,
+            AnnotationType = AnnotationType.Execution,
+            AnnotationKey = $"{AnnotationTypeCodes.Execution}.{subjectName}.{responsibilityName}.{contextName}",
+            Name = contextName,
+            ResponsibilityKey = $"{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
+            UnitKey = $"{AnnotationTypeCodes.Unit}.{unitName}",
+            SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
+            ContextKey = $"{AnnotationTypeCodes.Context}.{subjectName}.{contextName}",
+            UsageKey = $"{AnnotationTypeCodes.Usage}.{subjectName}.{responsibilityName}",
+            ExecutionKey = $"{AnnotationTypeCodes.Execution}.{subjectName}.{responsibilityName}.{contextName}",
+            ResponsibilityName = responsibilityName,
+            SubjectName = subjectName,
+            ContextName = contextName,
+            UnitName = unitName,
         };
     }
 
