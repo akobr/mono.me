@@ -246,12 +246,52 @@ public class AnnotationsHttp
                 break;
 
             case "all":
-                dataRequest.Types =
-                [
-                    AnnotationType.Usage,
-                    AnnotationType.Execution,
-                    AnnotationType.UnitOfExecution
-                ];
+                switch (annotationKey.Type)
+                {
+                    case AnnotationType.Responsibility:
+                        dataRequest.Types =
+                        [
+                            AnnotationType.Unit,
+                            AnnotationType.Usage,
+                            AnnotationType.Execution,
+                            AnnotationType.UnitOfExecution
+                        ];
+                        break;
+
+                    case AnnotationType.Unit:
+                        dataRequest.Types = [AnnotationType.UnitOfExecution];
+                        break;
+
+                    case AnnotationType.Subject:
+                        dataRequest.Types =
+                        [
+                            AnnotationType.Context,
+                            AnnotationType.Usage,
+                            AnnotationType.Execution,
+                            AnnotationType.UnitOfExecution
+                        ];
+                        break;
+
+                    case AnnotationType.Usage:
+                    case AnnotationType.Context:
+                        dataRequest.Types = [AnnotationType.Execution, AnnotationType.UnitOfExecution];
+                        break;
+
+                    case AnnotationType.Execution:
+                        dataRequest.Types = [AnnotationType.UnitOfExecution];
+                        break;
+
+                    default:
+                        dataRequest.Types =
+                        [
+                            AnnotationType.Unit,
+                            AnnotationType.Context,
+                            AnnotationType.Usage,
+                            AnnotationType.Execution,
+                            AnnotationType.UnitOfExecution
+                        ];
+                        break;
+                }
                 break;
 
             default:
