@@ -34,6 +34,8 @@ public static class Definitions
                 public const string Usages = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/usages";
                 public const string Contexts = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/contexts";
                 public const string Executions = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/executions";
+                public const string Units = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/units";
+                public const string UnitsOfExecution = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/units-of-execution";
             }
         }
 
@@ -91,6 +93,8 @@ public static class Definitions
             public const string GetUsages = nameof(GetUsages);
             public const string GetContexts = nameof(GetContexts);
             public const string GetExecutions = nameof(GetExecutions);
+            public const string GetUnits = nameof(GetUnits);
+            public const string GetUnitsOfExecution = nameof(GetUnitsOfExecution);
         }
 
         public static class Configuration
