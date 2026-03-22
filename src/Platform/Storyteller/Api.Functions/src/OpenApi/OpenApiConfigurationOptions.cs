@@ -2,6 +2,8 @@ using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Configurations;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json.Serialization;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
+using _42.Platform.Storyteller.Api.OpenApi.Filters;
 
 namespace _42.Platform.Storyteller.Api.OpenApi;
 
@@ -28,4 +30,9 @@ public class OpenApiConfigurationOptions : DefaultOpenApiConfigurationOptions
     public override OpenApiVersionType OpenApiVersion { get; set; } = OpenApiVersionType.V3;
 
     public override NamingStrategy NamingStrategy { get; set; } = new DefaultNamingStrategy();
+
+    public override List<IDocumentFilter> DocumentFilters { get; set; } =
+    [
+        new AnnotationDocumentFilter(),
+    ];
 }
