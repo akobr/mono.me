@@ -1003,4 +1003,238 @@ public class AnnotationsHttp
         var response = await _annotations.GetAnnotationsAsync(dataRequest);
         return new OkObjectResult(response.AsTyped<Execution>());
     }
+
+    [Function(nameof(GetUnits))]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetUnits, Definitions.Tags.Annotations)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiParameter("responsibilityNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The responsibility name query to filter the units.")]
+    [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse<Unit>), Description = "The list of units.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> GetUnits(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Annotations.V1.Units)]
+        HttpRequestData request,
+        string organization,
+        string project,
+        string view,
+        [FromQuery] string? responsibilityNameQuery = null,
+        [FromQuery] string? continuationToken = null)
+    {
+        request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
+        await request.CheckAccessToProjectAsync(_access, organization, project);
+
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var dataRequest = new AnnotationsRequest
+        {
+            Types =
+            [
+                AnnotationType.Unit
+            ],
+            Conditions = conditions,
+            ContinuationToken = continuationToken,
+            Organization = organization,
+            Project = project,
+            View = view,
+        };
+
+        if (!string.IsNullOrWhiteSpace(responsibilityNameQuery))
+        {
+            responsibilityNameQuery = responsibilityNameQuery.Trim();
+
+            if (responsibilityNameQuery.StartsWith('^') || responsibilityNameQuery.EndsWith('$'))
+            {
+                var regex = new Regex(responsibilityNameQuery, RegexOptions.Compiled);
+                conditions.Add(new AnnotationsRequest.Condition<Unit>
+                {
+                    Predicate = u => regex.IsMatch(u.ResponsibilityName),
+                });
+            }
+            else if (responsibilityNameQuery.StartsWith('%') || responsibilityNameQuery.EndsWith('%'))
+            {
+                conditions.Add(new AnnotationsRequest.Condition<Unit>
+                {
+                    Predicate = u => u.ResponsibilityName.Contains(responsibilityNameQuery),
+                });
+            }
+            else
+            {
+                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
+                conditions.Add(new AnnotationsRequest.Condition<Unit>
+                {
+                    Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
+                });
+            }
+        }
+
+        var response = await _annotations.GetAnnotationsAsync(dataRequest);
+        return new OkObjectResult(response.AsTyped<Unit>());
+    }
+
+    [Function(nameof(GetUnitsOfExecution))]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.GetUnitsOfExecution, Definitions.Tags.Annotations)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiParameter("responsibilityNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The responsibility name query to filter the units of execution.")]
+    [OpenApiParameter("unitNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The unit name query to filter the units of execution.")]
+    [OpenApiParameter("subjectNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The subject name query to filter the units of execution.")]
+    [OpenApiParameter("contextNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The context name query to filter the units of execution.")]
+    [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse<UnitOfExecution>), Description = "The list of units of execution.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> GetUnitsOfExecution(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Annotations.V1.UnitsOfExecution)]
+        HttpRequestData request,
+        string organization,
+        string project,
+        string view,
+        [FromQuery] string? responsibilityNameQuery = null,
+        [FromQuery] string? unitNameQuery = null,
+        [FromQuery] string? subjectNameQuery = null,
+        [FromQuery] string? contextNameQuery = null,
+        [FromQuery] string? continuationToken = null)
+    {
+        request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
+        await request.CheckAccessToProjectAsync(_access, organization, project);
+
+        var conditions = new List<AnnotationsRequest.ICondition>();
+        var dataRequest = new AnnotationsRequest
+        {
+            Types =
+            [
+                AnnotationType.UnitOfExecution
+            ],
+            Conditions = conditions,
+            ContinuationToken = continuationToken,
+            Organization = organization,
+            Project = project,
+            View = view,
+        };
+
+        if (!string.IsNullOrWhiteSpace(responsibilityNameQuery))
+        {
+            responsibilityNameQuery = responsibilityNameQuery.Trim();
+
+            if (responsibilityNameQuery.StartsWith('^') || responsibilityNameQuery.EndsWith('$'))
+            {
+                var regex = new Regex(responsibilityNameQuery, RegexOptions.Compiled);
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => regex.IsMatch(u.ResponsibilityName),
+                });
+            }
+            else if (responsibilityNameQuery.StartsWith('%') || responsibilityNameQuery.EndsWith('%'))
+            {
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => u.ResponsibilityName.Contains(responsibilityNameQuery),
+                });
+            }
+            else
+            {
+                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, responsibilityNameQuery);
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => u.ResponsibilityName == responsibilityNameQuery,
+                });
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(unitNameQuery))
+        {
+            unitNameQuery = unitNameQuery.Trim();
+
+            if (unitNameQuery.StartsWith('^') || unitNameQuery.EndsWith('$'))
+            {
+                var regex = new Regex(unitNameQuery, RegexOptions.Compiled);
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => regex.IsMatch(u.UnitName),
+                });
+            }
+            else if (unitNameQuery.StartsWith('%') || unitNameQuery.EndsWith('%'))
+            {
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => u.UnitName.Contains(unitNameQuery),
+                });
+            }
+            else
+            {
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => u.UnitName == unitNameQuery,
+                });
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(subjectNameQuery))
+        {
+            subjectNameQuery = subjectNameQuery.Trim();
+
+            if (subjectNameQuery.StartsWith('^') || subjectNameQuery.EndsWith('$'))
+            {
+                var regex = new Regex(subjectNameQuery, RegexOptions.Compiled);
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => regex.IsMatch(u.SubjectName),
+                });
+            }
+            else if (subjectNameQuery.StartsWith('%') || subjectNameQuery.EndsWith('%'))
+            {
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => u.SubjectName.Contains(subjectNameQuery),
+                });
+            }
+            else
+            {
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => u.SubjectName == subjectNameQuery,
+                });
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(contextNameQuery))
+        {
+            contextNameQuery = contextNameQuery.Trim();
+
+            if (contextNameQuery.StartsWith('^') || contextNameQuery.EndsWith('$'))
+            {
+                var regex = new Regex(contextNameQuery, RegexOptions.Compiled);
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => regex.IsMatch(u.ContextName),
+                });
+            }
+            else if (contextNameQuery.StartsWith('%') || contextNameQuery.EndsWith('%'))
+            {
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => u.ContextName.Contains(contextNameQuery),
+                });
+            }
+            else
+            {
+                conditions.Add(new AnnotationsRequest.Condition<UnitOfExecution>
+                {
+                    Predicate = u => u.ContextName == contextNameQuery,
+                });
+            }
+        }
+
+        var response = await _annotations.GetAnnotationsAsync(dataRequest);
+        return new OkObjectResult(response.AsTyped<UnitOfExecution>());
+    }
 }
