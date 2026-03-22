@@ -258,6 +258,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             ResponsibilityName = "app1",
             ContextKey = AnnotationKey.CreateContext(subjectName, "first"),
             ContextName = "first",
+            UsageKey = AnnotationKey.CreateUsage(subjectName, "app1"),
             ProjectName = Constants.DefaultProjectName,
             ViewName = Constants.DefaultViewName,
         });
@@ -269,10 +270,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
             Name = "second",
             SubjectKey = subjectAnnotationKey,
             SubjectName = subjectName,
-            ResponsibilityKey = AnnotationKey.CreateResponsibility("app2"),
-            ResponsibilityName = "app2",
+            ResponsibilityKey = AnnotationKey.CreateResponsibility("app1"),
+            ResponsibilityName = "app1",
             ContextKey = AnnotationKey.CreateContext(subjectName, "second"),
             ContextName = "second",
+            UsageKey = AnnotationKey.CreateUsage(subjectName, "app1"),
             ProjectName = Constants.DefaultProjectName,
             ViewName = Constants.DefaultViewName,
         });
@@ -428,6 +430,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
             ContextName = contextName,
             UnitKey = unitAnnotationKey,
             UnitName = unitName,
+            UsageKey = usageAnnotationKey,
+            ExecutionKey = executionAnnotationKey,
             ProjectName = Constants.DefaultProjectName,
             ViewName = Constants.DefaultViewName,
         });
@@ -506,6 +510,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var subjectAnnotationKey = AnnotationKey.CreateSubject(subjectName);
         var responsibilityAnnotationKey = AnnotationKey.CreateResponsibility(responsibilityName);
         var unitAnnotationKey = AnnotationKey.CreateUnit(responsibilityName, unitName);
+        var usageAnnotationKey = AnnotationKey.CreateUsage(subjectName, responsibilityName);
+        var executionAnnotationKey = AnnotationKey.CreateExecution(subjectName, responsibilityName, contextName);
 
         await annotations.CreateAnnotationAsync(TestConstants.Organization, new UnitOfExecution
         {
@@ -520,6 +526,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
             ContextName = contextName,
             UnitKey = unitAnnotationKey,
             UnitName = unitName,
+            UsageKey = usageAnnotationKey,
+            ExecutionKey = executionAnnotationKey,
             ProjectName = Constants.DefaultProjectName,
             ViewName = Constants.DefaultViewName,
         });

@@ -10,6 +10,10 @@ public interface IUnitOfExecution : IAnnotation
 
     string ContextKey { get; }
 
+    string UsageKey { get; init; }
+
+    string ExecutionKey { get; init; }
+
     string ResponsibilityName { get; }
 
     string UnitName { get; }

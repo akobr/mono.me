@@ -240,6 +240,7 @@ public class CosmosAnnotationServiceTests(Startup startup)
                 ResponsibilityName = "responsibility-for-only-execution",
                 ContextKey = contextKey,
                 ContextName = "context-for-only-execution",
+                UsageKey = usageKey,
                 ProjectName = Constants.DefaultProjectName,
                 ViewName = Constants.DefaultViewName,
             })).ToList();
@@ -289,6 +290,8 @@ public class CosmosAnnotationServiceTests(Startup startup)
                 ContextName = "context-for-only-uoe",
                 UnitKey = unitKey,
                 UnitName = "only-uoe",
+                UsageKey = usageKey,
+                ExecutionKey = executionKey,
                 ProjectName = Constants.DefaultProjectName,
                 ViewName = Constants.DefaultViewName,
             })).ToList();
@@ -448,6 +451,7 @@ public class CosmosAnnotationServiceTests(Startup startup)
                 ResponsibilityName = "responsibility-for-execution",
                 ContextKey = contextKey,
                 ContextName = "context-for-execution",
+                UsageKey = usageKey,
                 ProjectName = Constants.DefaultProjectName,
                 ViewName = Constants.DefaultViewName,
             });
@@ -466,6 +470,7 @@ public class CosmosAnnotationServiceTests(Startup startup)
         returnedTyped.SubjectKey.Should().Be(subjectKey);
         returnedTyped.ResponsibilityKey.Should().Be(responsibilityKey);
         returnedTyped.ContextKey.Should().Be(contextKey);
+        returnedTyped.UsageKey.Should().Be(usageKey);
 
         returnedSubject.ContextNames.Should().HaveCount(1);
         returnedSubject.ContextNames.Should().Contain("context-for-execution");
@@ -539,6 +544,7 @@ public class CosmosAnnotationServiceTests(Startup startup)
                 ResponsibilityName = "bulk-responsibility",
                 ContextKey = contextKey,
                 ContextName = "bulk-context",
+                UsageKey = usageKey,
                 ProjectName = Constants.DefaultProjectName,
                 ViewName = Constants.DefaultViewName,
             },
