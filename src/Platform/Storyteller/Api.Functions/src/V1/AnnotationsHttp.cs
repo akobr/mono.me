@@ -131,7 +131,7 @@ public class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
-    [OpenApiParameter(Definitions.Parameters.Descendants, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The type of descendants to retrieve, possible value is: usages, contexts, executions, units, unit-of-executions, or all.")]
+    [OpenApiParameter(Definitions.Parameters.Descendants, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The type of descendants to retrieve, possible value is: usages, contexts, executions, units, units-of-execution, or all.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of descendant annotations.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
@@ -169,9 +169,9 @@ public class AnnotationsHttp
 
             case AnnotationType.Unit:
             {
-                if (descendants != "units-of-executions" && descendants != "all")
+                if (descendants != "units-of-execution" && descendants != "all")
                 {
-                    return new BadRequestObjectResult(new ErrorResponse("An unit has only units-of-executions as descendants."));
+                    return new BadRequestObjectResult(new ErrorResponse("An unit has only units-of-execution as descendants."));
                 }
 
                 break;
@@ -190,9 +190,9 @@ public class AnnotationsHttp
             case AnnotationType.Usage:
             case AnnotationType.Context:
             {
-                if (descendants != "executions" && descendants != "units-of-executions" && descendants != "all")
+                if (descendants != "executions" && descendants != "units-of-execution" && descendants != "all")
                 {
-                    return new BadRequestObjectResult(new ErrorResponse("An usage has only executions or units-of-executions as descendants."));
+                    return new BadRequestObjectResult(new ErrorResponse("An usage has only executions or units-of-execution as descendants."));
                 }
 
                 break;
@@ -200,9 +200,9 @@ public class AnnotationsHttp
 
             case AnnotationType.Execution:
             {
-                if (descendants != "units-of-executions" && descendants != "all")
+                if (descendants != "units-of-execution" && descendants != "all")
                 {
-                    return new BadRequestObjectResult(new ErrorResponse("An execution has only units-of-executions as descendants."));
+                    return new BadRequestObjectResult(new ErrorResponse("An execution has only units-of-execution as descendants."));
                 }
 
                 break;
@@ -241,7 +241,7 @@ public class AnnotationsHttp
                 dataRequest.Types = [AnnotationType.Unit];
                 break;
 
-            case "unit-of-executions":
+            case "units-of-execution":
                 dataRequest.Types = [AnnotationType.UnitOfExecution];
                 break;
 
@@ -255,7 +255,7 @@ public class AnnotationsHttp
                 break;
 
             default:
-                return new BadRequestObjectResult(new ErrorResponse("Invalid type of descendants, allowed types are: usages, contexts, executions, units, unit-of-executions, or all."));
+                return new BadRequestObjectResult(new ErrorResponse("Invalid type of descendants, allowed types are: usages, contexts, executions, units, units-of-execution, or all."));
         }
 
         switch (annotationKey.Type)
@@ -328,7 +328,7 @@ public class AnnotationsHttp
             }
 
             default:
-                return new BadRequestObjectResult(new ErrorResponse("Invalid annotation key, descendants can be returned only of a responsibility, subject, context, usage, unit or execution."));
+                return new BadRequestObjectResult(new ErrorResponse("Invalid annotation key, descendants can be returned only of a responsibility, unit, subject, context, usage or execution."));
         }
 
         var response = await _annotations.GetAnnotationsAsync(dataRequest);
