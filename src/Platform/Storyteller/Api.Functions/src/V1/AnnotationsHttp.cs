@@ -167,6 +167,16 @@ public class AnnotationsHttp
                 break;
             }
 
+            case AnnotationType.Unit:
+            {
+                if (descendants != "units-of-executions" && descendants != "all")
+                {
+                    return new BadRequestObjectResult(new ErrorResponse("An unit has only units-of-executions as descendants."));
+                }
+
+                break;
+            }
+
             case AnnotationType.Subject:
             {
                 if (descendants == "units")
@@ -263,6 +273,16 @@ public class AnnotationsHttp
                 break;
             }
 
+            case AnnotationType.Unit:
+            {
+                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
+                dataRequest.Conditions =
+                [
+                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.UnitKey == key, },
+                ];
+                break;
+            }
+
             case AnnotationType.Subject:
             {
                 dataRequest.Conditions =
@@ -278,43 +298,37 @@ public class AnnotationsHttp
             case AnnotationType.Usage:
             {
                 dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
-                string subjectKey = annotationKey.GetSubjectKey();
-                string responsibilityKey = annotationKey.GetResponsibilityKey();
 
                 dataRequest.Conditions =
                 [
-                    new AnnotationsRequest.Condition<Execution>
-                    {
-                        Predicate = e => e.ResponsibilityKey == responsibilityKey && e.SubjectKey == subjectKey,
-                    },
-                    new AnnotationsRequest.Condition<UnitOfExecution>
-                    {
-                        Predicate = u => u.ResponsibilityKey == responsibilityKey && u.SubjectKey == subjectKey,
-                    },
+                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.UsageKey == key, },
+                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.UsageKey == key, },
                 ];
                 break;
             }
 
             case AnnotationType.Context:
             {
-                string subjectKey = annotationKey.GetSubjectKey();
-
                 dataRequest.Conditions =
                 [
-                    new AnnotationsRequest.Condition<Execution>
-                    {
-                        Predicate = e => e.SubjectKey == subjectKey && e.ContextKey == key,
-                    },
-                    new AnnotationsRequest.Condition<UnitOfExecution>
-                    {
-                        Predicate = u => u.SubjectKey == subjectKey && u.ContextKey == key,
-                    },
+                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.ContextKey == key, },
+                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.ContextKey == key, },
+                ];
+                break;
+            }
+
+            case AnnotationType.Execution:
+            {
+                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
+                dataRequest.Conditions =
+                [
+                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.ExecutionKey == key, },
                 ];
                 break;
             }
 
             default:
-                return new BadRequestObjectResult(new ErrorResponse("Invalid annotation key, descendants can be returned only of a responsibility, subject, context or usage."));
+                return new BadRequestObjectResult(new ErrorResponse("Invalid annotation key, descendants can be returned only of a responsibility, subject, context, usage, unit or execution."));
         }
 
         var response = await _annotations.GetAnnotationsAsync(dataRequest);
