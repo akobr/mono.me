@@ -303,6 +303,18 @@ public class CosmosConfigurationService : IConfigurationService
         // store history version only if there was some content before
         if (existingConfiguration.Content.HasValues)
         {
+            // has some content before, merge must be done (clone the original)
+            newContent = (JObject)existingConfiguration.Content.DeepClone();
+            newContent.MergeInto(value);
+            newContent.RemoveRequested();
+
+            if (JToken.DeepEquals(existingConfiguration.Content, newContent))
+            {
+                // check for no change after merge
+                return existingConfiguration.Content;
+            }
+
+            // save only if there was really a change
             var historyVersion = existingConfiguration.Version;
             var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{historyVersion}";
             var historyId = $"{key.ViewName}.{historyKey}";
@@ -317,22 +329,14 @@ public class CosmosConfigurationService : IConfigurationService
                 ViewName = existingConfiguration.ViewName,
                 Content = existingConfiguration.Content,
                 CreationTime = existingConfiguration.GetLastUpdatedTime(),
-                Author = author,
+                Author = existingConfiguration.Author,
             };
 
             await repository.Container.CreateItemAsync(history, partitionKey);
         }
-        else // has some content before, merge must be done
+        else
         {
-            newContent = existingConfiguration.Content;
-            newContent.MergeInto(value);
             newContent.RemoveRequested();
-
-            if (JToken.DeepEquals(existingConfiguration.Content, newContent))
-            {
-                // check for no change after merge
-                return existingConfiguration.Content;
-            }
         }
 
         // invalidate all ancestor configurations
@@ -343,6 +347,7 @@ public class CosmosConfigurationService : IConfigurationService
         {
             Version = existingConfiguration.Version + 1,
             Content = newContent,
+            Author = author,
             CalculatedContent = null,
             CalculatedContentHash = null,
         };

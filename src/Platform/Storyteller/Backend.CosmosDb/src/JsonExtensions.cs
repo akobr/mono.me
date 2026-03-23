@@ -81,7 +81,7 @@ public static class JsonExtensions
                          .Where(prop => prop.Type == JTokenType.String)
                          .Select(prop => prop.ToString()))
             {
-                var tokens = @this.SelectTokens(path);
+                var tokens = @this.SelectTokens(path).ToArray();
 
                 foreach (var token in tokens)
                 {
