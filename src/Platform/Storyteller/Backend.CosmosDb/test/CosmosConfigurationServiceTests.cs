@@ -334,7 +334,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                 """));
 
         await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system"); // version 2
-        configuration = new JObject();
+        configuration = JObject.Parse("""
+                                      {
+                                        "$remove": [ "$.*" ]
+                                      }
+                                      """);
         await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system"); // version 3 (current)
 
         var versions = await configs.GetConfigurationVersionsAsync(key);
