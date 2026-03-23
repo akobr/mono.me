@@ -20,17 +20,19 @@ public class AnnotationDocumentFilter : IDocumentFilter
         // 1. Add discriminator to the base Annotation schema
         annotationSchema.Discriminator = new OpenApiDiscriminator
         {
-            PropertyName = "annotationType",
+            PropertyName = "AnnotationType",
         };
+
+        annotationSchema.Required = new HashSet<string> (["ProjectName", "ViewName", "AnnotationKey", "Name", "AnnotationType"]);
 
         var derivedTypes = new[]
         {
             "Responsibility",
+            "Unit",
             "Subject",
             "Usage",
             "Context",
             "Execution",
-            "Unit",
             "UnitOfExecution",
         };
 
@@ -53,7 +55,7 @@ public class AnnotationDocumentFilter : IDocumentFilter
                 }
 
                 derivedSchema.Properties = null;
-                derivedSchema.Required = null;
+                derivedSchema.Required = new HashSet<string>(properties.Keys);
 
                 derivedSchema.AllOf = new List<OpenApiSchema>
                 {
