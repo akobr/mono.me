@@ -86,6 +86,12 @@
     <PackageVersion Include="Microsoft.Identity.Web" Version="4.5.0" />
     <PackageVersion Include="Microsoft.Identity.Web.MicrosoftGraph" Version="4.5.0" />
     <PackageVersion Include="Microsoft.Identity.Web.UI" Version="4.5.0" />
+    <PackageVersion Include="Microsoft.Kiota.Authentication.Azure" Version="1.22.1" />
+    <PackageVersion Include="Microsoft.Kiota.Bundle" Version="1.22.1" />
+    <PackageVersion Include="Microsoft.Kiota.Serialization.Form" Version="1.22.1" />
+    <PackageVersion Include="Microsoft.Kiota.Serialization.Json" Version="1.22.1" />
+    <PackageVersion Include="Microsoft.Kiota.Serialization.Multipart" Version="1.22.1" />
+    <PackageVersion Include="Microsoft.Kiota.Serialization.Text" Version="1.22.1" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.3.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.0.1" />
     <PackageVersion Include="Microsoft.Orleans.Clustering.Redis" Version="10.0.1" />

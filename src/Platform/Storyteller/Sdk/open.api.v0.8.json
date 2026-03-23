@@ -1,0 +1,4056 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "2S-API",
+    "description": "The 2S-API is a RESTful API for interacting with the 2S Platform.",
+    "contact": {
+      "name": "Ales Kobr",
+      "url": "https://42for.net/",
+      "email": "kobr.ales@outlook.com"
+    },
+    "license": {
+      "name": "MIT License",
+      "url": "https://opensource.org/licenses/MIT"
+    },
+    "version": "0.8.52.59697"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:7071/api"
+    }
+  ],
+  "paths": {
+    "/v1/access/account": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "GetAccount",
+        "responses": {
+          "200": {
+            "description": "Details about the log in account, contains all accessible access points.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The account doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "CreateAccount",
+        "requestBody": {
+          "description": "Organization and project for the new account.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Newly created account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The account already exists."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/access/points": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "GetAccessPoints",
+        "responses": {
+          "200": {
+            "description": "The list of all manageable organizations and projects. The access points where the account is Admin or Owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AccessPoint"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "CreateAccessPoint",
+        "requestBody": {
+          "description": "An organization or project to create.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccessPointCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The created access point (organization or project).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessPoint"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/access/points/{key}": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "GetAccessPoint",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of requested access point.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The access point (organization or project).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessPoint"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/access/grant": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "GrantUserAccess",
+        "requestBody": {
+          "description": "The requested permission to grant.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Permission"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The affected access point (organization or project).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessPoint"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/access/revoke": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "RevokeUserAccess",
+        "requestBody": {
+          "description": "The requested permission to revoke.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Permission"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The affected access point (organization or project).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessPoint"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/access/machines": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "GetMachineAccesses",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of machine accesses for the project.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MachineAccess"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "CreateMachineAccess",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "An organization or project to create.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MachineAccessCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The created access point (organization or project).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineAccess"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/access/machines/{id}": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "GetMachineAccess",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The id of the machine access.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The machine access.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineAccess"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "ResetMachineAccess",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The id of the machine access.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The restarted machine access.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineAccess"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "DeleteMachineAccess",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The id of the machine access.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Acknowledge of the deletion."
+          },
+          "404": {
+            "description": "The machine access doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): User.Impersonation"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/annotations": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetAnnotations",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of annotations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "SetAnnotations",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The annotations to create.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The id of the asynchronous create operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.ReadWrite, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/annotations/{key}": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetAnnotation",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested annotation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested annotation doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "SetAnnotation",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The annotation to create or update.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Annotation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The created or updated annotation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.ReadWrite, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "DeleteAnnotation",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Acknowledge of the deletion."
+          },
+          "404": {
+            "description": "The annotation doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.ReadWrite, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/annotations/{key}/{descendants}": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetDescendants",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "descendants",
+            "in": "path",
+            "description": "The type of descendants to retrieve, possible value is: usages, contexts, executions, units, units-of-execution, or all.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of descendant annotations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/annotations/simple": {
+      "post": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "SetAnnotationsSimple",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The annotations to create.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The id of the asynchronous create operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.ReadWrite, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/responsibilities": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetResponsibilities",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nameQuery",
+            "in": "query",
+            "description": "The name query to filter the responsibilities.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of responsibilities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse_Responsibility"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/subjects": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetSubjects",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nameQuery",
+            "in": "query",
+            "description": "The name query to filter the subjects.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of subjects.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse_Subject"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/usages": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetUsages",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "responsibilityNameQuery",
+            "in": "query",
+            "description": "The name query to filter the usages by responsibility.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectNameQuery",
+            "in": "query",
+            "description": "The name query to filter the usages by subject.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of usages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse_Usage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/contexts": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetContexts",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectNameQuery",
+            "in": "query",
+            "description": "The name query to filter the contexts by subject.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nameQuery",
+            "in": "query",
+            "description": "The name query to filter the contexts.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of contexts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse_Context"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/executions": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetExecutions",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "responsibilityNameQuery",
+            "in": "query",
+            "description": "The name query to filter the executions by responsibility.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectNameQuery",
+            "in": "query",
+            "description": "The name query to filter the executions by subject.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contextNameQuery",
+            "in": "query",
+            "description": "The name query to filter the executions by context.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of executions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse_Execution"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/units": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetUnits",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "responsibilityNameQuery",
+            "in": "query",
+            "description": "The responsibility name query to filter the units.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of units.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse_Unit"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/units-of-execution": {
+      "get": {
+        "tags": [
+          "Annotations"
+        ],
+        "operationId": "GetUnitsOfExecution",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "responsibilityNameQuery",
+            "in": "query",
+            "description": "The responsibility name query to filter the units of execution.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "unitNameQuery",
+            "in": "query",
+            "description": "The unit name query to filter the units of execution.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "subjectNameQuery",
+            "in": "query",
+            "description": "The subject name query to filter the units of execution.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "contextNameQuery",
+            "in": "query",
+            "description": "The context name query to filter the units of execution.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "continuationToken",
+            "in": "query",
+            "description": "The continuation token for multi-page queries.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of units of execution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationsResponse_UnitOfExecution"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration/{key}": {
+      "get": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "GetConfiguration",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The configuration model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested configuration doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "SetConfiguration",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The configuration model.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The created or updated configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "DeleteConfiguration",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Acknowledge of the deletion."
+          },
+          "404": {
+            "description": "The configuration doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration/{key}/resolved": {
+      "get": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "GetResolvedConfiguration",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The configuration model with resolved substitutions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested configuration doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration/{key}/versions": {
+      "get": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "GetConfigurationVersions",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The list of configuration versions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConfigurationVersion"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration/{key}/versions/{version}": {
+      "get": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "GetConfigurationVersion",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The version number.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The configuration content of the version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested version doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration/{key}/versions/{version}/diff": {
+      "get": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "GetConfigurationVersionDiff",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The version number.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The diff between this and previous version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The requested version doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration/{key}/versions/{version}/diff/{versionFrom}": {
+      "get": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "GetConfigurationVersionDiffCustom",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "version",
+            "in": "path",
+            "description": "The target version number (to).",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "versionFrom",
+            "in": "path",
+            "description": "The source version number (from).",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The diff between the two specified versions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "One of the requested versions doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration/{key}/diff/{viewTo}": {
+      "get": {
+        "tags": [
+          "Configuration"
+        ],
+        "operationId": "GetConfigurationViewDiff",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "viewTo",
+            "in": "path",
+            "description": "The target view name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The diff between the two views.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "One of the requested configurations doesn't exist."
+          },
+          "401": {
+            "description": "Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccessPoint": {
+        "type": "object",
+        "properties": {
+          "Key": {
+            "type": "string"
+          },
+          "AccessMap": {
+            "type": "object",
+            "additionalProperties": {
+              "enum": [
+                "None",
+                "Reader",
+                "Contributor",
+                "ContributorWithSecrets",
+                "Administrator",
+                "Owner"
+              ],
+              "type": "string",
+              "default": "None"
+            }
+          }
+        }
+      },
+      "AccessPointCreate": {
+        "type": "object",
+        "properties": {
+          "Organization": {
+            "type": "string"
+          },
+          "Project": {
+            "type": "string"
+          },
+          "OwnerId": {
+            "type": "string"
+          }
+        }
+      },
+      "Account": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "UserName": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          },
+          "AccessMap": {
+            "type": "object",
+            "additionalProperties": {
+              "enum": [
+                "None",
+                "Reader",
+                "Contributor",
+                "ContributorWithSecrets",
+                "Administrator",
+                "Owner"
+              ],
+              "type": "string",
+              "default": "None"
+            }
+          }
+        }
+      },
+      "AccountCreate": {
+        "type": "object",
+        "properties": {
+          "Organization": {
+            "type": "string"
+          },
+          "Project": {
+            "type": "string"
+          }
+        }
+      },
+      "Annotation": {
+        "required": [
+          "ProjectName",
+          "ViewName",
+          "AnnotationKey",
+          "Name",
+          "AnnotationType"
+        ],
+        "type": "object",
+        "properties": {
+          "ProjectName": {
+            "type": "string"
+          },
+          "ViewName": {
+            "type": "string"
+          },
+          "AnnotationKey": {
+            "type": "string"
+          },
+          "Name": {
+            "type": "string"
+          },
+          "AnnotationType": {
+            "enum": [
+              "Responsibility",
+              "Unit",
+              "Subject",
+              "Usage",
+              "Context",
+              "Execution",
+              "UnitOfExecution"
+            ],
+            "type": "string",
+            "default": "Responsibility"
+          },
+          "IsDisabled": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "ValidFrom": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ExpiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "TimeZone": {
+            "type": "string"
+          },
+          "Title": {
+            "type": "string"
+          },
+          "Description": {
+            "type": "string"
+          },
+          "DocumentationLink": {
+            "type": "string"
+          },
+          "Labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "Values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object"
+            }
+          }
+        },
+        "discriminator": {
+          "propertyName": "AnnotationType",
+          "mapping": {
+            "Responsibility": "#/components/schemas/Responsibility",
+            "Unit": "#/components/schemas/Unit",
+            "Subject": "#/components/schemas/Subject",
+            "Usage": "#/components/schemas/Usage",
+            "Context": "#/components/schemas/Context",
+            "Execution": "#/components/schemas/Execution",
+            "UnitOfExecution": "#/components/schemas/UnitOfExecution"
+          }
+        }
+      },
+      "AnnotationsResponse": {
+        "type": "object",
+        "properties": {
+          "Annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Annotation"
+            }
+          },
+          "ContinuationToken": {
+            "type": "string"
+          },
+          "Count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AnnotationsResponse_Context": {
+        "type": "object",
+        "properties": {
+          "Annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Context"
+            }
+          },
+          "ContinuationToken": {
+            "type": "string"
+          },
+          "Count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AnnotationsResponse_Execution": {
+        "type": "object",
+        "properties": {
+          "Annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Execution"
+            }
+          },
+          "ContinuationToken": {
+            "type": "string"
+          },
+          "Count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AnnotationsResponse_Responsibility": {
+        "type": "object",
+        "properties": {
+          "Annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Responsibility"
+            }
+          },
+          "ContinuationToken": {
+            "type": "string"
+          },
+          "Count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AnnotationsResponse_Subject": {
+        "type": "object",
+        "properties": {
+          "Annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Subject"
+            }
+          },
+          "ContinuationToken": {
+            "type": "string"
+          },
+          "Count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AnnotationsResponse_Unit": {
+        "type": "object",
+        "properties": {
+          "Annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Unit"
+            }
+          },
+          "ContinuationToken": {
+            "type": "string"
+          },
+          "Count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AnnotationsResponse_UnitOfExecution": {
+        "type": "object",
+        "properties": {
+          "Annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UnitOfExecution"
+            }
+          },
+          "ContinuationToken": {
+            "type": "string"
+          },
+          "Count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AnnotationsResponse_Usage": {
+        "type": "object",
+        "properties": {
+          "Annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Usage"
+            }
+          },
+          "ContinuationToken": {
+            "type": "string"
+          },
+          "Count": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ConfigurationVersion": {
+        "type": "object",
+        "properties": {
+          "Version": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Author": {
+            "type": "string"
+          },
+          "CreationTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ExpirationTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Context": {
+        "required": [
+          "SubjectKey",
+          "SubjectName",
+          "ResponsibilityNames"
+        ],
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Annotation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "SubjectKey": {
+                "type": "string"
+              },
+              "SubjectName": {
+                "type": "string"
+              },
+              "ResponsibilityNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "Message": {
+            "type": "string"
+          },
+          "Hint": {
+            "type": "string"
+          },
+          "ErrorCode": {
+            "type": "string"
+          },
+          "Error": {
+            "$ref": "#/components/schemas/ExceptionWrapper"
+          }
+        }
+      },
+      "ExceptionWrapper": {
+        "type": "object",
+        "properties": {
+          "Message": {
+            "type": "string"
+          },
+          "Source": {
+            "type": "string"
+          },
+          "StackTrace": {
+            "type": "string"
+          },
+          "HelpLink": {
+            "type": "string"
+          },
+          "HResult": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "InnerException": {
+            "$ref": "#/components/schemas/ExceptionWrapper"
+          }
+        }
+      },
+      "Execution": {
+        "required": [
+          "ResponsibilityKey",
+          "SubjectKey",
+          "ContextKey",
+          "UsageKey",
+          "SubjectName",
+          "ResponsibilityName",
+          "ContextName",
+          "UnitNames"
+        ],
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Annotation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ResponsibilityKey": {
+                "type": "string"
+              },
+              "SubjectKey": {
+                "type": "string"
+              },
+              "ContextKey": {
+                "type": "string"
+              },
+              "UsageKey": {
+                "type": "string"
+              },
+              "SubjectName": {
+                "type": "string"
+              },
+              "ResponsibilityName": {
+                "type": "string"
+              },
+              "ContextName": {
+                "type": "string"
+              },
+              "UnitNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "MachineAccess": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "ObjectId": {
+            "type": "string"
+          },
+          "AccessKey": {
+            "type": "string"
+          },
+          "Scope": {
+            "enum": [
+              "AnnotationRead",
+              "ConfigurationRead",
+              "DefaultRead",
+              "AnnotationReadWrite",
+              "ConfigurationReadWrite",
+              "DefaultReadWrite"
+            ],
+            "type": "string",
+            "default": "AnnotationRead"
+          },
+          "AnnotationKey": {
+            "type": "string"
+          }
+        }
+      },
+      "MachineAccessCreate": {
+        "type": "object",
+        "properties": {
+          "Organization": {
+            "type": "string"
+          },
+          "Project": {
+            "type": "string"
+          },
+          "Scope": {
+            "enum": [
+              "AnnotationRead",
+              "ConfigurationRead",
+              "DefaultRead",
+              "AnnotationReadWrite",
+              "ConfigurationReadWrite",
+              "DefaultReadWrite"
+            ],
+            "type": "string",
+            "default": "AnnotationRead"
+          },
+          "AnnotationKey": {
+            "type": "string"
+          }
+        }
+      },
+      "Permission": {
+        "type": "object",
+        "properties": {
+          "CreatedById": {
+            "type": "string"
+          },
+          "AccountId": {
+            "type": "string"
+          },
+          "AccessPointKey": {
+            "type": "string"
+          },
+          "Role": {
+            "enum": [
+              "None",
+              "Reader",
+              "Contributor",
+              "ContributorWithSecrets",
+              "Administrator",
+              "Owner"
+            ],
+            "type": "string",
+            "default": "None"
+          }
+        }
+      },
+      "Responsibility": {
+        "required": [
+          "UnitNames"
+        ],
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Annotation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "UnitNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Subject": {
+        "required": [
+          "ContextNames",
+          "ResponsibilityNames"
+        ],
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Annotation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ContextNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "ResponsibilityNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Unit": {
+        "required": [
+          "ResponsibilityKey",
+          "ResponsibilityName",
+          "UnitType",
+          "UnitDefinition"
+        ],
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Annotation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ResponsibilityKey": {
+                "type": "string"
+              },
+              "ResponsibilityName": {
+                "type": "string"
+              },
+              "UnitType": {
+                "type": "string"
+              },
+              "UnitDefinition": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "UnitOfExecution": {
+        "required": [
+          "ResponsibilityKey",
+          "UnitKey",
+          "SubjectKey",
+          "ContextKey",
+          "UsageKey",
+          "ExecutionKey",
+          "ResponsibilityName",
+          "UnitName",
+          "SubjectName",
+          "ContextName"
+        ],
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Annotation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "ResponsibilityKey": {
+                "type": "string"
+              },
+              "UnitKey": {
+                "type": "string"
+              },
+              "SubjectKey": {
+                "type": "string"
+              },
+              "ContextKey": {
+                "type": "string"
+              },
+              "UsageKey": {
+                "type": "string"
+              },
+              "ExecutionKey": {
+                "type": "string"
+              },
+              "ResponsibilityName": {
+                "type": "string"
+              },
+              "UnitName": {
+                "type": "string"
+              },
+              "SubjectName": {
+                "type": "string"
+              },
+              "ContextName": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "Usage": {
+        "required": [
+          "SubjectKey",
+          "ResponsibilityKey",
+          "SubjectName",
+          "ResponsibilityName",
+          "ContextNames"
+        ],
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Annotation"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "SubjectKey": {
+                "type": "string"
+              },
+              "ResponsibilityKey": {
+                "type": "string"
+              },
+              "SubjectName": {
+                "type": "string"
+              },
+              "ResponsibilityName": {
+                "type": "string"
+              },
+              "ContextNames": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "securitySchemes": {
+      "manual": {
+        "type": "http",
+        "description": "Manually by token in Authorization HTTP header.",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      },
+      "integrated": {
+        "type": "oauth2",
+        "flows": {
+          "implicit": {
+            "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            "refreshUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            "scopes": {
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read": "Allows the app to read annotations",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite": "Allows the app to modify or create annotations",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read": "Allows the app to read configuration",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite": "Allows the app to modify or create configuration",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets": "Allows the app to see secrets in configuration",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read": "Allows the app to read commons",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite": "Allows the app to modify or create commons",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation": "Allows the app to access the web API on your behalf"
+            }
+          },
+          "clientCredentials": {
+            "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+            "scopes": {
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default": "Default role(s) of the application"
+            }
+          }
+        }
+      }
+    }
+  }
+}
