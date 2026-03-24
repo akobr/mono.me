@@ -73,18 +73,18 @@ namespace ApiSdk.V1.Item.Item.Item.Configuration.Item
             };
             return await RequestAdapter.SendPrimitiveAsync<Stream>(requestInfo, errorMapping, cancellationToken).ConfigureAwait(false);
         }
-        /// <returns>A <see cref="global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyGetResponse"/></returns>
+        /// <returns>A <see cref="global::ApiSdk.Models.Configuration"/></returns>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
         /// <exception cref="global::ApiSdk.Models.ErrorResponse">When receiving a 400 status code</exception>
         /// <exception cref="global::ApiSdk.Models.ErrorResponse">When receiving a 500 status code</exception>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyGetResponse?> GetAsWithKeyGetResponseAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::ApiSdk.Models.Configuration?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyGetResponse> GetAsWithKeyGetResponseAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::ApiSdk.Models.Configuration> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             var requestInfo = ToGetRequestInformation(requestConfiguration);
@@ -93,32 +93,9 @@ namespace ApiSdk.V1.Item.Item.Item.Configuration.Item
                 { "400", global::ApiSdk.Models.ErrorResponse.CreateFromDiscriminatorValue },
                 { "500", global::ApiSdk.Models.ErrorResponse.CreateFromDiscriminatorValue },
             };
-            return await RequestAdapter.SendAsync<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyGetResponse>(requestInfo, global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyGetResponse.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
+            return await RequestAdapter.SendAsync<global::ApiSdk.Models.Configuration>(requestInfo, global::ApiSdk.Models.Configuration.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
         }
-        /// <returns>A <see cref="global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse"/></returns>
-        /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
-        /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
-        /// <exception cref="global::ApiSdk.Models.ErrorResponse">When receiving a 400 status code</exception>
-        /// <exception cref="global::ApiSdk.Models.ErrorResponse">When receiving a 500 status code</exception>
-        [Obsolete("This method is obsolete. Use GetAsWithKeyGetResponseAsync instead.")]
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public async Task<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse?> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
-        {
-#nullable restore
-#else
-        public async Task<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse> GetAsync(Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
-        {
-#endif
-            var requestInfo = ToGetRequestInformation(requestConfiguration);
-            var errorMapping = new Dictionary<string, ParsableFactory<IParsable>>
-            {
-                { "400", global::ApiSdk.Models.ErrorResponse.CreateFromDiscriminatorValue },
-                { "500", global::ApiSdk.Models.ErrorResponse.CreateFromDiscriminatorValue },
-            };
-            return await RequestAdapter.SendAsync<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse>(requestInfo, global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
-        }
-        /// <returns>A <see cref="global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostResponse"/></returns>
+        /// <returns>A <see cref="global::ApiSdk.Models.Configuration"/></returns>
         /// <param name="body">The request body</param>
         /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
@@ -126,11 +103,11 @@ namespace ApiSdk.V1.Item.Item.Item.Configuration.Item
         /// <exception cref="global::ApiSdk.Models.ErrorResponse">When receiving a 500 status code</exception>
 #if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
 #nullable enable
-        public async Task<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostResponse?> PostAsWithKeyPostResponseAsync(global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::ApiSdk.Models.Configuration?> PostAsync(global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #nullable restore
 #else
-        public async Task<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostResponse> PostAsWithKeyPostResponseAsync(global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
+        public async Task<global::ApiSdk.Models.Configuration> PostAsync(global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
         {
 #endif
             if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
@@ -140,32 +117,7 @@ namespace ApiSdk.V1.Item.Item.Item.Configuration.Item
                 { "400", global::ApiSdk.Models.ErrorResponse.CreateFromDiscriminatorValue },
                 { "500", global::ApiSdk.Models.ErrorResponse.CreateFromDiscriminatorValue },
             };
-            return await RequestAdapter.SendAsync<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostResponse>(requestInfo, global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostResponse.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
-        }
-        /// <returns>A <see cref="global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse"/></returns>
-        /// <param name="body">The request body</param>
-        /// <param name="cancellationToken">Cancellation token to use when cancelling requests</param>
-        /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
-        /// <exception cref="global::ApiSdk.Models.ErrorResponse">When receiving a 400 status code</exception>
-        /// <exception cref="global::ApiSdk.Models.ErrorResponse">When receiving a 500 status code</exception>
-        [Obsolete("This method is obsolete. Use PostAsWithKeyPostResponseAsync instead.")]
-#if NETSTANDARD2_1_OR_GREATER || NETCOREAPP3_1_OR_GREATER
-#nullable enable
-        public async Task<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse?> PostAsync(global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>>? requestConfiguration = default, CancellationToken cancellationToken = default)
-        {
-#nullable restore
-#else
-        public async Task<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse> PostAsync(global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyPostRequestBody body, Action<RequestConfiguration<DefaultQueryParameters>> requestConfiguration = default, CancellationToken cancellationToken = default)
-        {
-#endif
-            if(ReferenceEquals(body, null)) throw new ArgumentNullException(nameof(body));
-            var requestInfo = ToPostRequestInformation(body, requestConfiguration);
-            var errorMapping = new Dictionary<string, ParsableFactory<IParsable>>
-            {
-                { "400", global::ApiSdk.Models.ErrorResponse.CreateFromDiscriminatorValue },
-                { "500", global::ApiSdk.Models.ErrorResponse.CreateFromDiscriminatorValue },
-            };
-            return await RequestAdapter.SendAsync<global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse>(requestInfo, global::ApiSdk.V1.Item.Item.Item.Configuration.Item.WithKeyResponse.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
+            return await RequestAdapter.SendAsync<global::ApiSdk.Models.Configuration>(requestInfo, global::ApiSdk.Models.Configuration.CreateFromDiscriminatorValue, errorMapping, cancellationToken).ConfigureAwait(false);
         }
         /// <returns>A <see cref="RequestInformation"/></returns>
         /// <param name="requestConfiguration">Configuration for the request such as headers, query parameters, and middleware options.</param>
