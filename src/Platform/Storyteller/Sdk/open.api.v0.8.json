@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.8.52.59697"
+    "version": "0.8.54.29822"
   },
   "servers": [
     {
@@ -2388,7 +2388,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Configuration"
                 }
               }
             }
@@ -2498,7 +2498,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Configuration"
                 }
               }
             }
@@ -2690,7 +2690,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Configuration"
                 }
               }
             }
@@ -2900,11 +2900,11 @@
         ],
         "responses": {
           "200": {
-            "description": "The configuration content of the version.",
+            "description": "The configuration of the version.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/Configuration"
                 }
               }
             }
@@ -3618,6 +3618,39 @@
           "Count": {
             "type": "integer",
             "format": "int32"
+          }
+        }
+      },
+      "Configuration": {
+        "type": "object",
+        "properties": {
+          "AnnotationKey": {
+            "type": "string"
+          },
+          "Version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "Content": {
+            "type": "object"
+          },
+          "Author": {
+            "type": "string"
+          },
+          "Hash": {
+            "type": "string"
+          },
+          "Labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "Values": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object"
+            }
           }
         }
       },

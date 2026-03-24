@@ -22,4 +22,7 @@ kiota generate --openapi open.api.v0.8.json --language csharp --output src
 
 ### Incremental updates
 
-TBD
+```powershell
+cd src/Platform/Storyteller/Sdk/
+kiota update --output src
+```
