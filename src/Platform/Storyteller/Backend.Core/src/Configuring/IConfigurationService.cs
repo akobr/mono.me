@@ -6,17 +6,17 @@ public interface IConfigurationService
 {
     Task<bool> HasConfigurationContentAsync(FullKey key);
 
-    Task<JObject?> GetRawConfigurationAsync(FullKey key);
+    Task<Configuration?> GetRawConfigurationAsync(FullKey key);
 
-    Task<JObject?> GetResolvedConfigurationAsync(FullKey key, bool includeSecrets = false);
+    Task<Configuration?> GetResolvedConfigurationAsync(FullKey key, bool includeSecrets = false);
 
-    Task<JObject?> GetResolvedConfigurationWithSecretsAsync(FullKey key);
+    Task<Configuration?> GetResolvedConfigurationWithSecretsAsync(FullKey key);
 
-    Task<JObject?> GetResolvedConfigurationWithoutSecretsAsync(FullKey key);
+    Task<Configuration?> GetResolvedConfigurationWithoutSecretsAsync(FullKey key);
 
-    Task<JObject?> GetConfigurationHierarchyViewAsync(FullKey key);
+    Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key);
 
-    Task<JObject> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author);
+    Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author);
 
     Task ClearConfigurationAsync(FullKey key);
 
@@ -26,7 +26,7 @@ public interface IConfigurationService
 
     Task<IReadOnlyCollection<ConfigurationVersion>> GetConfigurationVersionsAsync(FullKey key);
 
-    Task<JObject?> GetConfigurationVersionContentAsync(FullKey key, uint version);
+    Task<Configuration?> GetConfigurationVersionContentAsync(FullKey key, uint version);
 
     Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint version);
 

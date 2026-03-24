@@ -42,9 +42,9 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var annotationKey = AnnotationKey.CreateResponsibility("empty");
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
         var configuration = await configs.GetRawConfigurationAsync(key);
-
-        configuration.Should().NotBeNull();
-        configuration.Should().BeEmpty();
+        var content = configuration?.Content;
+        content.Should().NotBeNull();
+        content.Should().BeEmpty();
     }
 
     [Fact]
@@ -78,13 +78,14 @@ public class CosmosConfigurationServiceTests(Startup startup)
         await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system");
         var hasContent = await configs.HasConfigurationContentAsync(key);
         var retrieveConfig = await configs.GetRawConfigurationAsync(key);
+        var content = retrieveConfig?.Content;
 
         hasContent.Should().BeTrue();
-        retrieveConfig.Should().NotBeNull();
-        retrieveConfig.Should().HaveCount(3);
-        retrieveConfig.Should().Contain(pair => pair.Key == "name");
-        retrieveConfig.Should().Contain(pair => pair.Key == "age");
-        retrieveConfig.Should().Contain(pair => pair.Key == "address");
+        content.Should().NotBeNull();
+        content.Should().HaveCount(3);
+        content.Should().Contain(pair => pair.Key == "name");
+        content.Should().Contain(pair => pair.Key == "age");
+        content.Should().Contain(pair => pair.Key == "address");
     }
 
     [Fact]
@@ -117,11 +118,12 @@ public class CosmosConfigurationServiceTests(Startup startup)
         await configs.ClearConfigurationAsync(key);
         var hasContentAfter = await configs.HasConfigurationContentAsync(key);
         var retrieveConfig = await configs.GetRawConfigurationAsync(key);
+        var content = retrieveConfig?.Content;
 
         hasContentBefore.Should().BeTrue();
         hasContentAfter.Should().BeFalse();
-        retrieveConfig.Should().NotBeNull();
-        retrieveConfig.Should().BeEmpty();
+        content.Should().NotBeNull();
+        content.Should().BeEmpty();
     }
 
     [Fact]
@@ -293,8 +295,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
         await annotations.DeleteAnnotationAsync(subjectKey); // this will delete configuration with descendants
         var executionConfigAfterDelete = await configs.GetRawConfigurationAsync(executionKey);
 
-        executionConfigBeforeDelete.Should().NotBeEmpty();
-        executionConfigBeforeDelete.Should().ContainKey("reason");
+        executionConfigBeforeDelete.Content.Should().NotBeEmpty();
+        executionConfigBeforeDelete.Content.Should().ContainKey("reason");
         executionConfigAfterDelete.Should().BeNull();
     }
 
@@ -352,9 +354,9 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var changes3 = await configs.GetConfigurationVersionChangesAsync(key, 3);
 
         versions.Should().HaveCount(3);
-        version1.Should().HaveCount(3);
-        version2.Should().HaveCount(4);
-        version3.Should().HaveCount(0);
+        version1?.Content.Should().HaveCount(3);
+        version2?.Content.Should().HaveCount(4);
+        version3?.Content.Should().HaveCount(0);
 
         changes1.Count(line => line.StartsWith("+ ")).Should().Be(5);
         changes1.Count(line => line.StartsWith("- ")).Should().Be(0);
@@ -368,8 +370,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
         changes3.Count(line => line.StartsWith("- ")).Should().Be(12);
         changes3.Count(line => line.StartsWith("  ")).Should().Be(0);
 
-        version3.Should().BeEmpty();
-        currentConfiguration.Should().BeEmpty();
+        version3?.Content.Should().BeEmpty();
+        currentConfiguration?.Content.Should().BeEmpty();
 
         var diff1To3 = await configs.GetConfigurationVersionChangesAsync(key, 1, 3);
         diff1To3.Count(line => line.StartsWith("- ")).Should().Be(5);
@@ -460,7 +462,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
         await configs.CreateOrUpdateConfigurationAsync(unitKey, JObject.Parse("""{ "level": "unit" }"""), "system");
         await configs.CreateOrUpdateConfigurationAsync(uoeKey, JObject.Parse("""{ "level": "unit-of-execution" }"""), "system");
 
-        var hierarchy = await configs.GetConfigurationHierarchyViewAsync(uoeKey);
+        var hierarchyResult = await configs.GetConfigurationHierarchyViewAsync(uoeKey);
+        var hierarchy = hierarchyResult?.Content;
 
         hierarchy.Should().NotBeNull();
         hierarchy.Should().HaveCount(7);
@@ -549,7 +552,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
         await configs.CreateOrUpdateConfigurationAsync(subjectKey, JObject.Parse("""{ "from": "subject" }"""), "system");
         await configs.CreateOrUpdateConfigurationAsync(uoeKey, JObject.Parse("""{ "from": "unit-of-execution" }"""), "system");
 
-        var hierarchy = await configs.GetConfigurationHierarchyViewAsync(uoeKey);
+        var hierarchyResult = await configs.GetConfigurationHierarchyViewAsync(uoeKey);
+        var hierarchy = hierarchyResult?.Content;
 
         hierarchy.Should().NotBeNull();
         hierarchy.Should().HaveCount(3);

@@ -54,7 +54,7 @@ public class CosmosConfigurationService : IConfigurationService
         return configuration is not null && configuration.Content.HasValues;
     }
 
-    public async Task<JObject?> GetRawConfigurationAsync(FullKey key)
+    public async Task<Configuration?> GetRawConfigurationAsync(FullKey key)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var configurationKey = $"{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
@@ -77,30 +77,44 @@ public class CosmosConfigurationService : IConfigurationService
 
         if (configuration?.CalculatedContent is not null)
         {
-            return configuration.CalculatedContent;
+            return configuration.ToConfiguration();
         }
 
         var node = BuildInheritanceGraph(key);
         var calculatedConfig = await CalculateAndCacheConfigurationAsync(node, repository);
-        return calculatedConfig;
+
+        if (calculatedConfig is null)
+        {
+            return null;
+        }
+
+        // reload from database to get the latest state with hash
+        configuration = await repository.Container.TryReadItemAsync(
+            id,
+            partitionKey,
+            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        return configuration is not null
+            ? configuration.ToConfiguration(calculatedConfig)
+            : calculatedConfig.ToConfiguration(key.Annotation);
     }
 
-    public Task<JObject?> GetResolvedConfigurationAsync(FullKey key, bool includeSecrets = false)
+    public Task<Configuration?> GetResolvedConfigurationAsync(FullKey key, bool includeSecrets = false)
     {
         return GetResolvedConfigurationInternalAsync(key, includeSecrets);
     }
 
-    public Task<JObject?> GetResolvedConfigurationWithSecretsAsync(FullKey key)
+    public Task<Configuration?> GetResolvedConfigurationWithSecretsAsync(FullKey key)
     {
         return GetResolvedConfigurationInternalAsync(key, true);
     }
 
-    public Task<JObject?> GetResolvedConfigurationWithoutSecretsAsync(FullKey key)
+    public Task<Configuration?> GetResolvedConfigurationWithoutSecretsAsync(FullKey key)
     {
         return GetResolvedConfigurationInternalAsync(key, false);
     }
 
-    public async Task<JObject?> GetConfigurationHierarchyViewAsync(FullKey key)
+    public async Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationExist = await repository.Container.ExistsAsync(key);
@@ -112,7 +126,19 @@ public class CosmosConfigurationService : IConfigurationService
         var node = BuildInheritanceGraph(key);
         var result = new JObject();
         await CollectHierarchyNodesAsync(node, repository, result, new HashSet<string>());
-        return result;
+
+        // reload from database to get the latest state with hash
+        var configurationKey = $"{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
+        var id = $"{key.ViewName}.{configurationKey}";
+        var partitionKey = key.GetCosmosPartitionKey();
+        var configuration = await repository.Container.TryReadItemAsync(
+            id,
+            partitionKey,
+            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        return configuration is not null
+            ? configuration.ToConfiguration(result)
+            : result.ToConfiguration(key.Annotation);
     }
 
     public async Task<IReadOnlyCollection<ConfigurationVersion>> GetConfigurationVersionsAsync(FullKey key)
@@ -152,7 +178,7 @@ public class CosmosConfigurationService : IConfigurationService
         return versions;
     }
 
-    public async Task<JObject?> GetConfigurationVersionContentAsync(FullKey key, uint version)
+    public async Task<Configuration?> GetConfigurationVersionContentAsync(FullKey key, uint version)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
@@ -166,7 +192,7 @@ public class CosmosConfigurationService : IConfigurationService
 
         if (versionEntity is not null)
         {
-            return versionEntity.Content;
+            return versionEntity.ToConfiguration();
         }
 
         var configId = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKey}";
@@ -181,7 +207,7 @@ public class CosmosConfigurationService : IConfigurationService
             return null;
         }
 
-        return configEntity.Content;
+        return configEntity.ToConfigurationFromContent();
     }
 
     public Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint version)
@@ -193,8 +219,8 @@ public class CosmosConfigurationService : IConfigurationService
     public Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion)
     {
         return GetConfigurationChangesAsync(
-            () => fromVersion == 0 ? Task.FromResult<JObject?>(new JObject()) : GetConfigurationVersionContentAsync(key, fromVersion),
-            () => toVersion == 0 ? Task.FromResult<JObject?>(new JObject()) : GetConfigurationVersionContentAsync(key, toVersion),
+            async () => fromVersion == 0 ? new JObject() : (await GetConfigurationVersionContentAsync(key, fromVersion))?.Content,
+            async () => toVersion == 0 ? new JObject() : (await GetConfigurationVersionContentAsync(key, toVersion))?.Content,
             $"Unknown version {fromVersion} of the configuration for {key.Annotation}.",
             $"Unknown version {toVersion} of the configuration for {key.Annotation}.");
     }
@@ -203,8 +229,8 @@ public class CosmosConfigurationService : IConfigurationService
     {
         var targetKey = FullKey.Create(sourceKey.Annotation, sourceKey.OrganizationName, sourceKey.ProjectName, toView);
         return GetConfigurationChangesAsync(
-            () => GetRawConfigurationAsync(sourceKey),
-            () => GetRawConfigurationAsync(targetKey),
+            async () => (await GetRawConfigurationAsync(sourceKey))?.Content,
+            async () => (await GetRawConfigurationAsync(targetKey))?.Content,
             $"Unknown configuration for {sourceKey.Annotation} in view {sourceKey.ViewName}.",
             $"Unknown configuration for {sourceKey.Annotation} in view {toView}.");
     }
@@ -255,7 +281,7 @@ public class CosmosConfigurationService : IConfigurationService
         return lines;
     }
 
-    public async Task<JObject> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author)
+    public async Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
@@ -295,7 +321,7 @@ public class CosmosConfigurationService : IConfigurationService
             };
 
             await repository.Container.CreateItemAsync(configuration, partitionKey);
-            return value;
+            return configuration.ToConfiguration();
         }
 
         var newContent = value;
@@ -311,7 +337,7 @@ public class CosmosConfigurationService : IConfigurationService
             if (JToken.DeepEquals(existingConfiguration.Content, newContent))
             {
                 // check for no change after merge
-                return existingConfiguration.Content;
+                return existingConfiguration.ToConfigurationFromContent();
             }
 
             // save only if there was really a change
@@ -353,7 +379,7 @@ public class CosmosConfigurationService : IConfigurationService
         };
         await repository.Container.UpsertItemAsync(newConfiguration, partitionKey);
 
-        return newContent;
+        return newConfiguration.ToConfigurationFromContent();
     }
 
     public async Task ClearConfigurationAsync(FullKey key)
@@ -526,22 +552,22 @@ public class CosmosConfigurationService : IConfigurationService
         }
     }
 
-    private async Task<JObject?> GetResolvedConfigurationInternalAsync(FullKey key, bool includeSecrets)
+    private async Task<Configuration?> GetResolvedConfigurationInternalAsync(FullKey key, bool includeSecrets)
     {
-        var content = await GetRawConfigurationAsync(key);
+        var config = await GetRawConfigurationAsync(key);
 
-        if (content is null)
+        if (config is null)
         {
             return null;
         }
 
         if (_bindingExecutor is null)
         {
-            return content;
+            return config;
         }
 
         var queue = new Queue<JObject>();
-        queue.Enqueue(content);
+        queue.Enqueue(config.Content);
 
         while (queue.Count > 0)
         {
@@ -583,7 +609,7 @@ public class CosmosConfigurationService : IConfigurationService
             }
         }
 
-        return content;
+        return config;
     }
 
     private ValueTask<bool> TryProcessDataBinding(JProperty property, bool includeSecrets)
