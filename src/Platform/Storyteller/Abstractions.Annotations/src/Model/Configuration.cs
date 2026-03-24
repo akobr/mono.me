@@ -15,7 +15,7 @@ public record class Configuration
 
     public string? Hash { get; init; }
 
-    IReadOnlyList<string>? Labels { get; }
+    public IReadOnlyList<string>? Labels { get; init; }
 
-    IReadOnlyDictionary<string, object>? Values { get; }
+    public IReadOnlyDictionary<string, object>? Values { get; init; }
 }

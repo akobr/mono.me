@@ -14,6 +14,8 @@ public static class Mapping
             Author = @this.Author,
             Content = content is null ? @this.CalculatedContent : content,
             Hash = @this.CalculatedContentHash,
+            Labels = @this.Labels,
+            Values = @this.Values,
         };
     }
 
@@ -26,6 +28,8 @@ public static class Mapping
             Author = @this.Author,
             Content = @this.Content,
             Hash = null,
+            Labels = @this.Labels,
+            Values = @this.Values,
         };
     }
 
