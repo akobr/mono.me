@@ -1,6 +1,8 @@
 ﻿using System;
+using System.IO.Abstractions;
 using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Kiota.Abstractions.Authentication;
 using Microsoft.Kiota.Http.HttpClientLibrary;
 
@@ -8,12 +10,16 @@ namespace ApiSdk;
 
 public static class EntryPoint
 {
-    public static IServiceCollection AddStorytellerApiClient(this IServiceCollection services, Uri baseUrl)
+    public static IServiceCollection AddStorytellerApiClient(
+        this IServiceCollection services,
+        Uri baseUrl,
+        Action<StorytellerSdkOptions>? configureOptions = null)
     {
         // Register Kiota middleware handlers in DI
         services.AddKiotaHandlers();
 
         // Register auth provider however your app gets tokens
+        services.TryAddSingleton<IFileSystem, FileSystem>();
         services.AddSingleton<ITokenService, TokenService>();
         services.AddSingleton<IAccessTokenProvider, AccessTokenProvider>();
         services.AddSingleton<IAuthenticationProvider>(sp =>
@@ -21,6 +27,11 @@ public static class EntryPoint
             var accessTokenProvider = sp.GetRequiredService<IAccessTokenProvider>();
             return new BaseBearerTokenAuthenticationProvider(accessTokenProvider);
         });
+
+        if (configureOptions != null)
+        {
+            services.Configure(configureOptions);
+        }
 
         // Register typed HttpClient used by the adapter
         services.AddHttpClient<ApiClientFactory>(client =>

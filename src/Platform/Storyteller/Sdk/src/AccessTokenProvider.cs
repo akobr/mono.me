@@ -2,11 +2,15 @@
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Microsoft.Kiota.Abstractions.Authentication;
 
 namespace ApiSdk;
 
-public class AccessTokenProvider(ITokenService tokenService) : IAccessTokenProvider
+public class AccessTokenProvider(
+    ITokenService tokenService,
+    IOptions<StorytellerSdkOptions> options)
+    : IAccessTokenProvider
 {
     // Called by Kiota before each request
     public async Task<string> GetAuthorizationTokenAsync(
@@ -20,5 +24,5 @@ public class AccessTokenProvider(ITokenService tokenService) : IAccessTokenProvi
 
     // Optional but recommended: restrict where tokens are sent
     public AllowedHostsValidator AllowedHostsValidator { get; } =
-        new AllowedHostsValidator(["api.yourdomain.com"]);
+        new AllowedHostsValidator(options.Value.AllowedHosts);
 }
