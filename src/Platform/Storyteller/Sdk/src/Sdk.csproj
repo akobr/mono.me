@@ -12,12 +12,21 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Identity.Client" />
+    <PackageReference Include="Microsoft.Identity.Client.Extensions.Msal" />
     <PackageReference Include="Microsoft.Kiota.Authentication.Azure" />
     <PackageReference Include="Microsoft.Kiota.Bundle" />
     <PackageReference Include="Microsoft.Kiota.Serialization.Form" />
     <PackageReference Include="Microsoft.Kiota.Serialization.Json" />
     <PackageReference Include="Microsoft.Kiota.Serialization.Multipart" />
     <PackageReference Include="Microsoft.Kiota.Serialization.Text" />
+    <PackageReference Include="TestableIO.System.IO.Abstractions" />
+    <PackageReference Include="TestableIO.System.IO.Abstractions.Wrappers" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\Libraries\Utils\Async\src\Async.csproj" />
   </ItemGroup>
 
 </Project>
