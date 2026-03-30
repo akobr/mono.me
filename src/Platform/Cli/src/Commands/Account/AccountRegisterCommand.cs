@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
-using System.Net;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -9,8 +8,8 @@ using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk.Api;
-using _42.Platform.Sdk.Model;
+using ApiSdk;
+using ApiSdk.Models;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 
@@ -21,31 +20,40 @@ public class AccountRegisterCommand : BaseCommand
 {
     private static readonly Regex InvalidCharacterRegex = new(@"[^a-z0-9\-_]", RegexOptions.Compiled);
 
-    private readonly IAccessApiAsync _accessApi;
+    private readonly ApiClient _apiClient;
     private readonly IAuthenticationService _authentication;
     private readonly IFileSystem _fileSystem;
 
     public AccountRegisterCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi,
+        ApiClient apiClient,
         IAuthenticationService authentication,
         IFileSystem fileSystem)
         : base(console)
     {
-        _accessApi = accessApi;
+        _apiClient = apiClient;
         _authentication = authentication;
         _fileSystem = fileSystem;
     }
 
     public override async Task<int> OnExecuteAsync()
     {
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        ApiSdk.Models.Account? account;
 
-        if (accountResponse.StatusCode is HttpStatusCode.OK)
+        try
+        {
+            account = await _apiClient.V1.Access.Account.GetAsync();
+        }
+        catch (ErrorResponse)
+        {
+            account = null;
+        }
+
+        if (account is not null)
         {
             Console.WriteImportant(
-                $"You are already registered as {accountResponse.Data.UserName} ",
-                $"#{accountResponse.Data.Id}".ThemedLowlight(Console.Theme));
+                $"You are already registered as {account.UserName} ",
+                $"#{account.Id}".ThemedLowlight(Console.Theme));
             return ExitCodes.SUCCESS;
         }
 
@@ -77,8 +85,8 @@ public class AccountRegisterCommand : BaseCommand
         });
 
         var projectKey = $"{organizationName}.{projectName}";
-        var newAccount = await _accessApi.CreateAccountAsync(new AccountCreate(organization: organizationName, project: projectName));
-        Console.WriteImportant($"Account {newAccount.UserName} ({newAccount.Name}) has been created.");
+        var newAccount = await _apiClient.V1.Access.Account.PostAsync(new AccountCreate { Organization = organizationName, Project = projectName });
+        Console.WriteImportant($"Account {newAccount?.UserName ?? "Unknown"} ({newAccount?.Name ?? "Unknown"}) has been created.");
         Console.WriteLine(
             "Default project set to ",
             projectKey.ThemedHighlight(Console.Theme),

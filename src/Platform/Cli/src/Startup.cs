@@ -5,7 +5,7 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk;
+using ApiSdk;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -91,28 +91,17 @@ namespace _42.Platform.Cli
 
         private static void ConfigurePlatformSdk(IServiceCollection services, IConfiguration configuration)
         {
-            // TODO: [P2] Make this better
             var authOptions = configuration.GetSection(ConfigurationSections.AUTHENTICATION).Get<AuthenticationOptions>();
             var generalOptions = configuration.GetSection(ConfigurationSections.GENERAL).Get<GeneralOptions>();
-            var authService = new AuthenticationService(new FileSystem(), new OptionsWrapper<AuthenticationOptions>(authOptions!));
 
-            services.AddPlatformSdk(() => new SdkConfiguration
-            {
-                AccessTokenFactory = () =>
+            services.AddStorytellerApiClient(
+                new Uri(generalOptions!.BaseUrl),
+                options =>
                 {
-                    try
-                    {
-                        var authResult = authService.GetAuthenticationAsync().GetAwaiter().GetResult();
-                        return authResult?.AccessToken ?? string.Empty;
-                    }
-                    catch (Exception ex)
-                    {
-                        return string.Empty;
-                    }
-                },
-                BasePath = generalOptions!.BaseUrl,
-                UserAgent = $"{generalOptions.UserAgent}/{ThisAssembly.AssemblyInformationalVersion} ({System.Environment.OSVersion.Platform:G}; {System.Environment.OSVersion.VersionString})",
-            });
+                    options.ClientId = authOptions!.ClientId;
+                    options.TenantId = authOptions.TenantId;
+                    options.AllowedHosts = [new Uri(generalOptions.BaseUrl).Host];
+                });
         }
     }
 }

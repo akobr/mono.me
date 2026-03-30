@@ -1,9 +1,8 @@
-using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
-using _42.Platform.Sdk.Api;
+using ApiSdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Account;
@@ -11,16 +10,16 @@ namespace _42.Platform.Cli.Commands.Account;
 [Command(CommandNames.LOGOUT, Description = "Logout out from this CLI instance.")]
 public class AccountLogoutCommand : BaseCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly ApiClient _apiClient;
     private readonly IAuthenticationService _authentication;
 
     public AccountLogoutCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi,
+        ApiClient apiClient,
         IAuthenticationService authentication)
         : base(console)
     {
-        _accessApi = accessApi;
+        _apiClient = apiClient;
         _authentication = authentication;
     }
 
@@ -34,14 +33,24 @@ public class AccountLogoutCommand : BaseCommand
             return ExitCodes.SUCCESS;
         }
 
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        ApiSdk.Models.Account? account = null;
+
+        try
+        {
+            account = await _apiClient.V1.Access.Account.GetAsync();
+        }
+        catch (ApiSdk.Models.ErrorResponse)
+        {
+            // ignore
+        }
+
         await _authentication.ClearAuthenticationAsync();
 
-        if (accountResponse.StatusCode is HttpStatusCode.OK)
+        if (account is not null)
         {
             Console.WriteImportant(
                 "You have been logged out from account: ",
-                accountResponse.Data.Name.ThemedHighlight(Console.Theme));
+                (account.Name ?? "Unknown").ThemedHighlight(Console.Theme));
         }
         else
         {

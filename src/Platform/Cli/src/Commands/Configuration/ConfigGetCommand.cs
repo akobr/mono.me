@@ -2,9 +2,9 @@ using System.IO.Abstractions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
+using ApiSdk;
+using ApiSdk.Models;
 using McMaster.Extensions.CommandLineUtils;
-using Newtonsoft.Json;
 
 namespace _42.Platform.Cli.Commands.Configuration;
 
@@ -15,17 +15,17 @@ namespace _42.Platform.Cli.Commands.Configuration;
 [Command(CommandNames.CONFIG, CommandNames.CONFIGURATION, Description = "Get and manage configuration in context of an annotation.")]
 public class ConfigGetCommand : BaseContextCommand
 {
-    private readonly IConfigurationApiAsync _configurationApi;
+    private readonly ApiClient _apiClient;
     private readonly IFileSystem _fileSystem;
 
     public ConfigGetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IConfigurationApiAsync configurationApi,
+        ApiClient apiClient,
         IFileSystem fileSystem)
         : base(console, context)
     {
-        _configurationApi = configurationApi;
+        _apiClient = apiClient;
         _fileSystem = fileSystem;
     }
 
@@ -33,7 +33,7 @@ public class ConfigGetCommand : BaseContextCommand
     public string AnnotationKey { get; set; } = string.Empty;
 
     [Option("-e|--export", CommandOptionType.SingleValue, Description = "Specify a file where the retrieved configuration will be saved.")]
-    public string ExportFilePath { get; set; }
+    public string ExportFilePath { get; set; } = string.Empty;
 
     public bool IsExportRequested => !string.IsNullOrWhiteSpace(ExportFilePath);
 
@@ -42,26 +42,29 @@ public class ConfigGetCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
-        var response = IsResolvedRetrievalRequested
-            ? await _configurationApi.GetResolvedConfigurationWithHttpInfoAsync(
-                Context.OrganizationName,
-                Context.ProjectName,
-                Context.ViewName,
-                AnnotationKey)
-            : await _configurationApi.GetConfigurationWithHttpInfoAsync(
-                Context.OrganizationName,
-                Context.ProjectName,
-                Context.ViewName,
-                AnnotationKey);
+        ApiSdk.Models.Configuration? config;
 
-        Console.WriteJson(response.Data);
+        try
+        {
+            config = IsResolvedRetrievalRequested
+                ? await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Configuration[AnnotationKey].Resolved
+                    .GetAsync()
+                : await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Configuration[AnnotationKey]
+                    .GetAsync();
+        }
+        catch (ErrorResponse)
+        {
+            Console.WriteLine($"The configuration for '{AnnotationKey}' has not been found.");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
+        Console.WriteJson(config);
 
         if (IsExportRequested)
         {
-            Console.WriteJsonToFile(response.Data, ExportFilePath, _fileSystem);
+            Console.WriteJsonToFile(config, ExportFilePath, _fileSystem);
         }
 
         return ExitCodes.SUCCESS;
-
     }
 }

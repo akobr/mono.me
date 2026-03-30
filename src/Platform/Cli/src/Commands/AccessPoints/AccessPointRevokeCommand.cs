@@ -1,12 +1,11 @@
 using System;
 using System.Linq;
-using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk.Api;
-using _42.Platform.Sdk.Model;
+using ApiSdk;
+using ApiSdk.Models;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Sharprompt;
@@ -16,16 +15,16 @@ namespace _42.Platform.Cli.Commands.AccessPoints;
 [Command(CommandNames.REVOKE, Description = "Revoke access to point to another user.")]
 public class AccessPointRevokeCommand : BaseCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly ApiClient _apiClient;
     private readonly AccessDefaultOptions _accessDefault;
 
     public AccessPointRevokeCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi,
+        ApiClient apiClient,
         IOptions<AccessDefaultOptions> accessDefaultOptions)
         : base(console)
     {
-        _accessApi = accessApi;
+        _apiClient = apiClient;
         _accessDefault = accessDefaultOptions.Value;
     }
 
@@ -51,9 +50,18 @@ public class AccessPointRevokeCommand : BaseCommand
             AccountId = AccountId[1..];
         }
 
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        ApiSdk.Models.Account? account;
 
-        if (accountResponse.StatusCode is not HttpStatusCode.OK)
+        try
+        {
+            account = await _apiClient.V1.Access.Account.GetAsync();
+        }
+        catch (ErrorResponse)
+        {
+            account = null;
+        }
+
+        if (account is null)
         {
             Console.Write(
                 "You account is not registered, to create a registration call ",
@@ -62,18 +70,23 @@ public class AccessPointRevokeCommand : BaseCommand
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
-        var account = accountResponse.Data;
-        if (Enum.TryParse<Permission.RoleEnum>(Role, true, out var role))
+        if (!Enum.TryParse<Permission_Role>(Role, true, out var role))
         {
-            role = Permission.RoleEnum.Reader;
+            role = Permission_Role.Reader;
         }
 
         var projectKey = string.IsNullOrWhiteSpace(ProjectKey)
             ? SelectPossiblePoint(account)
             : ProjectKey;
 
-        var point = await _accessApi.RevokeUserAccessAsync(
-            new Permission(account.Id, AccountId, projectKey, role));
+        var point = await _apiClient.V1.Access.Revoke.PostAsync(
+            new Permission
+            {
+                CreatedById = account.Id,
+                AccountId = AccountId,
+                AccessPointKey = projectKey,
+                Role = role,
+            });
 
         Console.WriteLine(
             "Access revoked to ",
@@ -81,21 +94,20 @@ public class AccessPointRevokeCommand : BaseCommand
             " with role ",
             $"{role:G}".ThemedHighlight(Console.Theme),
             " to ",
-            projectKey.ThemedHighlight(Console.Theme),
+            (projectKey ?? "Unknown").ThemedHighlight(Console.Theme),
             ".");
 
         return ExitCodes.SUCCESS;
     }
 
-    private string SelectPossiblePoint(Sdk.Model.Account account)
+    private string SelectPossiblePoint(ApiSdk.Models.Account account)
     {
         var selectOptions = new SelectOptions<string>
         {
             Message = "Which access point would you like to revoke access to",
-            Items = account.AccessMap
-                .Where(access => access.Value >= Sdk.Model.Account.InnerEnum.Administrator)
+            Items = account.AccessMap?.AdditionalData
                 .Select(access => access.Key)
-                .OrderBy(access => access),
+                .OrderBy(access => access) ?? Enumerable.Empty<string>(),
         };
 
         if (!string.IsNullOrWhiteSpace(_accessDefault.ProjectName))

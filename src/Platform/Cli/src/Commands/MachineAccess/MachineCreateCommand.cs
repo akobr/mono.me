@@ -1,8 +1,8 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
-using _42.Platform.Sdk.Model;
+using ApiSdk;
+using ApiSdk.Models;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
@@ -10,15 +10,15 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Command(CommandNames.CREATE, CommandNames.SET, Description = "Create new machine access.")]
 public class MachineCreateCommand : BaseContextCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly ApiClient _apiClient;
 
     public MachineCreateCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAccessApiAsync accessApi)
+        ApiClient apiClient)
         : base(console, context)
     {
-        _accessApi = accessApi;
+        _apiClient = apiClient;
     }
 
     [Option("-a|--annotation", CommandOptionType.SingleValue, Description = "An annotation key where the access is restricted.")]
@@ -37,17 +37,15 @@ public class MachineCreateCommand : BaseContextCommand
             Console.ValidateAnnotationKey(AnnotationKey);
         }
 
-        var machine = await _accessApi.CreateMachineAccessAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
+        var machine = await _apiClient.V1[Context.OrganizationName][Context.ProjectName].Access.Machines.PostAsync(
             new MachineAccessCreate
             {
                 Organization = Context.OrganizationName,
                 Project = Context.ProjectName,
                 AnnotationKey = AnnotationKey,
                 Scope = IsScopeReadWrite
-                    ? MachineAccessCreate.ScopeEnum.DefaultReadWrite
-                    : MachineAccessCreate.ScopeEnum.DefaultRead,
+                    ? MachineAccessCreate_Scope.DefaultReadWrite
+                    : MachineAccessCreate_Scope.DefaultRead,
             });
 
         Console.WriteJson(machine);

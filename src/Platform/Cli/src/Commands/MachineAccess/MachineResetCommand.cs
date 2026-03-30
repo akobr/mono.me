@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
+using ApiSdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
@@ -9,15 +9,15 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Command(CommandNames.RESET, Description = "Reset secret for an machine access.")]
 public class MachineResetCommand : BaseContextCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly ApiClient _apiClient;
 
     public MachineResetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAccessApiAsync accessApi)
+        ApiClient apiClient)
         : base(console, context)
     {
-        _accessApi = accessApi;
+        _apiClient = apiClient;
     }
 
     [Argument(0, Description = "An id of an machine access.")]
@@ -31,10 +31,7 @@ public class MachineResetCommand : BaseContextCommand
             return ExitCodes.ERROR_INPUT_PARSING;
         }
 
-        var machine = await _accessApi.ResetMachineAccessAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            MachineId);
+        var machine = await _apiClient.V1[Context.OrganizationName][Context.ProjectName].Access.Machines[MachineId].PutAsync();
 
         Console.WriteJson(machine);
         Console.WriteLine();

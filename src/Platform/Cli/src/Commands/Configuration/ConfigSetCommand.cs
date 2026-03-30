@@ -3,7 +3,8 @@ using System.IO.Abstractions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
+using ApiSdk;
+using ApiSdk.V1.Item.Item.Item.Configuration.Item;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -20,17 +21,17 @@ public class ConfigSetCommand : BaseContextCommand
         PropertyNameComparison = StringComparison.Ordinal,
     };
 
-    private readonly IConfigurationApiAsync _configurationApi;
+    private readonly ApiClient _apiClient;
     private readonly IFileSystem _fileSystem;
 
     public ConfigSetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IConfigurationApiAsync configurationApi,
+        ApiClient apiClient,
         IFileSystem fileSystem)
         : base(console, context)
     {
-        _configurationApi = configurationApi;
+        _apiClient = apiClient;
         _fileSystem = fileSystem;
     }
 
@@ -72,7 +73,7 @@ public class ConfigSetCommand : BaseContextCommand
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
 
-            using var fileReader = _fileSystem.File.OpenText(ImportFilePath);
+            using var fileReader = _fileSystem.File.OpenText(ImportFilePath!);
             await using var jsonReader = new JsonTextReader(fileReader);
             var fileContent = await JObject.LoadAsync(
                 jsonReader,
@@ -107,24 +108,22 @@ public class ConfigSetCommand : BaseContextCommand
         }
 
         // TODO: [P1] add support for custom properties and labels
-        var response = await _configurationApi.SetConfigurationWithHttpInfoAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            AnnotationKey,
-            config);
+        var requestBody = new WithKeyPostRequestBody();
+        foreach (var property in config.Properties())
+        {
+            requestBody.AdditionalData[property.Name] = property.Value.ToObject<object>()!;
+        }
+
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Configuration[AnnotationKey]
+            .PostAsync(requestBody);
 
         if (IsResolvedRetrievalRequested)
         {
-            response = await _configurationApi.GetResolvedConfigurationWithHttpInfoAsync(
-                Context.OrganizationName,
-                Context.ProjectName,
-                Context.ViewName,
-                AnnotationKey);
+            response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Configuration[AnnotationKey].Resolved
+                .GetAsync();
         }
 
-        Console.WriteJson(response.Data);
+        Console.WriteJson(response);
         return ExitCodes.SUCCESS;
-
     }
 }

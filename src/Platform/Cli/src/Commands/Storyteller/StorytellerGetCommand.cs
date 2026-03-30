@@ -1,9 +1,9 @@
 using System.IO.Abstractions;
-using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
+using ApiSdk;
+using ApiSdk.Models;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
@@ -11,17 +11,17 @@ namespace _42.Platform.Cli.Commands.Storyteller;
 [Command(CommandNames.GET, Description = "Retrieve a specific annotation.")]
 public class StorytellerGetCommand : BaseContextCommand
 {
-    private readonly IAnnotationsApiAsync _annotationsApi;
+    private readonly ApiClient _apiClient;
     private readonly IFileSystem _fileSystem;
 
     public StorytellerGetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAnnotationsApiAsync annotationsApi,
+        ApiClient apiClient,
         IFileSystem fileSystem)
         : base(console, context)
     {
-        _annotationsApi = annotationsApi;
+        _apiClient = apiClient;
         _fileSystem = fileSystem;
     }
 
@@ -29,7 +29,7 @@ public class StorytellerGetCommand : BaseContextCommand
     public string AnnotationKey { get; set; } = string.Empty;
 
     [Option("-e|--export", CommandOptionType.SingleValue, Description = "Specify a file where the retrieved configuration will be saved.")]
-    public string ExportFilePath { get; set; }
+    public string ExportFilePath { get; set; } = string.Empty;
 
     public bool IsExportRequested => !string.IsNullOrWhiteSpace(ExportFilePath);
 
@@ -41,23 +41,29 @@ public class StorytellerGetCommand : BaseContextCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        var response = await _annotationsApi.GetAnnotationWithHttpInfoAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            AnnotationKey);
+        Annotation? annotation;
 
-        if (response.StatusCode is HttpStatusCode.NotFound)
+        try
+        {
+            annotation = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Annotations[AnnotationKey]
+                .GetAsync();
+        }
+        catch (ErrorResponse)
+        {
+            annotation = null;
+        }
+
+        if (annotation is null)
         {
             Console.WriteLine($"The annotation '{AnnotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        Console.WriteJson(response.Data);
+        Console.WriteJson(annotation);
 
         if (IsExportRequested)
         {
-            Console.WriteJsonToFile(response.Data, ExportFilePath, _fileSystem);
+            Console.WriteJsonToFile(annotation, ExportFilePath, _fileSystem);
         }
 
         return ExitCodes.SUCCESS;

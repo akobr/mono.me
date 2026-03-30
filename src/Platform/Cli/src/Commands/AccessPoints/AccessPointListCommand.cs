@@ -1,8 +1,7 @@
-using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
-using _42.Platform.Sdk.Api;
+using ApiSdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.AccessPoints;
@@ -16,21 +15,30 @@ namespace _42.Platform.Cli.Commands.AccessPoints;
 [Command(CommandNames.POINTS, Description = "Get and manage access points.")]
 public class AccessPointListCommand : BaseCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly ApiClient _apiClient;
 
     public AccessPointListCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi)
+        ApiClient apiClient)
         : base(console)
     {
-        _accessApi = accessApi;
+        _apiClient = apiClient;
     }
 
     public override async Task<int> OnExecuteAsync()
     {
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        ApiSdk.Models.Account? account;
 
-        if (accountResponse.StatusCode is not HttpStatusCode.OK)
+        try
+        {
+            account = await _apiClient.V1.Access.Account.GetAsync();
+        }
+        catch (ApiSdk.Models.ErrorResponse)
+        {
+            account = null;
+        }
+
+        if (account is null)
         {
             Console.Write(
                 "You account is not registered, to create a registration call ",
@@ -39,14 +47,16 @@ public class AccessPointListCommand : BaseCommand
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
-        var account = accountResponse.Data;
-        var accessPoints = account.AccessMap;
+        var accessPoints = account.AccessMap?.AdditionalData;
 
         Console.WriteHeader("Access points");
 
-        foreach (var accessPoint in accessPoints)
+        if (accessPoints is not null)
         {
-            Console.WriteLine($"- {accessPoint.Key} ", $"[{accessPoint.Value:G}]".ThemedLowlight(Console.Theme));
+            foreach (var accessPoint in accessPoints)
+            {
+                Console.WriteLine($"- {accessPoint.Key} ", $"[{accessPoint.Value}]".ThemedLowlight(Console.Theme));
+            }
         }
 
         return ExitCodes.SUCCESS;

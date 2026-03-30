@@ -1,5 +1,4 @@
 using System;
-using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
@@ -7,8 +6,8 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands.AccessPoints;
 using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk.Api;
-using _42.Platform.Sdk.Client;
+using ApiSdk;
+using ApiSdk.Models;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Microsoft.Identity.Client;
@@ -25,18 +24,18 @@ namespace _42.Platform.Cli.Commands.Account;
 [Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage your account and access to 2S platform services.")]
 public class AccountCommand : BaseCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly ApiClient _apiClient;
     private readonly IAuthenticationService _authentication;
     private readonly AccessDefaultOptions _accessDefault;
 
     public AccountCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi,
+        ApiClient apiClient,
         IAuthenticationService authentication,
         IOptions<AccessDefaultOptions> accessDefaultOptions)
         : base(console)
     {
-        _accessApi = accessApi;
+        _apiClient = apiClient;
         _authentication = authentication;
         _accessDefault = accessDefaultOptions.Value;
     }
@@ -65,9 +64,13 @@ public class AccountCommand : BaseCommand
             }
         }
 
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        ApiSdk.Models.Account? account;
 
-        if (accountResponse.StatusCode is HttpStatusCode.NotFound)
+        try
+        {
+            account = await _apiClient.V1.Access.Account.GetAsync();
+        }
+        catch (ErrorResponse)
         {
             Console.Write(
                 "You account is not registered, to create a registration call ",
@@ -76,10 +79,18 @@ public class AccountCommand : BaseCommand
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
-        var account = accountResponse.Data;
+        if (account is null)
+        {
+            Console.Write(
+                "You account is not registered, to create a registration call ",
+                "sform account register ".ThemedHighlight(Console.Theme),
+                "command.");
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
+        }
+
         Console.WriteHeader($"{account.Name} @ {account.UserName}");
         Console.WriteLine("Account ID: ", $"#{account.Id}".ThemedLowlight(Console.Theme));
-        Console.WriteLine($"You have access to {account.AccessMap.Count} access points.");
+        Console.WriteLine($"You have access to {account.AccessMap?.AdditionalData.Count ?? 0} access points.");
 
         if (string.IsNullOrWhiteSpace(_accessDefault?.ProjectName))
         {

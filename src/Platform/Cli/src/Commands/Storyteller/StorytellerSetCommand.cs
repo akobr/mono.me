@@ -7,7 +7,7 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Model;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
+using ApiSdk;
 using _42.Platform.Storyteller;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
@@ -20,19 +20,19 @@ namespace _42.Platform.Cli.Commands.Storyteller;
 public class StorytellerSetCommand : BaseContextCommand
 {
     private readonly AccessDefaultOptions _accessDefault;
-    private readonly IAnnotationsApiAsync _annotationsApi;
+    private readonly ApiClient _apiClient;
     private readonly IFileSystem _fileSystem;
 
     public StorytellerSetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAnnotationsApiAsync annotationsApi,
+        ApiClient apiClient,
         IOptions<AccessDefaultOptions> accessDefaultOptions,
         IFileSystem fileSystem)
         : base(console, context)
     {
         _accessDefault = accessDefaultOptions.Value;
-        _annotationsApi = annotationsApi;
+        _apiClient = apiClient;
         _fileSystem = fileSystem;
     }
 
@@ -59,7 +59,7 @@ public class StorytellerSetCommand : BaseContextCommand
         var annotationKey = Console.ValidateAnnotationKey(AnnotationKey);
         var fullKey = Context.GetFullKey(annotationKey);
 
-        var annotation = new Annotation
+        var annotation = new _42.Platform.Storyteller.Annotation
         {
             AnnotationKey = annotationKey,
             AnnotationType = annotationKey.Type,
@@ -76,7 +76,7 @@ public class StorytellerSetCommand : BaseContextCommand
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
 
-            using var fileReader = _fileSystem.File.OpenText(ImportFilePath);
+            using var fileReader = _fileSystem.File.OpenText(ImportFilePath!);
             await using var jsonReader = new JsonTextReader(fileReader);
             var fileContent = await JObject.LoadAsync(
                 jsonReader,
@@ -90,7 +90,7 @@ public class StorytellerSetCommand : BaseContextCommand
             var annotationType = AnnotationTypes.GetRuntimeType(annotationKey.Type);
             var serializedAnnotation = fileContent.ToObject(annotationType, JsonSerializer.CreateDefault());
 
-            if (serializedAnnotation is not Annotation castedAnnotation)
+            if (serializedAnnotation is not _42.Platform.Storyteller.Annotation castedAnnotation)
             {
                 Console.WriteImportant($"The import file '{_fileSystem.Path.GetFileName(ImportFilePath)}' does not contain a valid annotation.");
                 return ExitCodes.ERROR_WRONG_INPUT;
@@ -162,12 +162,8 @@ public class StorytellerSetCommand : BaseContextCommand
             };
         }
 
-        var resultAnnotation = await _annotationsApi.SetAnnotationAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            annotationKey,
-            annotation.ToSdkAnnotation());
+        var resultAnnotation = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Annotations[annotationKey.ToString()]
+            .PostAsync(annotation.ToSdkAnnotation());
 
         Console.WriteJson(resultAnnotation);
         return ExitCodes.SUCCESS;

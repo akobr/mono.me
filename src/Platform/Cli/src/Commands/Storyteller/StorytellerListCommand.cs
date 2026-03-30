@@ -4,8 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands.Configuration;
-using _42.Platform.Sdk.Api;
 using _42.Platform.Storyteller;
+using ApiSdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
@@ -19,15 +19,15 @@ namespace _42.Platform.Cli.Commands.Storyteller;
 [Command(CommandNames.STORYTELLER, CommandNames.STORY, CommandNames.ANNOTATIONS, Description = "Retrieve the story of your platform (manage annotations).")]
 public class StorytellerListCommand : BaseContextCommand
 {
-    private readonly IAnnotationsApiAsync _annotationsApi;
+    private readonly ApiClient _apiClient;
 
     public StorytellerListCommand(
         IExtendedConsole console,
-        IAnnotationsApiAsync annotationsApi,
+        ApiClient apiClient,
         ICommandContext context)
         : base(console, context)
     {
-        _annotationsApi = annotationsApi;
+        _apiClient = apiClient;
     }
 
     [Option("-r|--responsibilities", CommandOptionType.SingleValue, Description = "Query responsibilities by name.")]
@@ -114,26 +114,28 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderSubjectsAsync()
     {
-        var response = await _annotationsApi.GetSubjectsAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            nameQuery: QuerySubjects,
-            ContinuationToken);
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Subjects
+            .GetAsync(rc =>
+            {
+                rc.QueryParameters.NameQuery = QuerySubjects;
+                rc.QueryParameters.ContinuationToken = ContinuationToken;
+            });
 
         Console.WriteHeader("Subjects");
 
-        if (response.Annotations.Count < 1)
+        if (response?.Annotations is null || response.Annotations.Count < 1)
         {
             Console.WriteLine("No subject exists yet.".ThemedLowlight(Console.Theme));
         }
-
-        foreach (var annotation in response.Annotations)
+        else
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            foreach (var annotation in response.Annotations)
+            {
+                Console.WriteLine($"- {annotation.AnnotationKey}");
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response?.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More subjects available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
@@ -145,26 +147,28 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderResponsibilitiesAsync()
     {
-        var response = await _annotationsApi.GetResponsibilitiesAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            nameQuery: QueryResponsibilities,
-            ContinuationToken);
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Responsibilities
+            .GetAsync(rc =>
+            {
+                rc.QueryParameters.NameQuery = QueryResponsibilities;
+                rc.QueryParameters.ContinuationToken = ContinuationToken;
+            });
 
         Console.WriteHeader("Responsibilities");
 
-        if (response.Annotations.Count < 1)
+        if (response?.Annotations is null || response.Annotations.Count < 1)
         {
             Console.WriteLine("No responsibility exists yet.".ThemedLowlight(Console.Theme));
         }
-
-        foreach (var annotation in response.Annotations)
+        else
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            foreach (var annotation in response.Annotations)
+            {
+                Console.WriteLine($"- {annotation.AnnotationKey}");
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response?.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More responsibilities available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
@@ -176,27 +180,29 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderUsagesAsync()
     {
-        var response = await _annotationsApi.GetUsagesAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            responsibilityNameQuery: QueryResponsibilities,
-            subjectNameQuery: QuerySubjects,
-            continuationToken: ContinuationToken);
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Usages
+            .GetAsync(rc =>
+            {
+                rc.QueryParameters.ResponsibilityNameQuery = QueryResponsibilities;
+                rc.QueryParameters.SubjectNameQuery = QuerySubjects;
+                rc.QueryParameters.ContinuationToken = ContinuationToken;
+            });
 
         Console.WriteHeader("Usages");
 
-        if (response.Annotations.Count < 1)
+        if (response?.Annotations is null || response.Annotations.Count < 1)
         {
             Console.WriteLine("No usage exists yet.".ThemedLowlight(Console.Theme));
         }
-
-        foreach (var annotation in response.Annotations)
+        else
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            foreach (var annotation in response.Annotations)
+            {
+                Console.WriteLine($"- {annotation.AnnotationKey}");
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response?.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More usages available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
@@ -208,27 +214,29 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderContextsAsync()
     {
-        var response = await _annotationsApi.GetContextsAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            subjectNameQuery: QuerySubjects,
-            nameQuery: QueryContexts,
-            continuationToken: ContinuationToken);
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Contexts
+            .GetAsync(rc =>
+            {
+                rc.QueryParameters.SubjectNameQuery = QuerySubjects;
+                rc.QueryParameters.NameQuery = QueryContexts;
+                rc.QueryParameters.ContinuationToken = ContinuationToken;
+            });
 
         Console.WriteHeader("Contexts");
 
-        if (response.Annotations.Count < 1)
+        if (response?.Annotations is null || response.Annotations.Count < 1)
         {
             Console.WriteLine("No context exists yet.".ThemedLowlight(Console.Theme));
         }
-
-        foreach (var annotation in response.Annotations)
+        else
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            foreach (var annotation in response.Annotations)
+            {
+                Console.WriteLine($"- {annotation.AnnotationKey}");
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response?.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More contexts available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
@@ -240,28 +248,30 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderExecutionsAsync()
     {
-        var response = await _annotationsApi.GetExecutionsAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            subjectNameQuery: QuerySubjects,
-            responsibilityNameQuery: QueryResponsibilities,
-            contextNameQuery: QueryContexts,
-            continuationToken: ContinuationToken);
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Executions
+            .GetAsync(rc =>
+            {
+                rc.QueryParameters.SubjectNameQuery = QuerySubjects;
+                rc.QueryParameters.ResponsibilityNameQuery = QueryResponsibilities;
+                rc.QueryParameters.ContextNameQuery = QueryContexts;
+                rc.QueryParameters.ContinuationToken = ContinuationToken;
+            });
 
         Console.WriteHeader("Executions");
 
-        if (response.Annotations.Count < 1)
+        if (response?.Annotations is null || response.Annotations.Count < 1)
         {
             Console.WriteLine("No execution exists yet.".ThemedLowlight(Console.Theme));
         }
-
-        foreach (var annotation in response.Annotations)
+        else
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            foreach (var annotation in response.Annotations)
+            {
+                Console.WriteLine($"- {annotation.AnnotationKey}");
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response?.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More executions available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
@@ -273,27 +283,27 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderDescendantsAsync(AnnotationKey annotationKey)
     {
-        var response = await _annotationsApi.GetDescendantsAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            annotationKey,
-            "all",
-            ContinuationToken);
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Annotations[annotationKey.ToString()]["all"]
+            .GetAsync(rc =>
+            {
+                rc.QueryParameters.ContinuationToken = ContinuationToken;
+            });
 
         Console.WriteHeader("All descendants");
 
-        if (response.Annotations.Count < 1)
+        if (response?.Annotations is null || response.Annotations.Count < 1)
         {
             Console.WriteLine("No descendant exists yet.".ThemedLowlight(Console.Theme));
         }
-
-        foreach (var annotation in response.Annotations)
+        else
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            foreach (var annotation in response.Annotations)
+            {
+                Console.WriteLine($"- {annotation.AnnotationKey}");
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response?.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More descendants available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
@@ -303,24 +313,28 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderAnnotationsAsync()
     {
-        var response = await _annotationsApi.GetAnnotationsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName);
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Annotations
+            .GetAsync(rc => rc.QueryParameters.ContinuationToken = ContinuationToken);
         Console.WriteHeader("Annotations");
 
-        if (response.Annotations.Count < 1)
+        if (response?.Annotations is null || response.Annotations.Count < 1)
         {
             Console.WriteLine("No annotation exists yet.".ThemedLowlight(Console.Theme));
         }
-
-        foreach (var annotation in response.Annotations)
+        else
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            foreach (var annotation in response.Annotations)
+            {
+                Console.WriteLine($"- {annotation.AnnotationKey}");
+            }
         }
 
-        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response?.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More annotations available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
-            Console.WriteLine($"  {response.ContinuationToken}");
+            var token = response.ContinuationToken;
+            Console.WriteLine($"  {token}");
         }
     }
 
@@ -340,68 +354,73 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderResponsibilityTreeAsync()
     {
-        var response = await _annotationsApi.GetResponsibilitiesAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            nameQuery: QueryResponsibilities,
-            continuationToken: ContinuationToken);
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Responsibilities
+            .GetAsync(rc =>
+            {
+                rc.QueryParameters.NameQuery = QueryResponsibilities;
+                rc.QueryParameters.ContinuationToken = ContinuationToken;
+            });
 
         var root = new Composition("Tree of responsibilities");
 
-        if (response.Annotations.Count < 1)
+        if (response?.Annotations is null || response.Annotations.Count < 1)
         {
             root.Children.Add(new Composition(new ConsoleOutputThemedText(
                 "No responsibility exists yet.",
                 t => t.LowlightColor)));
         }
-
-        foreach (var responsibility in response.Annotations)
+        else
         {
-            var mapOfSubjects = new Dictionary<string, Composition>();
-
-            var responsibilityNode = new Composition(new ConsoleOutputComposition(
-                new ConsoleOutput(responsibility.Name),
-                new ConsoleOutputThemedText(" [responsibility]", t => t.LowlightColor)));
-            root.Children.Add(responsibilityNode);
-
-            var executionsResponse = await _annotationsApi.GetExecutionsAsync(
-                Context.OrganizationName,
-                Context.ProjectName,
-                Context.ViewName,
-                subjectNameQuery: QuerySubjects,
-                responsibilityNameQuery: responsibility.Name,
-                contextNameQuery: QueryContexts);
-
-            foreach (var execution in executionsResponse.Annotations)
+            foreach (var responsibility in response.Annotations)
             {
-                var key = AnnotationKey.Parse(execution.AnnotationKey);
-                var subjectName = key.SubjectName;
+                var mapOfSubjects = new Dictionary<string, Composition>();
 
-                if (!mapOfSubjects.TryGetValue(subjectName, out var subjectNode))
+                var responsibilityNode = new Composition(new ConsoleOutputComposition(
+                    new ConsoleOutput(responsibility.Name),
+                    new ConsoleOutputThemedText(" [responsibility]", t => t.LowlightColor)));
+                root.Children.Add(responsibilityNode);
+
+                var executionsResponse = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Executions
+                    .GetAsync(rc =>
+                    {
+                        rc.QueryParameters.SubjectNameQuery = QuerySubjects;
+                        rc.QueryParameters.ResponsibilityNameQuery = responsibility.Name;
+                        rc.QueryParameters.ContextNameQuery = QueryContexts;
+                    });
+
+                if (executionsResponse?.Annotations is not null)
                 {
-                    subjectNode = new Composition(new ConsoleOutputComposition(
-                        new ConsoleOutput(subjectName),
-                        new ConsoleOutputThemedText(" [subject]", t => t.LowlightColor)));
-                    mapOfSubjects.Add(subjectName, subjectNode);
-                    responsibilityNode.Children.Add(subjectNode);
+                    foreach (var execution in executionsResponse.Annotations)
+                    {
+                        var key = AnnotationKey.Parse(execution.AnnotationKey!);
+                        var subjectName = key.SubjectName;
+
+                        if (!mapOfSubjects.TryGetValue(subjectName, out var subjectNode))
+                        {
+                            subjectNode = new Composition(new ConsoleOutputComposition(
+                                new ConsoleOutput(subjectName),
+                                new ConsoleOutputThemedText(" [subject]", t => t.LowlightColor)));
+                            mapOfSubjects.Add(subjectName, subjectNode);
+                            responsibilityNode.Children.Add(subjectNode);
+                        }
+
+                        subjectNode.Children.Add(new Composition(new ConsoleOutputComposition(
+                            new ConsoleOutput(key.ContextName),
+                            new ConsoleOutputThemedText(" [context]", t => t.LowlightColor))));
+                    }
                 }
 
-                subjectNode.Children.Add(new Composition(new ConsoleOutputComposition(
-                    new ConsoleOutput(key.ContextName),
-                    new ConsoleOutputThemedText(" [context]", t => t.LowlightColor))));
-            }
-
-            foreach (var childNode in responsibilityNode.Children
-                         .Where(node => node.Children.Count == 1))
-            {
-                childNode.Children.Clear();
+                foreach (var childNode in responsibilityNode.Children
+                             .Where(node => node.Children.Count == 1))
+                {
+                    childNode.Children.Clear();
+                }
             }
         }
 
         Console.WriteTree(root, node => node);
 
-        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response?.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More responsibilities available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));
@@ -411,61 +430,66 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderSubjectTreeAsync()
     {
-        var response = await _annotationsApi.GetSubjectsAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            nameQuery: QuerySubjects,
-            continuationToken: ContinuationToken);
+        var response = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Subjects
+            .GetAsync(rc =>
+            {
+                rc.QueryParameters.NameQuery = QuerySubjects;
+                rc.QueryParameters.ContinuationToken = ContinuationToken;
+            });
 
         var root = new Composition("Tree of subjects");
 
-        if (response.Annotations.Count < 1)
+        if (response?.Annotations is null || response.Annotations.Count < 1)
         {
             root.Children.Add(new Composition(new ConsoleOutputThemedText(
                 "No subject exists yet.",
                 t => t.LowlightColor)));
         }
-
-        foreach (var subject in response.Annotations)
+        else
         {
-            var mapOfContexts = new Dictionary<string, Composition>();
-            var subjectNode = new Composition(new ConsoleOutputComposition(
-                new ConsoleOutput(subject.Name),
-                new ConsoleOutputThemedText(" [subject]", t => t.LowlightColor)));
-            root.Children.Add(subjectNode);
-
-            var executionsResponse = await _annotationsApi.GetExecutionsAsync(
-                Context.OrganizationName,
-                Context.ProjectName,
-                Context.ViewName,
-                subjectNameQuery: subject.Name,
-                responsibilityNameQuery: QueryResponsibilities,
-                contextNameQuery: QueryContexts);
-
-            foreach (var execution in executionsResponse.Annotations)
+            foreach (var subject in response.Annotations)
             {
-                var key = AnnotationKey.Parse(execution.AnnotationKey);
-                var contextName = key.ContextName;
+                var mapOfContexts = new Dictionary<string, Composition>();
+                var subjectNode = new Composition(new ConsoleOutputComposition(
+                    new ConsoleOutput(subject.Name),
+                    new ConsoleOutputThemedText(" [subject]", t => t.LowlightColor)));
+                root.Children.Add(subjectNode);
 
-                if (!mapOfContexts.TryGetValue(contextName, out var contextNode))
+                var executionsResponse = await _apiClient.V1[Context.OrganizationName][Context.ProjectName][Context.ViewName].Executions
+                    .GetAsync(rc =>
+                    {
+                        rc.QueryParameters.SubjectNameQuery = subject.Name;
+                        rc.QueryParameters.ResponsibilityNameQuery = QueryResponsibilities;
+                        rc.QueryParameters.ContextNameQuery = QueryContexts;
+                    });
+
+                if (executionsResponse?.Annotations is not null)
                 {
-                    contextNode = new Composition(new ConsoleOutputComposition(
-                        new ConsoleOutput(contextName),
-                        new ConsoleOutputThemedText(" [context]", t => t.LowlightColor)));
-                    mapOfContexts.Add(contextName, contextNode);
-                    subjectNode.Children.Add(contextNode);
-                }
+                    foreach (var execution in executionsResponse.Annotations)
+                    {
+                        var key = AnnotationKey.Parse(execution.AnnotationKey!);
+                        var contextName = key.ContextName;
 
-                contextNode.Children.Add(new Composition(new ConsoleOutputComposition(
-                    new ConsoleOutput(key.ResponsibilityName),
-                    new ConsoleOutputThemedText(" [responsibility]", t => t.LowlightColor))));
+                        if (!mapOfContexts.TryGetValue(contextName, out var contextNode))
+                        {
+                            contextNode = new Composition(new ConsoleOutputComposition(
+                                new ConsoleOutput(contextName),
+                                new ConsoleOutputThemedText(" [context]", t => t.LowlightColor)));
+                            mapOfContexts.Add(contextName, contextNode);
+                            subjectNode.Children.Add(contextNode);
+                        }
+
+                        contextNode.Children.Add(new Composition(new ConsoleOutputComposition(
+                            new ConsoleOutput(key.ResponsibilityName),
+                            new ConsoleOutputThemedText(" [responsibility]", t => t.LowlightColor))));
+                    }
+                }
             }
         }
 
         Console.WriteTree(root, node => node);
 
-        if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
+        if (!string.IsNullOrWhiteSpace(response?.ContinuationToken))
         {
             Console.WriteLine();
             Console.WriteLine("More subjects available, use continuation token to retrieve next page:".ThemedLowlight(Console.Theme));

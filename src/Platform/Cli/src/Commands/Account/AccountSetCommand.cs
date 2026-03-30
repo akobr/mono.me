@@ -1,13 +1,13 @@
 using System;
 using System.IO.Abstractions;
 using System.Linq;
-using System.Net;
 using System.Reflection;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk.Api;
+using ApiSdk;
+using ApiSdk.Models;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -18,18 +18,18 @@ namespace _42.Platform.Cli.Commands.Account;
 [Command(CommandNames.SET, Description = "Set default project and view of the CLI toolkit.")]
 public class AccountSetCommand : BaseCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly ApiClient _apiClient;
     private readonly IFileSystem _fileSystem;
     private readonly AccessDefaultOptions _accessDefault;
 
     public AccountSetCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi,
+        ApiClient apiClient,
         IOptions<AccessDefaultOptions> accessDefaultOptions,
         IFileSystem fileSystem)
         : base(console)
     {
-        _accessApi = accessApi;
+        _apiClient = apiClient;
         _fileSystem = fileSystem;
         _accessDefault = accessDefaultOptions.Value;
     }
@@ -42,9 +42,18 @@ public class AccountSetCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        ApiSdk.Models.Account? account;
 
-        if (accountResponse.StatusCode is not HttpStatusCode.OK)
+        try
+        {
+            account = await _apiClient.V1.Access.Account.GetAsync();
+        }
+        catch (ErrorResponse)
+        {
+            account = null;
+        }
+
+        if (account is null)
         {
             Console.Write(
                 "You account is not registered, to create a registration call ",
@@ -52,8 +61,6 @@ public class AccountSetCommand : BaseCommand
                 "command.");
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
-
-        var account = accountResponse.Data;
 
         if (!string.IsNullOrWhiteSpace(_accessDefault.ProjectName))
         {
@@ -94,15 +101,15 @@ public class AccountSetCommand : BaseCommand
         serializer.Serialize(jWriter, config);
     }
 
-    private string SelectPossibleProject(Sdk.Model.Account account)
+    private string SelectPossibleProject(ApiSdk.Models.Account account)
     {
         var selectOptions = new SelectOptions<string>
         {
             Message = "Which project would you like to set as default",
-            Items = account.AccessMap
+            Items = account.AccessMap?.AdditionalData
                 .Where(access => access.Key.Contains('.'))
                 .Select(access => access.Key)
-                .OrderBy(access => access),
+                .OrderBy(access => access) ?? Enumerable.Empty<string>(),
         };
 
         if (!string.IsNullOrWhiteSpace(_accessDefault.ProjectName))

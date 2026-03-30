@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
-using _42.Platform.Sdk.Api;
+using ApiSdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
@@ -8,15 +8,15 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Command(CommandNames.DELETE, CommandNames.REMOVE, Description = "Delete a machine access.")]
 public class MachineDeleteCommand : BaseContextCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly ApiClient _apiClient;
 
     public MachineDeleteCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAccessApiAsync accessApi)
+        ApiClient apiClient)
         : base(console, context)
     {
-        _accessApi = accessApi;
+        _apiClient = apiClient;
     }
 
     [Argument(0, Description = "An id of an machine access.")]
@@ -30,10 +30,7 @@ public class MachineDeleteCommand : BaseContextCommand
             return ExitCodes.ERROR_INPUT_PARSING;
         }
 
-        await _accessApi.DeleteMachineAccessAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            MachineId);
+        await _apiClient.V1[Context.OrganizationName][Context.ProjectName].Access.Machines[MachineId].DeleteAsync();
 
         Console.WriteImportant($"The machine access {MachineId} has been deleted.");
         return ExitCodes.SUCCESS;

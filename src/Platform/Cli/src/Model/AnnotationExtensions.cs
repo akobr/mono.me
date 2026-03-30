@@ -1,6 +1,6 @@
 using System.Linq;
 using CoreAnnotation = _42.Platform.Storyteller.Annotation;
-using SdkAnnotation = _42.Platform.Sdk.Model.Annotation;
+using SdkAnnotation = ApiSdk.Models.Annotation;
 
 namespace _42.Platform.Cli.Model;
 
@@ -10,14 +10,14 @@ public static class AnnotationExtensions
     {
         return new SdkAnnotation
         {
-            AnnotationType = (SdkAnnotation.AnnotationTypeEnum)@this.AnnotationType,
+            AnnotationType = (ApiSdk.Models.Annotation_AnnotationType)@this.AnnotationType,
             Name = @this.Name,
 
             Title = @this.Title,
-            ValidFrom = @this.ValidFrom?.UtcDateTime,
-            ExpiresAt = @this.ExpiresAt?.UtcDateTime,
+            ValidFrom = @this.ValidFrom,
+            ExpiresAt = @this.ExpiresAt,
             IsDisabled = @this.IsDisabled,
-            VarTimeZone = @this.TimeZone,
+            TimeZone = @this.TimeZone,
 
             ViewName = @this.ViewName,
             ProjectName = @this.ProjectName,
@@ -25,7 +25,10 @@ public static class AnnotationExtensions
             Description = @this.Description,
             DocumentationLink = @this.DocumentationLink,
 
-            Values = @this.Values.ToDictionary(),
+            Values = new ApiSdk.Models.Annotation_Values
+            {
+                AdditionalData = @this.Values.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+            },
             Labels = @this.Labels.ToList(),
         };
     }
