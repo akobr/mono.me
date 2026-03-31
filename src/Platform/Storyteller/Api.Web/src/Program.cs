@@ -1,6 +1,7 @@
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.Security;
+using _42.Platform.Storyteller.Json;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Identity.Web;
@@ -72,7 +73,11 @@ builder.Services.AddApiVersioning(options =>
     options.ReportApiVersions = true;
 });
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JObjectConverter());
+    });
 
 // Learn more about configuring Swagger/OpenAPI at
 // https://learn.microsoft.com/en-us/aspnet/core/tutorials/getting-started-with-nswag?view=aspnetcore-7.0&tabs=visual-studio
