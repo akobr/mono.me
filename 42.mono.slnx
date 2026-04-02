@@ -103,6 +103,7 @@
     <Project Path="src/Platform/Storyteller/Binding.Azure.KeyVault/src/Binding.Azure.KeyVault.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Core/src/Binding.Core.csproj" />
     <Project Path="src/Platform/Storyteller/DbCreator/src/DbCreator.csproj" />
+    <Project Path="src/Platform/Storyteller/Sdk.NSwag/src/Sdk.NSwag.csproj" />
     <Project Path="src/Platform/Storyteller/Sdk/src/Sdk.csproj" />
   </Folder>
   <Folder Name="/Platform/Supervisor/">
