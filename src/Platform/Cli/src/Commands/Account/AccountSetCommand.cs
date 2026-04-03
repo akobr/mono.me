@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
@@ -18,13 +18,13 @@ namespace _42.Platform.Cli.Commands.Account;
 [Command(CommandNames.SET, Description = "Set default project and view of the CLI toolkit.")]
 public class AccountSetCommand : BaseCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly IAccessApiClient _accessApi;
     private readonly IFileSystem _fileSystem;
     private readonly AccessDefaultOptions _accessDefault;
 
     public AccountSetCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi,
+        IAccessApiClient accessApi,
         IOptions<AccessDefaultOptions> accessDefaultOptions,
         IFileSystem fileSystem)
         : base(console)
@@ -42,9 +42,13 @@ public class AccountSetCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        _42.Platform.Storyteller.Sdk.Account account;
 
-        if (accountResponse.StatusCode is not HttpStatusCode.OK)
+        try
+        {
+            account = await _accessApi.GetAccountAsync();
+        }
+        catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.NotFound)
         {
             Console.Write(
                 "You account is not registered, to create a registration call ",
@@ -52,8 +56,6 @@ public class AccountSetCommand : BaseCommand
                 "command.");
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
-
-        var account = accountResponse.Data;
 
         if (!string.IsNullOrWhiteSpace(_accessDefault.ProjectName))
         {
@@ -94,7 +96,7 @@ public class AccountSetCommand : BaseCommand
         serializer.Serialize(jWriter, config);
     }
 
-    private string SelectPossibleProject(Sdk.Model.Account account)
+    private string SelectPossibleProject(_42.Platform.Storyteller.Sdk.Account account)
     {
         var selectOptions = new SelectOptions<string>
         {
@@ -114,3 +116,4 @@ public class AccountSetCommand : BaseCommand
         return projectKey;
     }
 }
+

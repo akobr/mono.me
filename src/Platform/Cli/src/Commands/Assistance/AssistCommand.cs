@@ -16,3 +16,4 @@ public class AssistCommand : BaseParentCommand
         // no operation
     }
 }
+

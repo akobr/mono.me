@@ -6,7 +6,7 @@ using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands.Account;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Sharprompt;
 
@@ -15,12 +15,12 @@ namespace _42.Platform.Cli.Commands.AccessPoints;
 [Command(CommandNames.CREATE, Description = "Create a new project (access point).")]
 public class AccessPointCreateCommand : BaseCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly IAccessApiClient _accessApi;
     private readonly IFileSystem _fileSystem;
 
     public AccessPointCreateCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi,
+        IAccessApiClient accessApi,
         IFileSystem fileSystem)
         : base(console)
     {
@@ -30,9 +30,13 @@ public class AccessPointCreateCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        _42.Platform.Storyteller.Sdk.Account account;
 
-        if (accountResponse.StatusCode is not HttpStatusCode.OK)
+        try
+        {
+            account = await _accessApi.GetAccountAsync();
+        }
+        catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.NotFound)
         {
             Console.Write(
                 "You account is not registered, to create a registration call ",
@@ -41,12 +45,17 @@ public class AccessPointCreateCommand : BaseCommand
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
-        var account = accountResponse.Data;
         var organizationName = SelectOrInputOrganizationName(account);
 
         var projectName = Console.Input(new InputOptions<string>
         {
             Message = "Name of your new project",
+        });
+
+        await _accessApi.CreateAccessPointAsync(new AccessPointCreate
+        {
+            Organization = organizationName,
+            Project = projectName,
         });
 
         AccountSetCommand.CreateAccessDefaultConfigFile(
@@ -60,7 +69,7 @@ public class AccessPointCreateCommand : BaseCommand
         return ExitCodes.SUCCESS;
     }
 
-    private string SelectOrInputOrganizationName(Sdk.Model.Account account)
+    private string SelectOrInputOrganizationName(_42.Platform.Storyteller.Sdk.Account account)
     {
         const string createNew = "Create new";
         var existingOrganizations = account.AccessMap
@@ -86,3 +95,4 @@ public class AccessPointCreateCommand : BaseCommand
         return organizationName;
     }
 }
+

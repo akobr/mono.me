@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
@@ -13,12 +13,12 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Command(CommandNames.MACHINE, CommandNames.AGENT, Description = "Get and manage machine access to 2S platform.")]
 public class MachineListCommand : BaseContextCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly IAccessApiClient _accessApi;
 
     public MachineListCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAccessApiAsync accessApi)
+        IAccessApiClient accessApi)
         : base(console, context)
     {
         _accessApi = accessApi;
@@ -45,3 +45,4 @@ public class MachineListCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 }
+

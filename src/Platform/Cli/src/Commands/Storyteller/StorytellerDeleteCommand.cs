@@ -1,7 +1,7 @@
 using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
@@ -9,12 +9,12 @@ namespace _42.Platform.Cli.Commands.Storyteller;
 [Command(CommandNames.DELETE, CommandNames.REMOVE, Description = "Delete an annotation and its descendants.")]
 public class StorytellerDeleteCommand : BaseContextCommand
 {
-    private readonly IAnnotationsApiAsync _annotationsApi;
+    private readonly IAnnotationsApiClient _annotationsApi;
 
     public StorytellerDeleteCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAnnotationsApiAsync annotationsApi)
+        IAnnotationsApiClient annotationsApi)
         : base(console, context)
     {
         _annotationsApi = annotationsApi;
@@ -31,13 +31,15 @@ public class StorytellerDeleteCommand : BaseContextCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        var response = await _annotationsApi.DeleteAnnotationWithHttpInfoAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            AnnotationKey);
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        try
+        {
+            await _annotationsApi.DeleteAnnotationAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                Context.ViewName,
+                AnnotationKey);
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
             Console.WriteLine($"The annotation '{AnnotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
@@ -47,3 +49,4 @@ public class StorytellerDeleteCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 }
+

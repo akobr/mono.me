@@ -7,8 +7,7 @@ using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands.AccessPoints;
 using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk.Api;
-using _42.Platform.Sdk.Client;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Microsoft.Identity.Client;
@@ -25,13 +24,13 @@ namespace _42.Platform.Cli.Commands.Account;
 [Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage your account and access to 2S platform services.")]
 public class AccountCommand : BaseCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly IAccessApiClient _accessApi;
     private readonly IAuthenticationService _authentication;
     private readonly AccessDefaultOptions _accessDefault;
 
     public AccountCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi,
+        IAccessApiClient accessApi,
         IAuthenticationService authentication,
         IOptions<AccessDefaultOptions> accessDefaultOptions)
         : base(console)
@@ -65,9 +64,13 @@ public class AccountCommand : BaseCommand
             }
         }
 
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        _42.Platform.Storyteller.Sdk.Account account;
 
-        if (accountResponse.StatusCode is HttpStatusCode.NotFound)
+        try
+        {
+            account = await _accessApi.GetAccountAsync();
+        }
+        catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.NotFound)
         {
             Console.Write(
                 "You account is not registered, to create a registration call ",
@@ -76,7 +79,6 @@ public class AccountCommand : BaseCommand
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
-        var account = accountResponse.Data;
         Console.WriteHeader($"{account.Name} @ {account.UserName}");
         Console.WriteLine("Account ID: ", $"#{account.Id}".ThemedLowlight(Console.Theme));
         Console.WriteLine($"You have access to {account.AccessMap.Count} access points.");
@@ -168,3 +170,4 @@ public class AccountCommand : BaseCommand
         return ExitCodes.ERROR_WRONG_INPUT;
     }
 }
+

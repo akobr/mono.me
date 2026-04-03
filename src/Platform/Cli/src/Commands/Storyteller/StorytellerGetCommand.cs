@@ -3,7 +3,7 @@ using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
@@ -11,13 +11,13 @@ namespace _42.Platform.Cli.Commands.Storyteller;
 [Command(CommandNames.GET, Description = "Retrieve a specific annotation.")]
 public class StorytellerGetCommand : BaseContextCommand
 {
-    private readonly IAnnotationsApiAsync _annotationsApi;
+    private readonly IAnnotationsApiClient _annotationsApi;
     private readonly IFileSystem _fileSystem;
 
     public StorytellerGetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAnnotationsApiAsync annotationsApi,
+        IAnnotationsApiClient annotationsApi,
         IFileSystem fileSystem)
         : base(console, context)
     {
@@ -41,25 +41,30 @@ public class StorytellerGetCommand : BaseContextCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        var response = await _annotationsApi.GetAnnotationWithHttpInfoAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            AnnotationKey);
+        Annotation annotation;
 
-        if (response.StatusCode is HttpStatusCode.NotFound)
+        try
+        {
+            annotation = await _annotationsApi.GetAnnotationAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                Context.ViewName,
+                AnnotationKey);
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
             Console.WriteLine($"The annotation '{AnnotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        Console.WriteJson(response.Data);
+        Console.WriteJson(annotation);
 
         if (IsExportRequested)
         {
-            Console.WriteJsonToFile(response.Data, ExportFilePath, _fileSystem);
+            Console.WriteJsonToFile(annotation, ExportFilePath, _fileSystem);
         }
 
         return ExitCodes.SUCCESS;
     }
 }
+

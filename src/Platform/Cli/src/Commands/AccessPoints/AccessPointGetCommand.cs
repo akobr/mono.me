@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.Options;
 using Sharprompt;
@@ -14,12 +14,12 @@ namespace _42.Platform.Cli.Commands.AccessPoints;
 [Command(CommandNames.GET, Description = "Get an access point with list of users and role. You need to be administrator or owner.")]
 public class AccessPointGetCommand : BaseCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly IAccessApiClient _accessApi;
     private readonly AccessDefaultOptions _accessDefault;
 
     public AccessPointGetCommand(
         IExtendedConsole console,
-        IAccessApiAsync accessApi,
+        IAccessApiClient accessApi,
         IOptions<AccessDefaultOptions> accessDefaultOptions)
         : base(console)
     {
@@ -32,9 +32,13 @@ public class AccessPointGetCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        var accountResponse = await _accessApi.GetAccountWithHttpInfoAsync();
+        _42.Platform.Storyteller.Sdk.Account account;
 
-        if (accountResponse.StatusCode is not HttpStatusCode.OK)
+        try
+        {
+            account = await _accessApi.GetAccountAsync();
+        }
+        catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.NotFound)
         {
             Console.Write(
                 "You account is not registered, to create a registration call ",
@@ -43,7 +47,6 @@ public class AccessPointGetCommand : BaseCommand
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
-        var account = accountResponse.Data;
         var pointKey = PointKey ?? SelectPossiblePoint(account);
 
         if (!account.AccessMap.TryGetValue(pointKey, out var role))
@@ -52,7 +55,7 @@ public class AccessPointGetCommand : BaseCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        if (role < Sdk.Model.Account.InnerEnum.Administrator)
+        if (role < RoleType.Administrator)
         {
             Console.WriteLine($"You don't have administration permissions to the access point '{pointKey}'.");
             return ExitCodes.ERROR_WRONG_INPUT;
@@ -72,13 +75,13 @@ public class AccessPointGetCommand : BaseCommand
         return ExitCodes.SUCCESS;
     }
 
-    private string SelectPossiblePoint(Sdk.Model.Account account)
+    private string SelectPossiblePoint(_42.Platform.Storyteller.Sdk.Account account)
     {
         var selectOptions = new SelectOptions<string>
         {
             Message = "Which access point would you like to get",
             Items = account.AccessMap
-                .Where(access => access.Value >= Sdk.Model.Account.InnerEnum.Administrator)
+                .Where(access => access.Value >= RoleType.Administrator)
                 .Select(access => access.Key)
                 .OrderBy(access => access),
         };
@@ -92,3 +95,4 @@ public class AccessPointGetCommand : BaseCommand
         return projectKey;
     }
 }
+

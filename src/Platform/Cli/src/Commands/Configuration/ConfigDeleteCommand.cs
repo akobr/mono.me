@@ -1,7 +1,7 @@
 using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Configuration;
@@ -9,11 +9,11 @@ namespace _42.Platform.Cli.Commands.Configuration;
 [Command(CommandNames.DELETE, CommandNames.REMOVE, Description = "Delete a configuration.")]
 public class ConfigDeleteCommand : BaseContextCommand
 {
-    private readonly IConfigurationApiAsync _configurationApi;
+    private readonly IConfigurationApiClient _configurationApi;
 
     public ConfigDeleteCommand(
         IExtendedConsole console,
-        IConfigurationApiAsync configurationApi,
+        IConfigurationApiClient configurationApi,
         ICommandContext context)
         : base(console, context)
     {
@@ -25,13 +25,15 @@ public class ConfigDeleteCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
-        var response = await _configurationApi.DeleteConfigurationWithHttpInfoAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            AnnotationKey);
-
-        if (response.StatusCode == HttpStatusCode.NotFound)
+        try
+        {
+            await _configurationApi.DeleteConfigurationAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                Context.ViewName,
+                AnnotationKey);
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
             Console.WriteLine($"The configuration for '{AnnotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
@@ -42,3 +44,4 @@ public class ConfigDeleteCommand : BaseContextCommand
 
     }
 }
+
