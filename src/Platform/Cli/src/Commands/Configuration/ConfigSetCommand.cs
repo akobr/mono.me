@@ -3,7 +3,7 @@ using System.IO.Abstractions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -20,13 +20,13 @@ public class ConfigSetCommand : BaseContextCommand
         PropertyNameComparison = StringComparison.Ordinal,
     };
 
-    private readonly IConfigurationApiAsync _configurationApi;
+    private readonly IConfigurationApiClient _configurationApi;
     private readonly IFileSystem _fileSystem;
 
     public ConfigSetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IConfigurationApiAsync configurationApi,
+        IConfigurationApiClient configurationApi,
         IFileSystem fileSystem)
         : base(console, context)
     {
@@ -107,24 +107,35 @@ public class ConfigSetCommand : BaseContextCommand
         }
 
         // TODO: [P1] add support for custom properties and labels
-        var response = await _configurationApi.SetConfigurationWithHttpInfoAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            AnnotationKey,
-            config);
+        _42.Platform.Storyteller.Sdk.Configuration data;
 
-        if (IsResolvedRetrievalRequested)
+        try
         {
-            response = await _configurationApi.GetResolvedConfigurationWithHttpInfoAsync(
+            data = await _configurationApi.SetConfigurationAsync(
                 Context.OrganizationName,
                 Context.ProjectName,
                 Context.ViewName,
-                AnnotationKey);
+                AnnotationKey,
+                config);
+
+            if (IsResolvedRetrievalRequested)
+            {
+                data = await _configurationApi.GetResolvedConfigurationAsync(
+                    Context.OrganizationName,
+                    Context.ProjectName,
+                    Context.ViewName,
+                    AnnotationKey);
+            }
+        }
+        catch (ApiException e)
+        {
+            Console.WriteLine($"Error occurred: {e.Message}");
+            return ExitCodes.ERROR_CRASH;
         }
 
-        Console.WriteJson(response.Data);
+        Console.WriteJson(data);
         return ExitCodes.SUCCESS;
 
     }
 }
+

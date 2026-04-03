@@ -5,7 +5,7 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
-using _42.Platform.Sdk;
+using _42.Platform.Storyteller.Sdk;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -43,7 +43,7 @@ namespace _42.Platform.Cli
             services.AddSingleton<IAuthenticationService, AuthenticationService>();
             services.AddSingleton<ICommandContext, CommandContext>();
 
-            ConfigurePlatformSdk(services, configuration);
+            ConfigureStorytellerSdk(services, configuration);
         }
 
         public void ConfigureApplication(IConfigurationBuilder builder)
@@ -89,14 +89,14 @@ namespace _42.Platform.Cli
             services.Configure<AuthenticationOptions>(configuration.GetSection(ConfigurationSections.AUTHENTICATION));
         }
 
-        private static void ConfigurePlatformSdk(IServiceCollection services, IConfiguration configuration)
+
+        private static void ConfigureStorytellerSdk(IServiceCollection services, IConfiguration configuration)
         {
-            // TODO: [P2] Make this better
             var authOptions = configuration.GetSection(ConfigurationSections.AUTHENTICATION).Get<AuthenticationOptions>();
             var generalOptions = configuration.GetSection(ConfigurationSections.GENERAL).Get<GeneralOptions>();
             var authService = new AuthenticationService(new FileSystem(), new OptionsWrapper<AuthenticationOptions>(authOptions!));
 
-            services.AddPlatformSdk(() => new SdkConfiguration
+            services.AddStorytellerSdk(() => new _42.Platform.Storyteller.Sdk.SdkConfiguration
             {
                 AccessTokenFactory = () =>
                 {
@@ -105,13 +105,12 @@ namespace _42.Platform.Cli
                         var authResult = authService.GetAuthenticationAsync().GetAwaiter().GetResult();
                         return authResult?.AccessToken ?? string.Empty;
                     }
-                    catch (Exception ex)
+                    catch (Exception)
                     {
                         return string.Empty;
                     }
                 },
-                BasePath = generalOptions!.BaseUrl,
-                UserAgent = $"{generalOptions.UserAgent}/{ThisAssembly.AssemblyInformationalVersion} ({System.Environment.OSVersion.Platform:G}; {System.Environment.OSVersion.VersionString})",
+                BaseUrl = generalOptions!.BaseUrl,
             });
         }
     }

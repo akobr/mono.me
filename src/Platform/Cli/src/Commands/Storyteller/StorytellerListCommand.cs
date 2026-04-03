@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands.Configuration;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -19,11 +19,11 @@ namespace _42.Platform.Cli.Commands.Storyteller;
 [Command(CommandNames.STORYTELLER, CommandNames.STORY, CommandNames.ANNOTATIONS, Description = "Retrieve the story of your platform (manage annotations).")]
 public class StorytellerListCommand : BaseContextCommand
 {
-    private readonly IAnnotationsApiAsync _annotationsApi;
+    private readonly IAnnotationsApiClient _annotationsApi;
 
     public StorytellerListCommand(
         IExtendedConsole console,
-        IAnnotationsApiAsync annotationsApi,
+        IAnnotationsApiClient annotationsApi,
         ICommandContext context)
         : base(console, context)
     {
@@ -119,7 +119,7 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ProjectName,
             Context.ViewName,
             nameQuery: QuerySubjects,
-            ContinuationToken);
+            continuationToken: ContinuationToken);
 
         Console.WriteHeader("Subjects");
 
@@ -150,7 +150,7 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ProjectName,
             Context.ViewName,
             nameQuery: QueryResponsibilities,
-            ContinuationToken);
+            continuationToken: ContinuationToken);
 
         Console.WriteHeader("Responsibilities");
 
@@ -303,7 +303,7 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderAnnotationsAsync()
     {
-        var response = await _annotationsApi.GetAnnotationsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName);
+        var response = await _annotationsApi.GetAnnotationsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, null);
         Console.WriteHeader("Annotations");
 
         if (response.Annotations.Count < 1)
@@ -371,7 +371,8 @@ public class StorytellerListCommand : BaseContextCommand
                 Context.ViewName,
                 subjectNameQuery: QuerySubjects,
                 responsibilityNameQuery: responsibility.Name,
-                contextNameQuery: QueryContexts);
+                contextNameQuery: QueryContexts,
+                continuationToken: null);
 
             foreach (var execution in executionsResponse.Annotations)
             {
@@ -441,7 +442,8 @@ public class StorytellerListCommand : BaseContextCommand
                 Context.ViewName,
                 subjectNameQuery: subject.Name,
                 responsibilityNameQuery: QueryResponsibilities,
-                contextNameQuery: QueryContexts);
+                contextNameQuery: QueryContexts,
+                continuationToken: null);
 
             foreach (var execution in executionsResponse.Annotations)
             {
@@ -473,3 +475,4 @@ public class StorytellerListCommand : BaseContextCommand
         }
     }
 }
+

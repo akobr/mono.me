@@ -1,6 +1,6 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
@@ -8,12 +8,12 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Command(CommandNames.DELETE, CommandNames.REMOVE, Description = "Delete a machine access.")]
 public class MachineDeleteCommand : BaseContextCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly IAccessApiClient _accessApi;
 
     public MachineDeleteCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAccessApiAsync accessApi)
+        IAccessApiClient accessApi)
         : base(console, context)
     {
         _accessApi = accessApi;
@@ -39,3 +39,4 @@ public class MachineDeleteCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 }
+

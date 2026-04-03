@@ -1,7 +1,7 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
@@ -9,12 +9,12 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Command(CommandNames.RESET, Description = "Reset secret for an machine access.")]
 public class MachineResetCommand : BaseContextCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly IAccessApiClient _accessApi;
 
     public MachineResetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAccessApiAsync accessApi)
+        IAccessApiClient accessApi)
         : base(console, context)
     {
         _accessApi = accessApi;
@@ -42,3 +42,4 @@ public class MachineResetCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 }
+

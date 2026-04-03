@@ -1,8 +1,7 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
-using _42.Platform.Sdk.Api;
-using _42.Platform.Sdk.Model;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
@@ -10,12 +9,12 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Command(CommandNames.CREATE, CommandNames.SET, Description = "Create new machine access.")]
 public class MachineCreateCommand : BaseContextCommand
 {
-    private readonly IAccessApiAsync _accessApi;
+    private readonly IAccessApiClient _accessApi;
 
     public MachineCreateCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IAccessApiAsync accessApi)
+        IAccessApiClient accessApi)
         : base(console, context)
     {
         _accessApi = accessApi;
@@ -46,8 +45,8 @@ public class MachineCreateCommand : BaseContextCommand
                 Project = Context.ProjectName,
                 AnnotationKey = AnnotationKey,
                 Scope = IsScopeReadWrite
-                    ? MachineAccessCreate.ScopeEnum.DefaultReadWrite
-                    : MachineAccessCreate.ScopeEnum.DefaultRead,
+                    ? MachineAccessCreateScope.DefaultReadWrite
+                    : MachineAccessCreateScope.DefaultRead,
             });
 
         Console.WriteJson(machine);
@@ -56,3 +55,4 @@ public class MachineCreateCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 }
+

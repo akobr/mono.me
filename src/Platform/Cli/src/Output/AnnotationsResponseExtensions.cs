@@ -1,4 +1,4 @@
-using _42.Platform.Sdk.Model;
+using _42.Platform.Storyteller.Sdk;
 
 namespace _42.Platform.Cli.Output;
 

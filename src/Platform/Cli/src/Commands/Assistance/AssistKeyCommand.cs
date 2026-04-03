@@ -145,3 +145,4 @@ public class AssistKeyCommand : BaseCommand
         return ValidationResult.Success;
     }
 }
+
