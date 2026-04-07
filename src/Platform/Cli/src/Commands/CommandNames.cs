@@ -35,6 +35,7 @@ public static class CommandNames
     public const string CREATE = "create";
     public const string REMOVE = "remove";
     public const string RESET = "reset";
+    public const string DIFF = "diff";
 
     public const string ASSIST = "assist";
     public const string ASSISTANCE = "assistance";
