@@ -68,6 +68,10 @@
       "commandName": "Project",
       "commandLineArgs": "story config exe.42.storyteller.system"
     },
+    "story-config-diff": {
+      "commandName": "Project",
+      "commandLineArgs": "story config diff rst.versioning"
+    },
     "assist-key": {
       "commandName": "Project",
       "commandLineArgs": "assist key"
