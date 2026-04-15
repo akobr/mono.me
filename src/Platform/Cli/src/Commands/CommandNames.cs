@@ -30,6 +30,7 @@ public static class CommandNames
 
     public const string GET = "get";
     public const string SET = "set";
+    public const string EDIT = "edit";
     public const string DELETE = "delete";
     public const string LIST = "list";
     public const string CREATE = "create";

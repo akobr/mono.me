@@ -11,6 +11,7 @@ namespace _42.Platform.Cli.Commands.Configuration;
 
 [Subcommand(
     typeof(ConfigSetCommand),
+    typeof(ConfigEditCommand),
     typeof(ConfigDeleteCommand),
     typeof(ConfigDiffCommand))]
 

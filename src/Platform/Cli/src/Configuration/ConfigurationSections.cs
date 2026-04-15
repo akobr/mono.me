@@ -6,4 +6,5 @@ public static class ConfigurationSections
     public const string ACCESS = "access";
     public const string AUTHENTICATION = "authentication";
     public const string GENERAL = "general";
+    public const string EDITOR = "editor";
 }
