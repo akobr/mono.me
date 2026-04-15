@@ -17,5 +17,5 @@ public record class ConfigurationHistoryEntity : Entity
 
     [JsonProperty("ttl")]
     [JsonPropertyName("ttl")]
-    public int TimeToLiveInSeconds { get; init; } = 60 * 60 * 24 * 183; // default to 6 months (183 days)
+    public int TimeToLiveInSeconds { get; init; } = 60 * 60 * 24 * 365; // default to 12 months (365 days)
 }
