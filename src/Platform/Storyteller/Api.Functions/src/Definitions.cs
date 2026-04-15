@@ -53,6 +53,14 @@ public static class Definitions
                 public const string ViewDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/diff/{{{Parameters.ViewTo}}}";
             }
         }
+
+        public static class ConfigurationSchema
+        {
+            public static class V1
+            {
+                public const string Schema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.AnnotationType}}}";
+            }
+        }
     }
 
     public static class RouteIds
@@ -110,6 +118,13 @@ public static class Definitions
             public const string GetConfigurationVersionDiffCustom = nameof(GetConfigurationVersionDiffCustom);
             public const string GetConfigurationViewDiff = nameof(GetConfigurationViewDiff);
         }
+
+        public static class ConfigurationSchema
+        {
+            public const string GetConfigurationSchema = nameof(GetConfigurationSchema);
+            public const string SetConfigurationSchema = nameof(SetConfigurationSchema);
+            public const string DeleteConfigurationSchema = nameof(DeleteConfigurationSchema);
+        }
     }
 
     public static class Parameters
@@ -125,6 +140,7 @@ public static class Definitions
         public const string Version = "version";
         public const string VersionFrom = "versionFrom";
         public const string ViewTo = "viewTo";
+        public const string AnnotationType = "annotationType";
     }
 
     public static class Tags
@@ -132,6 +148,7 @@ public static class Definitions
         public const string Access = nameof(Access);
         public const string Annotations = nameof(Annotations);
         public const string Configuration = nameof(Configuration);
+        public const string ConfigurationSchema = nameof(ConfigurationSchema);
     }
 
     public static class Descriptions
@@ -149,6 +166,7 @@ public static class Definitions
         public const string ContinuationToken = "The continuation token for multi-page queries.";
         public const string IdMachine = "The id of the machine access.";
         public const string Key = "The key of the requested annotation.";
+        public const string AnnotationType = "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).";
     }
 
     public static class Errors
