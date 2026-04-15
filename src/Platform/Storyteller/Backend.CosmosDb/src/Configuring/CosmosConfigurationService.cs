@@ -625,10 +625,22 @@ public class CosmosConfigurationService : IConfigurationService
             : _bindingExecutor!.TryBinding(property, includeSecrets);
     }
 
-    private async Task TryAutogeneratePropertiesAsync(JObject config, FullKey key, IContainerRepository repository)
+    private async Task TryAutogeneratePropertiesAsync(JObject config, ConfigurationEntity configEntity, InheritanceGraphNode node, IContainerRepository repository)
     {
-        // TODO: [P2] Implement auto-generation of properties per type of annotation
-        await Task.CompletedTask;
+        var key = node.Key;
+        var partitionKey = key.GetCosmosPartitionKey();
+        var typeTemplateEntityId = $"{key.ViewName}.gen.{key.Annotation.TypeCode}";
+        var typeTemplateEntity = await repository.Container.TryReadItemAsync(
+            typeTemplateEntityId,
+            partitionKey,
+            stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
+
+        if (typeTemplateEntity is null)
+        {
+            return;
+        }
+
+        config.MergeInto(typeTemplateEntity.Content);
     }
 
     private async Task CollectHierarchyNodesAsync(
@@ -683,9 +695,6 @@ public class CosmosConfigurationService : IConfigurationService
 
         var config = new JObject();
 
-        // Fill auto-generated properties (if any) [not implemented yet]
-        await TryAutogeneratePropertiesAsync(config, key, repository);
-
         // Inherit parent configurations (responsibility <|- unit <|- subject <|- usage <|- context <|- execution <|- unit-of-execution) as graph
         foreach (var ancestorNode in node.GetAncestors())
         {
@@ -695,6 +704,9 @@ public class CosmosConfigurationService : IConfigurationService
                 config.MergeInto(parentConfig);
             }
         }
+
+        // Fill auto-generated content for the type (if any)
+        await TryAutogeneratePropertiesAsync(config, configEntry, node, repository);
 
         // The most specific configuration has precedence, is merged last
         if (exist)
