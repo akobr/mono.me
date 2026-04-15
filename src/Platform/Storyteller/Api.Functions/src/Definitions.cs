@@ -173,6 +173,7 @@ public static class Definitions
     {
         public const string Manual = "manual";
         public const string Integrated = "integrated";
+        public const string ApiKey = "apiKey";
     }
 
     public static class Others
