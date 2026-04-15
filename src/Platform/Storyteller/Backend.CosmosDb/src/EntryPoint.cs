@@ -94,6 +94,7 @@ public static class EntryPoint
         services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
         services.AddSingleton<IConfigurationService, CosmosConfigurationService>();
+        services.AddSingleton<IConfigurationSchemaService, CosmosConfigurationSchemaService>();
 
         services.AddAutoMapper(config =>
         {

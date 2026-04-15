@@ -109,6 +109,7 @@
     <PackageVersion Include="MurmurHash.Net" Version="0.0.2" />
     <PackageVersion Include="NBuilder" Version="6.1.0" />
     <PackageVersion Include="Nerdbank.GitVersioning" Version="3.8.118" />
+    <PackageVersion Include="NJsonSchema" Version="11.5.2" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
     <PackageVersion Include="NSwag.AspNetCore" Version="14.6.3" />
     <PackageVersion Include="NuGet.Frameworks" Version="7.3.0" />
