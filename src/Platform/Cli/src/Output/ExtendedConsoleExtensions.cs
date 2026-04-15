@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
 using System.Linq;
@@ -82,6 +83,64 @@ public static class ExtendedConsoleExtensions
         Console.WriteLine();
     }
 
+    public static void WriteDiff(this IExtendedConsole @this, string originalJson, string editedJson)
+    {
+        var originalLines = originalJson.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var editedLines = editedJson.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+        var maxLines = Math.Max(originalLines.Length, editedLines.Length);
+        var numWidth = maxLines.ToString().Length;
+        var hasDifferences = false;
+
+        Console.WriteLine();
+
+        // Simple line-by-line comparison with longest common subsequence
+        var lcs = ComputeLcs(originalLines, editedLines);
+        var oi = 0;
+        var ei = 0;
+        var li = 0;
+
+        while (oi < originalLines.Length || ei < editedLines.Length)
+        {
+            if (li < lcs.Count
+                && oi < originalLines.Length
+                && ei < editedLines.Length
+                && originalLines[oi] == lcs[li]
+                && editedLines[ei] == lcs[li])
+            {
+                // Context line (unchanged)
+                AnsiConsole.Markup($"[grey]{(ei + 1).ToString().PadLeft(numWidth)}[/] [dim]│[/] ");
+                AnsiConsole.MarkupLine($"[dim]{Markup.Escape(originalLines[oi])}[/]");
+                oi++;
+                ei++;
+                li++;
+            }
+            else if (oi < originalLines.Length && (li >= lcs.Count || originalLines[oi] != lcs[li]))
+            {
+                // Removed line
+                hasDifferences = true;
+                AnsiConsole.Markup($"[red]{(oi + 1).ToString().PadLeft(numWidth)}[/] [red]│[/] ");
+                AnsiConsole.MarkupLine($"[red]- {Markup.Escape(originalLines[oi])}[/]");
+                oi++;
+            }
+            else if (ei < editedLines.Length && (li >= lcs.Count || editedLines[ei] != lcs[li]))
+            {
+                // Added line
+                hasDifferences = true;
+                AnsiConsole.Markup($"[green]{(ei + 1).ToString().PadLeft(numWidth)}[/] [green]│[/] ");
+                AnsiConsole.MarkupLine($"[green]+ {Markup.Escape(editedLines[ei])}[/]");
+                ei++;
+            }
+        }
+
+        if (!hasDifferences)
+        {
+            AnsiConsole.MarkupLine("[dim]No differences found.[/]");
+        }
+
+        Console.WriteLine();
+    }
+
     public static AnnotationKey ValidateAnnotationKey(this IExtendedConsole @this, string rawAnnotationKey)
     {
         if (string.IsNullOrWhiteSpace(rawAnnotationKey)
@@ -97,5 +156,47 @@ public static class ExtendedConsoleExtensions
         }
 
         return annotationKey;
+    }
+
+    private static List<string> ComputeLcs(string[] a, string[] b)
+    {
+        var m = a.Length;
+        var n = b.Length;
+        var dp = new int[m + 1, n + 1];
+
+        for (var i = 1; i <= m; i++)
+        {
+            for (var j = 1; j <= n; j++)
+            {
+                dp[i, j] = a[i - 1] == b[j - 1]
+                    ? dp[i - 1, j - 1] + 1
+                    : Math.Max(dp[i - 1, j], dp[i, j - 1]);
+            }
+        }
+
+        var result = new List<string>();
+        var x = m;
+        var y = n;
+
+        while (x > 0 && y > 0)
+        {
+            if (a[x - 1] == b[y - 1])
+            {
+                result.Add(a[x - 1]);
+                x--;
+                y--;
+            }
+            else if (dp[x - 1, y] > dp[x, y - 1])
+            {
+                x--;
+            }
+            else
+            {
+                y--;
+            }
+        }
+
+        result.Reverse();
+        return result;
     }
 }

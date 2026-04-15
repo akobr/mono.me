@@ -5,6 +5,7 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,7 @@ namespace _42.Platform.Cli
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
             services.AddSingleton<IAuthenticationService, AuthenticationService>();
             services.AddSingleton<ICommandContext, CommandContext>();
+            services.AddSingleton<IEditorService, EditorService>();
 
             ConfigureStorytellerSdk(services, configuration);
         }
@@ -56,6 +58,7 @@ namespace _42.Platform.Cli
 
             builder.AddJsonFile(Constants.APPLICATION_CONFIG_JSON, false, false);
             builder.AddJsonFile(Constants.ACCESS_DEFAULT_JSON, true, false);
+            builder.AddJsonFile(Constants.EDITOR_CONFIG_JSON, true, false);
         }
 
         private void ConfigureLogging(ILoggingBuilder builder, IConfiguration configuration)
@@ -87,6 +90,7 @@ namespace _42.Platform.Cli
             services.Configure<LoggingOptions>(configuration.GetSection(ConfigurationSections.LOGGING));
             services.Configure<AccessDefaultOptions>(configuration.GetSection(ConfigurationSections.ACCESS));
             services.Configure<AuthenticationOptions>(configuration.GetSection(ConfigurationSections.AUTHENTICATION));
+            services.Configure<EditorOptions>(configuration.GetSection(ConfigurationSections.EDITOR));
         }
 
 
