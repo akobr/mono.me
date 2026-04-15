@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Api.ErrorHandling;
+using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Json;
 using Microsoft.Azure.Functions.Worker;
@@ -22,6 +23,7 @@ var host = new HostBuilder()
         //     ContractResolver = new DefaultContractResolver { NamingStrategy = new DefaultNamingStrategy() },
         //     Converters = new List<JsonConverter> { new StringEnumConverter(new DefaultNamingStrategy()) },
         // });
+        worker.UseMiddleware<ApiKeyAuthenticationMiddleware>();
         worker.UseMiddleware<ExceptionHandlingMiddleware>();
     })
     .ConfigureServices((context, services) =>
@@ -65,8 +67,8 @@ var host = new HostBuilder()
         // Add persistant and logic layer
         services.AddCosmosDbAnnotations(context.Configuration, "cosmos");
 
-        // Add authentication by Azure Entra
-        services.AddAzureAdMachineAccess();
+        // Add authentication by API keys
+        services.AddApiKeyMachineAccess();
 
         // Add data-bindings for configurations
         services

@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing.Model;
@@ -16,6 +18,7 @@ namespace _42.Platform.Storyteller.Accessing;
 public class CosmosAccessService : IAccessService
 {
     private const string MAIN_PARTITION_KEY = "access";
+    private const string API_KEYS_PARTITION_KEY = "apikeys";
 
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly IContainerFactory _containerFactory;
@@ -379,6 +382,10 @@ public class CosmosAccessService : IAccessService
         };
 
         var response = await repository.Container.CreateItemAsync(machineAccess, partitionKey);
+
+        // Store API key lookup entity in the core container
+        await CreateApiKeyEntityAsync(accessKey, model.Organization, model.Project, machineAccess.Id, machineAccess.Scope);
+
         machineAccess = response.Resource with { AccessKey = accessKey };
         return machineAccess;
     }
@@ -397,12 +404,18 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The machine access {appId} has not been found.");
         }
 
+        // Delete the old API key lookup entity
+        await TryDeleteApiKeyEntityByMachineAccessIdAsync(organization, project, machineAccess.Id);
+
         var accessKey = await MachineAccessService.ResetMachineAccessAsync(machineAccess.Id);
 
         if (accessKey is null)
         {
             throw new InvalidOperationException($"The machine access {appId} reset failed.");
         }
+
+        // Create a new API key lookup entity
+        await CreateApiKeyEntityAsync(accessKey, organization, project, machineAccess.Id, machineAccess.Scope);
 
         machineAccess = machineAccess with { AccessKey = $"{accessKey[..3]}***" };
         await repository.Container.UpsertItemAsync(machineAccess, partitionKey);
@@ -423,6 +436,9 @@ public class CosmosAccessService : IAccessService
         {
             return false;
         }
+
+        // Delete the API key lookup entity
+        await TryDeleteApiKeyEntityByMachineAccessIdAsync(organization, project, machineAccess.Id);
 
         var response = await repository.Container.DeleteItemAsync<MachineAccessEntity>(appId, partitionKey);
 
@@ -450,5 +466,83 @@ public class CosmosAccessService : IAccessService
             new PartitionKey($"{project}.access"),
             stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
         return machineAccess is not null;
+    }
+
+    public async Task<ApiKeyValidationResult?> ValidateApiKeyAsync(string apiKey)
+    {
+        var hashedKey = HashApiKey(apiKey);
+        var coreRepository = _repositoryProvider.GetCore();
+        var apiKeyEntity = await coreRepository.Container.TryReadItemAsync(
+            hashedKey,
+            new PartitionKey(API_KEYS_PARTITION_KEY),
+            stream => stream.DeserializeSystemTextJson<ApiKeyEntity>(_serializerOptions));
+
+        if (apiKeyEntity is null)
+        {
+            return null;
+        }
+
+        return new ApiKeyValidationResult(
+            apiKeyEntity.Organization,
+            apiKeyEntity.Project,
+            apiKeyEntity.MachineAccessId,
+            apiKeyEntity.Scope);
+    }
+
+    private async Task CreateApiKeyEntityAsync(string rawKey, string organization, string project, string machineAccessId, MachineAccessScope scope)
+    {
+        var coreRepository = _repositoryProvider.GetCore();
+        var apiKeyEntity = new ApiKeyEntity
+        {
+            Id = HashApiKey(rawKey),
+            Organization = organization,
+            Project = project,
+            MachineAccessId = machineAccessId,
+            Scope = scope,
+        };
+
+        await coreRepository.Container.CreateItemAsync(apiKeyEntity, new PartitionKey(API_KEYS_PARTITION_KEY));
+    }
+
+    private async Task TryDeleteApiKeyEntityByMachineAccessIdAsync(string organization, string project, string machineAccessId)
+    {
+        var coreRepository = _repositoryProvider.GetCore();
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.MachineAccessId = @machineAccessId AND c.Organization = @org AND c.Project = @project")
+            .WithParameter("@machineAccessId", machineAccessId)
+            .WithParameter("@org", organization)
+            .WithParameter("@project", project);
+
+        using var iterator = coreRepository.Container.GetItemQueryIterator<ApiKeyEntity>(
+            query,
+            requestOptions: new QueryRequestOptions
+            {
+                PartitionKey = new PartitionKey(API_KEYS_PARTITION_KEY),
+            });
+
+        while (iterator.HasMoreResults)
+        {
+            var batch = await iterator.ReadNextAsync();
+
+            foreach (var entity in batch)
+            {
+                try
+                {
+                    await coreRepository.Container.DeleteItemAsync<ApiKeyEntity>(entity.Id, new PartitionKey(API_KEYS_PARTITION_KEY));
+                }
+                catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+                {
+                    // Already deleted, ignore.
+                }
+            }
+        }
+    }
+
+    private static string HashApiKey(string apiKey)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(apiKey));
+        return Convert.ToBase64String(bytes)
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
     }
 }
