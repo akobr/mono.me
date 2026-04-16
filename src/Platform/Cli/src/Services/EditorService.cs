@@ -71,7 +71,9 @@ public class EditorService : IEditorService
     {
         var (command, arguments) = options.EditorType switch
         {
-            Configuration.EditorType.VsCode => ("code", $"--wait \"{filePath}\""),
+            Configuration.EditorType.VsCode => OperatingSystem.IsWindows()
+                ? ("cmd.exe", $"/c code --wait \"{filePath}\"")
+                : ("code", $"--wait \"{filePath}\""),
             Configuration.EditorType.Neovim => ("nvim", $"\"{filePath}\""),
             Configuration.EditorType.Vim => ("vim", $"\"{filePath}\""),
             Configuration.EditorType.Custom => ParseCustomCommand(options.CustomCommand ?? string.Empty, filePath),
@@ -82,7 +84,8 @@ public class EditorService : IEditorService
         {
             FileName = command,
             Arguments = arguments,
-            UseShellExecute = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
         };
 
         using var process = Process.Start(startInfo);
