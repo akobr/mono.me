@@ -102,24 +102,37 @@ public class ConfigDiffCommand : BaseContextCommand
                 return ExitCodes.SUCCESS;
             }
 
+            var numWidth = diffLines.Count.ToString().Length;
+            var lineNumber = 1;
+
             Console.WriteLine();
             foreach (var line in diffLines)
             {
+                var isRemoved = line.StartsWith('-');
+                var linePrefix = isRemoved
+                    ? new string(' ', numWidth)
+                    : lineNumber.ToString().PadLeft(numWidth);
+
+                AnsiConsole.Markup($"[grey]{linePrefix}[/] [dim]│[/] ");
+
                 if (line.StartsWith('+'))
                 {
                     AnsiConsole.MarkupLine($"[green]{Markup.Escape(line)}[/]");
+                    lineNumber++;
                 }
-                else if (line.StartsWith('-'))
+                else if (isRemoved)
                 {
                     AnsiConsole.MarkupLine($"[red]{Markup.Escape(line)}[/]");
                 }
                 else if (line.StartsWith('^'))
                 {
                     AnsiConsole.MarkupLine($"[blue]{Markup.Escape(line)}[/]");
+                    lineNumber++;
                 }
                 else
                 {
                     AnsiConsole.WriteLine(line);
+                    lineNumber++;
                 }
             }
 
