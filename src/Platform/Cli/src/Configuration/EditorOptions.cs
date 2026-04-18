@@ -14,5 +14,5 @@ public class EditorOptions
 
     public string? CustomCommand { get; set; }
 
-    public bool IsConfigured => EditorType.HasValue;
+    public bool IsConfigured => EditorType.HasValue && (EditorType != Configuration.EditorType.Custom || !string.IsNullOrWhiteSpace(CustomCommand));
 }

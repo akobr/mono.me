@@ -80,12 +80,15 @@ public class EditorService : IEditorService
             _ => throw new InvalidOperationException("Editor type is not configured."),
         };
 
+        var isTerminalEditor = options.EditorType == Configuration.EditorType.Neovim ||
+                               options.EditorType == Configuration.EditorType.Vim;
+
         var startInfo = new ProcessStartInfo
         {
             FileName = command,
             Arguments = arguments,
-            UseShellExecute = false,
-            CreateNoWindow = true,
+            UseShellExecute = isTerminalEditor,
+            CreateNoWindow = !isTerminalEditor,
         };
 
         using var process = Process.Start(startInfo);
@@ -143,8 +146,29 @@ public class EditorService : IEditorService
                 return false;
             }
 
-            process.WaitForExit(5000);
-            return process.ExitCode == 0;
+            if (!process.WaitForExit(5000))
+            {
+                try
+                {
+                    process.Kill();
+                    process.WaitForExit();
+                }
+                catch
+                {
+                    // Ignore exceptions from Kill
+                }
+
+                return false;
+            }
+
+            try
+            {
+                return process.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
         }
         catch
         {
@@ -174,7 +198,7 @@ public class EditorService : IEditorService
         var appDirectory = _fileSystem.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? Environment.CurrentDirectory;
         var fullPath = _fileSystem.Path.Combine(appDirectory, Constants.EDITOR_CONFIG_JSON);
         using var fileWriter = _fileSystem.File.CreateText(fullPath);
-        var jWriter = new JsonTextWriter(fileWriter);
+        using var jWriter = new JsonTextWriter(fileWriter);
         serializer.Serialize(jWriter, config);
     }
 }
