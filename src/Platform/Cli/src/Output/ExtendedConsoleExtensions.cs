@@ -49,6 +49,14 @@ public static class ExtendedConsoleExtensions
         }
     }
 
+    /// <summary>
+    /// Writes the provided object as JSON to the specified file, prompting the user before overwriting an existing file.
+    /// </summary>
+    /// <param name="data">The object to serialize to JSON.</param>
+    /// <param name="filePath">The path of the file to create or overwrite.</param>
+    /// <remarks>
+    /// If the path points to an existing directory, no file is written and the method returns. If the file already exists, the console is prompted to confirm overwriting (default true). The method writes an empty line before and after the JSON output.
+    /// </remarks>
     public static void WriteJsonToFile(this IExtendedConsole @this, object data, string filePath, IFileSystem fileSystem)
     {
         Console.WriteLine();
@@ -83,6 +91,11 @@ public static class ExtendedConsoleExtensions
         Console.WriteLine();
     }
 
+    /// <summary>
+    /// Prints a line-numbered, colorized diff between two JSON texts to the console using an LCS-based alignment.
+    /// </summary>
+    /// <param name="originalJson">The original JSON text to compare, as a single string.</param>
+    /// <param name="editedJson">The edited JSON text to compare, as a single string.</param>
     public static void WriteDiff(this IExtendedConsole @this, string originalJson, string editedJson)
     {
         var originalLines = originalJson.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -141,6 +154,12 @@ public static class ExtendedConsoleExtensions
         Console.WriteLine();
     }
 
+    /// <summary>
+    /// Validates and parses a raw annotation key string into an <see cref="AnnotationKey"/>.
+    /// </summary>
+    /// <param name="rawAnnotationKey">The raw annotation key string to validate and parse.</param>
+    /// <returns>The parsed <see cref="AnnotationKey"/>.</returns>
+    /// <exception cref="WrongInputException">Thrown when <paramref name="rawAnnotationKey"/> is null, empty, whitespace, or cannot be parsed as an <see cref="AnnotationKey"/>.</exception>
     public static AnnotationKey ValidateAnnotationKey(this IExtendedConsole @this, string rawAnnotationKey)
     {
         if (string.IsNullOrWhiteSpace(rawAnnotationKey)
@@ -158,6 +177,12 @@ public static class ExtendedConsoleExtensions
         return annotationKey;
     }
 
+    /// <summary>
+    /// Computes the longest common subsequence (LCS) of two string arrays.
+    /// </summary>
+    /// <param name="a">First sequence of strings to compare.</param>
+    /// <param name="b">Second sequence of strings to compare.</param>
+    /// <returns>The LCS as a list of strings in the same order they appear in the inputs (empty if there is no common subsequence).</returns>
     private static List<string> ComputeLcs(string[] a, string[] b)
     {
         var m = a.Length;

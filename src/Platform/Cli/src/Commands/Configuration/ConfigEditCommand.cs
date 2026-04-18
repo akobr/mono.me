@@ -26,6 +26,10 @@ public class ConfigEditCommand : BaseContextCommand
     private readonly IEditorService _editorService;
     private readonly EditorOptions _editorOptions;
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="ConfigEditCommand"/> with the specified services and options.
+    /// </summary>
+    /// <param name="editorOptions">Provides editor-related configuration used by the command.</param>
     public ConfigEditCommand(
         IExtendedConsole console,
         ICommandContext context,
@@ -44,6 +48,16 @@ public class ConfigEditCommand : BaseContextCommand
     [Argument(0, Description = "An annotation key to edit the configuration for.")]
     public string AnnotationKey { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Opens the configured editor to edit the configuration for the current context and specified annotation key, and uploads the updated configuration when the user confirms.
+    /// </summary>
+    /// <returns>
+    /// An exit code indicating the outcome:
+    /// - <c>ExitCodes.SUCCESS</c> when the edited configuration was saved;
+    /// - <c>ExitCodes.WARNING_NO_WORK_NEEDED</c> when no changes were made;
+    /// - <c>ExitCodes.WARNING_ABORTED</c> when the user aborted the operation;
+    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code.
+    /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
         // 1. Ensure editor is configured
@@ -176,6 +190,11 @@ public class ConfigEditCommand : BaseContextCommand
         }
     }
 
+    /// <summary>
+    /// Serializes an object to indented JSON text.
+    /// </summary>
+    /// <param name="content">The object to serialize using the default JSON serializer settings.</param>
+    /// <returns>The JSON representation of <paramref name="content"/> formatted with indentation.</returns>
     private static string SerializeContent(object content)
     {
         var sb = new StringBuilder();
@@ -185,6 +204,11 @@ public class ConfigEditCommand : BaseContextCommand
         return sb.ToString();
     }
 
+    /// <summary>
+    /// Normalize a JSON string to a consistently indented representation.
+    /// </summary>
+    /// <returns>The input JSON re-serialized with consistent indentation.</returns>
+    /// <exception cref="Newtonsoft.Json.JsonReaderException">Thrown when the input string is not valid JSON.</exception>
     private static string NormalizeJson(string json)
     {
         var obj = JObject.Parse(json);
