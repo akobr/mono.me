@@ -39,6 +39,27 @@ public class ConfigDiffCommand : BaseContextCommand
     {
         try
         {
+            // Validation: mutual exclusion check
+            if (!string.IsNullOrWhiteSpace(TargetView) &&
+                (!string.IsNullOrWhiteSpace(ToVersion) || !string.IsNullOrWhiteSpace(FromVersion)))
+            {
+                Console.WriteLine("Cannot specify both --view-to-compare and version arguments (ToVersion or FromVersion).");
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
+
+            // Validation: integer parsing check
+            if (!string.IsNullOrWhiteSpace(ToVersion) && !int.TryParse(ToVersion, out _))
+            {
+                Console.WriteLine($"ToVersion '{ToVersion}' is not a valid integer.");
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
+
+            if (!string.IsNullOrWhiteSpace(FromVersion) && !int.TryParse(FromVersion, out _))
+            {
+                Console.WriteLine($"FromVersion '{FromVersion}' is not a valid integer.");
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
+
             ICollection<string> diffLines;
 
             if (!string.IsNullOrWhiteSpace(TargetView))
