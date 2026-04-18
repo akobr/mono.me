@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -14,6 +14,9 @@ public class ConfigDiffCommand : BaseContextCommand
 {
     private readonly IConfigurationApiClient _configurationApi;
 
+    /// <summary>
+    /// Initializes a new instance of ConfigDiffCommand with the required console, command context, and configuration API client.
+    /// </summary>
     public ConfigDiffCommand(
         IExtendedConsole console,
         ICommandContext context,
@@ -35,6 +38,21 @@ public class ConfigDiffCommand : BaseContextCommand
     [Option("--view-to-compare", CommandOptionType.SingleValue, Description = "The view to compare with. Current view is used as from and the specified view as to.")]
     public string? TargetView { get; set; }
 
+    /// <summary>
+    /// Runs the diff command: validates arguments, retrieves the requested configuration diff, and writes a formatted, colorized diff to the console.
+    /// </summary>
+    /// <remarks>
+    /// Validation enforces that the view-to-compare option and version arguments are mutually exclusive and that any provided version values parse as integers.
+    /// Diff selection precedence:
+    /// - If a target view is specified, compare the current view to that view.
+    /// - Else if a `ToVersion` is provided (and optionally `FromVersion`), request the corresponding version diff.
+    /// - Otherwise, compare the latest version against its previous version.
+    /// If no diff lines are returned, the method prints "No changes detected." If the configuration has no versions or the annotation is not found, an error message is written.
+    /// </remarks>
+    /// <returns>
+    /// An exit code indicating the result:
+    /// `ExitCodes.SUCCESS` when the diff is displayed or when no changes are detected; `ExitCodes.ERROR_WRONG_INPUT` for invalid arguments, missing versions, or when the annotation is not found.
+    /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
         try
