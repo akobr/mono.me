@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Abstractions;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
@@ -77,7 +78,8 @@ public class ConfigEditCommand : BaseContextCommand
         }
 
         // 3. Write to temp file
-        var safeKey = AnnotationKey.Replace('/', '_').Replace('\\', '_');
+        var invalidChars = _fileSystem.Path.GetInvalidFileNameChars();
+        var safeKey = string.Concat(AnnotationKey.Select(c => invalidChars.Contains(c) ? '_' : c));
         var tempFilePath = _fileSystem.Path.Combine(
             _fileSystem.Path.GetTempPath(),
             $"config-{safeKey}.json");
