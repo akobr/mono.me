@@ -27,6 +27,11 @@ namespace _42.Platform.Cli
 
         public IHostEnvironment Environment { get; }
 
+        /// <summary>
+        /// Configures dependency injection, logging, application options, the platform file system implementation, core singleton services, and the Storyteller SDK for the CLI host.
+        /// </summary>
+        /// <param name="services">The service collection to configure with application services and options.</param>
+        /// <param name="configuration">The application configuration used to bind option classes and to configure logging and SDK settings.</param>
         public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
         {
             services.AddLogging(builder => ConfigureLogging(builder, configuration));
@@ -48,6 +53,11 @@ namespace _42.Platform.Cli
             ConfigureStorytellerSdk(services, configuration);
         }
 
+        /// <summary>
+        /// Sets default Newtonsoft.Json serializer settings (ignore null values and use indented formatting)
+        /// and adds the application's JSON configuration files to the provided configuration builder.
+        /// </summary>
+        /// <param name="builder">The configuration builder to which application JSON files are added.</param>
         public void ConfigureApplication(IConfigurationBuilder builder)
         {
             JsonConvert.DefaultSettings = () => new JsonSerializerSettings
@@ -61,6 +71,11 @@ namespace _42.Platform.Cli
             builder.AddJsonFile(Constants.EDITOR_CONFIG_JSON, true, false);
         }
 
+        /// <summary>
+        /// Configures the application's logging providers and sinks (Serilog, file sink, Sentry) and enables debug logging in the development environment.
+        /// </summary>
+        /// <param name="builder">The logging builder to configure.</param>
+        /// <param name="configuration">Application configuration; the logging section is read from ConfigurationSections.LOGGING for file sink settings.</param>
         private void ConfigureLogging(ILoggingBuilder builder, IConfiguration configuration)
         {
             var options = configuration
@@ -85,6 +100,11 @@ namespace _42.Platform.Cli
                     .CreateLogger());
         }
 
+        /// <summary>
+        /// Registers and binds specific configuration sections to their corresponding options types in the dependency injection container.
+        /// </summary>
+        /// <param name="configuration">The application configuration root from which the LOGGING, ACCESS, AUTHENTICATION, and EDITOR sections are read.</param>
+        /// <param name="services">The service collection where the configured options are registered.</param>
         private static void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
         {
             services.Configure<LoggingOptions>(configuration.GetSection(ConfigurationSections.LOGGING));

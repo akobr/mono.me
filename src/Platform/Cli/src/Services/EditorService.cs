@@ -15,11 +15,19 @@ public class EditorService : IEditorService
 {
     private readonly IFileSystem _fileSystem;
 
+    /// <summary>
+    /// Initializes a new instance of <see cref="EditorService"/> and stores the provided file system for use in file and path operations.
+    /// </summary>
     public EditorService(IFileSystem fileSystem)
     {
         _fileSystem = fileSystem;
     }
 
+    /// <summary>
+    /// Interactively prompts the user to choose an editor for editing JSON configuration and saves the selected preference.
+    /// </summary>
+    /// <param name="console">Console used to display the selection prompt and to read input for a custom command.</param>
+    /// <returns>The constructed <see cref="EditorOptions"/> reflecting the chosen editor; if a custom command was chosen, <see cref="EditorOptions.CustomCommand"/> contains the entered command.</returns>
     public EditorOptions SetupEditorPreference(IExtendedConsole console)
     {
         var availableEditors = DetectAvailableEditors();
@@ -67,6 +75,13 @@ public class EditorService : IEditorService
         return options;
     }
 
+    /// <summary>
+    /// Opens the specified file in the editor described by <paramref name="options"/> and returns the editor process's exit code.
+    /// </summary>
+    /// <param name="filePath">The path of the file to open in the editor.</param>
+    /// <param name="options">Editor selection and configuration to use when launching the editor.</param>
+    /// <returns>`1` if the editor process could not be started; otherwise the editor process exit code.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when <see cref="Configuration.EditorType"/> in <paramref name="options"/> is not configured.</exception>
     public async Task<int> OpenFileInEditorAsync(string filePath, EditorOptions options)
     {
         var (command, arguments) = options.EditorType switch
@@ -102,6 +117,10 @@ public class EditorService : IEditorService
         return process.ExitCode;
     }
 
+    /// <summary>
+    /// Detects which supported editors are available on the current system by checking for their executables.
+    /// </summary>
+    /// <returns>A set containing one or more <see cref="EditorType"/> values for editors found on the system (possible values: <c>VsCode</c>, <c>Neovim</c>, <c>Vim</c>).</returns>
     private static HashSet<EditorType> DetectAvailableEditors()
     {
         var available = new HashSet<EditorType>();
@@ -125,6 +144,12 @@ public class EditorService : IEditorService
         return available;
     }
 
+    /// <summary>
+    /// Checks whether a given command is available on the system by running the specified discovery executable with the target command as an argument.
+    /// </summary>
+    /// <param name="detectCommand">The discovery executable to run (for example, "where" on Windows or "which" on Unix).</param>
+    /// <param name="targetCommand">The command name to look up (for example, "code", "nvim", or "vim").</param>
+    /// <returns>`true` if the discovery process exits with code 0 within the timeout period, `false` otherwise.</returns>
     private static bool IsCommandAvailable(string detectCommand, string targetCommand)
     {
         try
@@ -176,6 +201,16 @@ public class EditorService : IEditorService
         }
     }
 
+    /// <summary>
+    /// Parse a user-provided custom command into the executable name and its arguments, always appending the provided file path as a quoted argument.
+    /// </summary>
+    /// <param name="customCommand">The custom command string entered by the user; may include the executable and optional base arguments.</param>
+    /// <param name="filePath">The file path to append to the command's arguments; it will be quoted.</param>
+    /// <returns>
+    /// A tuple where `command` is the executable (the first token of <paramref name="customCommand"/>)
+    /// and `arguments` are the remaining base arguments followed by the quoted <paramref name="filePath"/>.
+    /// If <paramref name="customCommand"/> contains no space, `arguments` will contain only the quoted file path.
+    /// </returns>
     private static (string command, string arguments) ParseCustomCommand(string customCommand, string filePath)
     {
         var trimmed = customCommand.Trim();
@@ -191,6 +226,11 @@ public class EditorService : IEditorService
         return (command, $"{baseArgs} \"{filePath}\"");
     }
 
+    /// <summary>
+    /// Persists the provided editor options to the application's editor configuration JSON file.
+    /// </summary>
+    /// <param name="options">The editor configuration to save; it will be stored under the top-level property "editor".</param>
+    /// <remarks>The file is written as indented JSON to the path [assembly directory or current directory]/Constants.EDITOR_CONFIG_JSON.</remarks>
     private void SaveEditorOptions(EditorOptions options)
     {
         var config = new { editor = options };
