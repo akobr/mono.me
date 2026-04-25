@@ -91,7 +91,7 @@ public class ConfigEditCommand : BaseContextCommand
             Console.WriteLine($"Configuration for '{AnnotationKey}' does not exist yet, creating new.");
         }
 
-        // 3. Write to temp file
+        // 3. Write to a temp file
         var invalidChars = _fileSystem.Path.GetInvalidFileNameChars();
         var safeKey = string.Concat(AnnotationKey.Select(c => invalidChars.Contains(c) ? '_' : c));
         var tempFilePath = _fileSystem.Path.Combine(
@@ -183,9 +183,20 @@ public class ConfigEditCommand : BaseContextCommand
         finally
         {
             // 9. Clean up temp file
-            if (_fileSystem.File.Exists(tempFilePath))
+            try
             {
-                _fileSystem.File.Delete(tempFilePath);
+                if (_fileSystem.File.Exists(tempFilePath))
+                {
+                    _fileSystem.File.Delete(tempFilePath);
+                }
+            }
+            catch (IOException ex)
+            {
+                Console.WriteImportant($"Could not delete temp file '{tempFilePath}': {ex.Message}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Console.WriteImportant($"Could not delete temp file '{tempFilePath}': {ex.Message}");
             }
         }
     }
