@@ -17,7 +17,7 @@ namespace _42.Platform.Storyteller.Configuring;
 
 public class CosmosConfigurationSchemaService : IConfigurationSchemaService
 {
-    private const string SchemaPartitionSuffix = "__schema__";
+    private const string SchemaPartitionSuffix = "schema";
 
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerSettings _serializerOptions;
