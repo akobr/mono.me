@@ -96,9 +96,9 @@ public class ConfigEditCommand : BaseContextCommand
         var safeKey = string.Concat(AnnotationKey.Select(c => invalidChars.Contains(c) ? '_' : c));
         var tempFilePath = _fileSystem.Path.Combine(
             _fileSystem.Path.GetTempPath(),
-            $"config-{safeKey}.json");
+            $"config-{safeKey}-{Path.GetRandomFileName()[..8]}.json");
 
-        _fileSystem.File.WriteAllText(tempFilePath, originalJson, Encoding.UTF8);
+        await _fileSystem.File.WriteAllTextAsync(tempFilePath, originalJson, Encoding.UTF8);
 
         try
         {
