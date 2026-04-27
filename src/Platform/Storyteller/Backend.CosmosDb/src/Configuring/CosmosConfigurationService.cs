@@ -23,6 +23,7 @@ public class CosmosConfigurationService : IConfigurationService
 {
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly IBindingExecutor? _bindingExecutor;
+    private readonly IConfigurationSchemaService? _schemaService;
     private readonly IJsonSerializationSettingsProvider _jsonSettingsProvider;
     private readonly IMapper _mapper;
     private readonly JsonSerializerSettings _serializerOptions;
@@ -32,10 +33,12 @@ public class CosmosConfigurationService : IConfigurationService
         IJsonSerializationSettingsProvider jsonSettingsProvider,
         IMapper mapper,
         IOptions<JsonSerializerSettings> serializerOptions,
-        IBindingExecutor bindingExecutor = null)
+        IBindingExecutor bindingExecutor = null,
+        IConfigurationSchemaService schemaService = null)
     {
         _repositoryProvider = repositoryProvider;
         _bindingExecutor = bindingExecutor;
+        _schemaService = schemaService;
         _jsonSettingsProvider = jsonSettingsProvider;
         _mapper = mapper;
         _serializerOptions = serializerOptions.Value;
@@ -300,6 +303,11 @@ public class CosmosConfigurationService : IConfigurationService
             // create a new configuration if there is nothing yet
             value.RemoveRequested();
 
+            if (_schemaService is not null && value.HasValues)
+            {
+                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, annotationKey, value);
+            }
+
             var maxVersionResponse = await repository.Container.GetItemLinqQueryable<ConfigurationHistoryEntity>(
                 requestOptions: new QueryRequestOptions { PartitionKey = partitionKey })
                 .Where(history => history.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}."))
@@ -363,6 +371,12 @@ public class CosmosConfigurationService : IConfigurationService
         else
         {
             newContent.RemoveRequested();
+        }
+
+        // validate against combined schema before persisting
+        if (_schemaService is not null && newContent.HasValues)
+        {
+            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, annotationKey, newContent);
         }
 
         // invalidate all ancestor configurations
