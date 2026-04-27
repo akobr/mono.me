@@ -58,7 +58,10 @@ public static class Definitions
         {
             public static class V1
             {
-                public const string Schema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.AnnotationType}}}";
+                public const string Schema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/type/{{{Parameters.AnnotationType}}}";
+                public const string AnnotationSchema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}";
+                public const string DescendantTypeSchema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}/type/{{{Parameters.AnnotationType}}}";
+                public const string CombinedSchema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}/definition";
             }
         }
     }
@@ -124,6 +127,16 @@ public static class Definitions
             public const string GetConfigurationSchema = nameof(GetConfigurationSchema);
             public const string SetConfigurationSchema = nameof(SetConfigurationSchema);
             public const string DeleteConfigurationSchema = nameof(DeleteConfigurationSchema);
+
+            public const string GetAnnotationSchema = nameof(GetAnnotationSchema);
+            public const string SetAnnotationSchema = nameof(SetAnnotationSchema);
+            public const string DeleteAnnotationSchema = nameof(DeleteAnnotationSchema);
+
+            public const string GetDescendantTypeSchema = nameof(GetDescendantTypeSchema);
+            public const string SetDescendantTypeSchema = nameof(SetDescendantTypeSchema);
+            public const string DeleteDescendantTypeSchema = nameof(DeleteDescendantTypeSchema);
+
+            public const string GetCombinedConfigurationSchema = nameof(GetCombinedConfigurationSchema);
         }
     }
 

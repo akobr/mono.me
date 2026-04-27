@@ -165,9 +165,25 @@ public class ConfigurationHttp
             return new BadRequestObjectResult(new ErrorResponse($"Invalid input configuration model: {e.Message}"));
         }
 
-        var author = request.GetAuthor();
-        var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author);
-        return new OkObjectResult(outputModel);
+        try
+        {
+            var author = request.GetAuthor();
+            var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author);
+            return new OkObjectResult(outputModel);
+        }
+        catch (SchemaValidationException ex)
+        {
+            var errorDetails = ex.ValidationErrors
+                .Select(e => new SchemaValidationErrorDetail
+                {
+                    AnnotationKey = e.AnnotationKey,
+                    ViewName = e.ViewName,
+                    Errors = e.Errors,
+                })
+                .ToList();
+
+            return new ConflictObjectResult(new SchemaValidationErrorResponse(ex.Message, errorDetails));
+        }
     }
 
     [Function(nameof(DeleteConfiguration))]
