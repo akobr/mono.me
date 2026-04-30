@@ -26,26 +26,26 @@ public static class AnnotationHierarchy
 
             case AnnotationType.Usage:
                 // usg.S.R → sbt.S defines dt.usg, rst.R defines dt.usg
-                results.Add((AnnotationKey.CreateSubject(key.SubjectName), AnnotationTypeCodes.Usage));
                 results.Add((AnnotationKey.CreateResponsibility(key.ResponsibilityName), AnnotationTypeCodes.Usage));
+                results.Add((AnnotationKey.CreateSubject(key.SubjectName), AnnotationTypeCodes.Usage));
                 break;
 
             case AnnotationType.Execution:
                 // exe.S.R.C → sbt.S, rst.R, cnt.S.C, usg.S.R all define dt.exe
-                results.Add((AnnotationKey.CreateSubject(key.SubjectName), AnnotationTypeCodes.Execution));
                 results.Add((AnnotationKey.CreateResponsibility(key.ResponsibilityName), AnnotationTypeCodes.Execution));
-                results.Add((AnnotationKey.CreateContext(key.SubjectName, key.ContextName), AnnotationTypeCodes.Execution));
+                results.Add((AnnotationKey.CreateSubject(key.SubjectName), AnnotationTypeCodes.Execution));
                 results.Add((AnnotationKey.CreateUsage(key.SubjectName, key.ResponsibilityName), AnnotationTypeCodes.Execution));
+                results.Add((AnnotationKey.CreateContext(key.SubjectName, key.ContextName), AnnotationTypeCodes.Execution));
                 break;
 
             case AnnotationType.UnitOfExecution:
                 // uxe.S.R.C.U → sbt.S, rst.R, cnt.S.C, usg.S.R, unt.R.U, exe.S.R.C all define dt.uxe
-                results.Add((AnnotationKey.CreateSubject(key.SubjectName), AnnotationTypeCodes.UnitOfExecution));
                 results.Add((AnnotationKey.CreateResponsibility(key.ResponsibilityName), AnnotationTypeCodes.UnitOfExecution));
-                results.Add((AnnotationKey.CreateContext(key.SubjectName, key.ContextName), AnnotationTypeCodes.UnitOfExecution));
+                results.Add((AnnotationKey.CreateSubject(key.SubjectName), AnnotationTypeCodes.UnitOfExecution));
                 results.Add((AnnotationKey.CreateUsage(key.SubjectName, key.ResponsibilityName), AnnotationTypeCodes.UnitOfExecution));
-                results.Add((AnnotationKey.CreateUnit(key.ResponsibilityName, key.UnitName), AnnotationTypeCodes.UnitOfExecution));
+                results.Add((AnnotationKey.CreateContext(key.SubjectName, key.ContextName), AnnotationTypeCodes.UnitOfExecution));
                 results.Add((AnnotationKey.CreateExecution(key.SubjectName, key.ResponsibilityName, key.ContextName), AnnotationTypeCodes.UnitOfExecution));
+                results.Add((AnnotationKey.CreateUnit(key.ResponsibilityName, key.UnitName), AnnotationTypeCodes.UnitOfExecution));
                 break;
         }
 
