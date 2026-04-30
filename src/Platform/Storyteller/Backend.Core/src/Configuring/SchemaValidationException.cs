@@ -5,7 +5,7 @@ public class SchemaValidationException : Exception
     public SchemaValidationException(IReadOnlyList<SchemaValidationError> validationErrors)
         : base("One or more existing configurations are not compliant with the provided schema.")
     {
-        ValidationErrors = validationErrors;
+        ValidationErrors = validationErrors ?? throw new ArgumentNullException(nameof(validationErrors));
     }
 
     public IReadOnlyList<SchemaValidationError> ValidationErrors { get; }
