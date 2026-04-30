@@ -58,10 +58,10 @@ public static class Definitions
         {
             public static class V1
             {
-                public const string Schema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/type/{{{Parameters.AnnotationType}}}";
-                public const string AnnotationSchema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}";
-                public const string DescendantTypeSchema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}/type/{{{Parameters.AnnotationType}}}";
-                public const string CombinedSchema = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}/definition";
+                public const string SchemaType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/type/{{{Parameters.AnnotationType}}}";
+                public const string SchemaAnnotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}";
+                public const string SchemaDescendantType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}/type/{{{Parameters.AnnotationType}}}";
+                public const string SchemaCombined = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}/definition";
             }
         }
     }
