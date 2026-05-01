@@ -157,6 +157,13 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         }
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var validationErrors = await ValidateExistingAnnotationConfigurationsAsync(repository, project, annotationKey, schema);
+
+        if (validationErrors.Count > 0)
+        {
+            throw new SchemaValidationException(validationErrors);
+        }
+
         var partitionKeyValue = GetAnnotationSchemaPartitionKey(project, parsedKey);
         var partitionKey = new PartitionKey(partitionKeyValue);
         var id = GetAnnotationSchemaEntityId(annotationKey);
@@ -253,6 +260,13 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         }
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var validationErrors = await ValidateExistingDescendantConfigurationsAsync(repository, project, annotationKey, descendantTypeCode, schema);
+
+        if (validationErrors.Count > 0)
+        {
+            throw new SchemaValidationException(validationErrors);
+        }
+
         var partitionKeyValue = GetAnnotationSchemaPartitionKey(project, parsedKey);
         var partitionKey = new PartitionKey(partitionKeyValue);
         var id = GetDescendantTypeSchemaEntityId(descendantTypeCode, annotationKey);
@@ -407,7 +421,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         string annotationType,
         JsonSchema schema)
     {
-        var configPrefix = $"{EntityIdPrefixTypes.Configuration}.{annotationType}.";
+        var configIdPart = $".{EntityIdPrefixTypes.Configuration}.{annotationType}.";
         var errors = new List<SchemaValidationError>();
 
         var queryable = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
@@ -416,7 +430,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         var feed = queryable
             .Where(config =>
                 config.ProjectName == project
-                && config.Id.Contains($".{configPrefix}"))
+                && config.Id.Contains(configIdPart))
             .ToFeedIterator();
 
         while (feed.HasMoreResults)
@@ -425,6 +439,107 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
             foreach (var configEntity in results)
             {
                 if (!configEntity.Content.HasValues)
+                {
+                    continue;
+                }
+
+                var configJson = configEntity.Content.ToString(Formatting.None);
+                var validationResults = schema.Validate(configJson);
+
+                if (validationResults.Count > 0)
+                {
+                    errors.Add(new SchemaValidationError
+                    {
+                        AnnotationKey = configEntity.AnnotationKey,
+                        ViewName = configEntity.ViewName,
+                        Errors = validationResults.Select(e => $"{e.Path}: {e.Kind}").ToList(),
+                    });
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    private async Task<IReadOnlyList<SchemaValidationError>> ValidateExistingAnnotationConfigurationsAsync(
+        IContainerRepository repository,
+        string project,
+        string annotationKey,
+        JsonSchema schema)
+    {
+        var configIdEnd = $".{EntityIdPrefixTypes.Configuration}.{annotationKey}";
+        var errors = new List<SchemaValidationError>();
+
+        var queryable = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
+            allowSynchronousQueryExecution: false);
+
+        var feed = queryable
+            .Where(config =>
+                config.ProjectName == project
+                && config.Id.EndsWith(configIdEnd))
+            .ToFeedIterator();
+
+        while (feed.HasMoreResults)
+        {
+            var results = await feed.ReadNextAsync();
+            foreach (var configEntity in results)
+            {
+                if (!configEntity.Content.HasValues)
+                {
+                    continue;
+                }
+
+                var configJson = configEntity.Content.ToString(Formatting.None);
+                var validationResults = schema.Validate(configJson);
+
+                if (validationResults.Count > 0)
+                {
+                    errors.Add(new SchemaValidationError
+                    {
+                        AnnotationKey = configEntity.AnnotationKey,
+                        ViewName = configEntity.ViewName,
+                        Errors = validationResults.Select(e => $"{e.Path}: {e.Kind}").ToList(),
+                    });
+                }
+            }
+        }
+
+        return errors;
+    }
+
+    private async Task<IReadOnlyList<SchemaValidationError>> ValidateExistingDescendantConfigurationsAsync(
+        IContainerRepository repository,
+        string project,
+        string annotationKey,
+        string descendantTypeCode,
+        JsonSchema schema)
+    {
+        var configIdPart = $".{EntityIdPrefixTypes.Configuration}.{descendantTypeCode}.";
+        var errors = new List<SchemaValidationError>();
+
+        var queryable = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
+            allowSynchronousQueryExecution: false);
+
+        var feed = queryable
+            .Where(config =>
+                config.ProjectName == project
+                && config.Id.Contains(configIdPart))
+            .ToFeedIterator();
+
+        while (feed.HasMoreResults)
+        {
+            var results = await feed.ReadNextAsync();
+            foreach (var configEntity in results)
+            {
+                if (!configEntity.Content.HasValues)
+                {
+                    continue;
+                }
+
+                var configAnnotationKey = AnnotationKey.Parse(configEntity.AnnotationKey);
+                var ancestors = AnnotationHierarchy.GetAncestorSchemaSources(configAnnotationKey);
+
+                if (!ancestors.Any(a => a.Ancestor == annotationKey && a.DescendantTypeCode == descendantTypeCode))
                 {
                     continue;
                 }
