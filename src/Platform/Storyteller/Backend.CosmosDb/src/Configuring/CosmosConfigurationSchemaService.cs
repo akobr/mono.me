@@ -35,6 +35,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetSchemaPartitionKey(project);
         var partitionKey = new PartitionKey(partitionKeyValue);
+        annotationType = NormalizeAnnotationType(annotationType);
         var id = GetSchemaEntityId(annotationType);
 
         var entity = await repository.Container.TryReadItemAsync(
@@ -73,6 +74,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
 
         var partitionKeyValue = GetSchemaPartitionKey(project);
         var partitionKey = new PartitionKey(partitionKeyValue);
+        annotationType = NormalizeAnnotationType(annotationType);
         var id = GetSchemaEntityId(annotationType);
 
         var existingEntity = await repository.Container.TryReadItemAsync(
@@ -104,6 +106,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetSchemaPartitionKey(project);
         var partitionKey = new PartitionKey(partitionKeyValue);
+        annotationType = NormalizeAnnotationType(annotationType);
         var id = GetSchemaEntityId(annotationType);
 
         try
@@ -211,6 +214,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetAnnotationSchemaPartitionKey(project, parsedKey);
         var partitionKey = new PartitionKey(partitionKeyValue);
+        descendantTypeCode = NormalizeAnnotationType(descendantTypeCode);
         var id = GetDescendantTypeSchemaEntityId(descendantTypeCode, annotationKey);
 
         var entity = await repository.Container.TryReadItemAsync(
@@ -229,6 +233,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         JObject schemaContent,
         string author)
     {
+        descendantTypeCode = NormalizeAnnotationType(descendantTypeCode);
         var parsedKey = AnnotationKey.Parse(annotationKey);
 
         if (!AnnotationTypeCodes.ValidCodes.ContainsKey(descendantTypeCode))
@@ -286,6 +291,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetAnnotationSchemaPartitionKey(project, parsedKey);
         var partitionKey = new PartitionKey(partitionKeyValue);
+        descendantTypeCode = NormalizeAnnotationType(descendantTypeCode);
         var id = GetDescendantTypeSchemaEntityId(descendantTypeCode, annotationKey);
 
         try
@@ -444,6 +450,11 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
     private static string GetSchemaPartitionKey(string project)
     {
         return $"{project}.{SchemaPartitionSuffix}";
+    }
+
+    private static string NormalizeAnnotationType(string annotationType)
+    {
+        return annotationType.ToLowerInvariant();
     }
 
     private static string GetSchemaEntityId(string annotationType)
