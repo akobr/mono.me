@@ -64,6 +64,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
             throw new ArgumentException($"Invalid JSON Schema: {ex.Message}", ex);
         }
 
+        annotationType = NormalizeAnnotationType(annotationType);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var validationErrors = await ValidateExistingConfigurationsAsync(repository, project, annotationType, schema);
 
@@ -74,7 +75,6 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
 
         var partitionKeyValue = GetSchemaPartitionKey(project);
         var partitionKey = new PartitionKey(partitionKeyValue);
-        annotationType = NormalizeAnnotationType(annotationType);
         var id = GetSchemaEntityId(annotationType);
 
         var existingEntity = await repository.Container.TryReadItemAsync(
