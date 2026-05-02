@@ -51,6 +51,26 @@ public static class ContainerExtensions
         return item;
     }
 
+    public static async Task<(TItem? Item, string? ETag)> TryReadItemWithETagAsync<TItem>(
+        this Container @this,
+        string id,
+        PartitionKey partitionKey,
+        Func<Stream, TItem?> serialization,
+        ItemRequestOptions? requestOptions = null,
+        CancellationToken cancellationToken = default)
+        where TItem : class
+    {
+        using var response = await @this.ReadItemStreamAsync(id, partitionKey, requestOptions, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return (default, null);
+        }
+
+        var item = serialization(response.Content);
+        return (item, response.Headers.ETag);
+    }
+
     public static async Task UpsertStoredProcedureAsync(this Container @this, StoredProcedureProperties props)
     {
         try

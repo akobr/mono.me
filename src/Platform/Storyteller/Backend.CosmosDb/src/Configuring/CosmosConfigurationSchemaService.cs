@@ -77,27 +77,23 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         var partitionKey = new PartitionKey(partitionKeyValue);
         var id = GetSchemaEntityId(annotationType);
 
-        var existingEntity = await repository.Container.TryReadItemAsync(
+        var entity = await UpsertWithOptimisticConcurrencyAsync(
+            repository.Container,
             id,
             partitionKey,
-            stream => stream.DeserializeNewtonsoft<ConfigurationSchemaEntity>(_serializerOptions));
+            existing => new ConfigurationSchemaEntity
+            {
+                PartitionKey = partitionKeyValue,
+                Id = id,
+                AnnotationKey = annotationType,
+                Name = annotationType,
+                ProjectName = project,
+                ViewName = string.Empty,
+                Content = schemaContent,
+                Author = author,
+                Version = existing is null ? 1UL : existing.Version + 1,
+            });
 
-        var newVersion = existingEntity is null ? 1UL : existingEntity.Version + 1;
-
-        var entity = new ConfigurationSchemaEntity
-        {
-            PartitionKey = partitionKeyValue,
-            Id = id,
-            AnnotationKey = annotationType,
-            Name = annotationType,
-            ProjectName = project,
-            ViewName = string.Empty,
-            Content = schemaContent,
-            Author = author,
-            Version = newVersion,
-        };
-
-        await repository.Container.UpsertItemAsync(entity, partitionKey);
         return ToModel(entity);
     }
 
@@ -168,27 +164,23 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         var partitionKey = new PartitionKey(partitionKeyValue);
         var id = GetAnnotationSchemaEntityId(annotationKey);
 
-        var existingEntity = await repository.Container.TryReadItemAsync(
+        var entity = await UpsertWithOptimisticConcurrencyAsync(
+            repository.Container,
             id,
             partitionKey,
-            stream => stream.DeserializeNewtonsoft<ConfigurationSchemaEntity>(_serializerOptions));
+            existing => new ConfigurationSchemaEntity
+            {
+                PartitionKey = partitionKeyValue,
+                Id = id,
+                AnnotationKey = annotationKey,
+                Name = annotationKey,
+                ProjectName = project,
+                ViewName = string.Empty,
+                Content = schemaContent,
+                Author = author,
+                Version = existing is null ? 1UL : existing.Version + 1,
+            });
 
-        var newVersion = existingEntity is null ? 1UL : existingEntity.Version + 1;
-
-        var entity = new ConfigurationSchemaEntity
-        {
-            PartitionKey = partitionKeyValue,
-            Id = id,
-            AnnotationKey = annotationKey,
-            Name = annotationKey,
-            ProjectName = project,
-            ViewName = string.Empty,
-            Content = schemaContent,
-            Author = author,
-            Version = newVersion,
-        };
-
-        await repository.Container.UpsertItemAsync(entity, partitionKey);
         return ToAnnotationModel(entity, annotationKey);
     }
 
@@ -271,27 +263,23 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         var partitionKey = new PartitionKey(partitionKeyValue);
         var id = GetDescendantTypeSchemaEntityId(descendantTypeCode, annotationKey);
 
-        var existingEntity = await repository.Container.TryReadItemAsync(
+        var entity = await UpsertWithOptimisticConcurrencyAsync(
+            repository.Container,
             id,
             partitionKey,
-            stream => stream.DeserializeNewtonsoft<ConfigurationSchemaEntity>(_serializerOptions));
+            existing => new ConfigurationSchemaEntity
+            {
+                PartitionKey = partitionKeyValue,
+                Id = id,
+                AnnotationKey = annotationKey,
+                Name = $"dt.{descendantTypeCode}.{annotationKey}",
+                ProjectName = project,
+                ViewName = string.Empty,
+                Content = schemaContent,
+                Author = author,
+                Version = existing is null ? 1UL : existing.Version + 1,
+            });
 
-        var newVersion = existingEntity is null ? 1UL : existingEntity.Version + 1;
-
-        var entity = new ConfigurationSchemaEntity
-        {
-            PartitionKey = partitionKeyValue,
-            Id = id,
-            AnnotationKey = annotationKey,
-            Name = $"dt.{descendantTypeCode}.{annotationKey}",
-            ProjectName = project,
-            ViewName = string.Empty,
-            Content = schemaContent,
-            Author = author,
-            Version = newVersion,
-        };
-
-        await repository.Container.UpsertItemAsync(entity, partitionKey);
         return ToDescendantTypeModel(entity, annotationKey, descendantTypeCode);
     }
 
@@ -560,6 +548,40 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         }
 
         return errors;
+    }
+
+    private async Task<ConfigurationSchemaEntity> UpsertWithOptimisticConcurrencyAsync(
+        Container container,
+        string id,
+        PartitionKey partitionKey,
+        Func<ConfigurationSchemaEntity?, ConfigurationSchemaEntity> entityFactory,
+        int maxRetries = 3)
+    {
+        for (var attempt = 0; attempt <= maxRetries; attempt++)
+        {
+            var (existing, etag) = await container.TryReadItemWithETagAsync(
+                id,
+                partitionKey,
+                stream => stream.DeserializeNewtonsoft<ConfigurationSchemaEntity>(_serializerOptions));
+
+            var entity = entityFactory(existing);
+
+            var requestOptions = etag is not null
+                ? new ItemRequestOptions { IfMatchEtag = etag }
+                : null;
+
+            try
+            {
+                await container.UpsertItemAsync(entity, partitionKey, requestOptions);
+                return entity;
+            }
+            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed && attempt < maxRetries)
+            {
+                // Another writer modified the item; retry with fresh read
+            }
+        }
+
+        throw new InvalidOperationException($"Failed to update schema '{id}' after multiple retries ({maxRetries}) due to concurrent modifications.");
     }
 
     private static string GetSchemaPartitionKey(string project)
