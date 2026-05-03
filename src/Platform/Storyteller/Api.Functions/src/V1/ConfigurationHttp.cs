@@ -237,6 +237,10 @@ public class ConfigurationHttp
             var outputModel = await _configuration.PatchConfigurationAsync(fullKey, patchOperations, author);
             return new OkObjectResult(outputModel);
         }
+        catch (ConfigurationNotFoundException ex)
+        {
+            return new NotFoundObjectResult(new ErrorResponse(ex.Message));
+        }
         catch (InvalidOperationException ex)
         {
             return new BadRequestObjectResult(new ErrorResponse(ex.Message));
