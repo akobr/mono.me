@@ -186,6 +186,76 @@ public class ConfigurationHttp
         }
     }
 
+    [Function(nameof(PatchConfiguration))]
+    [OpenApiOperation(Definitions.RouteIds.Configuration.PatchConfiguration, Definitions.Tags.Configuration)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
+    [OpenApiRequestBody("application/json-patch+json", typeof(JArray), Description = "A JSON Patch document (RFC 6902) containing the operations to apply.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The patched configuration.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The configuration doesn't exist or has no content to patch.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> PatchConfiguration(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Patch, Route = Definitions.Routes.Configuration.V1.Configuration)]
+        HttpRequestData request,
+        string organization,
+        string project,
+        string view,
+        string key)
+    {
+        request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
+        await request.CheckAccessToProjectAsync(_access, organization, project);
+
+        if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
+        {
+            return badRequestResult;
+        }
+
+        var fullKey = FullKey.Create(annotationKey, organization, project, view);
+        JArray patchOperations;
+
+        try
+        {
+            using var sReader = new StreamReader(request.Body);
+            await using var jReader = new JsonTextReader(sReader);
+            patchOperations = await JArray.LoadAsync(jReader);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error occurred while parsing JSON Patch document.");
+            return new BadRequestObjectResult(new ErrorResponse($"Invalid JSON Patch document: {e.Message}"));
+        }
+
+        try
+        {
+            var author = request.GetAuthor();
+            var outputModel = await _configuration.PatchConfigurationAsync(fullKey, patchOperations, author);
+            return new OkObjectResult(outputModel);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new BadRequestObjectResult(new ErrorResponse(ex.Message));
+        }
+        catch (SchemaValidationException ex)
+        {
+            var errorDetails = ex.ValidationErrors
+                .Select(e => new SchemaValidationErrorDetail
+                {
+                    AnnotationKey = e.AnnotationKey,
+                    ViewName = e.ViewName,
+                    Errors = e.Errors,
+                })
+                .ToList();
+
+            return new ConflictObjectResult(new SchemaValidationErrorResponse(ex.Message, errorDetails));
+        }
+    }
+
     [Function(nameof(DeleteConfiguration))]
     [OpenApiOperation(Definitions.RouteIds.Configuration.DeleteConfiguration, Definitions.Tags.Configuration)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]

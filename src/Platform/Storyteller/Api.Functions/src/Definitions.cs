@@ -113,6 +113,7 @@ public static class Definitions
             public const string GetConfiguration = nameof(GetConfiguration);
             public const string GetResolvedConfiguration = nameof(GetResolvedConfiguration);
             public const string SetConfiguration = nameof(SetConfiguration);
+            public const string PatchConfiguration = nameof(PatchConfiguration);
             public const string DeleteConfiguration = nameof(DeleteConfiguration);
 
             public const string GetConfigurationVersions = nameof(GetConfigurationVersions);
@@ -192,6 +193,7 @@ public static class Definitions
         public const string Get = "get";
         public const string Post = "post";
         public const string Put = "put";
+        public const string Patch = "patch";
         public const string Delete = "delete";
     }
 

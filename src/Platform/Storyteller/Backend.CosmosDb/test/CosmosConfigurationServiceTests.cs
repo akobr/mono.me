@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
@@ -626,5 +627,192 @@ public class CosmosConfigurationServiceTests(Startup startup)
         diff.Count(line => line.StartsWith("  ")).Should().BeGreaterThan(0);
         diff.Should().Contain(line => line.Contains("value-a") && line.StartsWith("- "));
         diff.Should().Contain(line => line.Contains("value-b") && line.StartsWith("+ "));
+    }
+
+    [Fact]
+    public async Task InlinePatch_ReplaceAndAddOperations()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("inline-patch");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "inline-patch",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
+            {
+                "name": "original",
+                "value": 10
+            }
+            """), "system");
+
+        // Update with $patch operations
+        var update = JObject.Parse("""
+            {
+                "$patch": [
+                    { "op": "replace", "path": "/name", "value": "patched" },
+                    { "op": "add", "path": "/newProp", "value": "added" }
+                ]
+            }
+            """);
+
+        var result = await configs.CreateOrUpdateConfigurationAsync(key, update, "system");
+        var content = result.Content;
+
+        content["name"]!.Value<string>().Should().Be("patched");
+        content["value"]!.Value<int>().Should().Be(10);
+        content["newProp"]!.Value<string>().Should().Be("added");
+        content.Property("$patch").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task InlinePatch_CombinedWithMergeAndRemove()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("patch-combo");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "patch-combo",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
+            {
+                "keep": "yes",
+                "removeMe": "bye",
+                "replace": "old"
+            }
+            """), "system");
+
+        // Merge new property + $remove + $patch
+        var update = JObject.Parse("""
+            {
+                "merged": "new",
+                "$remove": ["removeMe"],
+                "$patch": [
+                    { "op": "replace", "path": "/replace", "value": "new" }
+                ]
+            }
+            """);
+
+        var result = await configs.CreateOrUpdateConfigurationAsync(key, update, "system");
+        var content = result.Content;
+
+        content["keep"]!.Value<string>().Should().Be("yes");
+        content["merged"]!.Value<string>().Should().Be("new");
+        content["replace"]!.Value<string>().Should().Be("new");
+        content.Property("removeMe").Should().BeNull();
+        content.Property("$patch").Should().BeNull();
+        content.Property("$remove").Should().BeNull();
+    }
+
+    [Fact]
+    public async Task PatchConfigurationAsync_AppliesPatchToExistingConfig()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("dedicated-patch");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "dedicated-patch",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
+            {
+                "name": "before",
+                "count": 1,
+                "nested": { "a": 1, "b": 2 }
+            }
+            """), "system");
+
+        var patchOps = JArray.Parse("""
+            [
+                { "op": "replace", "path": "/name", "value": "after" },
+                { "op": "remove", "path": "/count" },
+                { "op": "add", "path": "/nested/c", "value": 3 }
+            ]
+            """);
+
+        var result = await configs.PatchConfigurationAsync(key, patchOps, "system");
+        var content = result.Content;
+
+        content["name"]!.Value<string>().Should().Be("after");
+        content.Property("count").Should().BeNull();
+        content["nested"]!["a"]!.Value<int>().Should().Be(1);
+        content["nested"]!["b"]!.Value<int>().Should().Be(2);
+        content["nested"]!["c"]!.Value<int>().Should().Be(3);
+        result.Version.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task PatchConfigurationAsync_CreatesVersionHistory()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("patch-history");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "patch-history",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "v": 1 }"""), "system");
+
+        var patchOps = JArray.Parse("""[{ "op": "replace", "path": "/v", "value": 2 }]""");
+        await configs.PatchConfigurationAsync(key, patchOps, "system");
+
+        var versions = await configs.GetConfigurationVersionsAsync(key);
+        versions.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task PatchConfigurationAsync_InvalidPath_Throws()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("patch-invalid");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "patch-invalid",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "a": 1 }"""), "system");
+
+        // replace on non-existing path should fail
+        var patchOps = JArray.Parse("""[{ "op": "replace", "path": "/nonexistent/deep/path", "value": 99 }]""");
+
+        var act = () => configs.PatchConfigurationAsync(key, patchOps, "system");
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*JSON Patch*failed*");
     }
 }

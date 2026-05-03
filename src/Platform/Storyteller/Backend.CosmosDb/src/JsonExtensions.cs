@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using global::Json.Patch;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -101,5 +102,47 @@ public static class JsonExtensions
 
         @this.Remove(removePropertyName);
         return @this;
+    }
+
+    public static async Task<JObject> ApplyPatchRequested(this JObject @this)
+    {
+        const string patchPropertyName = "$patch";
+        var patchProp = @this.Property(patchPropertyName);
+
+        if (patchProp is null)
+        {
+            return @this;
+        }
+
+        if (patchProp.Value.Type != JTokenType.Array)
+        {
+            @this.Remove(patchPropertyName);
+            return @this;
+        }
+
+        var patchArrayJson = patchProp.Value.ToString(Formatting.None);
+        @this.Remove(patchPropertyName);
+
+        var patch = System.Text.Json.JsonSerializer.Deserialize<JsonPatch>(patchArrayJson);
+
+        if (patch is null)
+        {
+            return @this;
+        }
+
+        var jsonObject = await @this.ToJsonObjectAsync();
+        var result = patch.Apply(jsonObject);
+
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException($"JSON Patch operation failed: {result.Error}");
+        }
+
+        if (result.Result is not JsonObject patchedObject)
+        {
+            throw new InvalidOperationException("JSON Patch result is not a JSON object.");
+        }
+
+        return await patchedObject.ToJObjectAsync();
     }
 }
