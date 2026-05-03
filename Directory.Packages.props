@@ -28,6 +28,7 @@
     <PackageVersion Include="DiffPlex" Version="1.9.0" />
     <PackageVersion Include="FluentAssertions" Version="[7.2.0]" />
     <PackageVersion Include="Humanizer" Version="3.0.10" />
+    <PackageVersion Include="JsonPatch.Net" Version="5.0.2" />
     <PackageVersion Include="JsonSubTypes" Version="2.0.1" />
     <PackageVersion Include="LibGit2Sharp" Version="0.31.0" />
     <PackageVersion Include="McMaster.Extensions.CommandLineUtils" Version="5.0.1" />

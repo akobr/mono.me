@@ -302,6 +302,7 @@ public class CosmosConfigurationService : IConfigurationService
         {
             // create a new configuration if there is nothing yet
             value.RemoveRequested();
+            value = await value.ApplyPatchRequested();
 
             if (_schemaService is not null && value.HasValues)
             {
@@ -341,6 +342,7 @@ public class CosmosConfigurationService : IConfigurationService
             newContent = (JObject)existingConfiguration.Content.DeepClone();
             newContent.MergeInto(value);
             newContent.RemoveRequested();
+            newContent = await newContent.ApplyPatchRequested();
 
             if (JToken.DeepEquals(existingConfiguration.Content, newContent))
             {
@@ -371,6 +373,7 @@ public class CosmosConfigurationService : IConfigurationService
         else
         {
             newContent.RemoveRequested();
+            newContent = await newContent.ApplyPatchRequested();
         }
 
         // validate against combined schema before persisting
@@ -378,6 +381,91 @@ public class CosmosConfigurationService : IConfigurationService
         {
             await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, annotationKey, newContent);
         }
+
+        // invalidate all ancestor configurations
+        await InvalidateConfigurationsAsync(key, repository);
+
+        // save a new version of the configuration
+        var newConfiguration = existingConfiguration with
+        {
+            Version = existingConfiguration.Version + 1,
+            Content = newContent,
+            Author = author,
+            CalculatedContent = null,
+            CalculatedContentHash = null,
+        };
+        await repository.Container.UpsertItemAsync(newConfiguration, partitionKey);
+
+        return newConfiguration.ToConfigurationFromContent();
+    }
+
+    public async Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author)
+    {
+        var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
+        var annotationKey = key.Annotation.ToString();
+        var configurationKey = $"{EntityIdPrefixTypes.Configuration}.{annotationKey}";
+        var id = $"{key.ViewName}.{configurationKey}";
+        var partitionKeyValue = key.GetPartitionKey();
+        var partitionKey = new PartitionKey(partitionKeyValue);
+
+        var existingConfiguration = await repository.Container.TryReadItemAsync(
+            id,
+            partitionKey,
+            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        if (existingConfiguration is null || !existingConfiguration.Content.HasValues)
+        {
+            throw new InvalidOperationException($"Configuration for '{key.Annotation}' does not exist or has no content to patch.");
+        }
+
+        var patchArrayJson = patchOperations.ToString(Formatting.None);
+        var patch = System.Text.Json.JsonSerializer.Deserialize<global::Json.Patch.JsonPatch>(patchArrayJson)
+            ?? throw new InvalidOperationException("Invalid JSON Patch document.");
+
+        var jsonObject = await existingConfiguration.Content.ToJsonObjectAsync();
+        var result = patch.Apply(jsonObject);
+
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException($"JSON Patch operation failed: {result.Error}");
+        }
+
+        if (result.Result is not System.Text.Json.Nodes.JsonObject patchedObject)
+        {
+            throw new InvalidOperationException("JSON Patch result is not a JSON object.");
+        }
+
+        var newContent = await patchedObject.ToJObjectAsync();
+
+        if (JToken.DeepEquals(existingConfiguration.Content, newContent))
+        {
+            return existingConfiguration.ToConfigurationFromContent();
+        }
+
+        if (_schemaService is not null && newContent.HasValues)
+        {
+            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, annotationKey, newContent);
+        }
+
+        // save history of the previous version
+        var historyVersion = existingConfiguration.Version;
+        var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{historyVersion}";
+        var historyId = $"{key.ViewName}.{historyKey}";
+        var history = new ConfigurationHistoryEntity
+        {
+            PartitionKey = partitionKeyValue,
+            Id = historyId,
+            AnnotationKey = annotationKey,
+            Version = historyVersion,
+            Name = existingConfiguration.Name,
+            ProjectName = existingConfiguration.ProjectName,
+            ViewName = existingConfiguration.ViewName,
+            Content = existingConfiguration.Content,
+            CreationTime = existingConfiguration.GetLastUpdatedTime(),
+            Author = existingConfiguration.Author,
+        };
+
+        await repository.Container.CreateItemAsync(history, partitionKey);
 
         // invalidate all ancestor configurations
         await InvalidateConfigurationsAsync(key, repository);
