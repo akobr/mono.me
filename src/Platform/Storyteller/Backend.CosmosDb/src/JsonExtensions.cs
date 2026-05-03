@@ -104,6 +104,28 @@ public static class JsonExtensions
         return @this;
     }
 
+    public static async Task<JObject> ApplyPatch(this JObject @this, JArray patchOperations)
+    {
+        var patchArrayJson = patchOperations.ToString(Formatting.None);
+        var patch = System.Text.Json.JsonSerializer.Deserialize<JsonPatch>(patchArrayJson)
+            ?? throw new InvalidOperationException("Invalid JSON Patch document.");
+
+        var jsonObject = await @this.ToJsonObjectAsync();
+        var result = patch.Apply(jsonObject);
+
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException($"JSON Patch operation failed: {result.Error}");
+        }
+
+        if (result.Result is not JsonObject patchedObject)
+        {
+            throw new InvalidOperationException("JSON Patch result is not a JSON object.");
+        }
+
+        return await patchedObject.ToJObjectAsync();
+    }
+
     public static async Task<JObject> ApplyPatchRequested(this JObject @this)
     {
         const string patchPropertyName = "$patch";
@@ -120,29 +142,8 @@ public static class JsonExtensions
             return @this;
         }
 
-        var patchArrayJson = patchProp.Value.ToString(Formatting.None);
+        var patchArray = (JArray)patchProp.Value;
         @this.Remove(patchPropertyName);
-
-        var patch = System.Text.Json.JsonSerializer.Deserialize<JsonPatch>(patchArrayJson);
-
-        if (patch is null)
-        {
-            return @this;
-        }
-
-        var jsonObject = await @this.ToJsonObjectAsync();
-        var result = patch.Apply(jsonObject);
-
-        if (!result.IsSuccess)
-        {
-            throw new InvalidOperationException($"JSON Patch operation failed: {result.Error}");
-        }
-
-        if (result.Result is not JsonObject patchedObject)
-        {
-            throw new InvalidOperationException("JSON Patch result is not a JSON object.");
-        }
-
-        return await patchedObject.ToJObjectAsync();
+        return await @this.ApplyPatch(patchArray);
     }
 }

@@ -418,24 +418,7 @@ public class CosmosConfigurationService : IConfigurationService
             throw new InvalidOperationException($"Configuration for '{key.Annotation}' does not exist or has no content to patch.");
         }
 
-        var patchArrayJson = patchOperations.ToString(Formatting.None);
-        var patch = System.Text.Json.JsonSerializer.Deserialize<global::Json.Patch.JsonPatch>(patchArrayJson)
-            ?? throw new InvalidOperationException("Invalid JSON Patch document.");
-
-        var jsonObject = await existingConfiguration.Content.ToJsonObjectAsync();
-        var result = patch.Apply(jsonObject);
-
-        if (!result.IsSuccess)
-        {
-            throw new InvalidOperationException($"JSON Patch operation failed: {result.Error}");
-        }
-
-        if (result.Result is not System.Text.Json.Nodes.JsonObject patchedObject)
-        {
-            throw new InvalidOperationException("JSON Patch result is not a JSON object.");
-        }
-
-        var newContent = await patchedObject.ToJObjectAsync();
+        var newContent = await existingConfiguration.Content.ApplyPatch(patchOperations);
 
         if (JToken.DeepEquals(existingConfiguration.Content, newContent))
         {
