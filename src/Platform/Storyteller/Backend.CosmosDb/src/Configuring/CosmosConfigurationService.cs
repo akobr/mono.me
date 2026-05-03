@@ -302,7 +302,7 @@ public class CosmosConfigurationService : IConfigurationService
         {
             // create a new configuration if there is nothing yet
             value.RemoveRequested();
-            value = await value.ApplyPatchRequested();
+            value = await ApplyPatchRequestedSafe(value, annotationKey);
 
             if (_schemaService is not null && value.HasValues)
             {
@@ -342,7 +342,7 @@ public class CosmosConfigurationService : IConfigurationService
             newContent = (JObject)existingConfiguration.Content.DeepClone();
             newContent.MergeInto(value);
             newContent.RemoveRequested();
-            newContent = await newContent.ApplyPatchRequested();
+            newContent = await ApplyPatchRequestedSafe(newContent, annotationKey);
 
             if (JToken.DeepEquals(existingConfiguration.Content, newContent))
             {
@@ -373,7 +373,7 @@ public class CosmosConfigurationService : IConfigurationService
         else
         {
             newContent.RemoveRequested();
-            newContent = await newContent.ApplyPatchRequested();
+            newContent = await ApplyPatchRequestedSafe(newContent, annotationKey);
         }
 
         // validate against combined schema before persisting
@@ -938,6 +938,26 @@ public class CosmosConfigurationService : IConfigurationService
             {
                 throw new ArgumentOutOfRangeException(nameof(key.Annotation.Type));
             }
+        }
+    }
+
+    private static async Task<JObject> ApplyPatchRequestedSafe(JObject content, string annotationKey)
+    {
+        try
+        {
+            return await content.ApplyPatchRequested();
+        }
+        catch (InvalidOperationException ex)
+        {
+            throw new SchemaValidationException(
+            [
+                new SchemaValidationError
+                {
+                    AnnotationKey = annotationKey,
+                    ViewName = string.Empty,
+                    Errors = [ex.Message],
+                },
+            ]);
         }
     }
 
