@@ -18,6 +18,8 @@ public interface IConfigurationService
 
     Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author);
 
+    Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author);
+
     Task ClearConfigurationAsync(FullKey key);
 
     Task DeleteAsync(FullKey key);

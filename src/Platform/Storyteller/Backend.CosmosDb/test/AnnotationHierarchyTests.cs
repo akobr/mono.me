@@ -50,9 +50,9 @@ public class AnnotationHierarchyTests
         var ancestors = AnnotationHierarchy.GetAncestorSchemaSources(key);
 
         ancestors.Should().HaveCount(2);
-        ancestors[0].Ancestor.ToString().Should().Be("sbt.mysubject");
+        ancestors[0].Ancestor.ToString().Should().Be("rst.myresp");
         ancestors[0].DescendantTypeCode.Should().Be(AnnotationTypeCodes.Usage);
-        ancestors[1].Ancestor.ToString().Should().Be("rst.myresp");
+        ancestors[1].Ancestor.ToString().Should().Be("sbt.mysubject");
         ancestors[1].DescendantTypeCode.Should().Be(AnnotationTypeCodes.Usage);
     }
 
@@ -63,13 +63,13 @@ public class AnnotationHierarchyTests
         var ancestors = AnnotationHierarchy.GetAncestorSchemaSources(key);
 
         ancestors.Should().HaveCount(4);
-        ancestors[0].Ancestor.ToString().Should().Be("sbt.mysubject");
+        ancestors[0].Ancestor.ToString().Should().Be("rst.myresp");
         ancestors[0].DescendantTypeCode.Should().Be(AnnotationTypeCodes.Execution);
-        ancestors[1].Ancestor.ToString().Should().Be("rst.myresp");
+        ancestors[1].Ancestor.ToString().Should().Be("sbt.mysubject");
         ancestors[1].DescendantTypeCode.Should().Be(AnnotationTypeCodes.Execution);
-        ancestors[2].Ancestor.ToString().Should().Be("cnt.mysubject.myctx");
+        ancestors[2].Ancestor.ToString().Should().Be("usg.mysubject.myresp");
         ancestors[2].DescendantTypeCode.Should().Be(AnnotationTypeCodes.Execution);
-        ancestors[3].Ancestor.ToString().Should().Be("usg.mysubject.myresp");
+        ancestors[3].Ancestor.ToString().Should().Be("cnt.mysubject.myctx");
         ancestors[3].DescendantTypeCode.Should().Be(AnnotationTypeCodes.Execution);
     }
 
@@ -80,17 +80,17 @@ public class AnnotationHierarchyTests
         var ancestors = AnnotationHierarchy.GetAncestorSchemaSources(key);
 
         ancestors.Should().HaveCount(6);
-        ancestors[0].Ancestor.ToString().Should().Be("sbt.mysubject");
+        ancestors[0].Ancestor.ToString().Should().Be("rst.myresp");
         ancestors[0].DescendantTypeCode.Should().Be(AnnotationTypeCodes.UnitOfExecution);
-        ancestors[1].Ancestor.ToString().Should().Be("rst.myresp");
+        ancestors[1].Ancestor.ToString().Should().Be("sbt.mysubject");
         ancestors[1].DescendantTypeCode.Should().Be(AnnotationTypeCodes.UnitOfExecution);
-        ancestors[2].Ancestor.ToString().Should().Be("cnt.mysubject.myctx");
+        ancestors[2].Ancestor.ToString().Should().Be("usg.mysubject.myresp");
         ancestors[2].DescendantTypeCode.Should().Be(AnnotationTypeCodes.UnitOfExecution);
-        ancestors[3].Ancestor.ToString().Should().Be("usg.mysubject.myresp");
+        ancestors[3].Ancestor.ToString().Should().Be("cnt.mysubject.myctx");
         ancestors[3].DescendantTypeCode.Should().Be(AnnotationTypeCodes.UnitOfExecution);
-        ancestors[4].Ancestor.ToString().Should().Be("unt.myresp.myunit");
+        ancestors[4].Ancestor.ToString().Should().Be("exe.mysubject.myresp.myctx");
         ancestors[4].DescendantTypeCode.Should().Be(AnnotationTypeCodes.UnitOfExecution);
-        ancestors[5].Ancestor.ToString().Should().Be("exe.mysubject.myresp.myctx");
+        ancestors[5].Ancestor.ToString().Should().Be("unt.myresp.myunit");
         ancestors[5].DescendantTypeCode.Should().Be(AnnotationTypeCodes.UnitOfExecution);
     }
 }

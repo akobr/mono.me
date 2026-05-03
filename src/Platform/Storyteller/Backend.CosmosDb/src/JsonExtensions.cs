@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using global::Json.Patch;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -101,5 +102,48 @@ public static class JsonExtensions
 
         @this.Remove(removePropertyName);
         return @this;
+    }
+
+    public static async Task<JObject> ApplyPatch(this JObject @this, JArray patchOperations)
+    {
+        var patchArrayJson = patchOperations.ToString(Formatting.None);
+        var patch = System.Text.Json.JsonSerializer.Deserialize<JsonPatch>(patchArrayJson)
+            ?? throw new InvalidOperationException("Invalid JSON Patch document.");
+
+        var jsonObject = await @this.ToJsonObjectAsync();
+        var result = patch.Apply(jsonObject);
+
+        if (!result.IsSuccess)
+        {
+            throw new InvalidOperationException($"JSON Patch operation failed: {result.Error}");
+        }
+
+        if (result.Result is not JsonObject patchedObject)
+        {
+            throw new InvalidOperationException("JSON Patch result is not a JSON object.");
+        }
+
+        return await patchedObject.ToJObjectAsync();
+    }
+
+    public static async Task<JObject> ApplyPatchRequested(this JObject @this)
+    {
+        const string patchPropertyName = "$patch";
+        var patchProp = @this.Property(patchPropertyName);
+
+        if (patchProp is null)
+        {
+            return @this;
+        }
+
+        if (patchProp.Value.Type != JTokenType.Array)
+        {
+            @this.Remove(patchPropertyName);
+            return @this;
+        }
+
+        var patchArray = (JArray)patchProp.Value;
+        @this.Remove(patchPropertyName);
+        return await @this.ApplyPatch(patchArray);
     }
 }
