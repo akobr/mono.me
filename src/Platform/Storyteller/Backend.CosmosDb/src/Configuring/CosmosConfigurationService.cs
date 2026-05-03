@@ -415,7 +415,7 @@ public class CosmosConfigurationService : IConfigurationService
 
         if (existingConfiguration is null || !existingConfiguration.Content.HasValues)
         {
-            throw new InvalidOperationException($"Configuration for '{key.Annotation}' does not exist or has no content to patch.");
+            throw new ConfigurationNotFoundException(key.Annotation);
         }
 
         var newContent = await existingConfiguration.Content.ApplyPatch(patchOperations);
