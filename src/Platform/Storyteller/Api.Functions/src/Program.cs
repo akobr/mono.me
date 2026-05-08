@@ -65,6 +65,8 @@ var host = new HostBuilder()
 
         // Add authentication by API keys
         services.AddApiKeyMachineAccess();
+        // Add authentication by Azure Entra
+        //services.AddAzureAdMachineAccess();
 
         // Add data-bindings for configurations
         services
