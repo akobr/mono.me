@@ -73,7 +73,14 @@ public class ApiKeyAuthenticationMiddleware : IFunctionsWorkerMiddleware
         };
 
         // Map MachineAccessScope to the appropriate role claims
-        foreach (var roleClaim in GetRoleClaimsForScope(result.Scope))
+        var roleClaims = GetRoleClaimsForScope(result.Scope).ToArray();
+        if (roleClaims.Length == 0)
+        {
+            await RespondUnauthorizedAsync(context, httpReqData);
+            return;
+        }
+
+        foreach (var roleClaim in roleClaims)
         {
             claims.Add(new Claim("roles", roleClaim));
         }
@@ -93,7 +100,7 @@ public class ApiKeyAuthenticationMiddleware : IFunctionsWorkerMiddleware
             MachineAccessScope.ConfigurationReadWrite => [Scopes.Configuration.Read, Scopes.Configuration.Write],
             MachineAccessScope.DefaultRead => [Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read],
             MachineAccessScope.DefaultReadWrite => [Scopes.Default.Read, Scopes.Default.Write, Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Configuration.Read, Scopes.Configuration.Write],
-            _ => [Scopes.Default.Read],
+            _ => [],
         };
     }
 
