@@ -430,7 +430,10 @@ public class CosmosConfigurationService : IConfigurationService
             await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, annotationKey, newContent);
         }
 
-        // save history of the previous version
+        // invalidate all dependent configurations before mutating this partition
+        await InvalidateConfigurationsAsync(key, repository);
+
+        // save history of the previous version together with the next version atomically
         var historyVersion = existingConfiguration.Version;
         var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{historyVersion}";
         var historyId = $"{key.ViewName}.{historyKey}";
@@ -448,12 +451,6 @@ public class CosmosConfigurationService : IConfigurationService
             Author = existingConfiguration.Author,
         };
 
-        await repository.Container.CreateItemAsync(history, partitionKey);
-
-        // invalidate all ancestor configurations
-        await InvalidateConfigurationsAsync(key, repository);
-
-        // save a new version of the configuration
         var newConfiguration = existingConfiguration with
         {
             Version = existingConfiguration.Version + 1,
@@ -462,7 +459,11 @@ public class CosmosConfigurationService : IConfigurationService
             CalculatedContent = null,
             CalculatedContentHash = null,
         };
-        await repository.Container.UpsertItemAsync(newConfiguration, partitionKey);
+
+        var batch = repository.Container.CreateTransactionalBatch(partitionKey);
+        batch.CreateItem(history);
+        batch.UpsertItem(newConfiguration);
+        await batch.ExecuteAsync();
 
         return newConfiguration.ToConfigurationFromContent();
     }
