@@ -138,8 +138,7 @@ public static class JsonExtensions
 
         if (patchProp.Value.Type != JTokenType.Array)
         {
-            @this.Remove(patchPropertyName);
-            return @this;
+            throw new InvalidOperationException($"'{patchPropertyName}' must be an array.");
         }
 
         var patchArray = (JArray)patchProp.Value;
