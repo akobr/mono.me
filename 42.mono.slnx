@@ -94,6 +94,7 @@
     <Project Path="src/Platform/Storyteller/Abstractions.Annotations/src/Abstractions.Annotations.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Functions/src/Api.Functions.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Web/src/Api.Web.csproj" />
+    <Project Path="src/Platform/Storyteller/Backend.ApiKeys/src/Backend.ApiKeys.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.AzureAd/src/Backend.AzureAd.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.Core/src/Backend.Core.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.CosmosDb/src/Backend.CosmosDb.csproj" />
