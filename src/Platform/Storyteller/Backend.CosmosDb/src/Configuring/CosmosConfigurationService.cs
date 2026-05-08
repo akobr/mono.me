@@ -301,8 +301,8 @@ public class CosmosConfigurationService : IConfigurationService
         if (existingConfiguration is null)
         {
             // create a new configuration if there is nothing yet
-            value.RemoveRequested();
-            value.ApplyPatchRequested();
+            value = value.RemoveRequested();
+            value = await value.ApplyPatchRequested();
 
             if (_schemaService is not null && value.HasValues)
             {
@@ -341,8 +341,8 @@ public class CosmosConfigurationService : IConfigurationService
             // has some content before, merge must be done (clone the original)
             newContent = (JObject)existingConfiguration.Content.DeepClone();
             newContent.MergeInto(value);
-            newContent.RemoveRequested();
-            newContent.ApplyPatchRequested();
+            newContent = newContent.RemoveRequested();
+            newContent = await newContent.ApplyPatchRequested();
 
             if (JToken.DeepEquals(existingConfiguration.Content, newContent))
             {
@@ -372,8 +372,8 @@ public class CosmosConfigurationService : IConfigurationService
         }
         else
         {
-            newContent.RemoveRequested();
-            newContent.ApplyPatchRequested();
+            newContent = newContent.RemoveRequested();
+            newContent = await newContent.ApplyPatchRequested();
         }
 
         // validate against combined schema before persisting
