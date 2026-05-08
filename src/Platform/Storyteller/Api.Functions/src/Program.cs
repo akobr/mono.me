@@ -1,4 +1,3 @@
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Api.ErrorHandling;
@@ -9,10 +8,6 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Serialization;
-using JsonConverter = Newtonsoft.Json.JsonConverter;
 
 var host = new HostBuilder()
     .ConfigureFunctionsWebApplication(worker =>
@@ -23,8 +18,9 @@ var host = new HostBuilder()
         //     ContractResolver = new DefaultContractResolver { NamingStrategy = new DefaultNamingStrategy() },
         //     Converters = new List<JsonConverter> { new StringEnumConverter(new DefaultNamingStrategy()) },
         // });
-        worker.UseMiddleware<ApiKeyAuthenticationMiddleware>();
+
         worker.UseMiddleware<ExceptionHandlingMiddleware>();
+        worker.UseMiddleware<ApiKeyAuthenticationMiddleware>();
     })
     .ConfigureServices((context, services) =>
     {
