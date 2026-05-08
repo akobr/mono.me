@@ -171,6 +171,10 @@ public class ConfigurationHttp
             var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author);
             return new OkObjectResult(outputModel);
         }
+        catch (InvalidOperationException ex)
+        {
+            return new BadRequestObjectResult(new ErrorResponse(ex.Message));
+        }
         catch (SchemaValidationException ex)
         {
             var errorDetails = ex.ValidationErrors
