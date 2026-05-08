@@ -413,7 +413,7 @@ public class CosmosConfigurationService : IConfigurationService
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
 
-        if (existingConfiguration is null || !existingConfiguration.Content.HasValues)
+        if (existingConfiguration is null)
         {
             throw new ConfigurationNotFoundException(key.Annotation);
         }
