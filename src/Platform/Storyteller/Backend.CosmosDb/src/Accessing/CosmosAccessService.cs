@@ -383,8 +383,25 @@ public class CosmosAccessService : IAccessService
 
         var response = await repository.Container.CreateItemAsync(machineAccess, partitionKey);
 
-        // Store API key lookup entity in the core container
-        await CreateApiKeyEntityAsync(accessKey, model.Organization, model.Project, machineAccess.Id, machineAccess.Scope);
+        try
+        {
+            // Store API key lookup entity in the core container
+            await CreateApiKeyEntityAsync(accessKey, model.Organization, model.Project, machineAccess.Id, machineAccess.Scope);
+        }
+        catch
+        {
+            // Compensate: remove the orphaned machine access entity
+            try
+            {
+                await repository.Container.DeleteItemAsync<MachineAccessEntity>(machineAccess.Id, partitionKey);
+            }
+            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Already gone, ignore.
+            }
+
+            throw;
+        }
 
         machineAccess = response.Resource with { AccessKey = accessKey };
         return machineAccess;
@@ -404,9 +421,7 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The machine access {appId} has not been found.");
         }
 
-        // Delete the old API key lookup entity
-        await TryDeleteApiKeyEntityByMachineAccessIdAsync(organization, project, machineAccess.Id);
-
+        // Generate the new key first
         var accessKey = await MachineAccessService.ResetMachineAccessAsync(machineAccess.Id);
 
         if (accessKey is null)
@@ -414,11 +429,35 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The machine access {appId} reset failed.");
         }
 
-        // Create a new API key lookup entity
+        // Create the new API key lookup before removing the old one
+        // so the system is never left without a valid lookup.
         await CreateApiKeyEntityAsync(accessKey, organization, project, machineAccess.Id, machineAccess.Scope);
 
-        machineAccess = machineAccess with { AccessKey = $"{accessKey[..3]}***" };
-        await repository.Container.UpsertItemAsync(machineAccess, partitionKey);
+        try
+        {
+            // Delete the old API key lookup entity
+            await TryDeleteApiKeyEntityByMachineAccessIdAsync(organization, project, machineAccess.Id, excludeHashedKey: HashApiKey(accessKey));
+
+            machineAccess = machineAccess with { AccessKey = $"{accessKey[..3]}***" };
+            await repository.Container.UpsertItemAsync(machineAccess, partitionKey);
+        }
+        catch
+        {
+            // Compensate: remove the newly created lookup to revert
+            try
+            {
+                var coreRepository = _repositoryProvider.GetCore();
+                await coreRepository.Container.DeleteItemAsync<ApiKeyEntity>(
+                    HashApiKey(accessKey), new PartitionKey(API_KEYS_PARTITION_KEY));
+            }
+            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+            {
+                // Already gone, ignore.
+            }
+
+            throw;
+        }
+
         machineAccess = machineAccess with { AccessKey = accessKey };
         return _mapper.Map<MachineAccessEntity, MachineAccess>(machineAccess);
     }
@@ -434,20 +473,30 @@ public class CosmosAccessService : IAccessService
 
         if (machineAccess is null)
         {
+            // Already deleted — idempotent success.
             return false;
         }
 
-        // Delete the API key lookup entity
+        // Delete lookup first (idempotent — tolerates missing entries).
         await TryDeleteApiKeyEntityByMachineAccessIdAsync(organization, project, machineAccess.Id);
 
-        var response = await repository.Container.DeleteItemAsync<MachineAccessEntity>(appId, partitionKey);
-
-        if (response.StatusCode != HttpStatusCode.NotFound)
+        // Delete the machine access entity.
+        try
         {
-            await MachineAccessService.DeleteMachineAccessAsync(machineAccess.ObjectId);
+            await repository.Container.DeleteItemAsync<MachineAccessEntity>(appId, partitionKey);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            // Already deleted between our read and delete — idempotent.
+            return false;
         }
 
-        return response.StatusCode != HttpStatusCode.NotFound;
+        // Remove from the external service last; if this fails the caller
+        // can retry the whole delete — the lookup and entity are already gone
+        // and the steps above are idempotent.
+        await MachineAccessService.DeleteMachineAccessAsync(machineAccess.ObjectId);
+
+        return true;
     }
 
     public async Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId)
@@ -501,10 +550,18 @@ public class CosmosAccessService : IAccessService
             Scope = scope,
         };
 
-        await coreRepository.Container.CreateItemAsync(apiKeyEntity, new PartitionKey(API_KEYS_PARTITION_KEY));
+        try
+        {
+            await coreRepository.Container.CreateItemAsync(apiKeyEntity, new PartitionKey(API_KEYS_PARTITION_KEY));
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            // Already exists (idempotent retry) — overwrite with current data.
+            await coreRepository.Container.UpsertItemAsync(apiKeyEntity, new PartitionKey(API_KEYS_PARTITION_KEY));
+        }
     }
 
-    private async Task TryDeleteApiKeyEntityByMachineAccessIdAsync(string organization, string project, string machineAccessId)
+    private async Task TryDeleteApiKeyEntityByMachineAccessIdAsync(string organization, string project, string machineAccessId, string? excludeHashedKey = null)
     {
         var coreRepository = _repositoryProvider.GetCore();
         var query = new QueryDefinition("SELECT * FROM c WHERE c.MachineAccessId = @machineAccessId AND c.Organization = @org AND c.Project = @project")
@@ -525,6 +582,11 @@ public class CosmosAccessService : IAccessService
 
             foreach (var entity in batch)
             {
+                if (excludeHashedKey is not null && entity.Id == excludeHashedKey)
+                {
+                    continue;
+                }
+
                 try
                 {
                     await coreRepository.Container.DeleteItemAsync<ApiKeyEntity>(entity.Id, new PartitionKey(API_KEYS_PARTITION_KEY));
