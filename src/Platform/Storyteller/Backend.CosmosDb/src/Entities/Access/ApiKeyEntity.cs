@@ -5,7 +5,7 @@ namespace _42.Platform.Storyteller.Entities.Access;
 
 public record class ApiKeyEntity
 {
-    public string PartitionKey => "apikeys";
+    public required string PartitionKey { get; init; }
 
     /// <summary>
     /// SHA-256 hash of the raw API key, base64url-encoded.
