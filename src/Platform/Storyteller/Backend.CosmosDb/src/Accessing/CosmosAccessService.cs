@@ -18,7 +18,6 @@ namespace _42.Platform.Storyteller.Accessing;
 public class CosmosAccessService : IAccessService
 {
     private const string MAIN_PARTITION_KEY = "access";
-    private const string API_KEYS_PARTITION_KEY = "apikeys";
 
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly IContainerFactory _containerFactory;
@@ -446,9 +445,10 @@ public class CosmosAccessService : IAccessService
             // Compensate: remove the newly created lookup to revert
             try
             {
+                var newHashedKey = HashApiKey(accessKey);
                 var coreRepository = _repositoryProvider.GetCore();
                 await coreRepository.Container.DeleteItemAsync<ApiKeyEntity>(
-                    HashApiKey(accessKey), new PartitionKey(API_KEYS_PARTITION_KEY));
+                    newHashedKey, new PartitionKey(GetApiKeyPartitionKey(newHashedKey)));
             }
             catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
             {
@@ -523,7 +523,7 @@ public class CosmosAccessService : IAccessService
         var coreRepository = _repositoryProvider.GetCore();
         var apiKeyEntity = await coreRepository.Container.TryReadItemAsync(
             hashedKey,
-            new PartitionKey(API_KEYS_PARTITION_KEY),
+            new PartitionKey(GetApiKeyPartitionKey(hashedKey)),
             stream => stream.DeserializeSystemTextJson<ApiKeyEntity>(_serializerOptions));
 
         if (apiKeyEntity is null)
@@ -540,10 +540,14 @@ public class CosmosAccessService : IAccessService
 
     private async Task CreateApiKeyEntityAsync(string rawKey, string organization, string project, string machineAccessId, MachineAccessScope scope)
     {
+        var hashedKey = HashApiKey(rawKey);
+        var partitionKeyValue = GetApiKeyPartitionKey(hashedKey);
+        var cosmosPartitionKey = new PartitionKey(partitionKeyValue);
         var coreRepository = _repositoryProvider.GetCore();
         var apiKeyEntity = new ApiKeyEntity
         {
-            Id = HashApiKey(rawKey),
+            Id = hashedKey,
+            PartitionKey = partitionKeyValue,
             Organization = organization,
             Project = project,
             MachineAccessId = machineAccessId,
@@ -552,12 +556,12 @@ public class CosmosAccessService : IAccessService
 
         try
         {
-            await coreRepository.Container.CreateItemAsync(apiKeyEntity, new PartitionKey(API_KEYS_PARTITION_KEY));
+            await coreRepository.Container.CreateItemAsync(apiKeyEntity, cosmosPartitionKey);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
         {
             // Already exists (idempotent retry) — overwrite with current data.
-            await coreRepository.Container.UpsertItemAsync(apiKeyEntity, new PartitionKey(API_KEYS_PARTITION_KEY));
+            await coreRepository.Container.UpsertItemAsync(apiKeyEntity, cosmosPartitionKey);
         }
     }
 
@@ -569,12 +573,8 @@ public class CosmosAccessService : IAccessService
             .WithParameter("@org", organization)
             .WithParameter("@project", project);
 
-        using var iterator = coreRepository.Container.GetItemQueryIterator<ApiKeyEntity>(
-            query,
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = new PartitionKey(API_KEYS_PARTITION_KEY),
-            });
+        // Cross-partition query — API key entities are sharded per key.
+        using var iterator = coreRepository.Container.GetItemQueryIterator<ApiKeyEntity>(query);
 
         while (iterator.HasMoreResults)
         {
@@ -589,7 +589,7 @@ public class CosmosAccessService : IAccessService
 
                 try
                 {
-                    await coreRepository.Container.DeleteItemAsync<ApiKeyEntity>(entity.Id, new PartitionKey(API_KEYS_PARTITION_KEY));
+                    await coreRepository.Container.DeleteItemAsync<ApiKeyEntity>(entity.Id, new PartitionKey(entity.PartitionKey));
                 }
                 catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
                 {
@@ -598,6 +598,8 @@ public class CosmosAccessService : IAccessService
             }
         }
     }
+
+    private static string GetApiKeyPartitionKey(string hashedApiKey) => $"ak.{hashedApiKey}";
 
     private static string HashApiKey(string apiKey)
     {
