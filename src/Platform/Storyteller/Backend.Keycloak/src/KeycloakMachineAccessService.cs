@@ -68,7 +68,7 @@ public class KeycloakMachineAccessService(IHttpClientFactory httpClientFactory) 
         };
     }
 
-    public async Task<string?> ResetMachineAccessAsync(string objectId)
+    public async Task<string?> ResetMachineAccessAsync(string objectId, string organization, string project)
     {
         var realm = GetRealm();
         var serverUrl = GetServerUrl();
@@ -87,7 +87,7 @@ public class KeycloakMachineAccessService(IHttpClientFactory httpClientFactory) 
         return secretData?["value"]?.ToString();
     }
 
-    public async Task<bool> DeleteMachineAccessAsync(string objectId)
+    public async Task<bool> DeleteMachineAccessAsync(string objectId, string organization, string project)
     {
         var realm = GetRealm();
         var serverUrl = GetServerUrl();

@@ -31,6 +31,4 @@ public interface IAccessService
     Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId);
 
     Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId);
-
-    Task<Model.ApiKeyValidationResult?> ValidateApiKeyAsync(string apiKey);
 }
