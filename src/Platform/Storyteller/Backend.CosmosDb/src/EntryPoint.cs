@@ -91,6 +91,7 @@ public static class EntryPoint
         services.AddSingleton<IContainerFactory, ContainerFactory>();
         services.AddSingleton<IContainerRepositoryProvider, ContainerRepositoryProvider>();
 
+        services.AddSingleton<IApiKeyHashStore, CosmosApiKeyHashStore>();
         services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
         services.AddSingleton<IConfigurationService, CosmosConfigurationService>();

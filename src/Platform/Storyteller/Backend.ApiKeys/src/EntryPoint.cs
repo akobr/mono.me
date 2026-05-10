@@ -8,7 +8,9 @@ public static class EntryPoint
     public static IServiceCollection AddApiKeyMachineAccess(
         this IServiceCollection services)
     {
-        services.AddSingleton<IMachineAccessService, ApiKeyMachineAccessService>();
+        services.AddSingleton<ApiKeyMachineAccessService>();
+        services.AddSingleton<IMachineAccessService>(p => p.GetRequiredService<ApiKeyMachineAccessService>());
+        services.AddSingleton<IApiKeyValidator>(p => p.GetRequiredService<ApiKeyMachineAccessService>());
         return services;
     }
 }

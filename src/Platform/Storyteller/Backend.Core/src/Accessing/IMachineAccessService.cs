@@ -6,7 +6,7 @@ public interface IMachineAccessService
 {
     Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model);
 
-    Task<string?> ResetMachineAccessAsync(string objectId);
+    Task<string?> ResetMachineAccessAsync(string objectId, string organization, string project);
 
-    Task<bool> DeleteMachineAccessAsync(string objectId);
+    Task<bool> DeleteMachineAccessAsync(string objectId, string organization, string project);
 }

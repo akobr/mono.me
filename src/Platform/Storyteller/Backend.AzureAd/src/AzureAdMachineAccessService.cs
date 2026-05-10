@@ -148,7 +148,7 @@ public class AzureAdMachineAccessService : IMachineAccessService
         };
     }
 
-    public async Task<string?> ResetMachineAccessAsync(string objectId)
+    public async Task<string?> ResetMachineAccessAsync(string objectId, string organization, string project)
     {
         // Create a new instance of the ApplicationClient class using the client secret credential.
         var client = new GraphServiceClient(new DefaultAzureCredential());
@@ -181,7 +181,7 @@ public class AzureAdMachineAccessService : IMachineAccessService
         return createdSecret?.SecretText;
     }
 
-    public async Task<bool> DeleteMachineAccessAsync(string objectId)
+    public async Task<bool> DeleteMachineAccessAsync(string objectId, string organization, string project)
     {
         // Create a new instance of the ApplicationClient class using the client secret credential.
         var client = new GraphServiceClient(new DefaultAzureCredential());

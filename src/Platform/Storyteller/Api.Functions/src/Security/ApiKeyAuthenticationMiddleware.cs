@@ -53,8 +53,8 @@ public class ApiKeyAuthenticationMiddleware : IFunctionsWorkerMiddleware
             return;
         }
 
-        var accessService = context.InstanceServices.GetRequiredService<IAccessService>();
-        var result = await accessService.ValidateApiKeyAsync(rawKey);
+        var validator = context.InstanceServices.GetRequiredService<IApiKeyValidator>();
+        var result = await validator.ValidateAsync(rawKey);
 
         if (result is null)
         {

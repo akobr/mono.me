@@ -1,47 +1,113 @@
 using System.Security.Cryptography;
+using System.Text;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 
 namespace _42.Platform.Storyteller;
 
-public class ApiKeyMachineAccessService : IMachineAccessService
+public class ApiKeyMachineAccessService : IMachineAccessService, IApiKeyValidator
 {
-    private const int KeySizeInBytes = 48;
+    private const int SecretSizeInBytes = 32;
 
-    public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
+    private readonly IApiKeyHashStore _hashStore;
+
+    public ApiKeyMachineAccessService(IApiKeyHashStore hashStore)
+    {
+        _hashStore = hashStore;
+    }
+
+    public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
         var id = Guid.NewGuid().ToString();
-        var rawKey = GenerateApiKey();
+        var secret = GenerateSecret();
 
-        var machineAccess = new MachineAccess
+        var scope = model.Scope <= MachineAccessScope.ConfigurationRead
+            ? MachineAccessScope.DefaultRead
+            : MachineAccessScope.DefaultReadWrite;
+
+        var structuredKey = new StructuredApiKey(model.Organization, model.Project, id, secret);
+        var rawKey = structuredKey.Format();
+
+        await _hashStore.StoreAsync(
+            model.Organization, model.Project, id, HashSecret(secret), scope);
+
+        return new MachineAccess
         {
             Id = id,
             ObjectId = id,
             AccessKey = rawKey,
             AnnotationKey = model.AnnotationKey,
-            Scope = model.Scope <= MachineAccessScope.ConfigurationRead
-                ? MachineAccessScope.DefaultRead
-                : MachineAccessScope.DefaultReadWrite,
+            Scope = scope,
         };
-
-        return Task.FromResult(machineAccess);
     }
 
-    public Task<string?> ResetMachineAccessAsync(string objectId)
+    public async Task<string?> ResetMachineAccessAsync(string objectId, string organization, string project)
     {
-        var rawKey = GenerateApiKey();
-        return Task.FromResult<string?>(rawKey);
+        var existing = await _hashStore.GetAsync(organization, project, objectId);
+
+        if (existing is null)
+        {
+            return null;
+        }
+
+        var secret = GenerateSecret();
+        var structuredKey = new StructuredApiKey(organization, project, objectId, secret);
+
+        await _hashStore.StoreAsync(
+            organization, project, objectId, HashSecret(secret), existing.Scope);
+
+        return structuredKey.Format();
     }
 
-    public Task<bool> DeleteMachineAccessAsync(string objectId)
+    public async Task<bool> DeleteMachineAccessAsync(string objectId, string organization, string project)
     {
-        // No external resource to clean up for API key auth.
-        return Task.FromResult(true);
+        return await _hashStore.DeleteAsync(organization, project, objectId);
     }
 
-    private static string GenerateApiKey()
+    public async Task<ApiKeyValidationResult?> ValidateAsync(string rawApiKey)
     {
-        var bytes = RandomNumberGenerator.GetBytes(KeySizeInBytes);
+        var parsed = StructuredApiKey.TryParse(rawApiKey);
+
+        if (parsed is null)
+        {
+            return null;
+        }
+
+        var entry = await _hashStore.GetAsync(parsed.Organization, parsed.Project, parsed.MachineAccessId);
+
+        if (entry is null)
+        {
+            return null;
+        }
+
+        var presentedHash = HashSecret(parsed.Secret);
+        var storedHashBytes = Encoding.UTF8.GetBytes(entry.HashedSecret);
+        var presentedHashBytes = Encoding.UTF8.GetBytes(presentedHash);
+
+        if (!CryptographicOperations.FixedTimeEquals(presentedHashBytes, storedHashBytes))
+        {
+            return null;
+        }
+
+        return new ApiKeyValidationResult(
+            parsed.Organization,
+            parsed.Project,
+            parsed.MachineAccessId,
+            entry.Scope);
+    }
+
+    private static string GenerateSecret()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(SecretSizeInBytes);
+        return Convert.ToBase64String(bytes)
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
+    }
+
+    private static string HashSecret(string secret)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(secret));
         return Convert.ToBase64String(bytes)
             .Replace('+', '-')
             .Replace('/', '_')
