@@ -10,6 +10,11 @@ public record StructuredApiKey(string Organization, string Project, string Machi
 
     public static StructuredApiKey? TryParse(string rawKey)
     {
+        if (string.IsNullOrWhiteSpace(rawKey))
+        {
+            return null;
+        }
+
         var parts = rawKey.Split(Separator, 3);
 
         if (parts.Length != 3 || parts[0] != Prefix)
