@@ -92,14 +92,14 @@
   <Folder Name="/Platform/Storyteller/">
     <Project Path="src/Platform/Storyteller/Abstractions.Access/src/Abstractions.Access.csproj" />
     <Project Path="src/Platform/Storyteller/Abstractions.Annotations/src/Abstractions.Annotations.csproj" />
+    <Project Path="src/Platform/Storyteller/Access.ApiKeys/src/Backend.ApiKeys.csproj" />
+    <Project Path="src/Platform/Storyteller/Access.AzureAd/src/Backend.AzureAd.csproj" />
+    <Project Path="src/Platform/Storyteller/Access.Keycloak/src/Backend.Keycloak.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Functions/src/Api.Functions.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Web/src/Api.Web.csproj" />
-    <Project Path="src/Platform/Storyteller/Backend.ApiKeys/src/Backend.ApiKeys.csproj" />
-    <Project Path="src/Platform/Storyteller/Backend.AzureAd/src/Backend.AzureAd.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.Core/src/Backend.Core.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.CosmosDb/src/Backend.CosmosDb.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.CosmosDb/test/Backend.CosmosDb.UnitTests.csproj" />
-    <Project Path="src/Platform/Storyteller/Backend.Keycloak/src/Backend.Keycloak.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Abstractions/src/Binding.Abstractions.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Azure.KeyVault/src/Binding.Azure.KeyVault.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Core/src/Binding.Core.csproj" />
