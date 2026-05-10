@@ -18,13 +18,9 @@ public class ApiKeyMachineAccessService : IMachineAccessService, IApiKeyValidato
 
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
-        var id = Guid.NewGuid().ToString();
+        var id = Guid.NewGuid().ToString("D");
         var secret = GenerateSecret();
-
-        var scope = model.Scope <= MachineAccessScope.ConfigurationRead
-            ? MachineAccessScope.DefaultRead
-            : MachineAccessScope.DefaultReadWrite;
-
+        var scope = model.Scope;
         var structuredKey = new StructuredApiKey(model.Organization, model.Project, id, secret);
         var rawKey = structuredKey.Format();
 
