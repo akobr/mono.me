@@ -1,8 +1,10 @@
-﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Binding;
 
 public interface IBindingExecutor
 {
-    public ValueTask<bool> TryBinding(JProperty property, bool includeSecrets);
+    ValueTask<bool> TryBinding(JProperty property, bool includeSecrets);
+
+    ValueTask<bool> TryBinding(JValue value, bool includeSecrets);
 }
