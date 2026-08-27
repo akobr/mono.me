@@ -1,4 +1,4 @@
-﻿using Azure.Identity;
+using Azure.Identity;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Azure;
 using Microsoft.Extensions.Configuration;
@@ -43,8 +43,8 @@ public static class EntryPoint
         {
             foreach (var vault in vaults.GetChildren())
             {
-                options.AddStrategy(
-                    provider => new KeyVaultBindingStrategy(
+                options.AddSource(
+                    provider => new KeyVaultBindingSource(
                         provider.GetRequiredService<IAzureClientFactory<SecretClient>>(), vault.Key),
                     vault.Key);
             }

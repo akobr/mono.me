@@ -661,7 +661,7 @@ public class CosmosConfigurationService : IConfigurationService
 
             foreach (var property in current.Properties())
             {
-                switch (property.Type)
+                switch (property.Value.Type)
                 {
                     case JTokenType.String:
                         await TryProcessDataBinding(property, includeSecrets);
@@ -675,12 +675,12 @@ public class CosmosConfigurationService : IConfigurationService
                     case JTokenType.Array:
                     {
                         var array = (JArray)property.Value;
-                        foreach (var item in array)
+                        foreach (var item in array.ToList())
                         {
                             switch (item.Type)
                             {
                                 case JTokenType.String:
-                                    await TryProcessDataBinding(property, includeSecrets);
+                                    await TryProcessDataBinding((JValue)item, includeSecrets);
                                     break;
 
                                 case JTokenType.Object:
@@ -700,15 +700,28 @@ public class CosmosConfigurationService : IConfigurationService
 
     private ValueTask<bool> TryProcessDataBinding(JProperty property, bool includeSecrets)
     {
-        if (property.Type != JTokenType.String)
+        if (property.Value.Type != JTokenType.String)
         {
             return ValueTask.FromResult(false);
         }
 
-        var rawValue = (string)property.Value;
-        return rawValue[0] != '@'
+        var rawValue = (string?)property.Value;
+        return string.IsNullOrEmpty(rawValue) || rawValue[0] != '@'
             ? ValueTask.FromResult(false)
             : _bindingExecutor!.TryBinding(property, includeSecrets);
+    }
+
+    private ValueTask<bool> TryProcessDataBinding(JValue value, bool includeSecrets)
+    {
+        if (value.Type != JTokenType.String)
+        {
+            return ValueTask.FromResult(false);
+        }
+
+        var rawValue = (string?)value;
+        return string.IsNullOrEmpty(rawValue) || rawValue[0] != '@'
+            ? ValueTask.FromResult(false)
+            : _bindingExecutor!.TryBinding(value, includeSecrets);
     }
 
     private async Task TryAutogeneratePropertiesAsync(JObject config, ConfigurationEntity configEntity, InheritanceGraphNode node, IContainerRepository repository)

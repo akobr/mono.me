@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Binding.Abstractions\src\Binding.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Binding.Language\src\Binding.Language.csproj" />
   </ItemGroup>
 
 </Project>
