@@ -82,4 +82,35 @@ public static class AnnotationKeyExtensions
     {
         return AnnotationKey.CreateExecution(@this.GetSubjectName(), @this.GetResponsibilityName(), @this.GetContextName());
     }
+
+    /// <summary>
+    /// Attempts to compute the ancestor key of <paramref name="ancestorType"/> for <paramref name="this"/>. Every
+    /// ancestor's name is already embedded directly in a descendant key's own segments (e.g. an
+    /// <see cref="AnnotationType.Execution"/> key carries its subject, responsibility, and context names), so no
+    /// graph traversal is required. Returns <c>null</c> when <paramref name="ancestorType"/> is not a valid
+    /// ancestor of <paramref name="this"/>'s type (e.g. asking a <see cref="AnnotationType.Responsibility"/> key for
+    /// its <see cref="AnnotationType.Subject"/> ancestor), and <see cref="AnnotationType.UnitOfExecution"/> is
+    /// never a valid ancestor of anything. Requesting <paramref name="this"/>'s own type returns an equivalent key
+    /// to itself rather than throwing or returning <c>null</c>.
+    /// </summary>
+    public static AnnotationKey? TryGetAncestorKey(this AnnotationKey @this, AnnotationType ancestorType)
+    {
+        try
+        {
+            return ancestorType switch
+            {
+                AnnotationType.Responsibility => @this.GetResponsibilityKey(),
+                AnnotationType.Subject => @this.GetSubjectKey(),
+                AnnotationType.Usage => @this.GetUsageKey(),
+                AnnotationType.Context => @this.GetContextKey(),
+                AnnotationType.Unit => @this.GetUnitKey(),
+                AnnotationType.Execution => @this.GetExecutionKey(),
+                _ => null,
+            };
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
 }

@@ -127,6 +127,47 @@ public class BindingEvaluatorTests
     }
 
     [Fact]
+    public async Task Evaluate_Function_ReceivesScopeDocumentAndContext()
+    {
+        BindingFunctionRequest? captured = null;
+        var functions = new Dictionary<string, IBindingFunction>
+        {
+            ["config"] = new DelegateFunction(request =>
+            {
+                captured = request;
+                return null;
+            }),
+        };
+        var document = new JObject { ["a"] = 1 };
+        var context = new object();
+        var scope = new BindingScope { Document = document, Context = context };
+
+        await Evaluate("@config(\"/a\")", functions: functions, scope: scope);
+
+        captured!.Document.Should().BeSameAs(document);
+        captured.Context.Should().BeSameAs(context);
+    }
+
+    [Fact]
+    public async Task Evaluate_Function_WithoutScope_HasNullDocumentAndContext()
+    {
+        BindingFunctionRequest? captured = null;
+        var functions = new Dictionary<string, IBindingFunction>
+        {
+            ["config"] = new DelegateFunction(request =>
+            {
+                captured = request;
+                return null;
+            }),
+        };
+
+        await Evaluate("@config(\"/a\")", functions: functions);
+
+        captured!.Document.Should().BeNull();
+        captured.Context.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Evaluate_FunctionWithUnresolvedArgument_Throws()
     {
         var functions = new Dictionary<string, IBindingFunction>
@@ -235,13 +276,15 @@ public class BindingEvaluatorTests
         string source,
         bool includeSecrets = true,
         IReadOnlyDictionary<string, IBindingSource>? sources = null,
-        IReadOnlyDictionary<string, IBindingFunction>? functions = null)
+        IReadOnlyDictionary<string, IBindingFunction>? functions = null,
+        BindingScope? scope = null)
     {
         var ast = new Parser(new Tokenizer(source).Tokenize()).Parse();
         var evaluator = new BindingEvaluator(
             sources ?? new Dictionary<string, IBindingSource>(),
             functions ?? new Dictionary<string, IBindingFunction>(),
-            includeSecrets);
+            includeSecrets,
+            scope);
         return evaluator.EvaluateAsync(ast).AsTask();
     }
 

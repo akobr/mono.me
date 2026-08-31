@@ -652,6 +652,12 @@ public class CosmosConfigurationService : IConfigurationService
             return config;
         }
 
+        var scope = new BindingScope
+        {
+            Document = config.Content.DeepClone(),
+            Context = new ConfigurationBindingContext(key),
+        };
+
         var queue = new Queue<JObject>();
         queue.Enqueue(config.Content);
 
@@ -664,7 +670,7 @@ public class CosmosConfigurationService : IConfigurationService
                 switch (property.Value.Type)
                 {
                     case JTokenType.String:
-                        await TryProcessDataBinding(property, includeSecrets);
+                        await TryProcessDataBinding(property, includeSecrets, scope);
                         break;
 
                     case JTokenType.Object:
@@ -680,7 +686,7 @@ public class CosmosConfigurationService : IConfigurationService
                             switch (item.Type)
                             {
                                 case JTokenType.String:
-                                    await TryProcessDataBinding((JValue)item, includeSecrets);
+                                    await TryProcessDataBinding((JValue)item, includeSecrets, scope);
                                     break;
 
                                 case JTokenType.Object:
@@ -698,7 +704,7 @@ public class CosmosConfigurationService : IConfigurationService
         return config;
     }
 
-    private ValueTask<bool> TryProcessDataBinding(JProperty property, bool includeSecrets)
+    private ValueTask<bool> TryProcessDataBinding(JProperty property, bool includeSecrets, BindingScope scope)
     {
         if (property.Value.Type != JTokenType.String)
         {
@@ -708,10 +714,10 @@ public class CosmosConfigurationService : IConfigurationService
         var rawValue = (string?)property.Value;
         return string.IsNullOrEmpty(rawValue) || rawValue[0] != '@'
             ? ValueTask.FromResult(false)
-            : _bindingExecutor!.TryBinding(property, includeSecrets);
+            : _bindingExecutor!.TryBinding(property, includeSecrets, scope);
     }
 
-    private ValueTask<bool> TryProcessDataBinding(JValue value, bool includeSecrets)
+    private ValueTask<bool> TryProcessDataBinding(JValue value, bool includeSecrets, BindingScope scope)
     {
         if (value.Type != JTokenType.String)
         {
@@ -721,7 +727,7 @@ public class CosmosConfigurationService : IConfigurationService
         var rawValue = (string?)value;
         return string.IsNullOrEmpty(rawValue) || rawValue[0] != '@'
             ? ValueTask.FromResult(false)
-            : _bindingExecutor!.TryBinding(value, includeSecrets);
+            : _bindingExecutor!.TryBinding(value, includeSecrets, scope);
     }
 
     private async Task TryAutogeneratePropertiesAsync(JObject config, ConfigurationEntity configEntity, InheritanceGraphNode node, IContainerRepository repository)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
@@ -814,5 +815,96 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var act = () => configs.PatchConfigurationAsync(key, patchOps, "system");
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*JSON Patch*failed*");
+    }
+
+    [Fact]
+    public async Task GetResolvedConfigurationAsync_ConfigFunction_ResolvesFromSameDocument()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("config-fn");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "config-fn",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
+            {
+                "maxPrice": 10,
+                "limit": "@config(\"/maxPrice\")"
+            }
+            """), "system");
+
+        var resolved = await configs.GetResolvedConfigurationAsync(key);
+
+        resolved!.Content["limit"]!.Value<int>().Should().Be(10);
+    }
+
+    [Fact]
+    public async Task GetResolvedConfigurationAsync_ConfigFunction_ResolvesAgainstPreBindingSnapshot()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("config-fn-snapshot");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "config-fn-snapshot",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        // "base" is processed before "snapshot" (declaration order); if @config read the live, in-progress
+        // document, it would see "base" already resolved to the number 2 by the time "snapshot" runs. Since it
+        // must resolve against a pre-binding snapshot instead, it sees the original unresolved math expression.
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
+            {
+                "base": "@{1 + 1}",
+                "snapshot": "@config(\"/base\")"
+            }
+            """), "system");
+
+        var resolved = await configs.GetResolvedConfigurationAsync(key);
+
+        resolved!.Content["base"]!.Value<int>().Should().Be(2);
+        resolved.Content["snapshot"]!.Value<string>().Should().Be("@{1 + 1}");
+    }
+
+    [Fact]
+    public async Task GetResolvedConfigurationAsync_AnnotationFunction_ResolvesDirectlyLinkedAnnotationValues()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("annotation-fn");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "annotation-fn",
+            ProjectName = Constants.DefaultProjectName,
+            ViewName = Constants.DefaultViewName,
+            Values = new Dictionary<string, object> { ["owner"] = "team-a" },
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
+            {
+                "owner": "@annotation(\"/owner\")"
+            }
+            """), "system");
+
+        var resolved = await configs.GetResolvedConfigurationAsync(key);
+
+        resolved!.Content["owner"]!.Value<string>().Should().Be("team-a");
     }
 }

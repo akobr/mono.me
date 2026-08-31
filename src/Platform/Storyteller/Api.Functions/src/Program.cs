@@ -3,6 +3,7 @@ using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Binding;
+using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
@@ -69,8 +70,12 @@ var host = new HostBuilder()
         //services.AddAzureAdMachineAccess();
 
         // Add data-bindings for configurations
+        services.AddSingleton<ConfigBindingFunction>();
+        services.AddSingleton<AnnotationBindingFunction>();
         services
-            .AddConfigurationBindings()
+            .AddConfigurationBindings(options => options
+                .AddFunction<ConfigBindingFunction>("config")
+                .AddFunction<AnnotationBindingFunction>("annotation"))
             .AddAzureKeyVaultBindings(
                 context.Configuration,
                 context.HostingEnvironment);

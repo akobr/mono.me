@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Binding.Core\src\Binding.Core.csproj" />
     <ProjectReference Include="..\..\DbCreator\src\DbCreator.csproj" />
     <ProjectReference Include="..\src\Backend.CosmosDb.csproj" />
   </ItemGroup>
