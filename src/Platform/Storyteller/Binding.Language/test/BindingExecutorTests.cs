@@ -133,6 +133,28 @@ public class BindingExecutorTests
         array[1].Value<string>().Should().Be("literal");
     }
 
+    [Fact]
+    public async Task TryBinding_WithScope_PropagatesDocumentAndContextToFunction()
+    {
+        var executor = new BindingExecutor();
+        BindingFunctionRequest? captured = null;
+        executor.RegisterFunction("config", new DelegateFunction(request =>
+        {
+            captured = request;
+            return BindingValue.FromString("resolved");
+        }));
+        var document = new JObject { ["a"] = 1 };
+        var context = new object();
+        var scope = new BindingScope { Document = document, Context = context };
+        var property = new JProperty("value", "@config(\"/a\")");
+
+        var result = await executor.TryBinding(property, includeSecrets: true, scope);
+
+        result.Should().BeTrue();
+        captured!.Document.Should().BeSameAs(document);
+        captured.Context.Should().BeSameAs(context);
+    }
+
     private sealed class DelegateSource : IBindingSource
     {
         private readonly Func<BindingRequest, BindingValue?> _resolve;
@@ -145,6 +167,21 @@ public class BindingExecutorTests
         public ValueTask<BindingValue?> ResolveAsync(BindingRequest request)
         {
             return new ValueTask<BindingValue?>(_resolve(request));
+        }
+    }
+
+    private sealed class DelegateFunction : IBindingFunction
+    {
+        private readonly Func<BindingFunctionRequest, BindingValue?> _invoke;
+
+        public DelegateFunction(Func<BindingFunctionRequest, BindingValue?> invoke)
+        {
+            _invoke = invoke;
+        }
+
+        public ValueTask<BindingValue?> InvokeAsync(BindingFunctionRequest request)
+        {
+            return new ValueTask<BindingValue?>(_invoke(request));
         }
     }
 }

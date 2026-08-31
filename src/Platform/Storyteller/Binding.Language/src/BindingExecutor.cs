@@ -25,17 +25,17 @@ public sealed class BindingExecutor : IBindingExecutor, IBindingRegistry
         _functions[name] = function;
     }
 
-    public ValueTask<bool> TryBinding(JProperty property, bool includeSecrets)
+    public ValueTask<bool> TryBinding(JProperty property, bool includeSecrets, BindingScope? scope = null)
     {
-        return BindAsync(property.Value, includeSecrets, token => property.Value = token);
+        return BindAsync(property.Value, includeSecrets, scope, token => property.Value = token);
     }
 
-    public ValueTask<bool> TryBinding(JValue value, bool includeSecrets)
+    public ValueTask<bool> TryBinding(JValue value, bool includeSecrets, BindingScope? scope = null)
     {
-        return BindAsync(value, includeSecrets, token => value.Replace(token));
+        return BindAsync(value, includeSecrets, scope, token => value.Replace(token));
     }
 
-    private async ValueTask<bool> BindAsync(JToken current, bool includeSecrets, Action<JToken> apply)
+    private async ValueTask<bool> BindAsync(JToken current, bool includeSecrets, BindingScope? scope, Action<JToken> apply)
     {
         if (current.Type != JTokenType.String)
         {
@@ -53,7 +53,7 @@ public sealed class BindingExecutor : IBindingExecutor, IBindingRegistry
         {
             var tokens = new Tokenizer(raw).Tokenize();
             var ast = new Parser(tokens).Parse();
-            var evaluator = new BindingEvaluator(_sources, _functions, includeSecrets);
+            var evaluator = new BindingEvaluator(_sources, _functions, includeSecrets, scope);
             result = await evaluator.EvaluateAsync(ast);
         }
         catch (BindingException exception)

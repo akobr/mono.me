@@ -18,15 +18,18 @@ public sealed class BindingEvaluator
     private readonly IReadOnlyDictionary<string, IBindingSource> _sources;
     private readonly IReadOnlyDictionary<string, IBindingFunction> _functions;
     private readonly bool _includeSecrets;
+    private readonly BindingScope? _scope;
 
     public BindingEvaluator(
         IReadOnlyDictionary<string, IBindingSource> sources,
         IReadOnlyDictionary<string, IBindingFunction> functions,
-        bool includeSecrets)
+        bool includeSecrets,
+        BindingScope? scope = null)
     {
         _sources = sources ?? throw new ArgumentNullException(nameof(sources));
         _functions = functions ?? throw new ArgumentNullException(nameof(functions));
         _includeSecrets = includeSecrets;
+        _scope = scope;
     }
 
     public ValueTask<JToken?> EvaluateAsync(BindingNode node)
@@ -152,6 +155,8 @@ public sealed class BindingEvaluator
             Name = function.Name,
             Arguments = arguments,
             IncludeSecrets = _includeSecrets,
+            Document = _scope?.Document,
+            Context = _scope?.Context,
         };
 
         var result = await binding.InvokeAsync(request);
