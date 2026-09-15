@@ -1,22 +1,37 @@
-﻿namespace _42.Platform.Storyteller.Binding;
+using _42.Platform.Storyteller.Binding.Language;
+
+namespace _42.Platform.Storyteller.Binding;
 
 public class BindingsOptions
 {
-    private readonly Dictionary<string, Func<IServiceProvider, IBindingStrategy>> _registrations = new();
+    private readonly Dictionary<string, Func<IServiceProvider, IBindingSource>> _sources = new();
+    private readonly Dictionary<string, Func<IServiceProvider, IBindingFunction>> _functions = new();
 
-    public BindingsOptions AddStrategy(
-        Func<IServiceProvider, IBindingStrategy> registration,
-        string key = BindingService.DefaultBindingKey)
+    public BindingsOptions AddSource(
+        Func<IServiceProvider, IBindingSource> registration,
+        string key = BindingExecutor.DefaultSourceKey)
     {
-        _registrations[key] = registration;
+        _sources[key] = registration;
         return this;
     }
 
-    internal IEnumerable<KeyValuePair<string, IBindingStrategy>> Resolve(IServiceProvider provider)
+    public BindingsOptions AddFunction(
+        string name,
+        Func<IServiceProvider, IBindingFunction> registration)
     {
-        return _registrations.Select(registration
-            => new KeyValuePair<string, IBindingStrategy>(
-                registration.Key,
-                registration.Value(provider)));
+        _functions[name] = registration;
+        return this;
+    }
+
+    internal IEnumerable<KeyValuePair<string, IBindingSource>> ResolveSources(IServiceProvider provider)
+    {
+        return _sources.Select(registration
+            => new KeyValuePair<string, IBindingSource>(registration.Key, registration.Value(provider)));
+    }
+
+    internal IEnumerable<KeyValuePair<string, IBindingFunction>> ResolveFunctions(IServiceProvider provider)
+    {
+        return _functions.Select(registration
+            => new KeyValuePair<string, IBindingFunction>(registration.Key, registration.Value(provider)));
     }
 }

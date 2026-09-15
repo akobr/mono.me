@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using _42.Platform.Storyteller.Binding.Language;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 
@@ -10,20 +11,25 @@ public static class EntryPoint
         this IServiceCollection @this,
         Action<BindingsOptions>? configure = null)
     {
-        @this.TryAddSingleton<BindingService>();
-        @this.TryAddSingleton<IBindingRegistry>(provider => provider.GetRequiredService<BindingService>());
+        @this.TryAddSingleton<BindingExecutor>();
+        @this.TryAddSingleton<IBindingRegistry>(provider => provider.GetRequiredService<BindingExecutor>());
 
         @this.TryAddSingleton<IBindingExecutor>(provider =>
         {
-            var service = provider.GetRequiredService<BindingService>();
+            var executor = provider.GetRequiredService<BindingExecutor>();
             var options = provider.GetRequiredService<IOptions<BindingsOptions>>();
 
-            foreach (var (key, strategy) in options.Value.Resolve(provider))
+            foreach (var (key, source) in options.Value.ResolveSources(provider))
             {
-                service.RegisterStrategy(key, strategy);
+                executor.RegisterSource(key, source);
             }
 
-            return service;
+            foreach (var (name, function) in options.Value.ResolveFunctions(provider))
+            {
+                executor.RegisterFunction(name, function);
+            }
+
+            return executor;
         });
 
         if (configure is not null)

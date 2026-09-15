@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Binding;
+using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.DbCreator.Logic;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
@@ -104,5 +106,11 @@ public class Startup : IAsyncLifetime, ITestContext
         services.AddLogging(builder => builder.AddConsole());
         services.AddCosmosDbAnnotations(configuration);
         services.AddSingleton<CoreDbStructureBuilder>();
+
+        services.AddSingleton<ConfigBindingFunction>();
+        services.AddSingleton<AnnotationBindingFunction>();
+        services.AddConfigurationBindings(options => options
+            .AddFunction<ConfigBindingFunction>("config")
+            .AddFunction<AnnotationBindingFunction>("annotation"));
     }
 }
