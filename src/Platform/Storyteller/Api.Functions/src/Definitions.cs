@@ -17,6 +17,9 @@ public static class Definitions
 
                 public const string Machines = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines";
                 public const string Machine = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}";
+
+                public const string CertificateAuthority = "v1/access/certificate-authority";
+                public const string MachineAuthentication = $"v1/access/points/{{{Parameters.Key}}}/machine-authentication";
             }
         }
 
@@ -86,6 +89,9 @@ public static class Definitions
 
             public const string ResetMachineAccess = nameof(ResetMachineAccess);
             public const string DeleteMachineAccess = nameof(DeleteMachineAccess);
+
+            public const string GetCertificateAuthority = nameof(GetCertificateAuthority);
+            public const string SetMachineAuthentication = nameof(SetMachineAuthentication);
         }
 
         public static class Annotations
@@ -207,6 +213,7 @@ public static class Definitions
         public const string Manual = "manual";
         public const string Integrated = "integrated";
         public const string ApiKey = "apiKey";
+        public const string Mtls = "mtls";
     }
 
     public static class Others

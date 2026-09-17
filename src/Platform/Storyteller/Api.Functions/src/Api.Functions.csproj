@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Access.ApiKeys\src\Access.ApiKeys.csproj" />
+    <ProjectReference Include="..\..\Access.Certificates\src\Access.Certificates.csproj" />
     <ProjectReference Include="..\..\Access.AzureAd\src\Access.AzureAd.csproj" />
     <ProjectReference Include="..\..\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
     <ProjectReference Include="..\..\Binding.Azure.KeyVault\src\Binding.Azure.KeyVault.csproj" />

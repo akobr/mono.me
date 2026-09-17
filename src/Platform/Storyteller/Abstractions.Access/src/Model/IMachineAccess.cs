@@ -1,3 +1,5 @@
+using System;
+
 namespace _42.Platform.Storyteller;
 
 public interface IMachineAccess
@@ -11,4 +13,14 @@ public interface IMachineAccess
     MachineAccessScope Scope { get; }
 
     string? AnnotationKey { get; }
+
+    MachineCredentialKind CredentialKind { get; }
+
+    string? CertificateThumbprint { get; }
+
+    string? Certificate { get; }
+
+    string? CertificatePassword { get; }
+
+    DateTimeOffset? LastRenewalAt { get; }
 }

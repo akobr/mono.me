@@ -91,11 +91,16 @@ public static class EntryPoint
         services.AddSingleton<IContainerFactory, ContainerFactory>();
         services.AddSingleton<IContainerRepositoryProvider, ContainerRepositoryProvider>();
 
-        services.AddSingleton<IApiKeyHashStore, CosmosApiKeyHashStore>();
+        services.AddSingleton<IApiKeyHashStore, CosmosMergedApiKeyHashStore>();
+        services.AddSingleton<ICertificateAuthorityStore, CosmosCertificateAuthorityStore>();
+        services.AddSingleton<IMachineAuthenticationPolicyStore, CosmosMachineAuthenticationPolicyStore>();
+
         services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
         services.AddSingleton<IConfigurationService, CosmosConfigurationService>();
         services.AddSingleton<IConfigurationSchemaService, CosmosConfigurationSchemaService>();
+
+        services.AddMemoryCache();
 
         services.AddAutoMapper(config =>
         {
@@ -112,7 +117,11 @@ public static class EntryPoint
 
             config.CreateMap<Account, AccountEntity>().ReverseMap();
             config.CreateMap<AccessPoint, AccessPointEntity>().ReverseMap();
-            config.CreateMap<MachineAccess, MachineAccessEntity>().ReverseMap();
+            config.CreateMap<MachineAccessEntity, MachineAccess>()
+                .ForMember(dest => dest.CertificateThumbprint, opt => opt.MapFrom(src => src.CertificateThumbprint));
+            config.CreateMap<MachineAccess, MachineAccessEntity>()
+                .ForMember(dest => dest.HashedSecret, opt => opt.Ignore())
+                .ForMember(dest => dest.ETag, opt => opt.Ignore());
 
             config.CreateMap<ConfigurationEntity, ConfigurationVersion>()
                 .ForMember(dest => dest.CreationTime, opt => opt.MapFrom(src => src.GetLastUpdatedTime()))
