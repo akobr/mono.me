@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Entities.Access;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
@@ -60,6 +61,63 @@ public class CosmosCertificateAuthorityStore : ICertificateAuthorityStore
             Id = $"{ActiveIdPrefix}{version}",
             CertificateData = cert.RawData,
             Pkcs12Data = pkcs12,
+            Version = version,
+            CreatedAt = DateTimeOffset.UtcNow,
+            ExpiresAt = new DateTimeOffset(cert.NotAfter, TimeSpan.Zero),
+            IsActive = true,
+        };
+
+        try
+        {
+            await repository.Container.CreateItemAsync(entity, partitionKey);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+        {
+            // Another instance already stored the CA — that's fine.
+        }
+    }
+
+    public async Task<CertificateAuthorityRecord?> GetActiveRecordAsync()
+    {
+        var repository = _repositoryProvider.GetCore();
+        var partitionKey = new PartitionKey(Partition);
+
+        var query = new QueryDefinition("SELECT * FROM c WHERE c.IsActive = true ORDER BY c.CreatedAt DESC");
+        using var iterator = repository.Container.GetItemQueryIterator<CertificateAuthorityEntity>(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = partitionKey, MaxItemCount = 1 });
+
+        if (iterator.HasMoreResults)
+        {
+            var response = await iterator.ReadNextAsync();
+            var entity = response.FirstOrDefault();
+
+            if (entity is not null)
+            {
+                return new CertificateAuthorityRecord(
+                    entity.CertificateData,
+                    entity.Pkcs12Data,
+                    entity.KeyVaultKeyIdentifier,
+                    entity.Version);
+            }
+        }
+
+        return null;
+    }
+
+    public async Task StoreCertificateAsync(byte[] certificateData, string version, string? keyVaultKeyIdentifier)
+    {
+        var repository = _repositoryProvider.GetCore();
+        var partitionKey = new PartitionKey(Partition);
+
+        using var cert = new X509Certificate2(certificateData);
+
+        var entity = new CertificateAuthorityEntity
+        {
+            Id = $"{ActiveIdPrefix}{version}",
+            CertificateData = certificateData,
+            Pkcs12Data = null,
+            KeyVaultKeyIdentifier = keyVaultKeyIdentifier,
             Version = version,
             CreatedAt = DateTimeOffset.UtcNow,
             ExpiresAt = new DateTimeOffset(cert.NotAfter, TimeSpan.Zero),

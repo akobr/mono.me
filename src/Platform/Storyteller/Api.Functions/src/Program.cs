@@ -67,6 +67,8 @@ var host = new HostBuilder()
         services.AddApiKeyMachineAccess();
         // Add certificate-based machine authentication (must be after AddApiKeyMachineAccess)
         services.AddCertificateMachineAccess(context.Configuration);
+        // Override to Key Vault CA in production (comment out for local dev)
+        //services.AddKeyVaultCertificateAuthority(context.Configuration);
         // Add authentication by Azure Entra
         //services.AddAzureAdMachineAccess();
 
