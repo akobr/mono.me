@@ -94,6 +94,8 @@ public static class EntryPoint
         services.AddSingleton<IApiKeyHashStore, CosmosMergedApiKeyHashStore>();
         services.AddSingleton<ICertificateAuthorityStore, CosmosCertificateAuthorityStore>();
         services.AddSingleton<IMachineAuthenticationPolicyStore, CosmosMachineAuthenticationPolicyStore>();
+        services.AddSingleton<ICertificateRenewalService, CosmosCertificateRenewalService>();
+        services.AddSingleton<ISharedCertificateStore, CosmosSharedCertificateStore>();
 
         services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();

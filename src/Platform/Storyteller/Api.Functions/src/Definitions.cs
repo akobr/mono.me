@@ -20,6 +20,10 @@ public static class Definitions
 
                 public const string CertificateAuthority = "v1/access/certificate-authority";
                 public const string MachineAuthentication = $"v1/access/points/{{{Parameters.Key}}}/machine-authentication";
+
+                public const string MachineCertificateRenew = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}/certificate/renew";
+                public const string SharedCertificates = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/certificates";
+                public const string SharedCertificate = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/certificates/{{{Parameters.Thumbprint}}}";
             }
         }
 
@@ -92,6 +96,11 @@ public static class Definitions
 
             public const string GetCertificateAuthority = nameof(GetCertificateAuthority);
             public const string SetMachineAuthentication = nameof(SetMachineAuthentication);
+
+            public const string RenewMachineCertificate = nameof(RenewMachineCertificate);
+            public const string GetSharedCertificates = nameof(GetSharedCertificates);
+            public const string IssueSharedCertificate = nameof(IssueSharedCertificate);
+            public const string RevokeSharedCertificate = nameof(RevokeSharedCertificate);
         }
 
         public static class Annotations
@@ -161,6 +170,7 @@ public static class Definitions
         public const string VersionFrom = "versionFrom";
         public const string ViewTo = "viewTo";
         public const string AnnotationType = "annotationType";
+        public const string Thumbprint = "thumbprint";
     }
 
     public static class Tags

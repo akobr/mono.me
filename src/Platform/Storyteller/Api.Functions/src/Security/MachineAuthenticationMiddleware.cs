@@ -222,6 +222,11 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;
         context.Items[FunctionContextItemKeys.MachineIdentity] = machineAccessId;
 
+        if (certResult is not null)
+        {
+            context.Items[FunctionContextItemKeys.PresentingCertificateThumbprint] = certResult.Thumbprint;
+        }
+
         await next(context);
     }
 

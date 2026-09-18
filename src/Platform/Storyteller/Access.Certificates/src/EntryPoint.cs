@@ -47,6 +47,8 @@ public static class CertificateEntryPoint
         // Register the local CA provider by default (can be overridden by AddKeyVaultCertificateAuthority).
         services.TryAddSingleton<ICertificateAuthorityProvider, LocalCertificateAuthorityProvider>();
 
+        services.AddSingleton<SharedCertificateService>();
+
         // Default to in-memory CA store (for tests); CosmosDb registration replaces this.
         services.TryAddSingleton<ICertificateAuthorityStore, ConfigurationCertificateAuthorityStore>();
         services.TryAddSingleton<IClientCertificateStore, InMemoryClientCertificateStore>();
