@@ -34,5 +34,6 @@ public class OpenApiConfigurationOptions : DefaultOpenApiConfigurationOptions
     public override List<IDocumentFilter> DocumentFilters { get; set; } =
     [
         new AnnotationDocumentFilter(),
+        new MtlsSecuritySchemeDocumentFilter(),
     ];
 }

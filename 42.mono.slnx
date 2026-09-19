@@ -95,6 +95,7 @@
     <Project Path="src/Platform/Storyteller/Access.ApiKeys/src/Access.ApiKeys.csproj" />
     <Project Path="src/Platform/Storyteller/Access.Certificates/src/Access.Certificates.csproj" />
     <Project Path="src/Platform/Storyteller/Access.Certificates/test/Access.Certificates.UnitTests.csproj" />
+    <Project Path="src/Platform/Storyteller/Access.Certificates/testint/Access.Certificates.IntegrationTests.csproj" />
     <Project Path="src/Platform/Storyteller/Access.Certificates.Azure.KeyVault/src/Access.Certificates.Azure.KeyVault.csproj" />
     <Project Path="src/Platform/Storyteller/Access.AzureAd/src/Access.AzureAd.csproj" />
     <Project Path="src/Platform/Storyteller/Access.Keycloak/src/Access.Keycloak.csproj" />

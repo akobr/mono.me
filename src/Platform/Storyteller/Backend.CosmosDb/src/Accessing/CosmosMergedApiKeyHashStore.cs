@@ -24,7 +24,8 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
                                   string hashedSecret, MachineAccessScope scope)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKey = new PartitionKey($"{project}.access");
+        var partitionKeyValue = $"{project}.access";
+        var partitionKey = new PartitionKey(partitionKeyValue);
 
         var existing = await repository.Container.TryReadItemAsync(
             machineAccessId,
@@ -35,6 +36,23 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
         {
             var updated = existing with { HashedSecret = hashedSecret, Scope = scope };
             await repository.Container.UpsertItemAsync(updated, partitionKey);
+        }
+        else
+        {
+            // Entity doesn't exist yet (StoreAsync is called before CosmosAccessService creates it).
+            // Create a partial entity with the hash — CosmosAccessService.CreateMachineAccessAsync
+            // will upsert the full entity on top of this.
+            var partial = new MachineAccessEntity
+            {
+                PartitionKey = partitionKeyValue,
+                Id = machineAccessId,
+                ObjectId = machineAccessId,
+                AccessKey = "***",
+                Scope = scope,
+                HashedSecret = hashedSecret,
+            };
+
+            await repository.Container.UpsertItemAsync(partial, partitionKey);
         }
     }
 

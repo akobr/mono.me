@@ -63,7 +63,7 @@ public class CosmosCertificateAuthorityStore : ICertificateAuthorityStore
             Pkcs12Data = pkcs12,
             Version = version,
             CreatedAt = DateTimeOffset.UtcNow,
-            ExpiresAt = new DateTimeOffset(cert.NotAfter, TimeSpan.Zero),
+            ExpiresAt = new DateTimeOffset(cert.NotAfter.ToUniversalTime(), TimeSpan.Zero),
             IsActive = true,
         };
 
@@ -120,7 +120,7 @@ public class CosmosCertificateAuthorityStore : ICertificateAuthorityStore
             KeyVaultKeyIdentifier = keyVaultKeyIdentifier,
             Version = version,
             CreatedAt = DateTimeOffset.UtcNow,
-            ExpiresAt = new DateTimeOffset(cert.NotAfter, TimeSpan.Zero),
+            ExpiresAt = new DateTimeOffset(cert.NotAfter.ToUniversalTime(), TimeSpan.Zero),
             IsActive = true,
         };
 

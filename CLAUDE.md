@@ -130,7 +130,7 @@ Reusable NuGet packages (suppressed as top-level mrepo item, referenced internal
 ## Project File Conventions
 
 - All projects target `net10.0` with `Nullable>enable</Nullable>`
-- Source lives in `<project>/src/`, tests in `<project>/test/`
+- Source lives in `<project>/src/`, unit tests in `<project>/test/`, integration tests in `<project>/testint/`
 - **Never** specify package versions in `.csproj` — all versions are in `Directory.Packages.props`
 - Packages in `Directory.Packages.props` are kept in **alphabetical order, no grouping**
 - Packable projects set `<IsPackable>true</IsPackable>` and can set `<PackAsTool>true</PackAsTool>`
@@ -214,15 +214,17 @@ Branch `feat/claude/*` is the convention for AI-assisted feature branches.
 
 ## Testing
 
-- Framework: **xUnit** with `FluentAssertions` (pinned to `[7.2.0]`)
+- Framework: **xUnit** with `FluentAssertions` (pinned to `[7.2.0]`) or **Shouldly** for new test projects
 - Test containers: `Testcontainers.CosmosDb`, `Testcontainers.Azurite`, `Testcontainers.PostgreSql`
 - Fake data: `Bogus`, `NBuilder`
 - Mocking: `Moq`
 - File system abstraction: `TestableIO.System.IO.Abstractions` (use `IFileSystem` injection — never `System.IO` directly)
+- **Folder convention**: unit tests in `<project>/test/`, integration tests in `<project>/testint/` — all test folders start with prefix `test`
 
 Run a specific test project:
 ```bash
 dotnet test src/Platform/Storyteller/Backend.CosmosDb/test
+dotnet test src/Platform/Storyteller/Access.Certificates/testint
 ```
 
 ---

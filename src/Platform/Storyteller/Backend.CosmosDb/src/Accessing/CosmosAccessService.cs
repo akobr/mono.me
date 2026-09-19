@@ -378,6 +378,13 @@ public class CosmosAccessService : IAccessService
             ? $"{accessKey[..3]}***"
             : "***";
 
+        // Read the partial entity that CosmosMergedApiKeyHashStore may have created
+        // (it stores HashedSecret before the full entity exists).
+        var existing = await repository.Container.TryReadItemAsync(
+            machineAccess.Id,
+            partitionKey,
+            stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
+
         var entity = new MachineAccessEntity
         {
             PartitionKey = partitionKeyValue,
@@ -388,11 +395,12 @@ public class CosmosAccessService : IAccessService
             AnnotationKey = machineAccess.AnnotationKey,
             CredentialKind = machineAccess.CredentialKind,
             CertificateThumbprint = machineAccess.CertificateThumbprint,
+            HashedSecret = existing?.HashedSecret,
         };
 
         try
         {
-            await repository.Container.CreateItemAsync(entity, partitionKey);
+            await repository.Container.UpsertItemAsync(entity, partitionKey);
         }
         catch
         {
