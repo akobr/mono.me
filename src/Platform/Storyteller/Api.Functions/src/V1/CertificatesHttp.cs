@@ -36,7 +36,7 @@ public class CertificatesHttp
 
     [Function(nameof(PostRenewCertificate))]
     [OpenApiOperation(Definitions.RouteIds.Access.RenewMachineCertificate, Definitions.Tags.Access)]
-    [OpenApiSecurity(Definitions.SecuritySchemas.Mtls, SecuritySchemeType.ApiKey, In = OpenApiSecurityLocationType.Header, Name = "X-ARR-ClientCert", Description = "Machine certificate authentication via mTLS.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Mtls, SecuritySchemeType.ApiKey, In = OpenApiSecurityLocationType.Header, Name = "X-ARR-ClientCert", Description = "Machine certificate authentication via mTLS. Mutual TLS client certificate authentication. The client certificate is presented during the TLS handshake (production) or via the X-ARR-ClientCert header (development). Configure the certificate on HttpClientHandler or equivalent, this is a transport-layer concern, not an API parameter.")]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdMachine)]

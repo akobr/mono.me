@@ -37,7 +37,7 @@ public class MtlsSecuritySchemeDocumentFilter : IDocumentFilter
                 Description = "Mutual TLS client certificate authentication. "
                     + "The client certificate is presented during the TLS handshake (production) "
                     + "or via the X-ARR-ClientCert header (development). "
-                    + "Configure the certificate on HttpClientHandler or equivalent — "
+                    + "Configure the certificate on HttpClientHandler or equivalent, "
                     + "this is a transport-layer concern, not an API parameter.",
             };
         }
