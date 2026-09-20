@@ -38,6 +38,15 @@ public static class CommandNames
     public const string RESET = "reset";
     public const string DIFF = "diff";
 
+    public const string RENEW = "renew";
+    public const string DOWNLOAD = "download";
+    public const string ISSUE = "issue";
+    public const string SHARED_CERT = "shared-cert";
+    public const string CERTIFICATE = "certificate";
+    public const string CA = "ca";
+    public const string AUTH = "auth";
+    public const string MACHINE_AUTH = "machine-auth";
+
     public const string ASSIST = "assist";
     public const string ASSISTANCE = "assistance";
     public const string KEY = "key";

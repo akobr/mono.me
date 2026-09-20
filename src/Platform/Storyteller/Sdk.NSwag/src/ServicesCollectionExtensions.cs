@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -19,10 +20,29 @@ public static class ServicesCollectionExtensions
             services.TryAddSingleton<ISdkConfiguration, SdkConfiguration>();
         }
 
-        services.AddHttpClient<IAccessApiClient, AccessApiClient>();
-        services.AddHttpClient<IAnnotationsApiClient, AnnotationsApiClient>();
-        services.AddHttpClient<IConfigurationApiClient, ConfigurationApiClient>();
+        ConfigureHttpClient<IAccessApiClient, AccessApiClient>(services);
+        ConfigureHttpClient<IAnnotationsApiClient, AnnotationsApiClient>(services);
+        ConfigureHttpClient<IConfigurationApiClient, ConfigurationApiClient>(services);
 
         return services;
+    }
+
+    private static void ConfigureHttpClient<TInterface, TImplementation>(IServiceCollection services)
+        where TInterface : class
+        where TImplementation : class, TInterface
+    {
+        services.AddHttpClient<TInterface, TImplementation>()
+            .ConfigurePrimaryHttpMessageHandler(sp =>
+            {
+                var config = sp.GetService<ISdkConfiguration>();
+                var handler = new HttpClientHandler();
+
+                if (config?.ClientCertificate is not null)
+                {
+                    handler.ClientCertificates.Add(config.ClientCertificate);
+                }
+
+                return handler;
+            });
     }
 }

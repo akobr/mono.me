@@ -6,6 +6,7 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands.AccessPoints;
 using _42.Platform.Cli.Commands.MachineAccess;
+using _42.Platform.Cli.Commands.SharedCertificates;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
@@ -19,6 +20,8 @@ namespace _42.Platform.Cli.Commands.Account;
     typeof(AccountSetCommand),
     typeof(AccessPointListCommand),
     typeof(MachineListCommand),
+    typeof(SharedCertListCommand),
+    typeof(CaDownloadCommand),
     typeof(AccountLogoutCommand))]
 
 [Command(CommandNames.ACCOUNT, CommandNames.ACCESS, CommandNames.LOGIN, Description = "Manage your account and access to 2S platform services.")]
