@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using _42.Platform.Storyteller.Accessing.Model;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 
@@ -34,7 +33,7 @@ public class CertificateIdentityTests
         var parsed = CertificateIdentity.TryParse(leaf, TrustDomain);
 
         parsed.ShouldNotBeNull();
-        parsed.Kind.ShouldBe(ClientCertificateKind.Machine);
+        parsed!.Kind.ShouldBe(ClientCertificateKind.Machine);
         parsed.Organization.ShouldBe("org1");
         parsed.Project.ShouldBe("proj1");
         parsed.MachineAccessId.ShouldBe("machine-abc");
@@ -50,7 +49,7 @@ public class CertificateIdentityTests
         var parsed = CertificateIdentity.TryParse(leaf, TrustDomain);
 
         parsed.ShouldNotBeNull();
-        parsed.Kind.ShouldBe(ClientCertificateKind.Shared);
+        parsed!.Kind.ShouldBe(ClientCertificateKind.Shared);
         parsed.Organization.ShouldBe("org1");
         parsed.Project.ShouldBe("proj1");
         parsed.SharedLabel.ShouldBe("svc-label");

@@ -237,6 +237,11 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
     {
         error = false;
 
+        if (!options.IsCertificateHeaderFromClientAllowed)
+        {
+            return null;
+        }
+
         if (!httpReqData.Headers.TryGetValues(options.CertificateHeaderName, out var certValues))
         {
             return null;
@@ -261,7 +266,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         try
         {
             var certBytes = Convert.FromBase64String(base64Der);
-            return new X509Certificate2(certBytes);
+            return X509CertificateLoader.LoadCertificate(certBytes);
         }
         catch
         {

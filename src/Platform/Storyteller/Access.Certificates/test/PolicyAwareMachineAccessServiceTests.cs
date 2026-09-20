@@ -3,7 +3,6 @@ using _42.Platform.Storyteller.Accessing.Model;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 

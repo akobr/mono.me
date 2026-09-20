@@ -156,6 +156,11 @@ public class CertificatesHttp
             return new StatusCodeResult((int)HttpStatusCode.NotImplemented);
         }
 
+        if (!CertificateIdentity.IsValidSpiffePathSegment(model.Label))
+        {
+            return new BadRequestObjectResult(new ErrorResponse { Message = "Invalid certificate label. Only letters, digits, hyphens, underscores, and dots are allowed." });
+        }
+
         var certificate = await _sharedCertService.IssueAsync(organization, project, model.Label, model.LifetimeDays);
         return new OkObjectResult(certificate);
     }

@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
 using Microsoft.OpenApi.Models;
 
@@ -14,8 +15,7 @@ public class AccountRoleSchemaDocumentFilter : IDocumentFilter
 {
     private const string SchemaName = "AccountRole";
 
-    private static readonly string[] EnumValues =
-        ["None", "Reader", "Contributor", "ContributorWithSecrets", "Administrator", "Owner"];
+    private static readonly string[] EnumValues = Enum.GetNames<AccountRole>();
 
     public void Apply(IHttpRequestDataObject req, OpenApiDocument document)
     {

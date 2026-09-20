@@ -19,6 +19,7 @@ public class KeyVaultCertificateAuthorityProvider : ICertificateAuthorityProvide
     private readonly KeyVaultCertificateAuthorityOptions _kvOptions;
     private readonly ILogger<KeyVaultCertificateAuthorityProvider> _logger;
     private readonly CachedAsync<CertificateAuthorityMaterial> _cachedMaterial;
+    private readonly CachedAsync<IReadOnlyList<X509Certificate2>> _cachedTrusted;
 
     public KeyVaultCertificateAuthorityProvider(
         IAzureClientFactory<KeyClient> keyClientFactory,
@@ -36,6 +37,10 @@ public class KeyVaultCertificateAuthorityProvider : ICertificateAuthorityProvide
             LoadOrBootstrapAsync,
             options.Value.Authority.RefreshInterval,
             ex => logger.LogError(ex, "Failed to refresh CA material from Key Vault; serving stale value"));
+        _cachedTrusted = new CachedAsync<IReadOnlyList<X509Certificate2>>(
+            store.GetAllCertificatesAsync,
+            options.Value.Authority.RefreshInterval,
+            ex => logger.LogError(ex, "Failed to refresh trusted CA list from Key Vault; serving stale value"));
 
         var authorityKind = options.Value.Authority.Kind;
 
@@ -53,9 +58,9 @@ public class KeyVaultCertificateAuthorityProvider : ICertificateAuthorityProvide
         return _cachedMaterial.GetValueAsync();
     }
 
-    public async Task<IReadOnlyList<X509Certificate2>> GetTrustedAsync()
+    public Task<IReadOnlyList<X509Certificate2>> GetTrustedAsync()
     {
-        return await _store.GetAllCertificatesAsync();
+        return _cachedTrusted.GetValueAsync();
     }
 
     private async Task<CertificateAuthorityMaterial> LoadOrBootstrapAsync()

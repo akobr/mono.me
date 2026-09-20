@@ -1,5 +1,4 @@
 using _42.Utils.Async;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 
@@ -85,7 +84,6 @@ public class CachedAsyncTests
             () => throw new InvalidOperationException("factory failed"),
             TimeSpan.FromHours(1));
 
-        await Should.ThrowAsync<InvalidOperationException>(
-            async () => await cache.GetValueAsync());
+        await Should.ThrowAsync<InvalidOperationException>(() => cache.GetValueAsync());
     }
 }

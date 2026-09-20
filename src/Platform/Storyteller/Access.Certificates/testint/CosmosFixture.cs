@@ -12,7 +12,11 @@ namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 
 public class CosmosFixture : IAsyncLifetime
 {
-    private const bool UseContainer = false;
+    private static readonly bool UseContainer =
+        !string.Equals(
+            Environment.GetEnvironmentVariable("STORYTELLER_TESTS_USE_LOCAL_EMULATOR"),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
 
     public IServiceProvider Services { get; private set; } = null!;
 

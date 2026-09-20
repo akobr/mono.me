@@ -2,7 +2,6 @@ using System.Security.Cryptography.X509Certificates;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using Microsoft.Extensions.DependencyInjection;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 
@@ -19,31 +18,44 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
     [Fact]
     public async Task IssueCertificate_ThenValidate_Succeeds()
     {
+        const string certProject = "certproj";
+
         var accessService = fixture.Services.GetRequiredService<IAccessService>();
         var validator = fixture.Services.GetRequiredService<IClientCertificateValidator>();
+        var policyStore = fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>();
 
-        // Create access point first.
-        await EnsureAccessPointAsync(accessService);
+        // Create access point for the certificate project.
+        try
+        {
+            await accessService.CreateAccessPointAsync(new AccessPointCreate
+            {
+                Organization = Organization,
+                Project = certProject,
+                OwnerId = "test-owner",
+            });
+        }
+        catch
+        {
+            // Already exists — fine.
+        }
+
+        // Configure Certificate policy so machine access always issues a certificate.
+        await policyStore.SetAsync(Organization, certProject, new MachineAuthenticationPolicy
+        {
+            CredentialKind = MachineCredentialKind.Certificate,
+        });
 
         // Create machine access with certificate.
         var model = new MachineAccessCreate
         {
             Organization = Organization,
-            Project = Project,
+            Project = certProject,
             Scope = MachineAccessScope.DefaultRead,
         };
 
         var machine = await accessService.CreateMachineAccessAsync(model);
         machine.ShouldNotBeNull();
         machine.Id.ShouldNotBeNullOrEmpty();
-
-        // If the policy is ApiKey (default), the machine won't have a certificate.
-        // We need to check if a certificate was issued.
-        if (string.IsNullOrEmpty(machine.CertificateThumbprint))
-        {
-            // API key only — expected for default policy. Skip certificate validation.
-            return;
-        }
 
         // Load the issued certificate.
         machine.Certificate.ShouldNotBeNullOrEmpty();
@@ -54,8 +66,8 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         var result = await validator.ValidateAsync(cert);
 
         result.ShouldNotBeNull();
-        result.Organization.ShouldBe(Organization);
-        result.Project.ShouldBe(Project);
+        result!.Organization.ShouldBe(Organization);
+        result.Project.ShouldBe(certProject);
         result.MachineAccessId.ShouldBe(machine.Id);
     }
 
@@ -123,7 +135,7 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
 
         var reset = await accessService.ResetMachineAccessAsync(Organization, Project, machine.Id);
         reset.ShouldNotBeNull();
-        reset.AccessKey.ShouldNotBe(originalKey);
+        reset!.AccessKey.ShouldNotBe(originalKey);
     }
 
     private static async Task EnsureAccessPointAsync(IAccessService accessService)

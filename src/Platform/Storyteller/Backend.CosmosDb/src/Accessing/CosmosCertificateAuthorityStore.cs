@@ -110,7 +110,7 @@ public class CosmosCertificateAuthorityStore : ICertificateAuthorityStore
         var repository = _repositoryProvider.GetCore();
         var partitionKey = new PartitionKey(Partition);
 
-        using var cert = new X509Certificate2(certificateData);
+        using var cert = X509CertificateLoader.LoadCertificate(certificateData);
 
         var entity = new CertificateAuthorityEntity
         {
@@ -151,7 +151,7 @@ public class CosmosCertificateAuthorityStore : ICertificateAuthorityStore
             var response = await iterator.ReadNextAsync();
             foreach (var entity in response)
             {
-                var cert = new X509Certificate2(entity.CertificateData);
+                var cert = X509CertificateLoader.LoadCertificate(entity.CertificateData);
                 if (cert.NotAfter > DateTime.UtcNow)
                 {
                     certificates.Add(cert);

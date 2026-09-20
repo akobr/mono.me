@@ -1,7 +1,6 @@
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using Microsoft.Extensions.DependencyInjection;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 
@@ -40,7 +39,7 @@ public class PolicyEnforcementTests(CosmosFixture fixture)
         var retrieved = await policyStore.GetAsync(Organization, Project);
 
         retrieved.ShouldNotBeNull();
-        retrieved.CredentialKind.ShouldBe(MachineCredentialKind.CertificateAndApiKey);
+        retrieved!.CredentialKind.ShouldBe(MachineCredentialKind.CertificateAndApiKey);
         retrieved.CertificateLifetimeDays.ShouldBe(180);
     }
 
@@ -64,7 +63,7 @@ public class PolicyEnforcementTests(CosmosFixture fixture)
         var retrieved = await policyStore.GetAsync(Organization, Project);
 
         retrieved.ShouldNotBeNull();
-        retrieved.CredentialKind.ShouldBe(MachineCredentialKind.Certificate);
+        retrieved!.CredentialKind.ShouldBe(MachineCredentialKind.Certificate);
         retrieved.CertificateLifetimeDays.ShouldBe(90);
     }
 

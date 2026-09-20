@@ -4,7 +4,6 @@ using _42.Platform.Storyteller.Accessing.Model;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 
@@ -52,7 +51,7 @@ public class LocalCertificateAuthorityTests
         var identity = CertificateIdentity.TryParse(cert, _options.TrustDomain);
 
         identity.ShouldNotBeNull();
-        identity.Kind.ShouldBe(ClientCertificateKind.Machine);
+        identity!.Kind.ShouldBe(ClientCertificateKind.Machine);
         identity.Organization.ShouldBe("org1");
         identity.Project.ShouldBe("proj1");
         identity.MachineAccessId.ShouldBe("machine-1");
@@ -86,7 +85,7 @@ public class LocalCertificateAuthorityTests
 
         var ekuExt = cert.Extensions.OfType<X509EnhancedKeyUsageExtension>().FirstOrDefault();
         ekuExt.ShouldNotBeNull();
-        ekuExt.EnhancedKeyUsages.Cast<System.Security.Cryptography.Oid>()
+        ekuExt!.EnhancedKeyUsages.Cast<System.Security.Cryptography.Oid>()
             .ShouldContain(oid => oid.Value == "1.3.6.1.5.5.7.3.2");
     }
 
@@ -116,7 +115,7 @@ public class LocalCertificateAuthorityTests
         var identity = CertificateIdentity.TryParse(cert, _options.TrustDomain);
 
         identity.ShouldNotBeNull();
-        identity.Kind.ShouldBe(ClientCertificateKind.Shared);
+        identity!.Kind.ShouldBe(ClientCertificateKind.Shared);
         identity.SharedLabel.ShouldBe("my-service");
     }
 
