@@ -7,4 +7,6 @@ public interface IAccessPoint
     string Key { get; }
 
     IReadOnlyDictionary<string, AccountRole> AccessMap { get; }
+
+    MachineAuthenticationPolicy? MachineAuthentication { get; }
 }

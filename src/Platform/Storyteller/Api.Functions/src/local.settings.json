@@ -9,7 +9,12 @@
     "Auth:AppRoles:DefaultRead": "008029ec-407f-48b2-8618-f38b8e03eebf",
     "Auth:AppRoles:DefaultReadWrite": "6eb2cfb3-a936-4077-8a58-620896871d32",
     "CosmosDb:Connection": "AccountEndpoint=https://localhost:8081/;AccountKey=C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==",
-    "CosmosDb:ShouldAcceptAnyCertificate": true
+    "CosmosDb:ShouldAcceptAnyCertificate": true,
+    "MachineAuth:DefaultCredentialKind": "ApiKey",
+    "MachineAuth:CertificateHeaderName": "X-ARR-ClientCert",
+    "MachineAuth:IsCertificateHeaderFromClientAllowed": true,
+    "MachineAuth:TrustDomain": "2s.platform",
+    "MachineAuth:Authority:Kind": "Cosmos"
   },
   "Host": {
     "LocalHttpPort": 7071,

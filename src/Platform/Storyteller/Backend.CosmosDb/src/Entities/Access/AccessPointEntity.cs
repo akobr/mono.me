@@ -15,4 +15,6 @@ public record class AccessPointEntity
     public required string Key { get; init; }
 
     public required Dictionary<string, AccountRole> AccessMap { get; init; } = new();
+
+    public MachineAuthenticationPolicy? MachineAuthentication { get; init; }
 }

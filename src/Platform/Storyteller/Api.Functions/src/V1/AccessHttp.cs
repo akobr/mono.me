@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Api.Models;
@@ -19,14 +20,20 @@ namespace _42.Platform.Storyteller.Api.V1;
 public class AccessHttp
 {
     private readonly IAccessService _accessService;
+    private readonly ICertificateAuthorityProvider? _caProvider;
+    private readonly IMachineAuthenticationPolicyStore? _policyStore;
     private readonly ILogger<AccessHttp> _logger;
 
     public AccessHttp(
         IAccessService accessService,
-        ILogger<AccessHttp> logger)
+        ILogger<AccessHttp> logger,
+        ICertificateAuthorityProvider? caProvider = null,
+        IMachineAuthenticationPolicyStore? policyStore = null)
     {
         _accessService = accessService;
         _logger = logger;
+        _caProvider = caProvider;
+        _policyStore = policyStore;
     }
 
     [Function(nameof(GetAccount))]
@@ -332,5 +339,59 @@ public class AccessHttp
         return isSuccess
             ? new OkResult()
             : new NotFoundResult();
+    }
+
+    [Function(nameof(GetCertificateAuthority))]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetCertificateAuthority, Definitions.Tags.Access)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, "application/x-pem-file", typeof(string), Description = "The CA public certificate in PEM format.")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> GetCertificateAuthority(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.CertificateAuthority)]
+        HttpRequestData request)
+    {
+        // This endpoint is unauthenticated — the CA public certificate is not a secret.
+        if (_caProvider is null)
+        {
+            return new NotFoundResult();
+        }
+
+        var material = await _caProvider.GetActiveAsync();
+        var pem = material.Certificate.ExportCertificatePem();
+        return new OkObjectResult(pem);
+    }
+
+    [Function(nameof(PutMachineAuthentication))]
+    [OpenApiOperation(Definitions.RouteIds.Access.SetMachineAuthentication, Definitions.Tags.Access)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The key of the access point (organization.project).")]
+    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The machine authentication policy to set.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The updated machine authentication policy.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> PutMachineAuthentication(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.MachineAuthentication)]
+        HttpRequestData request,
+        [FromBody] MachineAuthenticationPolicy policy,
+        string key)
+    {
+        request.CheckScope(Scopes.User.Impersonation);
+        var pointKey = key.Trim().ToLowerInvariant();
+        await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
+
+        if (_policyStore is null)
+        {
+            return new StatusCodeResult((int)HttpStatusCode.NotImplemented);
+        }
+
+        var segments = pointKey.Split('.', 2);
+
+        if (segments.Length < 2)
+        {
+            return new BadRequestObjectResult(new ErrorResponse { Message = "Access point key must be in organization.project format." });
+        }
+
+        await _policyStore.SetAsync(segments[0], segments[1], policy);
+        return new OkObjectResult(policy);
     }
 }

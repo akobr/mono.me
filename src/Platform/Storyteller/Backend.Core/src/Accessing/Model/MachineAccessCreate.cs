@@ -9,4 +9,6 @@ public record class MachineAccessCreate
     public required MachineAccessScope Scope { get; init; } = MachineAccessScope.DefaultRead;
 
     public string? AnnotationKey { get; init; }
+
+    public int? CertificateLifetimeDays { get; init; }
 }

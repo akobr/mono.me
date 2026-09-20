@@ -20,7 +20,7 @@ var host = new HostBuilder()
         // });
 
         worker.UseMiddleware<ExceptionHandlingMiddleware>();
-        worker.UseMiddleware<ApiKeyAuthenticationMiddleware>();
+        worker.UseMiddleware<MachineAuthenticationMiddleware>();
     })
     .ConfigureServices((context, services) =>
     {
@@ -65,6 +65,10 @@ var host = new HostBuilder()
 
         // Add authentication by API keys
         services.AddApiKeyMachineAccess();
+        // Add certificate-based machine authentication (must be after AddApiKeyMachineAccess)
+        services.AddCertificateMachineAccess(context.Configuration);
+        // Override to Key Vault CA in production (comment out for local dev)
+        //services.AddKeyVaultCertificateAuthority(context.Configuration);
         // Add authentication by Azure Entra
         //services.AddAzureAdMachineAccess();
 
