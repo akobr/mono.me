@@ -368,19 +368,39 @@ public class CosmosAccessService : IAccessService
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(model.Organization);
-        var partitionKey = new PartitionKey($"{model.Project}.access");
+        var partitionKeyValue = $"{model.Project}.access";
+        var partitionKey = new PartitionKey(partitionKeyValue);
 
         var machineAccess = await MachineAccessService.CreateMachineAccessAsync(model);
 
         var accessKey = machineAccess.AccessKey;
-        machineAccess = machineAccess with
+        var maskedKey = !string.IsNullOrEmpty(accessKey) && accessKey.Length >= 3
+            ? $"{accessKey[..3]}***"
+            : "***";
+
+        // Read the partial entity that CosmosMergedApiKeyHashStore may have created
+        // (it stores HashedSecret before the full entity exists).
+        var existing = await repository.Container.TryReadItemAsync(
+            machineAccess.Id,
+            partitionKey,
+            stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
+
+        var entity = new MachineAccessEntity
         {
-            AccessKey = $"{accessKey[..3]}***",
+            PartitionKey = partitionKeyValue,
+            Id = machineAccess.Id,
+            ObjectId = machineAccess.ObjectId,
+            AccessKey = maskedKey,
+            Scope = machineAccess.Scope,
+            AnnotationKey = machineAccess.AnnotationKey,
+            CredentialKind = machineAccess.CredentialKind,
+            CertificateThumbprint = machineAccess.CertificateThumbprint,
+            HashedSecret = existing?.HashedSecret,
         };
 
         try
         {
-            await repository.Container.CreateItemAsync(machineAccess, partitionKey);
+            await repository.Container.UpsertItemAsync(entity, partitionKey);
         }
         catch
         {
@@ -397,7 +417,6 @@ public class CosmosAccessService : IAccessService
             throw;
         }
 
-        machineAccess = machineAccess with { AccessKey = accessKey };
         return machineAccess;
     }
 
@@ -422,11 +441,14 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The machine access {appId} reset failed.");
         }
 
-        machineAccess = machineAccess with { AccessKey = $"{accessKey[..3]}***" };
+        var maskedKey = !string.IsNullOrEmpty(accessKey) && accessKey.Length >= 3
+            ? $"{accessKey[..3]}***"
+            : "***";
+        machineAccess = machineAccess with { AccessKey = maskedKey };
         await repository.Container.UpsertItemAsync(machineAccess, partitionKey);
 
-        machineAccess = machineAccess with { AccessKey = accessKey };
-        return _mapper.Map<MachineAccessEntity, MachineAccess>(machineAccess);
+        var result = _mapper.Map<MachineAccessEntity, MachineAccess>(machineAccess);
+        return result with { AccessKey = accessKey };
     }
 
     public async Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId)

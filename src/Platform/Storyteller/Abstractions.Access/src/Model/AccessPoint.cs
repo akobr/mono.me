@@ -7,4 +7,6 @@ public record class AccessPoint : IAccessPoint
     public required string Key { get; init; }
 
     public required IReadOnlyDictionary<string, AccountRole> AccessMap { get; init; }
+
+    public MachineAuthenticationPolicy? MachineAuthentication { get; init; }
 }
