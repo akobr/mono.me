@@ -1,3 +1,4 @@
+using Azure;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Azure;
 using Newtonsoft.Json.Linq;
@@ -17,13 +18,21 @@ public class KeyVaultBindingSource(IAzureClientFactory<SecretClient> factory, st
         }
 
         var secretName = string.Join("--", request.Path);
-        var secretResponse = await _client.GetSecretAsync(secretName);
 
-        if (!secretResponse.HasValue)
+        try
+        {
+            var secretResponse = await _client.GetSecretAsync(secretName);
+
+            if (!secretResponse.HasValue)
+            {
+                return null;
+            }
+
+            return new BindingValue(new JValue(secretResponse.Value.Value));
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
         {
             return null;
         }
-
-        return new BindingValue(new JValue(secretResponse.Value.Value));
     }
 }
