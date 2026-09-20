@@ -357,7 +357,7 @@ public class AccessHttp
 
         var material = await _caProvider.GetActiveAsync();
         var pem = material.Certificate.ExportCertificatePem();
-        return new OkObjectResult(pem);
+        return new ContentResult { Content = pem, ContentType = "application/x-pem-file", StatusCode = 200 };
     }
 
     [Function(nameof(PutMachineAuthentication))]

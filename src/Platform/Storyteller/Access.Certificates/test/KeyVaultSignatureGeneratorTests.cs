@@ -1,17 +1,14 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 
-public class KeyVaultSignatureGeneratorTests
+public class CertificateSigningPrimitivesTests
 {
     [Fact]
     public void GetSignatureAlgorithmIdentifier_MatchesLocalRsaGenerator()
     {
         using var key = RSA.Create(2048);
-        var spki = key.ExportSubjectPublicKeyInfo();
-        var publicKey = PublicKey.CreateFromSubjectPublicKeyInfo(spki, out _);
 
         // Use a real local generator as the "KV" generator's delegate algorithm source.
         var localGenerator = X509SignatureGenerator.CreateForRSA(key, RSASignaturePadding.Pkcs1);
@@ -57,11 +54,11 @@ public class KeyVaultSignatureGeneratorTests
         // Verify extensions.
         var basicConstraints = caCert.Extensions.OfType<X509BasicConstraintsExtension>().FirstOrDefault();
         basicConstraints.ShouldNotBeNull();
-        basicConstraints.CertificateAuthority.ShouldBeTrue();
+        basicConstraints!.CertificateAuthority.ShouldBeTrue();
 
         var keyUsage = caCert.Extensions.OfType<X509KeyUsageExtension>().FirstOrDefault();
         keyUsage.ShouldNotBeNull();
-        keyUsage.KeyUsages.ShouldBe(X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign);
+        keyUsage!.KeyUsages.ShouldBe(X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign);
 
         var ski = caCert.Extensions.OfType<X509SubjectKeyIdentifierExtension>().FirstOrDefault();
         ski.ShouldNotBeNull();

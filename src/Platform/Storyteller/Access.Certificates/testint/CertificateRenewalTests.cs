@@ -6,7 +6,6 @@ using _42.Platform.Storyteller.Entities.Access;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 

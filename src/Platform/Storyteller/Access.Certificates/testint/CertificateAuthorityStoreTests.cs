@@ -1,6 +1,5 @@
 using _42.Platform.Storyteller.Accessing;
 using Microsoft.Extensions.DependencyInjection;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 
@@ -31,7 +30,7 @@ public class CertificateAuthorityStoreTests(CosmosFixture fixture)
         var record = await store.GetActiveRecordAsync();
 
         record.ShouldNotBeNull();
-        record.CertificateData.ShouldNotBeEmpty();
+        record!.CertificateData.ShouldNotBeEmpty();
         record.Pkcs12Data.ShouldNotBeNull();
         record.Version.ShouldNotBeNullOrEmpty();
     }

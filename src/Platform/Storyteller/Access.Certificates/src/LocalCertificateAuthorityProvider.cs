@@ -14,6 +14,7 @@ public class LocalCertificateAuthorityProvider : ICertificateAuthorityProvider
     private readonly IOptions<MachineAuthenticationOptions> _options;
     private readonly ILogger<LocalCertificateAuthorityProvider> _logger;
     private readonly CachedAsync<CertificateAuthorityMaterial> _cachedMaterial;
+    private readonly CachedAsync<IReadOnlyList<X509Certificate2>> _cachedTrusted;
 
     public LocalCertificateAuthorityProvider(
         ICertificateAuthorityStore store,
@@ -27,6 +28,10 @@ public class LocalCertificateAuthorityProvider : ICertificateAuthorityProvider
             LoadOrBootstrapAsync,
             options.Value.Authority.RefreshInterval,
             ex => logger.LogError(ex, "Failed to refresh CA material; serving stale value"));
+        _cachedTrusted = new CachedAsync<IReadOnlyList<X509Certificate2>>(
+            store.GetAllCertificatesAsync,
+            options.Value.Authority.RefreshInterval,
+            ex => logger.LogError(ex, "Failed to refresh trusted CA list; serving stale value"));
     }
 
     public Task<CertificateAuthorityMaterial> GetActiveAsync()
@@ -34,9 +39,9 @@ public class LocalCertificateAuthorityProvider : ICertificateAuthorityProvider
         return _cachedMaterial.GetValueAsync();
     }
 
-    public async Task<IReadOnlyList<X509Certificate2>> GetTrustedAsync()
+    public Task<IReadOnlyList<X509Certificate2>> GetTrustedAsync()
     {
-        return await _store.GetAllCertificatesAsync();
+        return _cachedTrusted.GetValueAsync();
     }
 
     private async Task<CertificateAuthorityMaterial> LoadOrBootstrapAsync()
@@ -99,8 +104,10 @@ public class LocalCertificateAuthorityProvider : ICertificateAuthorityProvider
         var version = "1";
         await _store.StorePkcs12Async(pkcs12, version);
 
-        // Reload to get a proper persistent key.
-        var reloaded = X509CertificateLoader.LoadPkcs12(pkcs12, null,
+        // Re-read the active PKCS#12 from the store to get the definitive CA
+        // (handles concurrent bootstrap — another instance may have stored first).
+        var activePkcs12 = await _store.GetActivePkcs12Async() ?? pkcs12;
+        var reloaded = X509CertificateLoader.LoadPkcs12(activePkcs12, null,
             X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.Exportable);
         var rsa = reloaded.GetRSAPrivateKey()!;
         var generator = X509SignatureGenerator.CreateForRSA(rsa, RSASignaturePadding.Pkcs1);

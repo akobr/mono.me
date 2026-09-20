@@ -1,7 +1,6 @@
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using Microsoft.Extensions.DependencyInjection;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 
@@ -48,7 +47,7 @@ public class SharedCertificateStoreTests(CosmosFixture fixture)
         var list = await service.ListAsync(Organization, Project);
         var revokedCert = list.FirstOrDefault(c => c.Thumbprint == cert.Thumbprint);
         revokedCert.ShouldNotBeNull();
-        revokedCert.IsRevoked.ShouldBeTrue();
+        revokedCert!.IsRevoked.ShouldBeTrue();
     }
 
     [Fact]

@@ -63,6 +63,13 @@ public class LocalCertificateAuthority : IClientCertificateAuthority
 
         // Clamp lifetime to the CA's remaining validity.
         var caRemainingDays = (int)(caCert.NotAfter.ToUniversalTime() - DateTime.UtcNow).TotalDays;
+
+        if (caRemainingDays <= 0)
+        {
+            throw new InvalidOperationException(
+                $"Cannot issue certificate: the CA has expired (NotAfter: {caCert.NotAfter:u}).");
+        }
+
         if (lifetimeDays > caRemainingDays)
         {
             _logger.LogWarning(

@@ -11,17 +11,20 @@ public class ClientCertificateValidator : IClientCertificateValidator
 {
     private readonly ICertificateAuthorityProvider _caProvider;
     private readonly IClientCertificateStore _certificateStore;
+    private readonly ISharedCertificateStore _sharedCertificateStore;
     private readonly IOptions<MachineAuthenticationOptions> _options;
     private readonly ILogger<ClientCertificateValidator> _logger;
 
     public ClientCertificateValidator(
         ICertificateAuthorityProvider caProvider,
         IClientCertificateStore certificateStore,
+        ISharedCertificateStore sharedCertificateStore,
         IOptions<MachineAuthenticationOptions> options,
         ILogger<ClientCertificateValidator> logger)
     {
         _caProvider = caProvider;
         _certificateStore = certificateStore;
+        _sharedCertificateStore = sharedCertificateStore;
         _options = options;
         _logger = logger;
     }
@@ -75,14 +78,25 @@ public class ClientCertificateValidator : IClientCertificateValidator
             return await ValidateMachineCertificateAsync(clientCertificate, identity);
         }
 
-        // Shared certificates are validated by SAN + chain only.
+        // Shared certificates: SAN + chain validation, then check revocation status.
+        var thumbprint = clientCertificate.Thumbprint;
+        var sharedCerts = await _sharedCertificateStore.ListAsync(identity.Organization, identity.Project);
+        var sharedRecord = sharedCerts.FirstOrDefault(
+            c => string.Equals(c.Thumbprint, thumbprint, StringComparison.OrdinalIgnoreCase));
+
+        if (sharedRecord is { IsRevoked: true })
+        {
+            _logger.LogWarning("Shared certificate {Thumbprint} is revoked", thumbprint);
+            return null;
+        }
+
         // Identity/scope comes from the API key, not the certificate.
         return new ClientCertificateValidationResult(
             identity.Organization,
             identity.Project,
             null,
             default,
-            clientCertificate.Thumbprint,
+            thumbprint,
             ClientCertificateKind.Shared,
             null);
     }

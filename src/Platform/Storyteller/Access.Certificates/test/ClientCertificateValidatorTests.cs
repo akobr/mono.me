@@ -5,7 +5,6 @@ using _42.Platform.Storyteller.Accessing.Model;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
-using Shouldly;
 
 namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 
@@ -22,7 +21,8 @@ public class ClientCertificateValidatorTests
 
     private ClientCertificateValidator CreateValidator(
         CertificateRecord? record = null,
-        X509Certificate2? trustedCa = null)
+        X509Certificate2? trustedCa = null,
+        ISharedCertificateStore? sharedStore = null)
     {
         var caProviderMock = new Mock<ICertificateAuthorityProvider>();
         caProviderMock.Setup(p => p.GetTrustedAsync())
@@ -36,9 +36,18 @@ public class ClientCertificateValidatorTests
                 .ReturnsAsync(record);
         }
 
+        if (sharedStore is null)
+        {
+            var sharedStoreMock = new Mock<ISharedCertificateStore>();
+            sharedStoreMock.Setup(s => s.ListAsync(It.IsAny<string>(), It.IsAny<string>()))
+                .ReturnsAsync(new List<SharedCertificate>());
+            sharedStore = sharedStoreMock.Object;
+        }
+
         return new ClientCertificateValidator(
             caProviderMock.Object,
             storeMock.Object,
+            sharedStore,
             Options.Create(_options),
             NullLogger<ClientCertificateValidator>.Instance);
     }
@@ -54,7 +63,7 @@ public class ClientCertificateValidatorTests
         var result = await validator.ValidateAsync(leaf);
 
         result.ShouldNotBeNull();
-        result.Organization.ShouldBe("org1");
+        result!.Organization.ShouldBe("org1");
         result.Project.ShouldBe("proj1");
         result.MachineAccessId.ShouldBe("m1");
         result.Kind.ShouldBe(ClientCertificateKind.Machine);
@@ -70,7 +79,7 @@ public class ClientCertificateValidatorTests
         var result = await validator.ValidateAsync(leaf);
 
         result.ShouldNotBeNull();
-        result.Kind.ShouldBe(ClientCertificateKind.Shared);
+        result!.Kind.ShouldBe(ClientCertificateKind.Shared);
         result.Organization.ShouldBe("org1");
         result.Project.ShouldBe("proj1");
         result.MachineAccessId.ShouldBeNull();
@@ -170,7 +179,7 @@ public class ClientCertificateValidatorTests
 
         var result = await validator.ValidateAsync(leaf);
         result.ShouldNotBeNull();
-        result.MachineAccessId.ShouldBe("m1");
+        result!.MachineAccessId.ShouldBe("m1");
     }
 
     [Fact]
@@ -206,7 +215,7 @@ public class ClientCertificateValidatorTests
         var result = await validator.ValidateAsync(leaf);
 
         result.ShouldNotBeNull();
-        result.AnnotationKey.ShouldBe("my-annotation-key");
+        result!.AnnotationKey.ShouldBe("my-annotation-key");
         result.Scope.ShouldBe(MachineAccessScope.AnnotationRead);
     }
 }

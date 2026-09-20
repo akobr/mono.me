@@ -73,7 +73,7 @@ public static class HttpRequestDataExtensions
             .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
             .ToHashSet();
 
-        if (scopes.Any(scope => !allScopes.Contains(scope)))
+        if (!scopes.Any(scope => allScopes.Contains(scope)))
         {
             // TODO: [P2] remove details from the exception message
             var allInfo = new StringBuilder();
