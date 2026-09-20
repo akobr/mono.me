@@ -212,6 +212,56 @@ Branch `feat/claude/*` is the convention for AI-assisted feature branches.
 
 ---
 
+## Documentation Workflow
+
+Every non-trivial change follows a two-document lifecycle: a **spec** written before implementation, and a **review** written after.
+
+### Location
+
+Documents live under `docs/` mirroring the `src/` structure, inside a `specs/` subfolder:
+
+```
+docs/<Area>/<SubProject>/specs/
+    YYYY-MM-DD <Feature Title>.md          ← spec (plan)
+    reviews/
+        YYYY-MM-DD <Phase or Topic>.md     ← review (what was done)
+```
+
+Example (changes under `src/Platform/Storyteller`):
+```
+docs/Platform/Storyteller/specs/2026-09-16 mTLS Per-Machine Authentication for Storyteller API.md
+docs/Platform/Storyteller/specs/reviews/2026-09-17 Phase A of mTLS.md
+```
+
+### Spec (Plan) — write before any code
+
+Create a spec when asked to plan a feature or before starting implementation. Required sections:
+
+- **Problem** — what is wrong or missing
+- **Current State** — relevant existing code/behaviour (file paths, line numbers where useful)
+- **Proposed Changes** — numbered sections with full technical detail: new types, interfaces, API surface, data shapes, config, middleware order, etc.
+
+Date the file with the day the plan is written. The spec is the source of truth for what is intended; do not modify it retroactively once implementation begins.
+
+### Review — write after implementation (or after each phase)
+
+Create a review when a spec (or a phase of one) has been executed. Required sections:
+
+- **Overview** — one-paragraph summary of what the phase covers and a reference to the spec file
+- **What Was Done** — numbered sections matching the spec structure, describing what was actually implemented: file names, types added/changed, decisions made during implementation that deviated from the plan, anything notable
+
+When a spec is large and delivered in phases, create one review file per phase. Date each review with the day it was completed.
+
+### AI Assistant Rules
+
+- When asked to **create a plan**: produce the spec file first — before any code is changed. Web search, or analysis are recomended.
+- When asked to **execute a plan** (or a phase of one): implement the code, then produce the review file.
+- When asked to **create a plan and execute it**: create the spec, implement, then create the review.
+- Always infer the correct `docs/` path from the `src/` path of the affected code.
+- Use today's date (from `currentDate` context) for file naming.
+
+---
+
 ## Testing
 
 - Framework: **xUnit** with `FluentAssertions` (pinned to `[7.2.0]`) or **Shouldly** for new test projects
