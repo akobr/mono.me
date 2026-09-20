@@ -11,13 +11,10 @@ public static class EntryPoint
         this IServiceCollection @this,
         Action<BindingsOptions>? configure = null)
     {
-        @this.TryAddSingleton<BindingExecutor>();
-        @this.TryAddSingleton<IBindingRegistry>(provider => provider.GetRequiredService<BindingExecutor>());
-
-        @this.TryAddSingleton<IBindingExecutor>(provider =>
+        @this.TryAddSingleton<BindingExecutor>(provider =>
         {
-            var executor = provider.GetRequiredService<BindingExecutor>();
             var options = provider.GetRequiredService<IOptions<BindingsOptions>>();
+            var executor = new BindingExecutor();
 
             foreach (var (key, source) in options.Value.ResolveSources(provider))
             {
@@ -31,6 +28,8 @@ public static class EntryPoint
 
             return executor;
         });
+        @this.TryAddSingleton<IBindingRegistry>(provider => provider.GetRequiredService<BindingExecutor>());
+        @this.TryAddSingleton<IBindingExecutor>(provider => provider.GetRequiredService<BindingExecutor>());
 
         if (configure is not null)
         {
