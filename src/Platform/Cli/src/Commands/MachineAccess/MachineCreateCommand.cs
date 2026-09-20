@@ -66,22 +66,17 @@ public class MachineCreateCommand : BaseContextCommand
         Console.WriteJson(machine);
         Console.WriteLine();
 
-        // Extract certificate fields from AdditionalProperties (until NSwag is regenerated).
-        if (machine.AdditionalProperties.TryGetValue("Certificate", out var certObj)
-            && certObj is string certificate
-            && !string.IsNullOrEmpty(certificate))
+        if (!string.IsNullOrEmpty(machine.Certificate))
         {
-            var pkcs12Bytes = Convert.FromBase64String(certificate);
+            var pkcs12Bytes = Convert.FromBase64String(machine.Certificate);
             var filePath = OutputPath ?? $"{machine.Id}.pfx";
             _fileSystem.File.WriteAllBytes(filePath, pkcs12Bytes);
 
             Console.WriteImportant($"Certificate written to {filePath}");
 
-            if (machine.AdditionalProperties.TryGetValue("CertificatePassword", out var pwdObj)
-                && pwdObj is string password
-                && !string.IsNullOrEmpty(password))
+            if (!string.IsNullOrEmpty(machine.CertificatePassword))
             {
-                Console.WriteImportant($"Certificate password: {password}");
+                Console.WriteImportant($"Certificate password: {machine.CertificatePassword}");
                 Console.WriteImportant("Make sure to copy the password, it is not stored anywhere.");
             }
         }

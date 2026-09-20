@@ -10,13 +10,13 @@ namespace _42.Platform.Cli.Commands.SharedCertificates;
 [Command(CommandNames.ISSUE, CommandNames.CREATE, Description = "Issue a new shared certificate for a project.")]
 public class SharedCertIssueCommand : BaseContextCommand
 {
-    private readonly AccessApiClient _accessApi;
+    private readonly IAccessApiClient _accessApi;
     private readonly IFileSystem _fileSystem;
 
     public SharedCertIssueCommand(
         IExtendedConsole console,
         ICommandContext context,
-        AccessApiClient accessApi,
+        IAccessApiClient accessApi,
         IFileSystem fileSystem)
         : base(console, context)
     {
@@ -44,8 +44,11 @@ public class SharedCertIssueCommand : BaseContextCommand
         var certificate = await _accessApi.IssueSharedCertificateAsync(
             Context.OrganizationName,
             Context.ProjectName,
-            Label,
-            LifetimeDays);
+            new SharedCertificateCreate
+            {
+                Label = Label,
+                LifetimeDays = LifetimeDays,
+            });
 
         Console.WriteImportant($"Shared certificate issued: {certificate.Label}");
         Console.WriteLine($"  Thumbprint: {certificate.Thumbprint}");

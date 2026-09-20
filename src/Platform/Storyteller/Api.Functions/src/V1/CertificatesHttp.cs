@@ -36,7 +36,7 @@ public class CertificatesHttp
 
     [Function(nameof(PostRenewCertificate))]
     [OpenApiOperation(Definitions.RouteIds.Access.RenewMachineCertificate, Definitions.Tags.Access)]
-    [OpenApiSecurity(Definitions.SecuritySchemas.Mtls, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, Description = "Machine certificate authentication.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Mtls, SecuritySchemeType.ApiKey, In = OpenApiSecurityLocationType.Header, Name = "X-ARR-ClientCert", Description = "Machine certificate authentication via mTLS.")]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdMachine)]

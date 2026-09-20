@@ -10,13 +10,13 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Command(CommandNames.RENEW, Description = "Renew certificate for a machine access.")]
 public class MachineRenewCommand : BaseContextCommand
 {
-    private readonly AccessApiClient _accessApi;
+    private readonly IAccessApiClient _accessApi;
     private readonly IFileSystem _fileSystem;
 
     public MachineRenewCommand(
         IExtendedConsole console,
         ICommandContext context,
-        AccessApiClient accessApi,
+        IAccessApiClient accessApi,
         IFileSystem fileSystem)
         : base(console, context)
     {
@@ -48,17 +48,16 @@ public class MachineRenewCommand : BaseContextCommand
             Console.WriteImportant(result.Message);
         }
 
-        if (!string.IsNullOrEmpty(result.Certificate))
+        if (result.Pkcs12 is { Length: > 0 })
         {
-            var pkcs12Bytes = Convert.FromBase64String(result.Certificate);
             var filePath = OutputPath ?? $"{MachineId}-renewed.pfx";
-            _fileSystem.File.WriteAllBytes(filePath, pkcs12Bytes);
+            _fileSystem.File.WriteAllBytes(filePath, result.Pkcs12);
 
             Console.WriteImportant($"Renewed certificate written to {filePath}");
 
-            if (!string.IsNullOrEmpty(result.CertificatePassword))
+            if (!string.IsNullOrEmpty(result.Password))
             {
-                Console.WriteImportant($"Certificate password: {result.CertificatePassword}");
+                Console.WriteImportant($"Certificate password: {result.Password}");
                 Console.WriteImportant("Make sure to copy the password, it is not stored anywhere.");
             }
         }

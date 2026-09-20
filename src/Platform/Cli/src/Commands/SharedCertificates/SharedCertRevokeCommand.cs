@@ -8,12 +8,12 @@ namespace _42.Platform.Cli.Commands.SharedCertificates;
 [Command(CommandNames.REVOKE, CommandNames.DELETE, Description = "Revoke a shared certificate.")]
 public class SharedCertRevokeCommand : BaseContextCommand
 {
-    private readonly AccessApiClient _accessApi;
+    private readonly IAccessApiClient _accessApi;
 
     public SharedCertRevokeCommand(
         IExtendedConsole console,
         ICommandContext context,
-        AccessApiClient accessApi)
+        IAccessApiClient accessApi)
         : base(console, context)
     {
         _accessApi = accessApi;

@@ -8,19 +8,19 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Command(CommandNames.MACHINE_AUTH, Description = "Set the machine authentication policy for a project.")]
 public class MachineAuthSetCommand : BaseContextCommand
 {
-    private readonly AccessApiClient _accessApi;
+    private readonly IAccessApiClient _accessApi;
 
     public MachineAuthSetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        AccessApiClient accessApi)
+        IAccessApiClient accessApi)
         : base(console, context)
     {
         _accessApi = accessApi;
     }
 
-    [Option("-k|--credential-kind", CommandOptionType.SingleValue, Description = "Required credential kind: ApiKey, Certificate, or CertificateAndApiKey.")]
-    public string CredentialKind { get; set; } = "ApiKey";
+    [Option("-k|--credential-kind", CommandOptionType.SingleValue, Description = "Required credential kind: ApiKey (0), Certificate (1), or CertificateAndApiKey (2).")]
+    public int CredentialKind { get; set; }
 
     [Option("-l|--lifetime-days", CommandOptionType.SingleValue, Description = "Default certificate lifetime in days for this project.")]
     public int? CertificateLifetimeDays { get; set; }
@@ -29,20 +29,20 @@ public class MachineAuthSetCommand : BaseContextCommand
     {
         var accessPointKey = $"{Context.OrganizationName}.{Context.ProjectName}";
 
-        var policy = new MachineAuthenticationPolicyDto
+        var policy = new MachineAuthenticationPolicy
         {
-            CredentialKind = CredentialKind,
+            CredentialKind = (MachineAuthenticationPolicyCredentialKind)CredentialKind,
             CertificateLifetimeDays = CertificateLifetimeDays,
         };
 
-        await _accessApi.SetMachineAuthenticationPolicyAsync(accessPointKey, policy);
+        var result = await _accessApi.SetMachineAuthenticationAsync(accessPointKey, policy);
 
         Console.WriteImportant($"Machine authentication policy set for {accessPointKey}:");
-        Console.WriteLine($"  Credential kind: {CredentialKind}");
+        Console.WriteLine($"  Credential kind: {result.CredentialKind}");
 
-        if (CertificateLifetimeDays.HasValue)
+        if (result.CertificateLifetimeDays.HasValue)
         {
-            Console.WriteLine($"  Certificate lifetime: {CertificateLifetimeDays} days");
+            Console.WriteLine($"  Certificate lifetime: {result.CertificateLifetimeDays} days");
         }
 
         return ExitCodes.SUCCESS;

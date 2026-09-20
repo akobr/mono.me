@@ -9,13 +9,13 @@ namespace _42.Platform.Cli.Commands;
 [Command(CommandNames.CA, Description = "Download the CA certificate as PEM.")]
 public class CaDownloadCommand : BaseContextCommand
 {
-    private readonly AccessApiClient _accessApi;
+    private readonly IAccessApiClient _accessApi;
     private readonly IFileSystem _fileSystem;
 
     public CaDownloadCommand(
         IExtendedConsole console,
         ICommandContext context,
-        AccessApiClient accessApi,
+        IAccessApiClient accessApi,
         IFileSystem fileSystem)
         : base(console, context)
     {
@@ -28,7 +28,7 @@ public class CaDownloadCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
-        var pem = await _accessApi.GetCertificateAuthorityPemAsync();
+        var pem = await _accessApi.GetCertificateAuthorityAsync();
 
         if (string.IsNullOrWhiteSpace(pem))
         {

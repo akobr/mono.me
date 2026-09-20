@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Storyteller.Sdk;
@@ -11,12 +12,12 @@ namespace _42.Platform.Cli.Commands.SharedCertificates;
 [Command(CommandNames.SHARED_CERT, CommandNames.CERTIFICATE, Description = "List and manage shared certificates for a project.")]
 public class SharedCertListCommand : BaseContextCommand
 {
-    private readonly AccessApiClient _accessApi;
+    private readonly IAccessApiClient _accessApi;
 
     public SharedCertListCommand(
         IExtendedConsole console,
         ICommandContext context,
-        AccessApiClient accessApi)
+        IAccessApiClient accessApi)
         : base(console, context)
     {
         _accessApi = accessApi;
@@ -37,11 +38,11 @@ public class SharedCertListCommand : BaseContextCommand
         }
 
         Console.WriteTable(
-            certificates,
+            certificates.ToList(),
             cert => new[]
             {
                 cert.Label,
-                cert.Thumbprint[..8] + "...",
+                cert.Thumbprint.Length > 8 ? cert.Thumbprint[..8] + "..." : cert.Thumbprint,
                 cert.NotAfter.ToString("yyyy-MM-dd"),
                 cert.IsRevoked ? "REVOKED" : "Active",
             },

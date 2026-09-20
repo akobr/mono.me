@@ -55,7 +55,7 @@ public class AccessPointGetCommand : BaseCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        if (role < RoleType.Administrator)
+        if (role < AccountRole.Administrator)
         {
             Console.WriteLine($"You don't have administration permissions to the access point '{pointKey}'.");
             return ExitCodes.ERROR_WRONG_INPUT;
@@ -81,7 +81,7 @@ public class AccessPointGetCommand : BaseCommand
         {
             Message = "Which access point would you like to get",
             Items = account.AccessMap
-                .Where(access => access.Value >= RoleType.Administrator)
+                .Where(access => access.Value >= AccountRole.Administrator)
                 .Select(access => access.Key)
                 .OrderBy(access => access),
         };
