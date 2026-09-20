@@ -8,7 +8,9 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 [Subcommand(
     typeof(MachineCreateCommand),
     typeof(MachineResetCommand),
-    typeof(MachineDeleteCommand))]
+    typeof(MachineDeleteCommand),
+    typeof(MachineRenewCommand),
+    typeof(MachineAuthSetCommand))]
 
 [Command(CommandNames.MACHINE, CommandNames.AGENT, Description = "Get and manage machine access to 2S platform.")]
 public class MachineListCommand : BaseContextCommand
