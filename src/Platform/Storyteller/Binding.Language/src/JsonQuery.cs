@@ -84,6 +84,8 @@ public static class JsonQuery
 
                 case JArray array:
                     if (segment == "-"
+                        || segment.Length == 0
+                        || (segment.Length > 1 && segment[0] == '0')
                         || !int.TryParse(segment, NumberStyles.None, CultureInfo.InvariantCulture, out var index)
                         || index < 0
                         || index >= array.Count)
@@ -104,8 +106,20 @@ public static class JsonQuery
 
     private static string Unescape(string segment)
     {
-        return segment.Contains('~')
-            ? segment.Replace("~1", "/").Replace("~0", "~")
-            : segment;
+        if (!segment.Contains('~'))
+        {
+            return segment;
+        }
+
+        for (var i = 0; i < segment.Length; i++)
+        {
+            if (segment[i] == '~' && (i + 1 >= segment.Length || (segment[i + 1] != '0' && segment[i + 1] != '1')))
+            {
+                throw new BindingEvaluationException(
+                    $"Invalid JSON Pointer escape at position {i} in token '{segment}': '~' must be followed by '0' or '1'.");
+            }
+        }
+
+        return segment.Replace("~1", "/").Replace("~0", "~");
     }
 }

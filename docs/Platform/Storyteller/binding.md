@@ -17,7 +17,7 @@ The system is split into four main projects, plus built-in functions contributed
 
 ### Syntax
 
-Binding is triggered whenever a string value starts with the `@` character. The whole string is parsed as a single binding expression. Four forms are supported:
+Binding is triggered whenever a string value starts with the `@` character. The whole string is parsed as a single binding expression. Five forms are supported:
 
 1.  **Path (default source)**: `@path.to.value`
     - Resolves `path.to.value` against the source registered with the `"default"` key.

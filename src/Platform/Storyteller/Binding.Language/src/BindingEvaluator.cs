@@ -217,8 +217,15 @@ public sealed class BindingEvaluator
 
     private async ValueTask<JToken?> EvaluateMathAsync(MathExpression math)
     {
-        var value = await EvaluateNumericAsync(math.Expression);
-        return new JValue(value);
+        try
+        {
+            var value = await EvaluateNumericAsync(math.Expression);
+            return new JValue(value);
+        }
+        catch (OverflowException ex)
+        {
+            throw new BindingEvaluationException("Math expression resulted in a numeric overflow.", ex);
+        }
     }
 
     private async ValueTask<decimal> EvaluateNumericAsync(BindingNode node)
