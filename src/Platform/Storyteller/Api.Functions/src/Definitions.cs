@@ -171,6 +171,7 @@ public static class Definitions
         public const string ViewTo = "viewTo";
         public const string AnnotationType = "annotationType";
         public const string Thumbprint = "thumbprint";
+        public const string Format = "format";
     }
 
     public static class Tags
@@ -197,6 +198,7 @@ public static class Definitions
         public const string IdMachine = "The id of the machine access.";
         public const string Key = "The key of the requested annotation.";
         public const string AnnotationType = "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).";
+        public const string DiffFormat = "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.";
     }
 
     public static class Errors
@@ -216,6 +218,7 @@ public static class Definitions
     public static class ContentTypes
     {
         public const string Json = "application/json";
+        public const string PlainText = "text/plain";
     }
 
     public static class SecuritySchemas

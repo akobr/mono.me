@@ -389,7 +389,8 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiParameter(Definitions.Parameters.Version, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = "The version number.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<string>), Description = "The diff between this and previous version.")]
+    [OpenApiParameter(Definitions.Parameters.Format, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.DiffFormat)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(DiffResult), Description = "The diff between this and previous version.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The requested version doesn't exist.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -414,12 +415,7 @@ public class ConfigurationHttp
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
         var diff = await _configuration.GetConfigurationVersionChangesAsync(fullKey, version);
 
-        if (diff is null)
-        {
-            return new NotFoundResult();
-        }
-
-        return new OkObjectResult(diff);
+        return FormatDiffResult(diff, request);
     }
 
     [Function(nameof(GetConfigurationVersionDiffCustom))]
@@ -432,7 +428,8 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiParameter(Definitions.Parameters.Version, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = "The target version number (to).")]
     [OpenApiParameter(Definitions.Parameters.VersionFrom, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = "The source version number (from).")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<string>), Description = "The diff between the two specified versions.")]
+    [OpenApiParameter(Definitions.Parameters.Format, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.DiffFormat)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(DiffResult), Description = "The diff between the two specified versions.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "One of the requested versions doesn't exist.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -458,12 +455,7 @@ public class ConfigurationHttp
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
         var diff = await _configuration.GetConfigurationVersionChangesAsync(fullKey, versionFrom, version);
 
-        if (diff is null)
-        {
-            return new NotFoundResult();
-        }
-
-        return new OkObjectResult(diff);
+        return FormatDiffResult(diff, request);
     }
 
     [Function(nameof(GetConfigurationViewDiff))]
@@ -475,7 +467,8 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiParameter(Definitions.Parameters.ViewTo, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The target view name.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<string>), Description = "The diff between the two views.")]
+    [OpenApiParameter(Definitions.Parameters.Format, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.DiffFormat)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(DiffResult), Description = "The diff between the two views.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "One of the requested configurations doesn't exist.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -500,12 +493,7 @@ public class ConfigurationHttp
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
         var diff = await _configuration.GetConfigurationViewChangesAsync(fullKey, viewTo);
 
-        if (diff is null)
-        {
-            return new NotFoundResult();
-        }
-
-        return new OkObjectResult(diff);
+        return FormatDiffResult(diff, request);
     }
 
     private bool TryParseAnnotationKey(
@@ -522,5 +510,22 @@ public class ConfigurationHttp
         _logger.LogWarning("Invalid request; unknown annotation key '{annotationKey}'", annotationKey);
         badRequestResult = new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {annotationKey}"));
         return false;
+    }
+
+    private static IActionResult FormatDiffResult(DiffResult diff, HttpRequestData request)
+    {
+        var format = request.Query[Definitions.Parameters.Format];
+
+        if (string.Equals(format, "unified", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ContentResult
+            {
+                Content = DiffFormatter.ToUnifiedDiff(diff),
+                ContentType = Definitions.ContentTypes.PlainText,
+                StatusCode = (int)HttpStatusCode.OK,
+            };
+        }
+
+        return new OkObjectResult(diff);
     }
 }
