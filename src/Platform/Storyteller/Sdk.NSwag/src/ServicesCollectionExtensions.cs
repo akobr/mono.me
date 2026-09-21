@@ -39,6 +39,13 @@ public static class ServicesCollectionExtensions
 
                 if (config?.ClientCertificate is not null)
                 {
+                    if (!config.ClientCertificate.HasPrivateKey)
+                    {
+                        throw new InvalidOperationException(
+                            "The configured client certificate does not have a private key. " +
+                            "mTLS requires a certificate with a private key.");
+                    }
+
                     handler.ClientCertificates.Add(config.ClientCertificate);
                 }
 

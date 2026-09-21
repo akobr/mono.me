@@ -1,4 +1,5 @@
-﻿using System.Net.Http;
+using System;
+using System.Net.Http;
 using System.Net.Http.Headers;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -17,14 +18,7 @@ public partial class AccessApiClient
     }
 
     partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
-    {
-        var token = _configuration?.AccessTokenFactory?.Invoke();
-
-        if (!string.IsNullOrEmpty(token))
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        }
-    }
+        => SdkRequestHelper.ApplyAuthorization(_configuration, request);
 }
 
 public partial class AnnotationsApiClient
@@ -40,14 +34,7 @@ public partial class AnnotationsApiClient
     }
 
     partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
-    {
-        var token = _configuration?.AccessTokenFactory?.Invoke();
-
-        if (!string.IsNullOrEmpty(token))
-        {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        }
-    }
+        => SdkRequestHelper.ApplyAuthorization(_configuration, request);
 }
 
 public partial class ConfigurationApiClient
@@ -63,12 +50,23 @@ public partial class ConfigurationApiClient
     }
 
     partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
-    {
-        var token = _configuration?.AccessTokenFactory?.Invoke();
+        => SdkRequestHelper.ApplyAuthorization(_configuration, request);
+}
 
-        if (!string.IsNullOrEmpty(token))
+internal static class SdkRequestHelper
+{
+    internal static void ApplyAuthorization(ISdkConfiguration? configuration, HttpRequestMessage request)
+    {
+        var token = configuration?.AccessTokenFactory?.Invoke();
+
+        if (string.IsNullOrEmpty(token))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return;
         }
+
+        const string apiKeyPrefix = "ApiKey ";
+        request.Headers.Authorization = token.StartsWith(apiKeyPrefix, StringComparison.Ordinal)
+            ? new AuthenticationHeaderValue("ApiKey", token[apiKeyPrefix.Length..])
+            : new AuthenticationHeaderValue("Bearer", token);
     }
 }

@@ -34,9 +34,6 @@ public class MachineCreateCommand : BaseContextCommand
     [Option("-w|--write", CommandOptionType.NoValue, Description = "Scope will be read and write.")]
     public bool IsScopeReadWrite { get; set; }
 
-    [Option("-k|--credential-kind", CommandOptionType.SingleValue, Description = "Credential kind: ApiKey (default), Certificate, CertificateAndApiKey.")]
-    public string? CredentialKind { get; set; }
-
     [Option("-l|--lifetime-days", CommandOptionType.SingleValue, Description = "Certificate lifetime in days (when credential kind includes certificate).")]
     public int? LifetimeDays { get; set; }
 
@@ -61,9 +58,22 @@ public class MachineCreateCommand : BaseContextCommand
                 Scope = IsScopeReadWrite
                     ? MachineAccessCreateScope.DefaultReadWrite
                     : MachineAccessCreateScope.DefaultRead,
+                CertificateLifetimeDays = LifetimeDays,
             });
 
-        Console.WriteJson(machine);
+        Console.WriteJson(new
+        {
+            machine.Id,
+            machine.ObjectId,
+            machine.AccessKey,
+            machine.Scope,
+            machine.AnnotationKey,
+            machine.CredentialKind,
+            machine.CertificateThumbprint,
+            machine.LastRenewalAt,
+            Certificate = string.IsNullOrEmpty(machine.Certificate) ? null : "[written to file]",
+            CertificatePassword = string.IsNullOrEmpty(machine.CertificatePassword) ? null : "[see below]",
+        });
         Console.WriteLine();
 
         if (!string.IsNullOrEmpty(machine.Certificate))
