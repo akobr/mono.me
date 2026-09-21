@@ -360,36 +360,36 @@ public class CosmosConfigurationServiceTests(Startup startup)
         version2?.Content.Should().HaveCount(4);
         version3?.Content.Should().HaveCount(0);
 
-        changes1.Count(line => line.StartsWith("+ ")).Should().Be(5);
-        changes1.Count(line => line.StartsWith("- ")).Should().Be(0);
-        changes1.Count(line => line.StartsWith("  ")).Should().Be(0);
+        changes1.Stats.Additions.Should().Be(5);
+        changes1.Stats.Deletions.Should().Be(0);
+        changes1.Stats.Unchanged.Should().Be(0);
 
-        changes2.Count(line => line.StartsWith("+ ")).Should().Be(8);
-        changes2.Count(line => line.StartsWith("- ")).Should().Be(1);
-        changes2.Count(line => line.StartsWith("  ")).Should().Be(4);
+        changes2.Stats.Additions.Should().Be(8);
+        changes2.Stats.Deletions.Should().Be(1);
+        changes2.Stats.Unchanged.Should().Be(4);
 
-        changes3.Count(line => line.StartsWith("+ ")).Should().Be(0);
-        changes3.Count(line => line.StartsWith("- ")).Should().Be(12);
-        changes3.Count(line => line.StartsWith("  ")).Should().Be(0);
+        changes3.Stats.Additions.Should().Be(0);
+        changes3.Stats.Deletions.Should().Be(12);
+        changes3.Stats.Unchanged.Should().Be(0);
 
         version3?.Content.Should().BeEmpty();
         currentConfiguration?.Content.Should().BeEmpty();
 
         var diff1To3 = await configs.GetConfigurationVersionChangesAsync(key, 1, 3);
-        diff1To3.Count(line => line.StartsWith("- ")).Should().Be(5);
-        diff1To3.Count(line => line.StartsWith("+ ")).Should().Be(0);
+        diff1To3.Stats.Deletions.Should().Be(5);
+        diff1To3.Stats.Additions.Should().Be(0);
 
         var diff3To2 = await configs.GetConfigurationVersionChangesAsync(key, 3, 2);
-        diff3To2.Count(line => line.StartsWith("+ ")).Should().Be(12);
-        diff3To2.Count(line => line.StartsWith("- ")).Should().Be(0);
+        diff3To2.Stats.Additions.Should().Be(12);
+        diff3To2.Stats.Deletions.Should().Be(0);
 
         var diff2To1 = await configs.GetConfigurationVersionChangesAsync(key, 2, 1);
-        diff2To1.Count(line => line.StartsWith("- ")).Should().Be(8);
-        diff2To1.Count(line => line.StartsWith("+ ")).Should().Be(1);
+        diff2To1.Stats.Deletions.Should().Be(8);
+        diff2To1.Stats.Additions.Should().Be(1);
 
         var diff3To0 = await configs.GetConfigurationVersionChangesAsync(key, 3, 0);
-        diff3To0.Count(line => line.StartsWith("- ")).Should().Be(0);
-        diff3To0.Count(line => line.StartsWith("+ ")).Should().Be(0);
+        diff3To0.Stats.Deletions.Should().Be(0);
+        diff3To0.Stats.Additions.Should().Be(0);
     }
 
     [Fact]
@@ -623,11 +623,12 @@ public class CosmosConfigurationServiceTests(Startup startup)
         // expect - "key": "value-a"
         // expect + "key": "value-b"
         // expect   "common": "same" (and brackets)
-        diff.Count(line => line.StartsWith("- ")).Should().Be(1);
-        diff.Count(line => line.StartsWith("+ ")).Should().Be(1);
-        diff.Count(line => line.StartsWith("  ")).Should().BeGreaterThan(0);
-        diff.Should().Contain(line => line.Contains("value-a") && line.StartsWith("- "));
-        diff.Should().Contain(line => line.Contains("value-b") && line.StartsWith("+ "));
+        diff.Stats.Deletions.Should().Be(1);
+        diff.Stats.Additions.Should().Be(1);
+        diff.Stats.Unchanged.Should().BeGreaterThan(0);
+        var allLines = diff.Hunks.SelectMany(h => h.Lines).ToList();
+        allLines.Should().Contain(l => l.Content.Contains("value-a") && l.Type == DiffChangeType.Deletion);
+        allLines.Should().Contain(l => l.Content.Contains("value-b") && l.Type == DiffChangeType.Addition);
     }
 
     [Fact]

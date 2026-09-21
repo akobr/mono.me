@@ -30,9 +30,9 @@ public interface IConfigurationService
 
     Task<Configuration?> GetConfigurationVersionContentAsync(FullKey key, uint version);
 
-    Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint version);
+    Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint version);
 
-    Task<IReadOnlyCollection<string>> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion);
+    Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion);
 
-    Task<IReadOnlyCollection<string>> GetConfigurationViewChangesAsync(FullKey sourceKey, string toView);
+    Task<DiffResult> GetConfigurationViewChangesAsync(FullKey sourceKey, string toView);
 }
