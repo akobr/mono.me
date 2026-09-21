@@ -6,6 +6,7 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
+using Sharprompt;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
 
@@ -35,9 +36,6 @@ public class MachineRenewCommand : BaseContextCommand
     [Option("-c|--certificate", CommandOptionType.SingleValue, Description = "Path to the PKCS#12 (.pfx) certificate file for mTLS authentication.")]
     public string? CertificatePath { get; set; }
 
-    [Option("-p|--password", CommandOptionType.SingleValue, Description = "Password for the PKCS#12 certificate.")]
-    public string? CertificatePassword { get; set; }
-
     [Option("-o|--output", CommandOptionType.SingleValue, Description = "Output file path for the renewed PKCS#12 certificate (.pfx).")]
     public string? OutputPath { get; set; }
 
@@ -51,7 +49,11 @@ public class MachineRenewCommand : BaseContextCommand
 
         if (!string.IsNullOrWhiteSpace(CertificatePath))
         {
-            var cert = X509CertificateLoader.LoadPkcs12FromFile(CertificatePath, CertificatePassword);
+            var password = Console.Password(new PasswordOptions
+            {
+                Message = "Certificate password (press Enter if none)",
+            });
+            var cert = X509CertificateLoader.LoadPkcs12FromFile(CertificatePath, password);
             ((SdkConfiguration)_sdkConfiguration).ClientCertificate = cert;
         }
 
