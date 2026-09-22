@@ -4,17 +4,20 @@ using _42.Platform.Storyteller.Entities;
 using _42.Utils.Async;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Scripts;
+using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller;
 
 public class ContainerFactory : IContainerFactory
 {
     private readonly ICosmosClientProvider _cosmosClientProvider;
+    private readonly CosmosDbOptions _options;
     private readonly AsyncLazy<Database> _database;
 
-    public ContainerFactory(ICosmosClientProvider cosmosClientProvider)
+    public ContainerFactory(ICosmosClientProvider cosmosClientProvider, IOptions<CosmosDbOptions> options)
     {
         _cosmosClientProvider = cosmosClientProvider;
+        _options = options.Value;
         _database = new AsyncLazy<Database>(BuildDatabase);
     }
 
@@ -132,9 +135,13 @@ public class ContainerFactory : IContainerFactory
 
     private async Task<Database> BuildDatabase()
     {
+        ThroughputProperties? throughput = _options.AutoscaleMaxThroughput.HasValue
+            ? ThroughputProperties.CreateAutoscaleThroughput(_options.AutoscaleMaxThroughput.Value)
+            : null;
+
         var databaseResponse = await _cosmosClientProvider.Client.CreateDatabaseIfNotExistsAsync(
             "42.Platform.2S",
-            ThroughputProperties.CreateAutoscaleThroughput(1000));
+            throughput);
         return databaseResponse.Database;
     }
 }

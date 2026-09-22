@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.DbCreator.Logic;
@@ -96,7 +97,8 @@ public class Startup : IAsyncLifetime, ITestContext
         {
             InitialData = [
                 new KeyValuePair<string, string>("cosmosDb:connection", connectionString),
-                new KeyValuePair<string, string>("cosmosDb:shouldAcceptAnyCertificate", "True")
+                new KeyValuePair<string, string>("cosmosDb:shouldAcceptAnyCertificate", "True"),
+                new KeyValuePair<string, string?>("cosmosDb:autoscaleMaxThroughput", null)
             ]
         });
     }
@@ -108,7 +110,9 @@ public class Startup : IAsyncLifetime, ITestContext
         services.AddSingleton<CoreDbStructureBuilder>();
 
         services.AddSingleton<ConfigBindingFunction>();
-        services.AddSingleton<AnnotationBindingFunction>();
+        services.AddSingleton<AnnotationBindingFunction>(sp =>
+            new AnnotationBindingFunction(
+                new Lazy<IAnnotationService>(() => sp.GetRequiredService<IAnnotationService>())));
         services.AddConfigurationBindings(options => options
             .AddFunction<ConfigBindingFunction>("config")
             .AddFunction<AnnotationBindingFunction>("annotation"));

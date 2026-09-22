@@ -1,3 +1,4 @@
+using System.Text.Json;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Configuring;
@@ -16,9 +17,9 @@ public sealed class AnnotationBindingFunction : IBindingFunction
 {
     private const string FunctionName = "annotation";
 
-    private readonly IAnnotationService _annotationService;
+    private readonly Lazy<IAnnotationService> _annotationService;
 
-    public AnnotationBindingFunction(IAnnotationService annotationService)
+    public AnnotationBindingFunction(Lazy<IAnnotationService> annotationService)
     {
         _annotationService = annotationService ?? throw new ArgumentNullException(nameof(annotationService));
     }
@@ -62,13 +63,13 @@ public sealed class AnnotationBindingFunction : IBindingFunction
             targetKey = FullKey.Create(ancestorKey, context.ConfigurationKey);
         }
 
-        var annotation = await _annotationService.GetAnnotationAsync(targetKey);
+        var annotation = await _annotationService.Value.GetAnnotationAsync(targetKey);
         if (annotation is null || annotation.Values is null)
         {
             return null;
         }
 
-        var document = JObject.FromObject(annotation.Values);
+        var document = JObject.Parse(JsonSerializer.Serialize(annotation.Values));
         var result = JsonQuery.Resolve(document, expression);
 
         return result is null ? null : new BindingValue(result);
