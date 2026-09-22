@@ -4870,9 +4870,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and previous version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version);
+        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4880,9 +4881,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and previous version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -4890,9 +4892,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The target version number (to).</param>
         /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom);
+        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4901,18 +4904,20 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The target version number (to).</param>
         /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="viewTo">The target view name.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two views.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo);
+        System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4920,9 +4925,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="viewTo">The target view name.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two views.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format, System.Threading.CancellationToken cancellationToken);
 
     }
 
@@ -5955,11 +5961,12 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and previous version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version)
+        public virtual System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format)
         {
-            return GetConfigurationVersionDiffAsync(organization, project, view, key, version, System.Threading.CancellationToken.None);
+            return GetConfigurationVersionDiffAsync(organization, project, view, key, version, format, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -5968,9 +5975,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between this and previous version.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6010,6 +6018,12 @@ namespace _42.Platform.Storyteller.Sdk
                     urlBuilder_.Append("/versions/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/diff");
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -6036,7 +6050,7 @@ namespace _42.Platform.Storyteller.Sdk
                         var status_ = (int)response_.StatusCode;
                         if (status_ == 200)
                         {
-                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<string>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -6101,11 +6115,12 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The target version number (to).</param>
         /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom)
+        public virtual System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format)
         {
-            return GetConfigurationVersionDiffCustomAsync(organization, project, view, key, version, versionFrom, System.Threading.CancellationToken.None);
+            return GetConfigurationVersionDiffCustomAsync(organization, project, view, key, version, versionFrom, format, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -6115,9 +6130,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The target version number (to).</param>
         /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two specified versions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6161,6 +6177,12 @@ namespace _42.Platform.Storyteller.Sdk
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/diff/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(versionFrom, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -6187,7 +6209,7 @@ namespace _42.Platform.Storyteller.Sdk
                         var status_ = (int)response_.StatusCode;
                         if (status_ == 200)
                         {
-                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<string>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -6251,11 +6273,12 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="viewTo">The target view name.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two views.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo)
+        public virtual System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format)
         {
-            return GetConfigurationViewDiffAsync(organization, project, view, key, viewTo, System.Threading.CancellationToken.None);
+            return GetConfigurationViewDiffAsync(organization, project, view, key, viewTo, format, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -6264,9 +6287,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="viewTo">The target view name.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
         /// <returns>The diff between the two views.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<string>> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6305,6 +6329,12 @@ namespace _42.Platform.Storyteller.Sdk
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/diff/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(viewTo, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -6331,7 +6361,7 @@ namespace _42.Platform.Storyteller.Sdk
                         var status_ = (int)response_.StatusCode;
                         if (status_ == 200)
                         {
-                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<string>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -8724,6 +8754,133 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class DiffHunk
+    {
+
+        [Newtonsoft.Json.JsonProperty("OldStart", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int OldStart { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("OldCount", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int OldCount { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("NewStart", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int NewStart { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("NewCount", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int NewCount { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Lines", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<DiffLine> Lines { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class DiffLine
+    {
+
+        [Newtonsoft.Json.JsonProperty("Type", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public DiffLineType Type { get; set; } = _42.Platform.Storyteller.Sdk.DiffLineType.Unchanged;
+
+        [Newtonsoft.Json.JsonProperty("Content", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Content { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("OldLineNumber", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? OldLineNumber { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("NewLineNumber", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? NewLineNumber { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Segments", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<DiffSegment> Segments { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class DiffResult
+    {
+
+        [Newtonsoft.Json.JsonProperty("Stats", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public DiffStats Stats { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Hunks", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<DiffHunk> Hunks { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class DiffSegment
+    {
+
+        [Newtonsoft.Json.JsonProperty("Text", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Text { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsChange", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsChange { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class DiffStats
+    {
+
+        [Newtonsoft.Json.JsonProperty("Additions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int Additions { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Deletions", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int Deletions { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Unchanged", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int Unchanged { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ErrorResponse
     {
 
@@ -9187,6 +9344,21 @@ namespace _42.Platform.Storyteller.Sdk
 
         [System.Runtime.Serialization.EnumMember(Value = @"NotFound")]
         NotFound = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum DiffLineType
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Unchanged")]
+        Unchanged = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Addition")]
+        Addition = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Deletion")]
+        Deletion = 2,
 
     }
 
