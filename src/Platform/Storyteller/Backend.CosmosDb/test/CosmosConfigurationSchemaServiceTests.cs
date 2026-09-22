@@ -13,6 +13,8 @@ namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 public class CosmosConfigurationSchemaServiceTests(Startup startup)
     : BaseTestsClass(startup)
 {
+    private const string Project = "schema-tests";
+
     [Fact]
     public async Task TypeLevelSchema_SetAndGet()
     {
@@ -27,11 +29,11 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             }
             """);
 
-        var result = await schemas.SetSchemaAsync(TestConstants.Organization, Constants.DefaultProjectName, AnnotationTypeCodes.Responsibility, schema, "test");
+        var result = await schemas.SetSchemaAsync(TestConstants.Organization, Project, AnnotationTypeCodes.Responsibility, schema, "test");
         result.AnnotationType.Should().Be(AnnotationTypeCodes.Responsibility);
         result.Version.Should().Be(1);
 
-        var retrieved = await schemas.GetSchemaAsync(TestConstants.Organization, Constants.DefaultProjectName, AnnotationTypeCodes.Responsibility);
+        var retrieved = await schemas.GetSchemaAsync(TestConstants.Organization, Project, AnnotationTypeCodes.Responsibility);
         retrieved.Should().NotBeNull();
         retrieved!.Content["properties"]!["name"]!["type"]!.Value<string>().Should().Be("string");
     }
@@ -52,18 +54,18 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             }
             """);
 
-        var result = await schemas.SetAnnotationSchemaAsync(TestConstants.Organization, Constants.DefaultProjectName, annotationKey, schema, "test");
+        var result = await schemas.SetAnnotationSchemaAsync(TestConstants.Organization, Project, annotationKey, schema, "test");
         result.AnnotationKey.Should().Be(annotationKey);
         result.Version.Should().Be(1);
 
-        var retrieved = await schemas.GetAnnotationSchemaAsync(TestConstants.Organization, Constants.DefaultProjectName, annotationKey);
+        var retrieved = await schemas.GetAnnotationSchemaAsync(TestConstants.Organization, Project, annotationKey);
         retrieved.Should().NotBeNull();
         retrieved!.AnnotationKey.Should().Be(annotationKey);
 
-        var deleted = await schemas.DeleteAnnotationSchemaAsync(TestConstants.Organization, Constants.DefaultProjectName, annotationKey);
+        var deleted = await schemas.DeleteAnnotationSchemaAsync(TestConstants.Organization, Project, annotationKey);
         deleted.Should().BeTrue();
 
-        var afterDelete = await schemas.GetAnnotationSchemaAsync(TestConstants.Organization, Constants.DefaultProjectName, annotationKey);
+        var afterDelete = await schemas.GetAnnotationSchemaAsync(TestConstants.Organization, Project, annotationKey);
         afterDelete.Should().BeNull();
     }
 
@@ -83,23 +85,23 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             """);
 
         var result = await schemas.SetDescendantTypeSchemaAsync(
-            TestConstants.Organization, Constants.DefaultProjectName, annotationKey, AnnotationTypeCodes.Execution, schema, "test");
+            TestConstants.Organization, Project, annotationKey, AnnotationTypeCodes.Execution, schema, "test");
         result.AnnotationType.Should().Be(AnnotationTypeCodes.Execution);
         result.AnnotationKey.Should().Be(annotationKey);
         result.Version.Should().Be(1);
 
         var retrieved = await schemas.GetDescendantTypeSchemaAsync(
-            TestConstants.Organization, Constants.DefaultProjectName, annotationKey, AnnotationTypeCodes.Execution);
+            TestConstants.Organization, Project, annotationKey, AnnotationTypeCodes.Execution);
         retrieved.Should().NotBeNull();
         retrieved!.AnnotationType.Should().Be(AnnotationTypeCodes.Execution);
         retrieved!.AnnotationKey.Should().Be(annotationKey);
 
         var deleted = await schemas.DeleteDescendantTypeSchemaAsync(
-            TestConstants.Organization, Constants.DefaultProjectName, annotationKey, AnnotationTypeCodes.Execution);
+            TestConstants.Organization, Project, annotationKey, AnnotationTypeCodes.Execution);
         deleted.Should().BeTrue();
 
         var afterDelete = await schemas.GetDescendantTypeSchemaAsync(
-            TestConstants.Organization, Constants.DefaultProjectName, annotationKey, AnnotationTypeCodes.Execution);
+            TestConstants.Organization, Project, annotationKey, AnnotationTypeCodes.Execution);
         afterDelete.Should().BeNull();
     }
 

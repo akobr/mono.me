@@ -443,8 +443,8 @@ public class CosmosConfigurationService : IConfigurationService
         {
             var hunkLines = allLines.GetRange(start, end - start + 1);
 
-            int oldStart = hunkLines.FirstOrDefault(l => l.OldLineNumber.HasValue)?.OldLineNumber ?? 1;
-            int newStart = hunkLines.FirstOrDefault(l => l.NewLineNumber.HasValue)?.NewLineNumber ?? 1;
+            int oldStart = hunkLines.FirstOrDefault(l => l.OldLineNumber.HasValue)?.OldLineNumber ?? 0;
+            int newStart = hunkLines.FirstOrDefault(l => l.NewLineNumber.HasValue)?.NewLineNumber ?? 0;
             int oldCount = hunkLines.Count(l => l.Type != DiffChangeType.Addition);
             int newCount = hunkLines.Count(l => l.Type != DiffChangeType.Deletion);
 

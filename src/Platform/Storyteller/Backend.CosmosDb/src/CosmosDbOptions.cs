@@ -9,4 +9,6 @@ public class CosmosDbOptions
     public bool? ShouldAcceptAnyCertificate { get; set; }
 
     public int? AutoscaleMaxThroughput { get; set; } = 1000;
+
+    public int? ManualThroughput { get; set; }
 }
