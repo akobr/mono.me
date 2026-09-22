@@ -14,13 +14,15 @@ namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 public class CosmosConfigurationServiceTests(Startup startup)
     : BaseTestsClass(startup)
 {
+    private const string Project = "config-tests";
+
     [Fact]
     public async Task NonExistingConfiguration()
     {
         var configs = Context.Services.GetRequiredService<IConfigurationService>();
 
         var annotationKey = AnnotationKey.CreateResponsibility("non-exist");
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         var configuration = await configs.GetRawConfigurationAsync(key);
 
         configuration.Should().BeNull();
@@ -37,12 +39,12 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = AnnotationKey.CreateResponsibility("empty"),
             AnnotationType = AnnotationType.Responsibility,
             Name = "empty",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
         var annotationKey = AnnotationKey.CreateResponsibility("empty");
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         var configuration = await configs.GetRawConfigurationAsync(key);
         var content = configuration?.Content;
         content.Should().NotBeNull();
@@ -61,7 +63,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "simple",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -76,7 +78,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  }
                                                  """);
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system");
         var hasContent = await configs.HasConfigurationContentAsync(key);
         var retrieveConfig = await configs.GetRawConfigurationAsync(key);
@@ -102,7 +104,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Subject,
             Name = "clear",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -114,7 +116,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  }
                                                  """);
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system");
         var hasContentBefore = await configs.HasConfigurationContentAsync(key);
         await configs.ClearConfigurationAsync(key);
@@ -140,7 +142,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Subject,
             Name = "delete",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -150,7 +152,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  }
                                                  """);
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system");
         var hasContentBefore = await configs.HasConfigurationContentAsync(key);
         await configs.DeleteAsync(key);
@@ -176,7 +178,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = subjectAnnotationKey,
             AnnotationType = AnnotationType.Subject,
             Name = subjectName,
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -187,7 +189,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             Name = "first",
             SubjectName = subjectName,
             SubjectKey = subjectAnnotationKey,
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -198,7 +200,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             Name = "second",
             SubjectName = subjectName,
             SubjectKey = subjectAnnotationKey,
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -207,7 +209,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = AnnotationKey.CreateResponsibility("app1"),
             AnnotationType = AnnotationType.Responsibility,
             Name = "app1",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -216,7 +218,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = AnnotationKey.CreateResponsibility("app2"),
             AnnotationType = AnnotationType.Responsibility,
             Name = "app2",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -229,7 +231,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             SubjectName = subjectName,
             ResponsibilityKey = AnnotationKey.CreateResponsibility("app1"),
             ResponsibilityName = "app1",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -242,13 +244,13 @@ public class CosmosConfigurationServiceTests(Startup startup)
             SubjectName = subjectName,
             ResponsibilityKey = AnnotationKey.CreateResponsibility("app2"),
             ResponsibilityName = "app2",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
         var executionKey = FullKey.Create(
             AnnotationKey.CreateExecution(subjectName, "app1", "first"), TestConstants.Organization,
-            Constants.DefaultProjectName,
+            Project,
             Constants.DefaultViewName);
 
         await annotations.CreateAnnotationAsync(TestConstants.Organization, new Execution
@@ -263,7 +265,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             ContextKey = AnnotationKey.CreateContext(subjectName, "first"),
             ContextName = "first",
             UsageKey = AnnotationKey.CreateUsage(subjectName, "app1"),
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -279,7 +281,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             ContextKey = AnnotationKey.CreateContext(subjectName, "second"),
             ContextName = "second",
             UsageKey = AnnotationKey.CreateUsage(subjectName, "app1"),
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -289,7 +291,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  }
                                                  """);
 
-        var subjectKey = FullKey.Create(subjectAnnotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var subjectKey = FullKey.Create(subjectAnnotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(subjectKey, configuration, "system");
         var executionConfigBeforeDelete = await configs.GetRawConfigurationAsync(executionKey);
 
@@ -314,7 +316,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "versioning",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
@@ -326,7 +328,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  }
                                                  """);
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system"); // version 1
 
         configuration.Add("array", JArray.Parse("""
@@ -399,7 +401,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
 
         var key = FullKey.Create(
             AnnotationKey.CreateUnitOfExecution("hv-ne-subject", "hv-ne-resp", "hv-ne-ctx", "hv-ne-unit"),
-            TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+            TestConstants.Organization, Project, Constants.DefaultViewName);
 
         var result = await configs.GetConfigurationHierarchyViewAsync(key);
 
@@ -440,12 +442,12 @@ public class CosmosConfigurationServiceTests(Startup startup)
             UnitName = unitName,
             UsageKey = usageAnnotationKey,
             ExecutionKey = executionAnnotationKey,
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
         var org = TestConstants.Organization;
-        var project = Constants.DefaultProjectName;
+        var project = Project;
         var view = Constants.DefaultViewName;
 
         var uoeKey = FullKey.Create(uoeAnnotationKey, org, project, view);
@@ -537,12 +539,12 @@ public class CosmosConfigurationServiceTests(Startup startup)
             UnitName = unitName,
             UsageKey = usageAnnotationKey,
             ExecutionKey = executionAnnotationKey,
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
         var org = TestConstants.Organization;
-        var project = Constants.DefaultProjectName;
+        var project = Project;
         var view = Constants.DefaultViewName;
 
         var uoeKey = FullKey.Create(uoeAnnotationKey, org, project, view);
@@ -584,7 +586,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "view-diff",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = viewA,
         });
 
@@ -593,7 +595,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "view-diff",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = viewB,
         });
 
@@ -611,8 +613,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                     }
                                     """);
 
-        var fullKeyA = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, viewA);
-        var fullKeyB = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, viewB);
+        var fullKeyA = FullKey.Create(annotationKey, TestConstants.Organization, Project, viewA);
+        var fullKeyB = FullKey.Create(annotationKey, TestConstants.Organization, Project, viewB);
 
         await configs.CreateOrUpdateConfigurationAsync(fullKeyA, configA, "system");
         await configs.CreateOrUpdateConfigurationAsync(fullKeyB, configB, "system");
@@ -643,11 +645,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "inline-patch",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
             {
                 "name": "original",
@@ -686,11 +688,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "patch-combo",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
             {
                 "keep": "yes",
@@ -733,11 +735,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "dedicated-patch",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
             {
                 "name": "before",
@@ -777,11 +779,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "patch-history",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "v": 1 }"""), "system");
 
         var patchOps = JArray.Parse("""[{ "op": "replace", "path": "/v", "value": 2 }]""");
@@ -803,11 +805,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "patch-invalid",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "a": 1 }"""), "system");
 
         // replace on non-existing path should fail
@@ -830,11 +832,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "config-fn",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
             {
                 "maxPrice": 10,
@@ -859,11 +861,11 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "config-fn-snapshot",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
         });
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         // "base" is processed before "snapshot" (declaration order); if @config read the live, in-progress
         // document, it would see "base" already resolved to the number 2 by the time "snapshot" runs. Since it
         // must resolve against a pre-binding snapshot instead, it sees the original unresolved math expression.
@@ -892,12 +894,12 @@ public class CosmosConfigurationServiceTests(Startup startup)
             AnnotationKey = annotationKey,
             AnnotationType = AnnotationType.Responsibility,
             Name = "annotation-fn",
-            ProjectName = Constants.DefaultProjectName,
+            ProjectName = Project,
             ViewName = Constants.DefaultViewName,
             Values = new Dictionary<string, object> { ["owner"] = "team-a" },
         });
 
-        var key = FullKey.Create(annotationKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName);
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
         await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
             {
                 "owner": "@annotation(\"/owner\")"
@@ -907,5 +909,62 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var resolved = await configs.GetResolvedConfigurationAsync(key);
 
         resolved!.Content["owner"]!.Value<string>().Should().Be("team-a");
+    }
+
+    [Fact]
+    public async Task VersionDiff_EmptyToPopulated_HunkStartIsZeroOnOldSide()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("diff-hunk-new");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "diff-hunk-new",
+            ProjectName = Project,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "value": 1 }"""), "system");
+
+        var changes = await configs.GetConfigurationVersionChangesAsync(key, 1);
+
+        changes.Hunks.Should().HaveCount(1);
+        changes.Hunks[0].OldStart.Should().Be(0);
+        changes.Hunks[0].OldCount.Should().Be(0);
+        changes.Stats.Additions.Should().BeGreaterThan(0);
+        changes.Stats.Deletions.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task VersionDiff_PopulatedToEmpty_HunkStartIsZeroOnNewSide()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("diff-hunk-del");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "diff-hunk-del",
+            ProjectName = Project,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "value": 1 }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "$remove": [ "$.*" ] }"""), "system");
+
+        var changes = await configs.GetConfigurationVersionChangesAsync(key, 2);
+
+        changes.Hunks.Should().HaveCount(1);
+        changes.Hunks[0].NewStart.Should().Be(0);
+        changes.Hunks[0].NewCount.Should().Be(0);
+        changes.Stats.Deletions.Should().BeGreaterThan(0);
+        changes.Stats.Additions.Should().Be(0);
     }
 }

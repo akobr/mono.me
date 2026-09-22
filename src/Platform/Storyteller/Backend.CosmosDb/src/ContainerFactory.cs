@@ -137,7 +137,9 @@ public class ContainerFactory : IContainerFactory
     {
         ThroughputProperties? throughput = _options.AutoscaleMaxThroughput.HasValue
             ? ThroughputProperties.CreateAutoscaleThroughput(_options.AutoscaleMaxThroughput.Value)
-            : null;
+            : _options.ManualThroughput.HasValue
+                ? ThroughputProperties.CreateManualThroughput(_options.ManualThroughput.Value)
+                : null;
 
         var databaseResponse = await _cosmosClientProvider.Client.CreateDatabaseIfNotExistsAsync(
             "42.Platform.2S",
