@@ -14,7 +14,6 @@
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.2" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.2" />
     <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.1.2" />
-    <PackageVersion Include="AutoMapper" Version="[14.0.0]" />
     <PackageVersion Include="Azure.Data.Tables" Version="12.11.0" />
     <PackageVersion Include="Azure.Identity" Version="1.19.0" />
     <PackageVersion Include="Azure.Security.KeyVault.Keys" Version="4.7.0" />

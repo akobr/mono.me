@@ -7,7 +7,6 @@ using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Json;
-using AutoMapper;
 using DiffPlex;
 using DiffPlex.DiffBuilder;
 using DiffPlex.DiffBuilder.Model;
@@ -26,13 +25,11 @@ public class CosmosConfigurationService : IConfigurationService
     private readonly IBindingExecutor? _bindingExecutor;
     private readonly IConfigurationSchemaService? _schemaService;
     private readonly IJsonSerializationSettingsProvider _jsonSettingsProvider;
-    private readonly IMapper _mapper;
     private readonly JsonSerializerSettings _serializerOptions;
 
     public CosmosConfigurationService(
         IContainerRepositoryProvider repositoryProvider,
         IJsonSerializationSettingsProvider jsonSettingsProvider,
-        IMapper mapper,
         IOptions<JsonSerializerSettings> serializerOptions,
         IBindingExecutor bindingExecutor = null,
         IConfigurationSchemaService schemaService = null)
@@ -41,7 +38,6 @@ public class CosmosConfigurationService : IConfigurationService
         _bindingExecutor = bindingExecutor;
         _schemaService = schemaService;
         _jsonSettingsProvider = jsonSettingsProvider;
-        _mapper = mapper;
         _serializerOptions = serializerOptions.Value;
     }
 
@@ -163,7 +159,7 @@ public class CosmosConfigurationService : IConfigurationService
         while (feed.HasMoreResults)
         {
             var results = await feed.ReadNextAsync();
-            versions.AddRange(results.Select(entity => _mapper.Map<ConfigurationHistoryEntity, ConfigurationVersion>(entity)));
+            versions.AddRange(results.Select(entity => entity.ToConfigurationVersion()));
         }
 
         var configurationKey = $"{EntityIdPrefixTypes.Configuration}.{key.Annotation}";
@@ -176,7 +172,7 @@ public class CosmosConfigurationService : IConfigurationService
 
         if (configuration is not null)
         {
-            versions.Add(_mapper.Map<ConfigurationEntity, ConfigurationVersion>(configuration));
+            versions.Add(configuration.ToConfigurationVersion());
         }
 
         return versions;

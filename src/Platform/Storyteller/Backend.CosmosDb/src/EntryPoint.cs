@@ -1,14 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
-using _42.Platform.Storyteller.Entities;
-using _42.Platform.Storyteller.Entities.Access;
-using _42.Platform.Storyteller.Entities.Annotations;
-using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -103,35 +98,6 @@ public static class EntryPoint
         services.AddSingleton<IConfigurationSchemaService, CosmosConfigurationSchemaService>();
 
         services.AddMemoryCache();
-
-        services.AddAutoMapper(config =>
-        {
-            config.AllowNullDestinationValues = true;
-            config.AllowNullCollections = true;
-
-            config.CreateMap<Responsibility, ResponsibilityEntity>().ReverseMap();
-            config.CreateMap<Unit, UnitEntity>().ReverseMap();
-            config.CreateMap<Subject, SubjectEntity>().ReverseMap();
-            config.CreateMap<Context, ContextEntity>().ReverseMap();
-            config.CreateMap<Usage, UsageEntity>().ReverseMap();
-            config.CreateMap<Execution, ExecutionEntity>().ReverseMap();
-            config.CreateMap<UnitOfExecution, UnitOfExecutionEntity>().ReverseMap();
-
-            config.CreateMap<Account, AccountEntity>().ReverseMap();
-            config.CreateMap<AccessPoint, AccessPointEntity>().ReverseMap();
-            config.CreateMap<MachineAccessEntity, MachineAccess>()
-                .ForMember(dest => dest.CertificateThumbprint, opt => opt.MapFrom(src => src.CertificateThumbprint));
-            config.CreateMap<MachineAccess, MachineAccessEntity>()
-                .ForMember(dest => dest.HashedSecret, opt => opt.Ignore())
-                .ForMember(dest => dest.ETag, opt => opt.Ignore());
-
-            config.CreateMap<ConfigurationEntity, ConfigurationVersion>()
-                .ForMember(dest => dest.CreationTime, opt => opt.MapFrom(src => src.GetLastUpdatedTime()))
-                .ForMember(dest => dest.ExpirationTime, opt => opt.MapFrom(_ => DateTimeOffset.MaxValue));
-
-            config.CreateMap<ConfigurationHistoryEntity, ConfigurationVersion>()
-                .ForMember(dest => dest.ExpirationTime, opt => opt.MapFrom(src => src.GetExpirationTime()));
-        });
 
         return services;
     }
