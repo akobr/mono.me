@@ -135,10 +135,10 @@ public class ContainerFactory : IContainerFactory
 
     private async Task<Database> BuildDatabase()
     {
-        ThroughputProperties? throughput = _options.AutoscaleMaxThroughput.HasValue
-            ? ThroughputProperties.CreateAutoscaleThroughput(_options.AutoscaleMaxThroughput.Value)
-            : _options.ManualThroughput.HasValue
-                ? ThroughputProperties.CreateManualThroughput(_options.ManualThroughput.Value)
+        ThroughputProperties? throughput = _options.ManualThroughput.HasValue
+            ? ThroughputProperties.CreateManualThroughput(_options.ManualThroughput.Value)
+            : _options.AutoscaleMaxThroughput.HasValue
+                ? ThroughputProperties.CreateAutoscaleThroughput(_options.AutoscaleMaxThroughput.Value)
                 : null;
 
         var databaseResponse = await _cosmosClientProvider.Client.CreateDatabaseIfNotExistsAsync(
