@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.8.74.11883"
+    "version": "0.8.75.25896"
   },
   "servers": [
     {
@@ -3460,6 +3460,14 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3468,10 +3476,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                  "$ref": "#/components/schemas/DiffResult"
                 }
               }
             }
@@ -3585,6 +3590,14 @@
               "type": "integer",
               "format": "int32"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3593,10 +3606,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                  "$ref": "#/components/schemas/DiffResult"
                 }
               }
             }
@@ -3699,6 +3709,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "description": "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -3707,10 +3725,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  }
+                  "$ref": "#/components/schemas/DiffResult"
                 }
               }
             }
@@ -5187,6 +5202,108 @@
           }
         ]
       },
+      "DiffHunk": {
+        "type": "object",
+        "properties": {
+          "OldStart": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "OldCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "NewStart": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "NewCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiffLine"
+            }
+          }
+        }
+      },
+      "DiffLine": {
+        "type": "object",
+        "properties": {
+          "Type": {
+            "enum": [
+              "Unchanged",
+              "Addition",
+              "Deletion"
+            ],
+            "type": "string",
+            "default": "Unchanged"
+          },
+          "Content": {
+            "type": "string"
+          },
+          "OldLineNumber": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "NewLineNumber": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "Segments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiffSegment"
+            }
+          }
+        }
+      },
+      "DiffResult": {
+        "type": "object",
+        "properties": {
+          "Stats": {
+            "$ref": "#/components/schemas/DiffStats"
+          },
+          "Hunks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DiffHunk"
+            }
+          }
+        }
+      },
+      "DiffSegment": {
+        "type": "object",
+        "properties": {
+          "Text": {
+            "type": "string"
+          },
+          "IsChange": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DiffStats": {
+        "type": "object",
+        "properties": {
+          "Additions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Deletions": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Unchanged": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
       "ErrorResponse": {
         "type": "object",
         "properties": {
@@ -5708,8 +5825,14 @@
       },
       "mtls": {
         "type": "apiKey",
-        "description": "Machine certificate authentication via mTLS.",
+        "description": "Machine certificate authentication via mTLS. Mutual TLS client certificate authentication. The client certificate is presented during the TLS handshake (production) or via the X-ARR-ClientCert header (development). Configure the certificate on HttpClientHandler or equivalent, this is a transport-layer concern, not an API parameter.",
         "name": "X-ARR-ClientCert",
+        "in": "header"
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "description": "Machine access via structured API key. Format: 'ApiKey 2s.[base64(org:project:machineAccessId)].[secret]'. Issued through the machine access creation endpoint.",
+        "name": "Authorization",
         "in": "header"
       }
     }
