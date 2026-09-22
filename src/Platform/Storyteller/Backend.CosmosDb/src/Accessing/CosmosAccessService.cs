@@ -6,7 +6,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Entities.Access;
-using AutoMapper;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
 using Permission = _42.Platform.Storyteller.Accessing.Model.Permission;
@@ -19,20 +18,17 @@ public class CosmosAccessService : IAccessService
 
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly IContainerFactory _containerFactory;
-    private readonly IMapper _mapper;
     private readonly JsonSerializerOptions _serializerOptions;
     private readonly IMachineAccessService? _machineAccessService;
 
     public CosmosAccessService(IContainerRepositoryProvider repositoryProvider,
         IContainerFactory containerFactory,
-        IMapper mapper,
         IOptions<JsonSerializerOptions> serializerOptions,
         IMachineAccessService? machineAccessService = null)
     {
         _repositoryProvider = repositoryProvider;
         _machineAccessService = machineAccessService;
         _containerFactory = containerFactory;
-        _mapper = mapper;
         _serializerOptions = serializerOptions.Value;
     }
 
@@ -47,7 +43,7 @@ public class CosmosAccessService : IAccessService
             new PartitionKey(MAIN_PARTITION_KEY),
             stream => stream.DeserializeSystemTextJson<AccountEntity>(_serializerOptions));
         return account is not null
-            ? _mapper.Map<AccountEntity, Account>(account)
+            ? account.ToAccount()
             : null;
     }
 
@@ -84,7 +80,7 @@ public class CosmosAccessService : IAccessService
 
         var repository = _repositoryProvider.GetCore();
         var response = await repository.Container.CreateItemAsync(accountEntity, new PartitionKey(MAIN_PARTITION_KEY));
-        return _mapper.Map<AccountEntity, Account>(response.Resource);
+        return response.Resource.ToAccount();
     }
 
     public async Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey)
@@ -129,7 +125,7 @@ public class CosmosAccessService : IAccessService
             resultList.AddRange(await iterator.ReadNextAsync());
         }
 
-        return resultList.Select(entity => _mapper.Map<AccessPointEntity, AccessPoint>(entity));
+        return resultList.Select(entity => entity.ToAccessPoint());
     }
 
     public async Task<AccessPoint?> GetAccessPointAsync(string key)
@@ -141,7 +137,7 @@ public class CosmosAccessService : IAccessService
             new PartitionKey(MAIN_PARTITION_KEY),
             stream => stream.DeserializeSystemTextJson<AccessPointEntity>(_serializerOptions));
         return accessPoint is not null
-            ? _mapper.Map<AccessPointEntity, AccessPoint>(accessPoint)
+            ? accessPoint.ToAccessPoint()
             : null;
     }
 
@@ -200,7 +196,7 @@ public class CosmosAccessService : IAccessService
             await repository.Container.UpsertItemAsync(account, partitionKey);
         }
 
-        return _mapper.Map<AccessPointEntity, AccessPoint>(response.Resource);
+        return response.Resource.ToAccessPoint();
     }
 
     public async Task<bool> GrantPermissionAsync(Permission model)
@@ -350,7 +346,7 @@ public class CosmosAccessService : IAccessService
             resultList.AddRange(await iterator.ReadNextAsync());
         }
 
-        return resultList.Select(entity => _mapper.Map<MachineAccessEntity, MachineAccess>(entity));
+        return resultList.Select(entity => entity.ToMachineAccess());
     }
 
     public async Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id)
@@ -361,7 +357,7 @@ public class CosmosAccessService : IAccessService
             new PartitionKey(project),
             stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
         return machineAccess is not null
-            ? _mapper.Map<MachineAccessEntity, MachineAccess>(machineAccess)
+            ? machineAccess.ToMachineAccess()
             : null;
     }
 
@@ -447,7 +443,7 @@ public class CosmosAccessService : IAccessService
         machineAccess = machineAccess with { AccessKey = maskedKey };
         await repository.Container.UpsertItemAsync(machineAccess, partitionKey);
 
-        var result = _mapper.Map<MachineAccessEntity, MachineAccess>(machineAccess);
+        var result = machineAccess.ToMachineAccess();
         return result with { AccessKey = accessKey };
     }
 

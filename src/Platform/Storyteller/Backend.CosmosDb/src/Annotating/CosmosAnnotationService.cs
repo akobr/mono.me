@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Annotations;
-using AutoMapper;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Options;
@@ -27,18 +26,15 @@ public class CosmosAnnotationService : IAnnotationService
 
     private readonly IConfigurationService _configurationService;
     private readonly IContainerRepositoryProvider _repositoryProvider;
-    private readonly IMapper _mapper;
     private readonly JsonSerializerOptions _serializationOptions;
 
     public CosmosAnnotationService(
         IConfigurationService configurationService,
         IContainerRepositoryProvider repositoryProvider,
-        IMapper mapper,
         IOptions<JsonSerializerOptions> serializationOptions)
     {
         _configurationService = configurationService;
         _repositoryProvider = repositoryProvider;
-        _mapper = mapper;
         _serializationOptions = serializationOptions.Value;
     }
 
@@ -71,7 +67,7 @@ public class CosmosAnnotationService : IAnnotationService
         var annotationType = Enum.Parse<AnnotationType>(typeProperty.GetValue<string>());
         var types = CosmosTypeCodes.GetTypesPair(annotationType);
         var entity = (AnnotationEntity)jData.Deserialize(types.Entity, _serializationOptions)!;
-        return (Annotation)_mapper.Map(entity, types.Entity, types.Annotation);
+        return entity.ToModel();
     }
 
     public async Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request)
@@ -736,7 +732,7 @@ public class CosmosAnnotationService : IAnnotationService
         }
 
         var results = await feed.ReadNextAsync();
-        var mapped = results.Select(entity => _mapper.Map<TEntity, TAnnotation>(entity));
+        var mapped = results.Select(entity => entity.ToModel<TEntity, TAnnotation>());
         model.Annotations = model.Annotations.Concat(mapped);
         model.TotalCount += results.Count;
 
@@ -749,7 +745,7 @@ public class CosmosAnnotationService : IAnnotationService
     private async Task UpsertAnnotationEntityAsync(Annotation annotation, IContainerRepository repository)
     {
         var types = CosmosTypeCodes.GetTypesPair(annotation.AnnotationType);
-        var entity = (AnnotationEntity)_mapper.Map(annotation, types.Annotation, types.Entity);
+        var entity = annotation.ToEntity();
         var partitionKey = PartitionKeys.GetKey(annotation);
 
         entity = entity with
@@ -772,7 +768,7 @@ public class CosmosAnnotationService : IAnnotationService
     private async Task UpsertAnnotationEntityAsync(Annotation annotation, TransactionalBatch transaction, IDisposableList disposable)
     {
         var types = CosmosTypeCodes.GetTypesPair(annotation.AnnotationType);
-        var entity = (AnnotationEntity)_mapper.Map(annotation, types.Annotation, types.Entity);
+        var entity = annotation.ToEntity();
         var partitionKey = PartitionKeys.GetKey(annotation);
 
         entity = entity with
