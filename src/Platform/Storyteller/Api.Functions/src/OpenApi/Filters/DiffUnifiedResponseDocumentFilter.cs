@@ -14,7 +14,7 @@ public class DiffUnifiedResponseDocumentFilter : IDocumentFilter
     ];
 
     private const string UnifiedDiffExample =
-        "@@ -1,5 +1,6 @@\n" +
+        "@@ -1,4 +1,5 @@\n" +
         " {\n" +
         "-  \"owner\": \"team-a\",\n" +
         "+  \"owner\": \"team-b\",\n" +
