@@ -7,4 +7,6 @@ public class CosmosDbOptions
     public string Connection { get; set; } = string.Empty;
 
     public bool? ShouldAcceptAnyCertificate { get; set; }
+
+    public int? AutoscaleMaxThroughput { get; set; } = 1000;
 }

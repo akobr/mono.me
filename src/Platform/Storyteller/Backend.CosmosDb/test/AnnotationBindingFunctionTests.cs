@@ -23,7 +23,7 @@ public class AnnotationBindingFunctionTests
     {
         var service = new FakeAnnotationService();
         service.Set(ExecutionKey, new Dictionary<string, object> { ["title"] = "hello" });
-        var function = new AnnotationBindingFunction(service);
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
 
         var result = await function.InvokeAsync(CreateRequest(ExecutionKey, "/title"));
 
@@ -36,7 +36,7 @@ public class AnnotationBindingFunctionTests
         var service = new FakeAnnotationService();
         var responsibilityKey = FullKey.Create(AnnotationKey.CreateResponsibility("myresp"), ExecutionKey);
         service.Set(responsibilityKey, new Dictionary<string, object> { ["owner"] = "team-a" });
-        var function = new AnnotationBindingFunction(service);
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
 
         var result = await function.InvokeAsync(CreateRequest(ExecutionKey, "/owner", "Responsibility"));
 
@@ -49,7 +49,7 @@ public class AnnotationBindingFunctionTests
         var service = new FakeAnnotationService();
         var subjectKey = FullKey.Create(AnnotationKey.CreateSubject("mysubject"), ExecutionKey);
         service.Set(subjectKey, new Dictionary<string, object> { ["owner"] = "team-b" });
-        var function = new AnnotationBindingFunction(service);
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
 
         var result = await function.InvokeAsync(CreateRequest(ExecutionKey, "/owner", "subject"));
 
@@ -60,7 +60,7 @@ public class AnnotationBindingFunctionTests
     public async Task InvokeAsync_MissingAnnotation_ReturnsNull()
     {
         var service = new FakeAnnotationService();
-        var function = new AnnotationBindingFunction(service);
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
 
         var result = await function.InvokeAsync(CreateRequest(ExecutionKey, "/title"));
 
@@ -80,7 +80,7 @@ public class AnnotationBindingFunctionTests
             AnnotationType = AnnotationType.Execution,
             Values = null,
         });
-        var function = new AnnotationBindingFunction(service);
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
 
         var result = await function.InvokeAsync(CreateRequest(ExecutionKey, "/title"));
 
@@ -91,7 +91,7 @@ public class AnnotationBindingFunctionTests
     public async Task InvokeAsync_InvalidAnnotationTypeName_Throws()
     {
         var service = new FakeAnnotationService();
-        var function = new AnnotationBindingFunction(service);
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
 
         var act = () => function.InvokeAsync(CreateRequest(ExecutionKey, "/title", "NotAType")).AsTask();
 
@@ -102,7 +102,7 @@ public class AnnotationBindingFunctionTests
     public async Task InvokeAsync_TypeNotAnAncestor_Throws()
     {
         var service = new FakeAnnotationService();
-        var function = new AnnotationBindingFunction(service);
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
         var responsibilityKey = FullKey.Create(AnnotationKey.CreateResponsibility("myresp"), ExecutionKey);
 
         var act = () => function.InvokeAsync(CreateRequest(responsibilityKey, "/title", "Subject")).AsTask();
@@ -114,7 +114,7 @@ public class AnnotationBindingFunctionTests
     public async Task InvokeAsync_MissingContext_Throws()
     {
         var service = new FakeAnnotationService();
-        var function = new AnnotationBindingFunction(service);
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
         var request = new BindingFunctionRequest
         {
             Name = "annotation",
@@ -132,7 +132,7 @@ public class AnnotationBindingFunctionTests
     public async Task InvokeAsync_WrongArgumentCount_Throws()
     {
         var service = new FakeAnnotationService();
-        var function = new AnnotationBindingFunction(service);
+        var function = new AnnotationBindingFunction(new Lazy<IAnnotationService>(() => service));
         var request = new BindingFunctionRequest
         {
             Name = "annotation",

@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Security;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Json;
@@ -75,7 +76,9 @@ var host = new HostBuilder()
 
         // Add data-bindings for configurations
         services.AddSingleton<ConfigBindingFunction>();
-        services.AddSingleton<AnnotationBindingFunction>();
+        services.AddSingleton<AnnotationBindingFunction>(sp =>
+            new AnnotationBindingFunction(
+                new Lazy<IAnnotationService>(() => sp.GetRequiredService<IAnnotationService>())));
         services
             .AddConfigurationBindings(options => options
                 .AddFunction<ConfigBindingFunction>("config")
