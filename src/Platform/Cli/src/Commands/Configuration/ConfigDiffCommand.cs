@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -41,18 +41,6 @@ public class ConfigDiffCommand : BaseContextCommand
     /// <summary>
     /// Runs the diff command: validates arguments, retrieves the requested configuration diff, and writes a formatted, colorized diff to the console.
     /// </summary>
-    /// <remarks>
-    /// Validation enforces that the view-to-compare option and version arguments are mutually exclusive and that any provided version values parse as integers.
-    /// Diff selection precedence:
-    /// - If a target view is specified, compare the current view to that view.
-    /// - Else if a `ToVersion` is provided (and optionally `FromVersion`), request the corresponding version diff.
-    /// - Otherwise, compare the latest version against its previous version.
-    /// If no diff lines are returned, the method prints "No changes detected." If the configuration has no versions or the annotation is not found, an error message is written.
-    /// </remarks>
-    /// <returns>
-    /// An exit code indicating the result:
-    /// `ExitCodes.SUCCESS` when the diff is displayed or when no changes are detected; `ExitCodes.ERROR_WRONG_INPUT` for invalid arguments, missing versions, or when the annotation is not found.
-    /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
         try
@@ -78,37 +66,40 @@ public class ConfigDiffCommand : BaseContextCommand
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
 
-            ICollection<string> diffLines;
+            DiffResult diff;
 
             if (!string.IsNullOrWhiteSpace(TargetView))
             {
-                diffLines = await _configurationApi.GetConfigurationViewDiffAsync(
+                diff = await _configurationApi.GetConfigurationViewDiffAsync(
                     Context.OrganizationName,
                     Context.ProjectName,
                     Context.ViewName,
                     AnnotationKey,
-                    TargetView);
+                    TargetView,
+                    null);
             }
             else if (int.TryParse(ToVersion, out var toVersion))
             {
                 if (int.TryParse(FromVersion, out var fromVersion))
                 {
-                    diffLines = await _configurationApi.GetConfigurationVersionDiffCustomAsync(
+                    diff = await _configurationApi.GetConfigurationVersionDiffCustomAsync(
                         Context.OrganizationName,
                         Context.ProjectName,
                         Context.ViewName,
                         AnnotationKey,
                         toVersion,
-                        fromVersion);
+                        fromVersion,
+                        null);
                 }
                 else
                 {
-                    diffLines = await _configurationApi.GetConfigurationVersionDiffAsync(
+                    diff = await _configurationApi.GetConfigurationVersionDiffAsync(
                         Context.OrganizationName,
                         Context.ProjectName,
                         Context.ViewName,
                         AnnotationKey,
-                        toVersion);
+                        toVersion,
+                        null);
                 }
             }
             else
@@ -127,55 +118,58 @@ public class ConfigDiffCommand : BaseContextCommand
                 }
 
                 var latestVersion = versions.OrderByDescending(v => v.Version).First().Version;
-                diffLines = await _configurationApi.GetConfigurationVersionDiffAsync(
+                diff = await _configurationApi.GetConfigurationVersionDiffAsync(
                     Context.OrganizationName,
                     Context.ProjectName,
                     Context.ViewName,
                     AnnotationKey,
-                    latestVersion);
+                    latestVersion,
+                    null);
             }
 
-            if (diffLines == null || diffLines.Count == 0)
+            if (diff.Hunks == null || diff.Hunks.Count == 0)
             {
                 Console.WriteLine("No changes detected.");
                 return ExitCodes.SUCCESS;
             }
 
-            var numWidth = diffLines.Count.ToString().Length;
-            var lineNumber = 1;
-
+            // Stats header
             Console.WriteLine();
-            foreach (var line in diffLines)
+            AnsiConsole.MarkupLine($"[green]+{diff.Stats.Additions}[/] [red]-{diff.Stats.Deletions}[/] [dim]~{diff.Stats.Unchanged}[/]");
+            Console.WriteLine();
+
+            foreach (var hunk in diff.Hunks)
             {
-                var isRemoved = line.StartsWith('-');
-                var linePrefix = isRemoved
-                    ? new string(' ', numWidth)
-                    : lineNumber.ToString().PadLeft(numWidth);
+                AnsiConsole.MarkupLine($"[cyan]@@ -{hunk.OldStart},{hunk.OldCount} +{hunk.NewStart},{hunk.NewCount} @@[/]");
 
-                AnsiConsole.Markup($"[grey]{linePrefix}[/] [dim]│[/] ");
+                var maxLineNum = Math.Max(
+                    hunk.OldStart + hunk.OldCount,
+                    hunk.NewStart + hunk.NewCount);
+                var numWidth = maxLineNum.ToString().Length;
 
-                if (line.StartsWith('+'))
+                foreach (var line in hunk.Lines)
                 {
-                    AnsiConsole.MarkupLine($"[green]{Markup.Escape(line)}[/]");
-                    lineNumber++;
+                    var oldNum = line.OldLineNumber?.ToString().PadLeft(numWidth) ?? new string(' ', numWidth);
+                    var newNum = line.NewLineNumber?.ToString().PadLeft(numWidth) ?? new string(' ', numWidth);
+
+                    AnsiConsole.Markup($"[grey]{oldNum} {newNum}[/] [dim]│[/] ");
+
+                    switch (line.Type)
+                    {
+                        case DiffLineType.Addition:
+                            RenderLineWithSegments(line, "+", "green");
+                            break;
+                        case DiffLineType.Deletion:
+                            RenderLineWithSegments(line, "-", "red");
+                            break;
+                        default:
+                            AnsiConsole.MarkupLine($"[dim]  {Markup.Escape(line.Content)}[/]");
+                            break;
+                    }
                 }
-                else if (isRemoved)
-                {
-                    AnsiConsole.MarkupLine($"[red]{Markup.Escape(line)}[/]");
-                }
-                else if (line.StartsWith('^'))
-                {
-                    AnsiConsole.MarkupLine($"[blue]{Markup.Escape(line)}[/]");
-                    lineNumber++;
-                }
-                else
-                {
-                    AnsiConsole.WriteLine(line);
-                    lineNumber++;
-                }
+
+                Console.WriteLine();
             }
-
-            Console.WriteLine();
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
@@ -184,5 +178,30 @@ public class ConfigDiffCommand : BaseContextCommand
         }
 
         return ExitCodes.SUCCESS;
+    }
+
+    private static void RenderLineWithSegments(DiffLine line, string prefix, string baseColor)
+    {
+        if (line.Segments == null || line.Segments.Count == 0)
+        {
+            AnsiConsole.MarkupLine($"[{baseColor}]{Markup.Escape($"{prefix} {line.Content}")}[/]");
+            return;
+        }
+
+        AnsiConsole.Markup($"[{baseColor}]{Markup.Escape($"{prefix} ")}[/]");
+
+        foreach (var segment in line.Segments)
+        {
+            if (segment.IsChange)
+            {
+                AnsiConsole.Markup($"[bold underline {baseColor}]{Markup.Escape(segment.Text)}[/]");
+            }
+            else
+            {
+                AnsiConsole.Markup($"[{baseColor}]{Markup.Escape(segment.Text)}[/]");
+            }
+        }
+
+        AnsiConsole.WriteLine();
     }
 }
