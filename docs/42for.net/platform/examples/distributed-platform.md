@@ -6,7 +6,7 @@ The market is the subject. The cell is the context. The service is the responsib
 
 ## The catalog
 
-The platform operates three markets and, in each of them, a production cell and a canary cell. Playback, recommendations, search, and billing are responsibilities. Recommendations owns a unit, `model-refresh`, which runs on a schedule.
+The platform operates several markets and, in each of them, a production cell and a canary cell. Playback, recommendations, search, and billing are responsibilities. The diagram is a partial, illustrative slice: it shows two markets, `eu` and `us`, and draws the cells only for `eu`. Recommendations owns a unit, `model-refresh`, which runs on a schedule.
 
 ```mermaid
 flowchart TB

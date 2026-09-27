@@ -86,7 +86,7 @@ Two nodes are shared:
 
 The value merged from an ancestor is that ancestor's full calculated document. It already contains the ancestor's own ancestors, the ancestor's template, and the ancestor's stored content. A node that has no configuration item contributes an empty object, plus anything its ancestors and its template produced.
 
-Because a shared ancestor is reached through more than one parent, its calculated document is merged once on each branch. The second merge writes those properties again. Session consistency on the Cosmos client makes the cache row written by the first branch visible to the second branch inside the same read.
+Because a shared ancestor is reached through more than one parent, its calculated document is merged once on each branch. The second merge writes those properties again. The second branch reuses the cache row written by the first branch only when that write is visible to its read, which requires the Cosmos account to provide session consistency (or stronger). `CosmosClientProvider` does not set a consistency level, so the client uses the account default. Under a weaker level the second branch may recalculate the shared ancestor, which produces the same document.
 
 ## Merge rules
 

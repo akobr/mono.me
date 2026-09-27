@@ -75,7 +75,7 @@ The flagship **2S Platform** — a serverless annotation/metadata platform.
 - `Api.Web/` — ASP.NET Core Web API
 - `DbCreator/` — CosmosDB schema creation tool
 
-When you make changes in Storyteller, keep the documentation in `docs/Platform/Storyteller/` up to date, and skip the subfolder `docs/Platform/Storyteller/specs/`, as it contains only historical technical specifications and change reviews.
+When you make changes in Storyteller, keep the documentation in `docs/Platform/Storyteller/` up to date. Treat existing files in `docs/Platform/Storyteller/specs/` as historical reference documents, but create new specs and reviews there when the Documentation Workflow requires them.
 
 ### Monorepo (`src/Monorepo/`)
 The `mrepo` dotnet tool for monorepo management (build, release, versioning, conventional commits).

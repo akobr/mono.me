@@ -32,7 +32,7 @@ The body is the effective configuration: ancestors merged, `@` expressions still
 GET /v1/house/main/default/configuration/exe.northwind.invoicing.production/resolved
 ```
 
-The body is the same document with expressions evaluated. Secret sources are included only when the caller has the secret scope, or is a contributor allowed to read secrets. Everyone else receives the document with those expressions left unresolved.
+The body is the same document with expressions evaluated. Secret sources are included only when the caller has the `Configuration.Secrets` scope. A caller without that scope can still read secrets when it has both the `User.Impersonation` scope and a project role of `ContributorWithSecrets` or higher. Everyone else receives the document with those secret expressions left unresolved.
 
 The service does not merge customer files, environment files, and default files itself. The execution key is the merge.
 

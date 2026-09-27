@@ -45,7 +45,7 @@ For a unit of execution the unit is merged as well. The execution's effective do
 2. The execution's effective document
 3. The unit of execution
 
-Objects merge. A scalar written later replaces the same scalar written earlier, which is how a more specific document turns a flag off: store it as a boolean or a string, and set the new value. Arrays are **unioned**, so an allow-list or a package of feature ids grows as more specific annotations add entries. A null does not erase an inherited value. To change an inherited setting, write the new value on the more specific annotation.
+Objects merge. A scalar written later replaces the same scalar written earlier, which is how a more specific document turns a flag off: store it as a boolean or a string, and set the new value. Arrays are **unioned**, so an allow-list or a package of feature ids grows as more specific annotations add entries. A more specific annotation can add entries to an inherited array, but it cannot remove or replace the entries it inherited. A null does not erase an inherited value. To change an inherited scalar setting, write the new value on the more specific annotation.
 
 ```mermaid
 flowchart TB
