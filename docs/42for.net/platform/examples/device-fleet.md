@@ -6,7 +6,7 @@ The site is the subject. The device is the context. A capability is a responsibi
 
 ## The catalog
 
-Harbor Plant is a site. It has two compressors and one gateway. The gateway runs telemetry. Each compressor runs a control loop and a maintenance window. A second site, West Quay, runs the same capabilities on different hardware and with different thresholds.
+Harbor Plant is a site. It has two compressors and one gateway. The gateway runs telemetry. Both compressors run a control loop. Compressor 1 also runs a maintenance window. A second site, West Quay, runs the same capabilities on different hardware and with different thresholds.
 
 ```mermaid
 flowchart LR

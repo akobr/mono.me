@@ -46,7 +46,7 @@ unt.infotainment.firmware
 uxe.aurora.infotainment.gt.firmware
 ```
 
-ADAS is part of the GT recipe and not of Touring, so only the GT context has that execution. The VIN context exists because that car had its battery module replaced; its execution carries the replacement part number and the date, and the trim recipe stays untouched.
+ADAS is part of the GT recipe and not of Touring, so only the GT context has that execution. The VIN context exists because that car had its battery module replaced; its execution carries the replacement part number and the date, and the trim recipe stays untouched. The VIN and the trim are sibling contexts of the same subject, so the VIN execution does not inherit from the GT execution. Its document is the complete battery record for that car: it inherits from `rst.battery-pack`, `sbt.aurora`, `usg.aurora.battery-pack`, and `cnt.aurora.vin-4F2`, and stores the full pack configuration itself.
 
 ## Configuration is the build
 
@@ -75,7 +75,7 @@ The VIN-level context is optional. Use it when a car has diverged from its trim.
 
 ## What you can answer
 
-- **What is on a GT?** Every execution of `cnt.aurora.gt`: battery, infotainment, brakes, ADAS.
+- **What is on a GT?** Every execution of `cnt.aurora.gt`. In this slice that is the battery pack and ADAS, plus infotainment through its firmware unit of execution. Brakes are a responsibility in the catalog but have no GT execution here.
 - **Which trims use the Helios pack?** Executions of `rst.battery-pack` whose document names that supplier.
 - **What changed on VIN 4F2?** The execution for that context, its version history, and the fact that the trim document did not change.
 - **Which firmware is the GT infotainment supposed to run?** The unit of execution.
