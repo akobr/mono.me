@@ -75,6 +75,8 @@ The flagship **2S Platform** — a serverless annotation/metadata platform.
 - `Api.Web/` — ASP.NET Core Web API
 - `DbCreator/` — CosmosDB schema creation tool
 
+When you make changes in Storyteller, keep the documentation in `docs/Platform/Storyteller/` up to date, and skip the subfolder `docs/Platform/Storyteller/specs/`, as it contains only historical technical specifications and change reviews.
+
 ### Monorepo (`src/Monorepo/`)
 The `mrepo` dotnet tool for monorepo management (build, release, versioning, conventional commits).
 - `Cli/` — `mrepo` CLI entry point
@@ -307,6 +309,12 @@ StyleCop is enabled by default (opt-out with `<EnableStyleCop>false</EnableStyle
 4. **Middleware pipeline in Azure Functions**: `ExceptionHandlingMiddleware`, auth middleware
 5. **Configuration bindings**: `Binding.*` projects manage configuration injection into the domain (Key Vault, Azure)
 6. **Actor model (Crumble)**: Orleans grains implement `ICrumbGrain`, registered via `CrumbToGrainRegistry`
+
+---
+
+## Documentation
+
+Keep documentation in `docs/` up to date, and skip subfolders `docs/<project-area>/specs/`, as they contain only historical technical specifications and change reviews.
 
 ---
 

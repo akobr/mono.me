@@ -80,6 +80,23 @@ export default withMermaid({
         items: [
           { text: 'Introduction', link: '/platform/introduction' },
           { text: 'Overview', link: '/platform/overview' },
+          { text: 'Annotations', link: '/platform/annotations' },
+          { text: 'Configuration', link: '/platform/configuration' },
+          { text: 'How to model', link: '/platform/modeling' },
+          { text: 'Using the platform', link: '/platform/using-the-platform' },
+          {
+            text: 'Examples',
+            collapsed: false,
+            items: [
+              { text: 'How the examples are built', link: '/platform/examples/' },
+              { text: 'B2B SaaS', link: '/platform/examples/b2b-saas' },
+              { text: 'B2C finance suite', link: '/platform/examples/b2c-finance' },
+              { text: 'Distributed platform', link: '/platform/examples/distributed-platform' },
+              { text: 'Versioned monolith', link: '/platform/examples/versioned-monolith' },
+              { text: 'Physical product', link: '/platform/examples/physical-product' },
+              { text: 'Device fleet', link: '/platform/examples/device-fleet' },
+            ]
+          },
           { text: 'Live demo', link: '/platform/live-demo' },
           { text: 'Road map', link: '/platform/road-map' },
         ]

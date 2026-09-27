@@ -8,7 +8,7 @@ The main concepts of the **2S** platform are described here.
 
 ## Storyteller
 
-The hearth of the platform. The term ecosystem is vital in the concept of a managable modulith. It is a description and a model of your product. The description can be used as a data source for fundamental questions, like *what is used by a concrete customer?* The storyteller describes the entire ecosystem in simple but flexible way of annotations and acts as a single point of truth for configuring a satellite in any state/context.
+The heart of the platform. The term ecosystem is vital in the concept of a manageable modulith. It is a description and a model of your product. The description can be used as a data source for fundamental questions, like *what is used by a concrete customer?* The storyteller describes the entire ecosystem in simple but flexible way of annotations and acts as a single point of truth for configuring a satellite in any state/context.
 
 The model of annotations defines all critical relationships from the business point of view. The shape of it is crucial and probably the most important decision to make. The concept of annotation is quite abstract, flexible, and still simple. There are these annotations *(the diagrams are interactive)*:
 
@@ -103,8 +103,10 @@ flowchart LR
 The model is kept simple but generic to make it possible to describe a lot of variations of complex software systems. It can describe the relationship between your SaaS product and your customers, complex business workflows, or differences between major software versions released yearly. There are no limits to the imagination and what you want to describe by the annotation model. It should always be something that will help you to manage your product.
 
 ::: tip
-This platform can be very useful for the microservices approach because it can help you picture the system's whole architecture and simplify management. The platform is modeled to handle hundreds of thousands of annotations and serve them blazingly fast. 
+This platform can be very useful for the microservices approach because it can help you picture the system's whole architecture and simplify management. The platform is modeled to handle hundreds of thousands of annotations and serve them blazingly fast.
 :::
+
+The guide that follows this overview takes each annotation in turn, then the configuration merge, then several products modeled with the same records: [Annotations](annotations), [Configuration](configuration), [How to model](modeling), [Using the platform](using-the-platform), and the [examples](examples/).
 
 ## Supervisor
 

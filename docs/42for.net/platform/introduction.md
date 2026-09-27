@@ -25,3 +25,13 @@ The platform is designed in a way that should help you understand the modeled ec
 The actors are open-source, allowing you to deploy them on-premise, under your cloud account, or into any hybrid environment. If you need to bend some parts, please be your guest and create a PR with code changes. The other option is to subscribe and consume it as *Software as Service (SaS)*. In this setup, you don't need to take care of anything, and you will get some extra polish tooling plus reporting.
 
 The deeper dive into the concepts is done in the next section of [overview](overview), or if you would rather see it in action, please jump directly to [live demo](live-demo) page, where is a reference example of the modulith and you can see the platform in motion.
+
+## The annotation guide
+
+Storyteller is the actor that holds the catalog. The pages below explain how a product is described with annotations, how configuration stays flexible without a private copy of every deployment, and how that looks on products that are already in production somewhere.
+
+- [Annotations](annotations) — the seven records, what each one is for, and how they are addressed
+- [Configuration](configuration) — store the difference once, read the merged setup
+- [How to model a product](modeling) — which noun becomes a subject, a context, or a responsibility
+- [Using the platform](using-the-platform) — the scopes, the reads a service makes, and the writes that build the catalog
+- [Examples](examples/) — a B2B SaaS, a consumer finance suite, a distributed platform, a versioned monolith, a physical product, and a device fleet
