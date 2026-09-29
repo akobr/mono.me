@@ -485,15 +485,7 @@ public class ConfigurationSchemaHttp
 
     private bool TryValidateAnnotationType(string annotationType, out IActionResult badRequestResult)
     {
-        if (AnnotationTypeCodes.ValidCodes.ContainsKey(annotationType))
-        {
-            badRequestResult = null!;
-            return true;
-        }
-
-        _logger.LogWarning("Invalid request; unknown annotation type '{annotationType}'", annotationType);
-        badRequestResult = new BadRequestObjectResult(new ErrorResponse($"Invalid annotation type: {annotationType}"));
-        return false;
+        return AnnotationTypeValidation.TryValidate(annotationType, _logger, out badRequestResult);
     }
 
     private bool TryValidateAnnotationKey(string annotationKey, out IActionResult badRequestResult)

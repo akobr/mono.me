@@ -7,4 +7,6 @@ public record class GenerateTemplateEntity : Entity
     public required JObject Content { get; init; }
 
     public required string Author { get; init; }
+
+    public ulong Version { get; init; }
 }
