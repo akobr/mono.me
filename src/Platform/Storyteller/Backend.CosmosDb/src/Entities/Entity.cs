@@ -13,7 +13,7 @@ public record class Entity
 
     [JsonProperty("_ts")]
     [JsonPropertyName("_ts")]
-    public uint LastUpdatedEpochTimestamp { get; }
+    public uint LastUpdatedEpochTimestamp { get; init; }
 
     public required string ProjectName { get; init; }
 

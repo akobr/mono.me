@@ -358,6 +358,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var changes3 = await configs.GetConfigurationVersionChangesAsync(key, 3);
 
         versions.Should().HaveCount(3);
+        versions.First().CreationTime.Should().BeAfter(DateTimeOffset.UtcNow.AddDays(-1));
+        versions.First().ExpirationTime.Should().BeAfter(DateTimeOffset.UtcNow.AddDays(300));
         version1?.Content.Should().HaveCount(3);
         version2?.Content.Should().HaveCount(4);
         version3?.Content.Should().HaveCount(0);

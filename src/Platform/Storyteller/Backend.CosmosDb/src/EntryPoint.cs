@@ -96,6 +96,7 @@ public static class EntryPoint
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();
         services.AddSingleton<IConfigurationService, CosmosConfigurationService>();
         services.AddSingleton<IConfigurationSchemaService, CosmosConfigurationSchemaService>();
+        services.AddSingleton<IConfigurationTemplateService, CosmosConfigurationTemplateService>();
 
         services.AddMemoryCache();
 

@@ -413,9 +413,9 @@ public class ConfigurationHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        var diff = await _configuration.GetConfigurationVersionChangesAsync(fullKey, version);
-
-        return FormatDiffResult(diff, request);
+        return await _configuration
+            .GetConfigurationVersionChangesAsync(fullKey, version)
+            .ToDiffResponseAsync(request);
     }
 
     [Function(nameof(GetConfigurationVersionDiffCustom))]
@@ -453,9 +453,9 @@ public class ConfigurationHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        var diff = await _configuration.GetConfigurationVersionChangesAsync(fullKey, versionFrom, version);
-
-        return FormatDiffResult(diff, request);
+        return await _configuration
+            .GetConfigurationVersionChangesAsync(fullKey, versionFrom, version)
+            .ToDiffResponseAsync(request);
     }
 
     [Function(nameof(GetConfigurationViewDiff))]
@@ -491,9 +491,9 @@ public class ConfigurationHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        var diff = await _configuration.GetConfigurationViewChangesAsync(fullKey, viewTo);
-
-        return FormatDiffResult(diff, request);
+        return await _configuration
+            .GetConfigurationViewChangesAsync(fullKey, viewTo)
+            .ToDiffResponseAsync(request);
     }
 
     private bool TryParseAnnotationKey(
@@ -510,22 +510,5 @@ public class ConfigurationHttp
         _logger.LogWarning("Invalid request; unknown annotation key '{annotationKey}'", annotationKey);
         badRequestResult = new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {annotationKey}"));
         return false;
-    }
-
-    private static IActionResult FormatDiffResult(DiffResult diff, HttpRequestData request)
-    {
-        var format = request.Query[Definitions.Parameters.Format];
-
-        if (string.Equals(format, "unified", StringComparison.OrdinalIgnoreCase))
-        {
-            return new ContentResult
-            {
-                Content = DiffFormatter.ToUnifiedDiff(diff),
-                ContentType = Definitions.ContentTypes.PlainText,
-                StatusCode = (int)HttpStatusCode.OK,
-            };
-        }
-
-        return new OkObjectResult(diff);
     }
 }

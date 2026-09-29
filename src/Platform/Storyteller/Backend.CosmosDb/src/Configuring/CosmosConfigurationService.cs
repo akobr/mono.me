@@ -7,9 +7,6 @@ using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Json;
-using DiffPlex;
-using DiffPlex.DiffBuilder;
-using DiffPlex.DiffBuilder.Model;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Options;
@@ -26,6 +23,7 @@ public class CosmosConfigurationService : IConfigurationService
     private readonly IConfigurationSchemaService? _schemaService;
     private readonly IJsonSerializationSettingsProvider _jsonSettingsProvider;
     private readonly JsonSerializerSettings _serializerOptions;
+    private readonly JsonContentDiffer _differ;
 
     public CosmosConfigurationService(
         IContainerRepositoryProvider repositoryProvider,
@@ -39,6 +37,7 @@ public class CosmosConfigurationService : IConfigurationService
         _schemaService = schemaService;
         _jsonSettingsProvider = jsonSettingsProvider;
         _serializerOptions = serializerOptions.Value;
+        _differ = new JsonContentDiffer(jsonSettingsProvider);
     }
 
     public async Task<bool> HasConfigurationContentAsync(FullKey key)
@@ -81,7 +80,7 @@ public class CosmosConfigurationService : IConfigurationService
         }
 
         var node = BuildInheritanceGraph(key);
-        var calculatedConfig = await CalculateAndCacheConfigurationAsync(node, repository);
+        var calculatedConfig = await CalculateAndCacheConfigurationAsync(node, repository, new Dictionary<string, JObject?>());
 
         if (calculatedConfig is null)
         {
@@ -217,7 +216,7 @@ public class CosmosConfigurationService : IConfigurationService
 
     public Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion)
     {
-        return GetConfigurationChangesAsync(
+        return _differ.GetChangesAsync(
             async () => fromVersion == 0 ? new JObject() : (await GetConfigurationVersionContentAsync(key, fromVersion))?.Content,
             async () => toVersion == 0 ? new JObject() : (await GetConfigurationVersionContentAsync(key, toVersion))?.Content,
             $"Unknown version {fromVersion} of the configuration for {key.Annotation}.",
@@ -227,234 +226,11 @@ public class CosmosConfigurationService : IConfigurationService
     public Task<DiffResult> GetConfigurationViewChangesAsync(FullKey sourceKey, string toView)
     {
         var targetKey = FullKey.Create(sourceKey.Annotation, sourceKey.OrganizationName, sourceKey.ProjectName, toView);
-        return GetConfigurationChangesAsync(
+        return _differ.GetChangesAsync(
             async () => (await GetRawConfigurationAsync(sourceKey))?.Content,
             async () => (await GetRawConfigurationAsync(targetKey))?.Content,
             $"Unknown configuration for {sourceKey.Annotation} in view {sourceKey.ViewName}.",
             $"Unknown configuration for {sourceKey.Annotation} in view {toView}.");
-    }
-
-    private async Task<DiffResult> GetConfigurationChangesAsync(
-        Func<Task<JObject?>> fromProvider,
-        Func<Task<JObject?>> toProvider,
-        string fromErrorMessage,
-        string toErrorMessage)
-    {
-        var fromJson = await fromProvider();
-
-        if (fromJson is null)
-        {
-            throw new InvalidOperationException(fromErrorMessage);
-        }
-
-        var toJson = await toProvider();
-
-        if (toJson is null)
-        {
-            throw new InvalidOperationException(toErrorMessage);
-        }
-
-        var serializerSettings = _jsonSettingsProvider.GetSettings(JsonSettingNames.Unique);
-        var fromText = !fromJson.HasValues ? string.Empty : JsonConvert.SerializeObject(fromJson, Formatting.Indented, serializerSettings);
-        var toText = !toJson.HasValues ? string.Empty : JsonConvert.SerializeObject(toJson, Formatting.Indented, serializerSettings);
-
-        var diff = InlineDiffBuilder.Diff(fromText, toText);
-
-        // Build annotated lines with line numbers
-        var allLines = new List<DiffLine>();
-        int oldLine = 0, newLine = 0;
-
-        foreach (var line in diff.Lines)
-        {
-            var type = line.Type switch
-            {
-                ChangeType.Inserted => DiffChangeType.Addition,
-                ChangeType.Deleted => DiffChangeType.Deletion,
-                _ => DiffChangeType.Unchanged,
-            };
-
-            int? oldNum = type != DiffChangeType.Addition ? ++oldLine : null;
-            int? newNum = type != DiffChangeType.Deletion ? ++newLine : null;
-
-            allLines.Add(new DiffLine
-            {
-                Type = type,
-                Content = line.Text,
-                OldLineNumber = oldNum,
-                NewLineNumber = newNum,
-            });
-        }
-
-        // Compute word-level segments for modified pairs (deletion followed by insertion)
-        ComputeWordSegments(allLines);
-
-        // Group into hunks with 3-line context
-        var hunks = BuildHunks(allLines, contextLines: 3);
-
-        var stats = new DiffStats
-        {
-            Additions = allLines.Count(l => l.Type == DiffChangeType.Addition),
-            Deletions = allLines.Count(l => l.Type == DiffChangeType.Deletion),
-            Unchanged = allLines.Count(l => l.Type == DiffChangeType.Unchanged),
-        };
-
-        return new DiffResult { Stats = stats, Hunks = hunks };
-    }
-
-    private static void ComputeWordSegments(List<DiffLine> lines)
-    {
-        var differ = new Differ();
-
-        for (int i = 0; i < lines.Count - 1; i++)
-        {
-            if (lines[i].Type != DiffChangeType.Deletion
-                || lines[i + 1].Type != DiffChangeType.Addition)
-            {
-                continue;
-            }
-
-            var oldText = lines[i].Content;
-            var newText = lines[i + 1].Content;
-            var charDiff = differ.CreateCharacterDiffs(oldText, newText, false);
-
-            lines[i] = lines[i] with
-            {
-                Segments = BuildSegments(oldText, charDiff.DiffBlocks, isOldSide: true),
-            };
-
-            lines[i + 1] = lines[i + 1] with
-            {
-                Segments = BuildSegments(newText, charDiff.DiffBlocks, isOldSide: false),
-            };
-
-            i++; // skip the addition line we just processed
-        }
-    }
-
-    private static IReadOnlyList<DiffSegment> BuildSegments(
-        string text,
-        IList<DiffPlex.Model.DiffBlock> blocks,
-        bool isOldSide)
-    {
-        var segments = new List<DiffSegment>();
-        int pos = 0;
-
-        foreach (var block in blocks)
-        {
-            int start = isOldSide ? block.DeleteStartA : block.InsertStartB;
-            int count = isOldSide ? block.DeleteCountA : block.InsertCountB;
-
-            // Add unchanged segment before this block
-            if (start > pos)
-            {
-                segments.Add(new DiffSegment
-                {
-                    Text = text[pos..start],
-                    IsChange = false,
-                });
-            }
-
-            // Add changed segment
-            if (count > 0)
-            {
-                var end = Math.Min(start + count, text.Length);
-                segments.Add(new DiffSegment
-                {
-                    Text = text[start..end],
-                    IsChange = true,
-                });
-
-                pos = end;
-            }
-            else
-            {
-                pos = start;
-            }
-        }
-
-        // Add trailing unchanged segment
-        if (pos < text.Length)
-        {
-            segments.Add(new DiffSegment
-            {
-                Text = text[pos..],
-                IsChange = false,
-            });
-        }
-
-        return segments;
-    }
-
-    private static IReadOnlyList<DiffHunk> BuildHunks(List<DiffLine> allLines, int contextLines)
-    {
-        if (allLines.Count == 0)
-        {
-            return [];
-        }
-
-        // Find indices of changed lines
-        var changedIndices = new List<int>();
-        for (int i = 0; i < allLines.Count; i++)
-        {
-            if (allLines[i].Type != DiffChangeType.Unchanged)
-            {
-                changedIndices.Add(i);
-            }
-        }
-
-        if (changedIndices.Count == 0)
-        {
-            return [];
-        }
-
-        // Build hunk ranges (start/end indices into allLines) with context
-        var hunkRanges = new List<(int Start, int End)>();
-        int rangeStart = Math.Max(0, changedIndices[0] - contextLines);
-        int rangeEnd = Math.Min(allLines.Count - 1, changedIndices[0] + contextLines);
-
-        for (int i = 1; i < changedIndices.Count; i++)
-        {
-            int nextStart = Math.Max(0, changedIndices[i] - contextLines);
-            int nextEnd = Math.Min(allLines.Count - 1, changedIndices[i] + contextLines);
-
-            if (nextStart <= rangeEnd + 1)
-            {
-                // Merge with current range
-                rangeEnd = nextEnd;
-            }
-            else
-            {
-                hunkRanges.Add((rangeStart, rangeEnd));
-                rangeStart = nextStart;
-                rangeEnd = nextEnd;
-            }
-        }
-
-        hunkRanges.Add((rangeStart, rangeEnd));
-
-        // Convert ranges to DiffHunks
-        var hunks = new List<DiffHunk>();
-
-        foreach (var (start, end) in hunkRanges)
-        {
-            var hunkLines = allLines.GetRange(start, end - start + 1);
-
-            int oldStart = hunkLines.FirstOrDefault(l => l.OldLineNumber.HasValue)?.OldLineNumber ?? 0;
-            int newStart = hunkLines.FirstOrDefault(l => l.NewLineNumber.HasValue)?.NewLineNumber ?? 0;
-            int oldCount = hunkLines.Count(l => l.Type != DiffChangeType.Addition);
-            int newCount = hunkLines.Count(l => l.Type != DiffChangeType.Deletion);
-
-            hunks.Add(new DiffHunk
-            {
-                OldStart = oldStart,
-                OldCount = oldCount,
-                NewStart = newStart,
-                NewCount = newCount,
-                Lines = hunkLines,
-            });
-        }
-
-        return hunks;
     }
 
     public async Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author)
@@ -903,22 +679,32 @@ public class CosmosConfigurationService : IConfigurationService
             : _bindingExecutor!.TryBinding(value, includeSecrets, scope);
     }
 
-    private async Task TryAutogeneratePropertiesAsync(JObject config, ConfigurationEntity configEntity, InheritanceGraphNode node, IContainerRepository repository)
+    private async Task TryAutogeneratePropertiesAsync(
+        JObject config,
+        FullKey key,
+        IContainerRepository repository,
+        Dictionary<string, JObject?> templates)
     {
-        var key = node.Key;
-        var partitionKey = key.GetCosmosPartitionKey();
-        var typeTemplateEntityId = $"{key.ViewName}.gen.{key.Annotation.TypeCode}";
-        var typeTemplateEntity = await repository.Container.TryReadItemAsync(
-            typeTemplateEntityId,
-            partitionKey,
-            stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
+        var typeCode = key.Annotation.TypeCode.ToLowerInvariant();
 
-        if (typeTemplateEntity is null)
+        // the template is the same for the whole project, read it only once per calculation
+        if (!templates.TryGetValue(typeCode, out var templateContent))
+        {
+            var typeTemplateEntity = await repository.Container.TryReadItemAsync(
+                CosmosConfigurationTemplateService.GetTemplateId(typeCode),
+                PartitionKeys.GetCosmosTemplate(key.ProjectName),
+                stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
+
+            templateContent = typeTemplateEntity?.Content;
+            templates[typeCode] = templateContent;
+        }
+
+        if (templateContent is null)
         {
             return;
         }
 
-        config.MergeInto(typeTemplateEntity.Content);
+        config.MergeInto(templateContent);
     }
 
     private async Task CollectHierarchyNodesAsync(
@@ -952,7 +738,10 @@ public class CosmosConfigurationService : IConfigurationService
         }
     }
 
-    private async Task<JObject?> CalculateAndCacheConfigurationAsync(InheritanceGraphNode node, IContainerRepository repository)
+    private async Task<JObject?> CalculateAndCacheConfigurationAsync(
+        InheritanceGraphNode node,
+        IContainerRepository repository,
+        Dictionary<string, JObject?> templates)
     {
         var key = node.Key;
         var partitionKeyValue = key.GetPartitionKey();
@@ -976,15 +765,15 @@ public class CosmosConfigurationService : IConfigurationService
         // Inherit parent configurations (responsibility <|- unit <|- subject <|- usage <|- context <|- execution <|- unit-of-execution) as graph
         foreach (var ancestorNode in node.GetAncestors())
         {
-            var parentConfig = await CalculateAndCacheConfigurationAsync(ancestorNode, repository);
+            var parentConfig = await CalculateAndCacheConfigurationAsync(ancestorNode, repository, templates);
             if (parentConfig is not null)
             {
                 config.MergeInto(parentConfig);
             }
         }
 
-        // Fill auto-generated content for the type (if any)
-        await TryAutogeneratePropertiesAsync(config, configEntry, node, repository);
+        // Fill auto-generated content for the type from the project template (if any)
+        await TryAutogeneratePropertiesAsync(config, key, repository, templates);
 
         // The most specific configuration has precedence, is merged last
         if (exist)
@@ -1034,7 +823,7 @@ public class CosmosConfigurationService : IConfigurationService
             {
                 // invalidate all units, usages, executions, and unit-of-executions (one responsibility partition)
                 // invalidate all configuration in one responsibility partition
-                await InvalidateConfigurationsAsync(
+                await ConfigurationCacheInvalidator.InvalidateAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
@@ -1047,7 +836,7 @@ public class CosmosConfigurationService : IConfigurationService
             case AnnotationType.Unit:
             {
                 // invalidate all unit-of-executions (one responsibility partition)
-                await InvalidateConfigurationsAsync(
+                await ConfigurationCacheInvalidator.InvalidateAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
@@ -1060,7 +849,7 @@ public class CosmosConfigurationService : IConfigurationService
             case AnnotationType.Usage:
             {
                 // invalidate all executions, unit-of-executions (one responsibility partition)
-                await InvalidateConfigurationsAsync(
+                await ConfigurationCacheInvalidator.InvalidateAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
@@ -1075,7 +864,7 @@ public class CosmosConfigurationService : IConfigurationService
             {
                 // invalidate all usages, contexts, executions, unit-of-executions
                 // invalidate the context configurations in the subject partitions
-                await InvalidateConfigurationsAsync(
+                await ConfigurationCacheInvalidator.InvalidateAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
@@ -1084,7 +873,7 @@ public class CosmosConfigurationService : IConfigurationService
                     key.GetCosmosPartitionKey());
 
                 // invalidate usages, executions, unit-of-executions in the responsibility partitions
-                await InvalidateConfigurationsAsync(
+                await ConfigurationCacheInvalidator.InvalidateAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
@@ -1098,7 +887,7 @@ public class CosmosConfigurationService : IConfigurationService
             case AnnotationType.Context:
             {
                 // invalidate executions, and unit-of-executions configurations in the responsibility partitions
-                await InvalidateConfigurationsAsync(
+                await ConfigurationCacheInvalidator.InvalidateAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
@@ -1111,7 +900,7 @@ public class CosmosConfigurationService : IConfigurationService
             case AnnotationType.Execution:
             {
                 // invalidate unit-of-executions (one responsibility partition)
-                await InvalidateConfigurationsAsync(
+                await ConfigurationCacheInvalidator.InvalidateAsync(
                     repository,
                     config =>
                         config.ProjectName == key.ProjectName
@@ -1181,91 +970,6 @@ public class CosmosConfigurationService : IConfigurationService
         transaction.CreateItem(history);
         transaction.DeleteItem(id);
         await transaction.ExecuteAsync();
-    }
-
-    private static Task InvalidateConfigurationsAsync(
-    IContainerRepository repository,
-    Expression<Func<ConfigurationEntity, bool>> predicate)
-    {
-        var queryable = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
-            allowSynchronousQueryExecution: true);
-
-        var groups = queryable
-            .Where(predicate)
-            .Select(config => new EntityIndices { PartitionKey = config.PartitionKey, Id = config.Id })
-            .ToList()
-            .GroupBy(config => config.PartitionKey);
-
-        var patchOperations = new List<PatchOperation>
-        {
-            PatchOperation.Remove($"/{nameof(ConfigurationEntity.CalculatedContent)}"),
-            PatchOperation.Remove($"/{nameof(ConfigurationEntity.CalculatedContentHash)}"),
-            PatchOperation.Increment($"/{nameof(ConfigurationEntity.AffectedCounter)}", 1),
-        };
-
-        var transactionTasks = new List<Task>();
-
-        foreach (var group in groups)
-        {
-            var partitionKey = new PartitionKey(group.Key);
-            var batchItemCount = 0;
-            var batch = repository.Container.CreateTransactionalBatch(partitionKey);
-
-            foreach (var indices in group)
-            {
-                ++batchItemCount;
-                batch.PatchItem(indices.Id, patchOperations);
-            }
-
-            if (batchItemCount > 0)
-            {
-                transactionTasks.Add(batch.ExecuteAsync());
-            }
-        }
-
-        return Task.WhenAll(transactionTasks);
-    }
-
-    private static async Task InvalidateConfigurationsAsync(
-        IContainerRepository repository,
-        Expression<Func<ConfigurationEntity, bool>> predicate,
-        PartitionKey partitionKey)
-    {
-        var queryable = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = partitionKey,
-                MaxItemCount = CosmosConstants.MaxItemCountPerPage,
-            });
-
-        var feed = queryable
-            .Where(predicate)
-            .Select(config => config.Id)
-            .ToFeedIterator();
-
-        var patchOperations = new List<PatchOperation>
-        {
-            PatchOperation.Remove($"/{nameof(ConfigurationEntity.CalculatedContent)}"),
-            PatchOperation.Remove($"/{nameof(ConfigurationEntity.CalculatedContentHash)}"),
-            PatchOperation.Increment($"/{nameof(ConfigurationEntity.AffectedCounter)}", 1),
-        };
-
-        var patchItemCount = 0;
-        var batch = repository.Container.CreateTransactionalBatch(partitionKey);
-        while (feed.HasMoreResults)
-        {
-            var ids = await feed.ReadNextAsync();
-            foreach (var id in ids)
-            {
-                ++patchItemCount;
-                batch.PatchItem(id, patchOperations);
-            }
-        }
-
-        if (patchItemCount > 0)
-        {
-            await batch.ExecuteAsync();
-        }
     }
 
     private static Task DeleteConfigurationsAsync(

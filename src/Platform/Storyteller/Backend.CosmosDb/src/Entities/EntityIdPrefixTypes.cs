@@ -5,4 +5,6 @@ public static class EntityIdPrefixTypes
     public const string Configuration = "cnf";
     public const string ConfigurationVersion = "cfv";
     public const string ConfigurationSchema = "cfs";
+    public const string GenerateTemplate = "gen";
+    public const string GenerateTemplateVersion = "gnv";
 }

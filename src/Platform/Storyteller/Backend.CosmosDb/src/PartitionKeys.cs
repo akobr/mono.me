@@ -5,6 +5,8 @@ namespace _42.Platform.Storyteller;
 
 public static class PartitionKeys
 {
+    public const string TemplatePartitionSuffix = "template";
+
     public static string GetResponsibility(string projectName, string responsibilityName)
     {
         return $"{projectName}.{AnnotationTypeCodes.Responsibility}.{responsibilityName}";
@@ -13,6 +15,11 @@ public static class PartitionKeys
     public static string GetSubject(string projectName, string subjectName)
     {
         return $"{projectName}.{AnnotationTypeCodes.Subject}.{subjectName}";
+    }
+
+    public static string GetTemplate(string projectName)
+    {
+        return $"{projectName}.{TemplatePartitionSuffix}";
     }
 
     public static string GetKey(IAnnotation annotation)
@@ -53,5 +60,10 @@ public static class PartitionKeys
     public static PartitionKey GetCosmosSubject(string projectName, string subjectName)
     {
         return new PartitionKey(GetSubject(projectName, subjectName));
+    }
+
+    public static PartitionKey GetCosmosTemplate(string projectName)
+    {
+        return new PartitionKey(GetTemplate(projectName));
     }
 }

@@ -71,6 +71,19 @@ public static class Definitions
                 public const string SchemaCombined = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}/definition";
             }
         }
+
+        public static class Template
+        {
+            public static class V1
+            {
+                public const string Template = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/template/{{{Parameters.AnnotationType}}}";
+
+                public const string Versions = $"{Template}/versions";
+                public const string Version = $"{Template}/versions/{{{Parameters.Version}}}";
+                public const string VersionDiff = $"{Template}/versions/{{{Parameters.Version}}}/diff";
+                public const string VersionDiffCustom = $"{Template}/versions/{{{Parameters.Version}}}/diff/{{{Parameters.VersionFrom}}}";
+            }
+        }
     }
 
     public static class RouteIds
@@ -154,6 +167,19 @@ public static class Definitions
 
             public const string GetCombinedConfigurationSchema = nameof(GetCombinedConfigurationSchema);
         }
+
+        public static class Template
+        {
+            public const string GetTemplate = nameof(GetTemplate);
+            public const string SetTemplate = nameof(SetTemplate);
+            public const string PatchTemplate = nameof(PatchTemplate);
+            public const string DeleteTemplate = nameof(DeleteTemplate);
+
+            public const string GetTemplateVersions = nameof(GetTemplateVersions);
+            public const string GetTemplateVersion = nameof(GetTemplateVersion);
+            public const string GetTemplateVersionDiff = nameof(GetTemplateVersionDiff);
+            public const string GetTemplateVersionDiffCustom = nameof(GetTemplateVersionDiffCustom);
+        }
     }
 
     public static class Parameters
@@ -180,6 +206,7 @@ public static class Definitions
         public const string Annotations = nameof(Annotations);
         public const string Configuration = nameof(Configuration);
         public const string ConfigurationSchema = nameof(ConfigurationSchema);
+        public const string Template = nameof(Template);
     }
 
     public static class Descriptions

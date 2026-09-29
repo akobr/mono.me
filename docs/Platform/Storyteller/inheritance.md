@@ -80,7 +80,7 @@ Two nodes are shared:
 2. When `CalculatedContent` is already stored, return it.
 3. Start from an empty object.
 4. For each direct ancestor in `AnnotationType` order, calculate that ancestor and `MergeInto` its calculated document.
-5. `MergeInto` the type template `{view}.gen.{typeCode}` from this node's partition, when that item exists. See [templating.md](templating.md).
+5. `MergeInto` the project template of this node's type (`gen.{typeCode}` in partition `{project}.template`), when that item exists. See [templating.md](templating.md).
 6. `MergeInto` this node's stored `Content`, when the configuration item exists.
 7. When the merged object has at least one property, persist it. An existing item is upserted with `CalculatedContent` and `CalculatedContentHash`; stored `Content`, `Version`, and `Author` stay as they were. A missing item is created with empty `Content`, author `system`, and the merge in `CalculatedContent`. An empty merge is returned and left unstored, so the next read calculates it again.
 

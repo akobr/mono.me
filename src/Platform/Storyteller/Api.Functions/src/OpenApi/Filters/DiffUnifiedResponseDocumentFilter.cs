@@ -11,6 +11,8 @@ public class DiffUnifiedResponseDocumentFilter : IDocumentFilter
         "GetConfigurationVersionDiff",
         "GetConfigurationVersionDiffCustom",
         "GetConfigurationViewDiff",
+        "GetTemplateVersionDiff",
+        "GetTemplateVersionDiffCustom",
     ];
 
     private const string UnifiedDiffExample =
