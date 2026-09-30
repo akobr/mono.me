@@ -27,10 +27,10 @@ Registered under `sform storyteller` (alias `story`) through `StorytellerListCom
 
 | Class | Command |
 | --- | --- |
-| `TemplateGetCommand` (parent) | `template|templates <type> [--version <n>] [-e|--export <file>]` |
-| `TemplateSetCommand` | `set|create <type> [-i] [-x ...] [--replace]` |
+| `TemplateGetCommand` (parent) | `template\|templates <type> [--version <n>] [-e\|--export <file>]` |
+| `TemplateSetCommand` | `set\|create <type> [-i] [-x ...] [--replace]` |
 | `TemplateEditCommand` | `edit <type>` |
-| `TemplateDeleteCommand` | `delete|remove <type>` |
+| `TemplateDeleteCommand` | `delete\|remove <type>` |
 | `TemplateVersionsCommand` | `versions <type>` |
 | `TemplateDiffCommand` | `diff <type> [to] [from]` |
 
