@@ -204,9 +204,9 @@ public static class Definitions
     {
         public const string Access = nameof(Access);
         public const string Annotations = nameof(Annotations);
-        public const string Configuration = nameof(Configuration);
-        public const string ConfigurationSchema = nameof(ConfigurationSchema);
-        public const string Template = nameof(Template);
+        public const string Configurations = nameof(Configurations);
+        public const string Schemas = nameof(Schemas);
+        public const string Templates = nameof(Templates);
     }
 
     public static class Descriptions
