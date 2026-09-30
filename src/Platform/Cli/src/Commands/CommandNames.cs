@@ -25,6 +25,9 @@ public static class CommandNames
     public const string CONFIG = "config";
     public const string CONFIGURATION = "configuration";
 
+    public const string TEMPLATE = "template";
+    public const string TEMPLATES = "templates";
+
     public const string MACHINE = "machine";
     public const string AGENT = "agent";
 
@@ -37,6 +40,7 @@ public static class CommandNames
     public const string REMOVE = "remove";
     public const string RESET = "reset";
     public const string DIFF = "diff";
+    public const string VERSIONS = "versions";
 
     public const string RENEW = "renew";
     public const string DOWNLOAD = "download";

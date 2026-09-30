@@ -9,11 +9,11 @@ namespace _42.Platform.Cli.Commands.Configuration;
 [Command(CommandNames.DELETE, CommandNames.REMOVE, Description = "Delete a configuration.")]
 public class ConfigDeleteCommand : BaseContextCommand
 {
-    private readonly IConfigurationApiClient _configurationApi;
+    private readonly IConfigurationsApiClient _configurationApi;
 
     public ConfigDeleteCommand(
         IExtendedConsole console,
-        IConfigurationApiClient configurationApi,
+        IConfigurationsApiClient configurationApi,
         ICommandContext context)
         : base(console, context)
     {

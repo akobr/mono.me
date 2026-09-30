@@ -268,3 +268,42 @@ A template item written directly into Cosmos, bypassing the service, leaves exis
 While that walk visits nested objects it records a follow-up for logic operations and template processing (`TODO: [P3]` in `GetResolvedConfigurationInternalAsync`). Today a nested object is only queued so its strings can be bound. Type templates have already been merged during calculation.
 
 Schema validation runs on stored `Content` inside `CreateOrUpdateConfigurationAsync` and `PatchConfigurationAsync`. It sees the document being written. Template content and the calculated merge are outside that check.
+
+## CLI
+
+The `sform` CLI manages templates under `sform storyteller` (alias `story`), next to `config`. Organization, project, and view come from the command context; `-p|--projectKey` and `-v|--view` override them. `<type>` is a type code (`rst`, `unt`, `sbt`, `usg`, `cnt`, `exe`, `uxe`); an unknown code is rejected before any request is sent.
+
+```text
+sform story template <type> [--version <n>] [-e|--export <file>]
+sform story template set|create <type> [-i|--import <file>] [-x|--properties k=v ...] [--replace]
+sform story template edit <type>
+sform story template delete|remove <type>
+sform story template versions <type>
+sform story template diff <type> [to] [from]
+```
+
+| Command | Behaviour |
+| --- | --- |
+| `template <type>` | Prints the current template, or the version given by `--version`, and optionally exports it to a file. |
+| `set` | Builds a document from `--import` and `--properties` and merges it into the template (`SetTemplate`). With `--replace`, the template content is replaced by the document instead: the CLI sends a JSON Patch computed from the current content, so properties that are not in the document are removed and arrays are replaced, not unioned. |
+| `edit` | Opens the current template (or `{}`) in the configured editor, shows the changes, and after a confirmation replaces the template with the edited document, the same way as `set --replace`. |
+| `delete` | Deletes the template; its history is kept. |
+| `versions` | Lists the versions, newest first: version, author, creation time, and expiration time (`—` for the current version). |
+| `diff` | Shows the diff of the latest version against its previous one, of `to` against its previous one, or of `from → to`. |
+
+Examples, for the `default` view of the current project:
+
+```text
+sform story template exe
+sform story template set exe -x owner=platform -x retries=3
+sform story template set exe -i exe-template.json --replace
+sform story template edit exe
+sform story template versions exe
+sform story template diff exe 3 1
+sform story template exe --version 2 -e exe-v2.json
+sform story template delete exe -v rollout
+```
+
+The configuration commands work the same way. `sform story config versions <key>` lists configuration versions, `config <key> --version <n>` prints the stored content of a version, and `config set --replace` and `config edit` replace the stored content through a JSON Patch. `config edit` edits the stored content of the configuration, without inherited values and templates.
+
+A JSON Patch path can't safely contain a property name with `~` or `/`, because the server doesn't decode escaped JSON Pointers. When such a name changes, the CLI replaces the whole document with a single `replace` operation on the root path instead.

@@ -178,6 +178,28 @@ public static class ExtendedConsoleExtensions
     }
 
     /// <summary>
+    /// Validates an annotation type code (for example <c>exe</c>) and returns it in lower case.
+    /// </summary>
+    /// <param name="rawAnnotationType">The raw annotation type code to validate.</param>
+    /// <returns>The normalized annotation type code.</returns>
+    /// <exception cref="WrongInputException">Thrown when <paramref name="rawAnnotationType"/> is not a known annotation type code.</exception>
+    public static string ValidateAnnotationType(this IExtendedConsole @this, string rawAnnotationType)
+    {
+        if (string.IsNullOrWhiteSpace(rawAnnotationType)
+            || !AnnotationTypeCodes.ValidCodes.ContainsKey(rawAnnotationType))
+        {
+            @this.WriteImportant("Please specify a valid annotation type code.");
+            @this.WriteLine(
+                "Known codes: ".ThemedLowlight(@this.Theme),
+                string.Join(", ", AnnotationTypeCodes.ValidCodes.Keys));
+
+            throw new WrongInputException();
+        }
+
+        return rawAnnotationType.ToLowerInvariant();
+    }
+
+    /// <summary>
     /// Computes the longest common subsequence (LCS) of two string arrays.
     /// </summary>
     /// <param name="a">First sequence of strings to compare.</param>

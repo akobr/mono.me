@@ -37,12 +37,44 @@ public partial class AnnotationsApiClient
         => SdkRequestHelper.ApplyAuthorization(_configuration, request);
 }
 
-public partial class ConfigurationApiClient
+public partial class ConfigurationsApiClient
 {
     private ISdkConfiguration? _configuration;
 
     [ActivatorUtilitiesConstructor]
-    public ConfigurationApiClient(HttpClient httpClient, ISdkConfiguration configuration)
+    public ConfigurationsApiClient(HttpClient httpClient, ISdkConfiguration configuration)
+        : this(httpClient)
+    {
+        _configuration = configuration;
+        BaseUrl = configuration.BaseUrl;
+    }
+
+    partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
+        => SdkRequestHelper.ApplyAuthorization(_configuration, request);
+}
+
+public partial class SchemasApiClient
+{
+    private ISdkConfiguration? _configuration;
+
+    [ActivatorUtilitiesConstructor]
+    public SchemasApiClient(HttpClient httpClient, ISdkConfiguration configuration)
+        : this(httpClient)
+    {
+        _configuration = configuration;
+        BaseUrl = configuration.BaseUrl;
+    }
+
+    partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
+        => SdkRequestHelper.ApplyAuthorization(_configuration, request);
+}
+
+public partial class TemplatesApiClient
+{
+    private ISdkConfiguration? _configuration;
+
+    [ActivatorUtilitiesConstructor]
+    public TemplatesApiClient(HttpClient httpClient, ISdkConfiguration configuration)
         : this(httpClient)
     {
         _configuration = configuration;
