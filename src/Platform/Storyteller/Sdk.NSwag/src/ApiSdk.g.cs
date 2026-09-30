@@ -4738,7 +4738,7 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial interface IConfigurationApiClient
+    public partial interface IConfigurationsApiClient
     {
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -4871,7 +4871,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The version number.</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and previous version.</returns>
+        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format);
 
@@ -4882,7 +4882,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The version number.</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and previous version.</returns>
+        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken);
 
@@ -4893,7 +4893,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The target version number (to).</param>
         /// <param name="versionFrom">The source version number (from).</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions.</returns>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format);
 
@@ -4905,7 +4905,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The target version number (to).</param>
         /// <param name="versionFrom">The source version number (from).</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions.</returns>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
 
@@ -4915,7 +4915,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="viewTo">The target view name.</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two views.</returns>
+        /// <returns>The diff between the two views. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format);
 
@@ -4926,14 +4926,14 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="viewTo">The target view name.</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two views.</returns>
+        /// <returns>The diff between the two views. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format, System.Threading.CancellationToken cancellationToken);
 
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class ConfigurationApiClient : IConfigurationApiClient
+    public partial class ConfigurationsApiClient : IConfigurationsApiClient
     {
         #pragma warning disable 8618
         private string _baseUrl;
@@ -4944,7 +4944,7 @@ namespace _42.Platform.Storyteller.Sdk
         private Newtonsoft.Json.JsonSerializerSettings _instanceSettings;
 
     #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-        public ConfigurationApiClient(System.Net.Http.HttpClient httpClient)
+        public ConfigurationsApiClient(System.Net.Http.HttpClient httpClient)
     #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         {
             BaseUrl = "http://localhost:7071/api";
@@ -5962,7 +5962,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The version number.</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and previous version.</returns>
+        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format)
         {
@@ -5976,7 +5976,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="version">The version number.</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between this and previous version.</returns>
+        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken)
         {
@@ -6116,7 +6116,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The target version number (to).</param>
         /// <param name="versionFrom">The source version number (from).</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions.</returns>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format)
         {
@@ -6131,7 +6131,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="version">The target version number (to).</param>
         /// <param name="versionFrom">The source version number (from).</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two specified versions.</returns>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
         {
@@ -6274,7 +6274,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="viewTo">The target view name.</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two views.</returns>
+        /// <returns>The diff between the two views. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format)
         {
@@ -6288,7 +6288,7 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="viewTo">The target view name.</param>
         /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
-        /// <returns>The diff between the two views.</returns>
+        /// <returns>The diff between the two views. When ?format=unified, returns text/plain instead.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<DiffResult> GetConfigurationViewDiffAsync(string organization, string project, string view, string key, string viewTo, string format, System.Threading.CancellationToken cancellationToken)
         {
@@ -6553,7 +6553,7 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial interface IConfigurationSchemaApiClient
+    public partial interface ISchemasApiClient
     {
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -6720,7 +6720,7 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
-    public partial class ConfigurationSchemaApiClient : IConfigurationSchemaApiClient
+    public partial class SchemasApiClient : ISchemasApiClient
     {
         #pragma warning disable 8618
         private string _baseUrl;
@@ -6731,7 +6731,7 @@ namespace _42.Platform.Storyteller.Sdk
         private Newtonsoft.Json.JsonSerializerSettings _instanceSettings;
 
     #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
-        public ConfigurationSchemaApiClient(System.Net.Http.HttpClient httpClient)
+        public SchemasApiClient(System.Net.Http.HttpClient httpClient)
     #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
         {
             BaseUrl = "http://localhost:7071/api";
@@ -8233,6 +8233,1521 @@ namespace _42.Platform.Storyteller.Sdk
         }
     }
 
+    [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial interface ITemplatesApiClient
+    {
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The configuration template of the annotation type in the view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The configuration template of the annotation type in the view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="body">The template content, merged into the current template (supports $remove and $patch).</param>
+        /// <returns>The created or updated template.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="body">The template content, merged into the current template (supports $remove and $patch).</param>
+        /// <returns>The created or updated template.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
+        /// <returns>The patched template.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
+        /// <returns>The patched template.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>Acknowledge of the deletion.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>Acknowledge of the deletion.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The list of template versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The list of template versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The template of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The template of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class TemplatesApiClient : ITemplatesApiClient
+    {
+        #pragma warning disable 8618
+        private string _baseUrl;
+        #pragma warning restore 8618
+
+        private System.Net.Http.HttpClient _httpClient;
+        private static System.Lazy<Newtonsoft.Json.JsonSerializerSettings> _settings = new System.Lazy<Newtonsoft.Json.JsonSerializerSettings>(CreateSerializerSettings, true);
+        private Newtonsoft.Json.JsonSerializerSettings _instanceSettings;
+
+    #pragma warning disable CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+        public TemplatesApiClient(System.Net.Http.HttpClient httpClient)
+    #pragma warning restore CS8618 // Non-nullable field must contain a non-null value when exiting constructor. Consider declaring as nullable.
+        {
+            BaseUrl = "http://localhost:7071/api";
+            _httpClient = httpClient;
+            Initialize();
+        }
+
+        private static Newtonsoft.Json.JsonSerializerSettings CreateSerializerSettings()
+        {
+            var settings = new Newtonsoft.Json.JsonSerializerSettings();
+            UpdateJsonSerializerSettings(settings);
+            return settings;
+        }
+
+        public string BaseUrl
+        {
+            get { return _baseUrl; }
+            set
+            {
+                _baseUrl = value;
+                if (!string.IsNullOrEmpty(_baseUrl) && !_baseUrl.EndsWith("/"))
+                    _baseUrl += '/';
+            }
+        }
+
+        protected Newtonsoft.Json.JsonSerializerSettings JsonSerializerSettings { get { return _instanceSettings ?? _settings.Value; } }
+
+        static partial void UpdateJsonSerializerSettings(Newtonsoft.Json.JsonSerializerSettings settings);
+
+        partial void Initialize();
+
+        partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, string url);
+        partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
+        partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The configuration template of the annotation type in the view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType)
+        {
+            return GetTemplateAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The configuration template of the annotation type in the view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/template/{annotationType}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/template/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ConfigurationTemplate>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("No template exists for the annotation type in the view.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="body">The template content, merged into the current template (supports $remove and $patch).</param>
+        /// <returns>The created or updated template.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body)
+        {
+            return SetTemplateAsync(organization, project, view, annotationType, body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="body">The template content, merged into the current template (supports $remove and $patch).</param>
+        /// <returns>The created or updated template.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> SetTemplateAsync(string organization, string project, string view, string annotationType, object body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/template/{annotationType}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/template/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ConfigurationTemplate>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The template was changed concurrently too many times, the request can be repeated.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
+        /// <returns>The patched template.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body)
+        {
+            return PatchTemplateAsync(organization, project, view, annotationType, body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
+        /// <returns>The patched template.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, object body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json-patch+json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PATCH");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/template/{annotationType}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/template/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ConfigurationTemplate>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("No template exists for the annotation type in the view.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The template was changed concurrently too many times, the request can be repeated.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>Acknowledge of the deletion.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType)
+        {
+            return DeleteTemplateAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>Acknowledge of the deletion.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task DeleteTemplateAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("DELETE");
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/template/{annotationType}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/template/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            return;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("No template exists for the annotation type in the view.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The template was changed concurrently too many times, the request can be repeated.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The list of template versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType)
+        {
+            return GetTemplateVersionsAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The list of template versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/template/{annotationType}/versions"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/template/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<ConfigurationVersion>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The template of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version)
+        {
+            return GetTemplateVersionAsync(organization, project, view, annotationType, version, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The template of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ConfigurationTemplate> GetTemplateVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/template/{annotationType}/versions/{version}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/template/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ConfigurationTemplate>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The requested version doesn\'t exist.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format)
+        {
+            return GetTemplateVersionDiffAsync(organization, project, view, annotationType, version, format, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/template/{annotationType}/versions/{version}/diff"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/template/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/diff");
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The requested version doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format)
+        {
+            return GetTemplateVersionDiffCustomAsync(organization, project, view, annotationType, version, versionFrom, format, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetTemplateVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            if (versionFrom == null)
+                throw new System.ArgumentNullException("versionFrom");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/template/{annotationType}/versions/{version}/diff/{versionFrom}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/template/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/diff/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(versionFrom, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("One of the requested versions doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        protected struct ObjectResponseResult<T>
+        {
+            public ObjectResponseResult(T responseObject, string responseText)
+            {
+                this.Object = responseObject;
+                this.Text = responseText;
+            }
+
+            public T Object { get; }
+
+            public string Text { get; }
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static System.Threading.Tasks.Task<string> ReadAsStringAsync(System.Net.Http.HttpContent content, System.Threading.CancellationToken cancellationToken)
+        {
+    #if NET5_0_OR_GREATER
+            return content.ReadAsStringAsync(cancellationToken);
+    #else
+            return content.ReadAsStringAsync();
+    #endif
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        private static System.Threading.Tasks.Task<System.IO.Stream> ReadAsStreamAsync(System.Net.Http.HttpContent content, System.Threading.CancellationToken cancellationToken)
+        {
+    #if NET5_0_OR_GREATER
+            return content.ReadAsStreamAsync(cancellationToken);
+    #else
+            return content.ReadAsStreamAsync();
+    #endif
+        }
+
+        public bool ReadResponseAsString { get; set; }
+
+        protected virtual async System.Threading.Tasks.Task<ObjectResponseResult<T>> ReadObjectResponseAsync<T>(System.Net.Http.HttpResponseMessage response, System.Collections.Generic.IReadOnlyDictionary<string, System.Collections.Generic.IEnumerable<string>> headers, System.Threading.CancellationToken cancellationToken)
+        {
+            if (response == null || response.Content == null)
+            {
+                return new ObjectResponseResult<T>(default(T), string.Empty);
+            }
+
+            if (ReadResponseAsString)
+            {
+                var responseText = await ReadAsStringAsync(response.Content, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    var typedBody = Newtonsoft.Json.JsonConvert.DeserializeObject<T>(responseText, JsonSerializerSettings);
+                    return new ObjectResponseResult<T>(typedBody, responseText);
+                }
+                catch (Newtonsoft.Json.JsonException exception)
+                {
+                    var message = "Could not deserialize the response body string as " + typeof(T).FullName + ".";
+                    throw new ApiException(message, (int)response.StatusCode, responseText, headers, exception);
+                }
+            }
+            else
+            {
+                try
+                {
+                    using (var responseStream = await ReadAsStreamAsync(response.Content, cancellationToken).ConfigureAwait(false))
+                    using (var streamReader = new System.IO.StreamReader(responseStream))
+                    using (var jsonTextReader = new Newtonsoft.Json.JsonTextReader(streamReader))
+                    {
+                        var serializer = Newtonsoft.Json.JsonSerializer.Create(JsonSerializerSettings);
+                        var typedBody = serializer.Deserialize<T>(jsonTextReader);
+                        return new ObjectResponseResult<T>(typedBody, string.Empty);
+                    }
+                }
+                catch (Newtonsoft.Json.JsonException exception)
+                {
+                    var message = "Could not deserialize the response body stream as " + typeof(T).FullName + ".";
+                    throw new ApiException(message, (int)response.StatusCode, string.Empty, headers, exception);
+                }
+            }
+        }
+
+        private string ConvertToString(object value, System.Globalization.CultureInfo cultureInfo)
+        {
+            if (value == null)
+            {
+                return "";
+            }
+
+            if (value is System.Enum)
+            {
+                var name = System.Enum.GetName(value.GetType(), value);
+                if (name != null)
+                {
+                    var field_ = System.Reflection.IntrospectionExtensions.GetTypeInfo(value.GetType()).GetDeclaredField(name);
+                    if (field_ != null)
+                    {
+                        var attribute = System.Reflection.CustomAttributeExtensions.GetCustomAttribute(field_, typeof(System.Runtime.Serialization.EnumMemberAttribute)) 
+                            as System.Runtime.Serialization.EnumMemberAttribute;
+                        if (attribute != null)
+                        {
+                            return attribute.Value != null ? attribute.Value : name;
+                        }
+                    }
+
+                    var converted = System.Convert.ToString(System.Convert.ChangeType(value, System.Enum.GetUnderlyingType(value.GetType()), cultureInfo));
+                    return converted == null ? string.Empty : converted;
+                }
+            }
+            else if (value is bool) 
+            {
+                return System.Convert.ToString((bool)value, cultureInfo).ToLowerInvariant();
+            }
+            else if (value is byte[])
+            {
+                return System.Convert.ToBase64String((byte[]) value);
+            }
+            else if (value is string[])
+            {
+                return string.Join(",", (string[])value);
+            }
+            else if (value.GetType().IsArray)
+            {
+                var valueArray = (System.Array)value;
+                var valueTextArray = new string[valueArray.Length];
+                for (var i = 0; i < valueArray.Length; i++)
+                {
+                    valueTextArray[i] = ConvertToString(valueArray.GetValue(i), cultureInfo);
+                }
+                return string.Join(",", valueTextArray);
+            }
+
+            var result = System.Convert.ToString(value, cultureInfo);
+            return result == null ? "" : result;
+        }
+    }
+
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class AccessPoint
     {
@@ -8690,6 +10205,33 @@ namespace _42.Platform.Storyteller.Sdk
 
         [Newtonsoft.Json.JsonProperty("AnnotationKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string AnnotationKey { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long Version { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Content", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public object Content { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Author { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ConfigurationTemplate
+    {
+
+        [Newtonsoft.Json.JsonProperty("AnnotationType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AnnotationType { get; set; }
 
         [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long Version { get; set; }

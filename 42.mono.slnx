@@ -73,6 +73,7 @@
     <Project Path="src/Platform/Aspire.Host/src/Aspire.Host.Platform.csproj" />
     <Project Path="src/Platform/Aspire.ServiceDefaults/src/Aspire.ServiceDefaults.csproj" />
     <Project Path="src/Platform/Cli/src/Cli.csproj" />
+    <Project Path="src/Platform/Cli/test/Cli.UnitTests.csproj" />
     <Project Path="src/Platform/sdk.typescript/src/sdk.typescript.esproj">
       <Build />
       <Deploy />

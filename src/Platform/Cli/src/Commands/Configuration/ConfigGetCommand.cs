@@ -13,18 +13,19 @@ namespace _42.Platform.Cli.Commands.Configuration;
     typeof(ConfigSetCommand),
     typeof(ConfigEditCommand),
     typeof(ConfigDeleteCommand),
-    typeof(ConfigDiffCommand))]
+    typeof(ConfigDiffCommand),
+    typeof(ConfigVersionsCommand))]
 
 [Command(CommandNames.CONFIG, CommandNames.CONFIGURATION, Description = "Get and manage configuration in context of an annotation.")]
 public class ConfigGetCommand : BaseContextCommand
 {
-    private readonly IConfigurationApiClient _configurationApi;
+    private readonly IConfigurationsApiClient _configurationApi;
     private readonly IFileSystem _fileSystem;
 
     public ConfigGetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IConfigurationApiClient configurationApi,
+        IConfigurationsApiClient configurationApi,
         IFileSystem fileSystem)
         : base(console, context)
     {
@@ -43,11 +44,27 @@ public class ConfigGetCommand : BaseContextCommand
     [Option("-r|--resolved", CommandOptionType.NoValue, Description = "Retrieve resolved configuration, corresponding permission is needed.")]
     public bool IsResolvedRetrievalRequested { get; set; }
 
+    [Option("--version", CommandOptionType.SingleValue, Description = "Retrieve the stored content of a specific version (see 'versions').")]
+    public int? Version { get; set; }
+
     protected override async Task<int> ExecuteAsync()
     {
         try
         {
-            var data = IsResolvedRetrievalRequested
+            if (Version.HasValue && IsResolvedRetrievalRequested)
+            {
+                Console.WriteLine("Cannot specify both --version and --resolved.");
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
+
+            var data = Version.HasValue
+                ? await _configurationApi.GetConfigurationVersionAsync(
+                    Context.OrganizationName,
+                    Context.ProjectName,
+                    Context.ViewName,
+                    AnnotationKey,
+                    Version.Value)
+                : IsResolvedRetrievalRequested
                 ? await _configurationApi.GetResolvedConfigurationAsync(
                     Context.OrganizationName,
                     Context.ProjectName,
@@ -68,7 +85,9 @@ public class ConfigGetCommand : BaseContextCommand
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
-            Console.WriteLine($"The configuration for '{AnnotationKey}' has not been found.");
+            Console.WriteLine(Version.HasValue
+                ? $"The version {Version} of the configuration for '{AnnotationKey}' has not been found."
+                : $"The configuration for '{AnnotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 

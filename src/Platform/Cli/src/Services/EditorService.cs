@@ -1,12 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.IO.Abstractions;
+using System.Linq;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sharprompt;
 
 namespace _42.Platform.Cli.Services;
@@ -121,6 +126,121 @@ public class EditorService : IEditorService
     /// Detects which supported editors are available on the current system by checking for their executables.
     /// </summary>
     /// <returns>A set containing one or more <see cref="EditorType"/> values for editors found on the system (possible values: <c>VsCode</c>, <c>Neovim</c>, <c>Vim</c>).</returns>
+    /// <summary>
+    /// Lets the user edit a JSON document in the preferred editor, validates it, shows the changes and asks for a confirmation.
+    /// </summary>
+    /// <returns>
+    /// The confirmed edited document, or null with an exit code:
+    /// - <c>ExitCodes.WARNING_NO_WORK_NEEDED</c> when no changes were made;
+    /// - <c>ExitCodes.WARNING_ABORTED</c> when the user aborted the operation;
+    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code.
+    /// </returns>
+    public async Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew)
+    {
+        // 1. Ensure editor is configured
+        if (!options.IsConfigured)
+        {
+            console.WriteImportant("No editor is configured yet. Let's set one up.");
+            options = SetupEditorPreference(console);
+        }
+
+        // 2. Write to a temp file
+        var originalJson = original.ToString(Formatting.Indented);
+        var invalidChars = _fileSystem.Path.GetInvalidFileNameChars();
+        var safePrefix = string.Concat(fileNamePrefix.Select(c => invalidChars.Contains(c) ? '_' : c));
+        var tempFilePath = _fileSystem.Path.Combine(
+            _fileSystem.Path.GetTempPath(),
+            $"{safePrefix}-{_fileSystem.Path.GetRandomFileName()[..8]}.json");
+
+        await _fileSystem.File.WriteAllTextAsync(tempFilePath, originalJson, Encoding.UTF8);
+
+        try
+        {
+            // 3. Open editor loop (allows re-editing on invalid JSON)
+            JObject edited;
+
+            while (true)
+            {
+                var exitCode = await OpenFileInEditorAsync(tempFilePath, options);
+
+                if (exitCode != 0)
+                {
+                    console.WriteImportant($"Editor exited with code {exitCode}.");
+                    return new JsonEditResult(null, ExitCodes.ERROR_CRASH);
+                }
+
+                var editedJson = _fileSystem.File.ReadAllText(tempFilePath, Encoding.UTF8);
+
+                try
+                {
+                    edited = JObject.Parse(editedJson);
+                    break;
+                }
+                catch (JsonReaderException jsonEx)
+                {
+                    console.WriteImportant($"Invalid JSON: {jsonEx.Message}");
+
+                    var shouldRetry = console.Confirm(new ConfirmOptions
+                    {
+                        Message = "Would you like to re-open the editor to fix the issue",
+                        DefaultValue = true,
+                    });
+
+                    if (!shouldRetry)
+                    {
+                        console.WriteLine("Edit aborted.");
+                        return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+                    }
+                }
+            }
+
+            // 4. Compare the documents (not the formatting)
+            if (JToken.DeepEquals(original, edited))
+            {
+                console.WriteLine("No changes detected.");
+                return new JsonEditResult(null, ExitCodes.WARNING_NO_WORK_NEEDED);
+            }
+
+            // 5. Show diff
+            console.WriteHeader(isNew ? "New document" : "Changes");
+            console.WriteDiff(originalJson, edited.ToString(Formatting.Indented));
+
+            // 6. Confirm upload
+            var shouldSave = console.Confirm(new ConfirmOptions
+            {
+                Message = "Do you want to save these changes",
+                DefaultValue = true,
+            });
+
+            if (!shouldSave)
+            {
+                console.WriteLine("Edit aborted.");
+                return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+            }
+
+            return new JsonEditResult(edited, ExitCodes.SUCCESS);
+        }
+        finally
+        {
+            // 7. Clean up temp file
+            try
+            {
+                if (_fileSystem.File.Exists(tempFilePath))
+                {
+                    _fileSystem.File.Delete(tempFilePath);
+                }
+            }
+            catch (IOException ex)
+            {
+                console.WriteImportant($"Could not delete temp file '{tempFilePath}': {ex.Message}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                console.WriteImportant($"Could not delete temp file '{tempFilePath}': {ex.Message}");
+            }
+        }
+    }
+
     private static HashSet<EditorType> DetectAvailableEditors()
     {
         var available = new HashSet<EditorType>();

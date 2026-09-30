@@ -22,7 +22,9 @@ public static class ServicesCollectionExtensions
 
         ConfigureHttpClient<IAccessApiClient, AccessApiClient>(services);
         ConfigureHttpClient<IAnnotationsApiClient, AnnotationsApiClient>(services);
-        ConfigureHttpClient<IConfigurationApiClient, ConfigurationApiClient>(services);
+        ConfigureHttpClient<IConfigurationsApiClient, ConfigurationsApiClient>(services);
+        ConfigureHttpClient<ISchemasApiClient, SchemasApiClient>(services);
+        ConfigureHttpClient<ITemplatesApiClient, TemplatesApiClient>(services);
 
         return services;
     }

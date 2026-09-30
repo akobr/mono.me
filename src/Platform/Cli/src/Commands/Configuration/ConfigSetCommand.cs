@@ -1,32 +1,23 @@
-using System;
 using System.IO.Abstractions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Cli.Commands.Configuration;
 
-[Command(CommandNames.SET, CommandNames.CREATE, Description = "Create or update a configuration.")]
+[Command(CommandNames.SET, CommandNames.CREATE, Description = "Create or update a configuration (merged into the stored content, or replacing it with --replace).")]
 public class ConfigSetCommand : BaseContextCommand
 {
-    private static readonly JsonMergeSettings JsonMergeOptions = new()
-    {
-        MergeArrayHandling = MergeArrayHandling.Union,
-        MergeNullValueHandling = MergeNullValueHandling.Ignore,
-        PropertyNameComparison = StringComparison.Ordinal,
-    };
-
-    private readonly IConfigurationApiClient _configurationApi;
+    private readonly IConfigurationsApiClient _configurationApi;
     private readonly IFileSystem _fileSystem;
 
     public ConfigSetCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IConfigurationApiClient configurationApi,
+        IConfigurationsApiClient configurationApi,
         IFileSystem fileSystem)
         : base(console, context)
     {
@@ -60,63 +51,49 @@ public class ConfigSetCommand : BaseContextCommand
 
     public bool AreLabelsSpecified => Labels?.Length > 0;
 
+    [Option("--replace", CommandOptionType.NoValue, Description = "Replace the stored content of the configuration instead of merging into it (removes properties which are not specified).")]
+    public bool IsReplaceRequested { get; set; }
+
     protected override async Task<int> ExecuteAsync()
     {
-        var config = new JObject();
-
-        if (IsImportRequested)
-        {
-            if (!_fileSystem.File.Exists(ImportFilePath))
-            {
-                Console.WriteImportant($"The file '{_fileSystem.Path.GetFullPath(ImportFilePath!)}' does not exist.");
-                return ExitCodes.ERROR_WRONG_INPUT;
-            }
-
-            using var fileReader = _fileSystem.File.OpenText(ImportFilePath);
-            await using var jsonReader = new JsonTextReader(fileReader);
-            var fileContent = await JObject.LoadAsync(
-                jsonReader,
-                new JsonLoadSettings
-                {
-                    CommentHandling = CommentHandling.Ignore,
-                    DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Ignore,
-                    LineInfoHandling = LineInfoHandling.Ignore,
-                });
-
-            config.Merge(fileContent, JsonMergeOptions);
-        }
-
-        if (AreInlinePropertiesSpecified)
-        {
-            JObject inlineContent = new();
-
-            foreach (var inlineProperty in InlineProperties ?? Array.Empty<string>())
-            {
-                var parts = inlineProperty.Split('=', 2);
-
-                if (parts.Length != 2)
-                {
-                    Console.WriteImportant($"The inline property '{inlineProperty}' is not in the correct format.");
-                    return ExitCodes.ERROR_WRONG_INPUT;
-                }
-
-                inlineContent[parts[0]] = new JValue(PropertyValueParser.ParseValue(parts[1]));
-            }
-
-            config.Merge(inlineContent, JsonMergeOptions);
-        }
+        var config = await JsonInputBuilder.BuildAsync(Console, _fileSystem, ImportFilePath, InlineProperties);
 
         // TODO: [P1] add support for custom properties and labels
-        _42.Platform.Storyteller.Sdk.Configuration data;
+        _42.Platform.Storyteller.Sdk.Configuration? data;
 
         try
         {
-            data = await _configurationApi.SetConfigurationAsync(
-                Context.OrganizationName,
-                Context.ProjectName,
-                Context.ViewName,
-                AnnotationKey,
-                config);
+            if (IsReplaceRequested)
+            {
+                var storedContent = await _configurationApi.GetStoredConfigurationContentAsync(
+                    Context.OrganizationName,
+                    Context.ProjectName,
+                    Context.ViewName,
+                    AnnotationKey);
+
+                data = await _configurationApi.ReplaceConfigurationAsync(
+                    Context.OrganizationName,
+                    Context.ProjectName,
+                    Context.ViewName,
+                    AnnotationKey,
+                    storedContent,
+                    config);
+
+                if (data is null)
+                {
+                    Console.WriteLine("No changes detected.");
+                    return ExitCodes.WARNING_NO_WORK_NEEDED;
+                }
+            }
+            else
+            {
+                data = await _configurationApi.SetConfigurationAsync(
+                    Context.OrganizationName,
+                    Context.ProjectName,
+                    Context.ViewName,
+                    AnnotationKey,
+                    config);
+            }
 
             if (IsResolvedRetrievalRequested)
             {
@@ -135,7 +112,5 @@ public class ConfigSetCommand : BaseContextCommand
 
         Console.WriteJson(data);
         return ExitCodes.SUCCESS;
-
     }
 }
-
