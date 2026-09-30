@@ -7,4 +7,5 @@ public static class EntityIdPrefixTypes
     public const string ConfigurationSchema = "cfs";
     public const string GenerateTemplate = "gen";
     public const string GenerateTemplateVersion = "gnv";
+    public const string GenerateTemplateState = "gns";
 }

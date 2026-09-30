@@ -4,7 +4,7 @@
 
 Phase A of [2026-09-28 Versioning of Configuration Templates](../2026-09-28%20Versioning%20of%20Configuration%20Templates.md) moves configuration templates to a view-level identity: one template per annotation type per project and view, stored in a dedicated project partition like type-level schemas, with views fully isolated. It adds versioning with history modelled on configuration versioning, a template service, and HTTP endpoints. It also clears cached calculations whenever a template changes. The diff engine and cache invalidation were extracted from `CosmosConfigurationService` into shared helpers. The shared invalidation helper now respects the Cosmos DB limit of 100 operations per transactional batch. Phase B (SDK regeneration and CLI) is not part of this review.
 
-All 104 tests in `Backend.CosmosDb.UnitTests` pass, including the 17 template tests (see section 8).
+All 107 tests in `Backend.CosmosDb.UnitTests` pass, including the 20 template tests (see section 8 and *Code review fixes*).
 
 ### Revision 2026-09-30: templates per view
 
@@ -129,3 +129,37 @@ The property is now `{ get; init; }` (`Backend.CosmosDb/src/Entities/Entity.cs`)
 
 - `Backend.CosmosDb` and `Backend.CosmosDb.UnitTests` build with no new warnings. Remaining warnings in `CosmosConfigurationService.cs` (CS8625, SA1515, CA2208, CS8602) were already there.
 - `Api.Functions` builds with no new warnings. It was built with `-p:OutDir` to a temporary folder, because the running `Api.Functions` process locks `bin/Debug`.
+
+### Code review fixes (2026-09-30)
+
+A code review of commit `147845a` raised four issues. All four still applied and were fixed:
+
+1. **HTTP status mapping.** `SetTemplate` and `PatchTemplate` mapped every `InvalidOperationException` to 400, including exhausted concurrency retries, unexpected batch statuses and invalidation failures.
+   - New `TemplateConcurrencyException` (`Backend.Core/src/Configuring/`) is thrown when the retries run out. `SetTemplate`, `PatchTemplate` and `DeleteTemplate` map it to **409** and declare 409 in their OpenAPI attributes.
+   - New `ConfigurationStorageException` (`Backend.Core/src/Configuring/`, with `StatusCode`) is thrown for unexpected template batch statuses and by `ConfigurationCacheInvalidator` for failed invalidations. It is not caught, so `ExceptionHandlingMiddleware` returns **500**. This also moves invalidation failures of configuration writes from 400 to 500, because `ConfigurationHttp` only catches `InvalidOperationException`.
+   - Only input errors still map to 400: invalid JSON, `$patch`, and JSON Patch.
+2. **Stale calculation overwriting an invalidation.** In `CosmosConfigurationService.CalculateAndCacheConfigurationAsync`:
+   - The configuration item is read with its ETag. The cache write is now a `ReplaceItemAsync` with `IfMatchEtag` instead of an unconditional upsert. On 412 or 404 the result is returned but not cached.
+   - For a newly created system item, the calculation memo now keeps the ETag of every template it read (`TemplateSnapshot`). After the creation the templates are read again, and if any ETag changed, `CalculatedContent` of the new item is cleared, guarded by the item's own ETag.
+   - A 409 on the creation (item created concurrently) is now handled by keeping the other item. Before this fix, the 409 was thrown to the caller.
+3. **Version reuse.** New `GenerateTemplateStateEntity` (`{view}.gns.{typeCode}` in `{project}.template`, prefix `EntityIdPrefixTypes.GenerateTemplateState`) with `LastVersion`.
+   - Create, update and delete write it in the same transactional batch as the template, guarded by its ETag (or `CreateItem` when it does not exist yet). A new version is allocated from `LastVersion`, and the version allocation and the template creation are atomic.
+   - The history maximum is only a fallback for templates written before the state record existed.
+   - This also covers history items expiring through their TTL, which would otherwise have let a recreated template reuse an archived version number.
+4. **Invalidation lost after a committed write.** The state record has `IsInvalidationPending`.
+   - Every write batch sets it. After the invalidation finishes, it is cleared with a patch guarded by the state ETag returned from the batch, so a newer write keeps its own pending flag.
+   - The early returns now finish a pending invalidation before returning: no change on create/update, no change on patch, patch of a missing template, and delete of an already deleted template.
+   - The service method the review named `MergeTemplateAsync` is `CreateOrUpdateTemplateAsync` in the code.
+
+New regression tests, all passing:
+
+- `CommittedChangeWithPendingInvalidation_IsCompletedOnRepeatedRequest` — a committed change with a stale cache and a pending flag; the repeated request without changes invalidates the cache and clears the flag.
+- `CommittedDeletionWithPendingInvalidation_IsCompletedOnRepeatedDelete`
+- `DeleteThenCreate_AfterHistoryExpiration_DoesNotReuseVersion`
+
+Issues 1 and 2 have no automated test:
+
+- The HTTP mapping has no test project.
+- The calculation race needs a write interleaved inside one calculation, which the emulator tests cannot reproduce deterministically.
+
+`templating.md` is updated with the state record, the status codes, the conditional cache write, and the completion of a pending invalidation.

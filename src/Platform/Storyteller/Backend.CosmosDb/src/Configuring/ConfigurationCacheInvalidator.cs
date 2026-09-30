@@ -154,8 +154,9 @@ internal static class ConfigurationCacheInvalidator
 
             if (!response.Any(result => result.StatusCode == HttpStatusCode.NotFound))
             {
-                throw new InvalidOperationException(
-                    $"Invalidation of cached configurations failed in partition {partitionKey} with status {response.StatusCode}: {response.ErrorMessage}");
+                throw new ConfigurationStorageException(
+                    $"Invalidation of cached configurations failed in partition {partitionKey} with status {response.StatusCode}: {response.ErrorMessage}",
+                    response.StatusCode);
             }
 
             // an item has been deleted meanwhile, fall back to one-by-one patching (deleted items are skipped)
@@ -164,8 +165,9 @@ internal static class ConfigurationCacheInvalidator
                 using var itemResponse = await container.PatchItemStreamAsync(id, partitionKey, InvalidationPatch);
                 if (!itemResponse.IsSuccessStatusCode && itemResponse.StatusCode != HttpStatusCode.NotFound)
                 {
-                    throw new InvalidOperationException(
-                        $"Invalidation of cached configuration '{id}' failed with status {itemResponse.StatusCode}: {itemResponse.ErrorMessage}");
+                    throw new ConfigurationStorageException(
+                        $"Invalidation of cached configuration '{id}' failed with status {itemResponse.StatusCode}: {itemResponse.ErrorMessage}",
+                        itemResponse.StatusCode);
                 }
             }
         }
