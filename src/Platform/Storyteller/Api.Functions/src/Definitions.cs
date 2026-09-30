@@ -76,7 +76,7 @@ public static class Definitions
         {
             public static class V1
             {
-                public const string Template = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/template/{{{Parameters.AnnotationType}}}";
+                public const string Template = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/template/{{{Parameters.AnnotationType}}}";
 
                 public const string Versions = $"{Template}/versions";
                 public const string Version = $"{Template}/versions/{{{Parameters.Version}}}";

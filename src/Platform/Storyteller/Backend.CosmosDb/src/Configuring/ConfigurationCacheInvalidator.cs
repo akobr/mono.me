@@ -19,7 +19,6 @@ internal static class ConfigurationCacheInvalidator
     public const int MaxBatchOperations = 100;
 
     private const int MaxParallelBatches = 8;
-    private const string ConfigurationIdMarker = $".{EntityIdPrefixTypes.Configuration}.";
 
     // Configuration types which merge the template of the key type (the type itself and all its descendants, see BuildInheritanceGraph)
     private static readonly IReadOnlyDictionary<string, string[]> TemplateAffectedTypeCodes
@@ -56,39 +55,12 @@ internal static class ConfigurationCacheInvalidator
     }
 
     /// <summary>
-    /// Invalidates cached calculations of all configurations which merge the project template of the given type.
+    /// Invalidates cached calculations of all configurations in the view which merge the view template of the given type.
     /// </summary>
-    public static async Task InvalidateForTemplateAsync(IContainerRepository repository, string projectName, string typeCode)
+    public static Task InvalidateForTemplateAsync(IContainerRepository repository, string projectName, string viewName, string typeCode)
     {
-        var predicate = BuildTemplatePredicate(projectName, GetTemplateAffectedTypeCodes(typeCode));
-        var feed = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
-                requestOptions: new QueryRequestOptions { MaxItemCount = CosmosConstants.MaxItemCountPerPage })
-            .Where(predicate)
-            .Select(config => new TemplateCandidate
-            {
-                PartitionKey = config.PartitionKey,
-                Id = config.Id,
-                ViewName = config.ViewName,
-                AnnotationKey = config.AnnotationKey,
-            })
-            .ToFeedIterator();
-
-        var groups = new Dictionary<string, List<string>>(StringComparer.Ordinal);
-        while (feed.HasMoreResults)
-        {
-            foreach (var candidate in await feed.ReadNextAsync())
-            {
-                // the id marker can be part of an annotation name, only real configuration items are invalidated
-                if (candidate.Id != $"{candidate.ViewName}{ConfigurationIdMarker}{candidate.AnnotationKey}")
-                {
-                    continue;
-                }
-
-                AddToGroup(groups, candidate.PartitionKey, candidate.Id);
-            }
-        }
-
-        await PatchAsync(repository, groups);
+        var predicate = BuildTemplatePredicate(projectName, viewName, GetTemplateAffectedTypeCodes(typeCode));
+        return InvalidateAsync(repository, predicate);
     }
 
     public static async Task InvalidateAsync(
@@ -214,11 +186,10 @@ internal static class ConfigurationCacheInvalidator
         ids.Add(id);
     }
 
-    private static Expression<Func<ConfigurationEntity, bool>> BuildTemplatePredicate(string projectName, IEnumerable<string> typeCodes)
+    private static Expression<Func<ConfigurationEntity, bool>> BuildTemplatePredicate(string projectName, string viewName, IEnumerable<string> typeCodes)
     {
         var config = Expression.Parameter(typeof(ConfigurationEntity), "config");
         var startsWith = typeof(string).GetMethod(nameof(string.StartsWith), [typeof(string)])!;
-        var contains = typeof(string).GetMethod(nameof(string.Contains), [typeof(string)])!;
         var annotationKey = Expression.Property(config, nameof(Entity.AnnotationKey));
 
         Expression? anyType = null;
@@ -228,23 +199,15 @@ internal static class ConfigurationCacheInvalidator
             anyType = anyType is null ? isType : Expression.OrElse(anyType, isType);
         }
 
+        // only configuration items of the view ({view}.cnf.{annotationKey}), never history or annotation items
         var body = Expression.AndAlso(
             Expression.AndAlso(
-                Expression.Equal(Expression.Property(config, nameof(Entity.ProjectName)), Expression.Constant(projectName)),
-                Expression.Call(Expression.Property(config, nameof(Entity.Id)), contains, Expression.Constant(ConfigurationIdMarker))),
+                Expression.AndAlso(
+                    Expression.Equal(Expression.Property(config, nameof(Entity.ProjectName)), Expression.Constant(projectName)),
+                    Expression.Equal(Expression.Property(config, nameof(Entity.ViewName)), Expression.Constant(viewName))),
+                Expression.Call(Expression.Property(config, nameof(Entity.Id)), startsWith, Expression.Constant($"{viewName}.{EntityIdPrefixTypes.Configuration}."))),
             anyType ?? Expression.Constant(false));
 
         return Expression.Lambda<Func<ConfigurationEntity, bool>>(body, config);
-    }
-
-    private sealed record class TemplateCandidate
-    {
-        public required string PartitionKey { get; init; }
-
-        public required string Id { get; init; }
-
-        public required string ViewName { get; init; }
-
-        public required string AnnotationKey { get; init; }
     }
 }

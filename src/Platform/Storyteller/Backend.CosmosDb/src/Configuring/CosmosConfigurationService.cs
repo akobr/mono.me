@@ -687,11 +687,11 @@ public class CosmosConfigurationService : IConfigurationService
     {
         var typeCode = key.Annotation.TypeCode.ToLowerInvariant();
 
-        // the template is the same for the whole project, read it only once per calculation
+        // the whole inheritance graph is in one view, so the view template is read only once per calculation
         if (!templates.TryGetValue(typeCode, out var templateContent))
         {
             var typeTemplateEntity = await repository.Container.TryReadItemAsync(
-                CosmosConfigurationTemplateService.GetTemplateId(typeCode),
+                CosmosConfigurationTemplateService.GetTemplateId(key.ViewName, typeCode),
                 PartitionKeys.GetCosmosTemplate(key.ProjectName),
                 stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
 
