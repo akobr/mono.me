@@ -41,7 +41,7 @@ public class TemplateEditCommand : BaseContextCommand
     /// - <c>ExitCodes.SUCCESS</c> when the edited template was saved;
     /// - <c>ExitCodes.WARNING_NO_WORK_NEEDED</c> when no changes were made;
     /// - <c>ExitCodes.WARNING_ABORTED</c> when the user aborted the operation;
-    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code.
+    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code or the API rejected the change.
     /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
@@ -69,22 +69,30 @@ public class TemplateEditCommand : BaseContextCommand
             return result.ExitCode;
         }
 
-        // replace (not merge), so removed properties and array items are removed on the server as well
-        var saved = await _templatesApi.ReplaceTemplateAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            annotationType,
-            currentContent,
-            result.Edited);
-
-        if (saved is null)
+        try
         {
-            Console.WriteLine("No changes detected.");
-            return ExitCodes.WARNING_NO_WORK_NEEDED;
-        }
+            // replace (not merge), so removed properties and array items are removed on the server as well
+            var saved = await _templatesApi.ReplaceTemplateAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                Context.ViewName,
+                annotationType,
+                currentContent,
+                result.Edited);
 
-        Console.WriteImportant($"Template for '{annotationType}' has been saved (version {saved.Version}).");
-        return ExitCodes.SUCCESS;
+            if (saved is null)
+            {
+                Console.WriteLine("No changes detected.");
+                return ExitCodes.WARNING_NO_WORK_NEEDED;
+            }
+
+            Console.WriteImportant($"Template for '{annotationType}' has been saved (version {saved.Version}).");
+            return ExitCodes.SUCCESS;
+        }
+        catch (ApiException e)
+        {
+            Console.WriteLine($"Error occurred: {e.Message}");
+            return ExitCodes.ERROR_CRASH;
+        }
     }
 }
