@@ -41,7 +41,7 @@ internal static class TemplateMappings
     public static GenerateTemplateHistoryEntity ToHistory(this GenerateTemplateEntity e) => new()
     {
         PartitionKey = e.PartitionKey,
-        Id = $"{EntityIdPrefixTypes.GenerateTemplateVersion}.{e.Name}.{e.Version}",
+        Id = $"{e.ViewName}.{EntityIdPrefixTypes.GenerateTemplateVersion}.{e.Name}.{e.Version}",
         AnnotationKey = e.AnnotationKey,
         Name = e.Name,
         ProjectName = e.ProjectName,

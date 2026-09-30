@@ -33,12 +33,12 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         _differ = new JsonContentDiffer(jsonSettingsProvider);
     }
 
-    public async Task<ConfigurationTemplate?> GetTemplateAsync(string organization, string project, string annotationType)
+    public async Task<ConfigurationTemplate?> GetTemplateAsync(string organization, string project, string view, string annotationType)
     {
         annotationType = NormalizeAnnotationType(annotationType);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var entity = await repository.Container.TryReadItemAsync(
-            GetTemplateId(annotationType),
+            GetTemplateId(view, annotationType),
             PartitionKeys.GetCosmosTemplate(project),
             stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
 
@@ -48,6 +48,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
     public async Task<ConfigurationTemplate> CreateOrUpdateTemplateAsync(
         string organization,
         string project,
+        string view,
         string annotationType,
         JObject value,
         string author)
@@ -56,7 +57,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = PartitionKeys.GetTemplate(project);
         var partitionKey = new PartitionKey(partitionKeyValue);
-        var id = GetTemplateId(annotationType);
+        var id = GetTemplateId(view, annotationType);
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
@@ -76,7 +77,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
 
                 var maxVersionResponse = await repository.Container.GetItemLinqQueryable<GenerateTemplateHistoryEntity>(
                         requestOptions: new QueryRequestOptions { PartitionKey = partitionKey })
-                    .Where(history => history.Id.StartsWith($"{EntityIdPrefixTypes.GenerateTemplateVersion}.{annotationType}."))
+                    .Where(history => history.Id.StartsWith(GetTemplateVersionIdPrefix(view, annotationType)))
                     .Select(history => history.Version)
                     .MaxAsync();
 
@@ -87,7 +88,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                     AnnotationKey = annotationType,
                     Name = annotationType,
                     ProjectName = project,
-                    ViewName = string.Empty,
+                    ViewName = view,
                     Content = input,
                     Author = author,
                     Version = maxVersionResponse.Resource + 1,
@@ -103,7 +104,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                     continue;
                 }
 
-                await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, annotationType);
+                await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, view, annotationType);
                 return template.ToConfigurationTemplate();
             }
 
@@ -124,16 +125,17 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                 continue;
             }
 
-            await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, annotationType);
+            await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, view, annotationType);
             return updated.ToConfigurationTemplate();
         }
 
-        throw CreateConcurrencyException(project, annotationType);
+        throw CreateConcurrencyException(project, view, annotationType);
     }
 
     public async Task<ConfigurationTemplate> PatchTemplateAsync(
         string organization,
         string project,
+        string view,
         string annotationType,
         JArray patchOperations,
         string author)
@@ -141,7 +143,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         annotationType = NormalizeAnnotationType(annotationType);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = PartitionKeys.GetCosmosTemplate(project);
-        var id = GetTemplateId(annotationType);
+        var id = GetTemplateId(view, annotationType);
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
@@ -152,7 +154,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
 
             if (existing is null)
             {
-                throw new TemplateNotFoundException(project, annotationType);
+                throw new TemplateNotFoundException(project, view, annotationType);
             }
 
             var newContent = await existing.Content.ApplyPatch(patchOperations);
@@ -168,19 +170,19 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                 continue;
             }
 
-            await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, annotationType);
+            await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, view, annotationType);
             return updated.ToConfigurationTemplate();
         }
 
-        throw CreateConcurrencyException(project, annotationType);
+        throw CreateConcurrencyException(project, view, annotationType);
     }
 
-    public async Task<bool> DeleteTemplateAsync(string organization, string project, string annotationType)
+    public async Task<bool> DeleteTemplateAsync(string organization, string project, string view, string annotationType)
     {
         annotationType = NormalizeAnnotationType(annotationType);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = PartitionKeys.GetCosmosTemplate(project);
-        var id = GetTemplateId(annotationType);
+        var id = GetTemplateId(view, annotationType);
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
@@ -206,14 +208,14 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
             }
 
             EnsureSuccess(response, id);
-            await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, annotationType);
+            await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, view, annotationType);
             return true;
         }
 
-        throw CreateConcurrencyException(project, annotationType);
+        throw CreateConcurrencyException(project, view, annotationType);
     }
 
-    public async Task<IReadOnlyCollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string annotationType)
+    public async Task<IReadOnlyCollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType)
     {
         annotationType = NormalizeAnnotationType(annotationType);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
@@ -222,7 +224,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         // TODO: [P3] optimize the query to ignore Content
         var feed = repository.Container.GetItemLinqQueryable<GenerateTemplateHistoryEntity>(
                 requestOptions: new QueryRequestOptions { PartitionKey = partitionKey })
-            .Where(history => history.Id.StartsWith($"{EntityIdPrefixTypes.GenerateTemplateVersion}.{annotationType}."))
+            .Where(history => history.Id.StartsWith(GetTemplateVersionIdPrefix(view, annotationType)))
             .OrderBy(history => history.Version)
             .ToFeedIterator();
 
@@ -234,7 +236,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         }
 
         var template = await repository.Container.TryReadItemAsync(
-            GetTemplateId(annotationType),
+            GetTemplateId(view, annotationType),
             partitionKey,
             stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
 
@@ -246,13 +248,13 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         return versions;
     }
 
-    public async Task<ConfigurationTemplate?> GetTemplateVersionContentAsync(string organization, string project, string annotationType, uint version)
+    public async Task<ConfigurationTemplate?> GetTemplateVersionContentAsync(string organization, string project, string view, string annotationType, uint version)
     {
         annotationType = NormalizeAnnotationType(annotationType);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = PartitionKeys.GetCosmosTemplate(project);
         var versionEntity = await repository.Container.TryReadItemAsync(
-            $"{EntityIdPrefixTypes.GenerateTemplateVersion}.{annotationType}.{version}",
+            $"{GetTemplateVersionIdPrefix(view, annotationType)}{version}",
             partitionKey,
             stream => stream.DeserializeNewtonsoft<GenerateTemplateHistoryEntity>(_serializerOptions));
 
@@ -262,7 +264,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         }
 
         var template = await repository.Container.TryReadItemAsync(
-            GetTemplateId(annotationType),
+            GetTemplateId(view, annotationType),
             partitionKey,
             stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
 
@@ -275,23 +277,28 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         return template.ToConfigurationTemplate();
     }
 
-    public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string annotationType, uint version)
+    public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint version)
     {
-        return GetTemplateVersionChangesAsync(organization, project, annotationType, version - 1, version);
+        return GetTemplateVersionChangesAsync(organization, project, view, annotationType, version - 1, version);
     }
 
-    public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string annotationType, uint fromVersion, uint toVersion)
+    public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint fromVersion, uint toVersion)
     {
         return _differ.GetChangesAsync(
-            async () => fromVersion == 0 ? new JObject() : (await GetTemplateVersionContentAsync(organization, project, annotationType, fromVersion))?.Content,
-            async () => toVersion == 0 ? new JObject() : (await GetTemplateVersionContentAsync(organization, project, annotationType, toVersion))?.Content,
-            $"Unknown version {fromVersion} of the template for {annotationType}.",
-            $"Unknown version {toVersion} of the template for {annotationType}.");
+            async () => fromVersion == 0 ? new JObject() : (await GetTemplateVersionContentAsync(organization, project, view, annotationType, fromVersion))?.Content,
+            async () => toVersion == 0 ? new JObject() : (await GetTemplateVersionContentAsync(organization, project, view, annotationType, toVersion))?.Content,
+            $"Unknown version {fromVersion} of the template for {annotationType} in view {view}.",
+            $"Unknown version {toVersion} of the template for {annotationType} in view {view}.");
     }
 
-    internal static string GetTemplateId(string annotationType)
+    internal static string GetTemplateId(string view, string annotationType)
     {
-        return $"{EntityIdPrefixTypes.GenerateTemplate}.{annotationType}";
+        return $"{view}.{EntityIdPrefixTypes.GenerateTemplate}.{annotationType}";
+    }
+
+    private static string GetTemplateVersionIdPrefix(string view, string annotationType)
+    {
+        return $"{view}.{EntityIdPrefixTypes.GenerateTemplateVersion}.{annotationType}.";
     }
 
     private static async Task<GenerateTemplateEntity?> TryWriteNextVersionAsync(
@@ -338,10 +345,10 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         }
     }
 
-    private static InvalidOperationException CreateConcurrencyException(string project, string annotationType)
+    private static InvalidOperationException CreateConcurrencyException(string project, string view, string annotationType)
     {
         return new InvalidOperationException(
-            $"Failed to update template '{annotationType}' in project '{project}' after multiple retries ({MaxRetries}) due to concurrent modifications.");
+            $"Failed to update template '{annotationType}' in project '{project}' and view '{view}' after multiple retries ({MaxRetries}) due to concurrent modifications.");
     }
 
     private static string NormalizeAnnotationType(string annotationType)

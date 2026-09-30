@@ -38,10 +38,11 @@ public class TemplateHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationTemplate), Description = "The configuration template of the annotation type.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationTemplate), Description = "The configuration template of the annotation type in the view.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No template exists for the annotation type.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No template exists for the annotation type in the view.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetTemplate(
@@ -49,6 +50,7 @@ public class TemplateHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
@@ -59,7 +61,7 @@ public class TemplateHttp
             return badRequestResult;
         }
 
-        var template = await _templates.GetTemplateAsync(organization, project, annotationType);
+        var template = await _templates.GetTemplateAsync(organization, project, view, annotationType);
 
         if (template is null)
         {
@@ -75,6 +77,7 @@ public class TemplateHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(JObject), Description = "The template content, merged into the current template (supports $remove and $patch).")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationTemplate), Description = "The created or updated template.")]
@@ -86,6 +89,7 @@ public class TemplateHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
@@ -113,7 +117,7 @@ public class TemplateHttp
         try
         {
             var author = request.GetAuthor();
-            var outputModel = await _templates.CreateOrUpdateTemplateAsync(organization, project, annotationType, inputModel, author);
+            var outputModel = await _templates.CreateOrUpdateTemplateAsync(organization, project, view, annotationType, inputModel, author);
             return new OkObjectResult(outputModel);
         }
         catch (InvalidOperationException ex)
@@ -128,11 +132,12 @@ public class TemplateHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
     [OpenApiRequestBody("application/json-patch+json", typeof(JArray), Description = "A JSON Patch document (RFC 6902) containing the operations to apply.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationTemplate), Description = "The patched template.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No template exists for the annotation type.")]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No template exists for the annotation type in the view.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PatchTemplate(
@@ -140,6 +145,7 @@ public class TemplateHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
@@ -167,7 +173,7 @@ public class TemplateHttp
         try
         {
             var author = request.GetAuthor();
-            var outputModel = await _templates.PatchTemplateAsync(organization, project, annotationType, patchOperations, author);
+            var outputModel = await _templates.PatchTemplateAsync(organization, project, view, annotationType, patchOperations, author);
             return new OkObjectResult(outputModel);
         }
         catch (TemplateNotFoundException ex)
@@ -186,9 +192,10 @@ public class TemplateHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No template exists for the annotation type.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No template exists for the annotation type in the view.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -197,6 +204,7 @@ public class TemplateHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
@@ -207,7 +215,7 @@ public class TemplateHttp
             return badRequestResult;
         }
 
-        var deleted = await _templates.DeleteTemplateAsync(organization, project, annotationType);
+        var deleted = await _templates.DeleteTemplateAsync(organization, project, view, annotationType);
         return deleted ? new OkResult() : new NotFoundResult();
     }
 
@@ -217,6 +225,7 @@ public class TemplateHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<ConfigurationVersion>), Description = "The list of template versions.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
@@ -227,6 +236,7 @@ public class TemplateHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
@@ -237,7 +247,7 @@ public class TemplateHttp
             return badRequestResult;
         }
 
-        var versions = await _templates.GetTemplateVersionsAsync(organization, project, annotationType);
+        var versions = await _templates.GetTemplateVersionsAsync(organization, project, view, annotationType);
         return new OkObjectResult(versions);
     }
 
@@ -247,6 +257,7 @@ public class TemplateHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
     [OpenApiParameter(Definitions.Parameters.Version, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = "The version number.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationTemplate), Description = "The template of the version.")]
@@ -259,6 +270,7 @@ public class TemplateHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType,
         uint version)
     {
@@ -270,7 +282,7 @@ public class TemplateHttp
             return badRequestResult;
         }
 
-        var template = await _templates.GetTemplateVersionContentAsync(organization, project, annotationType, version);
+        var template = await _templates.GetTemplateVersionContentAsync(organization, project, view, annotationType, version);
 
         if (template is null)
         {
@@ -286,6 +298,7 @@ public class TemplateHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
     [OpenApiParameter(Definitions.Parameters.Version, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = "The version number.")]
     [OpenApiParameter(Definitions.Parameters.Format, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.DiffFormat)]
@@ -299,6 +312,7 @@ public class TemplateHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType,
         uint version)
     {
@@ -311,7 +325,7 @@ public class TemplateHttp
         }
 
         return await _templates
-            .GetTemplateVersionChangesAsync(organization, project, annotationType, version)
+            .GetTemplateVersionChangesAsync(organization, project, view, annotationType, version)
             .ToDiffResponseAsync(request);
     }
 
@@ -321,6 +335,7 @@ public class TemplateHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
     [OpenApiParameter(Definitions.Parameters.Version, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = "The target version number (to).")]
     [OpenApiParameter(Definitions.Parameters.VersionFrom, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = "The source version number (from).")]
@@ -335,6 +350,7 @@ public class TemplateHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType,
         uint version,
         uint versionFrom)
@@ -348,7 +364,7 @@ public class TemplateHttp
         }
 
         return await _templates
-            .GetTemplateVersionChangesAsync(organization, project, annotationType, versionFrom, version)
+            .GetTemplateVersionChangesAsync(organization, project, view, annotationType, versionFrom, version)
             .ToDiffResponseAsync(request);
     }
 }
