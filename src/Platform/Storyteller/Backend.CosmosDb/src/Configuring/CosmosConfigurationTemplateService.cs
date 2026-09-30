@@ -61,10 +61,8 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            var (existing, etag) = await repository.Container.TryReadItemWithETagAsync(
-                id,
-                partitionKey,
-                stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
+            var (existing, etag) = await ReadTemplateAsync(repository, partitionKey, id);
+            var (state, stateEtag) = await ReadStateAsync(repository, partitionKey, view, annotationType);
 
             // the input is mutated by the requested operations, each attempt works on a fresh copy
             var input = (JObject)value.DeepClone();
@@ -75,12 +73,8 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                 input = input.RemoveRequested();
                 input = await input.ApplyPatchRequested();
 
-                var maxVersionResponse = await repository.Container.GetItemLinqQueryable<GenerateTemplateHistoryEntity>(
-                        requestOptions: new QueryRequestOptions { PartitionKey = partitionKey })
-                    .Where(history => history.Id.StartsWith(GetTemplateVersionIdPrefix(view, annotationType)))
-                    .Select(history => history.Version)
-                    .MaxAsync();
-
+                // the state keeps the last version even after a deletion and an expiration of the history
+                var lastVersion = state?.LastVersion ?? await GetMaxHistoryVersionAsync(repository, partitionKey, view, annotationType);
                 var template = new GenerateTemplateEntity
                 {
                     PartitionKey = partitionKeyValue,
@@ -91,20 +85,20 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                     ViewName = view,
                     Content = input,
                     Author = author,
-                    Version = maxVersionResponse.Resource + 1,
+                    Version = lastVersion + 1,
                 };
 
-                try
+                // the version allocation and the creation are atomic, guarded by the state etag
+                var createBatch = repository.Container.CreateTransactionalBatch(partitionKey);
+                createBatch.CreateItem(template);
+                AddStateWrite(createBatch, template, state, stateEtag, template.Version);
+                var createdStateEtag = await TryExecuteWriteAsync(createBatch, id);
+                if (createdStateEtag is null)
                 {
-                    await repository.Container.CreateItemAsync(template, partitionKey);
-                }
-                catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
-                {
-                    // created by another writer meanwhile; retry as an update
                     continue;
                 }
 
-                await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, view, annotationType);
+                await InvalidateAsync(repository, partitionKey, project, view, annotationType, createdStateEtag);
                 return template.ToConfigurationTemplate();
             }
 
@@ -115,21 +109,21 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
 
             if (JToken.DeepEquals(existing.Content, newContent))
             {
-                // no change after merge
+                // no change after merge, but finish an invalidation of an earlier committed change
+                await CompletePendingInvalidationAsync(repository, partitionKey, project, view, annotationType, state, stateEtag);
                 return existing.ToConfigurationTemplate();
             }
 
-            var updated = await TryWriteNextVersionAsync(repository.Container, partitionKey, existing, etag!, newContent, author);
+            var updated = await TryWriteNextVersionAsync(repository, partitionKey, project, existing, etag!, state, stateEtag, newContent, author);
             if (updated is null)
             {
                 continue;
             }
 
-            await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, view, annotationType);
             return updated.ToConfigurationTemplate();
         }
 
-        throw CreateConcurrencyException(project, view, annotationType);
+        throw new TemplateConcurrencyException(project, view, annotationType, MaxRetries);
     }
 
     public async Task<ConfigurationTemplate> PatchTemplateAsync(
@@ -147,13 +141,12 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            var (existing, etag) = await repository.Container.TryReadItemWithETagAsync(
-                id,
-                partitionKey,
-                stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
+            var (existing, etag) = await ReadTemplateAsync(repository, partitionKey, id);
+            var (state, stateEtag) = await ReadStateAsync(repository, partitionKey, view, annotationType);
 
             if (existing is null)
             {
+                await CompletePendingInvalidationAsync(repository, partitionKey, project, view, annotationType, state, stateEtag);
                 throw new TemplateNotFoundException(project, view, annotationType);
             }
 
@@ -161,20 +154,20 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
 
             if (JToken.DeepEquals(existing.Content, newContent))
             {
+                await CompletePendingInvalidationAsync(repository, partitionKey, project, view, annotationType, state, stateEtag);
                 return existing.ToConfigurationTemplate();
             }
 
-            var updated = await TryWriteNextVersionAsync(repository.Container, partitionKey, existing, etag!, newContent, author);
+            var updated = await TryWriteNextVersionAsync(repository, partitionKey, project, existing, etag!, state, stateEtag, newContent, author);
             if (updated is null)
             {
                 continue;
             }
 
-            await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, view, annotationType);
             return updated.ToConfigurationTemplate();
         }
 
-        throw CreateConcurrencyException(project, view, annotationType);
+        throw new TemplateConcurrencyException(project, view, annotationType, MaxRetries);
     }
 
     public async Task<bool> DeleteTemplateAsync(string organization, string project, string view, string annotationType)
@@ -186,13 +179,13 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
 
         for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            var (existing, etag) = await repository.Container.TryReadItemWithETagAsync(
-                id,
-                partitionKey,
-                stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
+            var (existing, etag) = await ReadTemplateAsync(repository, partitionKey, id);
+            var (state, stateEtag) = await ReadStateAsync(repository, partitionKey, view, annotationType);
 
             if (existing is null)
             {
+                // already deleted, but finish an invalidation of an earlier committed deletion
+                await CompletePendingInvalidationAsync(repository, partitionKey, project, view, annotationType, state, stateEtag);
                 return false;
             }
 
@@ -200,19 +193,18 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
             var batch = repository.Container.CreateTransactionalBatch(partitionKey);
             batch.CreateItem(existing.ToHistory());
             batch.DeleteItem(id, new TransactionalBatchItemRequestOptions { IfMatchEtag = etag });
-            using var response = await batch.ExecuteAsync();
-
-            if (IsConcurrentModification(response))
+            AddStateWrite(batch, existing, state, stateEtag, existing.Version);
+            var newStateEtag = await TryExecuteWriteAsync(batch, id);
+            if (newStateEtag is null)
             {
                 continue;
             }
 
-            EnsureSuccess(response, id);
-            await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, view, annotationType);
+            await InvalidateAsync(repository, partitionKey, project, view, annotationType, newStateEtag);
             return true;
         }
 
-        throw CreateConcurrencyException(project, view, annotationType);
+        throw new TemplateConcurrencyException(project, view, annotationType, MaxRetries);
     }
 
     public async Task<IReadOnlyCollection<ConfigurationVersion>> GetTemplateVersionsAsync(string organization, string project, string view, string annotationType)
@@ -296,59 +288,161 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         return $"{view}.{EntityIdPrefixTypes.GenerateTemplate}.{annotationType}";
     }
 
+    internal static string GetTemplateStateId(string view, string annotationType)
+    {
+        return $"{view}.{EntityIdPrefixTypes.GenerateTemplateState}.{annotationType}";
+    }
+
     private static string GetTemplateVersionIdPrefix(string view, string annotationType)
     {
         return $"{view}.{EntityIdPrefixTypes.GenerateTemplateVersion}.{annotationType}.";
     }
 
+    private Task<(GenerateTemplateEntity? Item, string? ETag)> ReadTemplateAsync(IContainerRepository repository, PartitionKey partitionKey, string id)
+    {
+        return repository.Container.TryReadItemWithETagAsync(
+            id,
+            partitionKey,
+            stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
+    }
+
+    private Task<(GenerateTemplateStateEntity? Item, string? ETag)> ReadStateAsync(IContainerRepository repository, PartitionKey partitionKey, string view, string annotationType)
+    {
+        return repository.Container.TryReadItemWithETagAsync(
+            GetTemplateStateId(view, annotationType),
+            partitionKey,
+            stream => stream.DeserializeNewtonsoft<GenerateTemplateStateEntity>(_serializerOptions));
+    }
+
+    private static async Task<ulong> GetMaxHistoryVersionAsync(IContainerRepository repository, PartitionKey partitionKey, string view, string annotationType)
+    {
+        // fallback for templates written before the state record existed
+        var maxVersionResponse = await repository.Container.GetItemLinqQueryable<GenerateTemplateHistoryEntity>(
+                requestOptions: new QueryRequestOptions { PartitionKey = partitionKey })
+            .Where(history => history.Id.StartsWith(GetTemplateVersionIdPrefix(view, annotationType)))
+            .Select(history => history.Version)
+            .MaxAsync();
+
+        return maxVersionResponse.Resource;
+    }
+
     private static async Task<GenerateTemplateEntity?> TryWriteNextVersionAsync(
-        Container container,
+        IContainerRepository repository,
         PartitionKey partitionKey,
+        string project,
         GenerateTemplateEntity existing,
         string etag,
+        GenerateTemplateStateEntity? state,
+        string? stateEtag,
         JObject newContent,
         string author)
     {
         var updated = existing with
         {
-            Version = existing.Version + 1,
+            Version = Math.Max(existing.Version, state?.LastVersion ?? 0) + 1,
             Content = newContent,
             Author = author,
         };
 
         // save history of the previous version together with the next version atomically
-        var batch = container.CreateTransactionalBatch(partitionKey);
+        var batch = repository.Container.CreateTransactionalBatch(partitionKey);
         batch.CreateItem(existing.ToHistory());
         batch.ReplaceItem(existing.Id, updated, new TransactionalBatchItemRequestOptions { IfMatchEtag = etag });
-        using var response = await batch.ExecuteAsync();
-
-        if (IsConcurrentModification(response))
+        AddStateWrite(batch, existing, state, stateEtag, updated.Version);
+        var newStateEtag = await TryExecuteWriteAsync(batch, existing.Id);
+        if (newStateEtag is null)
         {
             return null;
         }
 
-        EnsureSuccess(response, existing.Id);
+        await InvalidateAsync(repository, partitionKey, project, existing.ViewName, existing.Name, newStateEtag);
         return updated;
     }
 
-    private static bool IsConcurrentModification(TransactionalBatchResponse response)
+    private static void AddStateWrite(
+        TransactionalBatch batch,
+        GenerateTemplateEntity template,
+        GenerateTemplateStateEntity? state,
+        string? stateEtag,
+        ulong version)
     {
-        // history of the version already archived (409), template changed (412) or deleted (404) by another writer
-        return response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound;
-    }
-
-    private static void EnsureSuccess(TransactionalBatchResponse response, string id)
-    {
-        if (!response.IsSuccessStatusCode)
+        // the state write is always the last operation of the batch, its etag is read from the response
+        var newState = new GenerateTemplateStateEntity
         {
-            throw new InvalidOperationException($"Failed to write template '{id}' with status {response.StatusCode}: {response.ErrorMessage}");
+            PartitionKey = template.PartitionKey,
+            Id = GetTemplateStateId(template.ViewName, template.Name),
+            AnnotationKey = template.AnnotationKey,
+            Name = template.Name,
+            ProjectName = template.ProjectName,
+            ViewName = template.ViewName,
+            LastVersion = Math.Max(state?.LastVersion ?? 0, version),
+            IsInvalidationPending = true,
+        };
+
+        if (state is null)
+        {
+            batch.CreateItem(newState);
+        }
+        else
+        {
+            batch.ReplaceItem(newState.Id, newState, new TransactionalBatchItemRequestOptions { IfMatchEtag = stateEtag });
         }
     }
 
-    private static InvalidOperationException CreateConcurrencyException(string project, string view, string annotationType)
+    /// <summary>
+    /// Executes a template write batch; returns the new etag of the state record, or null on a concurrent modification.
+    /// </summary>
+    private static async Task<string?> TryExecuteWriteAsync(TransactionalBatch batch, string id)
     {
-        return new InvalidOperationException(
-            $"Failed to update template '{annotationType}' in project '{project}' and view '{view}' after multiple retries ({MaxRetries}) due to concurrent modifications.");
+        using var response = await batch.ExecuteAsync();
+
+        // history of the version already archived or state created (409), template or state changed (412), or template deleted (404) by another writer
+        if (response.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ConfigurationStorageException(
+                $"Failed to write template '{id}' with status {response.StatusCode}: {response.ErrorMessage}",
+                response.StatusCode);
+        }
+
+        return response[response.Count - 1].ETag;
+    }
+
+    private static Task CompletePendingInvalidationAsync(
+        IContainerRepository repository,
+        PartitionKey partitionKey,
+        string project,
+        string view,
+        string annotationType,
+        GenerateTemplateStateEntity? state,
+        string? stateEtag)
+    {
+        return state?.IsInvalidationPending == true
+            ? InvalidateAsync(repository, partitionKey, project, view, annotationType, stateEtag!)
+            : Task.CompletedTask;
+    }
+
+    private static async Task InvalidateAsync(
+        IContainerRepository repository,
+        PartitionKey partitionKey,
+        string project,
+        string view,
+        string annotationType,
+        string stateEtag)
+    {
+        // a failure leaves the pending flag set, a repeated request completes the invalidation
+        await ConfigurationCacheInvalidator.InvalidateForTemplateAsync(repository, project, view, annotationType);
+
+        // clear the flag only if nobody changed the template meanwhile, otherwise their invalidation is still pending
+        using var response = await repository.Container.PatchItemStreamAsync(
+            GetTemplateStateId(view, annotationType),
+            partitionKey,
+            [PatchOperation.Set($"/{nameof(GenerateTemplateStateEntity.IsInvalidationPending)}", false)],
+            new PatchItemRequestOptions { IfMatchEtag = stateEtag });
     }
 
     private static string NormalizeAnnotationType(string annotationType)

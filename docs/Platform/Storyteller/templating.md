@@ -94,7 +94,12 @@ Before templates were versioned, a template lived inside the annotation partitio
 | `GetTemplateVersionContentAsync` | Returns the content of one version, or `null`. |
 | `GetTemplateVersionChangesAsync` | Diff of `version - 1 → version`, or of any `from → to` pair. Version `0` is an empty object. An unknown version throws `InvalidOperationException`. |
 
-Every write uses the ETag of the item it read. When another writer changed the template in the meantime, the write is retried on fresh data, up to three times.
+Every write uses the ETag of the item it read. When another writer changed the template in the meantime, the write is retried on fresh data, up to three times; after that `TemplateConcurrencyException` is thrown. An unexpected storage failure throws `ConfigurationStorageException`.
+
+Every write is one transactional batch: the history item (for an update or delete), the template change, and the state record `GenerateTemplateStateEntity` (id `{viewName}.gns.{typeCode}`, same partition, guarded by its ETag). The state record survives a deletion of the template and the expiration of its history. It holds:
+
+- `LastVersion` — the highest version ever allocated, so a version number is never reused.
+- `IsInvalidationPending` — set by every write and cleared after the cache invalidation of that write has finished. The flag is cleared only while the state ETag is unchanged, so a later write keeps its own pending flag.
 
 Template content is not validated against configuration schemas.
 
@@ -115,6 +120,7 @@ The routes include the view, like configuration routes:
 
 - Reads require one of the scopes `Configuration.Read`, `Configuration.Write`, `Default.Read`, `Default.Write`, plus access to the project.
 - Writes require `Configuration.Write` or `Default.Write` and the `Contributor` role in the project.
+- Write status codes: `400` for invalid input (JSON, `$patch`, JSON Patch), `404` for a patch of a missing template, `409` when the concurrency retries run out (`TemplateConcurrencyException`), `500` for a storage or cache-invalidation failure.
 - Diff endpoints return a `DiffResult`, or unified diff text with `?format=unified`. An unknown version returns `404`.
 
 ## Versions
@@ -123,7 +129,7 @@ Versioning follows configuration versioning:
 
 - A new template starts at version `1`. Each change that alters the content increments `Version`.
 - Before a change, the current item is copied into a `GenerateTemplateHistoryEntity` with id `{viewName}.gnv.{typeCode}.{version}`, in the same `{project}.template` partition. Every view has its own version sequence. The copy and the change are written in one transactional batch.
-- A delete also writes the history item of the deleted version. A template created again later continues the numbering after the highest history version.
+- A delete also writes the history item of the deleted version. A template created again later continues the numbering after `LastVersion` of the state record, even when the history has already expired. Templates written before the state record existed fall back to the highest history version.
 - History items expire after 365 days (`ttl`). The current version never expires.
 - `ConfigurationVersion` describes a version: `Version`, `Author`, `CreationTime`, `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
 
@@ -206,8 +212,8 @@ Calculation of that execution, with no other stored documents and no other templ
 
 When the merged object has at least one property, calculation persists it:
 
-- An existing configuration item is upserted with `CalculatedContent` and `CalculatedContentHash`. Stored `Content`, `Version`, and `Author` stay as they were.
-- A missing configuration item is created with empty `Content`, `Author` set to `"system"`, `CalculatedContent` set to the merge, and `Name` set to the annotation name. The id is the normal configuration id, `{viewName}.cnf.{annotationKey}`.
+- An existing configuration item is replaced with `CalculatedContent` and `CalculatedContentHash`, conditionally on the ETag read at the start of the calculation. Stored `Content`, `Version`, and `Author` stay as they were. When the item changed in the meantime (for example, an invalidation after a template write), the result is returned but not cached, because it may be stale.
+- A missing configuration item is created with empty `Content`, `Author` set to `"system"`, `CalculatedContent` set to the merge, and `Name` set to the annotation name. The id is the normal configuration id, `{viewName}.cnf.{annotationKey}`. An invalidation cannot reach an item that did not exist yet, so after the creation the templates used by the calculation are read again. If any of their ETags changed, `CalculatedContent` of the new item is cleared. If the item was created concurrently by someone else, theirs is kept.
 
 `CalculatedContentHash` is eight lowercase hex digits. It is MurmurHash3 32-bit, seed `42`, of the calculated JSON serialized with `JsonSettingNames.Unique` (properties ordered by name).
 
@@ -241,6 +247,8 @@ A template write invalidates, in the template's view only, all configurations of
 | `uxe` | `uxe` |
 
 This is a cross-partition operation over all annotation partitions of the view. Changing an `rst` or `sbt` template touches almost every configuration in the view. Configurations of other views are never touched.
+
+When the invalidation after a template write fails, the write stays committed and the state record keeps `IsInvalidationPending`. Repeating the request — even one that changes nothing, a patch of a missing template, or a delete of an already deleted template — finishes the invalidation.
 
 A template item written directly into Cosmos, bypassing the service, leaves existing `CalculatedContent` in place. That template is applied on the next calculation, after one of the writes above has cleared the cached document.
 

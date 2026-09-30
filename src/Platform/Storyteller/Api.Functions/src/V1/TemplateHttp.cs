@@ -82,6 +82,7 @@ public class TemplateHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(JObject), Description = "The template content, merged into the current template (supports $remove and $patch).")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationTemplate), Description = "The created or updated template.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The template was changed concurrently too many times, the request can be repeated.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetTemplate(
@@ -120,8 +121,13 @@ public class TemplateHttp
             var outputModel = await _templates.CreateOrUpdateTemplateAsync(organization, project, view, annotationType, inputModel, author);
             return new OkObjectResult(outputModel);
         }
+        catch (TemplateConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
         catch (InvalidOperationException ex)
         {
+            // invalid $patch or JSON Patch operations of the input
             return new BadRequestObjectResult(new ErrorResponse(ex.Message));
         }
     }
@@ -138,6 +144,7 @@ public class TemplateHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationTemplate), Description = "The patched template.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No template exists for the annotation type in the view.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The template was changed concurrently too many times, the request can be repeated.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PatchTemplate(
@@ -180,8 +187,13 @@ public class TemplateHttp
         {
             return new NotFoundObjectResult(new ErrorResponse(ex.Message));
         }
+        catch (TemplateConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
         catch (InvalidOperationException ex)
         {
+            // invalid JSON Patch operations of the input
             return new BadRequestObjectResult(new ErrorResponse(ex.Message));
         }
     }
@@ -197,6 +209,7 @@ public class TemplateHttp
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "No template exists for the annotation type in the view.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The template was changed concurrently too many times, the request can be repeated.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteTemplate(
@@ -215,8 +228,15 @@ public class TemplateHttp
             return badRequestResult;
         }
 
-        var deleted = await _templates.DeleteTemplateAsync(organization, project, view, annotationType);
-        return deleted ? new OkResult() : new NotFoundResult();
+        try
+        {
+            var deleted = await _templates.DeleteTemplateAsync(organization, project, view, annotationType);
+            return deleted ? new OkResult() : new NotFoundResult();
+        }
+        catch (TemplateConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
     }
 
     [Function(nameof(GetTemplateVersions))]

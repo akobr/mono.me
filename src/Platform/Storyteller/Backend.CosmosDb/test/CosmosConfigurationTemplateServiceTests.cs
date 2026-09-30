@@ -443,12 +443,100 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         configuration!.Content.Should().NotContainKey("legacy");
     }
 
+    [Fact]
+    public async Task CommittedChangeWithPendingInvalidation_IsCompletedOnRepeatedRequest()
+    {
+        var project = $"{ProjectPrefix}-pending-update";
+        var org = TestConstants.Organization;
+        const string type = AnnotationTypeCodes.Execution;
+        var execution = await CreateExecutionAsync(project, View, "customer", "billing", "prod");
+
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "platform" }"""), "system");
+        await Configs.GetRawConfigurationAsync(execution);
+
+        // simulate a committed template change whose invalidation failed afterwards
+        await ReplaceRawItemAsync(project, $"{View}.gen.{type}", item => item["Content"]!["owner"] = "team");
+        await ReplaceRawItemAsync(project, $"{View}.gns.{type}", item => item["IsInvalidationPending"] = true);
+        (await Configs.GetRawConfigurationAsync(execution))!.Content["owner"]!.Value<string>().Should().Be("platform");
+
+        // the repeated request has no change to write, but completes the invalidation
+        var repeated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "team" }"""), "system");
+
+        repeated.Version.Should().Be(1);
+        (await HasCachedCalculationAsync(execution)).Should().BeFalse();
+        (await Configs.GetRawConfigurationAsync(execution))!.Content["owner"]!.Value<string>().Should().Be("team");
+        (await ReadRawItemAsync(project, $"{View}.gns.{type}"))["IsInvalidationPending"]!.Value<bool>().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CommittedDeletionWithPendingInvalidation_IsCompletedOnRepeatedDelete()
+    {
+        var project = $"{ProjectPrefix}-pending-delete";
+        var org = TestConstants.Organization;
+        const string type = AnnotationTypeCodes.Execution;
+        var execution = await CreateExecutionAsync(project, View, "customer", "billing", "prod");
+        await Configs.CreateOrUpdateConfigurationAsync(execution, JObject.Parse("""{ "retries": 5 }"""), "system");
+
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "platform" }"""), "system");
+        await Configs.GetRawConfigurationAsync(execution);
+
+        // simulate a committed deletion whose invalidation failed afterwards
+        await GetContainer().DeleteItemAsync<JObject>(
+            $"{View}.gen.{type}",
+            PartitionKeys.GetCosmosTemplate(project));
+        await ReplaceRawItemAsync(project, $"{View}.gns.{type}", item => item["IsInvalidationPending"] = true);
+
+        var deleted = await Templates.DeleteTemplateAsync(org, project, View, type);
+        var configuration = await Configs.GetRawConfigurationAsync(execution);
+
+        deleted.Should().BeFalse();
+        configuration!.Content.Should().NotContainKey("owner");
+        configuration.Content["retries"]!.Value<int>().Should().Be(5);
+    }
+
+    [Fact]
+    public async Task DeleteThenCreate_AfterHistoryExpiration_DoesNotReuseVersion()
+    {
+        var project = $"{ProjectPrefix}-expired-history";
+        var org = TestConstants.Organization;
+        const string type = AnnotationTypeCodes.Unit;
+
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "a": 1 }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "b": 2 }"""), "system");
+        await Templates.DeleteTemplateAsync(org, project, View, type);
+
+        // simulate the expiration (ttl) of the whole history
+        foreach (var version in new[] { 1, 2 })
+        {
+            await GetContainer().DeleteItemAsync<JObject>($"{View}.gnv.{type}.{version}", PartitionKeys.GetCosmosTemplate(project));
+        }
+
+        var recreated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "c": 3 }"""), "system");
+        var updated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "d": 4 }"""), "system");
+
+        recreated.Version.Should().Be(3);
+        updated.Version.Should().Be(4);
+    }
+
     private Container GetContainer()
     {
         return Context.Services
             .GetRequiredService<IContainerRepositoryProvider>()
             .GetOrganizationContainer(TestConstants.Organization)
             .Container;
+    }
+
+    private async Task<JObject> ReadRawItemAsync(string project, string id)
+    {
+        var response = await GetContainer().ReadItemAsync<JObject>(id, PartitionKeys.GetCosmosTemplate(project));
+        return response.Resource;
+    }
+
+    private async Task ReplaceRawItemAsync(string project, string id, Action<JObject> change)
+    {
+        var item = await ReadRawItemAsync(project, id);
+        change(item);
+        await GetContainer().ReplaceItemAsync(item, id, PartitionKeys.GetCosmosTemplate(project));
     }
 
     private async Task<bool> HasCachedCalculationAsync(FullKey key)

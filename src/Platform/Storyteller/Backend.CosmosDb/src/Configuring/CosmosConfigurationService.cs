@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Net;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Entities;
@@ -80,7 +81,7 @@ public class CosmosConfigurationService : IConfigurationService
         }
 
         var node = BuildInheritanceGraph(key);
-        var calculatedConfig = await CalculateAndCacheConfigurationAsync(node, repository, new Dictionary<string, JObject?>());
+        var calculatedConfig = await CalculateAndCacheConfigurationAsync(node, repository, new Dictionary<string, TemplateSnapshot>());
 
         if (calculatedConfig is null)
         {
@@ -683,28 +684,46 @@ public class CosmosConfigurationService : IConfigurationService
         JObject config,
         FullKey key,
         IContainerRepository repository,
-        Dictionary<string, JObject?> templates)
+        Dictionary<string, TemplateSnapshot> templates)
     {
         var typeCode = key.Annotation.TypeCode.ToLowerInvariant();
 
         // the whole inheritance graph is in one view, so the view template is read only once per calculation
-        if (!templates.TryGetValue(typeCode, out var templateContent))
+        if (!templates.TryGetValue(typeCode, out var template))
         {
-            var typeTemplateEntity = await repository.Container.TryReadItemAsync(
-                CosmosConfigurationTemplateService.GetTemplateId(key.ViewName, typeCode),
-                PartitionKeys.GetCosmosTemplate(key.ProjectName),
-                stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
-
-            templateContent = typeTemplateEntity?.Content;
-            templates[typeCode] = templateContent;
+            var (typeTemplateEntity, etag) = await ReadTemplateAsync(key, typeCode, repository);
+            template = new TemplateSnapshot(typeTemplateEntity?.Content, etag);
+            templates[typeCode] = template;
         }
 
-        if (templateContent is null)
+        if (template.Content is null)
         {
             return;
         }
 
-        config.MergeInto(templateContent);
+        config.MergeInto(template.Content);
+    }
+
+    private Task<(GenerateTemplateEntity? Item, string? ETag)> ReadTemplateAsync(FullKey key, string typeCode, IContainerRepository repository)
+    {
+        return repository.Container.TryReadItemWithETagAsync(
+            CosmosConfigurationTemplateService.GetTemplateId(key.ViewName, typeCode),
+            PartitionKeys.GetCosmosTemplate(key.ProjectName),
+            stream => stream.DeserializeNewtonsoft<GenerateTemplateEntity>(_serializerOptions));
+    }
+
+    private async Task<bool> HaveTemplatesChangedAsync(FullKey key, IContainerRepository repository, Dictionary<string, TemplateSnapshot> templates)
+    {
+        foreach (var (typeCode, template) in templates)
+        {
+            var (_, etag) = await ReadTemplateAsync(key, typeCode, repository);
+            if (etag != template.ETag)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task CollectHierarchyNodesAsync(
@@ -741,14 +760,14 @@ public class CosmosConfigurationService : IConfigurationService
     private async Task<JObject?> CalculateAndCacheConfigurationAsync(
         InheritanceGraphNode node,
         IContainerRepository repository,
-        Dictionary<string, JObject?> templates)
+        Dictionary<string, TemplateSnapshot> templates)
     {
         var key = node.Key;
         var partitionKeyValue = key.GetPartitionKey();
         var partitionKey = new PartitionKey(partitionKeyValue);
         var annotationKeyString = key.Annotation.ToString();
         var configEntryId = $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKeyString}";
-        var configEntry = await repository.Container.TryReadItemAsync(
+        var (configEntry, configEntryETag) = await repository.Container.TryReadItemWithETagAsync(
             configEntryId,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
@@ -772,7 +791,7 @@ public class CosmosConfigurationService : IConfigurationService
             }
         }
 
-        // Fill auto-generated content for the type from the project template (if any)
+        // Fill auto-generated content for the type from the view template (if any)
         await TryAutogeneratePropertiesAsync(config, key, repository, templates);
 
         // The most specific configuration has precedence, is merged last
@@ -788,28 +807,65 @@ public class CosmosConfigurationService : IConfigurationService
                     CalculatedContent = config,
                     CalculatedContentHash = $"{hash:x8}",
                 };
-                await repository.Container.UpsertItemAsync(configEntry, partitionKey);
+
+                // an invalidation (or any other write) since the read means this calculation can be stale, then it is not cached
+                try
+                {
+                    await repository.Container.ReplaceItemAsync(
+                        configEntry,
+                        configEntryId,
+                        partitionKey,
+                        new ItemRequestOptions { IfMatchEtag = configEntryETag, EnableContentResponseOnWrite = false });
+                }
+                catch (CosmosException ex) when (ex.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
+                {
+                    // the next read calculates again
+                }
             }
         }
         else if (config.HasValues)
         {
             var hash = config.CalculateMurmurHash32Bits(_jsonSettingsProvider.GetSettings(JsonSettingNames.Unique));
-            await repository.Container.CreateItemAsync(
-                new ConfigurationEntity
-                {
-                    Id = configEntryId,
-                    PartitionKey = partitionKeyValue,
-                    AnnotationKey = annotationKeyString,
-                    IsServerSubstitutionDisabled = false,
-                    Name = key.Annotation.Name,
-                    ProjectName = key.ProjectName,
-                    ViewName = key.ViewName,
-                    Content = new JObject(),
-                    CalculatedContent = config,
-                    CalculatedContentHash = $"{hash:x8}",
-                    Author = "system",
-                },
-                partitionKey);
+            ItemResponse<ConfigurationEntity> created;
+
+            try
+            {
+                created = await repository.Container.CreateItemAsync(
+                    new ConfigurationEntity
+                    {
+                        Id = configEntryId,
+                        PartitionKey = partitionKeyValue,
+                        AnnotationKey = annotationKeyString,
+                        IsServerSubstitutionDisabled = false,
+                        Name = key.Annotation.Name,
+                        ProjectName = key.ProjectName,
+                        ViewName = key.ViewName,
+                        Content = new JObject(),
+                        CalculatedContent = config,
+                        CalculatedContentHash = $"{hash:x8}",
+                        Author = "system",
+                    },
+                    partitionKey,
+                    new ItemRequestOptions { EnableContentResponseOnWrite = false });
+            }
+            catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.Conflict)
+            {
+                // created meanwhile by another calculation or write, keep theirs
+                return config;
+            }
+
+            // an invalidation cannot reach an item which didn't exist yet, verify the used templates are still the same
+            if (await HaveTemplatesChangedAsync(key, repository, templates))
+            {
+                using var clearResponse = await repository.Container.PatchItemStreamAsync(
+                    configEntryId,
+                    partitionKey,
+                    [
+                        PatchOperation.Set<object?>($"/{nameof(ConfigurationEntity.CalculatedContent)}", null),
+                        PatchOperation.Set<object?>($"/{nameof(ConfigurationEntity.CalculatedContentHash)}", null),
+                    ],
+                    new PatchItemRequestOptions { IfMatchEtag = created.ETag });
+            }
         }
 
         return config;
@@ -1144,4 +1200,6 @@ public class CosmosConfigurationService : IConfigurationService
 
         return targetNode;
     }
+
+    private sealed record class TemplateSnapshot(JObject? Content, string? ETag);
 }
