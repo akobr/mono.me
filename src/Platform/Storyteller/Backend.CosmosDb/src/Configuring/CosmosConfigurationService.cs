@@ -234,7 +234,7 @@ public class CosmosConfigurationService : IConfigurationService
             $"Unknown configuration for {sourceKey.Annotation} in view {toView}.");
     }
 
-    public async Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author)
+    public async Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author, bool force = false)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
@@ -254,9 +254,9 @@ public class CosmosConfigurationService : IConfigurationService
             value = value.RemoveRequested();
             value = await value.ApplyPatchRequested();
 
-            if (_schemaService is not null && value.HasValues)
+            if (!force && _schemaService is not null && value.HasValues)
             {
-                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, annotationKey, value);
+                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, value);
             }
 
             var maxVersionResponse = await repository.Container.GetItemLinqQueryable<ConfigurationHistoryEntity>(
@@ -327,9 +327,9 @@ public class CosmosConfigurationService : IConfigurationService
         }
 
         // validate against combined schema before persisting
-        if (_schemaService is not null && newContent.HasValues)
+        if (!force && _schemaService is not null && newContent.HasValues)
         {
-            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, annotationKey, newContent);
+            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, newContent);
         }
 
         // invalidate all ancestor configurations
@@ -349,7 +349,7 @@ public class CosmosConfigurationService : IConfigurationService
         return newConfiguration.ToConfigurationFromContent();
     }
 
-    public async Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author)
+    public async Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author, bool force = false)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
@@ -375,9 +375,9 @@ public class CosmosConfigurationService : IConfigurationService
             return existingConfiguration.ToConfigurationFromContent();
         }
 
-        if (_schemaService is not null && newContent.HasValues)
+        if (!force && _schemaService is not null && newContent.HasValues)
         {
-            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, annotationKey, newContent);
+            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, newContent);
         }
 
         // invalidate all dependent configurations before mutating this partition

@@ -16,9 +16,9 @@ public interface IConfigurationService
 
     Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key);
 
-    Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author);
+    Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author, bool force = false);
 
-    Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author);
+    Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author, bool force = false);
 
     Task ClearConfigurationAsync(FullKey key);
 

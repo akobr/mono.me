@@ -16,7 +16,7 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Api.V1;
 
-public class ConfigurationSchemaHttp
+public partial class ConfigurationSchemaHttp
 {
     private readonly IConfigurationSchemaService _schemaService;
     private readonly IAccessService _access;
@@ -38,6 +38,7 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationSchema), Description = "The configuration schema for the specified annotation type.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
@@ -49,6 +50,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
@@ -59,7 +61,7 @@ public class ConfigurationSchemaHttp
             return badRequestResult;
         }
 
-        var schema = await _schemaService.GetSchemaAsync(organization, project, annotationType);
+        var schema = await _schemaService.GetSchemaAsync(organization, project, view, annotationType);
 
         if (schema is null)
         {
@@ -75,11 +77,13 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
+    [OpenApiParameter(Definitions.Parameters.Force, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "When true, save the schema even if stored configurations in the view do not comply.")]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(JObject), Description = "The JSON Schema to apply to configurations of this annotation type.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationSchema), Description = "The created or updated configuration schema.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetConfigurationSchema(
@@ -87,6 +91,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
@@ -113,7 +118,7 @@ public class ConfigurationSchemaHttp
         try
         {
             var author = request.GetAuthor();
-            var schema = await _schemaService.SetSchemaAsync(organization, project, annotationType, inputModel, author);
+            var schema = await _schemaService.SetSchemaAsync(organization, project, view, annotationType, inputModel, author, IsForce(request));
             return new OkObjectResult(schema);
         }
         catch (ArgumentException ex)
@@ -124,6 +129,10 @@ public class ConfigurationSchemaHttp
         {
             return ToConflictResult(ex);
         }
+        catch (SchemaConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
     }
 
     [Function(nameof(DeleteConfigurationSchema))]
@@ -132,9 +141,11 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.AnnotationType)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The configuration schema doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A concurrent modification prevented the deletion.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -143,6 +154,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
@@ -153,14 +165,15 @@ public class ConfigurationSchemaHttp
             return badRequestResult;
         }
 
-        var deleted = await _schemaService.DeleteSchemaAsync(organization, project, annotationType);
-
-        if (!deleted)
+        try
         {
-            return new NotFoundResult();
+            var deleted = await _schemaService.DeleteSchemaAsync(organization, project, view, annotationType);
+            return deleted ? new OkResult() : new NotFoundResult();
         }
-
-        return new OkResult();
+        catch (SchemaConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
     }
 
     [Function(nameof(GetAnnotationSchema))]
@@ -169,6 +182,7 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationSchema), Description = "The annotation-level configuration schema.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
@@ -180,6 +194,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string key)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
@@ -190,7 +205,7 @@ public class ConfigurationSchemaHttp
             return badRequestResult;
         }
 
-        var schema = await _schemaService.GetAnnotationSchemaAsync(organization, project, key);
+        var schema = await _schemaService.GetAnnotationSchemaAsync(organization, project, view, key);
 
         if (schema is null)
         {
@@ -206,11 +221,13 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
+    [OpenApiParameter(Definitions.Parameters.Force, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "When true, save the schema even if stored configurations in the view do not comply.")]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(JObject), Description = "The JSON Schema to apply to configurations of this annotation.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationSchema), Description = "The created or updated annotation-level schema.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetAnnotationSchema(
@@ -218,6 +235,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
@@ -244,7 +262,7 @@ public class ConfigurationSchemaHttp
         try
         {
             var author = request.GetAuthor();
-            var schema = await _schemaService.SetAnnotationSchemaAsync(organization, project, key, inputModel, author);
+            var schema = await _schemaService.SetAnnotationSchemaAsync(organization, project, view, key, inputModel, author, IsForce(request));
             return new OkObjectResult(schema);
         }
         catch (ArgumentException ex)
@@ -255,6 +273,10 @@ public class ConfigurationSchemaHttp
         {
             return ToConflictResult(ex);
         }
+        catch (SchemaConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
     }
 
     [Function(nameof(DeleteAnnotationSchema))]
@@ -263,9 +285,11 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The annotation schema doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A concurrent modification prevented the deletion.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -274,6 +298,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
@@ -284,14 +309,15 @@ public class ConfigurationSchemaHttp
             return badRequestResult;
         }
 
-        var deleted = await _schemaService.DeleteAnnotationSchemaAsync(organization, project, key);
-
-        if (!deleted)
+        try
         {
-            return new NotFoundResult();
+            var deleted = await _schemaService.DeleteAnnotationSchemaAsync(organization, project, view, key);
+            return deleted ? new OkResult() : new NotFoundResult();
         }
-
-        return new OkResult();
+        catch (SchemaConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
     }
 
     [Function(nameof(GetDescendantTypeSchema))]
@@ -300,6 +326,7 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The descendant annotation type code.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationSchema), Description = "The descendant-type configuration schema.")]
@@ -312,6 +339,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string key,
         string annotationType)
     {
@@ -328,7 +356,7 @@ public class ConfigurationSchemaHttp
             return badRequestResult;
         }
 
-        var schema = await _schemaService.GetDescendantTypeSchemaAsync(organization, project, key, annotationType);
+        var schema = await _schemaService.GetDescendantTypeSchemaAsync(organization, project, view, key, annotationType);
 
         if (schema is null)
         {
@@ -344,12 +372,14 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The descendant annotation type code.")]
+    [OpenApiParameter(Definitions.Parameters.Force, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "When true, save the schema even if stored configurations in the view do not comply.")]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(JObject), Description = "The JSON Schema to apply to descendant configurations of this type.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationSchema), Description = "The created or updated descendant-type schema.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetDescendantTypeSchema(
@@ -357,6 +387,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string key,
         string annotationType)
     {
@@ -389,7 +420,7 @@ public class ConfigurationSchemaHttp
         try
         {
             var author = request.GetAuthor();
-            var schema = await _schemaService.SetDescendantTypeSchemaAsync(organization, project, key, annotationType, inputModel, author);
+            var schema = await _schemaService.SetDescendantTypeSchemaAsync(organization, project, view, key, annotationType, inputModel, author, IsForce(request));
             return new OkObjectResult(schema);
         }
         catch (ArgumentException ex)
@@ -400,6 +431,10 @@ public class ConfigurationSchemaHttp
         {
             return ToConflictResult(ex);
         }
+        catch (SchemaConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
     }
 
     [Function(nameof(DeleteDescendantTypeSchema))]
@@ -408,10 +443,12 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The descendant annotation type code.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The descendant-type schema doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A concurrent modification prevented the deletion.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -420,6 +457,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string key,
         string annotationType)
     {
@@ -436,14 +474,15 @@ public class ConfigurationSchemaHttp
             return badRequestResult;
         }
 
-        var deleted = await _schemaService.DeleteDescendantTypeSchemaAsync(organization, project, key, annotationType);
-
-        if (!deleted)
+        try
         {
-            return new NotFoundResult();
+            var deleted = await _schemaService.DeleteDescendantTypeSchemaAsync(organization, project, view, key, annotationType);
+            return deleted ? new OkResult() : new NotFoundResult();
         }
-
-        return new OkResult();
+        catch (SchemaConcurrencyException ex)
+        {
+            return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
     }
 
     [Function(nameof(GetCombinedConfigurationSchema))]
@@ -452,6 +491,7 @@ public class ConfigurationSchemaHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(CombinedConfigurationSchema), Description = "The combined configuration schema from all applicable levels.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
@@ -463,6 +503,7 @@ public class ConfigurationSchemaHttp
         HttpRequestData request,
         string organization,
         string project,
+        string view,
         string key)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
@@ -473,7 +514,7 @@ public class ConfigurationSchemaHttp
             return badRequestResult;
         }
 
-        var combined = await _schemaService.GetCombinedSchemaAsync(organization, project, key);
+        var combined = await _schemaService.GetCombinedSchemaAsync(organization, project, view, key);
 
         if (combined is null)
         {
@@ -513,5 +554,10 @@ public class ConfigurationSchemaHttp
             .ToList();
 
         return new ConflictObjectResult(new SchemaValidationErrorResponse(ex.Message, errorDetails));
+    }
+
+    private static bool IsForce(HttpRequestData request)
+    {
+        return bool.TryParse(request.Query[Definitions.Parameters.Force], out var force) && force;
     }
 }

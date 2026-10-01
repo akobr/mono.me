@@ -4,6 +4,8 @@ namespace _42.Platform.Storyteller;
 
 public record class ConfigurationSchema
 {
+    public required string View { get; init; }
+
     public string? AnnotationType { get; init; }
 
     public string? AnnotationKey { get; init; }
