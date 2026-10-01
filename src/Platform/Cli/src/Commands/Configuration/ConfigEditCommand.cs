@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
@@ -35,6 +36,9 @@ public class ConfigEditCommand : BaseContextCommand
 
     [Argument(0, Description = "An annotation key to edit the configuration for.")]
     public string AnnotationKey { get; set; } = string.Empty;
+
+    [Option("-f|--force", CommandOptionType.NoValue, Description = "Store the configuration even when it violates the schema.")]
+    public bool Force { get; set; }
 
     /// <summary>
     /// Opens the stored content of the configuration (without inherited values and templates) in the configured editor,
@@ -81,7 +85,8 @@ public class ConfigEditCommand : BaseContextCommand
                 Context.ViewName,
                 AnnotationKey,
                 storedContent,
-                result.Edited);
+                result.Edited,
+                Force);
 
             if (saved is null)
             {
@@ -94,6 +99,11 @@ public class ConfigEditCommand : BaseContextCommand
         }
         catch (ApiException e)
         {
+            if (SchemaValidationConsole.TryWrite(Console, e))
+            {
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
+
             Console.WriteLine($"Error occurred: {e.Message}");
             return ExitCodes.ERROR_CRASH;
         }

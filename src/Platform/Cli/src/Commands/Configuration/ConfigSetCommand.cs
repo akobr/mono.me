@@ -54,6 +54,9 @@ public class ConfigSetCommand : BaseContextCommand
     [Option("--replace", CommandOptionType.NoValue, Description = "Replace the stored content of the configuration instead of merging into it (removes properties which are not specified).")]
     public bool IsReplaceRequested { get; set; }
 
+    [Option("-f|--force", CommandOptionType.NoValue, Description = "Store the configuration even when it violates the schema.")]
+    public bool Force { get; set; }
+
     protected override async Task<int> ExecuteAsync()
     {
         var config = await JsonInputBuilder.BuildAsync(Console, _fileSystem, ImportFilePath, InlineProperties);
@@ -77,7 +80,8 @@ public class ConfigSetCommand : BaseContextCommand
                     Context.ViewName,
                     AnnotationKey,
                     storedContent,
-                    config);
+                    config,
+                    Force);
 
                 if (data is null)
                 {
@@ -92,6 +96,7 @@ public class ConfigSetCommand : BaseContextCommand
                     Context.ProjectName,
                     Context.ViewName,
                     AnnotationKey,
+                    Force,
                     config);
             }
 
@@ -106,6 +111,11 @@ public class ConfigSetCommand : BaseContextCommand
         }
         catch (ApiException e)
         {
+            if (SchemaValidationConsole.TryWrite(Console, e))
+            {
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
+
             Console.WriteLine($"Error occurred: {e.Message}");
             return ExitCodes.ERROR_CRASH;
         }

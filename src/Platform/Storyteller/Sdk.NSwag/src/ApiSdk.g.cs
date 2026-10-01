@@ -4761,39 +4761,43 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
         /// <param name="body">The configuration model.</param>
         /// <returns>The created or updated configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, object body);
+        System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force, object body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
         /// <param name="body">The configuration model.</param>
         /// <returns>The created or updated configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, object body, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
         /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
         /// <returns>The patched configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, object body);
+        System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force, object body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
         /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
         /// <returns>The patched configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, object body, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -5121,12 +5125,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
         /// <param name="body">The configuration model.</param>
         /// <returns>The created or updated configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, object body)
+        public virtual System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force, object body)
         {
-            return SetConfigurationAsync(organization, project, view, key, body, System.Threading.CancellationToken.None);
+            return SetConfigurationAsync(organization, project, view, key, force, body, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -5134,10 +5139,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
         /// <param name="body">The configuration model.</param>
         /// <returns>The created or updated configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> SetConfigurationAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -5175,6 +5181,12 @@ namespace _42.Platform.Storyteller.Sdk
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (force != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("force")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(force, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -5225,6 +5237,16 @@ namespace _42.Platform.Storyteller.Sdk
                             throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<SchemaValidationErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<SchemaValidationErrorResponse>("The configuration violates the schema.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 500)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -5258,12 +5280,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
         /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
         /// <returns>The patched configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, object body)
+        public virtual System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force, object body)
         {
-            return PatchConfigurationAsync(organization, project, view, key, body, System.Threading.CancellationToken.None);
+            return PatchConfigurationAsync(organization, project, view, key, force, body, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -5271,10 +5294,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, store the configuration even if it violates the schema.</param>
         /// <param name="body">A JSON Patch document (RFC 6902) containing the operations to apply.</param>
         /// <returns>The patched configuration.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Configuration> PatchConfigurationAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -5312,6 +5336,12 @@ namespace _42.Platform.Storyteller.Sdk
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (force != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("force")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(force, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -6557,165 +6587,439 @@ namespace _42.Platform.Storyteller.Sdk
     {
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The configuration schema for the specified annotation type.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string annotationType);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The configuration schema for the specified annotation type.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string annotationType, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to configurations of this annotation type.</param>
         /// <returns>The created or updated configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string annotationType, object body);
+        System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force, object body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to configurations of this annotation type.</param>
         /// <returns>The created or updated configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string annotationType, object body, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force, object body, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string annotationType);
+        System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string annotationType, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The annotation-level configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string key);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The annotation-level configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string key, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to configurations of this annotation.</param>
         /// <returns>The created or updated annotation-level schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string key, object body);
+        System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force, object body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to configurations of this annotation.</param>
         /// <returns>The created or updated annotation-level schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string key, object body, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string key);
+        System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string key, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>The descendant-type configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>The descendant-type configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to descendant configurations of this type.</param>
         /// <returns>The created or updated descendant-type schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType, object body);
+        System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force, object body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to descendant configurations of this type.</param>
         /// <returns>The created or updated descendant-type schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType, object body, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force, object body, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType);
+        System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The combined configuration schema from all applicable levels.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string key);
+        System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The combined configuration schema from all applicable levels.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string key, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The list of type-schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The list of type-schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The type schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The type schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The list of annotation-schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The list of annotation-schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The annotation schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The annotation schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <returns>The list of descendant-type schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <returns>The list of descendant-type schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The descendant-type schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The descendant-type schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken);
 
     }
 
@@ -6769,27 +7073,32 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The configuration schema for the specified annotation type.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string annotationType)
+        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType)
         {
-            return GetConfigurationSchemaAsync(organization, project, annotationType, System.Threading.CancellationToken.None);
+            return GetConfigurationSchemaAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>The configuration schema for the specified annotation type.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (annotationType == null)
                 throw new System.ArgumentNullException("annotationType");
@@ -6805,11 +7114,13 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/type/{annotationType}"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/type/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
 
@@ -6899,29 +7210,36 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to configurations of this annotation type.</param>
         /// <returns>The created or updated configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string annotationType, object body)
+        public virtual System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force, object body)
         {
-            return SetConfigurationSchemaAsync(organization, project, annotationType, body, System.Threading.CancellationToken.None);
+            return SetConfigurationSchemaAsync(organization, project, view, annotationType, force, body, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to configurations of this annotation type.</param>
         /// <returns>The created or updated configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string annotationType, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetConfigurationSchemaAsync(string organization, string project, string view, string annotationType, bool? force, object body, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (annotationType == null)
                 throw new System.ArgumentNullException("annotationType");
@@ -6941,13 +7259,21 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/type/{annotationType}"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/type/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (force != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("force")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(force, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -7005,7 +7331,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<SchemaValidationErrorResponse>("Existing configurations are not compliant with the provided schema.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<SchemaValidationErrorResponse>("Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -7039,27 +7365,32 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string annotationType)
+        public virtual System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType)
         {
-            return DeleteConfigurationSchemaAsync(organization, project, annotationType, System.Threading.CancellationToken.None);
+            return DeleteConfigurationSchemaAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteConfigurationSchemaAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (annotationType == null)
                 throw new System.ArgumentNullException("annotationType");
@@ -7074,11 +7405,13 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/type/{annotationType}"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/type/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
 
@@ -7132,6 +7465,16 @@ namespace _42.Platform.Storyteller.Sdk
                             throw new ApiException("The configuration schema doesn\'t exist.", status_, responseText_, headers_, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A concurrent modification prevented the deletion.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 500)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -7163,27 +7506,32 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The annotation-level configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string key)
+        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key)
         {
-            return GetAnnotationSchemaAsync(organization, project, key, System.Threading.CancellationToken.None);
+            return GetAnnotationSchemaAsync(organization, project, view, key, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The annotation-level configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -7199,11 +7547,13 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/{key}"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
 
@@ -7293,29 +7643,36 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to configurations of this annotation.</param>
         /// <returns>The created or updated annotation-level schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string key, object body)
+        public virtual System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force, object body)
         {
-            return SetAnnotationSchemaAsync(organization, project, key, body, System.Threading.CancellationToken.None);
+            return SetAnnotationSchemaAsync(organization, project, view, key, force, body, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to configurations of this annotation.</param>
         /// <returns>The created or updated annotation-level schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string key, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetAnnotationSchemaAsync(string organization, string project, string view, string key, bool? force, object body, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -7335,13 +7692,21 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/{key}"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (force != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("force")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(force, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -7399,7 +7764,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<SchemaValidationErrorResponse>("Existing configurations are not compliant with the provided schema.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<SchemaValidationErrorResponse>("Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -7433,27 +7798,32 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string key)
+        public virtual System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key)
         {
-            return DeleteAnnotationSchemaAsync(organization, project, key, System.Threading.CancellationToken.None);
+            return DeleteAnnotationSchemaAsync(organization, project, view, key, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteAnnotationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -7468,11 +7838,13 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/{key}"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
 
@@ -7526,6 +7898,16 @@ namespace _42.Platform.Storyteller.Sdk
                             throw new ApiException("The annotation schema doesn\'t exist.", status_, responseText_, headers_, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A concurrent modification prevented the deletion.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 500)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -7557,29 +7939,34 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>The descendant-type configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType)
+        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType)
         {
-            return GetDescendantTypeSchemaAsync(organization, project, key, annotationType, System.Threading.CancellationToken.None);
+            return GetDescendantTypeSchemaAsync(organization, project, view, key, annotationType, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>The descendant-type configuration schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -7598,11 +7985,13 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/{key}/type/{annotationType}"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/type/");
@@ -7694,31 +8083,38 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to descendant configurations of this type.</param>
         /// <returns>The created or updated descendant-type schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType, object body)
+        public virtual System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force, object body)
         {
-            return SetDescendantTypeSchemaAsync(organization, project, key, annotationType, body, System.Threading.CancellationToken.None);
+            return SetDescendantTypeSchemaAsync(organization, project, view, key, annotationType, force, body, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="force">When true, save the schema even if stored configurations in the view do not comply.</param>
         /// <param name="body">The JSON Schema to apply to descendant configurations of this type.</param>
         /// <returns>The created or updated descendant-type schema.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType, object body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, bool? force, object body, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -7741,15 +8137,23 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/{key}/type/{annotationType}"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/type/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (force != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("force")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(force, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -7807,7 +8211,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<SchemaValidationErrorResponse>("Existing configurations are not compliant with the provided schema.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<SchemaValidationErrorResponse>("Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -7841,29 +8245,34 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType)
+        public virtual System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType)
         {
-            return DeleteDescendantTypeSchemaAsync(organization, project, key, annotationType, System.Threading.CancellationToken.None);
+            return DeleteDescendantTypeSchemaAsync(organization, project, view, key, annotationType, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="annotationType">The descendant annotation type code.</param>
         /// <returns>Acknowledge of the deletion.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string key, string annotationType, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -7881,11 +8290,13 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/{key}/type/{annotationType}"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/type/");
@@ -7941,6 +8352,16 @@ namespace _42.Platform.Storyteller.Sdk
                             throw new ApiException("The descendant-type schema doesn\'t exist.", status_, responseText_, headers_, null);
                         }
                         else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A concurrent modification prevented the deletion.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
                         if (status_ == 500)
                         {
                             var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
@@ -7972,27 +8393,32 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The combined configuration schema from all applicable levels.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string key)
+        public virtual System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key)
         {
-            return GetCombinedConfigurationSchemaAsync(organization, project, key, System.Threading.CancellationToken.None);
+            return GetCombinedConfigurationSchemaAsync(organization, project, view, key, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <returns>The combined configuration schema from all applicable levels.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
 
             if (project == null)
                 throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
 
             if (key == null)
                 throw new System.ArgumentNullException("key");
@@ -8008,11 +8434,13 @@ namespace _42.Platform.Storyteller.Sdk
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
-                    // Operation Path: "v1/{organization}/{project}/configuration-schema/{key}/definition"
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/definition"
                     urlBuilder_.Append("v1/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append('/');
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/configuration-schema/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/definition");
@@ -8070,6 +8498,1822 @@ namespace _42.Platform.Storyteller.Sdk
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
                             throw new ApiException("No schemas found for the specified annotation.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The list of type-schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType)
+        {
+            return GetSchemaVersionsAsync(organization, project, view, annotationType, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <returns>The list of type-schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}/versions"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/type/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<ConfigurationVersion>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The type schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version)
+        {
+            return GetSchemaVersionAsync(organization, project, view, annotationType, version, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The type schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetSchemaVersionAsync(string organization, string project, string view, string annotationType, int version, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}/versions/{version}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/type/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ConfigurationSchema>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The requested version doesn\'t exist.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format)
+        {
+            return GetSchemaVersionDiffAsync(organization, project, view, annotationType, version, format, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffAsync(string organization, string project, string view, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}/versions/{version}/diff"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/type/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/diff");
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The requested version doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format)
+        {
+            return GetSchemaVersionDiffCustomAsync(organization, project, view, annotationType, version, versionFrom, format, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetSchemaVersionDiffCustomAsync(string organization, string project, string view, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            if (versionFrom == null)
+                throw new System.ArgumentNullException("versionFrom");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}/versions/{version}/diff/{versionFrom}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/type/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/diff/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(versionFrom, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("One of the requested versions doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The list of annotation-schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key)
+        {
+            return GetAnnotationSchemaVersionsAsync(organization, project, view, key, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The list of annotation-schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetAnnotationSchemaVersionsAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/versions"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<ConfigurationVersion>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The annotation schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version)
+        {
+            return GetAnnotationSchemaVersionAsync(organization, project, view, key, version, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The annotation schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetAnnotationSchemaVersionAsync(string organization, string project, string view, string key, int version, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/versions/{version}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ConfigurationSchema>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The requested version doesn\'t exist.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format)
+        {
+            return GetAnnotationSchemaVersionDiffAsync(organization, project, view, key, version, format, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffAsync(string organization, string project, string view, string key, int version, string format, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/versions/{version}/diff"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/diff");
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The requested version doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format)
+        {
+            return GetAnnotationSchemaVersionDiffCustomAsync(organization, project, view, key, version, versionFrom, format, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetAnnotationSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            if (versionFrom == null)
+                throw new System.ArgumentNullException("versionFrom");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/versions/{version}/diff/{versionFrom}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/diff/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(versionFrom, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("One of the requested versions doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <returns>The list of descendant-type schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType)
+        {
+            return GetDescendantTypeSchemaVersionsAsync(organization, project, view, key, annotationType, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <returns>The list of descendant-type schema versions.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetDescendantTypeSchemaVersionsAsync(string organization, string project, string view, string key, string annotationType, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}/versions"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/type/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<ConfigurationVersion>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The descendant-type schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version)
+        {
+            return GetDescendantTypeSchemaVersionAsync(organization, project, view, key, annotationType, version, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The version number.</param>
+        /// <returns>The descendant-type schema of the version.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ConfigurationSchema> GetDescendantTypeSchemaVersionAsync(string organization, string project, string view, string key, string annotationType, int version, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}/versions/{version}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/type/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ConfigurationSchema>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The requested version doesn\'t exist.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format)
+        {
+            return GetDescendantTypeSchemaVersionDiffAsync(organization, project, view, key, annotationType, version, format, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The version number.</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between this and the previous version. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffAsync(string organization, string project, string view, string key, string annotationType, int version, string format, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}/versions/{version}/diff"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/type/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/diff");
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The requested version doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format)
+        {
+            return GetDescendantTypeSchemaVersionDiffCustomAsync(organization, project, view, key, annotationType, version, versionFrom, format, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="annotationType">The descendant annotation type code.</param>
+        /// <param name="version">The target version number (to).</param>
+        /// <param name="versionFrom">The source version number (from).</param>
+        /// <param name="format">Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.</param>
+        /// <returns>The diff between the two specified versions. When ?format=unified, returns text/plain instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<DiffResult> GetDescendantTypeSchemaVersionDiffCustomAsync(string organization, string project, string view, string key, string annotationType, int version, int versionFrom, string format, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (annotationType == null)
+                throw new System.ArgumentNullException("annotationType");
+
+            if (version == null)
+                throw new System.ArgumentNullException("version");
+
+            if (versionFrom == null)
+                throw new System.ArgumentNullException("versionFrom");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}/versions/{version}/diff/{versionFrom}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schema/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/type/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/versions/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(version, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/diff/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(versionFrom, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (format != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("format")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(format, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<DiffResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("One of the requested versions doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -10140,6 +12384,9 @@ namespace _42.Platform.Storyteller.Sdk
     public partial class CombinedConfigurationSchema
     {
 
+        [Newtonsoft.Json.JsonProperty("View", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string View { get; set; }
+
         [Newtonsoft.Json.JsonProperty("AnnotationKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string AnnotationKey { get; set; }
 
@@ -10199,6 +12446,9 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ConfigurationSchema
     {
+
+        [Newtonsoft.Json.JsonProperty("View", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string View { get; set; }
 
         [Newtonsoft.Json.JsonProperty("AnnotationType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string AnnotationType { get; set; }

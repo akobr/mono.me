@@ -2,7 +2,7 @@
 
 This document defines how a JSON Schema constrains the stored configuration of an annotation in Storyteller: where a schema lives, how layers combine, how a write is checked, and how a breaking change is published.
 
-The contract below is what the Storyteller service and HTTP API implement. A schema belongs to one view, carries an author and a version history, and a write that does not comply is rejected unless the caller passes `force=true`. The `sform` commands in [CLI](#cli) are the same contract and are not in the tool yet; that work is Phase B of [JSON Schema revision](specs/2026-09-30%20JSON%20Schema%20revision.md). The service and API review is [Phase A of JSON Schema revision](specs/reviews/2026-10-01%20Phase%20A%20of%20JSON%20Schema%20revision.md).
+The contract below is what the Storyteller service, HTTP API, and `sform` commands implement. A schema belongs to one view, carries an author and a version history, and a write that does not comply is rejected unless the caller passes `force=true` on the API or `-f`/`--force` on the CLI. The service and API review is [Phase A of JSON Schema revision](specs/reviews/2026-10-01%20Phase%20A%20of%20JSON%20Schema%20revision.md). The CLI review is [Phase B of JSON Schema revision](specs/reviews/2026-10-01%20Phase%20B%20of%20JSON%20Schema%20revision.md).
 
 A schema documents the shape of a configuration and lists the values that are allowed. It is a JSON Schema document stored by Storyteller and evaluated with NJsonSchema. Keywords such as `description`, `title`, and `examples` are kept and returned with the document. Keywords such as `type`, `required`, `properties`, `enum`, `const`, `minimum`, and `additionalProperties` are what a write is checked against.
 
@@ -187,7 +187,7 @@ sform story schema descendant set rst.invoicing exe --import exe-under-invoicing
 sform story schema definition exe.northwind.invoicing.prod
 ```
 
-`set` creates the schema or replaces it. `edit` opens the current document in the editor and replaces it with the result; there has to be a schema already. `definition` is read-only. Add `--force` to `set` and `edit` when the new schema should be stored even though configurations already in the view do not comply. See [Force](#force).
+`set` creates the schema or replaces it. It takes `-i|--import` and sends that file as the body. `edit` opens the current document in the editor and replaces it with the result; there has to be a schema already. `get` takes `--version` to print one stored version. `diff` takes the target version, an optional source version, and `--format`. `definition` is read-only. Add `-f` or `--force` to `set` and `edit` when the new schema should be stored even though configurations already in the view do not comply. See [Force](#force).
 
 ## What is checked
 
@@ -227,7 +227,7 @@ Force breaks one side of that deadlock for a single call. The caller passes it e
 | PUT a schema | Rejected when any in-scope configuration in the view would fail the combined schema after the write | The schema is stored. Existing configurations are left as they are |
 | PUT or PATCH a configuration | Rejected when the document about to be stored fails the combined schema | The document is stored |
 
-On the HTTP API the parameter is the query `force=true`. On the CLI it is `--force` on `schema type|annotation|descendant set|edit` and on `config set` and `config edit`. Force is not remembered. The next call defaults to rejection again. Force is not a separate permission: a caller who can write the project can pass it. The author recorded on the new version is the audit of who published the break.
+On the HTTP API the parameter is the query `force=true`. On the CLI it is `-f` or `--force` on `schema type|annotation|descendant set|edit` and on `config set` and `config edit`. Force is not remembered. The next call defaults to rejection again. Force is not a separate permission: a caller who can write the project can pass it. The author recorded on the new version is the audit of who published the break.
 
 Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, an unknown type code or annotation key, a patch of a missing configuration, and a lost concurrency race still fail.
 

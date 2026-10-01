@@ -28,6 +28,12 @@ public static class CommandNames
     public const string TEMPLATE = "template";
     public const string TEMPLATES = "templates";
 
+    public const string SCHEMA = "schema";
+    public const string TYPE = "type";
+    public const string ANNOTATION = "annotation";
+    public const string DESCENDANT = "descendant";
+    public const string DEFINITION = "definition";
+
     public const string MACHINE = "machine";
     public const string AGENT = "agent";
 

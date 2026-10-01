@@ -48,6 +48,7 @@ public static class StorytellerApiExtensions
     /// An existing configuration is changed by a JSON Patch computed from the stored content,
     /// so removed properties and array items are removed on the server as well (no merge).
     /// </remarks>
+    /// <param name="force">When <c>true</c>, store the document even if it violates the schema. PUT and PATCH both send the query.</param>
     /// <returns>The saved configuration, or null when there was no change.</returns>
     public static async Task<Storyteller.Sdk.Configuration?> ReplaceConfigurationAsync(
         this IConfigurationsApiClient @this,
@@ -56,18 +57,19 @@ public static class StorytellerApiExtensions
         string view,
         string annotationKey,
         JObject? storedContent,
-        JObject content)
+        JObject content,
+        bool force = false)
     {
         if (storedContent is null)
         {
-            return await @this.SetConfigurationAsync(organization, project, view, annotationKey, content);
+            return await @this.SetConfigurationAsync(organization, project, view, annotationKey, force, content);
         }
 
         var patch = JsonPatchBuilder.Create(storedContent, content);
 
         return patch.Count == 0
             ? null
-            : await @this.PatchConfigurationAsync(organization, project, view, annotationKey, patch);
+            : await @this.PatchConfigurationAsync(organization, project, view, annotationKey, force, patch);
     }
 
     /// <summary>

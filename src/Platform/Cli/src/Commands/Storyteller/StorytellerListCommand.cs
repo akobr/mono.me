@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands.Configuration;
+using _42.Platform.Cli.Commands.Schemas;
 using _42.Platform.Cli.Commands.Templates;
 using _42.Platform.Storyteller.Sdk;
 using _42.Platform.Storyteller;
@@ -16,7 +17,8 @@ namespace _42.Platform.Cli.Commands.Storyteller;
     typeof(StorytellerSetCommand),
     typeof(StorytellerDeleteCommand),
     typeof(ConfigGetCommand),
-    typeof(TemplateGetCommand))]
+    typeof(TemplateGetCommand),
+    typeof(SchemaCommand))]
 
 [Command(CommandNames.STORYTELLER, CommandNames.STORY, CommandNames.ANNOTATIONS, Description = "Retrieve the story of your platform (manage annotations).")]
 public class StorytellerListCommand : BaseContextCommand
