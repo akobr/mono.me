@@ -14,6 +14,11 @@ public static class ConfigurationHistoryEntityExtensions
         return GetExpirationTime(@this.LastUpdatedEpochTimestamp, @this.TimeToLiveInSeconds);
     }
 
+    public static DateTimeOffset GetExpirationTime(this ConfigurationSchemaHistoryEntity @this)
+    {
+        return GetExpirationTime(@this.LastUpdatedEpochTimestamp, @this.TimeToLiveInSeconds);
+    }
+
     private static DateTimeOffset GetExpirationTime(uint lastUpdatedEpochTimestamp, int timeToLiveInSeconds)
     {
         var expirationEpochTimestamp = lastUpdatedEpochTimestamp + timeToLiveInSeconds;

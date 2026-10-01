@@ -65,10 +65,25 @@ public static class Definitions
         {
             public static class V1
             {
-                public const string SchemaType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/type/{{{Parameters.AnnotationType}}}";
-                public const string SchemaAnnotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}";
-                public const string SchemaDescendantType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}/type/{{{Parameters.AnnotationType}}}";
-                public const string SchemaCombined = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/configuration-schema/{{{Parameters.Key}}}/definition";
+                public const string SchemaType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/type/{{{Parameters.AnnotationType}}}";
+                public const string SchemaAnnotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}";
+                public const string SchemaDescendantType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}/type/{{{Parameters.AnnotationType}}}";
+                public const string SchemaCombined = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}/definition";
+
+                public const string SchemaTypeVersions = $"{SchemaType}/versions";
+                public const string SchemaTypeVersion = $"{SchemaType}/versions/{{{Parameters.Version}}}";
+                public const string SchemaTypeVersionDiff = $"{SchemaTypeVersion}/diff";
+                public const string SchemaTypeVersionDiffCustom = $"{SchemaTypeVersionDiff}/{{{Parameters.VersionFrom}}}";
+
+                public const string SchemaAnnotationVersions = $"{SchemaAnnotation}/versions";
+                public const string SchemaAnnotationVersion = $"{SchemaAnnotation}/versions/{{{Parameters.Version}}}";
+                public const string SchemaAnnotationVersionDiff = $"{SchemaAnnotationVersion}/diff";
+                public const string SchemaAnnotationVersionDiffCustom = $"{SchemaAnnotationVersionDiff}/{{{Parameters.VersionFrom}}}";
+
+                public const string SchemaDescendantTypeVersions = $"{SchemaDescendantType}/versions";
+                public const string SchemaDescendantTypeVersion = $"{SchemaDescendantType}/versions/{{{Parameters.Version}}}";
+                public const string SchemaDescendantTypeVersionDiff = $"{SchemaDescendantTypeVersion}/diff";
+                public const string SchemaDescendantTypeVersionDiffCustom = $"{SchemaDescendantTypeVersionDiff}/{{{Parameters.VersionFrom}}}";
             }
         }
 
@@ -166,6 +181,21 @@ public static class Definitions
             public const string DeleteDescendantTypeSchema = nameof(DeleteDescendantTypeSchema);
 
             public const string GetCombinedConfigurationSchema = nameof(GetCombinedConfigurationSchema);
+
+            public const string GetSchemaVersions = nameof(GetSchemaVersions);
+            public const string GetSchemaVersion = nameof(GetSchemaVersion);
+            public const string GetSchemaVersionDiff = nameof(GetSchemaVersionDiff);
+            public const string GetSchemaVersionDiffCustom = nameof(GetSchemaVersionDiffCustom);
+
+            public const string GetAnnotationSchemaVersions = nameof(GetAnnotationSchemaVersions);
+            public const string GetAnnotationSchemaVersion = nameof(GetAnnotationSchemaVersion);
+            public const string GetAnnotationSchemaVersionDiff = nameof(GetAnnotationSchemaVersionDiff);
+            public const string GetAnnotationSchemaVersionDiffCustom = nameof(GetAnnotationSchemaVersionDiffCustom);
+
+            public const string GetDescendantTypeSchemaVersions = nameof(GetDescendantTypeSchemaVersions);
+            public const string GetDescendantTypeSchemaVersion = nameof(GetDescendantTypeSchemaVersion);
+            public const string GetDescendantTypeSchemaVersionDiff = nameof(GetDescendantTypeSchemaVersionDiff);
+            public const string GetDescendantTypeSchemaVersionDiffCustom = nameof(GetDescendantTypeSchemaVersionDiffCustom);
         }
 
         public static class Template
@@ -198,6 +228,7 @@ public static class Definitions
         public const string AnnotationType = "annotationType";
         public const string Thumbprint = "thumbprint";
         public const string Format = "format";
+        public const string Force = "force";
     }
 
     public static class Tags

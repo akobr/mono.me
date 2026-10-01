@@ -129,9 +129,11 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
+    [OpenApiParameter(Definitions.Parameters.Force, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "When true, store the configuration even if it violates the schema.")]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(JObject), Description = "The configuration model.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The created or updated configuration.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The configuration violates the schema.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetConfiguration(
@@ -168,7 +170,7 @@ public class ConfigurationHttp
         try
         {
             var author = request.GetAuthor();
-            var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author);
+            var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author, IsForce(request));
             return new OkObjectResult(outputModel);
         }
         catch (InvalidOperationException ex)
@@ -198,6 +200,7 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
+    [OpenApiParameter(Definitions.Parameters.Force, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "When true, store the configuration even if it violates the schema.")]
     [OpenApiRequestBody("application/json-patch+json", typeof(JArray), Description = "A JSON Patch document (RFC 6902) containing the operations to apply.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The patched configuration.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
@@ -239,7 +242,7 @@ public class ConfigurationHttp
         try
         {
             var author = request.GetAuthor();
-            var outputModel = await _configuration.PatchConfigurationAsync(fullKey, patchOperations, author);
+            var outputModel = await _configuration.PatchConfigurationAsync(fullKey, patchOperations, author, IsForce(request));
             return new OkObjectResult(outputModel);
         }
         catch (ConfigurationNotFoundException ex)
@@ -510,5 +513,10 @@ public class ConfigurationHttp
         _logger.LogWarning("Invalid request; unknown annotation key '{annotationKey}'", annotationKey);
         badRequestResult = new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {annotationKey}"));
         return false;
+    }
+
+    private static bool IsForce(HttpRequestData request)
+    {
+        return bool.TryParse(request.Query[Definitions.Parameters.Force], out var force) && force;
     }
 }

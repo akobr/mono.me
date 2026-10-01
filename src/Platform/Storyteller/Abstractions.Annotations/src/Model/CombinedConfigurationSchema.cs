@@ -5,6 +5,8 @@ namespace _42.Platform.Storyteller;
 
 public record class CombinedConfigurationSchema
 {
+    public required string View { get; init; }
+
     public required string AnnotationKey { get; init; }
 
     public required JObject MergedContent { get; init; }
