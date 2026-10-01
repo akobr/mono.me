@@ -17,6 +17,6 @@ dotnet tool install --global NSwag.ConsoleCore
 
 ```powershell
 cd src/Platform/Storyteller/Sdk.NSwag/
-nswag openapi2csclient /input:open.api.v0.8.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
+nswag openapi2csclient /input:open.api.v0.8.82.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
 ```
 
