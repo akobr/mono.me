@@ -509,6 +509,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
     {
         var schemaOverride = new SchemaOverride(identity.Kind, identity.ModelType, identity.Kind == SchemaKind.Type ? null : identity.ModelKey, schemaContent, author);
         var errors = new List<SchemaValidationError>();
+        var layerCache = new Dictionary<string, ConfigurationSchemaEntity?>();
         var feed = QueryAffectedConfigurations(repository.Container, project, view, identity);
 
         while (feed.HasMoreResults)
@@ -529,7 +530,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
                 }
 
                 var configKey = AnnotationKey.Parse(configEntity.AnnotationKey);
-                var combined = await ResolveCombinedAsync(repository, partitionKey, view, configKey, schemaOverride);
+                var combined = await ResolveCombinedAsync(repository, partitionKey, view, configKey, schemaOverride, layerCache);
 
                 if (combined is null)
                 {
@@ -558,7 +559,8 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         PartitionKey partitionKey,
         string view,
         AnnotationKey key,
-        SchemaOverride? schemaOverride)
+        SchemaOverride? schemaOverride,
+        Dictionary<string, ConfigurationSchemaEntity?>? layerCache = null)
     {
         var applied = new List<ConfigurationSchema>();
         var typeIdentity = SchemaIdentity.ForType(view, key.TypeCode);
@@ -569,7 +571,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         }
         else
         {
-            var stored = await ReadCurrentEntityAsync(repository, partitionKey, typeIdentity);
+            var stored = await ReadLayerAsync(repository, partitionKey, typeIdentity, layerCache);
 
             if (stored is not null)
             {
@@ -590,7 +592,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
             }
             else
             {
-                var stored = await ReadCurrentEntityAsync(repository, partitionKey, descendantIdentity);
+                var stored = await ReadLayerAsync(repository, partitionKey, descendantIdentity, layerCache);
 
                 if (stored is not null)
                 {
@@ -607,7 +609,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         }
         else
         {
-            var stored = await ReadCurrentEntityAsync(repository, partitionKey, annotationIdentity);
+            var stored = await ReadLayerAsync(repository, partitionKey, annotationIdentity, layerCache);
 
             if (stored is not null)
             {
@@ -638,6 +640,27 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
             identity.CurrentId,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationSchemaEntity>(_serializerOptions));
+    }
+
+    private async Task<ConfigurationSchemaEntity?> ReadLayerAsync(
+        IContainerRepository repository,
+        PartitionKey partitionKey,
+        SchemaIdentity identity,
+        Dictionary<string, ConfigurationSchemaEntity?>? layerCache)
+    {
+        if (layerCache is not null && layerCache.TryGetValue(identity.CurrentId, out var cached))
+        {
+            return cached;
+        }
+
+        var stored = await ReadCurrentEntityAsync(repository, partitionKey, identity);
+
+        if (layerCache is not null)
+        {
+            layerCache[identity.CurrentId] = stored;
+        }
+
+        return stored;
     }
 
     private async Task<ConfigurationSchemaEntity?> ReadCurrentEntityAsync(

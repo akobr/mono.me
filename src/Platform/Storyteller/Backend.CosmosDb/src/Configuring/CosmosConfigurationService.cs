@@ -285,10 +285,9 @@ public class CosmosConfigurationService : IConfigurationService
 
         var newContent = value;
 
-        // store history version only if there was some content before
+        // merge into stored content when there is some; an empty document is replaced
         if (existingConfiguration.Content.HasValues)
         {
-            // has some content before, merge must be done (clone the original)
             newContent = (JObject)existingConfiguration.Content.DeepClone();
             newContent.MergeInto(value);
             newContent = newContent.RemoveRequested();
@@ -299,8 +298,21 @@ public class CosmosConfigurationService : IConfigurationService
                 // check for no change after merge
                 return existingConfiguration.ToConfigurationFromContent();
             }
+        }
+        else
+        {
+            newContent = newContent.RemoveRequested();
+            newContent = await newContent.ApplyPatchRequested();
+        }
 
-            // save only if there was really a change
+        // validate before any write, so a rejection cannot leave a history item
+        if (!force && _schemaService is not null && newContent.HasValues)
+        {
+            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, newContent);
+        }
+
+        if (existingConfiguration.Content.HasValues)
+        {
             var historyVersion = existingConfiguration.Version;
             var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}.{historyVersion}";
             var historyId = $"{key.ViewName}.{historyKey}";
@@ -319,17 +331,6 @@ public class CosmosConfigurationService : IConfigurationService
             };
 
             await repository.Container.CreateItemAsync(history, partitionKey);
-        }
-        else
-        {
-            newContent = newContent.RemoveRequested();
-            newContent = await newContent.ApplyPatchRequested();
-        }
-
-        // validate against combined schema before persisting
-        if (!force && _schemaService is not null && newContent.HasValues)
-        {
-            await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, newContent);
         }
 
         // invalidate all ancestor configurations

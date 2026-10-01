@@ -491,6 +491,12 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
 
         await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "ok" }"""), "test");
 
+        var rejectedUpdate = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 1 }"""), "test");
+        await rejectedUpdate.Should().ThrowAsync<SchemaValidationException>();
+        var versionsAfterRejection = await configs.GetConfigurationVersionsAsync(key);
+        versionsAfterRejection.Should().ContainSingle();
+        versionsAfterRejection.Single().Version.Should().Be(1u);
+
         var patch = JArray.Parse("""[{ "op": "add", "path": "/badField", "value": 1 }]""");
         var rejected = () => configs.PatchConfigurationAsync(key, patch, "test");
         await rejected.Should().ThrowAsync<SchemaValidationException>();
