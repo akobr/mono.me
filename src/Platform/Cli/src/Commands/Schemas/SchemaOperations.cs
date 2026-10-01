@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -38,6 +39,10 @@ internal static class SchemaOperations
                 ? $"The version {version} of the schema for {subject} has not been found."
                 : $"The schema for {subject} has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
+        }
+        catch (ApiException e)
+        {
+            return WriteApiError(console, e);
         }
 
         return ExitCodes.SUCCESS;
@@ -90,6 +95,10 @@ internal static class SchemaOperations
             console.WriteLine($"The schema for {subject} has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
+        catch (ApiException e)
+        {
+            return WriteApiError(console, e);
+        }
 
         var result = await editorService.EditJsonAsync(
             console,
@@ -135,6 +144,10 @@ internal static class SchemaOperations
             console.WriteLine($"The schema for {subject} has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
+        catch (ApiException e)
+        {
+            return WriteApiError(console, e);
+        }
 
         console.WriteImportant($"The schema for {subject} has been deleted.");
         return ExitCodes.SUCCESS;
@@ -149,7 +162,21 @@ internal static class SchemaOperations
         string? annotationKey)
     {
         var subject = Describe(layer, annotationType, annotationKey);
-        var versions = await GetVersionsAsync(api, context, layer, annotationType, annotationKey);
+        ICollection<ConfigurationVersion> versions;
+
+        try
+        {
+            versions = await GetVersionsAsync(api, context, layer, annotationType, annotationKey);
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
+        {
+            console.WriteLine($"The schema for {subject} has not been found.");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+        catch (ApiException e)
+        {
+            return WriteApiError(console, e);
+        }
 
         console.WriteHeader($"Versions of the schema for {subject}");
 
@@ -220,6 +247,10 @@ internal static class SchemaOperations
         {
             console.WriteLine($"The schema for {subject} or the requested version has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
+        }
+        catch (ApiException e)
+        {
+            return WriteApiError(console, e);
         }
 
         return ExitCodes.SUCCESS;
@@ -419,7 +450,7 @@ internal static class SchemaOperations
         };
     }
 
-    private static Task<System.Collections.Generic.ICollection<ConfigurationVersion>> GetVersionsAsync(
+    private static Task<ICollection<ConfigurationVersion>> GetVersionsAsync(
         ISchemasApiClient api,
         ICommandContext context,
         SchemaLayer layer,
