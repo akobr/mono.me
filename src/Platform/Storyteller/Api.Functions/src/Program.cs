@@ -1,11 +1,13 @@
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
+using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Json;
+
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -23,6 +25,7 @@ var host = new HostBuilder()
 
         worker.UseMiddleware<ExceptionHandlingMiddleware>();
         worker.UseMiddleware<MachineAuthenticationMiddleware>();
+        worker.UseMiddleware<BearerAuthenticationMiddleware>();
     })
     .ConfigureServices((context, services) =>
     {
@@ -73,6 +76,25 @@ var host = new HostBuilder()
         //services.AddKeyVaultCertificateAuthority(context.Configuration);
         // Add authentication by Azure Entra
         //services.AddAzureAdMachineAccess();
+
+        // AuthKit user authentication is a later phase. Naming it here fails startup
+        // instead of validating those tokens with the Entra ID rules.
+        var authProvider = context.Configuration.GetSection(UserAuthenticationOptions.SectionName)["Provider"];
+
+        if (string.IsNullOrWhiteSpace(authProvider)
+            || authProvider.Equals(nameof(IdentityProviderKind.EntraId), StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddEntraIdUserAuthentication(context.Configuration);
+        }
+        else if (authProvider.Equals(nameof(IdentityProviderKind.AuthKit), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Auth:Provider AuthKit is not available yet. Entra ID remains the user identity provider in this build.");
+        }
+        else
+        {
+            throw new InvalidOperationException($"Auth:Provider '{authProvider}' is not a known identity provider.");
+        }
 
         // Add data-bindings for configurations
         services.AddSingleton<ConfigBindingFunction>();

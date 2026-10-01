@@ -1,62 +1,34 @@
 using System.Diagnostics.CodeAnalysis;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+
 using _42.Platform.Storyteller.Accessing;
-using Microsoft.IdentityModel.Protocols;
-using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+
 using Microsoft.IdentityModel.Tokens;
+
 using HttpRequestData = Microsoft.Azure.Functions.Worker.Http.HttpRequestData;
 
 namespace _42.Platform.Storyteller.Api.Security;
 
 public static class HttpRequestDataExtensions
 {
-    // TODO: [P2] make this configurable in better way
-    private static readonly string ClientId = Environment.GetEnvironmentVariable("Auth:ClientId");
-
     public static IReadOnlyList<Claim> GetClaims(this HttpRequestData @this)
     {
         @this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.CachedClaims, out var claimMap);
 
-        if (claimMap is List<Claim> cachedClaims)
+        if (claimMap is IReadOnlyList<Claim> cachedClaims)
         {
             return cachedClaims;
         }
 
-        var claims = new List<Claim>(0);
         var identity = @this.Identities.FirstOrDefault(i => i.IsAuthenticated);
-        if (identity is not null)
+
+        if (identity is null)
         {
-            claims = identity.Claims.ToList();
-            @this.FunctionContext.Items[FunctionContextItemKeys.CachedClaims] = claims;
-            return claims;
+            return [];
         }
 
-        var handler = new JwtSecurityTokenHandler();
-        @this.Headers.TryGetValues("Authorization", out var values);
-        var bearerValue = values?.FirstOrDefault(v => v.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase));
-
-        if (string.IsNullOrEmpty(bearerValue))
-        {
-            return claims;
-        }
-
-        var rawToken = bearerValue[7..];
-
-        if (!handler.CanReadToken(rawToken))
-        {
-            return claims;
-        }
-
-#if !DEV_AUTH
-        var principal = handler.ValidateAccessToken(rawToken);
-        claims = principal.Claims.ToList();
-#else
-        var token = handler.ReadJwtToken(rawToken);
-        claims = token.Claims.ToList();
-#endif
-
+        var claims = identity.Claims.ToList();
         @this.FunctionContext.Items[FunctionContextItemKeys.CachedClaims] = claims;
         return claims;
     }
@@ -179,17 +151,21 @@ public static class HttpRequestDataExtensions
 
     public static bool IsApplicationIdentity(this HttpRequestData @this)
     {
-        // TODO: [P1] find how to best detect application identity
-        var appId = @this.GetClaim("azp", "appid");
-        return appId is not null
-               && !string.Equals(appId, ClientId, StringComparison.OrdinalIgnoreCase);
+        return TryGetApplicationIdentity(@this, out _);
     }
 
-    public static bool TryGetApplicationIdentity(this HttpRequestData @this, [MaybeNullWhen(false)]out string appId)
+    public static bool TryGetApplicationIdentity(this HttpRequestData @this, [MaybeNullWhen(false)] out string appId)
     {
-        appId = @this.GetClaim("azp", "appid");
-        return appId is not null
-               && !string.Equals(appId, ClientId, StringComparison.OrdinalIgnoreCase);
+        if (@this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.MachineIdentity, out var value)
+            && value is string machineId
+            && !string.IsNullOrEmpty(machineId))
+        {
+            appId = machineId;
+            return true;
+        }
+
+        appId = null;
+        return false;
     }
 
     public static string? GetClaim(this HttpRequestData @this, params string[] claimTypes)
@@ -222,43 +198,5 @@ public static class HttpRequestDataExtensions
         }
 
         throw new SecurityTokenException($"Missing {claimTypes[0]} claim.");
-    }
-
-    private static ClaimsPrincipal ValidateAccessToken(this ISecurityTokenValidator @this, string accessToken)
-    {
-        var tenantId = Environment.GetEnvironmentVariable("Auth:TenantId");
-        var clientId = Environment.GetEnvironmentVariable("Auth:ClientId");
-        var audience = $"api://{clientId}";
-        var authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
-
-        // Debugging purposes only, set this to false for production
-        Microsoft.IdentityModel.Logging.IdentityModelEventSource.ShowPII = true;
-
-        var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
-            $"{authority}/.well-known/openid-configuration",
-            new OpenIdConnectConfigurationRetriever());
-
-        // Initialize the token validation parameters
-        var validationParameters = new TokenValidationParameters
-        {
-            // App Id URI and AppId of this service application are both valid audiences.
-            ValidAudiences = new[] { audience, clientId },
-
-            // Support Azure AD V1 and V2 endpoints.
-            IssuerValidator = (issuer, _, _) =>
-            {
-                if (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase)
-                    || issuer.StartsWith("https://login.microsoftonline.com/", StringComparison.OrdinalIgnoreCase))
-                {
-                    return issuer;
-                }
-
-                throw new SecurityTokenInvalidIssuerException($"Invalid issuer: {issuer}");
-            },
-            ConfigurationManager = configManager,
-        };
-
-        var claimsPrincipal = @this.ValidateToken(accessToken, validationParameters, out _);
-        return claimsPrincipal;
     }
 }
