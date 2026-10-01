@@ -4,6 +4,7 @@
     "DOTNET_ENVIRONMENT": "Development",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "Auth:Provider": "EntraId",
     "Auth:TenantId": "common",
     "Auth:ClientId": "303a7632-ecfd-4eb7-af9b-be2043eaf25d",
     "Auth:AppRoles:DefaultRead": "008029ec-407f-48b2-8618-f38b8e03eebf",
