@@ -212,7 +212,7 @@ public class CosmosConfigurationService : IConfigurationService
 
     public Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint version)
     {
-        return GetConfigurationVersionChangesAsync(key, version - 1, version);
+        return GetConfigurationVersionChangesAsync(key, version == 0 ? 0 : version - 1, version);
     }
 
     public Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion)

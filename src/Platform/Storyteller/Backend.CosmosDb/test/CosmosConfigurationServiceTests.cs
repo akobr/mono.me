@@ -394,6 +394,10 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var diff3To0 = await configs.GetConfigurationVersionChangesAsync(key, 3, 0);
         diff3To0.Stats.Deletions.Should().Be(0);
         diff3To0.Stats.Additions.Should().Be(0);
+
+        var changes0 = await configs.GetConfigurationVersionChangesAsync(key, 0);
+        changes0.Stats.Additions.Should().Be(0);
+        changes0.Stats.Deletions.Should().Be(0);
     }
 
     [Fact]

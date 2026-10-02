@@ -436,6 +436,24 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
 
         var diff = await schemas.GetSchemaVersionChangesAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, 2);
         diff.Stats.Additions.Should().BeGreaterThan(0);
+
+        var emptyTypeDiff = await schemas.GetSchemaVersionChangesAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, 0);
+        emptyTypeDiff.Stats.Additions.Should().Be(0);
+        emptyTypeDiff.Stats.Deletions.Should().Be(0);
+
+        var emptyAnnotationDiff = await schemas.GetAnnotationSchemaVersionChangesAsync(TestConstants.Organization, project, View, "rst.schema-versions", 0);
+        emptyAnnotationDiff.Stats.Additions.Should().Be(0);
+        emptyAnnotationDiff.Stats.Deletions.Should().Be(0);
+
+        var emptyDescendantDiff = await schemas.GetDescendantTypeSchemaVersionChangesAsync(
+            TestConstants.Organization,
+            project,
+            View,
+            "rst.schema-versions",
+            AnnotationTypeCodes.Unit,
+            0);
+        emptyDescendantDiff.Stats.Additions.Should().Be(0);
+        emptyDescendantDiff.Stats.Deletions.Should().Be(0);
     }
 
     [Fact]
