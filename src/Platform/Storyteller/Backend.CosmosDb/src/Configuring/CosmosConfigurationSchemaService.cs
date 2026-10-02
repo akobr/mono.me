@@ -179,7 +179,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
 
     public Task<DiffResult> GetSchemaVersionChangesAsync(string organization, string project, string view, string annotationType, uint version)
     {
-        return GetSchemaVersionChangesAsync(organization, project, view, annotationType, version - 1, version);
+        return GetSchemaVersionChangesAsync(organization, project, view, annotationType, version == 0 ? 0 : version - 1, version);
     }
 
     public Task<DiffResult> GetSchemaVersionChangesAsync(string organization, string project, string view, string annotationType, uint fromVersion, uint toVersion)
@@ -210,7 +210,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
 
     public Task<DiffResult> GetAnnotationSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, uint version)
     {
-        return GetAnnotationSchemaVersionChangesAsync(organization, project, view, annotationKey, version - 1, version);
+        return GetAnnotationSchemaVersionChangesAsync(organization, project, view, annotationKey, version == 0 ? 0 : version - 1, version);
     }
 
     public Task<DiffResult> GetAnnotationSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, uint fromVersion, uint toVersion)
@@ -258,7 +258,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         string descendantTypeCode,
         uint version)
     {
-        return GetDescendantTypeSchemaVersionChangesAsync(organization, project, view, annotationKey, descendantTypeCode, version - 1, version);
+        return GetDescendantTypeSchemaVersionChangesAsync(organization, project, view, annotationKey, descendantTypeCode, version == 0 ? 0 : version - 1, version);
     }
 
     public Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(

@@ -112,6 +112,10 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
 
         var unknownVersion = () => Templates.GetTemplateVersionChangesAsync(org, project, View, type, 7);
         await unknownVersion.Should().ThrowAsync<InvalidOperationException>();
+
+        var changes0 = await Templates.GetTemplateVersionChangesAsync(org, project, View, type, 0);
+        changes0.Stats.Additions.Should().Be(0);
+        changes0.Stats.Deletions.Should().Be(0);
     }
 
     [Fact]

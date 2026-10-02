@@ -271,7 +271,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
 
     public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint version)
     {
-        return GetTemplateVersionChangesAsync(organization, project, view, annotationType, version - 1, version);
+        return GetTemplateVersionChangesAsync(organization, project, view, annotationType, version == 0 ? 0 : version - 1, version);
     }
 
     public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint fromVersion, uint toVersion)
