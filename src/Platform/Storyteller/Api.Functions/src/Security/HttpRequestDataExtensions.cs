@@ -12,6 +12,10 @@ namespace _42.Platform.Storyteller.Api.Security;
 
 public static class HttpRequestDataExtensions
 {
+    private const string NameClaimType = "name";
+
+    private static readonly string[] UniqueNameClaimTypes = ["preferred_username", "unique_name", ClaimTypes.Upn];
+
     public static IReadOnlyList<Claim> GetClaims(this HttpRequestData @this)
     {
         @this.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.CachedClaims, out var claimMap);
@@ -136,12 +140,33 @@ public static class HttpRequestDataExtensions
 
     public static string GetIdentityUniqueName(this HttpRequestData @this)
     {
-        return GetRequiredClaim(@this, "preferred_username", "unique_name", ClaimTypes.Upn).Trim();
+        return GetRequiredClaim(@this, UniqueNameClaimTypes).Trim();
     }
 
     public static string GetIdentityName(this HttpRequestData @this)
     {
-        return GetRequiredClaim(@this, "name").Trim();
+        return GetRequiredClaim(@this, NameClaimType).Trim();
+    }
+
+    // Token claims win. The provider's resolver (AuthKit only) fills what the token lacks,
+    // so a deployment without a JWT template can still register accounts.
+    public static async Task<(string UserName, string Name)> GetIdentityProfileAsync(
+        this HttpRequestData @this,
+        IUserProfileResolver? profileResolver)
+    {
+        var userName = @this.GetClaim(UniqueNameClaimTypes)?.Trim();
+        var name = @this.GetClaim(NameClaimType)?.Trim();
+
+        if (profileResolver is not null && (string.IsNullOrEmpty(userName) || string.IsNullOrEmpty(name)))
+        {
+            var profile = await profileResolver.ResolveAsync(@this.GetIdentityUniqueId(), @this.FunctionContext.CancellationToken);
+            userName = string.IsNullOrEmpty(userName) ? profile?.UserName?.Trim() ?? userName : userName;
+            name = string.IsNullOrEmpty(name) ? profile?.Name?.Trim() ?? name : name;
+        }
+
+        return (
+            userName ?? throw new SecurityTokenException($"Missing {UniqueNameClaimTypes[0]} claim."),
+            name ?? throw new SecurityTokenException($"Missing {NameClaimType} claim."));
     }
 
     public static string GetIdentityUniqueId(this HttpRequestData @this)

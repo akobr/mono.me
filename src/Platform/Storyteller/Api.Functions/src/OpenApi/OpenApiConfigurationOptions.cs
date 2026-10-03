@@ -37,6 +37,7 @@ public class OpenApiConfigurationOptions : DefaultOpenApiConfigurationOptions
         new AccountRoleSchemaDocumentFilter(),
         new ApiKeySecuritySchemeDocumentFilter(),
         new MtlsSecuritySchemeDocumentFilter(),
+        new OAuthSecuritySchemeDocumentFilter(),
         new DiffUnifiedResponseDocumentFilter(),
     ];
 }

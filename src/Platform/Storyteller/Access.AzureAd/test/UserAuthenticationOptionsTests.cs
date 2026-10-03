@@ -153,6 +153,8 @@ public class UserAuthenticationOptionsTests
         options.ClientId.ShouldBe("client-id");
         options.AppRoles["DefaultRead"].ShouldBe("role-read");
         host.Services.GetRequiredService<IBearerTokenValidator>().ShouldBeOfType<EntraIdBearerTokenValidator>();
+        host.Services.GetRequiredService<IBearerClaimsNormalizer>().ShouldBeOfType<EntraIdClaimNormalizer>();
+        host.Services.GetService<IUserProfileResolver>().ShouldBeNull();
 
         await host.StopAsync();
     }
