@@ -11,7 +11,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Serilog;
 using IConfigurationBuilder = Microsoft.Extensions.Configuration.IConfigurationBuilder;
@@ -46,7 +45,10 @@ namespace _42.Platform.Cli
 #endif
 
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
-            services.AddSingleton<IAuthenticationService, AuthenticationService>();
+            services.AddHttpClient();
+            services.AddSingleton<ITokenStore, ProtectedTokenStore>();
+            services.AddSingleton<IAuthenticationConfigurationResolver, AuthenticationConfigurationResolver>();
+            services.AddSingleton<IAuthenticationService, AuthenticationServiceSelector>();
             services.AddSingleton<ICommandContext, CommandContext>();
             services.AddSingleton<IEditorService, EditorService>();
 
@@ -110,24 +112,25 @@ namespace _42.Platform.Cli
             services.Configure<LoggingOptions>(configuration.GetSection(ConfigurationSections.LOGGING));
             services.Configure<AccessDefaultOptions>(configuration.GetSection(ConfigurationSections.ACCESS));
             services.Configure<AuthenticationOptions>(configuration.GetSection(ConfigurationSections.AUTHENTICATION));
+            services.Configure<GeneralOptions>(configuration.GetSection(ConfigurationSections.GENERAL));
             services.Configure<EditorOptions>(configuration.GetSection(ConfigurationSections.EDITOR));
         }
 
 
         private static void ConfigureStorytellerSdk(IServiceCollection services, IConfiguration configuration)
         {
-            var authOptions = configuration.GetSection(ConfigurationSections.AUTHENTICATION).Get<AuthenticationOptions>();
             var generalOptions = configuration.GetSection(ConfigurationSections.GENERAL).Get<GeneralOptions>();
-            var authService = new AuthenticationService(new FileSystem(), new OptionsWrapper<AuthenticationOptions>(authOptions!));
 
-            services.AddStorytellerSdk(() => new _42.Platform.Storyteller.Sdk.SdkConfiguration
+            // Registered before AddStorytellerSdk, which only adds a configuration when none exists,
+            // so the token comes from the same IAuthenticationService the commands use.
+            services.AddSingleton<ISdkConfiguration>(provider => new SdkConfiguration
             {
                 AccessTokenFactory = () =>
                 {
                     try
                     {
-                        var authResult = authService.GetAuthenticationAsync().GetAwaiter().GetResult();
-                        return authResult?.AccessToken ?? string.Empty;
+                        var authentication = provider.GetRequiredService<IAuthenticationService>();
+                        return authentication.GetAccessTokenAsync().GetAwaiter().GetResult() ?? string.Empty;
                     }
                     catch (Exception)
                     {
@@ -136,6 +139,8 @@ namespace _42.Platform.Cli
                 },
                 BaseUrl = generalOptions!.BaseUrl,
             });
+
+            services.AddStorytellerSdk();
         }
     }
 }
