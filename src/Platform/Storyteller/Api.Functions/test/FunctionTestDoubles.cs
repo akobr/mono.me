@@ -13,14 +13,20 @@ internal static class FunctionTestDoubles
         IBearerTokenValidator validator,
         UserAuthenticationOptions? options = null)
     {
-        var services = new ServiceCollection();
-        services.AddSingleton(validator);
-        services.AddSingleton(Options.Create(options ?? new UserAuthenticationOptions
+        var resolved = Options.Create(options ?? new UserAuthenticationOptions
         {
             Provider = IdentityProviderKind.EntraId,
             TenantId = "tenant",
             ClientId = "client-id",
-        }));
+        });
+        IBearerClaimsNormalizer normalizer = resolved.Value.Provider == IdentityProviderKind.AuthKit
+            ? new AuthKitClaimNormalizer(resolved)
+            : new EntraIdClaimNormalizer(resolved);
+
+        var services = new ServiceCollection();
+        services.AddSingleton(validator);
+        services.AddSingleton(resolved);
+        services.AddSingleton(normalizer);
         return services.BuildServiceProvider();
     }
 

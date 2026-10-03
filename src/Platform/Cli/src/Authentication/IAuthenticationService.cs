@@ -1,15 +1,24 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Identity.Client;
 
 namespace _42.Platform.Cli.Authentication;
 
 public interface IAuthenticationService
 {
-    string[] Scopes { get; }
+    // Silent. Null means a sign-in is needed.
+    Task<SignedInUser?> GetSignedInUserAsync(CancellationToken cancellationToken = default);
 
-    Task<IPublicClientApplication> GetPublicClientApplicationAsync();
+    // Silent, refreshes when needed. Null means a sign-in is needed.
+    Task<string?> GetAccessTokenAsync(CancellationToken cancellationToken = default);
 
-    Task<AuthenticationResult?> GetAuthenticationAsync();
+    // Throws AuthenticationException when the sign-in does not complete.
+    // selectOrganization is asked only when an AuthKit user belongs to several organizations; null picks the first.
+    Task<SignedInUser> LoginWithDeviceCodeAsync(
+        Func<DeviceCodePrompt, Task> onPrompt,
+        Func<IReadOnlyList<OrganizationChoice>, Task<string>>? selectOrganization = null,
+        CancellationToken cancellationToken = default);
 
-    Task ClearAuthenticationAsync();
+    Task LogoutAsync(CancellationToken cancellationToken = default);
 }

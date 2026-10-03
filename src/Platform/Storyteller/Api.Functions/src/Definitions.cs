@@ -27,6 +27,14 @@ public static class Definitions
             }
         }
 
+        public static class Auth
+        {
+            public static class V1
+            {
+                public const string Configuration = "v1/auth/configuration";
+            }
+        }
+
         public static class Annotations
         {
             public static class V1
@@ -114,6 +122,8 @@ public static class Definitions
             public const string GetSharedCertificates = nameof(GetSharedCertificates);
             public const string IssueSharedCertificate = nameof(IssueSharedCertificate);
             public const string RevokeSharedCertificate = nameof(RevokeSharedCertificate);
+
+            public const string GetAuthConfiguration = nameof(GetAuthConfiguration);
         }
 
         public static class Annotations

@@ -4,6 +4,7 @@
     <AssemblyName>42.Platform.Cli.UnitTests</AssemblyName>
     <RootNamespace>_42.Platform.Cli.UnitTests</RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>

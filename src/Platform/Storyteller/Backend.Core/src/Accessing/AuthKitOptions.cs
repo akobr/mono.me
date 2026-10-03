@@ -7,7 +7,7 @@ public class AuthKitOptions
     // Or the custom auth domain. User tokens are checked against this issuer exactly.
     public string Issuer { get; set; } = "https://api.workos.com/";
 
-    // Null uses https://api.workos.com/sso/jwks/{ClientId}.
+    // Null uses {ApiBaseUrl}/sso/jwks/{ClientId}, which is https://api.workos.com/sso/jwks/{ClientId} by default.
     public string? JwksUri { get; set; }
 
     // Set when a JWT template adds "aud". Null means the audience is not validated.
@@ -26,9 +26,17 @@ public class AuthKitOptions
 
     public string[] DefaultUserScopes { get; set; } = [];
 
-    // WorkOS permission slug => Storyteller scope.
+    // WorkOS permission slug => Storyteller scope. A value can hold several scopes separated by spaces.
+    // Slugs may contain ':'; AddUserAuthenticationOptions reads the section so they bind as one key.
     public Dictionary<string, string> PermissionMap { get; set; } = new();
 
     // Phase E only.
     public string ApiKeyScheme { get; set; } = "WorkOS";
+
+    public string GetJwksUri()
+    {
+        return string.IsNullOrWhiteSpace(JwksUri)
+            ? $"{ApiBaseUrl.TrimEnd('/')}/sso/jwks/{Uri.EscapeDataString(ClientId)}"
+            : JwksUri;
+    }
 }

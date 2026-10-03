@@ -9,7 +9,6 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.Security;
@@ -58,8 +57,9 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
                 return;
             }
 
-            var options = context.InstanceServices.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value;
-            StoreIdentity(context, claims, EntraIdBearerTokenValidator.TryGetMachineId(claims, options.ClientId));
+            // The active provider's normalizer still runs, so decoded AuthKit tokens get name, preferred_username and scp.
+            var normalized = context.InstanceServices.GetRequiredService<IBearerClaimsNormalizer>().Normalize(claims);
+            StoreIdentity(context, normalized);
             await next(context);
             return;
         }
@@ -88,8 +88,7 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
             return;
         }
 
-        var validatedClaims = result.Claims as List<Claim> ?? result.Claims.ToList();
-        StoreIdentity(context, validatedClaims, result.IsMachine ? result.MachineId : null);
+        StoreIdentity(context, result);
         await next(context);
     }
 
@@ -148,13 +147,13 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         }
     }
 
-    private static void StoreIdentity(FunctionContext context, List<Claim> claims, string? machineId)
+    private static void StoreIdentity(FunctionContext context, BearerValidationResult result)
     {
-        context.Items[FunctionContextItemKeys.CachedClaims] = claims;
+        context.Items[FunctionContextItemKeys.CachedClaims] = result.Claims as List<Claim> ?? result.Claims.ToList();
 
-        if (!string.IsNullOrEmpty(machineId))
+        if (result.IsMachine && !string.IsNullOrEmpty(result.MachineId))
         {
-            context.Items[FunctionContextItemKeys.MachineIdentity] = machineId;
+            context.Items[FunctionContextItemKeys.MachineIdentity] = result.MachineId;
         }
     }
 

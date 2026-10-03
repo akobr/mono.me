@@ -222,6 +222,40 @@ public class BearerAuthenticationMiddlewareTests
     }
 
     [Fact]
+    public async Task Invoke_DebugDecode_AuthKitToken_RunsTheAuthKitNormalizer()
+    {
+        await WithModeAsync(decodeWithoutValidation: true, async () =>
+        {
+            var validator = new RecordingBearerTokenValidator();
+            using var services = FunctionTestDoubles.CreateServices(validator, new UserAuthenticationOptions
+            {
+                Provider = IdentityProviderKind.AuthKit,
+                AuthKit = new AuthKitOptions
+                {
+                    ClientId = "client_123",
+                    DefaultUserScopes = ["User.Impersonation"],
+                    PermissionMap = new Dictionary<string, string> { ["storyteller:annotation-read"] = "Annotation.Read" },
+                },
+            });
+            var (context, _) = FunctionTestDoubles.CreateRequest(
+                services,
+                Bearer(UnsignedJwt("""{"sub":"user_01","email":"ada@example.com","first_name":"Ada","last_name":"Lovelace","azp":"someone","permissions":["storyteller:annotation-read"]}""")));
+
+            var called = await InvokeAsync(context);
+
+            called.ShouldBeTrue();
+            validator.Calls.ShouldBe(0);
+            var claims = context.Items[FunctionContextItemKeys.CachedClaims].ShouldBeAssignableTo<IReadOnlyList<Claim>>();
+            claims.ShouldNotBeNull();
+            claims.ShouldContain(claim => claim.Type == "sub" && claim.Value == "user_01");
+            claims.ShouldContain(claim => claim.Type == "name" && claim.Value == "Ada Lovelace");
+            claims.ShouldContain(claim => claim.Type == "preferred_username" && claim.Value == "ada@example.com");
+            claims.ShouldContain(claim => claim.Type == "scp" && claim.Value == "User.Impersonation Annotation.Read");
+            context.Items.ContainsKey(FunctionContextItemKeys.MachineIdentity).ShouldBeFalse();
+        });
+    }
+
+    [Fact]
     public async Task Invoke_CancellationDuringValidation_Propagates()
     {
         await WithValidationAsync(async () =>

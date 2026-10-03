@@ -77,8 +77,7 @@ var host = new HostBuilder()
         // Add authentication by Azure Entra
         //services.AddAzureAdMachineAccess();
 
-        // AuthKit user authentication is a later phase. Naming it here fails startup
-        // instead of validating those tokens with the Entra ID rules.
+        // One user identity provider per deployment. A missing Auth:Provider keeps Entra ID.
         var authProvider = context.Configuration.GetSection(UserAuthenticationOptions.SectionName)["Provider"];
 
         if (string.IsNullOrWhiteSpace(authProvider)
@@ -88,8 +87,7 @@ var host = new HostBuilder()
         }
         else if (authProvider.Equals(nameof(IdentityProviderKind.AuthKit), StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException(
-                "Auth:Provider AuthKit is not available yet. Entra ID remains the user identity provider in this build.");
+            services.AddAuthKitUserAuthentication(context.Configuration);
         }
         else
         {
