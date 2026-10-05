@@ -123,19 +123,16 @@ public class EditorService : IEditorService
     }
 
     /// <summary>
-    /// Detects which supported editors are available on the current system by checking for their executables.
-    /// </summary>
-    /// <returns>A set containing one or more <see cref="EditorType"/> values for editors found on the system (possible values: <c>VsCode</c>, <c>Neovim</c>, <c>Vim</c>).</returns>
-    /// <summary>
     /// Lets the user edit a JSON document in the preferred editor, validates it, shows the changes and asks for a confirmation.
     /// </summary>
+    /// <param name="confirm">Whether to ask before accepting the edited document. The default is <c>true</c>.</param>
     /// <returns>
-    /// The confirmed edited document, or null with an exit code:
+    /// The edited document, or null with an exit code:
     /// - <c>ExitCodes.WARNING_NO_WORK_NEEDED</c> when no changes were made;
     /// - <c>ExitCodes.WARNING_ABORTED</c> when the user aborted the operation;
     /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code.
     /// </returns>
-    public async Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew)
+    public async Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew, bool confirm = true)
     {
         // 1. Ensure editor is configured
         if (!options.IsConfigured)
@@ -206,16 +203,19 @@ public class EditorService : IEditorService
             console.WriteDiff(originalJson, edited.ToString(Formatting.Indented));
 
             // 6. Confirm upload
-            var shouldSave = console.Confirm(new ConfirmOptions
+            if (confirm)
             {
-                Message = "Do you want to save these changes",
-                DefaultValue = true,
-            });
+                var shouldSave = console.Confirm(new ConfirmOptions
+                {
+                    Message = "Do you want to save these changes",
+                    DefaultValue = true,
+                });
 
-            if (!shouldSave)
-            {
-                console.WriteLine("Edit aborted.");
-                return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+                if (!shouldSave)
+                {
+                    console.WriteLine("Edit aborted.");
+                    return new JsonEditResult(null, ExitCodes.WARNING_ABORTED);
+                }
             }
 
             return new JsonEditResult(edited, ExitCodes.SUCCESS);
@@ -241,6 +241,10 @@ public class EditorService : IEditorService
         }
     }
 
+    /// <summary>
+    /// Detects which supported editors are available on the current system by checking for their executables.
+    /// </summary>
+    /// <returns>A set containing one or more <see cref="EditorType"/> values for editors found on the system (possible values: <c>VsCode</c>, <c>Neovim</c>, <c>Vim</c>).</returns>
     private static HashSet<EditorType> DetectAvailableEditors()
     {
         var available = new HashSet<EditorType>();
