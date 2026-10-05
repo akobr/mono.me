@@ -21,6 +21,21 @@ public static class StorytellerApiExtensions
         string view,
         string annotationKey)
     {
+        var stored = await @this.GetStoredConfigurationAsync(organization, project, view, annotationKey);
+        return stored?.Content;
+    }
+
+    /// <summary>
+    /// Gets the stored content of a configuration and the version it belongs to, without inherited values and templates.
+    /// </summary>
+    /// <returns>The stored content and version, or null when the configuration doesn't exist.</returns>
+    public static async Task<StoredConfiguration?> GetStoredConfigurationAsync(
+        this IConfigurationsApiClient @this,
+        string organization,
+        string project,
+        string view,
+        string annotationKey)
+    {
         // the calculated configuration (GetConfiguration) contains inherited values, the current version contains only the stored content
         var versions = await @this.GetConfigurationVersionsAsync(organization, project, view, annotationKey);
         var current = versions.FirstOrDefault(version => version.IsCurrent());
@@ -33,7 +48,7 @@ public static class StorytellerApiExtensions
         try
         {
             var data = await @this.GetConfigurationVersionAsync(organization, project, view, annotationKey, current.Version);
-            return ToJObject(data.Content);
+            return new StoredConfiguration(ToJObject(data.Content), current.Version);
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {

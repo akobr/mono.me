@@ -68,13 +68,25 @@
       "commandName": "Project",
       "commandLineArgs": "story config exe.42.storyteller.system"
     },
+    "story-config-help": {
+      "commandName": "Project",
+      "commandLineArgs": "story config --help"
+    },
     "story-config-diff": {
       "commandName": "Project",
-      "commandLineArgs": "story config diff rst.versioning"
+      "commandLineArgs": "story config diff exe.42.storyteller.system"
     },
     "story-config-edit": {
       "commandName": "Project",
       "commandLineArgs": "story config edit exe.42.storyteller.system"
+    },
+    "story-config-patch": {
+      "commandName": "Project",
+      "commandLineArgs": "story config patch exe.42.storyteller.system"
+    },
+    "story-config-versions": {
+      "commandName": "Project",
+      "commandLineArgs": "story config versions exe.42.storyteller.system"
     },
     "assist-key": {
       "commandName": "Project",

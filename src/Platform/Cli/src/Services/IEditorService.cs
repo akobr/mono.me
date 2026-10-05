@@ -30,6 +30,7 @@ public interface IEditorService
     /// <param name="original">The document to edit.</param>
     /// <param name="fileNamePrefix">A prefix of the temporary file name.</param>
     /// <param name="isNew">Whether the document doesn't exist on the server yet.</param>
-    /// <returns>The confirmed edited document, or the exit code when there is nothing to save.</returns>
-    Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew);
+    /// <param name="confirm">Whether to ask before accepting the edited document. The default is <c>true</c>.</param>
+    /// <returns>The edited document, or the exit code when there is nothing to save.</returns>
+    Task<JsonEditResult> EditJsonAsync(IExtendedConsole console, EditorOptions options, JObject original, string fileNamePrefix, bool isNew, bool confirm = true);
 }

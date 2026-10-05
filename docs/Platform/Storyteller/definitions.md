@@ -227,7 +227,7 @@ Force breaks one side of that deadlock for a single call. The caller passes it e
 | PUT a schema | Rejected when any in-scope configuration in the view would fail the combined schema after the write | The schema is stored. Existing configurations are left as they are |
 | PUT or PATCH a configuration | Rejected when the document about to be stored fails the combined schema | The document is stored |
 
-On the HTTP API the parameter is the query `force=true`. On the CLI it is `-f` or `--force` on `schema type|annotation|descendant set|edit` and on `config set` and `config edit`. Force is not remembered. The next call defaults to rejection again. Force is not a separate permission: a caller who can write the project can pass it. The author recorded on the new version is the audit of who published the break.
+On the HTTP API the parameter is the query `force=true`. On the CLI it is `-f` or `--force` on `schema type|annotation|descendant set|edit` and on `config set`, `config edit`, and `config patch`. Force is not remembered. The next call defaults to rejection again. Force is not a separate permission: a caller who can write the project can pass it. The author recorded on the new version is the audit of who published the break.
 
 Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, an unknown type code or annotation key, a patch of a missing configuration, and a lost concurrency race still fail.
 
