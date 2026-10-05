@@ -69,7 +69,9 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
 
         try
         {
-            result = await validator.ValidateAsync(rawToken, context.CancellationToken);
+            // Machines may come from a different provider than users (IMachineTokenValidator).
+            result = await validator.ValidateAsync(rawToken, context.CancellationToken)
+                ?? await ValidateMachineTokenAsync(context, rawToken);
         }
         catch (BearerKeyRetrievalException exception)
         {
@@ -119,6 +121,43 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         return true;
     }
 
+    // Only validators that claim the token's issuer are asked, and only machine results count.
+    private static async Task<BearerValidationResult?> ValidateMachineTokenAsync(FunctionContext context, string rawToken)
+    {
+        var validators = context.InstanceServices.GetServices<IMachineTokenValidator>().ToList();
+
+        if (validators.Count == 0 || TryReadIssuer(rawToken) is not { } issuer)
+        {
+            return null;
+        }
+
+        foreach (var validator in validators.Where(candidate => candidate.CanValidate(issuer)))
+        {
+            var result = await validator.ValidateAsync(rawToken, context.CancellationToken);
+
+            if (result is { IsMachine: true, MachineId.Length: > 0 })
+            {
+                return result;
+            }
+        }
+
+        return null;
+    }
+
+    private static string? TryReadIssuer(string rawToken)
+    {
+        var handler = new JwtSecurityTokenHandler();
+
+        try
+        {
+            return handler.CanReadToken(rawToken) ? handler.ReadJwtToken(rawToken).Issuer : null;
+        }
+        catch (Exception exception) when (exception is ArgumentException or SecurityTokenException)
+        {
+            return null;
+        }
+    }
+
     private static List<Claim>? TryReadUnvalidatedClaims(string rawToken)
     {
         if (string.IsNullOrWhiteSpace(rawToken))
@@ -154,6 +193,9 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         if (result.IsMachine && !string.IsNullOrEmpty(result.MachineId))
         {
             context.Items[FunctionContextItemKeys.MachineIdentity] = result.MachineId;
+
+            // A machine bearer token is an identity provider client-credentials token.
+            context.Items[FunctionContextItemKeys.MachineCredentialKind] = MachineCredentialKind.ClientCredentials;
         }
     }
 

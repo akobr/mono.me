@@ -243,7 +243,7 @@ public class AccessHttp
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
-        if (!Guid.TryParse(id, out var machineId))
+        if (!MachineIds.IsValid(id))
         {
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
@@ -277,8 +277,15 @@ public class AccessHttp
 
         // TODO: [P1] hide the model from the client
         machineModel = machineModel with { Organization = organization, Project = project };
-        var machineAccess = await _accessService.CreateMachineAccessAsync(machineModel);
-        return new OkObjectResult(machineAccess);
+        try
+        {
+            var machineAccess = await _accessService.CreateMachineAccessAsync(machineModel);
+            return new OkObjectResult(machineAccess);
+        }
+        catch (MachineAccessNotSupportedException exception)
+        {
+            return new BadRequestObjectResult(new ErrorResponse { Message = exception.Message });
+        }
     }
 
     [Function(nameof(PutMachine))]
@@ -301,13 +308,20 @@ public class AccessHttp
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
-        if (!Guid.TryParse(id, out _))
+        if (!MachineIds.IsValid(id))
         {
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
 
-        var machineAccess = await _accessService.ResetMachineAccessAsync(organization, project, id);
-        return new OkObjectResult(machineAccess);
+        try
+        {
+            var machineAccess = await _accessService.ResetMachineAccessAsync(organization, project, id);
+            return new OkObjectResult(machineAccess);
+        }
+        catch (MachineAccessNotSupportedException exception)
+        {
+            return new BadRequestObjectResult(new ErrorResponse { Message = exception.Message });
+        }
     }
 
     [Function(nameof(DeleteMachine))]
@@ -331,12 +345,21 @@ public class AccessHttp
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
-        if (!Guid.TryParse(id, out _))
+        if (!MachineIds.IsValid(id))
         {
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
 
-        var isSuccess = await _accessService.DeleteMachineAccessAsync(organization, project, id);
+        bool isSuccess;
+
+        try
+        {
+            isSuccess = await _accessService.DeleteMachineAccessAsync(organization, project, id);
+        }
+        catch (MachineAccessNotSupportedException exception)
+        {
+            return new BadRequestObjectResult(new ErrorResponse { Message = exception.Message });
+        }
 
         return isSuccess
             ? new OkResult()

@@ -134,6 +134,7 @@ public sealed class AuthenticationConfigurationResolver : IAuthenticationConfigu
             TenantId = discovered.TenantId,
             Scopes = discovered.Scopes ?? [],
             AuthKitApiBaseUrl = GetAuthKitApiBaseUrl(),
+            AuthKitDomain = discovered.AuthKitDomain,
         };
     }
 

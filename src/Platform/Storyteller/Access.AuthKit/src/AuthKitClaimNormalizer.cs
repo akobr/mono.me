@@ -6,14 +6,18 @@ using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller;
 
-// Maps AuthKit user access-token claims to the Entra-shaped set the API helpers read:
+// Maps AuthKit access-token claims to the Entra-shaped set the API helpers read:
 // name, preferred_username, and a space-separated scp built only from configuration.
+// User tokens get DefaultUserScopes plus mapped permissions; M2M tokens only their mapped scopes.
 public sealed class AuthKitClaimNormalizer : IBearerClaimsNormalizer
 {
     private const string ScopeClaimType = "scp";
     private const string NameClaimType = "name";
     private const string UserNameClaimType = "preferred_username";
     private const string PermissionsClaimType = "permissions";
+    private const string OAuthScopeClaimType = "scope";
+    private const string ClientIdClaimType = "client_id";
+    private const string UserIdPrefix = "user_";
 
     private static readonly char[] ScopeSeparators = [' ', '\t', ','];
 
@@ -27,17 +31,17 @@ public sealed class AuthKitClaimNormalizer : IBearerClaimsNormalizer
         _permissionMap = new Dictionary<string, string>(authKit.PermissionMap, StringComparer.Ordinal);
     }
 
+    // Validators call NormalizeUser or NormalizeMachine for the token source they checked.
+    // This entry point serves DEV_AUTH decoding, where the source is unknown.
     public BearerValidationResult Normalize(IReadOnlyList<Claim> claims)
     {
-        var normalized = new List<Claim>(claims.Count + 3);
+        var clientId = TryGetMachineClientId(claims);
+        return clientId is null ? NormalizeUser(claims) : NormalizeMachine(claims, clientId);
+    }
 
-        foreach (var claim in claims)
-        {
-            if (!IsReplaced(claim.Type))
-            {
-                normalized.Add(claim);
-            }
-        }
+    public BearerValidationResult NormalizeUser(IReadOnlyList<Claim> claims)
+    {
+        var normalized = CopyKeptClaims(claims);
 
         var name = ResolveName(claims);
         if (name is not null)
@@ -51,13 +55,31 @@ public sealed class AuthKitClaimNormalizer : IBearerClaimsNormalizer
             normalized.Add(new Claim(UserNameClaimType, userName));
         }
 
-        var scopes = ResolveScopes(claims);
-        if (scopes.Count > 0)
-        {
-            normalized.Add(new Claim(ScopeClaimType, string.Join(' ', scopes)));
-        }
-
+        AddScopeClaim(normalized, ResolveScopes(claims, _defaultScopes, PermissionsClaimType));
         return new BearerValidationResult(normalized, IsMachine: false, MachineId: null);
+    }
+
+    // M2M tokens carry granted WorkOS permission slugs in a space-separated scope claim.
+    public BearerValidationResult NormalizeMachine(IReadOnlyList<Claim> claims, string clientId)
+    {
+        var normalized = CopyKeptClaims(claims);
+        normalized.Add(new Claim("azp", clientId));
+        AddScopeClaim(normalized, ResolveScopes(claims, [], OAuthScopeClaimType, PermissionsClaimType));
+        return new BearerValidationResult(normalized, IsMachine: true, MachineId: clientId);
+    }
+
+    // An M2M token names its application in client_id, and sub is that same client ID.
+    // Null for user tokens, including Connect user tokens that also carry client_id.
+    public static string? TryGetMachineClientId(IReadOnlyList<Claim> claims)
+    {
+        var clientId = FirstValue(claims, ClientIdClaimType);
+        var subject = FirstValue(claims, "sub");
+
+        return clientId is not null
+            && string.Equals(subject, clientId, StringComparison.Ordinal)
+            && !clientId.StartsWith(UserIdPrefix, StringComparison.Ordinal)
+                ? clientId
+                : null;
     }
 
     // Joins the non-blank parts with a space. Null when every part is blank.
@@ -69,12 +91,40 @@ public sealed class AuthKitClaimNormalizer : IBearerClaimsNormalizer
         return joined.Length > 0 ? joined : null;
     }
 
+    internal static IEnumerable<string> SplitScopes(string value)
+    {
+        return value.Split(ScopeSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    }
+
     // Scope-bearing claims are rebuilt from configuration, so a JWT template cannot grant scopes
     // directly. azp is dropped because machine identity comes from the validator, not the token.
     private static bool IsReplaced(string claimType)
     {
         return claimType is ScopeClaimType or "roles" or ClaimTypes.Role or "azp" or NameClaimType or UserNameClaimType
             || claimType.EndsWith("/scope", StringComparison.Ordinal);
+    }
+
+    private static List<Claim> CopyKeptClaims(IReadOnlyList<Claim> claims)
+    {
+        var kept = new List<Claim>(claims.Count + 3);
+
+        foreach (var claim in claims)
+        {
+            if (!IsReplaced(claim.Type))
+            {
+                kept.Add(claim);
+            }
+        }
+
+        return kept;
+    }
+
+    private static void AddScopeClaim(List<Claim> claims, List<string> scopes)
+    {
+        if (scopes.Count > 0)
+        {
+            claims.Add(new Claim(ScopeClaimType, string.Join(' ', scopes)));
+        }
     }
 
     // A JWT template such as "{{ user.first_name }} {{ user.last_name }}" renders missing
@@ -105,23 +155,31 @@ public sealed class AuthKitClaimNormalizer : IBearerClaimsNormalizer
         return null;
     }
 
-    private List<string> ResolveScopes(IReadOnlyList<Claim> claims)
+    private List<string> ResolveScopes(IReadOnlyList<Claim> claims, IEnumerable<string> defaultScopes, params string[] slugClaimTypes)
     {
         var scopes = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var scope in _defaultScopes)
+        foreach (var scope in defaultScopes)
         {
             AddScopes(scope);
         }
 
         foreach (var claim in claims)
         {
-            // Unmapped WorkOS permissions grant nothing.
-            if (claim.Type == PermissionsClaimType
-                && _permissionMap.TryGetValue(claim.Value, out var mapped))
+            if (!slugClaimTypes.Contains(claim.Type))
             {
-                AddScopes(mapped);
+                continue;
+            }
+
+            // A scope claim is one space-separated string; permissions arrive one slug per claim.
+            foreach (var slug in SplitScopes(claim.Value))
+            {
+                // Unmapped WorkOS permissions grant nothing.
+                if (_permissionMap.TryGetValue(slug, out var mapped))
+                {
+                    AddScopes(mapped);
+                }
             }
         }
 
@@ -129,7 +187,7 @@ public sealed class AuthKitClaimNormalizer : IBearerClaimsNormalizer
 
         void AddScopes(string value)
         {
-            foreach (var scope in value.Split(ScopeSeparators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            foreach (var scope in SplitScopes(value))
             {
                 if (seen.Add(scope))
                 {

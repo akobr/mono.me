@@ -17,4 +17,7 @@ public sealed record ResolvedAuthentication
 
     // AuthKit only.
     public string AuthKitApiBaseUrl { get; init; } = AuthKitDefaults.ApiBaseUrl;
+
+    // AuthKit only, from discovery: issues M2M tokens at {AuthKitDomain}/oauth2/token.
+    public string? AuthKitDomain { get; init; }
 }

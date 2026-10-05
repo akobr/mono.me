@@ -39,4 +39,16 @@ public class AuthKitOptions
             ? $"{ApiBaseUrl.TrimEnd('/')}/sso/jwks/{Uri.EscapeDataString(ClientId)}"
             : JwksUri;
     }
+
+    // M2M machine access needs both the AuthKit domain (token issuer) and the organization that owns
+    // the applications. AuthKitDomain alone only describes the OpenAPI flows.
+    public bool HasMachineAccess()
+    {
+        return !string.IsNullOrWhiteSpace(AuthKitDomain) && !string.IsNullOrWhiteSpace(MachineOrganizationId);
+    }
+
+    public string GetMachineJwksUri()
+    {
+        return $"{AuthKitDomain.TrimEnd('/')}/oauth2/jwks";
+    }
 }

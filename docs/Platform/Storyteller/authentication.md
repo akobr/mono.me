@@ -37,9 +37,8 @@ The value is case-insensitive. Settings are validated at startup, so a missing r
 | `Auth:AuthKit:DefaultUserScopes:*` | no | none | Scopes given to every signed-in user. |
 | `Auth:AuthKit:PermissionMap:<slug>` | no | none | Maps a WorkOS permission slug to one or more Storyteller scopes. |
 | `Auth:AuthKit:ApiKey` | no | | WorkOS management key (`sk_…`). Used to look up a user's email and name at account registration when the token lacks them. Keep it in Key Vault, never in plain settings. |
-| `Auth:AuthKit:AuthKitDomain` | no | | `https://<subdomain>.authkit.app` or your custom domain. Enables the AuthKit OAuth flows in the OpenAPI document and is returned by the discovery endpoint. |
-
-`MachineOrganizationId` is reserved for AuthKit machine access and is not used yet.
+| `Auth:AuthKit:AuthKitDomain` | no | | `https://<subdomain>.authkit.app` or your custom domain. Enables the AuthKit OAuth flows in the OpenAPI document and is returned by the discovery endpoint. Together with `MachineOrganizationId` it turns on M2M machine access. |
+| `Auth:AuthKit:MachineOrganizationId` | no | | WorkOS organization (`org_…`) that owns the M2M applications Storyteller creates. Setting it (with `AuthKitDomain`) turns on M2M machine access, which then also requires `ApiKey`. |
 
 Example `local.settings.json` values:
 
@@ -146,7 +145,7 @@ The `integrated` OAuth2 security scheme follows `Auth:Provider`:
 Known limits of the AuthKit flows today:
 
 * Tokens from the AuthKit domain's OAuth endpoints are issued by the AuthKit domain and signed with `{AuthKitDomain}/oauth2/jwks`. The API accepts them only if `Issuer` and `JwksUri` point there, which in turn rejects device-flow tokens from `https://api.workos.com/`. The API cannot yet accept both token sources at once.
-* Client-credentials tokens are M2M tokens. Their `sub` is not a `user_…` ID, so the API rejects them until AuthKit machine access exists.
+* The client-credentials flow works only for an M2M application Storyteller created (see [Machine access with client credentials](#machine-access-with-client-credentials)), in a project with the `ClientCredentials` policy.
 * OpenAPI 3.0 cannot mark a flow as PKCE, and this Swagger UI does not turn PKCE on. Use a confidential OAuth application and enter its client secret in Swagger UI.
 
 ## Signing in with sform
@@ -182,11 +181,93 @@ One `sform` build therefore follows whichever provider the server at `general.ba
 
 Entra ID sign-in still uses MSAL with the cache in `~/.42for.net/msal.cache`.
 
+## Machine access with client credentials
+
+Storyteller API keys and mTLS certificates work under every user provider. In addition, a project can use **identity provider client credentials** (`ClientCredentials`): the machine exchanges a client ID and secret for a short-lived JWT at the identity provider and sends it as a bearer token.
+
+One identity provider issues machine credentials per deployment, independently of the user provider. `Program.cs` registers it with one of `AddAuthKitMachineAccess`, `AddAzureAdMachineAccess` or `AddKeycloakMachineAccess`. Registering a second one fails at startup. The registered provider then:
+
+* creates, resets and deletes machine credentials for `ClientCredentials` projects;
+* validates its machine tokens. `BearerAuthenticationMiddleware` asks it when the user provider's validator rejects a token whose issuer belongs to it.
+
+The common steps for every provider:
+
+```
+sform machine machine-auth --credential-kind client-credentials
+sform machine create
+```
+
+`machine create` prints the client ID (also the machine ID in Storyteller), the client secret (shown once), the token URL and, for Entra ID, the token scope, with a `curl` example. `sform machine reset <id>` replaces the secret and `sform machine delete <id>` removes the provider's client. Both follow the kind the machine was created with, even if the project policy changed since.
+
+Every provider's tokens are checked for the same things:
+
+* the provider's signature (RS256), issuer, audience and lifetime;
+* that the project named by the request has the `ClientCredentials` policy;
+* that the project owns the machine.
+
+A token that fails any of these gets 401. Projects with the `ClientCredentials` policy in turn reject API keys and certificates. Scopes come only from what Storyteller put into the client; `roles` or `scp` claims from elsewhere in the provider are dropped.
+
+### AuthKit M2M applications
+
+1. In WorkOS, create an organization for the machines (for example `Storyteller machines`) and note its `org_…` ID.
+2. Create WorkOS permissions for the machine scopes and map them in `PermissionMap`, for example:
+
+   ```json
+   "Auth:AuthKit:PermissionMap:storyteller:annotation-read": "Annotation.Read",
+   "Auth:AuthKit:PermissionMap:storyteller:annotation-write": "Annotation.ReadWrite",
+   "Auth:AuthKit:PermissionMap:storyteller:configuration-read": "Configuration.Read",
+   "Auth:AuthKit:PermissionMap:storyteller:configuration-write": "Configuration.ReadWrite",
+   "Auth:AuthKit:PermissionMap:storyteller:default-read": "Default.Read",
+   "Auth:AuthKit:PermissionMap:storyteller:default-write": "Default.ReadWrite"
+   ```
+
+   A new M2M application gets every mapped permission whose scopes all fall within the machine's scope (`DefaultRead` gets the three read permissions, `DefaultReadWrite` all six). If no permission matches, creation fails with 400. A permission that also grants something outside the machine scope, such as `Configuration.Secrets`, is never given to a machine.
+3. Set `Auth:AuthKit:ClientId`, `Auth:AuthKit:AuthKitDomain`, `Auth:AuthKit:MachineOrganizationId` and `Auth:AuthKit:ApiKey` (from Key Vault). `Program.cs` registers AuthKit machine access when the domain and the organization are set. The host then refuses to start without the other two. AuthKit users are not required.
+
+Tokens come from `{AuthKitDomain}/oauth2/token` and are checked as follows:
+
+* `iss` is `AuthKitDomain`, and the keys come from `{AuthKitDomain}/oauth2/jwks`.
+* `aud` is the environment client ID (`Auth:AuthKit:ClientId`). WorkOS does not let M2M applications choose it.
+* `sub` equals `client_id`, and `org_id` equals `MachineOrganizationId`.
+* The `scope` claim is mapped through `PermissionMap`. `DefaultUserScopes` never apply to machines.
+
+Reset mints a new secret and then revokes the old ones (WorkOS allows five per application). `Examples/CustomClientApp` (`dotnet run -- authkit`) shows the exchange in C#.
+
+### Entra ID app registrations
+
+1. The Storyteller API app registration (`Auth:ClientId`) needs two application app roles. Their IDs go into `Auth:AppRoles:DefaultRead` and `Auth:AppRoles:DefaultReadWrite`. A role value is what the token's `roles` claim carries, so name the values after the API scopes; the API strips an `App.` prefix. A machine gets the read/write role for any `…ReadWrite` scope, and the read role otherwise.
+2. Set `MachineAuth:AzureAd:TenantId` to the directory where machine app registrations are created. `Auth:TenantId` and `Auth:ClientId` must be set too, also when users sign in with AuthKit.
+3. The Functions identity (`DefaultAzureCredential`) needs Microsoft Graph permissions to create applications and service principals and to assign app roles.
+4. Use `services.AddAzureAdMachineAccess(context.Configuration)` in `Program.cs`.
+
+The machine ID is the appId. Tokens come from `https://login.microsoftonline.com/{MachineAuth:AzureAd:TenantId}/oauth2/v2.0/token` with `scope=api://{Auth:ClientId}/.default`. They are checked like Entra user tokens (audience `api://{ClientId}` or `{ClientId}`, a Microsoft issuer), and `azp` / `appid` must name a different application than the API. Reset removes the generated secrets and adds a new one.
+
+### Keycloak confidential clients
+
+1. Configure the `Keycloak` section:
+   * `ServerUrl` and `Realm`, the realm where machine clients are created;
+   * `Audience`, default `storyteller`;
+   * admin access, either `AdminClientSecret` for a client in `AdminRealm` (default `master`, client `AdminClientId`, default `admin-cli`) or `AdminUsername` with `AdminPassword`.
+2. Use `services.AddKeycloakMachineAccess(context.Configuration)` in `Program.cs`.
+
+Each machine client has a service account and two protocol mappers:
+
+* an audience mapper adds `Audience` to `aud`;
+* a hardcoded claim mapper adds `storyteller_scope` with the machine's Storyteller scopes.
+
+The machine ID is the `clientId` (`42.sform.…`). Tokens come from `{ServerUrl}/realms/{Realm}/protocol/openid-connect/token` and are checked as follows:
+
+* `iss` is `{ServerUrl}/realms/{Realm}`, and the keys come from the realm's OpenID metadata (HTTP is allowed only for a local server).
+* `aud` contains `Audience`.
+* `azp` is the machine.
+
+Reset regenerates the client secret.
+
 ## Switching an existing deployment
 
 `Account.Id` is the provider's `sub`. Entra object IDs and WorkOS user IDs are unrelated, so **changing `Auth:Provider` on a deployment that already has accounts orphans them**. Access maps, ownership and the `account: {sub}` author stamped on annotations stop resolving. AuthKit can federate to Microsoft sign-in, but the `sub` still changes. A migration tool is not available yet.
 
 ## Not available yet
 
-* Tokens issued by the AuthKit domain (Swagger UI sign-in, M2M) are not accepted alongside device-flow tokens. See [OpenAPI and Swagger UI](#openapi-and-swagger-ui).
-* AuthKit M2M applications cannot be used for machine access. Use Storyteller API keys or certificates.
+* User tokens issued by the AuthKit domain (Swagger UI sign-in) are not accepted alongside device-flow tokens. M2M tokens from the AuthKit domain are. See [OpenAPI and Swagger UI](#openapi-and-swagger-ui).
+* A combination of an mTLS certificate and client credentials (`CertificateAndClientCredentials`) is not available.

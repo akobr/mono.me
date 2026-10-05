@@ -23,4 +23,10 @@ public record class MachineAccess : IMachineAccess
     public string? CertificatePassword { get; init; }
 
     public DateTimeOffset? LastRenewalAt { get; init; }
+
+    // ClientCredentials only, returned on create and reset (not stored): where the machine
+    // exchanges Id and AccessKey for a token, and the scope parameter that exchange needs.
+    public string? TokenEndpoint { get; init; }
+
+    public string? TokenScope { get; init; }
 }
