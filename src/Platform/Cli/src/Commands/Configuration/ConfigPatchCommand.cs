@@ -59,16 +59,31 @@ public class ConfigPatchCommand : BaseContextCommand
     {
         JArray? patchFromFile = null;
 
-        if (!string.IsNullOrWhiteSpace(ImportFilePath))
+        if (ImportFilePath is not null)
         {
+            if (string.IsNullOrWhiteSpace(ImportFilePath))
+            {
+                Console.WriteLine("The --import option requires a path to a JSON Patch file.");
+                return ExitCodes.ERROR_WRONG_INPUT;
+            }
+
             patchFromFile = await JsonPatchDocumentReader.ReadAsync(Console, _fileSystem, ImportFilePath);
         }
 
-        var loaded = await _configurationApi.GetStoredConfigurationAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            AnnotationKey);
+        StoredConfiguration? loaded;
+
+        try
+        {
+            loaded = await _configurationApi.GetStoredConfigurationAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                Context.ViewName,
+                AnnotationKey);
+        }
+        catch (ApiException exception)
+        {
+            return WritePatchError(exception);
+        }
 
         if (loaded is not StoredConfiguration stored)
         {

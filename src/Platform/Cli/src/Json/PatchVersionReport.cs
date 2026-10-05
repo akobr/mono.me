@@ -20,7 +20,7 @@ public readonly record struct PatchVersionReport(string Message, bool Changed)
         }
 
         return new PatchVersionReport(
-            $"Configuration for '{annotationKey}' patched: version {versionBefore} -> {versionAfter}.",
+            $"Configuration for '{annotationKey}' patched: version {versionBefore} → {versionAfter}.",
             true);
     }
 }

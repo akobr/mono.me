@@ -38,6 +38,40 @@ public class JsonPatchDocumentReaderTests
     }
 
     [Fact]
+    public async Task TrailingWhitespace_IsAccepted()
+    {
+        var patch = await ReadAsync("[]  \r\n\t");
+
+        patch.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SecondJsonValue_IsRejected()
+    {
+        var exception = await Should.ThrowAsync<WrongInputException>(() => ReadAsync("[] []"));
+
+        exception.Message.ShouldStartWith("Invalid JSON Patch document:");
+        exception.Message.ShouldContain("Additional text encountered after finished reading JSON content");
+    }
+
+    [Fact]
+    public async Task TrailingComment_IsRejected()
+    {
+        var exception = await Should.ThrowAsync<WrongInputException>(() => ReadAsync("[] // trailing"));
+
+        exception.Message.ShouldStartWith("Invalid JSON Patch document:");
+    }
+
+    [Fact]
+    public async Task InvalidTextAfterTheArray_IsRejected()
+    {
+        var exception = await Should.ThrowAsync<WrongInputException>(() => ReadAsync("[] nope"));
+
+        exception.Message.ShouldStartWith("Invalid JSON Patch document:");
+        exception.InnerException.ShouldBeOfType<JsonReaderException>();
+    }
+
+    [Fact]
     public async Task JsonObject_IsRejected()
     {
         var exception = await Should.ThrowAsync<WrongInputException>(() => ReadAsync("""{ "op": "add", "path": "/a", "value": 1 }"""));
