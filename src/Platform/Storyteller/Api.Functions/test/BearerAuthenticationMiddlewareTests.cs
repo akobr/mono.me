@@ -132,6 +132,7 @@ public class BearerAuthenticationMiddlewareTests
             called.ShouldBeTrue();
             context.Items[FunctionContextItemKeys.CachedClaims].ShouldBeSameAs(claims);
             context.Items.ContainsKey(FunctionContextItemKeys.MachineIdentity).ShouldBeFalse();
+            context.Items.ContainsKey(FunctionContextItemKeys.MachineCredentialKind).ShouldBeFalse();
             _middleware.Response.ShouldBeNull();
         });
     }
@@ -153,6 +154,7 @@ public class BearerAuthenticationMiddlewareTests
 
             called.ShouldBeTrue();
             context.Items[FunctionContextItemKeys.MachineIdentity].ShouldBe("machine-app");
+            context.Items[FunctionContextItemKeys.MachineCredentialKind].ShouldBe(MachineCredentialKind.ClientCredentials);
             context.Items[FunctionContextItemKeys.CachedClaims].ShouldBeSameAs(claims);
         });
     }

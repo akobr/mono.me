@@ -9,13 +9,20 @@ public static class UserAuthenticationEntryPoint
 {
     private const string PermissionMapPath = "AuthKit:PermissionMap";
 
-    // Shared by every user identity provider registration.
+    // Shared by every user and machine identity provider registration. Idempotent: binding the
+    // section twice would append array values such as DefaultUserScopes a second time.
     public static IServiceCollection AddUserAuthenticationOptions(
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(UserAuthenticationOptionsMarker)))
+        {
+            return services;
+        }
+
         var section = configuration.GetSection(UserAuthenticationOptions.SectionName);
 
+        services.AddSingleton<UserAuthenticationOptionsMarker>();
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<UserAuthenticationOptions>, UserAuthenticationOptionsValidator>());
         services.AddOptions<UserAuthenticationOptions>()
             .Bind(section)
@@ -40,5 +47,19 @@ public static class UserAuthenticationEntryPoint
         }
 
         return map;
+    }
+
+    // Single identity provider for machine client credentials; every Add…MachineAccess calls this.
+    public static void EnsureNoOtherIdentityProviderMachineAccess(this IServiceCollection services, string provider)
+    {
+        if (services.Any(descriptor => descriptor.ServiceType == typeof(IIdentityProviderMachineAccessService)))
+        {
+            throw new InvalidOperationException(
+                $"An identity provider for ClientCredentials machine access is already registered; {provider} cannot be added as well.");
+        }
+    }
+
+    private sealed class UserAuthenticationOptionsMarker
+    {
     }
 }

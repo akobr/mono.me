@@ -42,6 +42,15 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
         }
     }
 
+    // v1 (sts.windows.net) and v2 (login.microsoftonline.com) issuers. The trailing slash keeps a
+    // host such as login.microsoftonline.com.evil out.
+    public static bool IsEntraIssuer(string? issuer)
+    {
+        return issuer is not null
+            && (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase)
+                || issuer.StartsWith("https://login.microsoftonline.com/", StringComparison.OrdinalIgnoreCase));
+    }
+
     public static string? TryGetMachineId(IReadOnlyList<Claim> claims, string? clientId)
     {
         var appId = FirstClaim(claims, "azp") ?? FirstClaim(claims, "appid");
@@ -84,17 +93,9 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
             {
                 ValidAudiences = [$"api://{_clientId}", _clientId],
                 IssuerSigningKeys = configuration.SigningKeys,
-                IssuerValidator = static (issuer, _, _) =>
-                {
-                    if (issuer is not null
-                        && (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase)
-                            || issuer.StartsWith("https://login.microsoftonline.com/", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        return issuer;
-                    }
-
-                    throw new SecurityTokenInvalidIssuerException($"Invalid issuer: {issuer}");
-                },
+                IssuerValidator = static (issuer, _, _) => IsEntraIssuer(issuer)
+                    ? issuer
+                    : throw new SecurityTokenInvalidIssuerException($"Invalid issuer: {issuer}"),
             };
 
             var principal = handler.ValidateToken(rawToken, validationParameters, out _);

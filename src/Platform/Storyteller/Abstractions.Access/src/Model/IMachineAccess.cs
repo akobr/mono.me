@@ -23,4 +23,8 @@ public interface IMachineAccess
     string? CertificatePassword { get; }
 
     DateTimeOffset? LastRenewalAt { get; }
+
+    string? TokenEndpoint { get; }
+
+    string? TokenScope { get; }
 }

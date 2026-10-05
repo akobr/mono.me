@@ -100,9 +100,11 @@
     <Project Path="src/Platform/Storyteller/Access.Certificates.Azure.KeyVault/src/Access.Certificates.Azure.KeyVault.csproj" />
     <Project Path="src/Platform/Storyteller/Access.AuthKit/src/Access.AuthKit.csproj" />
     <Project Path="src/Platform/Storyteller/Access.AuthKit/test/Access.AuthKit.UnitTests.csproj" />
+    <Project Path="src/Platform/Storyteller/Access.AuthKit/testint/Access.AuthKit.IntegrationTests.csproj" />
     <Project Path="src/Platform/Storyteller/Access.AzureAd/src/Access.AzureAd.csproj" />
     <Project Path="src/Platform/Storyteller/Access.AzureAd/test/Access.AzureAd.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Access.Keycloak/src/Access.Keycloak.csproj" />
+    <Project Path="src/Platform/Storyteller/Access.Keycloak/test/Access.Keycloak.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Functions/src/Api.Functions.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Functions/test/Api.Functions.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Web/src/Api.Web.csproj" />
