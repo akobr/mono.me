@@ -12,7 +12,7 @@ public class PatchVersionReportTests
         var report = PatchVersionReport.Create("exe.northwind.invoicing.prod", 4, 5);
 
         report.Changed.ShouldBeTrue();
-        report.Message.ShouldBe("Configuration for 'exe.northwind.invoicing.prod' patched: version 4 -> 5.");
+        report.Message.ShouldBe("Configuration for 'exe.northwind.invoicing.prod' patched: version 4 → 5.");
     }
 
     [Fact]
@@ -30,6 +30,6 @@ public class PatchVersionReportTests
         var report = PatchVersionReport.Create("exe.northwind.invoicing.prod", 4, 6);
 
         report.Changed.ShouldBeTrue();
-        report.Message.ShouldBe("Configuration for 'exe.northwind.invoicing.prod' patched: version 4 -> 6.");
+        report.Message.ShouldBe("Configuration for 'exe.northwind.invoicing.prod' patched: version 4 → 6.");
     }
 }

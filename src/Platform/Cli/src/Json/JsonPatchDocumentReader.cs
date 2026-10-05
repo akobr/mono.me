@@ -44,6 +44,11 @@ public static class JsonPatchDocumentReader
                     DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Ignore,
                     LineInfoHandling = LineInfoHandling.Ignore,
                 });
+
+            if (await jsonReader.ReadAsync())
+            {
+                throw new JsonReaderException("Additional content was found after the JSON Patch array.");
+            }
         }
         catch (JsonReaderException exception)
         {
