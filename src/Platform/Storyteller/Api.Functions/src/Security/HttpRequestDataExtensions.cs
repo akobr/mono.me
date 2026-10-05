@@ -106,6 +106,7 @@ public static class HttpRequestDataExtensions
                 throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
             }
 
+            await MachineCredentialPolicy.EnsureAllowedAsync(@this.FunctionContext, segments[0], segments[1]);
             return;
         }
 

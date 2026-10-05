@@ -13,8 +13,8 @@ namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 public class CosmosFixture : IAsyncLifetime
 {
     private static readonly bool UseContainer =
-        !string.Equals(
-            Environment.GetEnvironmentVariable("STORYTELLER_TESTS_USE_LOCAL_EMULATOR"),
+        string.Equals(
+            Environment.GetEnvironmentVariable("STORYTELLER_TESTS_USE_CONTAINER"),
             "true",
             StringComparison.OrdinalIgnoreCase);
 
@@ -71,6 +71,10 @@ public class CosmosFixture : IAsyncLifetime
         // Register certificate machine access (includes local CA, validator, policy-aware service).
         services.AddApiKeyMachineAccess();
         services.AddCertificateMachineAccess(Configuration);
+
+        // Stands in for AuthKit M2M applications, so ClientCredentials routing runs against real storage.
+        services.AddSingleton<RecordingIdentityProviderMachineAccessService>();
+        services.AddSingleton<IIdentityProviderMachineAccessService>(p => p.GetRequiredService<RecordingIdentityProviderMachineAccessService>());
 
         services.AddSingleton<CoreDbStructureBuilder>();
 

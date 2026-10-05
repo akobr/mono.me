@@ -43,6 +43,7 @@
     <ProjectReference Include="..\..\Access.Certificates\src\Access.Certificates.csproj" />
     <ProjectReference Include="..\..\Access.Certificates.Azure.KeyVault\src\Access.Certificates.Azure.KeyVault.csproj" />
     <ProjectReference Include="..\..\Access.AzureAd\src\Access.AzureAd.csproj" />
+    <ProjectReference Include="..\..\Access.Keycloak\src\Access.Keycloak.csproj" />
     <ProjectReference Include="..\..\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
     <ProjectReference Include="..\..\Binding.Azure.KeyVault\src\Binding.Azure.KeyVault.csproj" />
   </ItemGroup>

@@ -63,6 +63,7 @@ public sealed class AuthenticationConfigurationResolverTests : IDisposable
         resolved.Provider.ShouldBe(AuthenticationProvider.AuthKit);
         resolved.ClientId.ShouldBe("client_123");
         resolved.AuthKitApiBaseUrl.ShouldBe(AuthKitDefaults.ApiBaseUrl);
+        resolved.AuthKitDomain.ShouldBe("https://example.authkit.app");
         _http.Requests.Count.ShouldBe(1);
         _http.Requests[0].Uri.ShouldBe(new Uri($"{BaseUrl}/v1/auth/configuration"));
         _http.Requests[0].Authorization.ShouldBeNull();

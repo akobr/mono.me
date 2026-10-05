@@ -9,4 +9,7 @@ public enum MachineCredentialKind
     ApiKey = 0,
     Certificate,
     CertificateAndApiKey,
+
+    // An identity provider client ID and secret, exchanged for a JWT (AuthKit M2M application).
+    ClientCredentials,
 }

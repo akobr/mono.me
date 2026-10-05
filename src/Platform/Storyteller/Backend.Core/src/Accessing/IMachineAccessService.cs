@@ -12,4 +12,12 @@ public interface IMachineAccessService
     Task<string?> ResetMachineAccessAsync(string objectId, string organization, string project);
 
     Task<bool> DeleteMachineAccessAsync(string objectId, string organization, string project);
+
+    // Overloads with the stored access, so a router can follow the credential kind it was created with
+    // rather than the current project policy. The defaults keep the identifiers callers passed before.
+    Task<string?> ResetMachineAccessAsync(MachineAccess existingAccess, string organization, string project)
+        => ResetMachineAccessAsync(existingAccess.Id, organization, project);
+
+    Task<bool> DeleteMachineAccessAsync(MachineAccess existingAccess, string organization, string project)
+        => DeleteMachineAccessAsync(existingAccess.ObjectId, organization, project);
 }
