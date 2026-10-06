@@ -1,4 +1,4 @@
-namespace _42.Platform.Storyteller.Binding.Language;
+namespace _42.Platform.Storyteller.Binding;
 
 public sealed class BindingEvaluationException : BindingException
 {
