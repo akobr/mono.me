@@ -110,6 +110,8 @@
     <Project Path="src/Platform/Storyteller/Binding.Core/src/Binding.Core.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Language/src/Binding.Language.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Language/test/Binding.Language.UnitTests.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.Object/src/Binding.Object.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.Object/test/Binding.Object.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/DbCreator/src/DbCreator.csproj" />
     <Project Path="src/Platform/Storyteller/Sdk.NSwag/src/Sdk.NSwag.csproj" />
     <Project Path="src/Platform/Storyteller/Sdk.Kiota/src/Sdk.Kiota.csproj" />
