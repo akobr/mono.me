@@ -129,6 +129,8 @@ The fix:
 
 The earlier tests missed this. They built requirements only with Entra settings, and they fed the filter a hand-made document. A new test runs the extension's `GetOpenApiSecurityRequirement` and `GetOpenApiSecuritySchemes` on a sample operation whose flows type is AuthKit without a domain, and then applies the filter. Before the fix it failed with the same exception.
 
+**Fix after manual testing (2026-10-06).** `GET /api/swagger.json` failed with `An item with the same key has already been added. Key: AccountCreate` inside `TypeVisitor.Visit`. One request builds the document. The extension keeps a single `IOpenApiHttpTriggerContext` for the process, and its schema dictionary is filled during that build. A second request that overlaps the first inserts `AccountCreate` again. `SerialOpenApiTriggerFunction` replaces the extension's trigger function and runs one render at a time.
+
 **Deviations and limits, found while checking WorkOS Connect documentation:**
 
 - **PKCE:** OpenAPI 3.0 has no field to mark a flow as PKCE. The Swagger UI page in this extension calls `SwaggerUIBundle` without `initOAuth`, so `usePkceWithAuthorizationCodeGrant` is never on. A public OAuth application, which WorkOS requires to use PKCE, therefore cannot complete the flow from Swagger UI. A confidential application, with its secret entered in Swagger UI, can. Turning PKCE on would need a custom Swagger UI script, which is not done.
