@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.ErrorHandling;
+using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
@@ -9,6 +10,9 @@ using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Json;
 
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Extensions.OpenApi;
+using Microsoft.Azure.Functions.Worker.Extensions.OpenApi.Functions;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -30,6 +34,12 @@ var host = new HostBuilder()
     })
     .ConfigureServices((context, services) =>
     {
+        // Registered after the OpenAPI extension's own singleton, so this one is used.
+        // The extension's schema dictionary throws if two documents are built at once.
+        services.AddSingleton<IOpenApiTriggerFunction>(sp =>
+            new SerialOpenApiTriggerFunction(
+                new OpenApiTriggerFunction(sp.GetRequiredService<IOpenApiHttpTriggerContext>())));
+
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
 
