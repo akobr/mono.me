@@ -4,18 +4,21 @@ This document describes the concept and implementation of the data binding syste
 
 ## Overview
 
-The data binding system allows configuration values (stored as JSON) to dynamically reference data from external sources, such as Azure Key Vault, or to compute values via string interpolation and math expressions. This is particularly useful for managing secrets or environment-specific values without embedding them directly in the configuration files.
+The data binding system lets configuration values, stored as JSON, reference external data such as Azure Key Vault, compute values with string interpolation and math, and evaluate an object as a JSON Logic rule or a JSON-e template. Secrets and environment-specific values can live in a source and be filled in on the resolved read.
 
-The system is split into four main projects, plus built-in functions contributed by `Backend.Core`:
-- **Binding.Abstractions**: Defines the core interfaces and data structures (`IBindingExecutor`, `IBindingRegistry`, `IBindingSource`, `IBindingFunction`, `BindingScope`).
-- **Binding.Language**: Implements the binding language interpreter (tokenizer, parser, evaluator), the `IBindingExecutor` entry point, the `JsonQuery` structured-query helper, and the built-in `@config` function.
-- **Binding.Core**: Provides dependency-injection registration and options for wiring up sources and functions.
-- **Binding.Azure.KeyVault**: Implements a concrete `IBindingSource` backed by Azure Key Vault.
-- **Backend.Core**: Implements the built-in `@annotation` function on top of `IAnnotationService`.
+Resolution runs on the resolved read (`GetResolvedConfigurationAsync` and the with-secrets / without-secrets variants). Writes, `GetRawConfigurationAsync`, the hierarchy view, and version content keep the stored JSON, including any object-binding envelope.
+
+The system is split into five binding projects, plus built-in functions contributed by `Backend.Core`:
+- **Binding.Abstractions**: Core interfaces and data structures (`IBindingExecutor`, `IConfigurationBindingResolver`, `IBindingRegistry`, `IBindingSource`, `IBindingFunction`, `BindingScope`).
+- **Binding.Language**: The `@` string interpreter (tokenizer, parser, evaluator), the `IBindingExecutor` entry point, the `JsonQuery` structured-query helper, and the built-in `@config` function.
+- **Binding.Object**: The object-binding walker. An envelope whose `$binding` is `jlogic` or `jsone` is evaluated with JSON Logic or JSON-e.
+- **Binding.Core**: Dependency-injection registration and options for wiring up sources, functions, and the object-binding resolver.
+- **Binding.Azure.KeyVault**: A concrete `IBindingSource` backed by Azure Key Vault.
+- **Backend.Core**: The built-in `@annotation` function on top of `IAnnotationService`.
 
 ## Core Concepts
 
-### Syntax
+### String syntax (`@`)
 
 Binding is triggered whenever a string value starts with the `@` character. The whole string is parsed as a single binding expression. Five forms are supported:
 
@@ -24,7 +27,8 @@ Binding is triggered whenever a string value starts with the `@` character. The 
     - Example: `@database.connectionString`
 2.  **Sourced path**: `@(path.to.value, source)`
     - Resolves the path against the source registered under the given name.
-    - Example: `@(db-password, primary-vault)`
+    - Example: `@(db.password, primaryVault)`
+    - The path and the source name are identifiers. A hyphen is not an identifier character, so `@(db-password, primary-vault)` does not parse. `KeyVaultBindingSource` turns each dot in the path into `--` when it asks Key Vault for the secret (`db.password` becomes `db--password`).
 3.  **Function call**: `@name(arg1, arg2, ...)`
     - Invokes the `IBindingFunction` registered under `name`. Each argument is itself a path, a string literal (`"..."`), or a nested `@...` statement.
     - Example: `@myFunction(some.path, "literal", @another.path)`
@@ -40,17 +44,75 @@ Expressions never nest inside one another (an interpolation cannot contain a mat
 
 When a top-level path, sourced path, or function statement cannot be resolved (no matching source/function registered, or the source declines), the original string value is left untouched. Inside an interpolation or math expression, an unresolved statement instead throws a `BindingEvaluationException`. Malformed syntax throws a `BindingSyntaxException` that includes the character offset of the problem; both exceptions are wrapped with the JSON property path when raised through `IBindingExecutor`.
 
+### Object binding
+
+An object is an envelope when `$binding` is a JSON string and `$definition` is present. Names are exact and case-sensitive.
+
+| `$binding` | `$definition` present | Result |
+| --- | --- | --- |
+| `jlogic` or `jsone` | yes | Evaluate. Any other property is a malformed envelope and throws. |
+| `jlogic` or `jsone` | no | Malformed envelope. Throws. |
+| any other string | yes | Malformed envelope. Throws. A typo such as `json-e` or `JLogic` is reported at the object's JSON path. |
+| any other string | no | Ordinary object. The walk still visits its properties. `{"$binding": "manual"}` stays stored data. |
+| not a string | either | Ordinary object. |
+
+`$definition` is the program and may be any JSON value. The walker does not bind `@` strings inside it and does not evaluate envelopes inside it. `$context` is optional, defaults to `{}`, and must resolve to a JSON object. Secrets, `@config`, and `@annotation` that the program needs belong in `$context`. The walker resolves `$context` first, then the engine sees the untouched `$definition` and that resolved object.
+
+`jlogic` is [JSON Logic](https://jsonlogic.com/) through the `JsonLogic` 6.1.0 package (`JsonLogic.Apply`). `jsone` is [JSON-e](https://json-e.js.org/) through `JsonE.Net` 3.0.1 (`JsonE.Evaluate`). No custom operators are registered. JSON-e treats every `$` property as one of its own operators, so a template that must emit a Storyteller envelope writes `$$binding`, `$$definition`, and `$$context`. One JSON-e pass peels a single `$`. The walk of the result then evaluates the emitted envelope. JSON Logic does not reserve `$`. A rule that returns an envelope is evaluated by that same post-pass.
+
+```json
+{
+  "retries": {
+    "$binding": "jlogic",
+    "$definition": { "if": [ { "<": [ { "var": "tier" }, 2 ] }, 1, 5 ] },
+    "$context": { "tier": "@config(\"/plan/tier\")" }
+  }
+}
+```
+
+With a snapshot `plan.tier` of `1`, `retries` becomes the number `1`.
+
+```json
+{
+  "connection": {
+    "$binding": "jsone",
+    "$definition": {
+      "host": { "$eval": "host" },
+      "password": { "$eval": "password" }
+    },
+    "$context": {
+      "host": "@config(\"/endpoints/db\")",
+      "password": "@(db.password, primaryVault)"
+    }
+  }
+}
+```
+
+The context is resolved with the `@` language first. The template then sees plain JSON. `includeSecrets` is forwarded only into that string resolution. With secrets excluded, a Key Vault source declines and the engine receives the original `@(db.password, primaryVault)` string.
+
+The envelope is replaced by the engine result. The result may be an object, an array, a string, a number, a boolean, or null, and it is walked again, so a result string that starts with `@` is bound and an emitted envelope runs. The root `Configuration.Content` is a `JObject`. An envelope that is the entire content must evaluate to an object. The properties of that object replace the properties of the same instance. Any other root result throws `BindingEvaluationException` and leaves the token unchanged.
+
+Depth starts at 0 and increases by one for each envelope evaluation on the way down, including an envelope produced by an earlier result. Ordinary object nesting does not count. The maximum is 32 successful evaluations. The 33rd throws `BindingEvaluationException` with the JSON path. An empty path is shown as `$`. JSON-e already bounds its own loops. This counter bounds envelopes that emit envelopes.
+
+`@config` reads the snapshot taken before the pass. Object results are not written into that snapshot, so a sibling envelope is invisible to `@config` in another envelope. Nest the inner envelope inside the outer `$context` when one result must feed the other.
+
+`$fromNow` without `from` reads the clock, so that resolved document changes between reads. Calculated content is unchanged and stays cacheable. `$fromNow` with `from` stays a string.
+
+A malformed envelope throws `BindingEvaluationException` before either engine runs, and the token is left unchanged. `JsonEException` and `JsonLogicException` are rethrown as `BindingEvaluationException`. The resolver then wraps that failure as `BindingException` with the JSON path, in the same shape as `BindingExecutor`. The JSON Logic `log` operator writes to `ILogger` at Debug when the host supplied a logger, and drops the message otherwise.
+
 ## Project Structure
 
 ### Binding.Abstractions
 
 Defines the fundamental building blocks:
-- `IBindingExecutor`: Executes the binding process on a `JProperty`/`JValue`.
+- `IBindingExecutor`: Executes the `@` string language on a `JProperty`/`JValue`.
+- `IConfigurationBindingResolver`: Walks a configuration `JObject` and resolves `@` strings and object-binding envelopes in place.
 - `IBindingRegistry`: Registers named `IBindingSource`s and `IBindingFunction`s.
 - `IBindingSource`: Resolves a `BindingRequest` (a path plus `IncludeSecrets`) to a `BindingValue`.
 - `IBindingFunction`: Resolves a `BindingFunctionRequest` (a function name plus already-evaluated `BindingValue` arguments) to a `BindingValue`.
 - `BindingValue`: A thin wrapper around a `Newtonsoft.Json.Linq.JToken`.
 - `BindingException`: Base exception type for binding failures.
+- `BindingEvaluationException`: A binding failed or an object envelope is malformed. Object binding raises this type from the abstractions assembly.
 
 ### Binding.Language
 
@@ -62,12 +124,16 @@ Contains the interpreter pipeline:
 - `JsonQuery`: Resolves a JSONPath or JSON Pointer (RFC 6901) expression against a `JToken`, auto-detecting the dialect from the expression's leading character (`$` for JSONPath, `/` or empty for JSON Pointer).
 - `BindingFunctionArguments`: Shared helper that validates a function argument is a quoted string literal.
 - `ConfigBindingFunction`: The built-in `@config` function (see "Built-in Functions" below).
-- `BindingSyntaxException` / `BindingEvaluationException`: Binding-specific exception types.
+- `BindingSyntaxException`: Malformed `@` syntax, including the character offset.
+
+### Binding.Object
+
+Walks one configuration document. `ConfigurationBindingResolver` implements `IConfigurationBindingResolver`. Strings that start with `@` go to `IBindingExecutor`. Envelopes go to `ObjectBindingEngine`, which converts between `JToken` and `JsonNode` and calls JSON Logic or JSON-e. Numbers come back as `decimal`. ISO-8601 strings stay strings. The project references `JsonLogic` 6.1.0 and `JsonE.Net` 3.0.1. It does not reference `Binding.Language`, `Binding.Core`, or `Backend.CosmosDb`.
 
 ### Binding.Core
 
 Contains dependency-injection registration:
-- `EntryPoint.AddConfigurationBindings`: Registers `BindingExecutor` as `IBindingExecutor`/`IBindingRegistry` and applies `BindingsOptions`.
+- `EntryPoint.AddConfigurationBindings`: Registers `BindingExecutor` as `IBindingExecutor`/`IBindingRegistry`, registers `ConfigurationBindingResolver` as `IConfigurationBindingResolver` over that same executor, and applies `BindingsOptions`.
 - `BindingsOptions` / `BindingsOptionsExtensions`: Fluent API for registering sources (keyed, defaulting to `"default"`) and functions (by name) during startup.
 
 ### Binding.Azure.KeyVault
@@ -145,7 +211,7 @@ services.AddAzureKeyVaultBindings(configuration);
     "Default": "@sql-connection-string"
   },
   "ThirdPartyApi": {
-    "ApiKey": "@(prod-api-key, security-vault)",
+    "ApiKey": "@(prod.apiKey, securityVault)",
     "BaseUrl": "@[https://@host.value:@port.value/api]",
     "TimeoutMs": "@{@baseTimeout.value * 2}"
   }
@@ -154,7 +220,7 @@ services.AddAzureKeyVaultBindings(configuration);
 
 ### Dependency Injection
 
-`IBindingExecutor` is typically injected into services that process configurations (like `CosmosConfigurationService`), which call `TryBinding` on JSON properties/values before returning them to the client.
+`AddConfigurationBindings` registers `IConfigurationBindingResolver`. `CosmosConfigurationService` takes that resolver. `GetResolvedConfigurationInternalAsync` builds a `BindingScope` (a deep clone of the calculated document, plus a `ConfigurationBindingContext` for the configuration key) and calls `ResolveAsync`. When no resolver is registered, the calculated document is returned unchanged. `IBindingExecutor` remains the string entry point used by the resolver.
 
 ## Extending the System
 
