@@ -10,8 +10,12 @@ namespace _42.Platform.Storyteller.Binding.Object;
 public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
 {
     public const int MaxEnvelopeDepth = 32;
-
     public const int MaxEnvelopeEvaluations = 256;
+    public const int MaxJsonEOperatorDepth = 16;
+    public const int MaxRangeItems = 1000;
+    public const int MaxMergeItems = 1000;
+    public const int MaxReduceItems = 1000;
+    public const int MaxConcatLength = 100_000;
 
     private const string BindingProperty = "$binding";
     private const string DefinitionProperty = "$definition";
@@ -86,6 +90,13 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
             {
                 throw new BindingEvaluationException(
                     $"Failed to process the object binding for '{path}': nested object bindings exceed {MaxEnvelopeDepth}.");
+            }
+
+            if (kind == ObjectBindingEngine.JsonEKind &&
+                JsonELimits.OperatorDepth(definition!) > MaxJsonEOperatorDepth)
+            {
+                throw new BindingEvaluationException(
+                    $"Failed to process the object binding for '{path}': JSON-e template nesting exceeds {MaxJsonEOperatorDepth}.");
             }
 
             var resolvedContext = await ResolveContextAsync(context, includeSecrets, scope, depth + 1, path, budget);
