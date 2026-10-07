@@ -80,9 +80,13 @@ internal static class ObjectBindingEngine
         }
 
         // A context function overrides the built-in of the same name, including one supplied by the caller.
+        var budget = new JsonESizeBudget();
         contextNode["range"] = JsonFunction.Create(JsonELimits.Range);
+        contextNode["join"] = JsonFunction.Create((arguments, _) => JsonELimits.Join(arguments, budget));
         contextNode[JsonEExpressionRewriter.AddFunction] = JsonFunction.Create(JsonELimits.Add);
         contextNode[JsonEExpressionRewriter.ConcatFunction] = JsonFunction.Create(JsonELimits.Concat);
+        contextNode[JsonEExpressionRewriter.BoundFunction] = JsonFunction.Create(
+            (arguments, _) => JsonELimits.Bound(arguments, budget));
         return JsonTokenConverter.ToToken(JsonE.Evaluate(definitionNode, contextNode));
     }
 }

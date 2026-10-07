@@ -127,6 +127,46 @@ internal static class JsonELimits
         return result.ToString();
     }
 
+    public static JsonNode? Bound(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        var value = arguments.Length == 0 ? null : arguments[0];
+        budget.Add(EvaluationSize.SerializedLength(value));
+        return value;
+    }
+
+    public static JsonNode? Join(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        if (arguments.Length != 2 ||
+            arguments[0] is not JsonArray source ||
+            !TryJoinSeparator(arguments[1], out var separator))
+        {
+            throw new BuiltInException("invalid arguments to builtin: join");
+        }
+
+        var result = new StringBuilder();
+        var first = true;
+        foreach (var item in source)
+        {
+            if (!TryJoinElement(item, out var part))
+            {
+                throw new BuiltInException("invalid arguments to builtin: join");
+            }
+
+            var extra = first ? part.Length : separator.Length + part.Length;
+            budget.EnsureFits(result.Length + extra);
+            if (!first)
+            {
+                result.Append(separator);
+            }
+
+            result.Append(part);
+            first = false;
+        }
+
+        budget.Add(result.Length);
+        return result.ToString();
+    }
+
     private static void Rewrite(JToken token)
     {
         switch (token)
@@ -154,6 +194,7 @@ internal static class JsonELimits
                     Rewrite(property.Value);
                 }
 
+                WrapGrowth(obj);
                 break;
 
             case JArray array:
@@ -171,6 +212,43 @@ internal static class JsonELimits
 
                 break;
         }
+    }
+
+    private static void WrapGrowth(JObject obj)
+    {
+        var isMapping = obj.ContainsKey("$map") || obj.ContainsKey("$reduce");
+        var names = new List<string>();
+        foreach (var property in obj.Properties())
+        {
+            names.Add(property.Name);
+        }
+
+        foreach (var name in names)
+        {
+            var wrap = name == "$json" ||
+                (isMapping && name.StartsWith("each(", StringComparison.Ordinal) && name.EndsWith(')'));
+            if (!wrap || obj[name] is null)
+            {
+                continue;
+            }
+
+            obj[name] = BoundWrap(obj[name]!);
+        }
+    }
+
+    private static JObject BoundWrap(JToken body)
+    {
+        return new JObject
+        {
+            ["$let"] = new JObject
+            {
+                ["v"] = body.DeepClone(),
+            },
+            ["in"] = new JObject
+            {
+                ["$eval"] = JsonEExpressionRewriter.BoundFunction + "(v)",
+            },
+        };
     }
 
     private static void Walk(JToken token, int depth, ref int max)
@@ -254,6 +332,35 @@ internal static class JsonELimits
         }
 
         throw new InterpreterException("interpolation produced an array or object.");
+    }
+
+    private static bool TryJoinSeparator(JsonNode? node, out string text)
+    {
+        text = string.Empty;
+        if (TryNumber(node, out var number))
+        {
+            text = number.ToString(CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        return IsJsonString(node, out text);
+    }
+
+    private static bool TryJoinElement(JsonNode? node, out string text)
+    {
+        if (TryJoinSeparator(node, out text))
+        {
+            return true;
+        }
+
+        if (node is JsonValue value && value.TryGetValue(out bool boolean))
+        {
+            text = boolean ? "true" : "false";
+            return true;
+        }
+
+        text = string.Empty;
+        return false;
     }
 
     private static bool TryInteger(JsonNode? node, out decimal value)
