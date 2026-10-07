@@ -20,7 +20,10 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
     public ConfigurationBindingResolver(IBindingExecutor stringBindings, ILogger<ConfigurationBindingResolver>? logger = null)
     {
         _stringBindings = stringBindings ?? throw new ArgumentNullException(nameof(stringBindings));
-        ObjectBindingEngine.UseLogger(logger);
+        if (logger is not null)
+        {
+            ObjectBindingEngine.UseLogger(logger);
+        }
     }
 
     public async ValueTask ResolveAsync(JObject content, bool includeSecrets, BindingScope scope)

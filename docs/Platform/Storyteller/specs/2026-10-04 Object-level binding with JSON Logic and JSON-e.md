@@ -179,7 +179,7 @@ With a snapshot `plan.tier` of `1`, the property `retries` becomes the number `1
     },
     "$context": {
       "host": "@config(\"/endpoints/db\")",
-      "password": "@(db-password, primary-vault)"
+      "password": "@(db.password, primaryVault)"
     }
   }
 }
