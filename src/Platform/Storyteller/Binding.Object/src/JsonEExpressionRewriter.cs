@@ -12,6 +12,8 @@ internal static class JsonEExpressionRewriter
 
     public const string ConcatFunction = "storytellerConcat";
 
+    public const string BoundFunction = "storytellerBound";
+
     public static string RewritePlus(string expression)
     {
         if (!ContainsPlus(expression))

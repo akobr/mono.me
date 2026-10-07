@@ -119,6 +119,12 @@ internal static class JsonLogicBoundedRules
                 {
                     break;
                 }
+
+                if (EvaluationSize.SerializedLength(accumulator) > ConfigurationBindingResolver.MaxConcatLength)
+                {
+                    throw new BindingEvaluationException(
+                        $"JSON Logic reduce value exceeds {ConfigurationBindingResolver.MaxConcatLength} characters.");
+                }
             }
 
             return accumulator;

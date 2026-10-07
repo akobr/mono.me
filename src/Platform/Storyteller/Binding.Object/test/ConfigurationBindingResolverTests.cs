@@ -514,7 +514,7 @@ public class ConfigurationBindingResolverTests
         var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
 
         await act.Should().ThrowAsync<BindingException>()
-            .WithMessage($"*concatenation exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+            .WithMessage($"*value size exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
     }
 
     [Fact]
@@ -531,7 +531,157 @@ public class ConfigurationBindingResolverTests
         var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
 
         await act.Should().ThrowAsync<BindingException>()
-            .WithMessage($"*concatenation exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+            .WithMessage($"*value size exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEReduceArrayDoublingPastValueSize_Throws()
+    {
+        var steps = StepsUntilArrayExceedsConcatLimit();
+        steps.Should().BeInRange(1, 16);
+        var content = Envelope("jsone", new JObject
+        {
+            ["$reduce"] = new JObject { ["$eval"] = $"range(0, {steps})" },
+            ["initial"] = "x",
+            ["each(acc,i)"] = new JObject { ["$eval"] = "[acc,acc]" },
+        });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*value size exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicReduceArrayDoublingPastValueSize_Throws()
+    {
+        var steps = StepsUntilArrayExceedsConcatLimit();
+        steps.Should().BeInRange(1, 16);
+        var items = new JArray();
+        for (var index = 0; index < steps; index++)
+        {
+            items.Add(index);
+        }
+
+        var content = new JObject
+        {
+            ["value"] = new JObject
+            {
+                ["$binding"] = "jlogic",
+                ["$definition"] = new JObject
+                {
+                    ["reduce"] = new JArray
+                    {
+                        items,
+                        new JArray
+                        {
+                            new JObject { ["var"] = "accumulator" },
+                            new JObject { ["var"] = "accumulator" },
+                        },
+                        "x",
+                    },
+                },
+            },
+        };
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*reduce value exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEJsonArrayDoublingPastValueSize_Throws()
+    {
+        var steps = StepsUntilJsonDoublingExceedsBudget();
+        steps.Should().BeInRange(1, 10);
+        var content = Envelope("jsone", new JObject
+        {
+            ["$reduce"] = new JObject { ["$eval"] = $"range(0, {steps})" },
+            ["initial"] = "x",
+            ["each(acc,i)"] = new JObject
+            {
+                ["$json"] = new JObject { ["$eval"] = "[acc,acc]" },
+            },
+        });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*value size exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEJoinDoublingPastValueSize_Throws()
+    {
+        var steps = StepsUntilStringExceedsConcatLimit();
+        steps.Should().BeInRange(1, 18);
+        var content = Envelope("jsone", new JObject
+        {
+            ["$reduce"] = new JObject { ["$eval"] = $"range(0, {steps})" },
+            ["initial"] = "x",
+            ["each(acc,i)"] = new JObject { ["$eval"] = "join([acc,acc],'')" },
+        });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*value size exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonENestedMapPastValueSize_Throws()
+    {
+        var content = Envelope("jsone", NestedMaps(3));
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*value size exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEJoin_JoinsStrings()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "join(['a','b'],'-')" },
+            new JObject { ["join"] = "nope" });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<string>().Should().Be("a-b");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEReduceArrayPair_ReturnsBothCopies()
+    {
+        var content = Envelope("jsone", new JObject
+        {
+            ["$reduce"] = new JObject { ["$eval"] = "range(0, 1)" },
+            ["initial"] = "x",
+            ["each(acc,i)"] = new JObject { ["$eval"] = "[acc,acc]" },
+        });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JArray>().Subject;
+        value.Should().HaveCount(2);
+        value[0]!.Value<string>().Should().Be("x");
+        value[1]!.Value<string>().Should().Be("x");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEJson_ReturnsSerializedArray()
+    {
+        var content = Envelope("jsone", new JObject
+        {
+            ["$json"] = new JArray("x", "x"),
+        });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<string>().Should().Be("""["x","x"]""");
     }
 
     [Fact]
@@ -653,6 +803,75 @@ public class ConfigurationBindingResolverTests
 
         items.Add(items.Count);
         return items;
+    }
+
+    private static int StepsUntilArrayExceedsConcatLimit()
+    {
+        var length = 3;
+        var steps = 0;
+        while (length <= ConfigurationBindingResolver.MaxConcatLength)
+        {
+            length = (length * 2) + 3;
+            steps++;
+        }
+
+        return steps;
+    }
+
+    private static int StepsUntilStringExceedsConcatLimit()
+    {
+        var length = 1;
+        var steps = 0;
+        while (length <= ConfigurationBindingResolver.MaxConcatLength)
+        {
+            length *= 2;
+            steps++;
+        }
+
+        return steps;
+    }
+
+    private static int StepsUntilJsonDoublingExceedsBudget()
+    {
+        var length = 1;
+        var quotes = 0;
+        var slashes = 0;
+        var used = 0;
+        for (var steps = 1; steps <= 10; steps++)
+        {
+            var escaped = length + quotes + slashes;
+            var arrayLength = (escaped * 2) + 7;
+            var arrayQuotes = (quotes * 2) + 4;
+            var arraySlashes = (quotes * 2) + (slashes * 4);
+            var quoted = arrayLength + arrayQuotes + arraySlashes + 2;
+            if ((long)used + arrayLength > ConfigurationBindingResolver.MaxConcatLength ||
+                (long)used + arrayLength + quoted > ConfigurationBindingResolver.MaxConcatLength)
+            {
+                return steps;
+            }
+
+            used += arrayLength + quoted;
+            length = arrayLength;
+            quotes = arrayQuotes;
+            slashes = arraySlashes;
+        }
+
+        return 10;
+    }
+
+    private static JToken NestedMaps(int depth)
+    {
+        JToken body = new JObject { ["$eval"] = "x" };
+        for (var index = 0; index < depth; index++)
+        {
+            body = new JObject
+            {
+                ["$map"] = new JObject { ["$eval"] = "range(0, 50)" },
+                ["each(x)"] = body,
+            };
+        }
+
+        return body;
     }
 
     private static JObject Parse(string json)
