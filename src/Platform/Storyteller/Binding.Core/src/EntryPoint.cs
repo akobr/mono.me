@@ -1,6 +1,8 @@
 using _42.Platform.Storyteller.Binding.Language;
+using _42.Platform.Storyteller.Binding.Object;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller.Binding;
@@ -30,6 +32,10 @@ public static class EntryPoint
         });
         @this.TryAddSingleton<IBindingRegistry>(provider => provider.GetRequiredService<BindingExecutor>());
         @this.TryAddSingleton<IBindingExecutor>(provider => provider.GetRequiredService<BindingExecutor>());
+        @this.TryAddSingleton<IConfigurationBindingResolver>(provider =>
+            new ConfigurationBindingResolver(
+                provider.GetRequiredService<BindingExecutor>(),
+                provider.GetService<ILogger<ConfigurationBindingResolver>>()));
 
         if (configure is not null)
         {
