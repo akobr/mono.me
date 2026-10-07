@@ -20,7 +20,7 @@ namespace _42.Platform.Storyteller.Configuring;
 public class CosmosConfigurationService : IConfigurationService
 {
     private readonly IContainerRepositoryProvider _repositoryProvider;
-    private readonly IBindingExecutor? _bindingExecutor;
+    private readonly IConfigurationBindingResolver? _bindingResolver;
     private readonly IConfigurationSchemaService? _schemaService;
     private readonly IJsonSerializationSettingsProvider _jsonSettingsProvider;
     private readonly JsonSerializerSettings _serializerOptions;
@@ -30,11 +30,11 @@ public class CosmosConfigurationService : IConfigurationService
         IContainerRepositoryProvider repositoryProvider,
         IJsonSerializationSettingsProvider jsonSettingsProvider,
         IOptions<JsonSerializerSettings> serializerOptions,
-        IBindingExecutor bindingExecutor = null,
+        IConfigurationBindingResolver bindingResolver = null,
         IConfigurationSchemaService schemaService = null)
     {
         _repositoryProvider = repositoryProvider;
-        _bindingExecutor = bindingExecutor;
+        _bindingResolver = bindingResolver;
         _schemaService = schemaService;
         _jsonSettingsProvider = jsonSettingsProvider;
         _serializerOptions = serializerOptions.Value;
@@ -598,7 +598,7 @@ public class CosmosConfigurationService : IConfigurationService
             return null;
         }
 
-        if (_bindingExecutor is null)
+        if (_bindingResolver is null)
         {
             return config;
         }
@@ -609,76 +609,8 @@ public class CosmosConfigurationService : IConfigurationService
             Context = new ConfigurationBindingContext(key),
         };
 
-        var queue = new Queue<JObject>();
-        queue.Enqueue(config.Content);
-
-        while (queue.Count > 0)
-        {
-            var current = queue.Dequeue();
-
-            foreach (var property in current.Properties())
-            {
-                switch (property.Value.Type)
-                {
-                    case JTokenType.String:
-                        await TryProcessDataBinding(property, includeSecrets, scope);
-                        break;
-
-                    case JTokenType.Object:
-                        // TODO: [P3] logic operations and templates processing
-                        queue.Enqueue((JObject)property.Value);
-                        break;
-
-                    case JTokenType.Array:
-                    {
-                        var array = (JArray)property.Value;
-                        foreach (var item in array.ToList())
-                        {
-                            switch (item.Type)
-                            {
-                                case JTokenType.String:
-                                    await TryProcessDataBinding((JValue)item, includeSecrets, scope);
-                                    break;
-
-                                case JTokenType.Object:
-                                    queue.Enqueue((JObject)item);
-                                    break;
-                            }
-                        }
-
-                        break;
-                    }
-                }
-            }
-        }
-
+        await _bindingResolver.ResolveAsync(config.Content, includeSecrets, scope);
         return config;
-    }
-
-    private ValueTask<bool> TryProcessDataBinding(JProperty property, bool includeSecrets, BindingScope scope)
-    {
-        if (property.Value.Type != JTokenType.String)
-        {
-            return ValueTask.FromResult(false);
-        }
-
-        var rawValue = (string?)property.Value;
-        return string.IsNullOrEmpty(rawValue) || rawValue[0] != '@'
-            ? ValueTask.FromResult(false)
-            : _bindingExecutor!.TryBinding(property, includeSecrets, scope);
-    }
-
-    private ValueTask<bool> TryProcessDataBinding(JValue value, bool includeSecrets, BindingScope scope)
-    {
-        if (value.Type != JTokenType.String)
-        {
-            return ValueTask.FromResult(false);
-        }
-
-        var rawValue = (string?)value;
-        return string.IsNullOrEmpty(rawValue) || rawValue[0] != '@'
-            ? ValueTask.FromResult(false)
-            : _bindingExecutor!.TryBinding(value, includeSecrets, scope);
     }
 
     private async Task TryAutogeneratePropertiesAsync(

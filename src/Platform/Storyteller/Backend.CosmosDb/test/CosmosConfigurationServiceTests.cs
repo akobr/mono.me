@@ -973,4 +973,160 @@ public class CosmosConfigurationServiceTests(Startup startup)
         changes.Stats.Deletions.Should().BeGreaterThan(0);
         changes.Stats.Additions.Should().Be(0);
     }
+
+    [Fact]
+    public async Task GetResolvedConfigurationAsync_ObjectEnvelopeAndArrayItem_ResolveThroughBothLanguages()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("object-binding");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "object-binding",
+            ProjectName = Project,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
+            {
+                "retries": {
+                    "$binding": "jlogic",
+                    "$definition": { "+": [1, 2] }
+                },
+                "tags": [
+                    {
+                        "$binding": "jsone",
+                        "$definition": { "name": { "$eval": "name" } },
+                        "$context": { "name": "db" }
+                    }
+                ]
+            }
+            """), "system");
+
+        var resolved = await configs.GetResolvedConfigurationAsync(key);
+
+        resolved!.Content["retries"]!.Value<decimal>().Should().Be(3m);
+        resolved.Content["tags"]![0]!["name"]!.Value<string>().Should().Be("db");
+    }
+
+    [Fact]
+    public async Task GetResolvedConfigurationAsync_TemplateEnvelope_StaysCalculatedUntilResolvedRead()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+        var templates = Context.Services.GetRequiredService<IConfigurationTemplateService>();
+
+        const string project = "config-tests-template-envelope";
+        var annotationKey = AnnotationKey.CreateResponsibility("template-envelope");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "template-envelope",
+            ProjectName = project,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        await templates.CreateOrUpdateTemplateAsync(
+            TestConstants.Organization,
+            project,
+            Constants.DefaultViewName,
+            AnnotationTypeCodes.Responsibility,
+            JObject.Parse("""
+                {
+                    "retries": {
+                        "$binding": "jlogic",
+                        "$definition": { "+": [2, 2] }
+                    }
+                }
+                """),
+            "system");
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, project, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "stored" }"""), "system");
+
+        var calculated = await configs.GetRawConfigurationAsync(key);
+        calculated!.Content["name"]!.Value<string>().Should().Be("stored");
+        calculated.Content["retries"]!["$binding"]!.Value<string>().Should().Be("jlogic");
+
+        var resolved = await configs.GetResolvedConfigurationAsync(key);
+        resolved!.Content["name"]!.Value<string>().Should().Be("stored");
+        resolved.Content["retries"]!.Value<decimal>().Should().Be(4m);
+    }
+
+    [Fact]
+    public async Task CreateOrUpdateConfigurationAsync_Envelope_IsStoredAndRemainsInRawRead()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("stored-envelope");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "stored-envelope",
+            ProjectName = Project,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "stored" }"""), "system");
+        var written = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
+            {
+                "item": {
+                    "$binding": "jsone",
+                    "$definition": { "ok": true }
+                }
+            }
+            """), "system");
+
+        written.Content["name"]!.Value<string>().Should().Be("stored");
+        written.Content["item"]!["$binding"]!.Value<string>().Should().Be("jsone");
+        written.Content["item"]!["$definition"]!["ok"]!.Value<bool>().Should().BeTrue();
+
+        var raw = await configs.GetRawConfigurationAsync(key);
+        raw!.Content["item"]!["$binding"]!.Value<string>().Should().Be("jsone");
+        raw.Content["item"]!["$definition"]!["ok"]!.Value<bool>().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetResolvedConfigurationAsync_IncludeSecretsFalse_PassesUnresolvedVaultExpressionToEngine()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("vault-context");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "vault-context",
+            ProjectName = Project,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
+        var expression = $"@({DecliningSecretSource.SecretPath}, {DecliningSecretSource.VaultKey})";
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse($$"""
+            {
+                "label": {
+                    "$binding": "jlogic",
+                    "$definition": { "var": "secret" },
+                    "$context": { "secret": "{{expression}}" }
+                }
+            }
+            """), "system");
+
+        var hidden = await configs.GetResolvedConfigurationAsync(key, includeSecrets: false);
+        hidden!.Content["label"]!.Type.Should().Be(JTokenType.String);
+        hidden.Content["label"]!.Value<string>().Should().Be(expression);
+
+        var revealed = await configs.GetResolvedConfigurationAsync(key, includeSecrets: true);
+        revealed!.Content["label"]!.Value<string>().Should().Be(DecliningSecretSource.SecretValue);
+    }
 }

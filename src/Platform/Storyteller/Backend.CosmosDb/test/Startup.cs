@@ -113,8 +113,10 @@ public class Startup : IAsyncLifetime, ITestContext
         services.AddSingleton<AnnotationBindingFunction>(sp =>
             new AnnotationBindingFunction(
                 new Lazy<IAnnotationService>(() => sp.GetRequiredService<IAnnotationService>())));
+        services.AddSingleton<DecliningSecretSource>();
         services.AddConfigurationBindings(options => options
             .AddFunction<ConfigBindingFunction>("config")
-            .AddFunction<AnnotationBindingFunction>("annotation"));
+            .AddFunction<AnnotationBindingFunction>("annotation")
+            .AddSource<DecliningSecretSource>(DecliningSecretSource.VaultKey));
     }
 }
