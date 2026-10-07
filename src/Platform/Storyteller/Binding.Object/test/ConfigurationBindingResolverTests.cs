@@ -301,6 +301,35 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_EnvelopeFanOutOfTwo_ResolvesBothBranches()
+    {
+        var content = new JObject { ["value"] = FanOut(3) };
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JArray>().Subject;
+        value.Should().HaveCount(2);
+        value[0].Values<string>().Should().Equal("done", "done");
+        value[1].Values<string>().Should().Equal("done", "done");
+    }
+
+    [Fact]
+    public async Task Resolve_EnvelopeFanOutPastEvaluationBudget_Throws()
+    {
+        var levels = 1;
+        while ((1 << levels) - 1 <= ConfigurationBindingResolver.MaxEnvelopeEvaluations)
+        {
+            levels++;
+        }
+
+        var content = new JObject { ["value"] = FanOut(levels) };
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingEvaluationException>()
+            .WithMessage($"*exceed {ConfigurationBindingResolver.MaxEnvelopeEvaluations} evaluations*");
+    }
+
+    [Fact]
     public async Task Resolve_ForwardsIncludeSecretsAndScope()
     {
         var content = Parse("""{ "name": "@name" }""");
@@ -393,6 +422,26 @@ public class ConfigurationBindingResolverTests
             {
                 ["$binding"] = "jsone",
                 ["$definition"] = EscapeDollars(current),
+            };
+        }
+
+        return current;
+    }
+
+    private static JToken FanOut(int levels)
+    {
+        JToken current = new JObject
+        {
+            ["$binding"] = "jlogic",
+            ["$definition"] = "done",
+        };
+
+        for (var level = 1; level < levels; level++)
+        {
+            current = new JObject
+            {
+                ["$binding"] = "jsone",
+                ["$definition"] = new JArray(EscapeDollars(current), EscapeDollars(current)),
             };
         }
 
