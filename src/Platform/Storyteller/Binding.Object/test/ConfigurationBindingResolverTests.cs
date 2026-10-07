@@ -330,6 +330,211 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonLogicCat_ConcatenatesStrings()
+    {
+        var content = Parse("""
+            {
+              "name": {
+                "$binding": "jlogic",
+                "$definition": { "cat": ["a", "b"] }
+              }
+            }
+            """);
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["name"]!.Value<string>().Should().Be("ab");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicReduceDoublingPastConcatLimit_Throws()
+    {
+        var content = new JObject
+        {
+            ["value"] = new JObject
+            {
+                ["$binding"] = "jlogic",
+                ["$definition"] = new JObject
+                {
+                    ["reduce"] = new JArray
+                    {
+                        DoublingSteps("ab"),
+                        new JObject
+                        {
+                            ["cat"] = new JArray
+                            {
+                                new JObject { ["var"] = "accumulator" },
+                                new JObject { ["var"] = "accumulator" },
+                            },
+                        },
+                        "ab",
+                    },
+                },
+            },
+        };
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*cat exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicMergePastItemLimit_Throws()
+    {
+        var items = new JArray();
+        for (var index = 0; index < ConfigurationBindingResolver.MaxMergeItems + 1; index++)
+        {
+            items.Add(index);
+        }
+
+        var content = new JObject
+        {
+            ["value"] = new JObject
+            {
+                ["$binding"] = "jlogic",
+                ["$definition"] = new JObject
+                {
+                    ["merge"] = new JArray { items },
+                },
+            },
+        };
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*merge exceeds {ConfigurationBindingResolver.MaxMergeItems} items*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonERangeWithinLimit_ReturnsLength()
+    {
+        var content = Envelope("jsone", new JObject
+        {
+            ["$eval"] = $"len(range(0, {ConfigurationBindingResolver.MaxRangeItems}))",
+        });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<decimal>().Should().Be(ConfigurationBindingResolver.MaxRangeItems);
+    }
+
+    [Fact]
+    public async Task Resolve_JsonERangePastItemLimit_Throws()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$eval"] = $"len(range(0, {ConfigurationBindingResolver.MaxRangeItems + 1}))",
+            },
+            new JObject { ["range"] = "nope" });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*range exceeds {ConfigurationBindingResolver.MaxRangeItems} items*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEMapOverRangePastItemLimit_Throws()
+    {
+        var content = Envelope("jsone", new JObject
+        {
+            ["$map"] = new JObject
+            {
+                ["$eval"] = $"range(0, {ConfigurationBindingResolver.MaxRangeItems + 1})",
+            },
+            ["each(x)"] = true,
+        });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*range exceeds {ConfigurationBindingResolver.MaxRangeItems} items*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonENestedLetWithinDepth_DoublesString()
+    {
+        var content = Envelope("jsone", DoublingLets(3));
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<string>().Should().Be("aaaaaaaa");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonENestedLetPastOperatorDepth_Throws()
+    {
+        var content = Envelope("jsone", DoublingLets(ConfigurationBindingResolver.MaxJsonEOperatorDepth));
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingEvaluationException>()
+            .WithMessage($"*JSON-e template nesting exceeds {ConfigurationBindingResolver.MaxJsonEOperatorDepth}*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEAdditionRespectsPrecedence()
+    {
+        var content = Envelope("jsone", new JObject { ["$eval"] = "1+2*3" });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<decimal>().Should().Be(7);
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEInterpolation_ResolvesName()
+    {
+        var content = Envelope("jsone", Parse("""
+            {
+              "$let": { "name": "db" },
+              "in": "${name}"
+            }
+            """));
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<string>().Should().Be("db");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEReduceDoublingPastConcatLimit_Throws()
+    {
+        var steps = DoublingSteps("ab").Count;
+        var content = Envelope("jsone", new JObject
+        {
+            ["$reduce"] = new JObject { ["$eval"] = $"range(0, {steps})" },
+            ["initial"] = "ab",
+            ["each(acc,v)"] = new JObject { ["$eval"] = "acc+acc" },
+        });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*concatenation exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEInterpolationDoublingPastConcatLimit_Throws()
+    {
+        var steps = DoublingSteps("ab").Count;
+        var content = Envelope("jsone", new JObject
+        {
+            ["$reduce"] = new JObject { ["$eval"] = $"range(0, {steps})" },
+            ["initial"] = "ab",
+            ["each(acc,v)"] = "${acc}${acc}",
+        });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*concatenation exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
     public async Task Resolve_ForwardsIncludeSecretsAndScope()
     {
         var content = Parse("""{ "name": "@name" }""");
@@ -397,6 +602,57 @@ public class ConfigurationBindingResolverTests
         content["tags"]![0]!.Value<string>().Should().Be("resolved:@tag");
         content["tags"]![1]!.Value<string>().Should().Be("plain");
         content["count"]!.Value<int>().Should().Be(1);
+    }
+
+    private static JObject Envelope(string kind, JToken definition, JObject? context = null)
+    {
+        var envelope = new JObject
+        {
+            ["$binding"] = kind,
+            ["$definition"] = definition,
+        };
+        if (context is not null)
+        {
+            envelope["$context"] = context;
+        }
+
+        return new JObject { ["value"] = envelope };
+    }
+
+    private static JToken DoublingLets(int doublings)
+    {
+        JToken current = new JObject { ["$eval"] = "s" };
+        for (var index = 0; index < doublings; index++)
+        {
+            current = new JObject
+            {
+                ["$let"] = new JObject
+                {
+                    ["s"] = new JObject { ["$eval"] = "s+s" },
+                },
+                ["in"] = current,
+            };
+        }
+
+        return new JObject
+        {
+            ["$let"] = new JObject { ["s"] = "a" },
+            ["in"] = current,
+        };
+    }
+
+    private static JArray DoublingSteps(string seed)
+    {
+        var items = new JArray();
+        var length = seed.Length;
+        while ((long)length * 2 <= ConfigurationBindingResolver.MaxConcatLength)
+        {
+            items.Add(items.Count);
+            length *= 2;
+        }
+
+        items.Add(items.Count);
+        return items;
     }
 
     private static JObject Parse(string json)
