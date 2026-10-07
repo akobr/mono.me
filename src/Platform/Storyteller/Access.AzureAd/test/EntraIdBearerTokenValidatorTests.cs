@@ -220,6 +220,43 @@ public class EntraIdBearerTokenValidatorTests
         var result = await fixture.Validator.ValidateAsync(rawToken);
 
         result.ShouldBeNull();
+        fixture.Manager.RefreshRequests.ShouldBe(1);
+        fixture.Manager.Calls.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Validate_RolledSigningKey_RefreshesAndAcceptsTheNewKey()
+    {
+        using var fixture = new TokenFixture();
+        using var rolledRsa = RSA.Create(2048);
+        var rolledKey = new RsaSecurityKey(rolledRsa) { KeyId = "rolled-key" };
+        var rolledConfiguration = new OpenIdConnectConfiguration
+        {
+            Issuer = fixture.Configuration.Issuer,
+        };
+        rolledConfiguration.SigningKeys.Add(rolledKey);
+        var manager = new RefreshingConfigurationManager(fixture.Configuration, rolledConfiguration);
+        var validator = new EntraIdBearerTokenValidator(
+            Options.Create(new UserAuthenticationOptions
+            {
+                Provider = IdentityProviderKind.EntraId,
+                ClientId = fixture.ClientId,
+                TenantId = fixture.TenantId,
+            }),
+            new TestHostEnvironment(),
+            manager);
+        var rawToken = fixture.CreateToken(
+            fixture.V2Issuer,
+            fixture.ApiAudience,
+            [new Claim("sub", "user-1")],
+            signingKey: rolledKey);
+
+        var result = await validator.ValidateAsync(rawToken);
+
+        result.ShouldNotBeNull();
+        FindClaim(result, "sub", ClaimTypes.NameIdentifier).ShouldBe("user-1");
+        manager.RefreshRequests.ShouldBe(1);
+        manager.Calls.ShouldBe(2);
     }
 
     [Theory]
@@ -395,6 +432,8 @@ public class EntraIdBearerTokenValidatorTests
 
         public int Calls { get; private set; }
 
+        public int RefreshRequests { get; private set; }
+
         public Task<OpenIdConnectConfiguration> GetConfigurationAsync(CancellationToken cancel)
         {
             Calls++;
@@ -410,6 +449,38 @@ public class EntraIdBearerTokenValidatorTests
 
         public void RequestRefresh()
         {
+            RefreshRequests++;
+        }
+    }
+
+    // Returns the published keys until RequestRefresh, then the rolled set.
+    private sealed class RefreshingConfigurationManager : IConfigurationManager<OpenIdConnectConfiguration>
+    {
+        private readonly OpenIdConnectConfiguration _current;
+        private readonly OpenIdConnectConfiguration _rolled;
+        private bool _refreshed;
+
+        public RefreshingConfigurationManager(OpenIdConnectConfiguration current, OpenIdConnectConfiguration rolled)
+        {
+            _current = current;
+            _rolled = rolled;
+        }
+
+        public int Calls { get; private set; }
+
+        public int RefreshRequests { get; private set; }
+
+        public Task<OpenIdConnectConfiguration> GetConfigurationAsync(CancellationToken cancel)
+        {
+            Calls++;
+            cancel.ThrowIfCancellationRequested();
+            return Task.FromResult(_refreshed ? _rolled : _current);
+        }
+
+        public void RequestRefresh()
+        {
+            RefreshRequests++;
+            _refreshed = true;
         }
     }
 

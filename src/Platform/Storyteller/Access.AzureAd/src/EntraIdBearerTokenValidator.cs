@@ -76,31 +76,21 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
 
         try
         {
-            // The singleton configuration manager caches the signing keys and refreshes them.
+            // The singleton manager keeps one snapshot of the signing keys. An unknown kid is
+            // how a rollover shows up in that snapshot. Ask for a refresh and try the new set once.
+            // The manager's RefreshInterval stops a made-up kid from fetching metadata on every call.
             var configuration = await _configurationManager.GetConfigurationAsync(cancellationToken);
 
-            // Entra keeps the handler default clock skew of five minutes. AuthKit uses 30 seconds.
-            var validationParameters = new TokenValidationParameters
+            try
             {
-                ValidAudiences = [$"api://{_clientId}", _clientId],
-                IssuerSigningKeys = configuration.SigningKeys,
-                IssuerValidator = static (issuer, _, _) =>
-                {
-                    if (issuer is not null
-                        && (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase)
-                            || issuer.StartsWith("https://login.microsoftonline.com/", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        return issuer;
-                    }
-
-                    throw new SecurityTokenInvalidIssuerException($"Invalid issuer: {issuer}");
-                },
-            };
-
-            var principal = handler.ValidateToken(rawToken, validationParameters, out _);
-            var claims = principal.Claims.ToList();
-            var machineId = TryGetMachineId(claims, _clientId);
-            return new BearerValidationResult(claims, machineId is not null, machineId);
+                return Validate(handler, rawToken, configuration);
+            }
+            catch (SecurityTokenSignatureKeyNotFoundException)
+            {
+                _configurationManager.RequestRefresh();
+                configuration = await _configurationManager.GetConfigurationAsync(cancellationToken);
+                return Validate(handler, rawToken, configuration);
+            }
         }
         catch (SecurityTokenException)
         {
@@ -118,6 +108,32 @@ public class EntraIdBearerTokenValidator : IBearerTokenValidator
         {
             throw new BearerKeyRetrievalException("The OpenID signing keys could not be retrieved.", exception);
         }
+    }
+
+    private BearerValidationResult Validate(JwtSecurityTokenHandler handler, string rawToken, OpenIdConnectConfiguration configuration)
+    {
+        // Entra keeps the handler default clock skew of five minutes. AuthKit uses 30 seconds.
+        var validationParameters = new TokenValidationParameters
+        {
+            ValidAudiences = [$"api://{_clientId}", _clientId],
+            IssuerSigningKeys = configuration.SigningKeys,
+            IssuerValidator = static (issuer, _, _) =>
+            {
+                if (issuer is not null
+                    && (issuer.StartsWith("https://sts.windows.net/", StringComparison.OrdinalIgnoreCase)
+                        || issuer.StartsWith("https://login.microsoftonline.com/", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return issuer;
+                }
+
+                throw new SecurityTokenInvalidIssuerException($"Invalid issuer: {issuer}");
+            },
+        };
+
+        var principal = handler.ValidateToken(rawToken, validationParameters, out _);
+        var claims = principal.Claims.ToList();
+        var machineId = TryGetMachineId(claims, _clientId);
+        return new BearerValidationResult(claims, machineId is not null, machineId);
     }
 
     private static ConfigurationManager<OpenIdConnectConfiguration> CreateConfigurationManager(UserAuthenticationOptions options)
