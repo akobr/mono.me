@@ -19,9 +19,9 @@ internal static class JsonELimits
     {
         var clone = definition.DeepClone();
         if (clone.Type == JTokenType.String &&
-            JsonEExpressionRewriter.TryRewriteInterpolation(clone.Value<string>() ?? string.Empty, out var expression))
+            JsonEExpressionRewriter.TryRewriteInterpolation(clone.Value<string>() ?? string.Empty, out var rewritten))
         {
-            return new JObject { ["$eval"] = expression };
+            return new JValue(rewritten);
         }
 
         Rewrite(clone);
@@ -210,9 +210,9 @@ internal static class JsonELimits
                             continue;
                         }
 
-                        if (JsonEExpressionRewriter.TryRewriteInterpolation(text, out var expression))
+                        if (JsonEExpressionRewriter.TryRewriteInterpolation(text, out var rewritten))
                         {
-                            property.Value = new JObject { ["$eval"] = expression };
+                            property.Value = rewritten;
                         }
 
                         continue;
@@ -228,9 +228,9 @@ internal static class JsonELimits
                 for (var index = 0; index < array.Count; index++)
                 {
                     if (array[index].Type == JTokenType.String &&
-                        JsonEExpressionRewriter.TryRewriteInterpolation(array[index].Value<string>() ?? string.Empty, out var expression))
+                        JsonEExpressionRewriter.TryRewriteInterpolation(array[index].Value<string>() ?? string.Empty, out var rewritten))
                     {
-                        array[index] = new JObject { ["$eval"] = expression };
+                        array[index] = rewritten;
                         continue;
                     }
 
@@ -275,9 +275,9 @@ internal static class JsonELimits
         var changed = false;
         foreach (var property in obj.Properties())
         {
-            if (JsonEExpressionRewriter.TryRewriteInterpolation(property.Name, out var expression))
+            if (JsonEExpressionRewriter.TryRewriteInterpolation(property.Name, out var rewritten))
             {
-                names.Add("${" + expression + "}");
+                names.Add(rewritten);
                 changed = true;
             }
             else
