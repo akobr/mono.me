@@ -16,6 +16,7 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
     public const int MaxMergeItems = 1000;
     public const int MaxReduceItems = 1000;
     public const int MaxConcatLength = 100_000;
+    public const int MaxEvaluationSteps = 100_000;
 
     private const string BindingProperty = "$binding";
     private const string DefinitionProperty = "$definition";

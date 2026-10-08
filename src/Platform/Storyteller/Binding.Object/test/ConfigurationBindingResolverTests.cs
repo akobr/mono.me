@@ -784,6 +784,63 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonLogicAll_ReturnsTrue()
+    {
+        var content = new JObject
+        {
+            ["value"] = new JObject
+            {
+                ["$binding"] = "jlogic",
+                ["$definition"] = new JObject
+                {
+                    ["all"] = new JArray
+                    {
+                        new JArray(1, 2),
+                        true,
+                    },
+                },
+            },
+        };
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<bool>().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicNestedAllPastIterationLimit_Throws()
+    {
+        var width = CubicWidthPastStepLimit();
+        width.Should().BeInRange(1, 50);
+        var content = new JObject
+        {
+            ["value"] = new JObject
+            {
+                ["$binding"] = "jlogic",
+                ["$definition"] = NestedAll(3, width),
+            },
+        };
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*exceeds {ConfigurationBindingResolver.MaxEvaluationSteps} iterations*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonENestedMapDeletedPastStepLimit_Throws()
+    {
+        var width = CubicWidthPastStepLimit();
+        width.Should().BeInRange(1, 50);
+        var content = Envelope("jsone", NestedDeletedMaps(3, width));
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*exceeds {ConfigurationBindingResolver.MaxEvaluationSteps} steps*");
+    }
+
+    [Fact]
     public async Task Resolve_ForwardsIncludeSecretsAndScope()
     {
         var content = Parse("""{ "name": "@name" }""");
@@ -1023,6 +1080,71 @@ public class ConfigurationBindingResolverTests
     private static string RepeatedExpression(string name, int copies)
     {
         return "[" + string.Join(",", Enumerable.Repeat(name, copies)) + "]";
+    }
+
+    private static int CubicWidthPastStepLimit()
+    {
+        // 50 is the largest width these fixtures build. 600 is the reported multi-gigabyte case.
+        for (var width = 1; width <= 50; width++)
+        {
+            var steps = (long)width + (width * width) + ((long)width * width * width);
+            if (steps > ConfigurationBindingResolver.MaxEvaluationSteps)
+            {
+                return width;
+            }
+        }
+
+        return 50;
+    }
+
+    private static JToken NestedAll(int depth, int count)
+    {
+        JToken rule = new JValue(true);
+        for (var level = 0; level < depth; level++)
+        {
+            var items = new JArray();
+            for (var index = 0; index < count; index++)
+            {
+                items.Add(index);
+            }
+
+            rule = new JObject
+            {
+                ["all"] = new JArray
+                {
+                    items,
+                    rule,
+                },
+            };
+        }
+
+        return rule;
+    }
+
+    private static JToken NestedDeletedMaps(int depth, int count)
+    {
+        JToken body = new JObject
+        {
+            ["$if"] = "false",
+            ["then"] = 1,
+        };
+
+        for (var level = 0; level < depth; level++)
+        {
+            var items = new JArray();
+            for (var index = 0; index < count; index++)
+            {
+                items.Add(index);
+            }
+
+            body = new JObject
+            {
+                ["$map"] = items,
+                ["each(x)"] = body,
+            };
+        }
+
+        return body;
     }
 
     private static JToken NestedJsonLogicMaps(int depth, int count, string leaf)

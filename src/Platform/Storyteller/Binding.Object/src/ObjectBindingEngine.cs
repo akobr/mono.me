@@ -43,6 +43,7 @@ internal static class ObjectBindingEngine
             var contextNode = JsonTokenConverter.ToNode(context)
                 ?? throw new BindingEvaluationException("Object binding $context must be a JSON object.");
 
+            JsonLogicBoundedRules.ResetIterations();
             JsonNode? result = kind switch
             {
                 JsonLogicKind => JsonLogic.Apply(definitionNode, contextNode),
@@ -87,6 +88,8 @@ internal static class ObjectBindingEngine
         contextNode[JsonEExpressionRewriter.ConcatFunction] = JsonFunction.Create(JsonELimits.Concat);
         contextNode[JsonEExpressionRewriter.BoundFunction] = JsonFunction.Create(
             (arguments, _) => JsonELimits.Bound(arguments, budget));
+        contextNode[JsonEExpressionRewriter.StepFunction] = JsonFunction.Create(
+            (arguments, _) => JsonELimits.Step(arguments, budget));
         return JsonTokenConverter.ToToken(JsonE.Evaluate(definitionNode, contextNode));
     }
 }
