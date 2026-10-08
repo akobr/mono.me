@@ -1402,6 +1402,14 @@ public class ConfigurationBindingResolverTests
         await _resolver.ResolveAsync(parts, includeSecrets: true, _scope);
         parts["value"].Should().BeOfType<JArray>().Which.Select(item => item!.Value<string>()).Should().Equal("left", "right");
 
+        var chars = Envelope("jsone", new JObject { ["$eval"] = "split('ab', '')" });
+        await _resolver.ResolveAsync(chars, includeSecrets: true, _scope);
+        chars["value"].Should().BeOfType<JArray>().Which.Select(item => item!.Value<string>()).Should().Equal("a", "b");
+
+        var zero = Envelope("jsone", new JObject { ["$eval"] = "split('a0b', 0)" });
+        await _resolver.ResolveAsync(zero, includeSecrets: true, _scope);
+        zero["value"].Should().BeOfType<JArray>().Which.Select(item => item!.Value<string>()).Should().Equal("a", "b");
+
         var content = Envelope(
             "jsone",
             new JObject { ["$eval"] = "split(s, ':')" },
@@ -1490,6 +1498,266 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_ContextString_IsReadManyTimes()
+    {
+        // One context string is read on every term. Copying it on each read is the reported cost.
+        const int reads = 64;
+        var text = new string('b', 50_000);
+        var terms = string.Join("||", Enumerable.Repeat("s<'a'", reads));
+        var jsone = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = terms },
+            new JObject { ["s"] = text });
+        await _resolver.ResolveAsync(jsone, includeSecrets: true, _scope);
+        jsone["value"]!.Value<bool>().Should().BeFalse();
+
+        var comparisons = new JArray();
+        for (var index = 0; index < reads; index++)
+        {
+            comparisons.Add(Parse("""{ "==": [{ "var": "s" }, "a"] }"""));
+        }
+
+        var logic = Envelope(
+            "jlogic",
+            new JObject { ["or"] = comparisons },
+            new JObject { ["s"] = text });
+        await _resolver.ResolveAsync(logic, includeSecrets: true, _scope);
+        logic["value"]!.Value<bool>().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Resolve_JsonELen_ChargesString()
+    {
+        var sample = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$let"] = new JObject
+                {
+                    ["s"] = "abc",
+                    ["emoji"] = "😀",
+                    ["xs"] = new JArray(1, 2, 3),
+                },
+                ["in"] = new JObject { ["$eval"] = "[len(s), len(emoji), len(xs)]" },
+            });
+        await _resolver.ResolveAsync(sample, includeSecrets: true, _scope);
+        sample["value"].Should().BeOfType<JArray>().Which.Select(item => item!.Value<decimal>()).Should().Equal(3m, 1m, 3m);
+
+        var array = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "len(xs)" },
+            new JObject { ["xs"] = NumberArray(ConfigurationBindingResolver.MaxEvaluationSteps + 1) });
+        await _resolver.ResolveAsync(array, includeSecrets: true, _scope);
+        array["value"]!.Value<decimal>().Should().Be(ConfigurationBindingResolver.MaxEvaluationSteps + 1);
+
+        var content = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "len(s)" },
+            new JObject { ["s"] = TextPastStepLimit() });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEIndex_ChargesString()
+    {
+        var sample = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$let"] = new JObject
+                {
+                    ["s"] = "abc",
+                    ["emoji"] = "😀",
+                    ["obj"] = new JObject { ["a"] = 1 },
+                    ["xs"] = new JArray(10, 20, 30),
+                },
+                ["in"] = new JObject { ["$eval"] = "[s[0], s[-1], emoji[0], obj['a'], xs[0], xs[-1]]" },
+            });
+        await _resolver.ResolveAsync(sample, includeSecrets: true, _scope);
+        var indexed = sample["value"].Should().BeOfType<JArray>().Subject;
+        indexed[0]!.Value<string>().Should().Be("a");
+        indexed[1]!.Value<string>().Should().Be("c");
+        indexed[2]!.Value<string>().Should().Be("😀");
+        indexed[3]!.Value<decimal>().Should().Be(1);
+        indexed[4]!.Value<decimal>().Should().Be(10);
+        indexed[5]!.Value<decimal>().Should().Be(30);
+
+        var missing = Envelope("jsone", new JObject { ["$eval"] = "{a: 1}['missing']" });
+        await _resolver.ResolveAsync(missing, includeSecrets: true, _scope);
+        missing["value"]!.Type.Should().Be(JTokenType.Null);
+
+        var bounds = Envelope("jsone", new JObject { ["$eval"] = "'ab'[5]" });
+        var boundsAct = () => _resolver.ResolveAsync(bounds, includeSecrets: true, _scope).AsTask();
+        await boundsAct.Should().ThrowAsync<BindingException>().WithMessage("*index out of bounds*");
+
+        var array = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "xs[0]" },
+            new JObject { ["xs"] = NumberArray(ConfigurationBindingResolver.MaxEvaluationSteps + 1) });
+        await _resolver.ResolveAsync(array, includeSecrets: true, _scope);
+        array["value"]!.Value<decimal>().Should().Be(0);
+
+        var content = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "s[0]" },
+            new JObject { ["s"] = TextPastStepLimit() });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonESlice_ChargesString()
+    {
+        var sample = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$let"] = new JObject { ["s"] = "abcde" },
+                ["in"] = new JObject { ["$eval"] = "[s[1:3], s[:2], s[2:], s[-2:], s[4:2], s[:-1]]" },
+            });
+        await _resolver.ResolveAsync(sample, includeSecrets: true, _scope);
+        sample["value"].Should().BeOfType<JArray>().Which.Select(item => item!.Value<string>())
+            .Should().Equal("bc", "ab", "cde", "de", string.Empty, "abcd");
+
+        var array = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "xs[0:1]" },
+            new JObject { ["xs"] = NumberArray(ConfigurationBindingResolver.MaxEvaluationSteps + 1) });
+        await _resolver.ResolveAsync(array, includeSecrets: true, _scope);
+        array["value"].Should().BeOfType<JArray>().Which.Select(item => item!.Value<decimal>()).Should().Equal(0m);
+
+        var content = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "s[1:2]" },
+            new JObject { ["s"] = TextPastStepLimit() });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicStrictEquals_ChargesStructure()
+    {
+        var same = Envelope("jlogic", Parse("""{ "===": [[1, 1], [1, 1]] }"""));
+        await _resolver.ResolveAsync(same, includeSecrets: true, _scope);
+        same["value"]!.Value<bool>().Should().BeTrue();
+
+        var coerced = Envelope("jlogic", Parse("""{ "===": [1, "1"] }"""));
+        await _resolver.ResolveAsync(coerced, includeSecrets: true, _scope);
+        coerced["value"]!.Value<bool>().Should().BeFalse();
+
+        var mixed = Envelope(
+            "jlogic",
+            Parse("""{ "===": [{ "var": "s" }, 1] }"""),
+            new JObject { ["s"] = TextPastStepLimit() });
+        await _resolver.ResolveAsync(mixed, includeSecrets: true, _scope);
+        mixed["value"]!.Value<bool>().Should().BeFalse();
+
+        var text = Envelope(
+            "jlogic",
+            Parse("""{ "===": [{ "var": "s" }, { "var": "s" }] }"""),
+            new JObject { ["s"] = TextPastStepLimit() });
+        var textAct = () => _resolver.ResolveAsync(text, includeSecrets: true, _scope).AsTask();
+        await textAct.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+
+        var content = Envelope(
+            "jlogic",
+            Parse("""{ "===": [{ "var": "xs" }, [0]] }"""),
+            new JObject { ["xs"] = NumberArray(ConfigurationBindingResolver.MaxEvaluationSteps + 1) });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicStrictNotEquals_ChargesStructure()
+    {
+        var different = Envelope("jlogic", Parse("""{ "!==": [[1], [2]] }"""));
+        await _resolver.ResolveAsync(different, includeSecrets: true, _scope);
+        different["value"]!.Value<bool>().Should().BeTrue();
+
+        var obj = Envelope("jlogic", Parse("""{ "!==": [{ "a": 1 }, { "a": 2 }] }"""));
+        await _resolver.ResolveAsync(obj, includeSecrets: true, _scope);
+        obj["value"]!.Value<bool>().Should().BeTrue();
+
+        var content = Envelope(
+            "jlogic",
+            Parse("""{ "!==": [{ "var": "o" }, { "a": "b" }] }"""),
+            new JObject { ["o"] = new JObject { ["a"] = TextPastStepLimit() } });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicLessThan_ChargesString()
+    {
+        var between = Envelope("jlogic", Parse("""{ "<": [1, 2, 3] }"""));
+        await _resolver.ResolveAsync(between, includeSecrets: true, _scope);
+        between["value"]!.Value<bool>().Should().BeTrue();
+
+        await AssertComparisonRule("""{ "<": [1, 2] }""", true, """{ "<": [0, { "var": "d" }] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicLessThanOrEqual_ChargesString()
+    {
+        await AssertComparisonRule("""{ "<=": [1, 1] }""", true, """{ "<=": [0, { "var": "d" }] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicGreaterThan_ChargesString()
+    {
+        await AssertComparisonRule("""{ ">": [1, 0] }""", true, """{ ">": [{ "var": "d" }, 0] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicGreaterThanOrEqual_ChargesString()
+    {
+        await AssertComparisonRule("""{ ">=": [1, 1] }""", true, """{ ">=": [{ "var": "d" }, 0] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicAdd_ChargesString()
+    {
+        await AssertNumericRule("""{ "+": [1, 2] }""", 3, """{ "+": [{ "var": "d" }] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicSubtract_ChargesString()
+    {
+        await AssertNumericRule("""{ "-": [5, 2] }""", 3, """{ "-": [{ "var": "d" }, 1] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicMultiply_ChargesString()
+    {
+        await AssertNumericRule("""{ "*": [3, 4] }""", 12, """{ "*": [{ "var": "d" }, 1] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicDivide_ChargesString()
+    {
+        await AssertNumericRule("""{ "/": [6, 2] }""", 3, """{ "/": [{ "var": "d" }, 1] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicModulo_ChargesString()
+    {
+        await AssertNumericRule("""{ "%": [5, 2] }""", 1, """{ "%": [{ "var": "d" }, 1] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicMin_ChargesString()
+    {
+        await AssertNumericRule("""{ "min": [1, 3] }""", 1, """{ "min": [{ "var": "d" }, 1] }""");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicMax_ChargesString()
+    {
+        await AssertNumericRule("""{ "max": [1, 3] }""", 3, """{ "max": [{ "var": "d" }, 1] }""");
+    }
+
+    [Fact]
     public async Task Resolve_OrdinaryDocument_BindsStringsInPropertiesAndArrayItems()
     {
         var content = Parse("""
@@ -1506,6 +1774,34 @@ public class ConfigurationBindingResolverTests
         content["tags"]![0]!.Value<string>().Should().Be("resolved:@tag");
         content["tags"]![1]!.Value<string>().Should().Be("plain");
         content["count"]!.Value<int>().Should().Be(1);
+    }
+
+    private async Task AssertComparisonRule(string sample, bool expected, string overCap)
+    {
+        var rendered = Envelope("jlogic", Parse(sample));
+        await _resolver.ResolveAsync(rendered, includeSecrets: true, _scope);
+        rendered["value"]!.Value<bool>().Should().Be(expected);
+
+        var content = Envelope(
+            "jlogic",
+            Parse(overCap),
+            new JObject { ["d"] = DigitsPastStepLimit() });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+    }
+
+    private async Task AssertNumericRule(string sample, decimal expected, string overCap)
+    {
+        var rendered = Envelope("jlogic", Parse(sample));
+        await _resolver.ResolveAsync(rendered, includeSecrets: true, _scope);
+        rendered["value"]!.Value<decimal>().Should().Be(expected);
+
+        var content = Envelope(
+            "jlogic",
+            Parse(overCap),
+            new JObject { ["d"] = DigitsPastStepLimit() });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
     }
 
     private async Task AssertStringBuiltin(string sample, string expected, string overCap)
@@ -1525,6 +1821,11 @@ public class ConfigurationBindingResolverTests
     private static string TextPastStepLimit()
     {
         return new string('a', ConfigurationBindingResolver.MaxEvaluationSteps + 1);
+    }
+
+    private static string DigitsPastStepLimit()
+    {
+        return new string('0', ConfigurationBindingResolver.MaxEvaluationSteps + 1);
     }
 
     private static JArray NumberArray(int count)

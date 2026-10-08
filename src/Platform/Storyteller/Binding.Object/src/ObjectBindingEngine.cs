@@ -93,6 +93,11 @@ internal static class ObjectBindingEngine
         contextNode["range"] = JsonFunction.Create(JsonELimits.Range);
         contextNode["join"] = JsonFunction.Create((arguments, _) => JsonELimits.Join(arguments, sizeBudget));
         contextNode["split"] = JsonFunction.Create((arguments, _) => JsonELimits.Split(arguments, sizeBudget));
+        contextNode["len"] = JsonFunction.Create((arguments, _) => JsonELimits.Len(arguments, sizeBudget));
+        contextNode[JsonEExpressionRewriter.IndexFunction] = JsonFunction.Create(
+            (arguments, _) => JsonELimits.Index(arguments, sizeBudget));
+        contextNode[JsonEExpressionRewriter.SliceFunction] = JsonFunction.Create(
+            (arguments, _) => JsonELimits.Slice(arguments, sizeBudget));
         contextNode["lowercase"] = JsonFunction.Create((arguments, _) => JsonELimits.Lowercase(arguments, sizeBudget));
         contextNode["uppercase"] = JsonFunction.Create((arguments, _) => JsonELimits.Uppercase(arguments, sizeBudget));
         contextNode["strip"] = JsonFunction.Create((arguments, _) => JsonELimits.Strip(arguments, sizeBudget));

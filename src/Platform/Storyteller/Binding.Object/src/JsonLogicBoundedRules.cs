@@ -7,8 +7,9 @@ using Json.More;
 namespace _42.Platform.Storyteller.Binding.Object;
 
 /// <summary>
-/// Replaces the model-less JSON Logic handlers that can grow a result without a library limit.
-/// Size is checked while the result is built. The original handler is not called first.
+/// Replaces the model-less JSON Logic handlers that can grow a result or scan a value without a library limit.
+/// Growth rules check the size while the result is built and do not call the original handler.
+/// Comparison and arithmetic rules charge the scan, then use the library comparison.
 /// </summary>
 internal static class JsonLogicBoundedRules
 {
@@ -34,6 +35,26 @@ internal static class JsonLogicBoundedRules
         RuleRegistry.AddRule("in", new In());
         RuleRegistry.AddRule("==", new LooseEquals());
         RuleRegistry.AddRule("!=", new LooseNotEquals());
+        AddLibraryRule("===", strict: true, invert: false);
+        AddLibraryRule("!==", strict: true, invert: true);
+        AddLibraryRule("<", strict: false, invert: false);
+        AddLibraryRule("<=", strict: false, invert: false);
+        AddLibraryRule(">", strict: false, invert: false);
+        AddLibraryRule(">=", strict: false, invert: false);
+        AddLibraryRule("+", strict: false, invert: false);
+        AddLibraryRule("-", strict: false, invert: false);
+        AddLibraryRule("*", strict: false, invert: false);
+        AddLibraryRule("/", strict: false, invert: false);
+        AddLibraryRule("%", strict: false, invert: false);
+        AddLibraryRule("min", strict: false, invert: false);
+        AddLibraryRule("max", strict: false, invert: false);
+    }
+
+    private static void AddLibraryRule(string name, bool strict, bool invert)
+    {
+        var inner = RuleRegistry.GetHandler(name)
+            ?? throw new InvalidOperationException($"JSON Logic has no '{name}' rule.");
+        RuleRegistry.AddRule(name, new Metered(inner, strict, invert));
     }
 
     private static void CountIteration()
@@ -469,6 +490,99 @@ internal static class JsonLogicBoundedRules
             }
 
             return !left.LooseEquals(right);
+        }
+    }
+
+    private sealed class Metered : IRule
+    {
+        private readonly IRule _inner;
+        private readonly bool _strict;
+        private readonly bool _invert;
+
+        public Metered(IRule inner, bool strict, bool invert)
+        {
+            _inner = inner;
+            _strict = strict;
+            _invert = invert;
+        }
+
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            if (_strict)
+            {
+                if (args is not JsonArray { Count: 2 } pair)
+                {
+                    return _inner.Apply(args, context);
+                }
+
+                var left = JsonLogic.Apply(pair[0], context);
+                var right = JsonLogic.Apply(pair[1], context);
+                ChargeStrict(left, right);
+                var same = left.IsEquivalentTo(right);
+                return _invert ? !same : same;
+            }
+
+            if (args is not JsonArray array)
+            {
+                var single = JsonLogic.Apply(args, context);
+                ChargeOperand(single);
+                return _inner.Apply(CopyValue(single), context);
+            }
+
+            var evaluated = new JsonNode?[array.Count];
+            for (var index = 0; index < array.Count; index++)
+            {
+                evaluated[index] = JsonLogic.Apply(array[index], context);
+                ChargeOperand(evaluated[index]);
+            }
+
+            var copy = new JsonArray();
+            foreach (var value in evaluated)
+            {
+                copy.Add(CopyValue(value));
+            }
+
+            return _inner.Apply(copy, context);
+        }
+
+        private static void ChargeStrict(JsonNode? left, JsonNode? right)
+        {
+            if (left is JsonArray or JsonObject || right is JsonArray or JsonObject)
+            {
+                ChargeStructure(left);
+                ChargeStructure(right);
+                return;
+            }
+
+            if (left is JsonValue leftValue && leftValue.TryGetValue(out string? leftText) &&
+                right is JsonValue rightValue && rightValue.TryGetValue(out string? rightText))
+            {
+                Charge(leftText?.Length ?? 0);
+                Charge(rightText?.Length ?? 0);
+            }
+        }
+
+        private static void ChargeOperand(JsonNode? node)
+        {
+            if (node is JsonValue value && value.TryGetValue(out string? text))
+            {
+                Charge(text?.Length ?? 0);
+            }
+        }
+
+        private static JsonNode? CopyValue(JsonNode? node)
+        {
+            if (node is null)
+            {
+                return null;
+            }
+
+            if (node is JsonValue value && value.TryGetValue(out string? text))
+            {
+                return text;
+            }
+
+            return node.DeepClone();
         }
     }
 }
