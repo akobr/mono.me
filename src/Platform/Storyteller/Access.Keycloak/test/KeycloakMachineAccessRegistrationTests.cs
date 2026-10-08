@@ -46,6 +46,31 @@ public class KeycloakMachineAccessRegistrationTests
         exception.Message.ShouldContain("Keycloak:AdminClientSecret");
     }
 
+    [Theory]
+    [InlineData("http://keycloak.example", false)]
+    [InlineData("http://localhost:8080", true)]
+    [InlineData("https://127.0.0.1:8443", true)]
+    public void ServerUrl_RequiresHttpsExceptOnLoopback(string serverUrl, bool allowed)
+    {
+        var result = new KeycloakOptionsValidator().Validate(null, new KeycloakOptions
+        {
+            ServerUrl = serverUrl,
+            Realm = "storyteller",
+            Audience = "storyteller-api",
+            AdminClientSecret = "admin-secret",
+        });
+
+        if (allowed)
+        {
+            result.Succeeded.ShouldBeTrue();
+        }
+        else
+        {
+            result.Failed.ShouldBeTrue();
+            result.FailureMessage.ShouldContain("HTTPS");
+        }
+    }
+
     [Fact]
     public void AddKeycloakMachineAccess_AfterAnotherMachineProvider_Throws()
     {

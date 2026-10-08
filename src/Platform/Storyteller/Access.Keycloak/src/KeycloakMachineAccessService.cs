@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller;
@@ -11,7 +12,10 @@ namespace _42.Platform.Storyteller;
 // Machine access as Keycloak confidential clients with a service account. MachineAccess.Id is the
 // clientId (the token azp), ObjectId the client's internal ID. Two protocol mappers make the tokens
 // self-describing: the API audience and the machine's Storyteller scopes (storyteller_scope).
-public class KeycloakMachineAccessService(IHttpClientFactory httpClientFactory, IOptions<KeycloakOptions> options)
+public class KeycloakMachineAccessService(
+    IHttpClientFactory httpClientFactory,
+    IOptions<KeycloakOptions> options,
+    ILogger<KeycloakMachineAccessService> logger)
     : IIdentityProviderMachineAccessService
 {
     public const string ScopeClaimType = "storyteller_scope";
@@ -54,7 +58,16 @@ public class KeycloakMachineAccessService(IHttpClientFactory httpClientFactory, 
         catch
         {
             // Compensation: a client without a secret the caller ever saw is useless.
-            await client.DeleteAsync(AdminUrl($"clients/{internalId}"));
+            // A failed delete must not replace the secret failure.
+            try
+            {
+                await client.DeleteAsync(AdminUrl($"clients/{internalId}"));
+            }
+            catch (Exception compensationException)
+            {
+                logger.LogError(compensationException, "Failed to delete the Keycloak client {ClientId} after its secret could not be read", internalId);
+            }
+
             throw;
         }
     }

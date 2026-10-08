@@ -24,27 +24,27 @@ internal sealed class SerialOpenApiTriggerFunction : IOpenApiTriggerFunction
 
     public Task<HttpResponseData> RenderSwaggerDocument(HttpRequestData req, string extension, FunctionContext ctx)
     {
-        return Run(() => _inner.RenderSwaggerDocument(req, extension, ctx));
+        return Run(ctx, () => _inner.RenderSwaggerDocument(req, extension, ctx));
     }
 
     public Task<HttpResponseData> RenderOpenApiDocument(HttpRequestData req, string version, string extension, FunctionContext ctx)
     {
-        return Run(() => _inner.RenderOpenApiDocument(req, version, extension, ctx));
+        return Run(ctx, () => _inner.RenderOpenApiDocument(req, version, extension, ctx));
     }
 
     public Task<HttpResponseData> RenderSwaggerUI(HttpRequestData req, FunctionContext ctx)
     {
-        return Run(() => _inner.RenderSwaggerUI(req, ctx));
+        return Run(ctx, () => _inner.RenderSwaggerUI(req, ctx));
     }
 
     public Task<HttpResponseData> RenderOAuth2Redirect(HttpRequestData req, FunctionContext ctx)
     {
-        return Run(() => _inner.RenderOAuth2Redirect(req, ctx));
+        return Run(ctx, () => _inner.RenderOAuth2Redirect(req, ctx));
     }
 
-    private async Task<HttpResponseData> Run(Func<Task<HttpResponseData>> render)
+    private async Task<HttpResponseData> Run(FunctionContext context, Func<Task<HttpResponseData>> render)
     {
-        await _gate.WaitAsync();
+        await _gate.WaitAsync(context.CancellationToken);
         try
         {
             return await render();
