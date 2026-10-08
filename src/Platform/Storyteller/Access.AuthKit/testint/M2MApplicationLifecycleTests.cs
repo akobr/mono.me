@@ -64,7 +64,7 @@ public class M2MApplicationLifecycleTests
             var token = await RequestTokenAsync(http, settings.AuthKitDomain, access.Id, access.AccessKey);
             token.ShouldNotBeNull();
 
-            var validator = new AuthKitBearerTokenValidator(options, new AuthKitClaimNormalizer(options), new TestHostEnvironment());
+            var validator = new AuthKitMachineTokenValidator(options, new AuthKitClaimNormalizer(options));
             var result = await validator.ValidateAsync(token);
 
             result.ShouldNotBeNull("The M2M token was rejected; check its iss, aud and org_id.");

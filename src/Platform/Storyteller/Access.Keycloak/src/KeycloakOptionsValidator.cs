@@ -8,9 +8,13 @@ public sealed class KeycloakOptionsValidator : IValidateOptions<KeycloakOptions>
     {
         var failures = new List<string>();
 
-        if (!Uri.TryCreate(options.ServerUrl, UriKind.Absolute, out _))
+        if (!Uri.TryCreate(options.ServerUrl, UriKind.Absolute, out var server))
         {
             failures.Add("Keycloak:ServerUrl must be an absolute URL.");
+        }
+        else if (!string.Equals(server.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) && !server.IsLoopback)
+        {
+            failures.Add("Keycloak:ServerUrl must use HTTPS.");
         }
 
         if (string.IsNullOrWhiteSpace(options.Realm))

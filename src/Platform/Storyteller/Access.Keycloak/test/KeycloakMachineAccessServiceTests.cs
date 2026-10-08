@@ -3,6 +3,7 @@ using System.Text.Json;
 
 using _42.Platform.Storyteller.Accessing.Model;
 
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller.Access.Keycloak.UnitTests;
@@ -83,6 +84,26 @@ public class KeycloakMachineAccessServiceTests
     }
 
     [Fact]
+    public async Task Create_SecretFails_KeepsThatFailureWhenCleanupFails()
+    {
+        _keycloak.WithAdminToken()
+            .On(HttpMethod.Post, ClientsPath, HttpStatusCode.Created, location: new Uri($"https://keycloak.example{ClientsPath}/{InternalId}"))
+            .On(HttpMethod.Get, $"{ClientsPath}/{InternalId}/client-secret", HttpStatusCode.InternalServerError)
+            .OnThrow(HttpMethod.Delete, $"{ClientsPath}/{InternalId}", new HttpRequestException("cleanup failed"));
+
+        var exception = await Should.ThrowAsync<HttpRequestException>(() => CreateService().CreateMachineAccessAsync(new MachineAccessCreate
+        {
+            Organization = "org1",
+            Project = "proj1",
+            Scope = MachineAccessScope.DefaultRead,
+        }));
+
+        exception.Message.ShouldContain("500");
+        exception.Message.ShouldNotContain("cleanup failed");
+        _keycloak.Requests.Last().Method.ShouldBe(HttpMethod.Delete);
+    }
+
+    [Fact]
     public async Task Reset_RegeneratesTheSecretOfTheStoredClient()
     {
         _keycloak.WithAdminToken()
@@ -144,6 +165,6 @@ public class KeycloakMachineAccessServiceTests
             Audience = "storyteller-api",
         };
         configure?.Invoke(options);
-        return new KeycloakMachineAccessService(_keycloak, Options.Create(options));
+        return new KeycloakMachineAccessService(_keycloak, Options.Create(options), NullLogger<KeycloakMachineAccessService>.Instance);
     }
 }

@@ -21,6 +21,12 @@ internal sealed class KeycloakStub : HttpMessageHandler, IHttpClientFactory
         return this;
     }
 
+    public KeycloakStub OnThrow(HttpMethod method, string path, Exception exception)
+    {
+        _routes[$"{method} {path}"] = () => throw exception;
+        return this;
+    }
+
     public KeycloakStub WithAdminToken()
     {
         return On(HttpMethod.Post, "/realms/master/protocol/openid-connect/token", HttpStatusCode.OK, """{"access_token":"admin-token"}""");

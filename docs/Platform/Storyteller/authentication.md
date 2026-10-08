@@ -323,7 +323,7 @@ When the Cosmos write after a successful create fails, Storyteller asks WorkOS t
 
 `GET v1/{organization}/{project}/access/machines` runs `SELECT *` on `{project}.access` and returns the whole list in one response. `sform machine` does the same. A project that holds a large share of a few hundred thousand machines exhausts the function memory and the response. The query has no page size and no continuation token.
 
-`GET v1/{organization}/{project}/access/machines/{id}` point-reads the partition `project`. The document is stored in `{project}.access`, so the read misses and the endpoint returns 404. Reset and delete use `{project}.access` and find the document.
+`GET v1/{organization}/{project}/access/machines/{id}` point-reads `{project}.access`, the same partition reset and delete use.
 
 `MachineIds` accepts a GUID, a WorkOS `client_…` id, or a Keycloak client id `42.sform.{organization}.{project}.{32 hex}`. An Entra appId is a GUID, so it passes. Organization and project in the Keycloak id are one segment each (`A-Za-z0-9_-`).
 

@@ -28,4 +28,8 @@ internal sealed class TestFunctionContext : FunctionContext
     public override IDictionary<object, object> Items { get; set; }
 
     public override IInvocationFeatures Features { get; }
+
+    public override CancellationToken CancellationToken => Token;
+
+    public CancellationToken Token { get; set; }
 }

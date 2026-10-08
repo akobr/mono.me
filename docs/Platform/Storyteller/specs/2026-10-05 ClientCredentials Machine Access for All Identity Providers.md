@@ -53,7 +53,7 @@ Each of `AddAuthKitMachineAccess`, `AddAzureAdMachineAccess` and `AddKeycloakMac
 
 ### 3. Token endpoint in `MachineAccess`
 
-Add `TokenEndpoint` and `TokenScope` (both `string?`) to `MachineAccess` / `IMachineAccess`, and by hand to the NSwag SDK model. They are filled on create (and reset) by identity provider services, and not stored in Cosmos. `sform machine create` prints them and builds the `curl` example from them. It falls back to the discovered AuthKit domain only when they are absent.
+Add `TokenEndpoint` and `TokenScope` (both `string?`) to `MachineAccess` / `IMachineAccess`, and by hand to the NSwag SDK model. Identity provider services fill them on create. They are not stored in Cosmos, so get, list, and reset omit them. Reset returns the machine with the regenerated secret only. `sform machine create` prints them and builds the `curl` example from them. It falls back to the discovered AuthKit domain only when they are absent.
 
 | Provider | `TokenEndpoint` | `TokenScope` |
 |---|---|---|

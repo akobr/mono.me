@@ -354,7 +354,7 @@ public class CosmosAccessService : IAccessService
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var machineAccess = await repository.Container.TryReadItemAsync(
             id,
-            new PartitionKey(project),
+            new PartitionKey($"{project}.access"),
             stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
         return machineAccess is not null
             ? machineAccess.ToMachineAccess()
