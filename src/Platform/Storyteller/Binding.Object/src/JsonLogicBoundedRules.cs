@@ -31,11 +31,58 @@ internal static class JsonLogicBoundedRules
         RuleRegistry.AddRule("some", new Some());
         RuleRegistry.AddRule("none", new None());
         RuleRegistry.AddRule("filter", new Filter());
+        RuleRegistry.AddRule("in", new In());
+        RuleRegistry.AddRule("==", new LooseEquals());
+        RuleRegistry.AddRule("!=", new LooseNotEquals());
     }
 
     private static void CountIteration()
     {
         (_read ?? throw new BindingEvaluationException("JSON Logic evaluation has no step budget.")).AddStep();
+    }
+
+    private static void Charge(int count)
+    {
+        (_read ?? throw new BindingEvaluationException("JSON Logic evaluation has no step budget.")).AddSteps(count);
+    }
+
+    private static void ChargeStructure(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonArray array:
+                Charge(array.Count);
+                foreach (var item in array)
+                {
+                    ChargeStructure(item);
+                }
+
+                break;
+            case JsonObject obj:
+                Charge(obj.Count);
+                foreach (var property in obj)
+                {
+                    ChargeStructure(property.Value);
+                }
+
+                break;
+            case JsonValue value when value.TryGetValue(out string? text):
+                Charge(text?.Length ?? 0);
+                break;
+        }
+    }
+
+    private static string Describe(JsonNode? node)
+    {
+        return node switch
+        {
+            null => "null",
+            JsonObject => "object",
+            JsonArray => "array",
+            JsonValue value when value.TryGetValue(out string? _) => "string",
+            JsonValue value when value.TryGetValue(out bool _) => "boolean",
+            _ => "number",
+        };
     }
 
     private static bool ApplyElement(JsonNode? rule, JsonNode? element, EvaluationContext context)
@@ -323,6 +370,105 @@ internal static class JsonLogicBoundedRules
             }
 
             return result;
+        }
+    }
+
+    private sealed class In : IRule
+    {
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            if (args is not JsonArray { Count: 2 } array)
+            {
+                throw new JsonLogicException("The 'in' rule requires an array with 2 parameters");
+            }
+
+            var test = JsonLogic.Apply(array[0], context);
+            var source = JsonLogic.Apply(array[1], context);
+            if (source is JsonValue value && value.TryGetValue(out string? stringSource))
+            {
+                var stringTest = test.Stringify();
+                if (stringTest == null)
+                {
+                    throw new JsonLogicException($"Cannot check string for {Describe(test)}.");
+                }
+
+                if (string.IsNullOrEmpty(stringTest))
+                {
+                    return false;
+                }
+
+                var haystack = stringSource ?? string.Empty;
+                Charge(haystack.Length);
+                return haystack.Contains(stringTest);
+            }
+
+            if (source is JsonArray arr)
+            {
+                ChargeStructure(arr);
+                foreach (var item in arr)
+                {
+                    if (item is null || test is null)
+                    {
+                        if (item is null && test is null)
+                        {
+                            return true;
+                        }
+
+                        continue;
+                    }
+
+                    if (item.IsEquivalentTo(test))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            return false;
+        }
+    }
+
+    private sealed class LooseEquals : IRule
+    {
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            if (args is not JsonArray { Count: 2 } array)
+            {
+                throw new JsonLogicException("The '==' rule needs an array with 2 parameters");
+            }
+
+            var left = JsonLogic.Apply(array[0], context);
+            var right = JsonLogic.Apply(array[1], context);
+            if (left is JsonArray || right is JsonArray)
+            {
+                ChargeStructure(left);
+                ChargeStructure(right);
+            }
+
+            return left.LooseEquals(right);
+        }
+    }
+
+    private sealed class LooseNotEquals : IRule
+    {
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            if (args is not JsonArray { Count: 2 } array)
+            {
+                throw new JsonLogicException("The '!=' rule needs an array with 2 parameters");
+            }
+
+            var left = JsonLogic.Apply(array[0], context);
+            var right = JsonLogic.Apply(array[1], context);
+            if (left is JsonArray || right is JsonArray)
+            {
+                ChargeStructure(left);
+                ChargeStructure(right);
+            }
+
+            return !left.LooseEquals(right);
         }
     }
 }

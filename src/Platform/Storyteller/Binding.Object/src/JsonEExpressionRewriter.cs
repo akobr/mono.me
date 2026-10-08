@@ -3,9 +3,10 @@ using System.Text;
 namespace _42.Platform.Storyteller.Binding.Object;
 
 /// <summary>
-/// Rewrites JSON-e <c>+</c> through a length-checked function, and rewrites each <c>${...}</c> hole
-/// through the value-size budget. Surrounding text stays in place for JSON-e to interpolate.
-/// An expression that contains <c>+</c> and cannot be rewritten is rejected.
+/// Rewrites JSON-e <c>+</c>, <c>in</c>, <c>==</c>, and <c>!=</c> through checked functions,
+/// and rewrites each <c>${...}</c> hole through the value-size budget.
+/// Surrounding text stays in place for JSON-e to interpolate.
+/// An expression that contains one of those operators and cannot be rewritten is rejected.
 /// </summary>
 internal static class JsonEExpressionRewriter
 {
@@ -17,9 +18,13 @@ internal static class JsonEExpressionRewriter
 
     public const string StepFunction = "storytellerStep";
 
+    public const string InFunction = "storytellerIn";
+
+    public const string EqualsFunction = "storytellerEquals";
+
     public static string RewritePlus(string expression)
     {
-        if (!ContainsPlus(expression))
+        if (!ContainsBoundedOperator(expression))
         {
             return expression;
         }
@@ -92,7 +97,7 @@ internal static class JsonEExpressionRewriter
         return TryRewriteInterpolation(name, out rewritten);
     }
 
-    private static bool ContainsPlus(string expression)
+    private static bool ContainsBoundedOperator(string expression)
     {
         char? quote = null;
         for (var index = 0; index < expression.Length; index++)
@@ -124,9 +129,30 @@ internal static class JsonEExpressionRewriter
             {
                 return true;
             }
+
+            if (index + 1 < expression.Length &&
+                ((current == '=' && expression[index + 1] == '=') ||
+                 (current == '!' && expression[index + 1] == '=')))
+            {
+                return true;
+            }
+
+            if (current == 'i' &&
+                index + 1 < expression.Length &&
+                expression[index + 1] == 'n' &&
+                (index == 0 || !IsWordChar(expression[index - 1])) &&
+                (index + 2 >= expression.Length || !IsWordChar(expression[index + 2])))
+            {
+                return true;
+            }
         }
 
         return false;
+    }
+
+    private static bool IsWordChar(char value)
+    {
+        return value is '_' || char.IsLetterOrDigit(value);
     }
 
     private static bool ContainsInterpolation(string text)
@@ -238,9 +264,26 @@ internal static class JsonEExpressionRewriter
 
                 var nextMin = op == "**" ? precedence : precedence + 1;
                 var right = ParseExpression(nextMin);
-                left = op == "+"
-                    ? $"{AddFunction}({left},{right})"
-                    : left + op + right;
+                if (op == "+")
+                {
+                    left = $"{AddFunction}({left},{right})";
+                }
+                else if (op == "in")
+                {
+                    left = $"{InFunction}({left},{right})";
+                }
+                else if (op == "==")
+                {
+                    left = $"{EqualsFunction}({left},{right})";
+                }
+                else if (op == "!=")
+                {
+                    left = $"!{EqualsFunction}({left},{right})";
+                }
+                else
+                {
+                    left = left + op + right;
+                }
             }
 
             return left;
@@ -601,7 +644,7 @@ internal static class JsonEExpressionRewriter
                 rest[1] == 'n' &&
                 (rest.Length == 2 || !IsIdentChar(rest[2])))
             {
-                text = " in ";
+                text = "in";
                 precedence = 4;
                 _index += 2;
                 return true;

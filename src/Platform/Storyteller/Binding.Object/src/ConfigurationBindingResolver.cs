@@ -268,11 +268,23 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
 
         public void AddStep()
         {
-            if (++Steps > MaxEvaluationSteps)
+            AddSteps(1);
+        }
+
+        public void AddSteps(int count)
+        {
+            if (count <= 0)
+            {
+                return;
+            }
+
+            if ((long)Steps + count > MaxEvaluationSteps)
             {
                 throw new BindingEvaluationException(
                     $"Evaluation exceeds {MaxEvaluationSteps} steps.");
             }
+
+            Steps += count;
         }
     }
 }

@@ -92,7 +92,17 @@ internal static class ObjectBindingEngine
         var sizeBudget = new JsonESizeBudget(budget);
         contextNode["range"] = JsonFunction.Create(JsonELimits.Range);
         contextNode["join"] = JsonFunction.Create((arguments, _) => JsonELimits.Join(arguments, sizeBudget));
+        contextNode["split"] = JsonFunction.Create((arguments, _) => JsonELimits.Split(arguments, sizeBudget));
+        contextNode["lowercase"] = JsonFunction.Create((arguments, _) => JsonELimits.Lowercase(arguments, sizeBudget));
+        contextNode["uppercase"] = JsonFunction.Create((arguments, _) => JsonELimits.Uppercase(arguments, sizeBudget));
+        contextNode["strip"] = JsonFunction.Create((arguments, _) => JsonELimits.Strip(arguments, sizeBudget));
+        contextNode["lstrip"] = JsonFunction.Create((arguments, _) => JsonELimits.LStrip(arguments, sizeBudget));
+        contextNode["rstrip"] = JsonFunction.Create((arguments, _) => JsonELimits.RStrip(arguments, sizeBudget));
         contextNode[JsonEExpressionRewriter.AddFunction] = JsonFunction.Create(JsonELimits.Add);
+        contextNode[JsonEExpressionRewriter.InFunction] = JsonFunction.Create(
+            (arguments, _) => JsonELimits.In(arguments, sizeBudget));
+        contextNode[JsonEExpressionRewriter.EqualsFunction] = JsonFunction.Create(
+            (arguments, _) => JsonELimits.Equals(arguments, sizeBudget));
         contextNode[JsonEExpressionRewriter.ConcatFunction] = JsonFunction.Create(JsonELimits.Concat);
         contextNode[JsonEExpressionRewriter.BoundFunction] = JsonFunction.Create(
             (arguments, _) => JsonELimits.Bound(arguments, sizeBudget));
