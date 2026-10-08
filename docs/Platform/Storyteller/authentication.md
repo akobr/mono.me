@@ -325,7 +325,7 @@ When the Cosmos write after a successful create fails, Storyteller asks WorkOS t
 
 `GET v1/{organization}/{project}/access/machines/{id}` point-reads the partition `project`. The document is stored in `{project}.access`, so the read misses and the endpoint returns 404. Reset and delete use `{project}.access` and find the document.
 
-`MachineIds` accepts a GUID or a WorkOS `client_…` id. An Entra appId is a GUID, so it passes. A Keycloak client id (`42.sform.…`) fails the check, and get, reset and delete answer 400 before they touch Cosmos. Create still succeeds.
+`MachineIds` accepts a GUID, a WorkOS `client_…` id, or a Keycloak client id `42.sform.{organization}.{project}.{32 hex}`. An Entra appId is a GUID, so it passes. Organization and project in the Keycloak id are one segment each (`A-Za-z0-9_-`).
 
 ### The other kinds at the same size
 
@@ -335,7 +335,7 @@ When the Cosmos write after a successful create fails, Storyteller asks WorkOS t
 
 `CertificateAndApiKey` does both. The API-key half is durable in Cosmos. The certificate half is the in-memory store, so the pair fails on any instance that did not issue the certificate.
 
-Entra ID and Keycloak `ClientCredentials` follow the same Storyteller shape as AuthKit: one external object per machine, a JWT checked locally, and the Cosmos document as the allow list. Entra provisioning is Microsoft Graph (application, service principal, and app-role assignment) in one tenant, so the tenant's directory-object quota and Graph throttling are the figures to confirm before a large rollout. Keycloak provisioning is the admin API of one realm; how many clients that realm can hold is a property of that Keycloak deployment. Its client id is also rejected by `MachineIds`, as described above.
+Entra ID and Keycloak `ClientCredentials` follow the same Storyteller shape as AuthKit: one external object per machine, a JWT checked locally, and the Cosmos document as the allow list. Entra provisioning is Microsoft Graph (application, service principal, and app-role assignment) in one tenant, so the tenant's directory-object quota and Graph throttling are the figures to confirm before a large rollout. Keycloak provisioning is the admin API of one realm; how many clients that realm can hold is a property of that Keycloak deployment.
 
 ## Switching an existing deployment
 
