@@ -179,17 +179,24 @@ internal static class JsonELimits
         switch (token)
         {
             case JObject obj:
+                var isSort = obj.ContainsKey("$sort");
+                var isFind = obj.ContainsKey("$find");
                 foreach (var property in obj.Properties())
                 {
-                    if (property.Name == "$eval" && property.Value.Type == JTokenType.String)
+                    if (property.Name is "$switch" or "$match" && property.Value is JObject cases)
                     {
-                        property.Value = JsonEExpressionRewriter.RewritePlus(property.Value.Value<string>() ?? string.Empty);
-                        continue;
+                        RewriteCaseKeys(cases);
                     }
 
                     if (property.Value.Type == JTokenType.String)
                     {
                         var text = property.Value.Value<string>() ?? string.Empty;
+                        if (IsExpressionSlot(property.Name, isSort, isFind))
+                        {
+                            property.Value = JsonEExpressionRewriter.RewritePlus(text);
+                            continue;
+                        }
+
                         if (JsonEExpressionRewriter.TryRewriteInterpolation(text, out var expression))
                         {
                             property.Value = new JObject { ["$eval"] = expression };
@@ -226,6 +233,50 @@ internal static class JsonELimits
                 }
 
                 break;
+        }
+    }
+
+    private static bool IsExpressionSlot(string name, bool isSort, bool isFind)
+    {
+        if (name is "$eval" or "$if")
+        {
+            return true;
+        }
+
+        if (isSort && IsNamedClause(name, "by"))
+        {
+            return true;
+        }
+
+        return isFind && IsNamedClause(name, "each");
+    }
+
+    private static bool IsNamedClause(string name, string keyword)
+    {
+        return name.StartsWith(keyword + "(", StringComparison.Ordinal) && name.EndsWith(')');
+    }
+
+    private static void RewriteCaseKeys(JObject cases)
+    {
+        var rebuilt = new JObject();
+        foreach (var property in cases.Properties().ToList())
+        {
+            var name = property.Name == "$default"
+                ? property.Name
+                : JsonEExpressionRewriter.RewritePlus(property.Name);
+            if (rebuilt.Property(name) is not null)
+            {
+                throw new BindingEvaluationException("JSON-e expression could not be bounded.");
+            }
+
+            rebuilt.Add(name, property.Value.DeepClone());
+        }
+
+        cases.RemoveAll();
+        foreach (var property in rebuilt.Properties().ToList())
+        {
+            property.Remove();
+            cases.Add(property);
         }
     }
 
