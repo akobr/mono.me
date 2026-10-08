@@ -16,6 +16,7 @@ internal static class JsonLogicBoundedRules
         RuleRegistry.AddRule("cat", new Cat());
         RuleRegistry.AddRule("merge", new Merge());
         RuleRegistry.AddRule("reduce", new Reduce());
+        RuleRegistry.AddRule("map", new Map());
     }
 
     private sealed class Cat : IRule
@@ -128,6 +129,52 @@ internal static class JsonLogicBoundedRules
             }
 
             return accumulator;
+        }
+    }
+
+    private sealed class Map : IRule
+    {
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            if (args is not JsonArray { Count: 2 } array)
+            {
+                throw new JsonLogicException("The 'map' rule requires an array with two arguments");
+            }
+
+            var input = JsonLogic.Apply(array[0], context);
+            var rule = array[1];
+            if (input is not JsonArray items)
+            {
+                return new JsonArray();
+            }
+
+            var result = new JsonArray();
+            var used = 0;
+            foreach (var element in items)
+            {
+                context.Push(element);
+                JsonNode? mapped;
+                try
+                {
+                    mapped = JsonLogic.Apply(rule, context);
+                }
+                finally
+                {
+                    context.Pop();
+                }
+
+                var length = EvaluationSize.SerializedLength(mapped);
+                if ((long)used + length > ConfigurationBindingResolver.MaxConcatLength)
+                {
+                    throw new BindingEvaluationException(
+                        $"JSON Logic map exceeds {ConfigurationBindingResolver.MaxConcatLength} characters.");
+                }
+
+                used += length;
+                result.Add(mapped?.DeepClone());
+            }
+
+            return result;
         }
     }
 }

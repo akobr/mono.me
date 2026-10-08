@@ -210,6 +210,14 @@ internal static class JsonELimits
                     Rewrite(array[index]);
                 }
 
+                for (var index = 0; index < array.Count; index++)
+                {
+                    if (array[index] is JObject child && HasOperator(child))
+                    {
+                        array[index] = BoundWrap(child);
+                    }
+                }
+
                 break;
         }
     }
@@ -225,28 +233,48 @@ internal static class JsonELimits
 
         foreach (var name in names)
         {
-            var wrap = name == "$json" ||
-                (isMapping && name.StartsWith("each(", StringComparison.Ordinal) && name.EndsWith(')'));
-            if (!wrap || obj[name] is null)
+            if (obj[name] is not JToken value || !ShouldBound(name, value, isMapping))
             {
                 continue;
             }
 
-            obj[name] = BoundWrap(obj[name]!);
+            obj[name] = BoundWrap(value);
         }
+    }
+
+    private static bool ShouldBound(string name, JToken value, bool isMapping)
+    {
+        if (value is JObject child && HasOperator(child))
+        {
+            return true;
+        }
+
+        if (name == "$json")
+        {
+            return true;
+        }
+
+        return isMapping && name.StartsWith("each(", StringComparison.Ordinal) && name.EndsWith(')');
     }
 
     private static JObject BoundWrap(JToken body)
     {
+        // An array drops a delete marker, so $if without else still removes the value.
+        var held = new JArray();
+        held.Add(body.DeepClone());
         return new JObject
         {
             ["$let"] = new JObject
             {
-                ["v"] = body.DeepClone(),
+                ["v"] = held,
             },
             ["in"] = new JObject
             {
-                ["$eval"] = JsonEExpressionRewriter.BoundFunction + "(v)",
+                ["$if"] = "len(v) > 0",
+                ["then"] = new JObject
+                {
+                    ["$eval"] = JsonEExpressionRewriter.BoundFunction + "(v[0])",
+                },
             },
         };
     }
