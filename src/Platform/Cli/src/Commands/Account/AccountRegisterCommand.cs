@@ -1,8 +1,5 @@
-using System.Collections.Generic;
 using System.IO.Abstractions;
-using System.Linq;
 using System.Net;
-using System.Security.Claims;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
@@ -55,9 +52,9 @@ public class AccountRegisterCommand : BaseCommand
             // not registered - continue
         }
 
-        var auth = await _authentication.GetAuthenticationAsync();
+        var user = await _authentication.GetSignedInUserAsync();
 
-        if (auth is null)
+        if (user is null)
         {
             Console.WriteImportant(
                 "You are not logged in, please call ",
@@ -67,8 +64,7 @@ public class AccountRegisterCommand : BaseCommand
             return ExitCodes.WARNING_INTERACTION_NEEDED;
         }
 
-        var uniqueName = GetRequiredClaim(auth.ClaimsPrincipal.Claims.ToList(), "unique_name", "upn", "preferred_username");
-        var identifier = uniqueName ?? "live#john.doe@outlook.com";
+        var identifier = user.UserName;
 
         var organizationName = Console.Input(new InputOptions<string>
         {
@@ -101,20 +97,6 @@ public class AccountRegisterCommand : BaseCommand
             },
             _fileSystem);
         return ExitCodes.SUCCESS;
-    }
-
-    private static string? GetRequiredClaim(IReadOnlyCollection<Claim> claims, params string[] claimTypes)
-    {
-        foreach (var claimType in claimTypes)
-        {
-            var uniqueNameClaim = claims.FirstOrDefault(c => c.Type == claimType);
-            if (uniqueNameClaim is not null)
-            {
-                return uniqueNameClaim.Value;
-            }
-        }
-
-        return null;
     }
 
     private static string GetPossibleOrganizationName(string text)

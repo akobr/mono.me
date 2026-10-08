@@ -3,6 +3,7 @@ using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
+using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
 using McMaster.Extensions.CommandLineUtils;
@@ -56,6 +57,18 @@ public class Program
 
             Console.Write("! ", Color.Magenta);
             Console.WriteLine("You are not authorized to execute the command or you don't have access to requested resources.");
+            return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
+        }
+        catch (AuthenticationException exception)
+        {
+            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
+                exception,
+                "Sign-in failed ({reason}); Arguments: {args}",
+                exception.Reason,
+                args)));
+
+            Console.Write("! ", Color.Magenta);
+            Console.WriteLine(exception.Message);
             return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
         }
         catch (Exception exception)

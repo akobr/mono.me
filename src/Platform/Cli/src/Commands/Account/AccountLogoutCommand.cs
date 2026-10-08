@@ -26,10 +26,12 @@ public class AccountLogoutCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
-        var auth = await _authentication.GetAuthenticationAsync();
+        var user = await _authentication.GetSignedInUserAsync();
 
-        if (auth is null)
+        if (user is null)
         {
+            // Still clears an expired session and the discovered provider.
+            await _authentication.LogoutAsync();
             Console.WriteImportant("No account is logged in this CLI instance.");
             return ExitCodes.SUCCESS;
         }
@@ -37,14 +39,14 @@ public class AccountLogoutCommand : BaseCommand
         try
         {
             var account = await _accessApi.GetAccountAsync();
-            await _authentication.ClearAuthenticationAsync();
+            await _authentication.LogoutAsync();
             Console.WriteImportant(
                 "You have been logged out from account: ",
                 account.Name.ThemedHighlight(Console.Theme));
         }
         catch (ApiException e) when (e.StatusCode is (int)HttpStatusCode.NotFound)
         {
-            await _authentication.ClearAuthenticationAsync();
+            await _authentication.LogoutAsync();
             Console.WriteImportant("You have been logged out.");
         }
 

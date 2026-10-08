@@ -22,18 +22,21 @@ public class AccessHttp
     private readonly IAccessService _accessService;
     private readonly ICertificateAuthorityProvider? _caProvider;
     private readonly IMachineAuthenticationPolicyStore? _policyStore;
+    private readonly IUserProfileResolver? _profileResolver;
     private readonly ILogger<AccessHttp> _logger;
 
     public AccessHttp(
         IAccessService accessService,
         ILogger<AccessHttp> logger,
         ICertificateAuthorityProvider? caProvider = null,
-        IMachineAuthenticationPolicyStore? policyStore = null)
+        IMachineAuthenticationPolicyStore? policyStore = null,
+        IUserProfileResolver? profileResolver = null)
     {
         _accessService = accessService;
         _logger = logger;
         _caProvider = caProvider;
         _policyStore = policyStore;
+        _profileResolver = profileResolver;
     }
 
     [Function(nameof(GetAccount))]
@@ -82,8 +85,7 @@ public class AccessHttp
             return new BadRequestResult();
         }
 
-        var userName = request.GetIdentityUniqueName();
-        var name = request.GetIdentityName();
+        var (userName, name) = await request.GetIdentityProfileAsync(_profileResolver);
         var internalAccountModel = new AccountCreate
         {
             IdentityId = accountId,
