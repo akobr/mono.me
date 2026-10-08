@@ -91,6 +91,20 @@ public sealed class AuthenticationConfigurationResolverTests : IDisposable
     }
 
     [Fact]
+    public async Task CacheWriteFailure_StillReturnsTheDiscoveredSettings()
+    {
+        // The cache path is a directory, so WriteAllText is denied and must not fail discovery.
+        Directory.CreateDirectory(CachePath);
+        _http.Respond(HttpStatusCode.OK, """{"Provider":"AuthKit","ClientId":"client_123"}""");
+
+        var resolved = await CreateResolver(new AuthenticationOptions()).ResolveAsync();
+
+        resolved.Provider.ShouldBe(AuthenticationProvider.AuthKit);
+        resolved.ClientId.ShouldBe("client_123");
+        _http.Requests.Count.ShouldBe(1);
+    }
+
+    [Fact]
     public async Task CacheForAnotherServer_IsIgnored()
     {
         File.WriteAllText(CachePath, """{"baseUrl":"https://other.example/api","provider":"EntraId","clientId":"old"}""");
