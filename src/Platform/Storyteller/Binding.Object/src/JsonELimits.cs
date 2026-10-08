@@ -333,7 +333,7 @@ internal static class JsonELimits
                 throw new InterpreterException("object keys must be strings");
             }
 
-            return obj.TryGetPropertyValue(key, out var value) ? CopyValue(value) : null;
+            return obj.TryGetPropertyValue(key, out var value) ? CopyValue(value, budget) : null;
         }
 
         if (!TryInteger(index, out var raw))
@@ -352,7 +352,7 @@ internal static class JsonELimits
         if (target is JsonArray array)
         {
             var position = ResolveIndex(raw, array.Count);
-            return CopyValue(array[position]);
+            return CopyValue(array[position], budget);
         }
 
         throw new InterpreterException("infix: \"[..]\" expects object, array, or string");
@@ -393,10 +393,11 @@ internal static class JsonELimits
         if (target is JsonArray array)
         {
             var (from, to) = SliceRange(DecimalToInt(start), end, array.Count);
+            budget.AddSteps(to - from);
             var slice = new JsonArray();
             for (var position = from; position < to; position++)
             {
-                slice.Add(CopyValue(array[position]));
+                slice.Add(CopyValue(array[position], budget));
             }
 
             return slice;
@@ -868,7 +869,7 @@ internal static class JsonELimits
         return (int)value;
     }
 
-    private static JsonNode? CopyValue(JsonNode? node)
+    private static JsonNode? CopyValue(JsonNode? node, JsonESizeBudget budget)
     {
         if (node is null)
         {
@@ -880,7 +881,38 @@ internal static class JsonELimits
             return text;
         }
 
+        ChargeCopiedStructure(node, budget);
         return node.DeepClone();
+    }
+
+    private static void ChargeCopiedStructure(JsonNode? node, JsonESizeBudget budget)
+    {
+        switch (node)
+        {
+            case JsonArray array:
+                budget.AddSteps(array.Count);
+                foreach (var item in array)
+                {
+                    ChargeCopiedStructure(item, budget);
+                }
+
+                break;
+            case JsonObject obj:
+                budget.AddSteps(obj.Count);
+                foreach (var property in obj)
+                {
+                    ChargeCopiedStructure(property.Value, budget);
+                }
+
+                break;
+            default:
+                if (IsJsonString(node, out var text))
+                {
+                    budget.AddSteps(text.Length);
+                }
+
+                break;
+        }
     }
 
     private static bool DeepEquals(JsonNode? left, JsonNode? right, JsonESizeBudget budget)
