@@ -685,6 +685,85 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonEMapIfWithoutElse_DropsFalseItems()
+    {
+        var content = Envelope("jsone", new JObject
+        {
+            ["$map"] = new JArray(1, 2, 3),
+            ["each(x)"] = new JObject
+            {
+                ["$if"] = "x > 1",
+                ["then"] = new JObject { ["$eval"] = "x" },
+            },
+        });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JArray>().Subject;
+        value.Select(item => item!.Value<decimal>()).Should().Equal(2m, 3m);
+    }
+
+    [Fact]
+    public async Task Resolve_JsonELetFanOutPastValueSize_Throws()
+    {
+        const int copies = 10;
+        var levels = LetFanOutLevels(copies, seedLength: 100);
+        levels.Should().BeInRange(1, 4);
+        var content = Envelope("jsone", LetFanOut(levels, copies, new string('x', 100)));
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*value size exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicMap_RepeatsLiteral()
+    {
+        var content = new JObject
+        {
+            ["value"] = new JObject
+            {
+                ["$binding"] = "jlogic",
+                ["$definition"] = new JObject
+                {
+                    ["map"] = new JArray
+                    {
+                        new JArray(1, 2),
+                        "a",
+                    },
+                },
+            },
+        };
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JArray>().Subject;
+        value.Select(item => item!.Value<string>()).Should().Equal("a", "a");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicNestedMapPastValueSize_Throws()
+    {
+        // 30 keeps an unchecked result under a megabyte. 200 is the reported multi-gigabyte case.
+        const int count = 30;
+        count.Should().BeLessThan(40);
+        var content = new JObject
+        {
+            ["value"] = new JObject
+            {
+                ["$binding"] = "jlogic",
+                ["$definition"] = NestedJsonLogicMaps(3, count, "xxxxxxxxxx"),
+            },
+        };
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*map exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
     public async Task Resolve_ForwardsIncludeSecretsAndScope()
     {
         var content = Parse("""{ "name": "@name" }""");
@@ -872,6 +951,82 @@ public class ConfigurationBindingResolverTests
         }
 
         return body;
+    }
+
+    private static int LetFanOutLevels(int copies, int seedLength)
+    {
+        var length = seedLength + 2;
+        for (var level = 1; level <= 4; level++)
+        {
+            length = 2 + (copies * length) + (copies - 1);
+            if (length > ConfigurationBindingResolver.MaxConcatLength)
+            {
+                return level;
+            }
+        }
+
+        return 4;
+    }
+
+    private static JToken LetFanOut(int levels, int copies, string seed)
+    {
+        JToken current = new JObject
+        {
+            ["$eval"] = RepeatedExpression($"v{levels - 1}", copies),
+        };
+
+        for (var level = levels - 1; level >= 1; level--)
+        {
+            current = new JObject
+            {
+                ["$let"] = new JObject
+                {
+                    [$"v{level}"] = new JObject
+                    {
+                        ["$eval"] = RepeatedExpression($"v{level - 1}", copies),
+                    },
+                },
+                ["in"] = current,
+            };
+        }
+
+        return new JObject
+        {
+            ["$let"] = new JObject
+            {
+                ["v0"] = seed,
+            },
+            ["in"] = current,
+        };
+    }
+
+    private static string RepeatedExpression(string name, int copies)
+    {
+        return "[" + string.Join(",", Enumerable.Repeat(name, copies)) + "]";
+    }
+
+    private static JToken NestedJsonLogicMaps(int depth, int count, string leaf)
+    {
+        JToken rule = leaf;
+        for (var level = 0; level < depth; level++)
+        {
+            var items = new JArray();
+            for (var index = 0; index < count; index++)
+            {
+                items.Add(index);
+            }
+
+            rule = new JObject
+            {
+                ["map"] = new JArray
+                {
+                    items,
+                    rule,
+                },
+            };
+        }
+
+        return rule;
     }
 
     private static JObject Parse(string json)
