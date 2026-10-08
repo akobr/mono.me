@@ -54,6 +54,7 @@ internal static class ObjectBindingEngine
                 _ => throw new BindingEvaluationException($"Unknown object binding '{kind}'."),
             };
 
+            EnsureResultFits(result);
             return JsonTokenConverter.ToToken(result);
         }
         catch (BindingException)
@@ -97,6 +98,17 @@ internal static class ObjectBindingEngine
             (arguments, _) => JsonELimits.Bound(arguments, sizeBudget));
         contextNode[JsonEExpressionRewriter.StepFunction] = JsonFunction.Create(
             (arguments, _) => JsonELimits.Step(arguments, sizeBudget));
-        return JsonTokenConverter.ToToken(JsonE.Evaluate(definitionNode, contextNode));
+        var result = JsonE.Evaluate(definitionNode, contextNode);
+        EnsureResultFits(result);
+        return JsonTokenConverter.ToToken(result);
+    }
+
+    private static void EnsureResultFits(JsonNode? result)
+    {
+        if (EvaluationSize.SerializedLength(result) > ConfigurationBindingResolver.MaxConcatLength)
+        {
+            throw new BindingEvaluationException(
+                $"Object binding result exceeds {ConfigurationBindingResolver.MaxConcatLength} characters.");
+        }
     }
 }

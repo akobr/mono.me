@@ -591,6 +591,65 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonERootListLiteralPastValueSize_Throws()
+    {
+        // Two copies cross the cap. Repeating a 90000-character seed hundreds of times is the reported case.
+        var content = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "[s,s]" },
+            new JObject { ["s"] = new string('x', (ConfigurationBindingResolver.MaxConcatLength / 2) + 1) });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*result exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicArrayLiteralPastValueSize_Throws()
+    {
+        var content = Envelope(
+            "jlogic",
+            new JArray
+            {
+                new JObject { ["var"] = "s" },
+                new JObject { ["var"] = "s" },
+            },
+            new JObject { ["s"] = new string('x', (ConfigurationBindingResolver.MaxConcatLength / 2) + 1) });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*result exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonENestedListLiteralPastValueSize_Throws()
+    {
+        const int terms = 12_000;
+        var seedLength = 1;
+        while (ListLiteralLength(seedLength, terms) <= ConfigurationBindingResolver.MaxConcatLength)
+        {
+            seedLength++;
+        }
+
+        // A 90000-character seed is the reported case. This seed keeps an unchecked result near the cap.
+        seedLength.Should().BeInRange(1, 32);
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["a"] = new JObject { ["$eval"] = RepeatedExpression("s", terms) },
+            },
+            new JObject { ["s"] = new string('x', seedLength) });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*value size exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
     public async Task Resolve_JsonEJsonArrayDoublingPastValueSize_Throws()
     {
         var steps = StepsUntilJsonDoublingExceedsBudget();
@@ -1449,6 +1508,12 @@ public class ConfigurationBindingResolverTests
     private static string RepeatedExpression(string name, int copies)
     {
         return "[" + string.Join(",", Enumerable.Repeat(name, copies)) + "]";
+    }
+
+    private static int ListLiteralLength(int seedLength, int terms)
+    {
+        var item = seedLength + 2;
+        return 2 + (terms * item) + (terms - 1);
     }
 
     private static int CubicWidthPastStepLimit()
