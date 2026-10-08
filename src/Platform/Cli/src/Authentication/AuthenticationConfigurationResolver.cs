@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.IO.Abstractions;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -201,7 +202,16 @@ public sealed class AuthenticationConfigurationResolver : IAuthenticationConfigu
                 AuthKitDomain = answer.AuthKitDomain,
             };
 
-            _fileSystem.File.WriteAllText(_cachePath, JsonSerializer.Serialize(discovered, CacheJson));
+            // The answer is already valid. A cache that cannot be written is used on the next sign-in.
+            try
+            {
+                _fileSystem.File.WriteAllText(_cachePath, JsonSerializer.Serialize(discovered, CacheJson));
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException)
+            {
+                _logger.LogInformation(exception, "Sign-in discovery settings could not be cached at {Path}", _cachePath);
+            }
+
             return discovered;
         }
         catch (Exception exception) when (exception is HttpRequestException or JsonException or NotSupportedException
