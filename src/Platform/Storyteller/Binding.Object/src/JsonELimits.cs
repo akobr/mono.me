@@ -244,6 +244,12 @@ internal static class JsonELimits
 
     private static bool ShouldBound(string name, JToken value, bool isMapping)
     {
+        // $default makes the cases object look like an operator. The case values are wrapped on their own.
+        if (name == "$switch")
+        {
+            return false;
+        }
+
         if (value is JObject child && HasOperator(child))
         {
             return true;
