@@ -195,6 +195,21 @@ namespace _42.Platform.Storyteller.Sdk
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body, System.Threading.CancellationToken cancellationToken);
 
+        /// <remarks>
+        /// Anonymous. Tells clients which identity provider signs users in and with which public settings.
+        /// </remarks>
+        /// <returns>The user identity provider of this deployment.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync();
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Anonymous. Tells clients which identity provider signs users in and with which public settings.
+        /// </remarks>
+        /// <returns>The user identity provider of this deployment.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync(System.Threading.CancellationToken cancellationToken);
+
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="id">The id of the machine access.</param>
@@ -1732,6 +1747,100 @@ namespace _42.Platform.Storyteller.Sdk
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
                             throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Anonymous. Tells clients which identity provider signs users in and with which public settings.
+        /// </remarks>
+        /// <returns>The user identity provider of this deployment.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync()
+        {
+            return GetAuthConfigurationAsync(System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Anonymous. Tells clients which identity provider signs users in and with which public settings.
+        /// </remarks>
+        /// <returns>The user identity provider of this deployment.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AuthConfiguration> GetAuthConfigurationAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/auth/configuration"
+                    urlBuilder_.Append("v1/auth/configuration");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AuthConfiguration>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
                         }
                         else
                         if (status_ == 500)
@@ -12347,6 +12456,36 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AuthConfiguration
+    {
+
+        [Newtonsoft.Json.JsonProperty("Provider", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Provider { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ClientId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ClientId { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("TenantId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TenantId { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Scopes", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> Scopes { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("AuthKitDomain", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AuthKitDomain { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class CertificateRenewalResult
     {
 
@@ -12798,6 +12937,12 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("LastRenewalAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.DateTimeOffset? LastRenewalAt { get; set; }
 
+        [Newtonsoft.Json.JsonProperty("TokenEndpoint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TokenEndpoint { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("TokenScope", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string TokenScope { get; set; }
+
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
         [Newtonsoft.Json.JsonExtensionData]
@@ -13191,6 +13336,9 @@ namespace _42.Platform.Storyteller.Sdk
         [System.Runtime.Serialization.EnumMember(Value = @"CertificateAndApiKey")]
         CertificateAndApiKey = 2,
 
+        [System.Runtime.Serialization.EnumMember(Value = @"ClientCredentials")]
+        ClientCredentials = 3,
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -13229,6 +13377,9 @@ namespace _42.Platform.Storyteller.Sdk
 
         [System.Runtime.Serialization.EnumMember(Value = @"CertificateAndApiKey")]
         CertificateAndApiKey = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ClientCredentials")]
+        ClientCredentials = 3,
 
     }
 
