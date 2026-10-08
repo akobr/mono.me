@@ -3,7 +3,8 @@ using System.Text;
 namespace _42.Platform.Storyteller.Binding.Object;
 
 /// <summary>
-/// Rewrites JSON-e <c>+</c> and <c>${...}</c> so concatenation goes through a length-checked function.
+/// Rewrites JSON-e <c>+</c> through a length-checked function, and rewrites each <c>${...}</c> hole
+/// through the value-size budget. Surrounding text stays in place for JSON-e to interpolate.
 /// An expression that contains <c>+</c> and cannot be rewritten is rejected.
 /// </summary>
 internal static class JsonEExpressionRewriter
@@ -26,16 +27,15 @@ internal static class JsonEExpressionRewriter
         return new Parser(expression).Rewrite();
     }
 
-    public static bool TryRewriteInterpolation(string text, out string expression)
+    public static bool TryRewriteInterpolation(string text, out string rewritten)
     {
-        expression = string.Empty;
+        rewritten = string.Empty;
         if (!ContainsInterpolation(text))
         {
             return false;
         }
 
-        var parts = new List<string>();
-        var literal = new StringBuilder();
+        var result = new StringBuilder();
         var index = 0;
         while (index < text.Length)
         {
@@ -43,8 +43,8 @@ internal static class JsonEExpressionRewriter
             {
                 if (IsEscapedInterpolation(text, index))
                 {
-                    // The extra '$' is already in the literal. Keep `${...}` as text.
-                    literal.Append('{');
+                    // The extra '$' is already in the result. Keep `${...}` as text.
+                    result.Append('{');
                     index += 2;
                     var depth = 1;
                     while (index < text.Length && depth > 0)
@@ -59,14 +59,13 @@ internal static class JsonEExpressionRewriter
                             depth--;
                         }
 
-                        literal.Append(current);
+                        result.Append(current);
                         index++;
                     }
 
                     continue;
                 }
 
-                FlushLiteral(literal, parts);
                 index += 2;
                 var start = index;
                 if (!TrySkipExpression(text, ref index))
@@ -74,34 +73,21 @@ internal static class JsonEExpressionRewriter
                     throw new BindingEvaluationException("JSON-e expression could not be bounded.");
                 }
 
-                parts.Add(RewritePlus(text[start..index]));
+                result.Append("${");
+                result.Append(BoundFunction);
+                result.Append('(');
+                result.Append(RewritePlus(text[start..index]));
+                result.Append(")}");
                 index++;
                 continue;
             }
 
-            literal.Append(text[index]);
+            result.Append(text[index]);
             index++;
         }
 
-        FlushLiteral(literal, parts);
-        expression = $"{ConcatFunction}({string.Join(",", parts)})";
+        rewritten = result.ToString();
         return true;
-    }
-
-    private static void FlushLiteral(StringBuilder literal, List<string> parts)
-    {
-        if (literal.Length == 0)
-        {
-            return;
-        }
-
-        parts.Add(Quote(literal.ToString()));
-        literal.Clear();
-    }
-
-    private static string Quote(string text)
-    {
-        return "'" + text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("'", "\\'", StringComparison.Ordinal) + "'";
     }
 
     private static bool ContainsPlus(string expression)
@@ -293,6 +279,10 @@ internal static class JsonEExpressionRewriter
             {
                 atom = ParseList('[', ']');
             }
+            else if (current == '{')
+            {
+                atom = ParseObject();
+            }
             else if (current is '\'' or '"')
             {
                 atom = ParseString();
@@ -340,11 +330,7 @@ internal static class JsonEExpressionRewriter
 
                 if (_source[_index] == '[')
                 {
-                    _index++;
-                    var index = ParseExpression(0);
-                    SkipWhitespace();
-                    Expect(']');
-                    atom = atom + "[" + index + "]";
+                    atom += ParseIndexOrSlice();
                     continue;
                 }
 
@@ -371,6 +357,121 @@ internal static class JsonEExpressionRewriter
                 _index = saved;
                 return atom;
             }
+        }
+
+        private string ParseIndexOrSlice()
+        {
+            Expect('[');
+            SkipWhitespace();
+            if (_index < _source.Length && _source[_index] == ':')
+            {
+                return FinishSlice(start: null);
+            }
+
+            if (_index >= _source.Length || _source[_index] == ']')
+            {
+                throw new BindingEvaluationException("JSON-e expression could not be bounded.");
+            }
+
+            var start = ParseExpression(0);
+            SkipWhitespace();
+            if (_index < _source.Length && _source[_index] == ':')
+            {
+                return FinishSlice(start);
+            }
+
+            Expect(']');
+            return "[" + start + "]";
+        }
+
+        private string FinishSlice(string? start)
+        {
+            Expect(':');
+            SkipWhitespace();
+            string? end = null;
+            if (_index < _source.Length && _source[_index] != ']')
+            {
+                end = ParseExpression(0);
+                SkipWhitespace();
+            }
+
+            Expect(']');
+            return "[" + (start ?? string.Empty) + ":" + (end ?? string.Empty) + "]";
+        }
+
+        private string ParseObject()
+        {
+            Expect('{');
+            SkipWhitespace();
+            if (_index < _source.Length && _source[_index] == '}')
+            {
+                _index++;
+                return "{}";
+            }
+
+            var parts = new List<string>();
+            while (true)
+            {
+                parts.Add(ParseObjectEntry());
+                SkipWhitespace();
+                if (_index >= _source.Length)
+                {
+                    throw new BindingEvaluationException("JSON-e expression could not be bounded.");
+                }
+
+                if (_source[_index] == ',')
+                {
+                    _index++;
+                    continue;
+                }
+
+                if (_source[_index] == '}')
+                {
+                    _index++;
+                    break;
+                }
+
+                throw new BindingEvaluationException("JSON-e expression could not be bounded.");
+            }
+
+            return "{" + string.Join(",", parts) + "}";
+        }
+
+        private string ParseObjectEntry()
+        {
+            var key = ParseObjectKey();
+            SkipWhitespace();
+            Expect(':');
+            return key + ":" + ParseExpression(0);
+        }
+
+        private string ParseObjectKey()
+        {
+            SkipWhitespace();
+            if (_index >= _source.Length)
+            {
+                throw new BindingEvaluationException("JSON-e expression could not be bounded.");
+            }
+
+            var current = _source[_index];
+            if (current is '\'' or '"')
+            {
+                return ParseString();
+            }
+
+            if (!IsIdentStart(current))
+            {
+                throw new BindingEvaluationException("JSON-e expression could not be bounded.");
+            }
+
+            var start = _index;
+            _index++;
+            while (_index < _source.Length && IsIdentChar(_source[_index]))
+            {
+                _index++;
+            }
+
+            return _source[start.._index];
         }
 
         private string ParseList(char open, char close)

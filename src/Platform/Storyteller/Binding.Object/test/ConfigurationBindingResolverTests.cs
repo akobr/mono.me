@@ -891,6 +891,105 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonEInterpolation_KeepsApostropheAndBackslash()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["greeting"] = "it's ${name}",
+                ["path"] = "C:\\data\\${env}",
+            },
+            new JObject
+            {
+                ["name"] = "a",
+                ["env"] = "x",
+            });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JObject>().Subject;
+        value["greeting"]!.Value<string>().Should().Be("it's a");
+        value["path"]!.Value<string>().Should().Be("C:\\data\\x");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEInterpolatedKey_KeepsApostropheBackslashAndDollarEscape()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["it's ${name}"] = 1,
+                ["C:\\data\\${env}"] = 2,
+                ["$$a${name}"] = 3,
+            },
+            new JObject
+            {
+                ["name"] = "a",
+                ["env"] = "x",
+            });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JObject>().Subject;
+        value["it's a"]!.Value<decimal>().Should().Be(1);
+        value["C:\\data\\x"]!.Value<decimal>().Should().Be(2);
+        value["$aa"]!.Value<decimal>().Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Resolve_JsonESlicePlus_ReturnsEachSlice()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$let"] = new JObject { ["s"] = "abc" },
+                ["in"] = new JArray
+                {
+                    new JObject { ["$eval"] = "s[0] + 'x'" },
+                    new JObject { ["$eval"] = "s[0:2] + 'x'" },
+                    new JObject { ["$eval"] = "s[:2] + 'x'" },
+                    new JObject { ["$eval"] = "s[1:] + 'x'" },
+                },
+            });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JArray>().Subject;
+        value.Select(item => item!.Value<string>()).Should().Equal("ax", "abx", "abx", "bcx");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEInterpolationSlicePlus_ReturnsPrefix()
+    {
+        var content = Envelope(
+            "jsone",
+            "${name[0:1] + '.'}",
+            new JObject { ["name"] = "ab" });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<string>().Should().Be("a.");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEObjectLiteralPlus_ReturnsObject()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "{a: n + 1, 'b': n + 2}" },
+            new JObject { ["n"] = 2 });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JObject>().Subject;
+        value["a"]!.Value<decimal>().Should().Be(3);
+        value["b"]!.Value<decimal>().Should().Be(4);
+    }
+
+    [Fact]
     public async Task Resolve_JsonELetFanOutPastValueSize_Throws()
     {
         const int copies = 10;
