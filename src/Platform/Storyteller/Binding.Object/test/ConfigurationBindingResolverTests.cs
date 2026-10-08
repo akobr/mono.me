@@ -855,6 +855,42 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonEInterpolatedKey_RendersName()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["${s+'b'}"] = 1,
+                ["pre-${s}-mid}{-${s+'}'}"] = 2,
+            },
+            new JObject { ["s"] = "a" });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JObject>().Subject;
+        value["ab"]!.Value<decimal>().Should().Be(1);
+        value["pre-a-mid}{-a}"]!.Value<decimal>().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEInterpolatedKeyPastConcatLimit_Throws()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["${len(s+s)}"] = 1,
+            },
+            new JObject { ["s"] = new string('x', (ConfigurationBindingResolver.MaxConcatLength / 2) + 1) });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*string concatenation exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
     public async Task Resolve_JsonELetFanOutPastValueSize_Throws()
     {
         const int copies = 10;
