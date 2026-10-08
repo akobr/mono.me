@@ -1,8 +1,10 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Binding;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -1786,6 +1788,94 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonELetReservedName_Throws()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$let"] = new JObject { ["storytellerStep"] = new JObject { ["$eval"] = "len" } },
+                ["in"] = 1,
+            });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*reserved*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEComputedLetReservedName_Throws()
+    {
+        var ordinary = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$let"] = new JObject { ["$eval"] = "{a: 1}" },
+                ["in"] = new JObject { ["$eval"] = "a" },
+            });
+        await _resolver.ResolveAsync(ordinary, includeSecrets: true, _scope);
+        ordinary["value"]!.Value<decimal>().Should().Be(1);
+
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$let"] = new JObject { ["$eval"] = "{storytellerStep: len}" },
+                ["in"] = 1,
+            });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*reserved*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEEachReservedName_Throws()
+    {
+        var mapped = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$map"] = new JArray(1),
+                ["each(storytellerStep)"] = 1,
+            });
+        var mappedAct = () => _resolver.ResolveAsync(mapped, includeSecrets: true, _scope).AsTask();
+        await mappedAct.Should().ThrowAsync<BindingException>().WithMessage("*reserved*");
+
+        var sorted = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$sort"] = new JArray(1),
+                ["by(storytellerStep)"] = "1",
+            });
+        var sortedAct = () => _resolver.ResolveAsync(sorted, includeSecrets: true, _scope).AsTask();
+        await sortedAct.Should().ThrowAsync<BindingException>().WithMessage("*reserved*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicLog_ChargesArray()
+    {
+        var logger = new SilentLogger();
+        var resolver = new ConfigurationBindingResolver(_strings, logger);
+        var small = Envelope("jlogic", Parse("""{ "log": 1 }"""));
+        await resolver.ResolveAsync(small, includeSecrets: true, _scope);
+        small["value"]!.Value<decimal>().Should().Be(1);
+        logger.Writes.Should().Be(0);
+
+        var logs = new JArray();
+        for (var index = 0; index < 3; index++)
+        {
+            logs.Add(Parse("""{ "log": { "var": "xs" } }"""));
+        }
+
+        logs.Add(false);
+        var content = Envelope(
+            "jlogic",
+            new JObject { ["and"] = logs },
+            new JObject { ["xs"] = NumberArray((ConfigurationBindingResolver.MaxEvaluationSteps / 2) + 1) });
+        var act = () => resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+        logger.Writes.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Resolve_OrdinaryDocument_BindsStringsInPropertiesAndArrayItems()
     {
         var content = Parse("""
@@ -2212,6 +2302,32 @@ public class ConfigurationBindingResolverTests
 
             default:
                 return token.DeepClone();
+        }
+    }
+
+    private sealed class SilentLogger : ILogger<ConfigurationBindingResolver>
+    {
+        public int Writes { get; private set; }
+
+        public IDisposable BeginScope<TState>(TState state)
+            where TState : notnull
+        {
+            return new MemoryStream();
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return false;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Writes++;
         }
     }
 }

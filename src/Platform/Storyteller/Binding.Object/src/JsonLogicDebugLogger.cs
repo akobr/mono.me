@@ -25,6 +25,9 @@ internal sealed class JsonLogicDebugLogger : ILogicLogger
 
     public void WriteLine(JsonNode? node)
     {
-        _logger?.LogDebug("JSON Logic log: {Value}", node?.ToJsonString());
+        if (_logger?.IsEnabled(LogLevel.Debug) == true)
+        {
+            _logger.LogDebug("JSON Logic log: {Value}", node?.ToJsonString());
+        }
     }
 }
