@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.JsonE;
 using Newtonsoft.Json.Linq;
@@ -298,6 +299,110 @@ internal static class JsonELimits
         var text = RequireString(arguments, "rstrip");
         budget.AddSteps(text.Length);
         return Trim(text, leading: false, trailing: true);
+    }
+
+    public static JsonNode? Len(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        if (arguments.Length == 1 && arguments[0] is JsonArray array)
+        {
+            return array.Count;
+        }
+
+        if (arguments.Length == 1 && IsJsonString(arguments[0], out var text))
+        {
+            budget.AddSteps(text.Length);
+            return new StringInfo(text).LengthInTextElements;
+        }
+
+        throw new BuiltInException("invalid arguments to builtin: len");
+    }
+
+    public static JsonNode? Index(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        if (arguments.Length != 2)
+        {
+            throw new InterpreterException("infix: \"[..]\" expects object, array, or string");
+        }
+
+        var target = arguments[0];
+        var index = arguments[1];
+        if (target is JsonObject obj)
+        {
+            if (!IsJsonString(index, out var key))
+            {
+                throw new InterpreterException("object keys must be strings");
+            }
+
+            return obj.TryGetPropertyValue(key, out var value) ? CopyValue(value) : null;
+        }
+
+        if (!TryInteger(index, out var raw))
+        {
+            throw new InterpreterException("should only use integers to access arrays or strings");
+        }
+
+        if (IsJsonString(target, out var text))
+        {
+            budget.AddSteps(text.Length);
+            var info = new StringInfo(text);
+            var position = ResolveIndex(raw, info.LengthInTextElements);
+            return info.SubstringByTextElements(position, 1);
+        }
+
+        if (target is JsonArray array)
+        {
+            var position = ResolveIndex(raw, array.Count);
+            return CopyValue(array[position]);
+        }
+
+        throw new InterpreterException("infix: \"[..]\" expects object, array, or string");
+    }
+
+    public static JsonNode? Slice(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        if (arguments.Length is < 2 or > 3)
+        {
+            throw new InterpreterException("infix: \"[..]\" expects object, array, or string");
+        }
+
+        if (!TryInteger(arguments[1], out var start))
+        {
+            throw new InterpreterException("cannot perform interval access with non-integers");
+        }
+
+        int? end = null;
+        if (arguments.Length == 3)
+        {
+            if (!TryInteger(arguments[2], out var endValue))
+            {
+                throw new InterpreterException("cannot perform interval access with non-integers");
+            }
+
+            end = DecimalToInt(endValue);
+        }
+
+        var target = arguments[0];
+        if (IsJsonString(target, out var text))
+        {
+            budget.AddSteps(text.Length);
+            var info = new StringInfo(text);
+            var (from, to) = SliceRange(DecimalToInt(start), end, info.LengthInTextElements);
+            return from >= to ? string.Empty : info.SubstringByTextElements(from, to - from);
+        }
+
+        if (target is JsonArray array)
+        {
+            var (from, to) = SliceRange(DecimalToInt(start), end, array.Count);
+            var slice = new JsonArray();
+            for (var position = from; position < to; position++)
+            {
+                slice.Add(CopyValue(array[position]));
+            }
+
+            return slice;
+        }
+
+        throw new InterpreterException("infix: \"[..]\" expects object, array, or string");
     }
 
     private static void Rewrite(JToken token)
@@ -686,19 +791,96 @@ internal static class JsonELimits
 
     private static bool IsJsonString(JsonNode? node, out string text)
     {
+        if (node is JsonValue value &&
+            value.GetValueKind() == JsonValueKind.String &&
+            value.TryGetValue(out string? parsed) &&
+            parsed is not null)
+        {
+            text = parsed;
+            return true;
+        }
+
         text = string.Empty;
-        if (node is not JsonValue value)
+        return false;
+    }
+
+    private static int ResolveIndex(decimal raw, int length)
+    {
+        var position = (long)DecimalToInt(raw);
+        if (position < 0)
         {
-            return false;
+            position += length;
         }
 
-        var json = value.ToJsonString();
-        if (json.Length == 0 || json[0] != '"')
+        if (position < 0 || position >= length)
         {
-            return false;
+            throw new InterpreterException("index out of bounds");
         }
 
-        return value.TryGetValue(out text!);
+        return (int)position;
+    }
+
+    private static (int From, int To) SliceRange(int start, int? end, int length)
+    {
+        var from = Clamp(start, length);
+        var to = end is int value ? Clamp(value, length) : length;
+        if (from > to)
+        {
+            to = from;
+        }
+
+        return (from, to);
+    }
+
+    private static int Clamp(int bound, int length)
+    {
+        var value = (long)bound;
+        if (value < 0)
+        {
+            value += length;
+        }
+
+        if (value < 0)
+        {
+            return 0;
+        }
+
+        if (value > length)
+        {
+            return length;
+        }
+
+        return (int)value;
+    }
+
+    private static int DecimalToInt(decimal value)
+    {
+        if (value >= int.MaxValue)
+        {
+            return int.MaxValue;
+        }
+
+        if (value <= int.MinValue)
+        {
+            return int.MinValue;
+        }
+
+        return (int)value;
+    }
+
+    private static JsonNode? CopyValue(JsonNode? node)
+    {
+        if (node is null)
+        {
+            return null;
+        }
+
+        if (IsJsonString(node, out var text))
+        {
+            return text;
+        }
+
+        return node.DeepClone();
     }
 
     private static bool DeepEquals(JsonNode? left, JsonNode? right, JsonESizeBudget budget)
@@ -800,7 +982,7 @@ internal static class JsonELimits
             return false;
         }
 
-        delimiter = number == 0 ? string.Empty : number.ToString(CultureInfo.InvariantCulture);
+        delimiter = number.ToString(CultureInfo.InvariantCulture);
         return true;
     }
 

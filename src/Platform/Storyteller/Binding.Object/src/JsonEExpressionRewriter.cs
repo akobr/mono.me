@@ -3,8 +3,8 @@ using System.Text;
 namespace _42.Platform.Storyteller.Binding.Object;
 
 /// <summary>
-/// Rewrites JSON-e <c>+</c>, <c>in</c>, <c>==</c>, and <c>!=</c> through checked functions,
-/// and rewrites each <c>${...}</c> hole through the value-size budget.
+/// Rewrites JSON-e <c>+</c>, <c>in</c>, <c>==</c>, <c>!=</c>, and index or slice access
+/// through checked functions, and rewrites each <c>${...}</c> hole through the value-size budget.
 /// Surrounding text stays in place for JSON-e to interpolate.
 /// An expression that contains one of those operators and cannot be rewritten is rejected.
 /// </summary>
@@ -21,6 +21,10 @@ internal static class JsonEExpressionRewriter
     public const string InFunction = "storytellerIn";
 
     public const string EqualsFunction = "storytellerEquals";
+
+    public const string IndexFunction = "storytellerIndex";
+
+    public const string SliceFunction = "storytellerSlice";
 
     public static string RewritePlus(string expression)
     {
@@ -125,7 +129,7 @@ internal static class JsonEExpressionRewriter
                 continue;
             }
 
-            if (current == '+')
+            if (current is '+' or '[')
             {
                 return true;
             }
@@ -375,7 +379,7 @@ internal static class JsonEExpressionRewriter
 
                 if (_source[_index] == '[')
                 {
-                    atom += ParseIndexOrSlice();
+                    atom = ParseIndexOrSlice(atom);
                     continue;
                 }
 
@@ -404,13 +408,13 @@ internal static class JsonEExpressionRewriter
             }
         }
 
-        private string ParseIndexOrSlice()
+        private string ParseIndexOrSlice(string atom)
         {
             Expect('[');
             SkipWhitespace();
             if (_index < _source.Length && _source[_index] == ':')
             {
-                return FinishSlice(start: null);
+                return FinishSlice(atom, "0");
             }
 
             if (_index >= _source.Length || _source[_index] == ']')
@@ -422,14 +426,14 @@ internal static class JsonEExpressionRewriter
             SkipWhitespace();
             if (_index < _source.Length && _source[_index] == ':')
             {
-                return FinishSlice(start);
+                return FinishSlice(atom, start);
             }
 
             Expect(']');
-            return "[" + start + "]";
+            return IndexFunction + "(" + atom + ",(" + start + "))";
         }
 
-        private string FinishSlice(string? start)
+        private string FinishSlice(string atom, string start)
         {
             Expect(':');
             SkipWhitespace();
@@ -441,7 +445,12 @@ internal static class JsonEExpressionRewriter
             }
 
             Expect(']');
-            return "[" + (start ?? string.Empty) + ":" + (end ?? string.Empty) + "]";
+            if (end is null)
+            {
+                return SliceFunction + "(" + atom + ",(" + start + "))";
+            }
+
+            return SliceFunction + "(" + atom + ",(" + start + "),(" + end + "))";
         }
 
         private string ParseObject()
