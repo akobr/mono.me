@@ -1826,6 +1826,21 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonEInterpolatedLetKey_Throws()
+    {
+        var content = Envelope(
+            "jsone",
+            Parse("""
+                {
+                  "$let": { "s${'torytellerStep'}": 1 },
+                  "in": { "$eval": "storytellerStep" }
+                }
+                """));
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*reserved*");
+    }
+
+    [Fact]
     public async Task Resolve_JsonEEachReservedName_Throws()
     {
         var mapped = Envelope(

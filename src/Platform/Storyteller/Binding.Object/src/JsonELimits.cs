@@ -666,6 +666,12 @@ internal static class JsonELimits
             return false;
         }
 
+        // Keys can be interpolated, so check them after rendering.
+        if (name == "$let")
+        {
+            return true;
+        }
+
         if (value is JObject child && HasOperator(child))
         {
             return true;
