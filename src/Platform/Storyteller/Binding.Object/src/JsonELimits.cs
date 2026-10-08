@@ -134,6 +134,13 @@ internal static class JsonELimits
         return value;
     }
 
+    public static JsonNode? Step(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        budget.AddStep();
+        var value = arguments.Length == 0 ? null : arguments[0];
+        return value is JsonArray { Count: > 0 };
+    }
+
     public static JsonNode? Join(JsonNode?[] arguments, JsonESizeBudget budget)
     {
         if (arguments.Length != 2 ||
@@ -276,7 +283,7 @@ internal static class JsonELimits
             },
             ["in"] = new JObject
             {
-                ["$if"] = "len(v) > 0",
+                ["$if"] = JsonEExpressionRewriter.StepFunction + "(v)",
                 ["then"] = new JObject
                 {
                     ["$eval"] = JsonEExpressionRewriter.BoundFunction + "(v[0])",

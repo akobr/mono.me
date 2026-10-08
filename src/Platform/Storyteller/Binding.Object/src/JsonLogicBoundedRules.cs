@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Json.Logic;
+using Json.More;
 
 namespace _42.Platform.Storyteller.Binding.Object;
 
@@ -11,12 +12,48 @@ namespace _42.Platform.Storyteller.Binding.Object;
 /// </summary>
 internal static class JsonLogicBoundedRules
 {
+    // The handlers are process-wide singletons, so the iteration count lives on the calling thread.
+    [ThreadStatic]
+    private static int _iterations;
+
+    public static void ResetIterations()
+    {
+        _iterations = 0;
+    }
+
     public static void Register()
     {
         RuleRegistry.AddRule("cat", new Cat());
         RuleRegistry.AddRule("merge", new Merge());
         RuleRegistry.AddRule("reduce", new Reduce());
         RuleRegistry.AddRule("map", new Map());
+        RuleRegistry.AddRule("all", new All());
+        RuleRegistry.AddRule("some", new Some());
+        RuleRegistry.AddRule("none", new None());
+        RuleRegistry.AddRule("filter", new Filter());
+    }
+
+    private static void CountIteration()
+    {
+        if (++_iterations > ConfigurationBindingResolver.MaxEvaluationSteps)
+        {
+            throw new BindingEvaluationException(
+                $"JSON Logic evaluation exceeds {ConfigurationBindingResolver.MaxEvaluationSteps} iterations.");
+        }
+    }
+
+    private static bool ApplyElement(JsonNode? rule, JsonNode? element, EvaluationContext context)
+    {
+        CountIteration();
+        context.Push(element);
+        try
+        {
+            return JsonLogic.Apply(rule, context).IsTruthy();
+        }
+        finally
+        {
+            context.Pop();
+        }
     }
 
     private sealed class Cat : IRule
@@ -100,6 +137,7 @@ internal static class JsonLogicBoundedRules
 
             foreach (var element in items)
             {
+                CountIteration();
                 var intermediary = new JsonObject
                 {
                     ["current"] = element?.DeepClone(),
@@ -152,6 +190,7 @@ internal static class JsonLogicBoundedRules
             var used = 0;
             foreach (var element in items)
             {
+                CountIteration();
                 context.Push(element);
                 JsonNode? mapped;
                 try
@@ -172,6 +211,119 @@ internal static class JsonLogicBoundedRules
 
                 used += length;
                 result.Add(mapped?.DeepClone());
+            }
+
+            return result;
+        }
+    }
+
+    private sealed class All : IRule
+    {
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            if (args is not JsonArray { Count: 2 } array)
+            {
+                throw new JsonLogicException("The 'all' rule requires an array with two arguments");
+            }
+
+            var input = JsonLogic.Apply(array[0], context);
+            var rule = array[1];
+            if (input is not JsonArray { Count: > 0 } items)
+            {
+                return false;
+            }
+
+            foreach (var element in items)
+            {
+                if (!ApplyElement(rule, element, context))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
+    private sealed class Some : IRule
+    {
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            if (args is not JsonArray { Count: 2 } array)
+            {
+                throw new JsonLogicException("The 'some' rule requires an array with two arguments");
+            }
+
+            var input = JsonLogic.Apply(array[0], context);
+            var rule = array[1];
+            if (input is not JsonArray items)
+            {
+                return false;
+            }
+
+            foreach (var element in items)
+            {
+                if (ApplyElement(rule, element, context))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
+    private sealed class None : IRule
+    {
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            if (args is not JsonArray { Count: 2 } array)
+            {
+                throw new JsonLogicException("The 'none' rule requires an array with two arguments");
+            }
+
+            var input = JsonLogic.Apply(array[0], context);
+            var rule = array[1];
+            if (input is not JsonArray items)
+            {
+                return true;
+            }
+
+            foreach (var element in items)
+            {
+                if (ApplyElement(rule, element, context))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+    }
+
+    private sealed class Filter : IRule
+    {
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            if (args is not JsonArray { Count: 2 } array)
+            {
+                throw new JsonLogicException("The 'filter' rule requires an array with two arguments");
+            }
+
+            var input = JsonLogic.Apply(array[0], context);
+            var rule = array[1];
+            if (input is not JsonArray items)
+            {
+                return false;
+            }
+
+            var result = new JsonArray();
+            foreach (var element in items)
+            {
+                if (ApplyElement(rule, element, context))
+                {
+                    result.Add(element?.DeepClone());
+                }
             }
 
             return result;

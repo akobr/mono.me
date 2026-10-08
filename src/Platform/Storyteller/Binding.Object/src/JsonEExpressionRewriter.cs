@@ -14,6 +14,8 @@ internal static class JsonEExpressionRewriter
 
     public const string BoundFunction = "storytellerBound";
 
+    public const string StepFunction = "storytellerStep";
+
     public static string RewritePlus(string expression)
     {
         if (!ContainsPlus(expression))
