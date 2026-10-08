@@ -43,26 +43,10 @@ internal static class JsonEExpressionRewriter
             {
                 if (IsEscapedInterpolation(text, index))
                 {
-                    // The extra '$' is already in the result. Keep `${...}` as text.
-                    result.Append('{');
+                    // The preceding '$' is already in the result. JSON-e turns `$${`
+                    // into a literal `${` and keeps scanning, so a later hole is still rewritten.
+                    result.Append("${");
                     index += 2;
-                    var depth = 1;
-                    while (index < text.Length && depth > 0)
-                    {
-                        var current = text[index];
-                        if (current == '{')
-                        {
-                            depth++;
-                        }
-                        else if (current == '}')
-                        {
-                            depth--;
-                        }
-
-                        result.Append(current);
-                        index++;
-                    }
-
                     continue;
                 }
 
@@ -88,6 +72,24 @@ internal static class JsonEExpressionRewriter
 
         rewritten = result.ToString();
         return true;
+    }
+
+    public static bool TryRewriteInterpolatedKey(string name, out string rewritten)
+    {
+        // JSON-e removes one leading '$' from a `$$` key before it interpolates.
+        if (name.StartsWith("$$", StringComparison.Ordinal))
+        {
+            if (!TryRewriteInterpolation(name[1..], out var body))
+            {
+                rewritten = string.Empty;
+                return false;
+            }
+
+            rewritten = "$" + body;
+            return true;
+        }
+
+        return TryRewriteInterpolation(name, out rewritten);
     }
 
     private static bool ContainsPlus(string expression)

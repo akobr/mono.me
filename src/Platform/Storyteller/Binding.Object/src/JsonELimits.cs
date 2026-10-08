@@ -275,7 +275,7 @@ internal static class JsonELimits
         var changed = false;
         foreach (var property in obj.Properties())
         {
-            if (JsonEExpressionRewriter.TryRewriteInterpolation(property.Name, out var rewritten))
+            if (JsonEExpressionRewriter.TryRewriteInterpolatedKey(property.Name, out var rewritten))
             {
                 names.Add(rewritten);
                 changed = true;

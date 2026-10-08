@@ -939,6 +939,70 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonEInterpolation_KeepsEscapedDollar()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["mixed"] = "$${x} and ${x}",
+                ["nested"] = "$${a ${s}}",
+            },
+            new JObject
+            {
+                ["x"] = 1.5,
+                ["s"] = "ab",
+            });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JObject>().Subject;
+        value["mixed"]!.Value<string>().Should().Be("${x} and 1.5");
+        value["nested"]!.Value<string>().Should().Be("${a ab}");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEInterpolatedKey_KeepsEscapedDollar()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["pre$${x} and ${x}"] = 1,
+            },
+            new JObject { ["x"] = 1.5 });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JObject>().Subject;
+        value["pre${x} and 1.5"]!.Value<decimal>().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEInterpolatedKey_OnlyEscapedHole_IsBounded()
+    {
+        var rendered = Envelope(
+            "jsone",
+            new JObject { ["$${x}"] = 1 },
+            new JObject { ["x"] = 1.5 });
+
+        await _resolver.ResolveAsync(rendered, includeSecrets: true, _scope);
+
+        var renderedValue = rendered["value"].Should().BeOfType<JObject>().Subject;
+        renderedValue["1.5"]!.Value<decimal>().Should().Be(1);
+
+        var content = Envelope(
+            "jsone",
+            new JObject { ["$${len(s+s)}"] = 1 },
+            new JObject { ["s"] = new string('x', (ConfigurationBindingResolver.MaxConcatLength / 2) + 1) });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*string concatenation exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
     public async Task Resolve_JsonESlicePlus_ReturnsEachSlice()
     {
         var content = Envelope(
