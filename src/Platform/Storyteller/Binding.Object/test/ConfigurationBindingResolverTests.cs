@@ -724,6 +724,137 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonEIfPlus_ReturnsThen()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$if"] = "s+'b' == 'ab'",
+                ["then"] = 1,
+                ["else"] = 0,
+            },
+            new JObject { ["s"] = "a" });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<decimal>().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEIfPlusPastConcatLimit_Throws()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$if"] = "len(s+s) > 0",
+                ["then"] = 1,
+                ["else"] = 0,
+            },
+            new JObject { ["s"] = new string('x', (ConfigurationBindingResolver.MaxConcatLength / 2) + 1) });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*string concatenation exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonESwitchPlusKey_ReturnsMatch()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$switch"] = new JObject
+                {
+                    ["s+'b' == 'ab'"] = 1,
+                    ["$default"] = 0,
+                },
+            },
+            new JObject { ["s"] = "a" });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<decimal>().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Resolve_JsonESwitchPlusKeyPastConcatLimit_Throws()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$switch"] = new JObject
+                {
+                    ["len(s+s) > 0"] = 1,
+                    ["$default"] = 0,
+                },
+            },
+            new JObject { ["s"] = new string('x', (ConfigurationBindingResolver.MaxConcatLength / 2) + 1) });
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*string concatenation exceeds {ConfigurationBindingResolver.MaxConcatLength} characters*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonESortByPlus_OrdersByKey()
+    {
+        var content = Envelope("jsone", new JObject
+        {
+            ["$sort"] = new JArray
+            {
+                new JObject { ["a"] = 2 },
+                new JObject { ["a"] = 1 },
+            },
+            ["by(x)"] = "x.a + 10",
+        });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JArray>().Subject;
+        value.Select(item => item!["a"]!.Value<decimal>()).Should().Equal(1m, 2m);
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEFindEachPlus_ReturnsFirstMatch()
+    {
+        var content = Envelope("jsone", new JObject
+        {
+            ["$find"] = new JArray("aa", "b"),
+            ["each(x)"] = "len(x+x) > 3",
+        });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<string>().Should().Be("aa");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEMatchPlusKey_ReturnsMatch()
+    {
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$match"] = new JObject
+                {
+                    ["s+'b' == 'ab'"] = "yes",
+                },
+            },
+            new JObject { ["s"] = "a" });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        var value = content["value"].Should().BeOfType<JArray>().Subject;
+        value.Select(item => item!.Value<string>()).Should().Equal("yes");
+    }
+
+    [Fact]
     public async Task Resolve_JsonELetFanOutPastValueSize_Throws()
     {
         const int copies = 10;
