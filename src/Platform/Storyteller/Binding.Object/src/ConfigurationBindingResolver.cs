@@ -111,7 +111,7 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
             JToken result;
             try
             {
-                result = ObjectBindingEngine.Evaluate(kind!, definition!, resolvedContext);
+                result = ObjectBindingEngine.Evaluate(kind!, definition!, resolvedContext, budget);
             }
             catch (BindingException exception)
             {
@@ -260,8 +260,19 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         return string.IsNullOrEmpty(token.Path) ? "$" : token.Path;
     }
 
-    private sealed class EvaluationBudget
+    internal sealed class EvaluationBudget
     {
         public int Count { get; set; }
+
+        public int Steps { get; private set; }
+
+        public void AddStep()
+        {
+            if (++Steps > MaxEvaluationSteps)
+            {
+                throw new BindingEvaluationException(
+                    $"Evaluation exceeds {MaxEvaluationSteps} steps.");
+            }
+        }
     }
 }

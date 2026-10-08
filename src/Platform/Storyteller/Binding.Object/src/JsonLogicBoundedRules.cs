@@ -12,13 +12,13 @@ namespace _42.Platform.Storyteller.Binding.Object;
 /// </summary>
 internal static class JsonLogicBoundedRules
 {
-    // The handlers are process-wide singletons, so the iteration count lives on the calling thread.
+    // The handlers are process-wide singletons, so each call points this thread at the read's budget.
     [ThreadStatic]
-    private static int _iterations;
+    private static ConfigurationBindingResolver.EvaluationBudget? _read;
 
-    public static void ResetIterations()
+    public static void UseBudget(ConfigurationBindingResolver.EvaluationBudget read)
     {
-        _iterations = 0;
+        _read = read;
     }
 
     public static void Register()
@@ -35,11 +35,7 @@ internal static class JsonLogicBoundedRules
 
     private static void CountIteration()
     {
-        if (++_iterations > ConfigurationBindingResolver.MaxEvaluationSteps)
-        {
-            throw new BindingEvaluationException(
-                $"JSON Logic evaluation exceeds {ConfigurationBindingResolver.MaxEvaluationSteps} iterations.");
-        }
+        (_read ?? throw new BindingEvaluationException("JSON Logic evaluation has no step budget.")).AddStep();
     }
 
     private static bool ApplyElement(JsonNode? rule, JsonNode? element, EvaluationContext context)

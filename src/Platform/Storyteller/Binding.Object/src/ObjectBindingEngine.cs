@@ -25,13 +25,17 @@ internal static class ObjectBindingEngine
         JsonLogicDebugLogger.Instance.Use(logger);
     }
 
-    public static JToken Evaluate(string kind, JToken definition, JObject context)
+    public static JToken Evaluate(
+        string kind,
+        JToken definition,
+        JObject context,
+        ConfigurationBindingResolver.EvaluationBudget budget)
     {
         try
         {
             if (kind == JsonEKind)
             {
-                return EvaluateJsonE(definition, context);
+                return EvaluateJsonE(definition, context, budget);
             }
 
             var definitionNode = JsonTokenConverter.ToNode(definition);
@@ -43,7 +47,7 @@ internal static class ObjectBindingEngine
             var contextNode = JsonTokenConverter.ToNode(context)
                 ?? throw new BindingEvaluationException("Object binding $context must be a JSON object.");
 
-            JsonLogicBoundedRules.ResetIterations();
+            JsonLogicBoundedRules.UseBudget(budget);
             JsonNode? result = kind switch
             {
                 JsonLogicKind => JsonLogic.Apply(definitionNode, contextNode),
@@ -66,7 +70,10 @@ internal static class ObjectBindingEngine
         }
     }
 
-    private static JToken EvaluateJsonE(JToken definition, JObject context)
+    private static JToken EvaluateJsonE(
+        JToken definition,
+        JObject context,
+        ConfigurationBindingResolver.EvaluationBudget budget)
     {
         var prepared = JsonELimits.PrepareDefinition(definition);
         var definitionNode = JsonTokenConverter.ToNode(prepared);
@@ -81,15 +88,15 @@ internal static class ObjectBindingEngine
         }
 
         // A context function overrides the built-in of the same name, including one supplied by the caller.
-        var budget = new JsonESizeBudget();
+        var sizeBudget = new JsonESizeBudget(budget);
         contextNode["range"] = JsonFunction.Create(JsonELimits.Range);
-        contextNode["join"] = JsonFunction.Create((arguments, _) => JsonELimits.Join(arguments, budget));
+        contextNode["join"] = JsonFunction.Create((arguments, _) => JsonELimits.Join(arguments, sizeBudget));
         contextNode[JsonEExpressionRewriter.AddFunction] = JsonFunction.Create(JsonELimits.Add);
         contextNode[JsonEExpressionRewriter.ConcatFunction] = JsonFunction.Create(JsonELimits.Concat);
         contextNode[JsonEExpressionRewriter.BoundFunction] = JsonFunction.Create(
-            (arguments, _) => JsonELimits.Bound(arguments, budget));
+            (arguments, _) => JsonELimits.Bound(arguments, sizeBudget));
         contextNode[JsonEExpressionRewriter.StepFunction] = JsonFunction.Create(
-            (arguments, _) => JsonELimits.Step(arguments, budget));
+            (arguments, _) => JsonELimits.Step(arguments, sizeBudget));
         return JsonTokenConverter.ToToken(JsonE.Evaluate(definitionNode, contextNode));
     }
 }
