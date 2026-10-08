@@ -111,6 +111,8 @@ internal static class ObjectBindingEngine
         contextNode[JsonEExpressionRewriter.ConcatFunction] = JsonFunction.Create(JsonELimits.Concat);
         contextNode[JsonEExpressionRewriter.BoundFunction] = JsonFunction.Create(
             (arguments, _) => JsonELimits.Bound(arguments, sizeBudget));
+        contextNode[JsonEExpressionRewriter.LetFunction] = JsonFunction.Create(
+            (arguments, _) => JsonELimits.Let(arguments, sizeBudget));
         contextNode[JsonEExpressionRewriter.StepFunction] = JsonFunction.Create(
             (arguments, _) => JsonELimits.Step(arguments, sizeBudget));
         var result = JsonE.Evaluate(definitionNode, contextNode);

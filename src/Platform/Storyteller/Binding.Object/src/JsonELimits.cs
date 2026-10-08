@@ -9,6 +9,8 @@ namespace _42.Platform.Storyteller.Binding.Object;
 
 internal static class JsonELimits
 {
+    private const string ReservedPrefix = "storyteller";
+
     public static int OperatorDepth(JToken token)
     {
         var max = 0;
@@ -133,6 +135,23 @@ internal static class JsonELimits
         var value = arguments.Length == 0 ? null : arguments[0];
         budget.Add(EvaluationSize.SerializedLength(value));
         return value;
+    }
+
+    public static JsonNode? Let(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        var value = arguments.Length == 0 ? null : arguments[0];
+        if (value is JsonObject obj)
+        {
+            foreach (var property in obj)
+            {
+                if (property.Key.StartsWith(ReservedPrefix, StringComparison.Ordinal))
+                {
+                    throw new BindingEvaluationException($"JSON-e name '{property.Key}' is reserved.");
+                }
+            }
+        }
+
+        return Bound(arguments, budget);
     }
 
     public static JsonNode? Step(JsonNode?[] arguments, JsonESizeBudget budget)
@@ -433,6 +452,8 @@ internal static class JsonELimits
                         continue;
                     }
 
+                    RejectReservedBinding(property);
+
                     if (property.Value.Type == JTokenType.String)
                     {
                         var text = property.Value.Value<string>() ?? string.Empty;
@@ -585,8 +606,56 @@ internal static class JsonELimits
                 continue;
             }
 
-            obj[name] = BoundWrap(value);
+            obj[name] = name == "$let" ? LetWrap(value) : BoundWrap(value);
         }
+    }
+
+    private static void RejectReservedBinding(JProperty property)
+    {
+        if (property.Name == "$let" && property.Value is JObject bindings)
+        {
+            foreach (var binding in bindings.Properties())
+            {
+                RejectReservedName(binding.Name);
+            }
+        }
+
+        if (!TryClauseParameters(property.Name, out var parameters))
+        {
+            return;
+        }
+
+        foreach (var parameter in parameters)
+        {
+            RejectReservedName(parameter);
+        }
+    }
+
+    private static void RejectReservedName(string name)
+    {
+        if (name.StartsWith(ReservedPrefix, StringComparison.Ordinal))
+        {
+            throw new BindingEvaluationException($"JSON-e name '{name}' is reserved.");
+        }
+    }
+
+    private static bool TryClauseParameters(string name, out string[] parameters)
+    {
+        parameters = [];
+        var open = name.IndexOf('(');
+        if (open <= 0 || name[^1] != ')')
+        {
+            return false;
+        }
+
+        var keyword = name[..open];
+        if (keyword is not ("each" or "by"))
+        {
+            return false;
+        }
+
+        parameters = name[(open + 1)..^1].Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        return true;
     }
 
     private static bool ShouldBound(string name, JToken value, bool isMapping)
@@ -612,6 +681,16 @@ internal static class JsonELimits
 
     private static JObject BoundWrap(JToken body)
     {
+        return ChargeWrap(body, JsonEExpressionRewriter.BoundFunction);
+    }
+
+    private static JObject LetWrap(JToken body)
+    {
+        return ChargeWrap(body, JsonEExpressionRewriter.LetFunction);
+    }
+
+    private static JObject ChargeWrap(JToken body, string function)
+    {
         // An array drops a delete marker, so $if without else still removes the value.
         var held = new JArray();
         held.Add(body.DeepClone());
@@ -626,7 +705,7 @@ internal static class JsonELimits
                 ["$if"] = JsonEExpressionRewriter.StepFunction + "(v)",
                 ["then"] = new JObject
                 {
-                    ["$eval"] = JsonEExpressionRewriter.BoundFunction + "(v[0])",
+                    ["$eval"] = function + "(v[0])",
                 },
             },
         };

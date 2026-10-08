@@ -16,6 +16,8 @@ internal static class JsonEExpressionRewriter
 
     public const string BoundFunction = "storytellerBound";
 
+    public const string LetFunction = "storytellerLet";
+
     public const string StepFunction = "storytellerStep";
 
     public const string InFunction = "storytellerIn";

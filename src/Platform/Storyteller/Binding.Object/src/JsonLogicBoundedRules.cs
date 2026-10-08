@@ -48,6 +48,7 @@ internal static class JsonLogicBoundedRules
         AddLibraryRule("%", strict: false, invert: false);
         AddLibraryRule("min", strict: false, invert: false);
         AddLibraryRule("max", strict: false, invert: false);
+        RuleRegistry.AddRule("log", new Log());
     }
 
     private static void AddLibraryRule(string name, bool strict, bool invert)
@@ -90,6 +91,20 @@ internal static class JsonLogicBoundedRules
             case JsonValue value when value.TryGetValue(out string? text):
                 Charge(text?.Length ?? 0);
                 break;
+        }
+    }
+
+    private static void ChargeOperand(JsonNode? node)
+    {
+        if (node is JsonArray or JsonObject)
+        {
+            ChargeStructure(node);
+            return;
+        }
+
+        if (node is JsonValue value && value.TryGetValue(out string? text))
+        {
+            Charge(text?.Length ?? 0);
         }
     }
 
@@ -493,6 +508,17 @@ internal static class JsonLogicBoundedRules
         }
     }
 
+    private sealed class Log : IRule
+    {
+        public JsonNode? Apply(JsonNode? args, EvaluationContext context)
+        {
+            var value = JsonLogic.Apply(args, context);
+            ChargeOperand(value);
+            JsonLogicDebugLogger.Instance.WriteLine(value);
+            return value;
+        }
+    }
+
     private sealed class Metered : IRule
     {
         private readonly IRule _inner;
@@ -559,20 +585,6 @@ internal static class JsonLogicBoundedRules
             {
                 Charge(leftText?.Length ?? 0);
                 Charge(rightText?.Length ?? 0);
-            }
-        }
-
-        private static void ChargeOperand(JsonNode? node)
-        {
-            if (node is JsonArray or JsonObject)
-            {
-                ChargeStructure(node);
-                return;
-            }
-
-            if (node is JsonValue value && value.TryGetValue(out string? text))
-            {
-                Charge(text?.Length ?? 0);
             }
         }
 
