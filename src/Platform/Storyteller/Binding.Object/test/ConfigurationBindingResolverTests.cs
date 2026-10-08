@@ -824,7 +824,46 @@ public class ConfigurationBindingResolverTests
         var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
 
         await act.Should().ThrowAsync<BindingException>()
-            .WithMessage($"*exceeds {ConfigurationBindingResolver.MaxEvaluationSteps} iterations*");
+            .WithMessage($"*exceeds {ConfigurationBindingResolver.MaxEvaluationSteps} steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_SiblingEnvelopesShareStepLimit_Throws()
+    {
+        var width = CubicWidthPastStepLimit() - 1;
+        width.Should().BeInRange(1, 49);
+        var one = (long)width + ((long)width * width) + ((long)width * width * width);
+        one.Should().BeLessThanOrEqualTo(ConfigurationBindingResolver.MaxEvaluationSteps);
+        (one * 2).Should().BeGreaterThan(ConfigurationBindingResolver.MaxEvaluationSteps);
+
+        var single = new JObject
+        {
+            ["value"] = new JObject
+            {
+                ["$binding"] = "jsone",
+                ["$definition"] = NestedDeletedMaps(3, width),
+            },
+        };
+        await _resolver.ResolveAsync(single, includeSecrets: true, _scope);
+
+        var content = new JObject
+        {
+            ["first"] = new JObject
+            {
+                ["$binding"] = "jsone",
+                ["$definition"] = NestedDeletedMaps(3, width),
+            },
+            ["second"] = new JObject
+            {
+                ["$binding"] = "jlogic",
+                ["$definition"] = NestedAll(3, width),
+            },
+        };
+
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+
+        await act.Should().ThrowAsync<BindingException>()
+            .WithMessage($"*exceeds {ConfigurationBindingResolver.MaxEvaluationSteps} steps*");
     }
 
     [Fact]
