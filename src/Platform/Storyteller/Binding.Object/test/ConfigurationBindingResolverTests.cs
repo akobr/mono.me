@@ -1598,6 +1598,16 @@ public class ConfigurationBindingResolverTests
         await _resolver.ResolveAsync(array, includeSecrets: true, _scope);
         array["value"]!.Value<decimal>().Should().Be(0);
 
+        var nested = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "xs[0]" },
+            new JObject
+            {
+                ["xs"] = new JArray { NumberArray(ConfigurationBindingResolver.MaxEvaluationSteps + 1) },
+            });
+        var nestedAct = () => _resolver.ResolveAsync(nested, includeSecrets: true, _scope).AsTask();
+        await nestedAct.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+
         var content = Envelope(
             "jsone",
             new JObject { ["$eval"] = "s[0]" },
@@ -1626,6 +1636,13 @@ public class ConfigurationBindingResolverTests
             new JObject { ["xs"] = NumberArray(ConfigurationBindingResolver.MaxEvaluationSteps + 1) });
         await _resolver.ResolveAsync(array, includeSecrets: true, _scope);
         array["value"].Should().BeOfType<JArray>().Which.Select(item => item!.Value<decimal>()).Should().Equal(0m);
+
+        var wide = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "xs[0:]" },
+            new JObject { ["xs"] = NumberArray(ConfigurationBindingResolver.MaxEvaluationSteps + 1) });
+        var wideAct = () => _resolver.ResolveAsync(wide, includeSecrets: true, _scope).AsTask();
+        await wideAct.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
 
         var content = Envelope(
             "jsone",
@@ -1693,6 +1710,17 @@ public class ConfigurationBindingResolverTests
         var between = Envelope("jlogic", Parse("""{ "<": [1, 2, 3] }"""));
         await _resolver.ResolveAsync(between, includeSecrets: true, _scope);
         between["value"]!.Value<bool>().Should().BeTrue();
+
+        var small = Envelope("jlogic", Parse("""{ "<": [[1], 0] }"""));
+        await _resolver.ResolveAsync(small, includeSecrets: true, _scope);
+        small["value"]!.Value<bool>().Should().BeFalse();
+
+        var wide = Envelope(
+            "jlogic",
+            Parse("""{ "<": [{ "var": "xs" }, 0] }"""),
+            new JObject { ["xs"] = NumberArray(ConfigurationBindingResolver.MaxEvaluationSteps + 1) });
+        var wideAct = () => _resolver.ResolveAsync(wide, includeSecrets: true, _scope).AsTask();
+        await wideAct.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
 
         await AssertComparisonRule("""{ "<": [1, 2] }""", true, """{ "<": [0, { "var": "d" }] }""");
     }

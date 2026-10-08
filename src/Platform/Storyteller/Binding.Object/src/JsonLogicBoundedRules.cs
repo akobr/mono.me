@@ -564,6 +564,12 @@ internal static class JsonLogicBoundedRules
 
         private static void ChargeOperand(JsonNode? node)
         {
+            if (node is JsonArray or JsonObject)
+            {
+                ChargeStructure(node);
+                return;
+            }
+
             if (node is JsonValue value && value.TryGetValue(out string? text))
             {
                 Charge(text?.Length ?? 0);
