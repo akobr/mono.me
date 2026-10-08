@@ -704,6 +704,26 @@ public class ConfigurationBindingResolverTests
     }
 
     [Fact]
+    public async Task Resolve_JsonESwitchDefault_ReturnsDefault()
+    {
+        var content = Envelope(
+            "jsone",
+            Parse("""
+                {
+                  "$switch": {
+                    "x == 2": "two",
+                    "$default": "other"
+                  }
+                }
+                """),
+            new JObject { ["x"] = 1 });
+
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+
+        content["value"]!.Value<string>().Should().Be("other");
+    }
+
+    [Fact]
     public async Task Resolve_JsonELetFanOutPastValueSize_Throws()
     {
         const int copies = 10;
