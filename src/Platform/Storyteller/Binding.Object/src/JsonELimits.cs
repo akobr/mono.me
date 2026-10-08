@@ -174,6 +174,132 @@ internal static class JsonELimits
         return result.ToString();
     }
 
+    public static JsonNode? In(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        if (arguments.Length != 2)
+        {
+            throw new InterpreterException("infix: in expects Array, string, or object on right side");
+        }
+
+        var left = arguments[0];
+        var right = arguments[1];
+        if (right is JsonObject obj)
+        {
+            if (!IsJsonString(left, out var key))
+            {
+                throw new InterpreterException("infix: in-object expects string on left side");
+            }
+
+            budget.AddSteps(obj.Count);
+            return obj.ContainsKey(key);
+        }
+
+        if (IsJsonString(right, out var haystack))
+        {
+            if (!IsJsonString(left, out var needle))
+            {
+                throw new InterpreterException("infix: in-string expects string on left side");
+            }
+
+            if (needle.Length == 0)
+            {
+                return true;
+            }
+
+            budget.AddSteps(haystack.Length);
+            return haystack.Contains(needle);
+        }
+
+        if (right is JsonArray array)
+        {
+            budget.AddSteps(array.Count);
+            foreach (var item in array)
+            {
+                if (DeepEquals(left, item, budget))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        throw new InterpreterException("infix: in expects Array, string, or object on right side");
+    }
+
+    public static JsonNode? Equals(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        if (arguments.Length != 2)
+        {
+            throw new InterpreterException("infix: == expects two values");
+        }
+
+        return DeepEquals(arguments[0], arguments[1], budget);
+    }
+
+    public static JsonNode? Split(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        if (arguments.Length != 2 || !IsJsonString(arguments[0], out var text) || !TrySplitDelimiter(arguments[1], out var delimiter))
+        {
+            throw new BuiltInException("invalid arguments to builtin: split");
+        }
+
+        budget.AddSteps(text.Length);
+        if (delimiter.Length == 0)
+        {
+            var chars = new JsonArray();
+            foreach (var character in text)
+            {
+                chars.Add(character.ToString());
+            }
+
+            return chars;
+        }
+
+        var parts = new JsonArray();
+        foreach (var part in text.Split(delimiter))
+        {
+            parts.Add(part);
+        }
+
+        return parts;
+    }
+
+    public static JsonNode? Lowercase(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        var text = RequireString(arguments, "lowercase");
+        budget.AddSteps(text.Length);
+        return text.ToLowerInvariant();
+    }
+
+    public static JsonNode? Uppercase(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        var text = RequireString(arguments, "uppercase");
+        budget.AddSteps(text.Length);
+        return text.ToUpperInvariant();
+    }
+
+    public static JsonNode? Strip(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        var text = RequireString(arguments, "strip");
+        budget.AddSteps(text.Length);
+        return Trim(text, leading: true, trailing: true);
+    }
+
+    public static JsonNode? LStrip(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        var text = RequireString(arguments, "lstrip");
+        budget.AddSteps(text.Length);
+        return Trim(text, leading: true, trailing: false);
+    }
+
+    public static JsonNode? RStrip(JsonNode?[] arguments, JsonESizeBudget budget)
+    {
+        var text = RequireString(arguments, "rstrip");
+        budget.AddSteps(text.Length);
+        return Trim(text, leading: false, trailing: true);
+    }
+
     private static void Rewrite(JToken token)
     {
         Rewrite(token, interpolateKeys: true);
@@ -573,5 +699,131 @@ internal static class JsonELimits
         }
 
         return value.TryGetValue(out text!);
+    }
+
+    private static bool DeepEquals(JsonNode? left, JsonNode? right, JsonESizeBudget budget)
+    {
+        if (left is null || right is null)
+        {
+            return left is null && right is null;
+        }
+
+        if (left is JsonArray leftArray && right is JsonArray rightArray)
+        {
+            budget.AddSteps(Math.Max(leftArray.Count, rightArray.Count));
+            if (leftArray.Count != rightArray.Count)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < leftArray.Count; index++)
+            {
+                if (!DeepEquals(leftArray[index], rightArray[index], budget))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (left is JsonObject leftObject && right is JsonObject rightObject)
+        {
+            budget.AddSteps(Math.Max(leftObject.Count, rightObject.Count));
+            if (leftObject.Count != rightObject.Count)
+            {
+                return false;
+            }
+
+            foreach (var property in leftObject)
+            {
+                if (!rightObject.TryGetPropertyValue(property.Key, out var other) ||
+                    !DeepEquals(property.Value, other, budget))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (IsJsonString(left, out var leftText) && IsJsonString(right, out var rightText))
+        {
+            var limit = Math.Min(leftText.Length, rightText.Length);
+            var index = 0;
+            while (index < limit && leftText[index] == rightText[index])
+            {
+                index++;
+            }
+
+            var scanned = index < limit ? index + 1 : index;
+            budget.AddSteps(scanned);
+            return index == leftText.Length && leftText.Length == rightText.Length;
+        }
+
+        if (TryNumber(left, out var leftNumber) && TryNumber(right, out var rightNumber))
+        {
+            return leftNumber == rightNumber;
+        }
+
+        if (left is JsonValue leftValue &&
+            right is JsonValue rightValue &&
+            leftValue.TryGetValue(out bool leftBool) &&
+            rightValue.TryGetValue(out bool rightBool))
+        {
+            return leftBool == rightBool;
+        }
+
+        return false;
+    }
+
+    private static string RequireString(JsonNode?[] arguments, string name)
+    {
+        if (arguments.Length == 1 && IsJsonString(arguments[0], out var text))
+        {
+            return text;
+        }
+
+        throw new BuiltInException($"invalid arguments to builtin: {name}");
+    }
+
+    private static bool TrySplitDelimiter(JsonNode? node, out string delimiter)
+    {
+        if (IsJsonString(node, out delimiter))
+        {
+            return true;
+        }
+
+        if (!TryNumber(node, out var number))
+        {
+            delimiter = string.Empty;
+            return false;
+        }
+
+        delimiter = number == 0 ? string.Empty : number.ToString(CultureInfo.InvariantCulture);
+        return true;
+    }
+
+    private static string Trim(string text, bool leading, bool trailing)
+    {
+        var start = 0;
+        var end = text.Length - 1;
+        if (leading)
+        {
+            while (start <= end && char.IsWhiteSpace(text[start]))
+            {
+                start++;
+            }
+        }
+
+        if (trailing)
+        {
+            while (end >= start && char.IsWhiteSpace(text[end]))
+            {
+                end--;
+            }
+        }
+
+        return text[start..(end + 1)];
     }
 }

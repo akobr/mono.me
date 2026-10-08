@@ -20,6 +20,11 @@ internal sealed class JsonESizeBudget
         _read.AddStep();
     }
 
+    public void AddSteps(int count)
+    {
+        _read.AddSteps(count);
+    }
+
     public void Add(int length)
     {
         EnsureFits(length);
