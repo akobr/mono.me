@@ -25,7 +25,7 @@ Writing again merges into the stored document. Objects combine property by prope
 - `$remove` — an array of JSON paths to drop from the stored document after the merge
 - `$patch` — a JSON Patch array applied after `$remove`
 
-Both instructions are consumed by the write. They are not left in the stored document. Each change that actually alters the document becomes a version, with an author and a timestamp, and the previous document is kept. You can read any version and diff any two versions of that annotation's own document.
+Both instructions are consumed by the write. They are not left in the stored document. A JSON Patch may start with `test` operations that check the values the client last read. When a value has changed in the meantime, the API answers `412 Precondition Failed` with the error code `PatchTestFailed` and stores nothing, so two editors cannot silently overwrite each other. Any other invalid patch answers `400` with `PatchInvalid`. Writing a configuration needs the `Contributor` role on the project. Each change that actually alters the document becomes a version, with an author and a timestamp, and the previous document is kept. You can read any version and diff any two versions of that annotation's own document.
 
 ## The effective document
 

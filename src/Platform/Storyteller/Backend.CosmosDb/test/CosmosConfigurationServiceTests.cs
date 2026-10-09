@@ -827,6 +827,41 @@ public class CosmosConfigurationServiceTests(Startup startup)
     }
 
     [Fact]
+    public async Task PatchConfigurationAsync_FailedTest_ThrowsTestFailedAndKeepsTheVersion()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var annotationKey = AnnotationKey.CreateResponsibility("patch-test-failed");
+        await annotations.CreateAnnotationAsync(TestConstants.Organization, new Responsibility
+        {
+            AnnotationKey = annotationKey,
+            AnnotationType = AnnotationType.Responsibility,
+            Name = "patch-test-failed",
+            ProjectName = Project,
+            ViewName = Constants.DefaultViewName,
+        });
+
+        var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
+        var stored = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "retries": 3 }"""), "system");
+
+        // a client that still sees retries = 2 must not overwrite the newer value
+        var patchOps = JArray.Parse("""
+            [
+              { "op": "test", "path": "/retries", "value": 2 },
+              { "op": "replace", "path": "/retries", "value": 5 }
+            ]
+            """);
+
+        var act = () => configs.PatchConfigurationAsync(key, patchOps, "system");
+        (await act.Should().ThrowAsync<JsonPatchException>()).Which.Kind.Should().Be(JsonPatchFailureKind.TestFailed);
+
+        var current = await configs.GetRawConfigurationAsync(key);
+        current!.Version.Should().Be(stored.Version);
+        current.Content["retries"]!.Value<int>().Should().Be(3);
+    }
+
+    [Fact]
     public async Task GetResolvedConfigurationAsync_ConfigFunction_ResolvesFromSameDocument()
     {
         var annotations = Context.Services.GetRequiredService<IAnnotationService>();

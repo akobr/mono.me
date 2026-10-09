@@ -1,5 +1,6 @@
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Binding;
+using _42.Platform.Storyteller.Configuring;
 
 namespace _42.Platform.Storyteller.Api.ErrorHandling;
 
@@ -23,6 +24,8 @@ public static class ExceptionExtensions
         {
             EvaluationLimitExceededException limit => $"binding.limit.{ToCodeName(limit.Kind)}",
             BindingEvaluationException => "binding.evaluation",
+            StorytellerException domain => domain.ErrorCode,
+            JsonPatchException patch => patch.ErrorCode,
             _ => null,
         };
     }

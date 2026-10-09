@@ -12,11 +12,26 @@ internal static class AccessMappings
         AccessMap = e.AccessMap,
     };
 
+    public static AccountEntity ToEntity(this Account m) => new()
+    {
+        Id = m.Id,
+        UserName = m.UserName,
+        Name = m.Name,
+        AccessMap = new(m.AccessMap),
+    };
+
     public static AccessPoint ToAccessPoint(this AccessPointEntity e) => new()
     {
         Key = e.Key,
         AccessMap = e.AccessMap,
         MachineAuthentication = e.MachineAuthentication,
+    };
+
+    public static AccessPointEntity ToEntity(this AccessPoint m) => new()
+    {
+        Key = m.Key,
+        AccessMap = new(m.AccessMap),
+        MachineAuthentication = m.MachineAuthentication,
     };
 
     public static MachineAccess ToMachineAccess(this MachineAccessEntity e) => new()

@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
@@ -135,6 +136,7 @@ public class ConfigurationHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The created or updated configuration.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The configuration violates the schema.")]
+    [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetConfiguration(
@@ -146,7 +148,7 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -173,6 +175,11 @@ public class ConfigurationHttp
             var author = request.GetAuthor();
             var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author, IsForce(request));
             return new OkObjectResult(outputModel);
+        }
+        catch (JsonPatchException ex)
+        {
+            // A failed test operation answers 412, any other patch failure 400.
+            return ErrorResponseMapping.ToActionResult(ex);
         }
         catch (InvalidOperationException ex)
         {
@@ -207,6 +214,7 @@ public class ConfigurationHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The configuration doesn't exist or has no content to patch.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The patch violates the configuration schema.")]
+    [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PatchConfiguration(
@@ -218,7 +226,7 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -249,6 +257,11 @@ public class ConfigurationHttp
         catch (ConfigurationNotFoundException ex)
         {
             return new NotFoundObjectResult(new ErrorResponse(ex.Message));
+        }
+        catch (JsonPatchException ex)
+        {
+            // A failed test operation answers 412, any other patch failure 400.
+            return ErrorResponseMapping.ToActionResult(ex);
         }
         catch (InvalidOperationException ex)
         {
@@ -291,7 +304,7 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {

@@ -120,7 +120,7 @@ The routes include the view, like configuration routes:
 
 - Reads require one of the scopes `Configuration.Read`, `Configuration.Write`, `Default.Read`, `Default.Write`, plus access to the project.
 - Writes require `Configuration.Write` or `Default.Write` and the `Contributor` role in the project.
-- Write status codes: `400` for invalid input (JSON, `$patch`, JSON Patch), `404` for a patch of a missing template, `409` when the concurrency retries run out (`TemplateConcurrencyException`), `500` for a storage or cache-invalidation failure.
+- Write status codes: `400` for invalid input (JSON, `$patch`, JSON Patch; `ErrorCode` `PatchInvalid` for patch errors), `404` for a patch of a missing template, `409` when the concurrency retries run out (`TemplateConcurrencyException`), `412` when a JSON Patch `test` operation does not match the stored template (`ErrorCode` `PatchTestFailed`), `500` for a storage or cache-invalidation failure. A client that puts `test` operations before its changes gets optimistic concurrency: a stale view of the template returns 412 instead of overwriting newer content.
 - Diff endpoints return a `DiffResult`, or unified diff text with `?format=unified`. An unknown version returns `404`.
 
 ## Versions

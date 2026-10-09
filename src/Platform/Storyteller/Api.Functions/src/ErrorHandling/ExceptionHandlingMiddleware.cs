@@ -32,6 +32,10 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         {
             await ProcessBindingEvaluationExceptionAsync(context, exception);
         }
+        catch (Exception exception) when (ErrorResponseMapping.TryMap(exception, out var statusCode, out var errorResponse))
+        {
+            await ProcessClientErrorAsync(context, exception, statusCode, errorResponse);
+        }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Error processing invocation");
@@ -70,6 +74,26 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         _logger.LogWarning(exception, "Authentication failed at: {url}", httpReqData.Url.AbsolutePath);
         var httpUnauthorizedResponse = httpReqData.CreateResponse(HttpStatusCode.Unauthorized);
         context.SetInvocationResult(httpUnauthorizedResponse);
+    }
+
+    private async Task ProcessClientErrorAsync(FunctionContext context, Exception exception, HttpStatusCode statusCode, ErrorResponse errorResponse)
+    {
+        // A domain rule rejected the request: a client error. No exception details leave the API.
+        _logger.LogWarning(
+            "Request rejected with {StatusCode} ({ErrorCode}): {Message}",
+            (int)statusCode,
+            errorResponse.ErrorCode,
+            exception.Message);
+        var httpReqData = await context.GetHttpRequestDataAsync();
+
+        if (httpReqData is null)
+        {
+            return;
+        }
+
+        var httpErrorResponse = httpReqData.CreateResponse(statusCode);
+        await httpErrorResponse.WriteAsJsonAsync(errorResponse);
+        context.SetInvocationResult(httpErrorResponse);
     }
 
     private async Task ProcessBindingEvaluationExceptionAsync(FunctionContext context, BindingEvaluationException exception)

@@ -112,12 +112,17 @@ public static class HttpRequestDataExtensions
 
         var accountId = @this.GetIdentityUniqueId();
         var accessRole = await accessService.GetAccountRoleAsync(accountId, accessPointKey);
-
-        if (accessRole < minimalRole)
-        {
-            throw new SecurityTokenException($"No {minimalRole:G} access to the project {accessPointKey}.");
-        }
+        EnsureRole(accessRole, minimalRole, accessPointKey);
 #endif
+    }
+
+    // An authenticated user without the role gets 403, never 401, so clients do not sign in again for nothing.
+    public static void EnsureRole(AccountRole actualRole, AccountRole minimalRole, string accessPointKey)
+    {
+        if (actualRole < minimalRole)
+        {
+            throw new AccessDeniedException($"No {minimalRole:G} access to '{accessPointKey}'.");
+        }
     }
 
     public static Task CheckAccessToOrganizationAsync(
