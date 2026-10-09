@@ -1,0 +1,80 @@
+{
+  "name": "@42for.net/2splatform.sdk",
+  "version": "0.8.91",
+  "description": "TypeScript SDK for the 2S Platform Storyteller API: fetch functions, Vue Query composables, Zod schemas and MSW mocks.",
+  "license": "MIT",
+  "author": "Ales Kobr",
+  "homepage": "https://42for.net/",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./vue-query": {
+      "types": "./dist/vue-query.d.ts",
+      "import": "./dist/vue-query.js"
+    },
+    "./zod": {
+      "types": "./dist/zod.d.ts",
+      "import": "./dist/zod.js"
+    },
+    "./msw": {
+      "types": "./dist/msw.d.ts",
+      "import": "./dist/msw.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "build": "tsup",
+    "prepare": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --ignore-pattern \"generated/**\" --ignore-pattern \"dist/**\"",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@faker-js/faker": ">=9",
+    "@tanstack/vue-query": "^5",
+    "msw": "^2",
+    "vue": "^3.5",
+    "zod": "^4"
+  },
+  "peerDependenciesMeta": {
+    "@faker-js/faker": {
+      "optional": true
+    },
+    "@tanstack/vue-query": {
+      "optional": true
+    },
+    "msw": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "zod": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^10.6.0",
+    "@tanstack/vue-query": "^5.104.1",
+    "@types/node": "^24.0.0",
+    "msw": "^2.15.0",
+    "orval": "^8.41.0",
+    "oxlint": "^1.87.0",
+    "prettier": "^3.9.9",
+    "tsup": "^8.5.1",
+    "typescript": "~6.0.3",
+    "vitest": "^4.1.11",
+    "vue": "^3.5.43",
+    "zod": "^4.6.5"
+  }
+}
