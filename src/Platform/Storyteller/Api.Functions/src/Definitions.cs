@@ -15,6 +15,16 @@ public static class Definitions
                 public const string Grant = "v1/access/grant";
                 public const string Revoke = "v1/access/revoke";
 
+                public const string Members = $"v1/access/points/{{{Parameters.Key}}}/members";
+                public const string Member = $"v1/access/points/{{{Parameters.Key}}}/members/{{{Parameters.AccountId}}}";
+
+                public const string PointInvitations = $"v1/access/points/{{{Parameters.Key}}}/invitations";
+                public const string PointInvitation = $"v1/access/points/{{{Parameters.Key}}}/invitations/{{{Parameters.Id}}}";
+                public const string PointInvitationResend = $"v1/access/points/{{{Parameters.Key}}}/invitations/{{{Parameters.Id}}}/resend";
+                public const string MyInvitations = "v1/access/invitations/mine";
+                public const string InvitationAccept = $"v1/access/invitations/{{{Parameters.Id}}}/accept";
+                public const string InvitationDecline = $"v1/access/invitations/{{{Parameters.Id}}}/decline";
+
                 public const string Machines = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines";
                 public const string Machine = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}";
 
@@ -122,6 +132,18 @@ public static class Definitions
 
             public const string GrantUserAccess = nameof(GrantUserAccess);
             public const string RevokeUserAccess = nameof(RevokeUserAccess);
+
+            public const string GetMembers = nameof(GetMembers);
+            public const string SetMemberRole = nameof(SetMemberRole);
+            public const string RemoveMember = nameof(RemoveMember);
+
+            public const string GetInvitations = nameof(GetInvitations);
+            public const string CreateInvitation = nameof(CreateInvitation);
+            public const string ResendInvitation = nameof(ResendInvitation);
+            public const string RevokeInvitation = nameof(RevokeInvitation);
+            public const string GetMyInvitations = nameof(GetMyInvitations);
+            public const string AcceptInvitation = nameof(AcceptInvitation);
+            public const string DeclineInvitation = nameof(DeclineInvitation);
 
             public const string GetMachineAccesses = nameof(GetMachineAccesses);
             public const string GetMachineAccess = nameof(GetMachineAccess);
@@ -237,6 +259,7 @@ public static class Definitions
         public const string ViewTo = "viewTo";
         public const string AnnotationType = "annotationType";
         public const string Thumbprint = "thumbprint";
+        public const string AccountId = "accountId";
         public const string Format = "format";
         public const string Force = "force";
     }
@@ -266,6 +289,9 @@ public static class Definitions
         public const string View = "The target view inside the project.";
         public const string ContinuationToken = "The continuation token for multi-page queries.";
         public const string IdMachine = "The id of the machine access.";
+        public const string AccessPointKey = "The key of the access point: organization, or organization.project.";
+        public const string AccountId = "The id of the account (the identity provider's subject).";
+        public const string InvitationId = "The id of the invitation.";
         public const string Key = "The key of the requested annotation.";
         public const string AnnotationType = "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).";
         public const string DiffFormat = "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.";

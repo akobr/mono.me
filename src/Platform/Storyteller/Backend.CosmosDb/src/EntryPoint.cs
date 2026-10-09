@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -7,6 +8,7 @@ using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
@@ -97,6 +99,12 @@ public static class EntryPoint
         services.AddSingleton<IConfigurationService, CosmosConfigurationService>();
         services.AddSingleton<IConfigurationSchemaService, CosmosConfigurationSchemaService>();
         services.AddSingleton<IConfigurationTemplateService, CosmosConfigurationTemplateService>();
+
+        // Invitations: the identity provider may replace the sender (AuthKit sends the email through WorkOS).
+        services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));
+        services.TryAddSingleton<IInvitationSender, NoopInvitationSender>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddTransient<IInvitationService, CosmosInvitationService>();
 
         services.AddMemoryCache();
 

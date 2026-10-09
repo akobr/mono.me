@@ -26,6 +26,10 @@ public class AuthKitOptions
 
     public string[] DefaultUserScopes { get; set; } = [];
 
+    // Accepting an invitation needs a verified email. Tokens without an email_verified claim
+    // count as verified only when this is false; add email_verified to the JWT template instead.
+    public bool RequireVerifiedEmail { get; set; } = true;
+
     // WorkOS permission slug => Storyteller scope. A value can hold several scopes separated by spaces.
     // Slugs may contain ':'; AddUserAuthenticationOptions reads the section so they bind as one key.
     public Dictionary<string, string> PermissionMap { get; set; } = new();

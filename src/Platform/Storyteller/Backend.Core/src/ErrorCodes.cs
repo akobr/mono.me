@@ -11,6 +11,14 @@ public static class ErrorCodes
     public const string AccessPointExists = "AccessPointExists";
     public const string LastOwner = "LastOwner";
     public const string ElevatedRole = "ElevatedRole";
+    public const string SelfRoleChange = "SelfRoleChange";
+    public const string MemberNotFound = "MemberNotFound";
+
+    public const string InvitationExists = "InvitationExists";
+    public const string InvitationNotPending = "InvitationNotPending";
+    public const string InvitationExpired = "InvitationExpired";
+    public const string EmailNotVerified = "EmailNotVerified";
+    public const string EmailMismatch = "EmailMismatch";
 
     public const string PatchInvalid = "PatchInvalid";
     public const string PatchTestFailed = "PatchTestFailed";
