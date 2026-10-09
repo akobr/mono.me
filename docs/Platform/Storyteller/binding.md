@@ -1,4 +1,4 @@
-﻿# Configuration Data Binding
+# Configuration Data Binding
 
 This document describes the concept and implementation of the data binding system for configurations within the Platform Storyteller.
 
@@ -58,7 +58,7 @@ An object is an envelope when `$binding` is a JSON string and `$definition` is p
 
 `$definition` is the program and may be any JSON value. The walker does not bind `@` strings inside it and does not evaluate envelopes inside it. `$context` is optional, defaults to `{}`, and must resolve to a JSON object. Secrets, `@config`, and `@annotation` that the program needs belong in `$context`. The walker resolves `$context` first, then the engine sees the untouched `$definition` and that resolved object.
 
-`jlogic` is [JSON Logic](https://jsonlogic.com/) through the `JsonLogic` 6.1.0 package (`JsonLogic.Apply`). `jsone` is [JSON-e](https://json-e.js.org/) through `JsonE.Net` 3.0.1 (`JsonE.Evaluate`). No custom operators are registered. JSON-e treats every `$` property as one of its own operators, so a template that must emit a Storyteller envelope writes `$$binding`, `$$definition`, and `$$context`. One JSON-e pass peels a single `$`. The walk of the result then evaluates the emitted envelope. JSON Logic does not reserve `$`. A rule that returns an envelope is evaluated by that same post-pass.
+`jlogic` is [JSON Logic](https://jsonlogic.com/) through the `JsonLogic` 6.1.0 package (`JsonLogic.Apply`). `jsone` is [JSON-e](https://json-e.js.org/) through a vendored build of `JsonE.Net` 3.0.1 (`Binding.JsonE`, see below) that adds a metering hook and nothing else. No custom operators are registered. JSON-e treats every `$` property as one of its own operators, so a template that must emit a Storyteller envelope writes `$$binding`, `$$definition`, and `$$context`. One JSON-e pass peels a single `$`. The walk of the result then evaluates the emitted envelope. JSON Logic does not reserve `$`. A rule that returns an envelope is evaluated by that same post-pass.
 
 ```json
 {
@@ -92,15 +92,42 @@ The context is resolved with the `@` language first. The template then sees plai
 
 The envelope is replaced by the engine result. The result may be an object, an array, a string, a number, a boolean, or null, and it is walked again, so a result string that starts with `@` is bound and an emitted envelope runs. The root `Configuration.Content` is a `JObject`. An envelope that is the entire content must evaluate to an object. The properties of that object replace the properties of the same instance. Any other root result throws `BindingEvaluationException` and leaves the token unchanged.
 
-Depth starts at 0 and increases by one for each envelope evaluation on the way down, including an envelope produced by an earlier result. Ordinary object nesting does not count. Nesting deeper than 32 throws `BindingEvaluationException` with the JSON path. An empty path is shown as `$`. A second counter bounds the whole read: one resolved read evaluates at most 256 envelopes, whether they are nested or siblings produced by an earlier result. The 257th throws `BindingEvaluationException` with the JSON path.
-
-One evaluation has its own limits. JSON-e `range` returns at most 1000 numbers. A JSON-e template nests at most 16 operators, counted on objects whose keys start with a single `$` (`$let`, `$map`, `$reduce`, `$eval`, and the other `$` operators). Keys that start with `$$` are escaped data and do not count. JSON-e string `+` stops at 100000 characters in every expression, including `$eval`, an `$if` condition, a `$switch` or `$match` key, `$sort` `by(...)`, and `$find` `each(...)`. `${...}` interpolation stops at the same limit in string values and in object keys. JSON Logic `cat` stops at the same character limit, `merge` returns at most 1000 items, and `reduce` accepts at most 1000 items. Passing a limit throws `BindingEvaluationException`. A failure inside an engine is then wrapped as `BindingException` with the JSON path. The depth and evaluation counters bound envelopes that emit envelopes. The same 100000-character limit is a size budget for one evaluation. The envelope result is charged against that limit too. JSON Logic `reduce` measures its accumulator after each step and stops when the serialized value passes the budget. JSON Logic `map` adds the serialized length of each mapped value and stops when that total passes the budget. JSON-e adds the serialized length of every operator result, including `$let`, `$eval`, `$if`, `$merge`, and `$flatten`, and of every `$map` or `$reduce` `each` result and `$json` value. `join` charges the same budget while it builds its string. An `$if` without `else` still drops the value, including a value inside `$map` or `$reduce`. JSON Logic `all`, `some`, `none`, `filter`, `map`, and `reduce`, together with every wrapped JSON-e evaluation, share one limit of 100000 steps in one read. A dropped value still counts. JSON-e `in`, `==`, `!=`, string indexing and slicing, and the builtins `len`, `split`, `lowercase`, `uppercase`, `strip`, `lstrip`, and `rstrip` charge one step for each array item, object property, or string character they scan. An array index or slice charges the value it copies, one step for each nested array item, object property, or string character, and a slice also charges the number of items it returns. `len` of an array stays uncharged. JSON Logic `in`, and `==` or `!=` when either side is an array, charge the same way. `===` and `!==` charge an array or object operand, and they charge string length when both sides are strings. `<`, `<=`, `>`, `>=`, `+`, `-`, `*`, `/`, `%`, `min`, and `max` charge a string operand's length, and they charge an array or object operand the same way, before the value is copied. Those scans share the 100000-step limit. The context names `range`, `join`, `split`, `len`, `lowercase`, `uppercase`, `strip`, `lstrip`, `rstrip`, `storytellerAdd`, `storytellerConcat`, `storytellerBound`, `storytellerLet`, `storytellerStep`, `storytellerIn`, `storytellerEquals`, `storytellerIndex`, and `storytellerSlice` are reserved for these checks, so a value of the same name in `$context` does not replace them. A `$let` binding, a computed `$let` object, or an `each(...)` or `by(...)` parameter whose name starts with `storyteller` is rejected. Every `$let` value is checked again after its keys render, so an interpolated key is rejected too. That check charges the size budget only when the `$let` value is itself an operator. A wrapped iteration and a `$find` item charge the body's node count plus its expression length divided by 8, and a JSON Logic loop charges the body rule's node count on each item.
-
 `@config` reads the snapshot taken before the pass. Object results are not written into that snapshot, so a sibling envelope is invisible to `@config` in another envelope. Nest the inner envelope inside the outer `$context` when one result must feed the other.
 
 `$fromNow` without `from` reads the clock, so that resolved document changes between reads. Calculated content is unchanged and stays cacheable. `$fromNow` with `from` stays a string.
 
-A malformed envelope throws `BindingEvaluationException` before either engine runs, and the token is left unchanged. `JsonEException` and `JsonLogicException` are rethrown as `BindingEvaluationException`. The resolver then wraps that failure as `BindingException` with the JSON path, in the same shape as `BindingExecutor`. The JSON Logic `log` operator charges its operand on the shared step limit, then writes that operand to `ILogger` only when Debug is enabled.
+#### Evaluation limits
+
+JSON Logic and JSON-e are full languages, and a configuration author can write a small envelope that would otherwise run for minutes, allocate gigabytes, or overflow the stack. Instead of capping operators one by one, one meter bounds the real resources of a whole resolved read. Every JSON Logic rule invocation and every JSON-e template node, expression node, expression parse, `${...}` hole, and `range` item reports one step to it. The recursion of the interpreters, the expression parser, and expression evaluation is counted as depth. Every operator is bounded, including ones nobody has listed.
+
+| Limit (`ObjectBindingLimits`) | Default | Scope | Kind |
+| --- | --- | --- | --- |
+| `MaxSteps` | 1,000,000 | one read, shared by all its envelopes | `Steps` |
+| `MaxAllocatedBytes` | 64 MiB | one read, bytes allocated on the evaluating thread inside the engines | `Memory` |
+| `MaxEvaluationTime` | 500 ms | one read, time inside the engines (asynchronous `@` resolution between envelopes does not count) | `Time` |
+| `MaxDepth` | 512 | one engine call: template, rule, parser, and expression recursion; also the nesting of a `$definition` or `$context` | `Depth` |
+| `MaxResultLength` | 100,000 serialized characters | one envelope result | `Result` |
+| `MaxResultDepth` | 64 nested arrays and objects | one envelope result | `Result` |
+| `MaxEnvelopeDepth` | 32 | nested envelope evaluations in one read | `EnvelopeDepth` |
+| `MaxEnvelopeEvaluations` | 256 | envelope evaluations in one read | `EnvelopeCount` |
+
+Steps are the same on every machine, so a template that passes on steps always passes. Allocation is nearly deterministic for one runtime version, and time is not; both are backstops for work inside one primitive, such as `in` over a large context array or `missing` over many keys, which counts as one step. Which limit stops a runaway template depends on its shape: loops that build values usually stop on memory, `range`-driven loops on steps, very long expression chains (more than about 500 terms of `||`, `+`, and so on) on depth, and repeated scans of large context data on time. The meter checks steps and allocation on every step and the clock every 16 steps, so a limit is overshot by at most one primitive (16 for time). The first exceeded limit is latched: every later step throws again.
+
+The stack is never exhausted. Past `MaxDepth`, or when the thread is close to the end of its stack, evaluation stops with a `Depth` limit. Before this meter, a 15 KB expression such as `!!!…true` overflowed the stack in the JSON-e parser and killed the worker process.
+
+The result of each envelope is walked before it is converted back. The walk stops as soon as the serialized length passes `MaxResultLength` or the nesting passes `MaxResultDepth`, so a result like `[s,s,…]` that shares one large string is rejected without being serialized. `MaxResultDepth` matches the reader that converts the result back to a token.
+
+Depth of envelopes starts at 0 and increases by one for each envelope evaluation on the way down, including an envelope produced by an earlier result. Ordinary object nesting does not count. Nesting deeper than `MaxEnvelopeDepth` throws. A second counter bounds the whole read: one resolved read evaluates at most `MaxEnvelopeEvaluations` envelopes, whether they are nested or siblings produced by an earlier result. The next one throws.
+
+Passing any limit throws `EvaluationLimitExceededException` (a `BindingEvaluationException`) with `Kind`, `Limit`, and the JSON `Path` of the envelope. An empty path is shown as `$`. The resolver logs a Warning with the kind, path, configuration, and the meter totals (steps, milliseconds, allocated bytes), and a Debug summary of the totals for every read that evaluated envelopes. The defaults can be changed in code through `BindingsOptions.ObjectBindingLimits`.
+
+Converting `$definition` and `$context` to the engines' JSON model is linear in the stored document and is not metered.
+
+#### Errors
+
+A malformed envelope throws `BindingEvaluationException` before either engine runs, and the token is left unchanged. `JsonEException` and `JsonLogicException` are rethrown as `BindingEvaluationException`, and so is any other exception an engine throws for the author's input (for example an `OverflowException` from `2 ** 100000`). The resolver adds the JSON path to the message and keeps the type: a `BindingEvaluationException` stays one, and an `EvaluationLimitExceededException` keeps its `Kind` and `Limit`. The resolved-configuration endpoint returns these as `422 Unprocessable Content` with an `ErrorResponse` whose `ErrorCode` is `binding.evaluation` or `binding.limit.<kind>` (`binding.limit.steps`, `binding.limit.time`, `binding.limit.memory`, `binding.limit.depth`, `binding.limit.result`, `binding.limit.envelopeDepth`, `binding.limit.envelopeCount`). The response carries no exception details. `@config` and `@annotation` evaluation failures are `BindingEvaluationException` too and also return 422.
+
+The JSON Logic `log` operator writes its operand to `ILogger` only when Debug is enabled.
 
 ## Project Structure
 
@@ -114,7 +141,8 @@ Defines the fundamental building blocks:
 - `IBindingFunction`: Resolves a `BindingFunctionRequest` (a function name plus already-evaluated `BindingValue` arguments) to a `BindingValue`.
 - `BindingValue`: A thin wrapper around a `Newtonsoft.Json.Linq.JToken`.
 - `BindingException`: Base exception type for binding failures.
-- `BindingEvaluationException`: A binding failed or an object envelope is malformed. Object binding raises this type from the abstractions assembly.
+- `BindingEvaluationException`: A binding's own content cannot be evaluated: a failed statement, a malformed envelope, or an engine error. Carries the JSON `Path` when known. The API returns it as 422.
+- `EvaluationLimitExceededException` / `EvaluationLimitKind`: An object-binding read ran into an evaluation limit (`Steps`, `Time`, `Memory`, `Depth`, `Result`, `EnvelopeDepth`, `EnvelopeCount`).
 
 ### Binding.Language
 
@@ -130,13 +158,17 @@ Contains the interpreter pipeline:
 
 ### Binding.Object
 
-Walks one configuration document. `ConfigurationBindingResolver` implements `IConfigurationBindingResolver`. Strings that start with `@` go to `IBindingExecutor`. Envelopes go to `ObjectBindingEngine`, which converts between `JToken` and `JsonNode` and calls JSON Logic or JSON-e. Numbers come back as `decimal`. ISO-8601 strings stay strings. The project references `JsonLogic` 6.1.0 and `JsonE.Net` 3.0.1. It does not reference `Binding.Language`, `Binding.Core`, or `Backend.CosmosDb`.
+Walks one configuration document. `ConfigurationBindingResolver` implements `IConfigurationBindingResolver`. Strings that start with `@` go to `IBindingExecutor`. Envelopes go to `ObjectBindingEngine`, which converts between `JToken` and `JsonNode` and calls JSON Logic or JSON-e. Numbers come back as `decimal`. ISO-8601 strings stay strings. One `EvaluationMeter` per read enforces `ObjectBindingLimits`; `JsonLogicMetering` wraps every built-in JSON Logic rule so it reports to that meter, and `ResultCheck` walks each result. The project references `JsonLogic` 6.1.0 and `Binding.JsonE`. It does not reference `Binding.Language`, `Binding.Core`, or `Backend.CosmosDb`.
+
+### Binding.JsonE
+
+A source copy of `JsonE.Net` 3.0.1 (json-everything commit `8b8ab34`, MIT) with one change: a public `IEvaluationMeter` hook and a `JsonE.Evaluate(template, context, meter)` overload. The interpreter reports steps and recursion frames to the meter, and the meter may throw to stop it. Namespaces stay `Json.JsonE`. `VENDORED.md` in the project lists every patched line, the audits, and how to re-sync with upstream. Its tests run the JSON-e specification suite and compare every case with the unpatched `JsonE.Net` binary.
 
 ### Binding.Core
 
 Contains dependency-injection registration:
 - `EntryPoint.AddConfigurationBindings`: Registers `BindingExecutor` as `IBindingExecutor`/`IBindingRegistry`, registers `ConfigurationBindingResolver` as `IConfigurationBindingResolver` over that same executor, and applies `BindingsOptions`.
-- `BindingsOptions` / `BindingsOptionsExtensions`: Fluent API for registering sources (keyed, defaulting to `"default"`) and functions (by name) during startup.
+- `BindingsOptions` / `BindingsOptionsExtensions`: Fluent API for registering sources (keyed, defaulting to `"default"`) and functions (by name) during startup. `BindingsOptions.ObjectBindingLimits` sets the object-binding evaluation limits (defaults in "Evaluation limits" above).
 
 ### Binding.Azure.KeyVault
 

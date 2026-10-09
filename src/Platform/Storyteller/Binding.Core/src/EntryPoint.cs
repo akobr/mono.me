@@ -35,7 +35,9 @@ public static class EntryPoint
         @this.TryAddSingleton<IConfigurationBindingResolver>(provider =>
             new ConfigurationBindingResolver(
                 provider.GetRequiredService<BindingExecutor>(),
-                provider.GetService<ILogger<ConfigurationBindingResolver>>()));
+                provider.GetService<ILogger<ConfigurationBindingResolver>>(),
+                provider.GetRequiredService<IOptions<BindingsOptions>>().Value.ObjectBindingLimits,
+                TimeProvider.System));
 
         if (configure is not null)
         {

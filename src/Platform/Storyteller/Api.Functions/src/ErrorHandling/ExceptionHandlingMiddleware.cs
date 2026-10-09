@@ -1,5 +1,6 @@
 using System.Net;
 using _42.Platform.Storyteller.Api.Models;
+using _42.Platform.Storyteller.Binding;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
@@ -26,6 +27,10 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         catch (SecurityTokenException exception)
         {
             await ProcessSecurityExceptionAsync(context, exception);
+        }
+        catch (BindingEvaluationException exception)
+        {
+            await ProcessBindingEvaluationExceptionAsync(context, exception);
         }
         catch (Exception exception)
         {
@@ -65,5 +70,32 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         _logger.LogWarning(exception, "Authentication failed at: {url}", httpReqData.Url.AbsolutePath);
         var httpUnauthorizedResponse = httpReqData.CreateResponse(HttpStatusCode.Unauthorized);
         context.SetInvocationResult(httpUnauthorizedResponse);
+    }
+
+    private async Task ProcessBindingEvaluationExceptionAsync(FunctionContext context, BindingEvaluationException exception)
+    {
+        // The binding's own content cannot be evaluated: a client error. No exception details leave the API.
+        _logger.LogWarning(
+            "Binding evaluation failed ({ErrorCode}) at {Path}: {Message}",
+            exception.TryGetErrorCode(),
+            exception.Path,
+            exception.Message);
+        var httpReqData = await context.GetHttpRequestDataAsync();
+
+        if (httpReqData is null)
+        {
+            return;
+        }
+
+        var httpErrorResponse = httpReqData.CreateResponse(HttpStatusCode.UnprocessableEntity);
+        await httpErrorResponse.WriteAsJsonAsync(
+            new ErrorResponse
+            {
+                Message = exception.TryGetErrorMessage(),
+                Hint = exception.TryGetErrorHint(),
+                ErrorCode = exception.TryGetErrorCode(),
+            });
+
+        context.SetInvocationResult(httpErrorResponse);
     }
 }

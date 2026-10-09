@@ -83,6 +83,7 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The configuration model with resolved substitutions.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithBody(HttpStatusCode.UnprocessableEntity, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A binding in the configuration cannot be evaluated or exceeds an evaluation limit. ErrorCode is binding.evaluation or binding.limit.<kind>.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The requested configuration doesn't exist.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
