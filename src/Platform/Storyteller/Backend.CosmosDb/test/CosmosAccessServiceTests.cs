@@ -265,6 +265,44 @@ public class CosmosAccessServiceTests(Startup startup)
         await act.Should().ThrowAsync<NotFoundException>();
     }
 
+    [Theory]
+    [InlineData("Billing")]
+    [InlineData("bill.ing")]
+    [InlineData("members")]
+    public async Task CreateAccessPoint_InvalidProjectName_ThrowsInvalidName(string project)
+    {
+        await EnsureOwnerAsync();
+
+        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = Organization, Project = project, OwnerId = OwnerId });
+
+        (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidName);
+    }
+
+    [Fact]
+    public async Task CreateAccessPoint_ReservedNewOrganization_ThrowsInvalidName()
+    {
+        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = "access", Project = NewProjectName(), OwnerId = OwnerId });
+
+        (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidName);
+        (await Access.GetAccessPointAsync("access")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateAccessPoint_ExistingLegacyOrganization_AcceptsANewProject()
+    {
+        // Organizations created before the name rules keep working; only the new project name is checked.
+        const string legacyOrganization = "Legacy_Org";
+        var repository = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetCore();
+        await repository.Container.UpsertItemAsync(
+            new AccessPointEntity { Key = legacyOrganization, AccessMap = new() { [OwnerId] = AccountRole.Owner } },
+            new PartitionKey("access"));
+        await EnsureOwnerAsync();
+
+        var point = await Access.CreateAccessPointAsync(new AccessPointCreate { Organization = legacyOrganization, Project = NewProjectName(), OwnerId = OwnerId });
+
+        point.Key.Should().StartWith($"{legacyOrganization}.");
+    }
+
     [Fact]
     public async Task CreateAccount_WithoutProject_StoresAnAccountWithoutMemberships()
     {

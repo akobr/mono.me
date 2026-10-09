@@ -33,6 +33,34 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         _differ = new JsonContentDiffer(jsonSettingsProvider);
     }
 
+    public async Task<IReadOnlyList<ConfigurationTemplateSummary>> ListTemplatesAsync(string organization, string project, string view)
+    {
+        // Current templates only: "{view}.gen." excludes the state ("gns") and history ("gnv") items.
+        var prefix = $"{view}.{EntityIdPrefixTypes.GenerateTemplate}.";
+        var query = new QueryDefinition("SELECT c.id, c.Version, c.Author, c._ts FROM c WHERE STARTSWITH(c.id, @prefix)")
+            .WithParameter("@prefix", prefix);
+
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var iterator = repository.Container.GetItemQueryIterator<DocumentListingRow>(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = PartitionKeys.GetCosmosTemplate(project) });
+
+        var summaries = new List<ConfigurationTemplateSummary>();
+
+        while (iterator.HasMoreResults)
+        {
+            summaries.AddRange((await iterator.ReadNextAsync()).Select(row => new ConfigurationTemplateSummary
+            {
+                AnnotationType = row.Id[prefix.Length..],
+                Version = row.Version,
+                Author = row.Author,
+                UpdatedAt = ListingTimestamps.ToUpdatedAt(row.Timestamp),
+            }));
+        }
+
+        return summaries.OrderBy(summary => summary.AnnotationType, StringComparer.Ordinal).ToList();
+    }
+
     public async Task<ConfigurationTemplate?> GetTemplateAsync(string organization, string project, string view, string annotationType)
     {
         annotationType = NormalizeAnnotationType(annotationType);

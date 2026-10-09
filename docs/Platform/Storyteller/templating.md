@@ -109,6 +109,7 @@ The routes include the view, like configuration routes:
 
 | Method | Route | Operation |
 | --- | --- | --- |
+| GET | `v1/{organization}/{project}/{view}/templates` | `GetTemplates`: every template of the view without its content (`AnnotationType`, `Version`, `Author`, `UpdatedAt`) |
 | GET | `v1/{organization}/{project}/{view}/template/{annotationType}` | `GetTemplate` |
 | POST, PUT | same | `SetTemplate` |
 | PATCH (`application/json-patch+json`) | same | `PatchTemplate` |

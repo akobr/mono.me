@@ -18,6 +18,10 @@ A full key puts the three scopes in front of the annotation key:
 
 Use a second view (`preview`, `2026-q4`) when you want a parallel configuration you can diff and then promote. The annotation keys stay the same, so a service can be pointed at a view without a new model.
 
+A view comes into existence with its first write; nothing has to be created first. To give views a description and list them cheaply, register them: `GET /v1/{org}/{project}/views` lists the registered views and `default`, `POST` registers one, and `PUT .../views/{view}` sets its description. Administrators can add `?discover=true` to also find views that hold data but are not registered.
+
+New organization, project, and view names use 2 to 63 lower-case letters, digits, or hyphens, start with a letter or a digit, and contain no dots, because the dot separates the parts of a key. A few words that the API and the admin UI use in their addresses are reserved, for example `access`, `views`, and `members`.
+
 ## What a service reads
 
 At runtime a satellite already knows which subject, responsibility, and context it is serving. It asks for the execution:
@@ -91,6 +95,14 @@ PUT /v1/{org}/{project}/{view}/configuration/{key}
 ```
 
 The body is the JSON object to merge into the stored document. `PATCH` on the same path applies a JSON Patch to the stored document. `DELETE` clears it.
+
+All configurations of a view, without their documents, one page of up to 1000 at a time:
+
+```text
+GET /v1/{org}/{project}/{view}/configurations?annotationType=exe&keyPrefix=exe.northwind&continuationToken=…
+```
+
+Each entry carries the annotation key and type, the version, the author, the last change, the hash of the effective document, and whether the annotation has a document of its own.
 
 Versions of that stored document:
 

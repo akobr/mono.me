@@ -54,6 +54,71 @@ public class CosmosConfigurationService : IConfigurationService
         return configuration is not null && configuration.Content.HasValues;
     }
 
+    public async Task<ConfigurationsResponse> ListConfigurationsAsync(
+        string organization,
+        string project,
+        string view,
+        string? annotationType = null,
+        string? keyPrefix = null,
+        string? continuationToken = null)
+    {
+        var idPrefix = $"{view}.{EntityIdPrefixTypes.Configuration}.";
+        var text = "SELECT c.AnnotationKey, c.Version, c.Author, c.CalculatedContentHash, c._ts, "
+            + "(IS_OBJECT(c.Content) AND ARRAY_LENGTH(ObjectToArray(c.Content)) > 0) AS HasContent "
+            + "FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND STARTSWITH(c.id, @idPrefix)";
+
+        if (!string.IsNullOrWhiteSpace(annotationType))
+        {
+            text += " AND STARTSWITH(c.id, @typePrefix)";
+        }
+
+        if (!string.IsNullOrWhiteSpace(keyPrefix))
+        {
+            text += " AND STARTSWITH(c.id, @keyPrefix)";
+        }
+
+        var query = new QueryDefinition(text)
+            .WithParameter("@projectPrefix", $"{project}.")
+            .WithParameter("@idPrefix", idPrefix)
+            .WithParameter("@typePrefix", $"{idPrefix}{annotationType?.Trim().ToLowerInvariant()}.")
+            .WithParameter("@keyPrefix", $"{idPrefix}{keyPrefix?.Trim()}");
+
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var iterator = repository.Container.GetItemQueryIterator<ConfigurationListingRow>(
+            query,
+            string.IsNullOrWhiteSpace(continuationToken) ? null : continuationToken,
+            new QueryRequestOptions { MaxItemCount = CosmosConstants.MaxItemCountPerPage });
+
+        if (!iterator.HasMoreResults)
+        {
+            return new ConfigurationsResponse { Configurations = [] };
+        }
+
+        var page = await iterator.ReadNextAsync();
+        var configurations = page
+            .Where(row => !string.IsNullOrEmpty(row.AnnotationKey))
+            .Select(row => (Row: row, Code: row.AnnotationKey!.Split('.', 2)[0]))
+            .Where(item => AnnotationTypeCodes.ValidCodes.ContainsKey(item.Code))
+            .Select(item => new ConfigurationSummary
+            {
+                AnnotationKey = item.Row.AnnotationKey!,
+                AnnotationType = AnnotationTypeCodes.ValidCodes[item.Code],
+                Version = item.Row.Version,
+                Author = item.Row.Author,
+                Hash = item.Row.CalculatedContentHash,
+                UpdatedAt = ListingTimestamps.ToUpdatedAt(item.Row.Timestamp),
+                HasContent = item.Row.HasContent,
+            })
+            .ToList();
+
+        return new ConfigurationsResponse
+        {
+            Configurations = configurations,
+            ContinuationToken = page.ContinuationToken,
+            Count = configurations.Count,
+        };
+    }
+
     public async Task<Configuration?> GetRawConfigurationAsync(FullKey key)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);

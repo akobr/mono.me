@@ -64,10 +64,20 @@ public static class Definitions
             }
         }
 
+        public static class Views
+        {
+            public static class V1
+            {
+                public const string Views = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/views";
+                public const string View = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/views/{{{Parameters.View}}}";
+            }
+        }
+
         public static class Configuration
         {
             public static class V1
             {
+                public const string Configurations = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configurations";
                 public const string Configuration = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}";
                 public const string ConfigurationResolved = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/resolved";
 
@@ -83,6 +93,7 @@ public static class Definitions
         {
             public static class V1
             {
+                public const string Schemas = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schemas";
                 public const string SchemaType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/type/{{{Parameters.AnnotationType}}}";
                 public const string SchemaAnnotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}";
                 public const string SchemaDescendantType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}/type/{{{Parameters.AnnotationType}}}";
@@ -109,6 +120,7 @@ public static class Definitions
         {
             public static class V1
             {
+                public const string Templates = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/templates";
                 public const string Template = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/template/{{{Parameters.AnnotationType}}}";
 
                 public const string Versions = $"{Template}/versions";
@@ -163,6 +175,13 @@ public static class Definitions
             public const string GetAuthConfiguration = nameof(GetAuthConfiguration);
         }
 
+        public static class Views
+        {
+            public const string GetViews = nameof(GetViews);
+            public const string CreateView = nameof(CreateView);
+            public const string UpdateView = nameof(UpdateView);
+        }
+
         public static class Annotations
         {
             public const string GetAnnotations = nameof(GetAnnotations);
@@ -185,6 +204,7 @@ public static class Definitions
 
         public static class Configuration
         {
+            public const string GetConfigurations = nameof(GetConfigurations);
             public const string GetConfiguration = nameof(GetConfiguration);
             public const string GetResolvedConfiguration = nameof(GetResolvedConfiguration);
             public const string SetConfiguration = nameof(SetConfiguration);
@@ -200,6 +220,7 @@ public static class Definitions
 
         public static class ConfigurationSchema
         {
+            public const string GetConfigurationSchemas = nameof(GetConfigurationSchemas);
             public const string GetConfigurationSchema = nameof(GetConfigurationSchema);
             public const string SetConfigurationSchema = nameof(SetConfigurationSchema);
             public const string DeleteConfigurationSchema = nameof(DeleteConfigurationSchema);
@@ -232,6 +253,7 @@ public static class Definitions
 
         public static class Template
         {
+            public const string GetTemplates = nameof(GetTemplates);
             public const string GetTemplate = nameof(GetTemplate);
             public const string SetTemplate = nameof(SetTemplate);
             public const string PatchTemplate = nameof(PatchTemplate);
@@ -260,6 +282,8 @@ public static class Definitions
         public const string AnnotationType = "annotationType";
         public const string Thumbprint = "thumbprint";
         public const string AccountId = "accountId";
+        public const string Discover = "discover";
+        public const string KeyPrefix = "keyPrefix";
         public const string Format = "format";
         public const string Force = "force";
     }

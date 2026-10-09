@@ -46,6 +46,40 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         Descendant,
     }
 
+    public async Task<IReadOnlyList<ConfigurationSchemaSummary>> ListSchemasAsync(string organization, string project, string view)
+    {
+        // Current schema documents only: "{view}.cfs." excludes the state ("css") and history ("csv") items.
+        var prefix = $"{view}.{EntityIdPrefixTypes.ConfigurationSchema}.";
+        var query = new QueryDefinition("SELECT c.id, c.Version, c.Author, c._ts FROM c WHERE STARTSWITH(c.id, @prefix)")
+            .WithParameter("@prefix", prefix);
+
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        using var iterator = repository.Container.GetItemQueryIterator<DocumentListingRow>(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(GetSchemaPartitionKey(project)) });
+
+        var summaries = new List<ConfigurationSchemaSummary>();
+
+        while (iterator.HasMoreResults)
+        {
+            foreach (var row in await iterator.ReadNextAsync())
+            {
+                var summary = ToSchemaSummary(row, row.Id[prefix.Length..]);
+
+                if (summary is not null)
+                {
+                    summaries.Add(summary);
+                }
+            }
+        }
+
+        return summaries
+            .OrderBy(summary => summary.Kind)
+            .ThenBy(summary => summary.AnnotationType, StringComparer.Ordinal)
+            .ThenBy(summary => summary.AnnotationKey, StringComparer.Ordinal)
+            .ToList();
+    }
+
     public Task<ConfigurationSchema?> GetSchemaAsync(string organization, string project, string view, string annotationType)
     {
         var identity = SchemaIdentity.ForType(view, NormalizeAnnotationType(annotationType));
@@ -859,6 +893,31 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         return AnnotationTypeCodes.ValidCodes.ContainsKey(normalized)
             ? normalized
             : throw new ArgumentException($"Invalid annotation type code: {annotationType}");
+    }
+
+    // The id suffix after "{view}.cfs." is "t.{type}", "a.{annotationKey}" or "d.{type}.{ancestorKey}" (SchemaIdentity).
+    private static ConfigurationSchemaSummary? ToSchemaSummary(DocumentListingRow row, string suffix)
+    {
+        var parts = suffix.Split('.', 3);
+        (ConfigurationSchemaKind Kind, string? Type, string? Key)? identity = parts switch
+        {
+            ["t", var type] => (ConfigurationSchemaKind.Type, type, null),
+            ["a", var first, var rest] => (ConfigurationSchemaKind.Annotation, null, $"{first}.{rest}"),
+            ["d", var type, var key] => (ConfigurationSchemaKind.DescendantType, type, key),
+            _ => null,
+        };
+
+        return identity is { } value
+            ? new ConfigurationSchemaSummary
+            {
+                Kind = value.Kind,
+                AnnotationType = value.Type,
+                AnnotationKey = value.Key,
+                Version = row.Version,
+                Author = row.Author,
+                UpdatedAt = ListingTimestamps.ToUpdatedAt(row.Timestamp),
+            }
+            : null;
     }
 
     private readonly record struct SchemaIdentity(

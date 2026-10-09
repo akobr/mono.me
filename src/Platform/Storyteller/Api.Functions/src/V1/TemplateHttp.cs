@@ -33,6 +33,30 @@ public class TemplateHttp
         _logger = logger;
     }
 
+    [Function(nameof(GetTemplates))]
+    [OpenApiOperation(Definitions.RouteIds.Template.GetTemplates, Definitions.Tags.Templates, Description = "Templates of the view without their content.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<ConfigurationTemplateSummary>), Description = "The template summaries, by annotation type code.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> GetTemplates(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Template.V1.Templates)]
+        HttpRequestData request,
+        string organization,
+        string project,
+        string view)
+    {
+        request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
+        await request.CheckAccessToProjectAsync(_access, organization, project);
+
+        var templates = await _templates.ListTemplatesAsync(organization, project, view);
+        return new OkObjectResult(templates);
+    }
+
     [Function(nameof(GetTemplate))]
     [OpenApiOperation(Definitions.RouteIds.Template.GetTemplate, Definitions.Tags.Templates)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]

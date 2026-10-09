@@ -34,6 +34,43 @@ public class ConfigurationHttp
         _logger = logger;
     }
 
+    [Function(nameof(GetConfigurations))]
+    [OpenApiOperation(Definitions.RouteIds.Configuration.GetConfigurations, Definitions.Tags.Configurations, Description = "Configurations of the view without their documents, up to 1000 per page.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiParameter(Definitions.Parameters.AnnotationType, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "Only this annotation type code (rst, unt, sbt, usg, cnt, exe, uxe).")]
+    [OpenApiParameter(Definitions.Parameters.KeyPrefix, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "Only annotation keys starting with this prefix.")]
+    [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationsResponse), Description = "One page of configuration summaries.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> GetConfigurations(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Configuration.V1.Configurations)]
+        HttpRequestData request,
+        string organization,
+        string project,
+        string view,
+        [FromQuery] string? annotationType = null,
+        [FromQuery] string? keyPrefix = null,
+        [FromQuery] string? continuationToken = null)
+    {
+        request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
+        await request.CheckAccessToProjectAsync(_access, organization, project);
+
+        if (!string.IsNullOrWhiteSpace(annotationType)
+            && !AnnotationTypeValidation.TryValidate(annotationType.Trim(), _logger, out var badRequestResult))
+        {
+            return badRequestResult;
+        }
+
+        var response = await _configuration.ListConfigurationsAsync(organization, project, view, annotationType, keyPrefix, continuationToken);
+        return new OkObjectResult(response);
+    }
+
     [Function(nameof(GetConfiguration))]
     [OpenApiOperation(Definitions.RouteIds.Configuration.GetConfiguration, Definitions.Tags.Configurations)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]

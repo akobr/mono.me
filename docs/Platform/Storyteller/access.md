@@ -1,8 +1,33 @@
-# Members and Invitations
+# Access Points, Views, Members and Invitations
 
 Organizations and projects are **access points**. An organization has the key `{organization}` and a project the key `{organization}.{project}`. Each access point keeps a map of account IDs to roles, and each account keeps the same map from its side. Both documents live in the main partition (`access`) of the `core` container, so every membership change replaces them together in one transactional batch, guarded by their ETags. A concurrent change of either document makes the batch fail; the change is then evaluated once more on fresh data, and a second failure answers `409 Conflict`.
 
 An organization role does not grant access to the organization's projects. Each project has its own members.
+
+## Names
+
+New organizations, projects, and views follow one rule: 2 to 63 characters from `a-z`, `0-9`, and `-`, starting with a letter or a digit (`^[a-z0-9][a-z0-9-]{1,62}$`). Names become route segments, container names (`org.{organization}`), and parts of keys, where `.` separates the segments, so upper case and dots are not allowed. Some words are reserved because the API or the admin UI uses them in addresses:
+
+| Kind | Reserved |
+| --- | --- |
+| Organization | `access`, `auth`, `login`, `callback`, `onboarding`, `invitations`, `account`, `orgs`, `unsupported` |
+| Project and view | `access`, `views`, `members`, `invitations`, `machines`, `certificates`, `settings` |
+
+A violation answers `400` with `ErrorCode` `InvalidName`. Only new names are checked: an organization created before the rule keeps working, and new projects can still be added to it, as long as the project name follows the rule. Existing documents are not migrated.
+
+## Views
+
+Views are implicit: the first write to a view creates it, and a write is never blocked because a view is not registered. The registry adds a description and a cheap list for clients.
+
+| Method | Route | Needs | Result |
+| --- | --- | --- | --- |
+| GET | `v1/{organization}/{project}/views` | Reader; Administrator with `?discover=true` | `View[]`, `default` first |
+| POST | `v1/{organization}/{project}/views` | Administrator | `{ "Name", "Description" }` → `View`; `409 ViewExists` when registered, or for `default` |
+| PUT | `v1/{organization}/{project}/views/{view}` | Administrator | `{ "Description" }` → `View`; registers the view when needed, including `default` |
+
+A `View` has `Name`, `Description`, `CreatedAt`, `CreatedBy`, `IsDefault`, and `IsRegistered`. `default` is always listed, also when it is not registered. Registrations live in the organization container, partition `{project}.meta`, id `view.{name}`.
+
+`?discover=true` also lists every view that holds documents of the project (annotations, configurations, templates, schemas, and their history) with `IsRegistered = false`. It is a cross-partition `SELECT DISTINCT VALUE c.ViewName` over the organization container, so it is meant for an administrator's occasional check, not for every page load.
 
 ## Roles
 
@@ -65,10 +90,12 @@ All errors use `ErrorResponse` with a stable `ErrorCode` and without exception d
 
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
+| `400` | `InvalidName` | A new organization, project, or view name breaks the [name rules](#names). |
 | `403` | `AccessDenied` | The caller's role on the access point is too low. |
 | `403` | `EmailMismatch`, `EmailNotVerified` | Accepting or declining with another or an unverified email. |
 | `404` | `NotFound` | The access point, account, or invitation does not exist. |
 | `404` | `MemberNotFound` | The account is not a member of the access point. |
 | `409` | `LastOwner`, `SelfRoleChange` | Member rules above. |
 | `409` | `InvitationExists`, `InvitationNotPending`, `InvitationExpired` | Invitation rules above. |
+| `409` | `ViewExists` | The view is already registered, or is `default`. |
 | `409` | `Conflict` | The membership or invitation changed concurrently twice; repeat the request. |

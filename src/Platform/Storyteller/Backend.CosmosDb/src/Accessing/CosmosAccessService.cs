@@ -164,6 +164,14 @@ public class CosmosAccessService : IAccessService
         var partitionKey = new PartitionKey(MAIN_PARTITION_KEY);
         var organizationAccessPoint = await GetAccessPointAsync(model.Organization);
 
+        // Only new names are checked: projects of an organization created before the rules can still be added.
+        if (organizationAccessPoint is null)
+        {
+            NameRules.EnsureOrganizationName(model.Organization);
+        }
+
+        NameRules.EnsureProjectName(model.Project);
+
         if (organizationAccessPoint is not null
             && (!organizationAccessPoint.AccessMap.TryGetValue(model.OwnerId, out var role)
             || role != AccountRole.Owner))
