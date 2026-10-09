@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" />
+    <!-- Pin vulnerable transitive MessagePack (via StreamJsonRpc) to a patched 2.5.x; remove after Aspire upgrade to 13.6+. -->
+    <PackageReference Include="MessagePack" />
     <PackageReference Include="Aspire.Hosting.Orleans" />
     <PackageReference Include="Aspire.Hosting.Redis" />
   </ItemGroup>
