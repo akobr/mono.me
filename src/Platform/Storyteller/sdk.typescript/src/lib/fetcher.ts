@@ -3,8 +3,11 @@ import { StorytellerError } from './errors'
 export interface StorytellerConfig {
   /** API root including the "/api" prefix, for example https://host/api. */
   baseUrl: string
-  /** Bearer token for user calls; return undefined to send no Authorization header. */
-  getAccessToken?: () => Promise<string | undefined> | string | undefined
+  /**
+   * Bearer token for user calls; return undefined to send no Authorization header.
+   * forceRefresh is true for the one retry after a 401, so the provider can skip its cached token.
+   */
+  getAccessToken?: (options: { forceRefresh: boolean }) => Promise<string | undefined> | string | undefined
   /** Called once a 401 survived one token refresh, for example to start a new sign-in. */
   onUnauthorized?: () => void
   /** Transport override for tests and special hosts. Defaults to the global fetch. */
@@ -47,12 +50,12 @@ export async function storytellerFetch<T>(url: string, init: RequestInit = {}): 
   const current = getStorytellerConfig()
   const target = /^https?:\/\//i.test(url) ? url : `${current.baseUrl}${url.startsWith('/') ? '' : '/'}${url}`
 
-  let response = await send(current, target, init)
+  let response = await send(current, target, init, false)
 
   if (response.status === 401 && current.getAccessToken) {
     // The unread body would keep the first connection busy.
     await response.body?.cancel().catch(() => undefined)
-    response = await send(current, target, init)
+    response = await send(current, target, init, true)
 
     if (response.status === 401) {
       current.onUnauthorized?.()
@@ -68,7 +71,7 @@ export async function storytellerFetch<T>(url: string, init: RequestInit = {}): 
   return body as T
 }
 
-async function send(current: StorytellerConfig, target: string, init: RequestInit): Promise<Response> {
+async function send(current: StorytellerConfig, target: string, init: RequestInit, forceRefresh: boolean): Promise<Response> {
   const headers = new Headers(init.headers)
 
   for (const [name, value] of Object.entries(current.headers ?? {})) {
@@ -77,7 +80,7 @@ async function send(current: StorytellerConfig, target: string, init: RequestIni
     }
   }
 
-  const token = await current.getAccessToken?.()
+  const token = await current.getAccessToken?.({ forceRefresh })
 
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
@@ -92,6 +95,7 @@ async function send(current: StorytellerConfig, target: string, init: RequestIni
     throw new StorytellerError({
       status: 0,
       message: aborted ? 'The request was aborted.' : `The Storyteller API is not reachable (${new URL(target, 'http://localhost').pathname}).`,
+      aborted,
       cause: error,
     })
   }

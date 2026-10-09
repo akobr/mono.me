@@ -18,7 +18,7 @@ import { configureStoryteller, getAccount, isForbidden } from '@42for.net/2splat
 
 configureStoryteller({
   baseUrl: 'https://api.2s.42for.net/api',
-  getAccessToken: () => authkit.getAccessToken(), // bearer for user calls
+  getAccessToken: ({ forceRefresh }) => authkit.getAccessToken({ forceRefresh }), // bearer for user calls
   onUnauthorized: () => authkit.signIn(), // a 401 survived one token refresh
 })
 
@@ -34,9 +34,9 @@ try {
 The fetcher (`lib/fetcher.ts`, the Orval mutator):
 
 - prefixes `baseUrl` to the generated `/v1/...` paths,
-- adds `Authorization: Bearer …` when `getAccessToken` returns a token, and asks for a token once more after a `401`,
+- adds `Authorization: Bearer …` when `getAccessToken` returns a token, and asks for a token once more after a `401` (with `forceRefresh: true`),
 - parses `application/json` and `application/*+json` bodies and returns every other content type as text (PEM certificates, unified diffs),
-- throws `StorytellerError` (`status`, `message`, `hint`, `errorCode`, `schemaErrors`) for non-2xx responses, and with `status: 0` for network failures and aborts.
+- throws `StorytellerError` (`status`, `message`, `hint`, `errorCode`, `schemaErrors`) for non-2xx responses, and with `status: 0` for network failures and aborts (`aborted: true`, `isAborted(error)`).
 
 With Vue Query, query keys are the path segments of the request, so cache invalidation can use paths:
 

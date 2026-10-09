@@ -8,6 +8,8 @@ export interface StorytellerErrorInit {
   errorCode?: string
   schemaErrors?: SchemaValidationErrorDetail[]
   body?: unknown
+  /** True when the request was cancelled through its AbortSignal (status 0). */
+  aborted?: boolean
   cause?: unknown
 }
 
@@ -26,6 +28,9 @@ export class StorytellerError extends Error {
   /** The parsed error body, when there was one. */
   readonly body?: unknown
 
+  /** True when the request was cancelled through its AbortSignal; such errors are not failures to report. */
+  readonly aborted: boolean
+
   constructor(init: StorytellerErrorInit) {
     super(init.message, { cause: init.cause })
     this.name = 'StorytellerError'
@@ -34,6 +39,7 @@ export class StorytellerError extends Error {
     this.errorCode = init.errorCode
     this.schemaErrors = init.schemaErrors
     this.body = init.body
+    this.aborted = init.aborted ?? false
   }
 
   /** Builds the error from a response status and its (possibly empty or non-JSON) body. */
@@ -56,6 +62,9 @@ export class StorytellerError extends Error {
 }
 
 export const isStorytellerError = (error: unknown): error is StorytellerError => error instanceof StorytellerError
+
+/** An aborted request (status 0, cancelled through its AbortSignal), as opposed to a network failure. */
+export const isAborted = (error: unknown): error is StorytellerError => error instanceof StorytellerError && error.aborted
 
 const hasStatus = (status: number) => (error: unknown): error is StorytellerError =>
   isStorytellerError(error) && error.status === status

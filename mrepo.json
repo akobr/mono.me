@@ -79,6 +79,18 @@
       }
     },
     {
+      "path": "src/Platform/ui.admin",
+      "name": "2S admin UI",
+      "description": "Administration single-page application of the 2S platform (Vue 3, Vite, Nuxt UI).",
+      "scripts": {
+        "install": "npm --prefix src ci",
+        "build": "npm --prefix src run build",
+        "run": "npm --prefix src run dev",
+        "test": "npm --prefix src test",
+        "lint": "npm --prefix src run lint"
+      }
+    },
+    {
       "path": "src/Monorepo",
       "name": "Monorepo",
       "description": "Tooling around mono-repository.",

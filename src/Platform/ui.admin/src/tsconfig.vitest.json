@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.vitest.tsbuildinfo",
+    "noUnusedLocals": false,
+    "types": ["node", "vite/client"]
+  },
+  "include": ["app/**/*.ts", "app/**/*.vue", "app/**/*.d.ts", "test/**/*.ts"]
+}

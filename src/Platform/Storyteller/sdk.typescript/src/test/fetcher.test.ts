@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { configureStoryteller, getStorytellerConfig, storytellerFetch, type StorytellerConfig } from '../lib/fetcher'
-import { hasErrorCode, isForbidden, isPreconditionFailed, StorytellerError } from '../lib/errors'
+import { hasErrorCode, isAborted, isForbidden, isPreconditionFailed, StorytellerError } from '../lib/errors'
 import { deleteAnnotation } from '../generated/client/annotations/annotations'
 
 interface Call {
@@ -134,11 +134,13 @@ describe('storytellerFetch', () => {
   it('retries once with a fresh token after 401, then reports onUnauthorized', async () => {
     const tokens = ['expired', 'fresh', 'fresh-again', 'still-bad']
     const onUnauthorized = vi.fn()
+    const getAccessToken = vi.fn(() => tokens.shift())
     const first = fakeFetch(new Response(null, { status: 401 }), json({ Id: 'user-1' }))
-    configure({ fetch: first.fetch, getAccessToken: () => tokens.shift(), onUnauthorized })
+    configure({ fetch: first.fetch, getAccessToken, onUnauthorized })
 
     await expect(storytellerFetch('/v1/access/account')).resolves.toEqual({ Id: 'user-1' })
     expect(first.calls.map((call) => new Headers(call.init.headers).get('Authorization'))).toEqual(['Bearer expired', 'Bearer fresh'])
+    expect(getAccessToken.mock.calls).toEqual([[{ forceRefresh: false }], [{ forceRefresh: true }]])
     expect(onUnauthorized).not.toHaveBeenCalled()
 
     const second = fakeFetch(new Response(null, { status: 401 }), new Response(null, { status: 401 }))
@@ -184,6 +186,7 @@ describe('storytellerFetch', () => {
 
     const error = (await storytellerFetch('/v1/access/account').catch((caught: unknown) => caught)) as StorytellerError
     expect(error.status).toBe(0)
+    expect(error.aborted).toBe(false)
     expect(error.message).toContain('/api/v1/access/account')
     expect(JSON.stringify({ message: error.message, body: error.body })).not.toContain('secret-token')
 
@@ -193,6 +196,7 @@ describe('storytellerFetch', () => {
     const aborted = (await storytellerFetch('/v1/access/account', { signal: controller.signal }).catch((caught: unknown) => caught)) as StorytellerError
     expect(aborted.status).toBe(0)
     expect(aborted.message).toBe('The request was aborted.')
+    expect(isAborted(aborted)).toBe(true)
   })
 
   it('turns network failures into status 0 also with a relative base URL', async () => {

@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+test-results
+playwright-report
+blob-report
+*.log
+*.tsbuildinfo
+.env.local
+.env.*.local
+.vite
+.nuxt-ui
+.vscode/*
+!.vscode/extensions.json
+.idea
+# the root .gitignore ignores *.e2e; the mock-mode variables are part of the app
+!.env.e2e

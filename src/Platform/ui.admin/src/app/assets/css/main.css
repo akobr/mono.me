@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+@import '@nuxt/ui';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+@theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/*
+ * Annotation type tokens. Light values are Tailwind 700 shades and dark values 400 shades, so text in the
+ * type color meets WCAG AA against the panel background. Badges also show an icon and the type code.
+ */
+:root {
+  --st-rst: #6d28d9;
+  --st-unt: #a21caf;
+  --st-sbt: #1d4ed8;
+  --st-usg: #b45309;
+  --st-cnt: #0e7490;
+  --st-exe: #047857;
+  --st-uxe: #c2410c;
+}
+
+.dark {
+  --st-rst: #a78bfa;
+  --st-unt: #e879f9;
+  --st-sbt: #60a5fa;
+  --st-usg: #fbbf24;
+  --st-cnt: #22d3ee;
+  --st-exe: #34d399;
+  --st-uxe: #fb923c;
+}
+
+@theme inline {
+  --color-st-rst: var(--st-rst);
+  --color-st-unt: var(--st-unt);
+  --color-st-sbt: var(--st-sbt);
+  --color-st-usg: var(--st-usg);
+  --color-st-cnt: var(--st-cnt);
+  --color-st-exe: var(--st-exe);
+  --color-st-uxe: var(--st-uxe);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
