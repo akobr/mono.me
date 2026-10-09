@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using _42.Platform.Storyteller.Accessing;
@@ -173,6 +174,12 @@ public class AccessHttp
         [FromBody] Permission permissionModel)
     {
         request.CheckScope(Scopes.User.Impersonation);
+
+        if (!TryValidatePermission(permissionModel, out var badRequestResult))
+        {
+            return badRequestResult;
+        }
+
         var accountId = request.GetIdentityUniqueId();
         permissionModel = permissionModel with { CreatedById = accountId };
         await _accessService.GrantPermissionAsync(permissionModel);
@@ -194,6 +201,12 @@ public class AccessHttp
         [FromBody] Permission permissionModel)
     {
         request.CheckScope(Scopes.User.Impersonation);
+
+        if (!TryValidatePermission(permissionModel, out var badRequestResult))
+        {
+            return badRequestResult;
+        }
+
         var accountId = request.GetIdentityUniqueId();
         permissionModel = permissionModel with { CreatedById = accountId };
         await _accessService.RevokePermissionAsync(permissionModel);
@@ -418,5 +431,22 @@ public class AccessHttp
 
         await _policyStore.SetAsync(segments[0], segments[1], policy);
         return new OkObjectResult(policy);
+    }
+
+    private static bool TryValidatePermission(Permission? model, [NotNullWhen(false)] out IActionResult? badRequestResult)
+    {
+        var message = model switch
+        {
+            null => "The permission is missing.",
+            { Role: AccountRole.None } => "The role None can't be granted or revoked.",
+            { AccountId: var targetId } when string.IsNullOrWhiteSpace(targetId) => "The target account is missing.",
+            { AccessPointKey: var pointKey } when string.IsNullOrWhiteSpace(pointKey) => "The access point key is missing.",
+            _ => null,
+        };
+
+        badRequestResult = message is null
+            ? null
+            : new BadRequestObjectResult(new ErrorResponse(message));
+        return message is null;
     }
 }

@@ -337,6 +337,29 @@ When the Cosmos write after a successful create fails, Storyteller asks WorkOS t
 
 Entra ID and Keycloak `ClientCredentials` follow the same Storyteller shape as AuthKit: one external object per machine, a JWT checked locally, and the Cosmos document as the allow list. Entra provisioning is Microsoft Graph (application, service principal, and app-role assignment) in one tenant, so the tenant's directory-object quota and Graph throttling are the figures to confirm before a large rollout. Keycloak provisioning is the admin API of one realm; how many clients that realm can hold is a property of that Keycloak deployment.
 
+## 401 and 403
+
+The two status codes mean different things, so a client knows whether signing in again can help:
+
+| Status | Meaning | Body |
+| --- | --- | --- |
+| `401` | The credentials are missing, invalid or expired, or the token lacks the required scope. Machine credentials that fail their checks also get 401. | none |
+| `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
+
+A user role check runs on every project endpoint (`CheckAccessToProjectAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`. Shared certificates, access points and the machine authentication policy need `Administrator`. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check.
+
+Other access-management errors use the same `ErrorResponse` shape, without exception details:
+
+| Status | `ErrorCode` | When |
+| --- | --- | --- |
+| `400` | none | Grant or revoke with a missing account, a missing access point key, or the role `None`. |
+| `404` | `NotFound` | The target account, the access point, or the machine access does not exist. |
+| `409` | `AccountExists`, `AccessPointExists` | The account or project already exists. |
+| `409` | `ElevatedRole` | Revoke names a lower role than the member holds. Revoke the stored role instead. |
+| `409` | `LastOwner` | The revoke would leave the access point without an `Owner`. |
+
+Grant only raises a role. To lower one, revoke the current role and grant the new one.
+
 ## Switching an existing deployment
 
 `Account.Id` is the provider's `sub`. Entra object IDs and WorkOS user IDs are unrelated, so **changing `Auth:Provider` on a deployment that already has accounts orphans them**. Access maps, ownership and the `account: {sub}` author stamped on annotations stop resolving. AuthKit can federate to Microsoft sign-in, but the `sub` still changes. A migration tool is not available yet.

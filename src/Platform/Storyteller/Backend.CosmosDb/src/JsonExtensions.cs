@@ -4,7 +4,9 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Configuring;
 using global::Json.Patch;
+using global::Json.Pointer;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -106,21 +108,24 @@ public static class JsonExtensions
 
     public static async Task<JObject> ApplyPatch(this JObject @this, JArray patchOperations)
     {
-        var patchArrayJson = patchOperations.ToString(Formatting.None);
-        var patch = System.Text.Json.JsonSerializer.Deserialize<JsonPatch>(patchArrayJson)
-            ?? throw new InvalidOperationException("Invalid JSON Patch document.");
-
+        var patch = ParsePatch(patchOperations);
         var jsonObject = await @this.ToJsonObjectAsync();
         var result = patch.Apply(jsonObject);
 
         if (!result.IsSuccess)
         {
-            throw new InvalidOperationException($"JSON Patch operation failed: {result.Error}");
+            var failedOperation = result.Operation >= 0 && result.Operation < patch.Operations.Count
+                ? patch.Operations[result.Operation]
+                : null;
+            var kind = failedOperation?.Op == OperationType.Test
+                ? JsonPatchFailureKind.TestFailed
+                : JsonPatchFailureKind.OperationFailed;
+            throw new JsonPatchException($"JSON Patch operation {result.Operation} failed: {result.Error}", kind, result.Operation);
         }
 
         if (result.Result is not JsonObject patchedObject)
         {
-            throw new InvalidOperationException("JSON Patch result is not a JSON object.");
+            throw new JsonPatchException("JSON Patch result is not a JSON object.", JsonPatchFailureKind.Invalid);
         }
 
         return await patchedObject.ToJObjectAsync();
@@ -138,11 +143,27 @@ public static class JsonExtensions
 
         if (patchProp.Value.Type != JTokenType.Array)
         {
-            throw new InvalidOperationException($"'{patchPropertyName}' must be an array.");
+            throw new JsonPatchException($"'{patchPropertyName}' must be an array.", JsonPatchFailureKind.Invalid);
         }
 
         var patchArray = (JArray)patchProp.Value;
         @this.Remove(patchPropertyName);
         return await @this.ApplyPatch(patchArray);
+    }
+
+    private static JsonPatch ParsePatch(JArray patchOperations)
+    {
+        var patchArrayJson = patchOperations.ToString(Formatting.None);
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<JsonPatch>(patchArrayJson)
+                ?? throw new JsonPatchException("Invalid JSON Patch document.", JsonPatchFailureKind.Invalid);
+        }
+        catch (Exception exception) when (exception is System.Text.Json.JsonException or PointerParseException)
+        {
+            // Unknown op, missing path or value, or a malformed pointer: the document itself is not a valid patch.
+            throw new JsonPatchException($"Invalid JSON Patch document: {exception.Message}", JsonPatchFailureKind.Invalid);
+        }
     }
 }

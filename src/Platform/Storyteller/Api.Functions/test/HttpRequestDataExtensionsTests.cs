@@ -82,4 +82,24 @@ public class HttpRequestDataExtensionsTests
         request.TryGetApplicationIdentity(out var appId).ShouldBeFalse();
         appId.ShouldBeNull();
     }
+
+    [Theory]
+    [InlineData(AccountRole.None, AccountRole.Reader)]
+    [InlineData(AccountRole.Reader, AccountRole.Contributor)]
+    [InlineData(AccountRole.ContributorWithSecrets, AccountRole.Administrator)]
+    public void EnsureRole_BelowMinimal_ThrowsAccessDenied(AccountRole actual, AccountRole minimal)
+    {
+        var exception = Should.Throw<AccessDeniedException>(() => HttpRequestDataExtensions.EnsureRole(actual, minimal, "org.project"));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldContain("org.project");
+    }
+
+    [Theory]
+    [InlineData(AccountRole.Reader, AccountRole.Reader)]
+    [InlineData(AccountRole.Owner, AccountRole.Administrator)]
+    public void EnsureRole_SufficientRole_DoesNotThrow(AccountRole actual, AccountRole minimal)
+    {
+        Should.NotThrow(() => HttpRequestDataExtensions.EnsureRole(actual, minimal, "org.project"));
+    }
 }
