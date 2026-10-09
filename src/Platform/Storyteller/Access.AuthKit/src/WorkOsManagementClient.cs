@@ -118,6 +118,36 @@ public class WorkOsManagementClient
         return true;
     }
 
+    // WorkOS sends the invitation email. Never retried except on 429, so one call sends at most one email.
+    public virtual async Task<WorkOsInvitation> SendInvitationAsync(WorkOsInvitationCreate invitation, CancellationToken cancellationToken = default)
+    {
+        using var request = CreateRequest(HttpMethod.Post, "user_management/invitations");
+        request.Content = JsonContent.Create(invitation);
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        var created = await response.Content.ReadFromJsonAsync<WorkOsInvitation>(cancellationToken);
+
+        return string.IsNullOrEmpty(created?.Id)
+            ? throw new WorkOsApiException(response.StatusCode, "WorkOS returned an invitation without its id.")
+            : created;
+    }
+
+    // False when the invitation does not exist.
+    public virtual async Task<bool> RevokeInvitationAsync(string invitationId, CancellationToken cancellationToken = default)
+    {
+        using var request = CreateRequest(HttpMethod.Post, $"user_management/invitations/{Uri.EscapeDataString(invitationId)}/revoke");
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        return true;
+    }
+
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode)

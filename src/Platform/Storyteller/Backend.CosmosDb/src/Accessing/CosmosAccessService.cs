@@ -52,30 +52,41 @@ public class CosmosAccessService : IAccessService
         var name = model.Name.Trim();
         var userName = model.UserName.Trim();
         var accountId = model.IdentityId.Trim();
-        var account = await GetAccountAsync(userName);
+        var account = await GetAccountAsync(accountId);
 
         if (account is not null)
         {
-            throw new InvalidOperationException($"The account {userName}#{accountId}' already exists.");
+            throw new ConflictException($"The account '{userName}#{accountId}' already exists.", ErrorCodes.AccountExists);
         }
 
-        var point = await CreateAccessPointAsync(new AccessPointCreate
+        var hasOrganization = !string.IsNullOrWhiteSpace(model.Organization);
+        var hasProject = !string.IsNullOrWhiteSpace(model.Project);
+
+        if (hasOrganization != hasProject)
         {
-            OwnerId = accountId,
-            Organization = model.Organization,
-            Project = model.Project,
-        });
+            throw new ArgumentException("The organization and the project are given together, or not at all.", nameof(model));
+        }
+
+        var accessMap = new Dictionary<string, AccountRole>();
+
+        if (hasOrganization)
+        {
+            var point = await CreateAccessPointAsync(new AccessPointCreate
+            {
+                OwnerId = accountId,
+                Organization = model.Organization!,
+                Project = model.Project!,
+            });
+            accessMap[model.Organization!] = AccountRole.Owner;
+            accessMap[point.Key] = AccountRole.Owner;
+        }
 
         var accountEntity = new AccountEntity
         {
             Id = accountId,
             UserName = userName,
             Name = name,
-            AccessMap = new()
-            {
-                { model.Organization, AccountRole.Owner },
-                { point.Key, AccountRole.Owner },
-            },
+            AccessMap = accessMap,
         };
 
         var repository = _repositoryProvider.GetCore();
@@ -101,15 +112,21 @@ public class CosmosAccessService : IAccessService
 
         if (account is null)
         {
-            throw new InvalidOperationException($"The owner '{accountId}' doesn't exist.");
+            throw new NotFoundException($"The account '{accountId}' doesn't exist.");
         }
 
         var accessPointIds = account.AccessMap
             .Where(pair => pair.Value >= AccountRole.Administrator)
-            .Select(pair => $"apt.{pair.Key}");
+            .Select(pair => $"apt.{pair.Key}")
+            .ToList();
+
+        if (accessPointIds.Count == 0)
+        {
+            return [];
+        }
 
         var repository = _repositoryProvider.GetCore();
-        var query = new QueryDefinition("SELECT * FROM ap WHERE ap.Id IN @ids");
+        var query = new QueryDefinition("SELECT * FROM ap WHERE ARRAY_CONTAINS(@ids, ap.id)");
         query.WithParameter("@ids", accessPointIds);
         using var iterator = repository.Container.GetItemQueryIterator<AccessPointEntity>(
             query,
@@ -147,11 +164,19 @@ public class CosmosAccessService : IAccessService
         var partitionKey = new PartitionKey(MAIN_PARTITION_KEY);
         var organizationAccessPoint = await GetAccessPointAsync(model.Organization);
 
+        // Only new names are checked: projects of an organization created before the rules can still be added.
+        if (organizationAccessPoint is null)
+        {
+            NameRules.EnsureOrganizationName(model.Organization);
+        }
+
+        NameRules.EnsureProjectName(model.Project);
+
         if (organizationAccessPoint is not null
             && (!organizationAccessPoint.AccessMap.TryGetValue(model.OwnerId, out var role)
             || role != AccountRole.Owner))
         {
-            throw new InvalidOperationException($"The account '{model.OwnerId}' doesn't have owner rights to the organization.");
+            throw new AccessDeniedException($"The account '{model.OwnerId}' doesn't have owner rights to the organization '{model.Organization}'.");
         }
 
         if (organizationAccessPoint is null)
@@ -171,7 +196,7 @@ public class CosmosAccessService : IAccessService
 
         if (accessPoint is not null)
         {
-            throw new InvalidOperationException($"The access point '{accessPointKey}' already exists.");
+            throw new ConflictException($"The access point '{accessPointKey}' already exists.", ErrorCodes.AccessPointExists);
         }
 
         var accessPointEntity = new AccessPointEntity
@@ -193,7 +218,7 @@ public class CosmosAccessService : IAccessService
                     [accessPointKey] = AccountRole.Owner,
                 },
             };
-            await repository.Container.UpsertItemAsync(account, partitionKey);
+            await repository.Container.UpsertItemAsync(account.ToEntity(), partitionKey);
         }
 
         return response.Resource.ToAccessPoint();
@@ -203,128 +228,163 @@ public class CosmosAccessService : IAccessService
     {
         if (model.Role == AccountRole.None)
         {
-            throw new InvalidOperationException("The no role can't be allowed.");
+            throw new ArgumentException("The role None can't be granted, revoke the permission instead.", nameof(model));
         }
 
-        var creator = await GetAccountAsync(model.CreatedById);
-        var account = await GetAccountAsync(model.AccountId);
-
-        if (creator is null)
+        var (changed, _) = await UpdateMembershipAsync(model.AccessPointKey, model.AccountId, (point, _) =>
         {
-            throw new InvalidOperationException($"The creator '{model.CreatedById}' doesn't exist.");
-        }
+            EnsureCanManage(point, model.CreatedById, model.Role);
 
-        if (account is null)
-        {
-            throw new InvalidOperationException($"The target account '{model.AccountId}' doesn't exist.");
-        }
+            // Grant only raises a role. Lowering one is a revoke followed by a grant, or a member role update.
+            return point.AccessMap.TryGetValue(model.AccountId, out var accountRole) && accountRole >= model.Role
+                ? MembershipDecision.Keep
+                : MembershipDecision.Set(model.Role);
+        });
 
-        if (!creator.AccessMap.TryGetValue(model.AccessPointKey, out var creatorRole))
-        {
-            throw new InvalidOperationException($"The access point '{model.AccessPointKey}' doesn't exist.");
-        }
-
-        if (creatorRole < AccountRole.Administrator
-            || model.Role == AccountRole.Owner && creatorRole != AccountRole.Owner)
-        {
-            throw new InvalidOperationException($"The creator '{model.CreatedById}' doesn't have privileges to grant this access permission.");
-        }
-
-        var accessPoint = await GetAccessPointAsync(model.AccessPointKey);
-
-        if (accessPoint is null)
-        {
-            throw new InvalidOperationException($"The access point '{model.AccessPointKey}' doesn't exist.");
-        }
-
-        if (accessPoint.AccessMap.TryGetValue(model.AccountId, out var accountRole)
-            && accountRole >= model.Role)
-        {
-            return false;
-        }
-
-        var repository = _repositoryProvider.GetCore();
-        var mainPartitionKey = new PartitionKey(MAIN_PARTITION_KEY);
-
-        accessPoint = accessPoint with
-        {
-            AccessMap = new Dictionary<string, AccountRole>(accessPoint.AccessMap)
-            {
-                [model.AccountId] = model.Role,
-            },
-        };
-        await repository.Container.UpsertItemAsync(accessPoint, mainPartitionKey);
-
-        account = account with
-        {
-            AccessMap = new Dictionary<string, AccountRole>(account.AccessMap)
-            {
-                [model.AccessPointKey] = model.Role,
-            },
-        };
-        await repository.Container.UpsertItemAsync(account, mainPartitionKey);
-
-        return true;
+        return changed;
     }
 
     public async Task<bool> RevokePermissionAsync(Permission model)
     {
-        var creator = await GetAccountAsync(model.CreatedById);
-        var account = await GetAccountAsync(model.AccountId);
-
-        if (creator is null)
+        var (changed, _) = await UpdateMembershipAsync(model.AccessPointKey, model.AccountId, (point, _) =>
         {
-            throw new InvalidOperationException($"The creator '{model.CreatedById}' doesn't exist.");
+            EnsureCanManage(point, model.CreatedById, model.Role);
+
+            if (!point.AccessMap.TryGetValue(model.AccountId, out var accountRole)
+                || accountRole < model.Role)
+            {
+                return MembershipDecision.Keep;
+            }
+
+            if (accountRole > model.Role)
+            {
+                throw new ConflictException(
+                    $"The target account '{model.AccountId}' has the higher role {accountRole} on '{model.AccessPointKey}', revoke that role instead.",
+                    ErrorCodes.ElevatedRole);
+            }
+
+            EnsureNotLastOwner(point, model.AccountId, accountRole);
+            return MembershipDecision.Remove;
+        });
+
+        return changed;
+    }
+
+    public async Task<IReadOnlyList<AccessPointMember>> GetMembersAsync(string accessPointKey, string actorId)
+    {
+        var point = await GetAccessPointAsync(accessPointKey)
+            ?? throw new NotFoundException($"The access point '{accessPointKey}' doesn't exist.");
+
+        if (point.AccessMap.GetValueOrDefault(actorId, AccountRole.None) < AccountRole.Administrator)
+        {
+            throw new AccessDeniedException($"The account '{actorId}' can't list the members of '{accessPointKey}'.");
         }
 
-        if (account is null)
+        var accounts = await GetAccountProfilesAsync(point.AccessMap.Keys);
+
+        return point.AccessMap
+            .Select(pair => new AccessPointMember
+            {
+                AccountId = pair.Key,
+                UserName = accounts.GetValueOrDefault(pair.Key)?.UserName,
+                Name = accounts.GetValueOrDefault(pair.Key)?.Name,
+                Role = pair.Value,
+            })
+            .OrderByDescending(member => member.Role)
+            .ThenBy(member => member.Name ?? member.UserName ?? member.AccountId, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    public async Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole role, string actorId)
+    {
+        if (role == AccountRole.None)
         {
-            throw new InvalidOperationException($"The target account '{model.AccountId}' doesn't exist.");
+            throw new ArgumentException("The role None can't be set, remove the member instead.", nameof(role));
         }
 
-        if (creator.AccessMap.TryGetValue(model.AccessPointKey, out _))
+        var (_, resultRole) = await UpdateMembershipAsync(accessPointKey, accountId, (point, _) =>
         {
-            throw new InvalidOperationException($"The access point '{model.AccessPointKey}' doesn't exist or the creator doesn't have permissions.");
-        }
+            var actorRole = point.AccessMap.GetValueOrDefault(actorId, AccountRole.None);
 
-        var accessPoint = await GetAccessPointAsync(model.AccessPointKey);
+            if (actorRole < AccountRole.Administrator)
+            {
+                throw new AccessDeniedException($"The account '{actorId}' can't change roles on '{accessPointKey}'.");
+            }
 
-        if (accessPoint is null)
+            if (!point.AccessMap.TryGetValue(accountId, out var currentRole))
+            {
+                throw new NotFoundException($"The account '{accountId}' is not a member of '{accessPointKey}'.", ErrorCodes.MemberNotFound);
+            }
+
+            if (string.Equals(actorId, accountId, StringComparison.Ordinal))
+            {
+                throw new ConflictException("Members can't change their own role.", ErrorCodes.SelfRoleChange);
+            }
+
+            if ((currentRole == AccountRole.Owner || role == AccountRole.Owner) && actorRole != AccountRole.Owner)
+            {
+                throw new AccessDeniedException($"Only an owner can change the role {AccountRole.Owner} on '{accessPointKey}'.");
+            }
+
+            if (currentRole == role)
+            {
+                return MembershipDecision.Keep;
+            }
+
+            EnsureNotLastOwner(point, accountId, currentRole);
+            return MembershipDecision.Set(role);
+        });
+
+        var account = await GetAccountAsync(accountId);
+        return new AccessPointMember
         {
-            throw new InvalidOperationException($"The access point '{model.AccessPointKey}' doesn't exist.");
-        }
-
-        if (!accessPoint.AccessMap.TryGetValue(model.AccountId, out var accountRole)
-            || accountRole < model.Role)
-        {
-            return false;
-        }
-
-        if (accountRole > model.Role)
-        {
-            throw new InvalidOperationException($"The target account '{model.AccountId}' has elevated role.");
-        }
-
-        var mainPartitionKey = new PartitionKey(MAIN_PARTITION_KEY);
-        var repository = _repositoryProvider.GetCore();
-
-        var accessPointAccessMap = new Dictionary<string, AccountRole>(accessPoint.AccessMap);
-        accessPointAccessMap.Remove(model.AccountId);
-        accessPoint = accessPoint with
-        {
-            AccessMap = accessPointAccessMap,
+            AccountId = accountId,
+            UserName = account?.UserName,
+            Name = account?.Name,
+            Role = resultRole ?? role,
         };
-        await repository.Container.UpsertItemAsync(accessPoint, mainPartitionKey);
+    }
 
-        var accountAccessMap = new Dictionary<string, AccountRole>(account.AccessMap);
-        accountAccessMap.Remove(model.AccessPointKey);
-        account = account with
+    public async Task RemoveMemberAsync(string accessPointKey, string accountId, string actorId)
+    {
+        await UpdateMembershipAsync(accessPointKey, accountId, (point, _) =>
         {
-            AccessMap = accountAccessMap,
-        };
-        await repository.Container.UpsertItemAsync(account, mainPartitionKey);
+            var isLeaving = string.Equals(actorId, accountId, StringComparison.Ordinal);
+            var actorRole = point.AccessMap.GetValueOrDefault(actorId, AccountRole.None);
 
-        return true;
+            if (!isLeaving && actorRole < AccountRole.Administrator)
+            {
+                throw new AccessDeniedException($"The account '{actorId}' can't remove members of '{accessPointKey}'.");
+            }
+
+            if (!point.AccessMap.TryGetValue(accountId, out var currentRole))
+            {
+                throw new NotFoundException($"The account '{accountId}' is not a member of '{accessPointKey}'.", ErrorCodes.MemberNotFound);
+            }
+
+            if (!isLeaving && currentRole == AccountRole.Owner && actorRole != AccountRole.Owner)
+            {
+                throw new AccessDeniedException($"Only an owner can remove an owner of '{accessPointKey}'.");
+            }
+
+            EnsureNotLastOwner(point, accountId, currentRole);
+            return MembershipDecision.Remove;
+        });
+    }
+
+    public async Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role)
+    {
+        if (role == AccountRole.None)
+        {
+            throw new ArgumentException("The role None can't be joined with.", nameof(role));
+        }
+
+        var (_, resultRole) = await UpdateMembershipAsync(accessPointKey, accountId, (point, _) =>
+            point.AccessMap.TryGetValue(accountId, out var currentRole) && currentRole >= role
+                ? MembershipDecision.Keep
+                : MembershipDecision.Set(role));
+
+        return resultRole ?? role;
     }
 
     public async Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project)
@@ -427,7 +487,7 @@ public class CosmosAccessService : IAccessService
 
         if (machineAccess is null)
         {
-            throw new InvalidOperationException($"The machine access {appId} has not been found.");
+            throw new NotFoundException($"The machine access {appId} has not been found.");
         }
 
         var accessKey = await MachineAccessService.ResetMachineAccessAsync(machineAccess.ToMachineAccess(), organization, project);
@@ -497,4 +557,153 @@ public class CosmosAccessService : IAccessService
         return machineAccess is not null;
     }
 
+    // Managing a role needs Administrator on the access point; only an Owner may grant or revoke Owner.
+    // The access point's own map is the authority, read in the same optimistic transaction as the change.
+    private static void EnsureCanManage(AccessPoint point, string actorId, AccountRole role)
+    {
+        var actorRole = point.AccessMap.GetValueOrDefault(actorId, AccountRole.None);
+
+        if (actorRole < AccountRole.Administrator
+            || (role == AccountRole.Owner && actorRole != AccountRole.Owner))
+        {
+            throw new AccessDeniedException($"The account '{actorId}' can't manage the role {role} on '{point.Key}'.");
+        }
+    }
+
+    private static void EnsureNotLastOwner(AccessPoint point, string accountId, AccountRole currentRole)
+    {
+        if (currentRole == AccountRole.Owner
+            && point.AccessMap.Count(pair => pair.Value == AccountRole.Owner) <= 1)
+        {
+            throw new ConflictException($"The account '{accountId}' is the last owner of '{point.Key}'.", ErrorCodes.LastOwner);
+        }
+    }
+
+    // The membership is stored twice: in the access point and in the account. Both documents live in the
+    // main partition, so one transactional batch replaces them together, guarded by their ETags.
+    // A concurrent change of either document makes the batch fail with 412; the rule runs once more on fresh data.
+    private async Task<(bool Changed, AccountRole? Role)> UpdateMembershipAsync(
+        string accessPointKey,
+        string accountId,
+        Func<AccessPoint, Account, MembershipDecision> decide)
+    {
+        const int maxAttempts = 2;
+        var repository = _repositoryProvider.GetCore();
+        var partitionKey = new PartitionKey(MAIN_PARTITION_KEY);
+
+        for (var attempt = 1; ; attempt++)
+        {
+            var (pointEntity, pointETag) = await repository.Container.TryReadItemWithETagAsync(
+                $"apt.{accessPointKey}",
+                partitionKey,
+                stream => stream.DeserializeSystemTextJson<AccessPointEntity>(_serializerOptions));
+            var (accountEntity, accountETag) = await repository.Container.TryReadItemWithETagAsync(
+                accountId,
+                partitionKey,
+                stream => stream.DeserializeSystemTextJson<AccountEntity>(_serializerOptions));
+
+            if (pointEntity is null)
+            {
+                throw new NotFoundException($"The access point '{accessPointKey}' doesn't exist.");
+            }
+
+            if (accountEntity is null)
+            {
+                throw new NotFoundException($"The target account '{accountId}' doesn't exist.");
+            }
+
+            var point = pointEntity.ToAccessPoint();
+            var account = accountEntity.ToAccount();
+            var decision = decide(point, account);
+
+            if (!decision.IsChange)
+            {
+                return (false, point.AccessMap.TryGetValue(accountId, out var keptRole) ? keptRole : null);
+            }
+
+            var pointMap = new Dictionary<string, AccountRole>(point.AccessMap);
+            var accountMap = new Dictionary<string, AccountRole>(account.AccessMap);
+
+            if (decision.Role is { } newRole)
+            {
+                pointMap[accountId] = newRole;
+                accountMap[accessPointKey] = newRole;
+            }
+            else
+            {
+                pointMap.Remove(accountId);
+                accountMap.Remove(accessPointKey);
+            }
+
+            using var response = await repository.Container.CreateTransactionalBatch(partitionKey)
+                .ReplaceItem(pointEntity.Id, pointEntity with { AccessMap = pointMap }, new TransactionalBatchItemRequestOptions { IfMatchEtag = pointETag })
+                .ReplaceItem(accountEntity.Id, accountEntity with { AccessMap = accountMap }, new TransactionalBatchItemRequestOptions { IfMatchEtag = accountETag })
+                .ExecuteAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                return (true, decision.Role);
+            }
+
+            if (response.StatusCode != HttpStatusCode.PreconditionFailed)
+            {
+                throw new InvalidOperationException($"Updating the membership of '{accountId}' in '{accessPointKey}' failed with {(int)response.StatusCode}: {response.ErrorMessage}");
+            }
+
+            if (attempt >= maxAttempts)
+            {
+                throw new ConflictException(
+                    $"The membership of '{accountId}' in '{accessPointKey}' was changed concurrently, try again.",
+                    ErrorCodes.Conflict);
+            }
+        }
+    }
+
+    private async Task<Dictionary<string, AccountProfile>> GetAccountProfilesAsync(IEnumerable<string> accountIds)
+    {
+        var ids = accountIds.ToList();
+
+        if (ids.Count == 0)
+        {
+            return new Dictionary<string, AccountProfile>(StringComparer.Ordinal);
+        }
+
+        var repository = _repositoryProvider.GetCore();
+        var query = new QueryDefinition("SELECT c.id, c.UserName, c.Name FROM c WHERE ARRAY_CONTAINS(@ids, c.id)")
+            .WithParameter("@ids", ids);
+        using var iterator = repository.Container.GetItemQueryIterator<AccountProfile>(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(MAIN_PARTITION_KEY) });
+
+        var profiles = new Dictionary<string, AccountProfile>(StringComparer.Ordinal);
+
+        while (iterator.HasMoreResults)
+        {
+            foreach (var profile in await iterator.ReadNextAsync())
+            {
+                profiles[profile.Id] = profile;
+            }
+        }
+
+        return profiles;
+    }
+
+    private readonly record struct MembershipDecision(bool IsChange, AccountRole? Role)
+    {
+        public static MembershipDecision Keep => new(false, null);
+
+        public static MembershipDecision Remove => new(true, null);
+
+        public static MembershipDecision Set(AccountRole role) => new(true, role);
+    }
+
+    private sealed record AccountProfile
+    {
+        [Newtonsoft.Json.JsonProperty("id")]
+        public required string Id { get; init; }
+
+        public string? UserName { get; init; }
+
+        public string? Name { get; init; }
+    }
 }

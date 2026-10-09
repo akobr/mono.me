@@ -15,6 +15,16 @@ public static class Definitions
                 public const string Grant = "v1/access/grant";
                 public const string Revoke = "v1/access/revoke";
 
+                public const string Members = $"v1/access/points/{{{Parameters.Key}}}/members";
+                public const string Member = $"v1/access/points/{{{Parameters.Key}}}/members/{{{Parameters.AccountId}}}";
+
+                public const string PointInvitations = $"v1/access/points/{{{Parameters.Key}}}/invitations";
+                public const string PointInvitation = $"v1/access/points/{{{Parameters.Key}}}/invitations/{{{Parameters.Id}}}";
+                public const string PointInvitationResend = $"v1/access/points/{{{Parameters.Key}}}/invitations/{{{Parameters.Id}}}/resend";
+                public const string MyInvitations = "v1/access/invitations/mine";
+                public const string InvitationAccept = $"v1/access/invitations/{{{Parameters.Id}}}/accept";
+                public const string InvitationDecline = $"v1/access/invitations/{{{Parameters.Id}}}/decline";
+
                 public const string Machines = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines";
                 public const string Machine = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}";
 
@@ -54,10 +64,20 @@ public static class Definitions
             }
         }
 
+        public static class Views
+        {
+            public static class V1
+            {
+                public const string Views = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/views";
+                public const string View = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/views/{{{Parameters.View}}}";
+            }
+        }
+
         public static class Configuration
         {
             public static class V1
             {
+                public const string Configurations = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configurations";
                 public const string Configuration = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}";
                 public const string ConfigurationResolved = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/resolved";
 
@@ -73,6 +93,7 @@ public static class Definitions
         {
             public static class V1
             {
+                public const string Schemas = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schemas";
                 public const string SchemaType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/type/{{{Parameters.AnnotationType}}}";
                 public const string SchemaAnnotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}";
                 public const string SchemaDescendantType = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration-schema/{{{Parameters.Key}}}/type/{{{Parameters.AnnotationType}}}";
@@ -99,6 +120,7 @@ public static class Definitions
         {
             public static class V1
             {
+                public const string Templates = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/templates";
                 public const string Template = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/template/{{{Parameters.AnnotationType}}}";
 
                 public const string Versions = $"{Template}/versions";
@@ -123,6 +145,18 @@ public static class Definitions
             public const string GrantUserAccess = nameof(GrantUserAccess);
             public const string RevokeUserAccess = nameof(RevokeUserAccess);
 
+            public const string GetMembers = nameof(GetMembers);
+            public const string SetMemberRole = nameof(SetMemberRole);
+            public const string RemoveMember = nameof(RemoveMember);
+
+            public const string GetInvitations = nameof(GetInvitations);
+            public const string CreateInvitation = nameof(CreateInvitation);
+            public const string ResendInvitation = nameof(ResendInvitation);
+            public const string RevokeInvitation = nameof(RevokeInvitation);
+            public const string GetMyInvitations = nameof(GetMyInvitations);
+            public const string AcceptInvitation = nameof(AcceptInvitation);
+            public const string DeclineInvitation = nameof(DeclineInvitation);
+
             public const string GetMachineAccesses = nameof(GetMachineAccesses);
             public const string GetMachineAccess = nameof(GetMachineAccess);
             public const string CreateMachineAccess = nameof(CreateMachineAccess);
@@ -139,6 +173,13 @@ public static class Definitions
             public const string RevokeSharedCertificate = nameof(RevokeSharedCertificate);
 
             public const string GetAuthConfiguration = nameof(GetAuthConfiguration);
+        }
+
+        public static class Views
+        {
+            public const string GetViews = nameof(GetViews);
+            public const string CreateView = nameof(CreateView);
+            public const string UpdateView = nameof(UpdateView);
         }
 
         public static class Annotations
@@ -163,6 +204,7 @@ public static class Definitions
 
         public static class Configuration
         {
+            public const string GetConfigurations = nameof(GetConfigurations);
             public const string GetConfiguration = nameof(GetConfiguration);
             public const string GetResolvedConfiguration = nameof(GetResolvedConfiguration);
             public const string SetConfiguration = nameof(SetConfiguration);
@@ -178,6 +220,7 @@ public static class Definitions
 
         public static class ConfigurationSchema
         {
+            public const string GetConfigurationSchemas = nameof(GetConfigurationSchemas);
             public const string GetConfigurationSchema = nameof(GetConfigurationSchema);
             public const string SetConfigurationSchema = nameof(SetConfigurationSchema);
             public const string DeleteConfigurationSchema = nameof(DeleteConfigurationSchema);
@@ -210,6 +253,7 @@ public static class Definitions
 
         public static class Template
         {
+            public const string GetTemplates = nameof(GetTemplates);
             public const string GetTemplate = nameof(GetTemplate);
             public const string SetTemplate = nameof(SetTemplate);
             public const string PatchTemplate = nameof(PatchTemplate);
@@ -237,6 +281,9 @@ public static class Definitions
         public const string ViewTo = "viewTo";
         public const string AnnotationType = "annotationType";
         public const string Thumbprint = "thumbprint";
+        public const string AccountId = "accountId";
+        public const string Discover = "discover";
+        public const string KeyPrefix = "keyPrefix";
         public const string Format = "format";
         public const string Force = "force";
     }
@@ -254,7 +301,9 @@ public static class Definitions
     {
         public const string ResponseAccount = "Details about the log in account, contains all accessible access points.";
         public const string ResponseBadRequest = "The request is not well formed.";
-        public const string ResponseUnauthorized = "Authentication or authorization issues. Scope(s): ";
+        public const string ResponseUnauthorized = "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): ";
+        public const string ResponseForbidden = "The caller is authenticated, but its role on the organization or project does not allow the operation.";
+        public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";
         public const string ResponseInternalServerError = "Unexpected error occurred on the service.";
 
         public const string SecureManual = "Manually by token in Authorization HTTP header.";
@@ -264,6 +313,9 @@ public static class Definitions
         public const string View = "The target view inside the project.";
         public const string ContinuationToken = "The continuation token for multi-page queries.";
         public const string IdMachine = "The id of the machine access.";
+        public const string AccessPointKey = "The key of the access point: organization, or organization.project.";
+        public const string AccountId = "The id of the account (the identity provider's subject).";
+        public const string InvitationId = "The id of the invitation.";
         public const string Key = "The key of the requested annotation.";
         public const string AnnotationType = "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).";
         public const string DiffFormat = "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.";

@@ -24,9 +24,13 @@ public static class AuthKitEntryPoint
         services.AddSingleton<IBearerClaimsNormalizer>(provider => provider.GetRequiredService<AuthKitClaimNormalizer>());
         services.AddSingleton<IBearerTokenValidator, AuthKitBearerTokenValidator>();
 
-        // Typed clients are transient, so the resolver is too.
+        // Typed clients are transient, so the resolver and the invitation sender are too.
         services.AddWorkOsManagementClient();
         services.AddTransient<IUserProfileResolver, AuthKitUserProfileResolver>();
+
+        // Replaces the default NoopInvitationSender whatever the registration order. Without Auth:AuthKit:ApiKey
+        // the sender sends nothing, so invitations still work through a shared link.
+        services.Replace(ServiceDescriptor.Transient<IInvitationSender, AuthKitInvitationSender>());
         return services;
     }
 

@@ -140,6 +140,7 @@ Routes include the view, like configuration and template routes. The caller send
 
 | Method | Route | Operation |
 | --- | --- | --- |
+| GET | `v1/{organization}/{project}/{view}/configuration-schemas` | Every schema of the view without its content: `Kind` (`Type`, `Annotation`, `DescendantType`), `AnnotationType`, `AnnotationKey`, `Version`, `Author`, `UpdatedAt` |
 | GET, PUT, DELETE | `v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}` | Type schema |
 | GET, PUT, DELETE | `v1/{organization}/{project}/{view}/configuration-schema/{key}` | Annotation schema |
 | GET, PUT, DELETE | `v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}` | Descendant-type schema on annotation `{key}` for descendant type `{annotationType}` |

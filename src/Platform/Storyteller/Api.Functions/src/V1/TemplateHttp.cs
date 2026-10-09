@@ -1,5 +1,6 @@
 using System.Net;
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
@@ -30,6 +31,30 @@ public class TemplateHttp
         _templates = templates;
         _access = access;
         _logger = logger;
+    }
+
+    [Function(nameof(GetTemplates))]
+    [OpenApiOperation(Definitions.RouteIds.Template.GetTemplates, Definitions.Tags.Templates, Description = "Templates of the view without their content.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
+    [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
+    [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<ConfigurationTemplateSummary>), Description = "The template summaries, by annotation type code.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> GetTemplates(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Template.V1.Templates)]
+        HttpRequestData request,
+        string organization,
+        string project,
+        string view)
+    {
+        request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
+        await request.CheckAccessToProjectAsync(_access, organization, project);
+
+        var templates = await _templates.ListTemplatesAsync(organization, project, view);
+        return new OkObjectResult(templates);
     }
 
     [Function(nameof(GetTemplate))]
@@ -83,6 +108,7 @@ public class TemplateHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationTemplate), Description = "The created or updated template.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The template was changed concurrently too many times, the request can be repeated.")]
+    [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetTemplate(
@@ -125,6 +151,11 @@ public class TemplateHttp
         {
             return new ConflictObjectResult(new ErrorResponse(ex.Message));
         }
+        catch (JsonPatchException ex)
+        {
+            // A failed test operation answers 412, any other patch failure 400.
+            return ErrorResponseMapping.ToActionResult(ex);
+        }
         catch (InvalidOperationException ex)
         {
             // invalid $patch or JSON Patch operations of the input
@@ -145,6 +176,7 @@ public class TemplateHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No template exists for the annotation type in the view.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The template was changed concurrently too many times, the request can be repeated.")]
+    [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PatchTemplate(
@@ -190,6 +222,11 @@ public class TemplateHttp
         catch (TemplateConcurrencyException ex)
         {
             return new ConflictObjectResult(new ErrorResponse(ex.Message));
+        }
+        catch (JsonPatchException ex)
+        {
+            // A failed test operation answers 412, any other patch failure 400.
+            return ErrorResponseMapping.ToActionResult(ex);
         }
         catch (InvalidOperationException ex)
         {

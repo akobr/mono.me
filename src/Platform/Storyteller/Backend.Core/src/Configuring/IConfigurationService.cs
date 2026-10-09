@@ -8,6 +8,16 @@ public interface IConfigurationService
 
     Task<Configuration?> GetRawConfigurationAsync(FullKey key);
 
+    // Configurations of a view without their documents, up to 1000 per page.
+    // annotationType is a type code (rst, sbt, …); keyPrefix filters the annotation keys.
+    Task<ConfigurationsResponse> ListConfigurationsAsync(
+        string organization,
+        string project,
+        string view,
+        string? annotationType = null,
+        string? keyPrefix = null,
+        string? continuationToken = null);
+
     Task<Configuration?> GetResolvedConfigurationAsync(FullKey key, bool includeSecrets = false);
 
     Task<Configuration?> GetResolvedConfigurationWithSecretsAsync(FullKey key);

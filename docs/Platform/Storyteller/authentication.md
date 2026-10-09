@@ -36,7 +36,8 @@ The value is case-insensitive. Settings are validated at startup, so a missing r
 | `Auth:AuthKit:Audience` | no, but set it in production | | When set, tokens must carry this `aud`. When empty, the audience is not checked. |
 | `Auth:AuthKit:DefaultUserScopes:*` | no | none | Scopes given to every signed-in user. |
 | `Auth:AuthKit:PermissionMap:<slug>` | no | none | Maps a WorkOS permission slug to one or more Storyteller scopes. |
-| `Auth:AuthKit:ApiKey` | no | | WorkOS management key (`sk_…`). Used to look up a user's email and name at account registration when the token lacks them. Keep it in Key Vault, never in plain settings. |
+| `Auth:AuthKit:ApiKey` | no | | WorkOS management key (`sk_…`). Used to look up a user's email and name at account registration when the token lacks them, and to send invitation emails. Keep it in Key Vault, never in plain settings. |
+| `Auth:AuthKit:RequireVerifiedEmail` | no | `true` | Accepting an invitation needs a verified email. When the token has no `email_verified` claim, the email counts as verified only if this is `false`. |
 | `Auth:AuthKit:AuthKitDomain` | no | | `https://<subdomain>.authkit.app` or your custom domain. Enables the AuthKit OAuth flows in the OpenAPI document and is returned by the discovery endpoint. Together with `MachineOrganizationId` it turns on M2M machine access. |
 | `Auth:AuthKit:MachineOrganizationId` | no | | WorkOS organization (`org_…`) that owns the M2M applications Storyteller creates. Setting it (with `AuthKitDomain`) turns on M2M machine access, which then also requires `ApiKey`. |
 
@@ -113,13 +114,15 @@ A `PermissionMap` value may list several scopes separated by spaces, for example
    {
      "aud": "https://storyteller.42for.net",
      "email": {{ user.email }},
+     "email_verified": {{ user.email_verified }},
      "name": "{{ user.first_name }} {{ user.last_name }}"
    }
    ```
 
-   Set `Auth:AuthKit:Audience` to the same `aud`. When a user has no first or last name, the template renders a blank or partial `name`, and Storyteller falls back as described above.
+   Set `Auth:AuthKit:Audience` to the same `aud`. `email_verified` is needed to accept invitations (see [Members and invitations](access.md)). Without it, invitations can only be accepted when `Auth:AuthKit:RequireVerifiedEmail` is `false`. When a user has no first or last name, the template renders a blank or partial `name`, and Storyteller falls back as described above.
 4. If you use role-driven scopes, create the permissions (for example `storyteller:annotation-read`) and assign them to organization roles.
 5. Enable **CLI Auth** for the environment so `sform` can use the device sign-in. Without it, `POST /user_management/authorize/device` is rejected and `sform account` reports the WorkOS message.
+6. For invitation emails, set `Auth:AuthKit:ApiKey` (the management key) and point the environment's invitation link at the admin UI's accept page, for example `https://admin.42for.net/invitations/accept`. Without the key, invitations are still created, but no email is sent.
 
 ## Discovery endpoint
 
@@ -336,6 +339,37 @@ When the Cosmos write after a successful create fails, Storyteller asks WorkOS t
 `CertificateAndApiKey` does both. The API-key half is durable in Cosmos. The certificate half is the in-memory store, so the pair fails on any instance that did not issue the certificate.
 
 Entra ID and Keycloak `ClientCredentials` follow the same Storyteller shape as AuthKit: one external object per machine, a JWT checked locally, and the Cosmos document as the allow list. Entra provisioning is Microsoft Graph (application, service principal, and app-role assignment) in one tenant, so the tenant's directory-object quota and Graph throttling are the figures to confirm before a large rollout. Keycloak provisioning is the admin API of one realm; how many clients that realm can hold is a property of that Keycloak deployment.
+
+## 401 and 403
+
+The two status codes mean different things, so a client knows whether signing in again can help:
+
+| Status | Meaning | Body |
+| --- | --- | --- |
+| `401` | The credentials are missing, invalid or expired, or the token lacks the required scope. Machine credentials that fail their checks also get 401. | none |
+| `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
+
+A user role check runs on every project endpoint (`CheckAccessToProjectAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`. Shared certificates, access points and the machine authentication policy need `Administrator`. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check.
+
+Other access-management errors use the same `ErrorResponse` shape, without exception details:
+
+| Status | `ErrorCode` | When |
+| --- | --- | --- |
+| `400` | none | Grant or revoke with a missing account, a missing access point key, or the role `None`. |
+| `404` | `NotFound` | The target account, the access point, or the machine access does not exist. |
+| `409` | `AccountExists`, `AccessPointExists` | The account or project already exists. |
+| `409` | `ElevatedRole` | Revoke names a lower role than the member holds. Revoke the stored role instead. |
+| `409` | `LastOwner` | The revoke would leave the access point without an `Owner`. |
+
+Grant only raises a role. To lower one, revoke the current role and grant the new one, or set the exact role through the members endpoint. Members and invitations, with their own error codes, are described in [Members and invitations](access.md).
+
+## CORS for browser clients
+
+Browser clients, such as the admin UI, call the API from another origin. The deployed Function App's CORS settings must allow the origin of each such client (for example `https://admin.42for.net`). The clients send bearer tokens in the `Authorization` header and no cookies, so `Access-Control-Allow-Credentials` stays off and no cookie settings are needed. The anonymous `GET v1/auth/configuration` must be reachable from the same origins, because clients read it before they sign in. Local development keeps `"CORS": "*"` in `local.settings.json`.
+
+```bash
+az functionapp cors add --name <function-app> --resource-group <group> --allowed-origins https://admin.42for.net
+```
 
 ## Switching an existing deployment
 

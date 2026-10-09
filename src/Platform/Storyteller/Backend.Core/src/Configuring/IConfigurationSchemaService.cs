@@ -6,6 +6,9 @@ public interface IConfigurationSchemaService
 {
     Task<ConfigurationSchema?> GetSchemaAsync(string organization, string project, string view, string annotationType);
 
+    // Every schema document of the view (type, annotation, descendant type) without its content.
+    Task<IReadOnlyList<ConfigurationSchemaSummary>> ListSchemasAsync(string organization, string project, string view);
+
     Task<ConfigurationSchema> SetSchemaAsync(string organization, string project, string view, string annotationType, JObject schemaContent, string author, bool force);
 
     Task<bool> DeleteSchemaAsync(string organization, string project, string view, string annotationType);
