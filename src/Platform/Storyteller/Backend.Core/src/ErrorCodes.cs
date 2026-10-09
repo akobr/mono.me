@@ -6,6 +6,8 @@ public static class ErrorCodes
     public const string AccessDenied = "AccessDenied";
     public const string NotFound = "NotFound";
     public const string Conflict = "Conflict";
+    public const string InvalidName = "InvalidName";
+    public const string ViewExists = "ViewExists";
 
     public const string AccountExists = "AccountExists";
     public const string AccessPointExists = "AccessPointExists";

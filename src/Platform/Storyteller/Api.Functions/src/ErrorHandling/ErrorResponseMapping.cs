@@ -16,6 +16,7 @@ public static class ErrorResponseMapping
             AccessDeniedException e => (HttpStatusCode.Forbidden, e.ErrorCode),
             NotFoundException e => (HttpStatusCode.NotFound, e.ErrorCode),
             ConflictException e => (HttpStatusCode.Conflict, e.ErrorCode),
+            InvalidInputException e => (HttpStatusCode.BadRequest, e.ErrorCode),
             JsonPatchException { Kind: JsonPatchFailureKind.TestFailed } e => (HttpStatusCode.PreconditionFailed, e.ErrorCode),
             JsonPatchException e => (HttpStatusCode.BadRequest, e.ErrorCode),
             _ => (HttpStatusCode.InternalServerError, null),

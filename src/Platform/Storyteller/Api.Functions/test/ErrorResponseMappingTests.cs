@@ -15,6 +15,7 @@ public class ErrorResponseMappingTests
         { new NotFoundException("missing"), HttpStatusCode.NotFound, ErrorCodes.NotFound },
         { new ConflictException("duplicate"), HttpStatusCode.Conflict, ErrorCodes.Conflict },
         { new ConflictException("last owner", ErrorCodes.LastOwner), HttpStatusCode.Conflict, ErrorCodes.LastOwner },
+        { new InvalidInputException("bad name", ErrorCodes.InvalidName), HttpStatusCode.BadRequest, ErrorCodes.InvalidName },
         { new JsonPatchException("stale", JsonPatchFailureKind.TestFailed, 0), HttpStatusCode.PreconditionFailed, ErrorCodes.PatchTestFailed },
         { new JsonPatchException("unknown op", JsonPatchFailureKind.Invalid), HttpStatusCode.BadRequest, ErrorCodes.PatchInvalid },
         { new JsonPatchException("no path", JsonPatchFailureKind.OperationFailed, 1), HttpStatusCode.BadRequest, ErrorCodes.PatchInvalid },

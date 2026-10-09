@@ -99,6 +99,7 @@ public static class EntryPoint
         services.AddSingleton<IConfigurationService, CosmosConfigurationService>();
         services.AddSingleton<IConfigurationSchemaService, CosmosConfigurationSchemaService>();
         services.AddSingleton<IConfigurationTemplateService, CosmosConfigurationTemplateService>();
+        services.AddSingleton<IViewService, CosmosViewService>();
 
         // Invitations: the identity provider may replace the sender (AuthKit sends the email through WorkOS).
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));
