@@ -20,7 +20,7 @@ internal class InOperator : IBinaryOperator
 				: throw new InterpreterException("only strings can be found in objects"),
 			JsonValue vRight when vRight.TryGetValue(out string? sRight) &&
 								  left is JsonValue vLeft &&
-								  vLeft.TryGetValue(out string? sLeft) => sRight.Contains(sLeft),
+								  vLeft.TryGetValue(out string? sLeft) => OrdinalSearch.Contains(sRight, sLeft), // Storyteller patch: linear worst case. See VENDORED.md.
 			_ => throw new BuiltInException(CommonErrors.IncorrectArgType("in"))
 		};
 	}

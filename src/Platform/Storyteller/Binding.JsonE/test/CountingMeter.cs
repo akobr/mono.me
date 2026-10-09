@@ -10,11 +10,13 @@ internal sealed class CountingMeter : IEvaluationMeter
 {
     private readonly long _maxTicks;
     private readonly int _maxDepth;
+    private readonly long _maxReservedBytes;
 
-    public CountingMeter(long maxTicks = long.MaxValue, int maxDepth = int.MaxValue)
+    public CountingMeter(long maxTicks = long.MaxValue, int maxDepth = int.MaxValue, long maxReservedBytes = long.MaxValue)
     {
         _maxTicks = maxTicks;
         _maxDepth = maxDepth;
+        _maxReservedBytes = maxReservedBytes;
     }
 
     public long Ticks { get; private set; }
@@ -24,6 +26,8 @@ internal sealed class CountingMeter : IEvaluationMeter
     public int MaxObservedDepth { get; private set; }
 
     public long Frames { get; private set; }
+
+    public long MaxReservedBytes { get; private set; }
 
     public void Tick(int weight)
     {
@@ -49,5 +53,14 @@ internal sealed class CountingMeter : IEvaluationMeter
     public void ExitFrame()
     {
         Depth--;
+    }
+
+    public void Reserve(long bytes)
+    {
+        MaxReservedBytes = Math.Max(MaxReservedBytes, bytes);
+        if (bytes > _maxReservedBytes)
+        {
+            throw new MeterStopException("reserve");
+        }
     }
 }

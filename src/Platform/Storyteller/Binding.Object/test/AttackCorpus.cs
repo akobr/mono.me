@@ -74,6 +74,27 @@ internal static class AttackCorpus
         ["r19 jlogic missing_some 100k keys x200"] = () => JsonLogic(Or(200, """{ "!": [{ "missing_some": [1, { "var": "keys" }] }] }"""), KeysContext(100_000)),
         ["r19 jlogic var 400KB path x2000"] = () => JsonLogic(Or(2_000, """{ "var": { "var": "p" } }"""), new JObject { ["p"] = Repeat("a", 200_000, ".") }),
 
+        // Shared string instances: N references cost N small nodes, but flattening them costs N x |s| in one primitive.
+        ["shared jsone len(join([s x4000]))"] = () => JsonE(Eval("len(join([" + Repeat("s", 4_000, ",") + "],''))"), Text("s", 100_000)),
+        ["shared jsone $let $json [s x4000]"] = () => JsonE(
+            new JObject
+            {
+                ["$let"] = new JObject { ["a"] = new JObject { ["$json"] = Eval("[" + Repeat("s", 4_000, ",") + "]") } },
+                ["in"] = Eval("a == ''"),
+            },
+            Text("s", 100_000)),
+        ["shared jsone ${s} x4000 in one value"] = () => JsonE(string.Concat(Enumerable.Repeat("${s}", 4_000)), Text("s", 100_000)),
+        ["shared jlogic cat [var s x4000]"] = () => JsonLogic(new JObject { ["<"] = new JArray(new JObject { ["cat"] = new JArray(Enumerable.Range(0, 4_000).Select(_ => Parse("""{ "var": "s" }"""))) }, 0) }, Text("s", 100_000)),
+        ["shared jlogic merge [var xs x4000]"] = () => JsonLogic(new JObject { ["<"] = new JArray(new JObject { ["merge"] = new JArray(Enumerable.Range(0, 4_000).Select(_ => Parse("""{ "var": "xs" }"""))) }, 0) }, Zeros("xs", 100_000)),
+
+        // Worst-case substring search: ordinal Contains filters on the first character and one other character of the
+        // needle, then compares. In (ab)^n every other position passes both filters and the needle only fails on its
+        // last character, so one `in` with string.Contains cost about |s| x |t| / 2 comparisons (0.6 s) and allocated nothing.
+        // Both engines now search in linear time (OrdinalSearch). Each search allocates its 800 KB prefix table, so the
+        // chain stops on Memory within about 100 ms; without that table it would stop on Time with a small overshoot.
+        ["cpu jsone t in s x2000 (worst-case substring search)"] = () => JsonE(new JObject { ["$map"] = Eval("range(0, 2000)"), ["each(i)"] = new JObject { ["$if"] = "t in s", ["then"] = 1 } }, SearchContext()),
+        ["cpu jlogic in [var t, var s] x2000 (worst-case substring search)"] = () => JsonLogic(Or(2_000, """{ "in": [{ "var": "t" }, { "var": "s" }] }"""), SearchContext()),
+
         ["stack jsone !x15000"] = () => JsonE(Eval(new string('!', 15_000) + "true")),
         ["stack jsone -x50000"] = () => JsonE(Eval(new string('-', 50_000) + "1")),
         ["stack jsone [x5000"] = () => JsonE(Eval(new string('[', 5_000) + "1" + new string(']', 5_000))),
@@ -127,6 +148,18 @@ internal static class AttackCorpus
         }
 
         return context;
+    }
+
+    /// <summary>
+    /// <c>s</c> = (ab)^200,000 (400,000 characters) and <c>t</c> = (ab)^100,000 + "aa" (200,002 characters): about 600 KB stored.
+    /// </summary>
+    private static JObject SearchContext()
+    {
+        return new JObject
+        {
+            ["s"] = string.Concat(Enumerable.Repeat("ab", 200_000)),
+            ["t"] = string.Concat(Enumerable.Repeat("ab", 100_000)) + "aa",
+        };
     }
 
     private static JArray Keys(int count)

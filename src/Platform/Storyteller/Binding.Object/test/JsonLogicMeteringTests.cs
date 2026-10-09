@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Text.Json.Nodes;
 using FluentAssertions;
@@ -55,6 +56,33 @@ public class JsonLogicMeteringTests
         meter.Steps.Should().Be(1 + (3 * 2));
     }
 
+    [Theory]
+    [InlineData("""["foo", "foobar"]""")]
+    [InlineData("""["baz", "foobar"]""")]
+    [InlineData("""["", "foobar"]""")]
+    [InlineData("""[1, "a1b"]""")]
+    [InlineData("""[true, "xtruex"]""")]
+    [InlineData("""[null, "abc"]""")]
+    [InlineData("""[["a", "b"], "xa,by"]""")]
+    [InlineData("""[{ "var": "o" }, "abc"]""")]
+    [InlineData("""["a", ["b", "a"]]""")]
+    [InlineData("""[1, [1.0, 2]]""")]
+    [InlineData("""[{ "var": "o" }, [{ "a": 1 }]]""")]
+    [InlineData("""["a", 5]""")]
+    [InlineData("""["a", null]""")]
+    [InlineData("""["a"]""")]
+    [InlineData("\"a\"")]
+    public void LinearInRule_MatchesTheLibraryRule(string args)
+    {
+        var library = (IRule)Activator.CreateInstance(typeof(Json.Logic.Rules.InRule), nonPublic: true)!;
+        var linear = new JsonLogicMetering.LinearInRule();
+
+        var expected = Outcome(() => library.Apply(JsonNode.Parse(args), Context()));
+        var actual = Outcome(() => linear.Apply(JsonNode.Parse(args), Context()));
+
+        actual.Should().Be(expected);
+    }
+
     [Fact]
     public void BindingObject_ReferencesVendoredJsonE_NotThePackage()
     {
@@ -62,5 +90,28 @@ public class JsonLogicMeteringTests
 
         references.Should().Contain("42.Platform.Storyteller.Binding.JsonE");
         references.Should().NotContain("JsonE.Net");
+    }
+
+    private static EvaluationContext Context()
+    {
+        // The constructor is internal; JsonLogic.Apply builds the same context from the data.
+        return (EvaluationContext)Activator.CreateInstance(
+            typeof(EvaluationContext),
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public,
+            binder: null,
+            args: new object?[] { JsonNode.Parse("""{ "o": { "a": 1 } }""") },
+            culture: null)!;
+    }
+
+    private static string Outcome(Func<JsonNode?> apply)
+    {
+        try
+        {
+            return apply()?.ToJsonString() ?? "null";
+        }
+        catch (Exception exception)
+        {
+            return $"{exception.GetType().Name}: {exception.Message}";
+        }
     }
 }

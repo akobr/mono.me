@@ -55,10 +55,11 @@ internal static class ObjectBindingEngine
                     JsonEKind => JsonE.Evaluate(definitionNode, contextNode, meter),
                     _ => throw new BindingEvaluationException($"Unknown object binding '{kind}'."),
                 };
+
+                // No step follows the last primitive, and a library catch block could have swallowed a latched limit.
+                meter.CheckResources();
             }
 
-            // A library catch block could have swallowed the meter's exception. The limit is latched.
-            meter.ThrowIfExceeded();
             ResultCheck.Ensure(result, meter.Limits);
             return JsonTokenConverter.ToToken(result);
         }
