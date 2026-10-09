@@ -115,6 +115,10 @@
     <Project Path="src/Platform/Storyteller/DbCreator/src/DbCreator.csproj" />
     <Project Path="src/Platform/Storyteller/Sdk.NSwag/src/Sdk.NSwag.csproj" />
     <Project Path="src/Platform/Storyteller/Sdk.Kiota/src/Sdk.Kiota.csproj" />
+    <Project Path="src/Platform/Storyteller/sdk.typescript/src/sdk.typescript.esproj">
+      <Build />
+      <Deploy />
+    </Project>
   </Folder>
   <Folder Name="/Platform/Supervisor/">
     <Project Path="src/Platform/Supervisor/Abstraction/src/Abstraction.csproj" />
