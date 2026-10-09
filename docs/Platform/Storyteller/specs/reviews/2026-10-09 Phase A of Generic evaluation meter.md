@@ -9,7 +9,7 @@ This review covers Phase A of [2026-10-09 Generic evaluation meter for object bi
 
 The envelope depth and count limits and the bounded result walk stay. Every evaluation failure now keeps its type and reaches the API as 422 instead of 500.
 
-All 50 attack inputs from the review (Air rounds 1–19 plus the stack-overflow inputs) stop on a limit, and none crashes the process. The fork matches the unpatched binary on all 1,195 cases of the JSON-e specification suite. `Binding.Object/src` shrank from 3,279 to 1,099 lines. Phase B (child-process sandbox) was not started.
+All 55 attack inputs (Air rounds 1–19, the stack-overflow inputs, and five shared-string inputs added after a later review round, see "Shared strings and the last primitive") stop on a limit, and none crashes the process. The fork matches the unpatched binary on all 1,195 cases of the JSON-e specification suite. `Binding.Object/src` shrank from 3,279 to 1,099 lines. Phase B (child-process sandbox) was not started.
 
 ## What Was Done
 
@@ -248,6 +248,52 @@ Not done, as planned:
 - cancellation
 - weighted ticks for scanning primitives
 - Phase B
+
+## Shared strings and the last primitive
+
+A later review round found two gaps in the claim that a limit is overshot by at most one primitive.
+
+1. **The last primitive was never checked.** After the engine returned, only a latched limit was re-thrown. `len(join([s,…×4000],''))` with a 100,000-character `s` did all its work in `join`, nothing ticked afterwards, and the read succeeded after 8.6 s and 7.2 GB.
+2. **One primitive was not bounded by memory already paid for.** `JsonValue.DeepClone` shares the string instance, so `[s,s,…]` costs 4,000 small nodes but represents 400 million characters. `join`, `$json`, and `${}` interpolation (`string.Replace` replaces every occurrence in one call) flatten that in a single call: 8.8 s and 14.7 GB for `$json`, and 800 MB in one `Replace`. The builtin audit had asked whether output is larger than input, instead of larger than the memory allocated for the input.
+
+What changed:
+
+- **`IEvaluationMeter.Reserve(long bytes)`** (public, in the fork), and the internal helper `Metering.ReserveChars`. `EvaluationMeter.Reserve` fails with `Memory` when the allocation so far plus `bytes` passes `MaxAllocatedBytes`. It does not charge anything; the real allocation is measured afterwards.
+- **Fork call sites** (`VENDORED.md` lists them and corrects the audit rule):
+  - `JoinFunction` reserves the running joined length per part, so it fails before `string.Join` runs.
+  - `JsonOperator` reserves an upper bound of the serialized size from an iterative walk over the nodes, with 6 characters per string character for worst-case escaping. It never scans string contents.
+  - `Interpolate` routes every `string.Replace` through `ReplaceReserved`. When a meter is active and the replacement is non-empty, it counts the occurrences in the already allocated string and reserves the exact result size. This deviates from the reviewer's `length / hole length` upper bound, which would have failed legitimate long literals with one large replacement.
+- **`EvaluationMeter.CheckResources()`** checks allocation and time without sampling. `ObjectBindingEngine.Evaluate` calls it right after the engine returns, still inside the metered call. It replaces the latch-only `ThrowIfExceeded` there.
+- **JSON Logic needed no patch.** Upstream `cat` and `merge` evaluate each argument through the rule registry inside their build loop, so the wrapped `var` ticks after every appended argument. The attack set now proves this.
+
+Tests:
+
+- **Attack set:** five new inputs. The three from the review stop on `Memory` in 0–8 ms (Release). JSON Logic `cat` over 4,000 shared `var s` stops in 17 ms and `merge` over 4,000 `var xs` (100,000 items) in 193 ms. All 55 inputs stop on a limit. The slowest is still `!==` at 1.10 s (A.12), and the next ones take 0.62 s and 0.57 s.
+- **`EvaluationLimitTests`:** `Reserve` fails before allocating. `CheckResources` sees work after the last step. A resolver test, `len(lowercase(s))` with a 1,000,000-character `s` and a 1 MiB budget, fails only through the check after the engine.
+- **`MeteringHookTests`:** `join`, `$json`, and interpolation reserve before building over 10 shared references, and reserve their result size on small inputs.
+- **Totals:** `Binding.Object.UnitTests` 177, `Binding.JsonE.UnitTests` 2,417 (specification parity unchanged). All pass.
+
+The overhead benchmark was not re-run. Per engine call this adds one clock read and one allocation read. Interpolation also scans the interpolated string once per replacement, but only while metering.
+
+**Remaining risk.** An in-process meter cannot interrupt one primitive that burns CPU without allocating. See the next section.
+
+## Worst-case substring search
+
+The remaining risk above turned out to be real. Both engines implement string `in` with ordinal `string.Contains`. It filters candidate positions on the needle's first character and on one other, different character, and then compares. In `s` = `abab…` (400,000 characters) and `t` = `abab…aa` (200,002), about 600 KB stored, every other position passes both filters, and `t` fails only on its last character. One `t in s` took about 634 ms (100 / 315 / 634 ms for haystacks of 100k / 200k / 400k) and allocated nothing. A chain of 20 such checks stopped on `Time` only after 2.1 s (JSON-e) and 3.2 s (JSON Logic), because the clock is read every 16 steps (about 5 calls) and no single call can be interrupted. Strings near the Cosmos 2 MB item limit would make one call take seconds.
+
+What changed:
+
+- **`Json.JsonE.OrdinalSearch.Contains(source, value)`** (new, public, in the fork): ordinal containment with a linear worst case. Needles longer than 64 characters use Knuth–Morris–Pratt, at most 2 × (|source| + |value|) comparisons. Shorter needles keep `string.Contains`, whose worst case is then at most 64 × |source|. The answer is the same UTF-16 code-unit containment.
+- **JSON-e:** `InOperator` calls it for the string case.
+- **JSON Logic:** `JsonLogicMetering.LinearInRule` replaces the library's `in` handler (still wrapped by `MeteredRule`). It is a copy of the JsonLogic 6.1.0 `in` rule: the same argument check, `Stringify` of the test value, the empty-string rule, the array case through `IsEquivalentTo`, and the same error messages. Only the string search differs. The library's internal `JsonType()` is replaced by the literal `object`, the only type for which `Stringify` returns null.
+- **`VENDORED.md`:** a new audit category, "CPU larger than linear in the input, without allocating", whose only member is substring search.
+
+Tests:
+
+- **`OrdinalSearchTests`:** small cases, including a lone surrogate. 2,000 random differential cases against `string.Contains` over small alphabets with needles longer than the cutoff. The periodic worst case (under 100 ms). JSON-e `in` through the fork.
+- **`LinearInRule_MatchesTheLibraryRule`:** 15 argument shapes, compared against the library's `InRule` instance, results and error messages included.
+- **Attack set:** two inputs, 2,000 searches each. The JSON-e chain runs inside `$map`, so it does not stop on depth first. Each search now allocates its 800 KB prefix table, so both stop on `Memory` in 66 ms (JSON-e) and 102 ms (JSON Logic) in Release. All 57 inputs stop on a limit. The slowest is still `!==` at 1.08 s (A.12).
+- **Totals:** `Binding.Object.UnitTests` 194, `Binding.JsonE.UnitTests` 2,429. All pass, specification parity included.
 
 ## Follow-ups found during implementation
 

@@ -267,6 +267,51 @@ public class EvaluationLimitTests
     }
 
     [Fact]
+    public void Meter_Reserve_FailsBeforeTheAllocation()
+    {
+        var meter = new EvaluationMeter(ObjectBindingLimits.Default with { MaxAllocatedBytes = 1L << 20 }, TimeProvider.System);
+        using (meter.Enter())
+        {
+            meter.Reserve(1_000);
+
+            var act = () => meter.Reserve(2L << 20);
+            act.Should().Throw<EvaluationLimitExceededException>().Which.Kind.Should().Be(EvaluationLimitKind.Memory);
+        }
+
+        meter.Exceeded.Should().Be(EvaluationLimitKind.Memory);
+    }
+
+    [Fact]
+    public void Meter_CheckResources_CatchesWorkAfterTheLastStep()
+    {
+        var meter = new EvaluationMeter(ObjectBindingLimits.Default with { MaxAllocatedBytes = 1L << 20 }, TimeProvider.System);
+        using (meter.Enter())
+        {
+            meter.Tick();
+            GC.KeepAlive(new byte[2 << 20]);
+
+            var act = () => meter.CheckResources();
+            act.Should().Throw<EvaluationLimitExceededException>().Which.Kind.Should().Be(EvaluationLimitKind.Memory);
+        }
+    }
+
+    [Fact]
+    public async Task Memory_LastPrimitiveOfAnEvaluation_IsChecked()
+    {
+        // Every step happens before `lowercase` builds its 2 MB string, and `len` adds no step after it,
+        // so only the check after the engine returns sees that allocation.
+        var resolver = Resolver(ObjectBindingLimits.Default with { MaxAllocatedBytes = 1L << 20 });
+        var content = Envelope(
+            "jsone",
+            new JObject { ["$eval"] = "len(lowercase(s))" },
+            new JObject { ["s"] = new string('X', 1_000_000) });
+
+        var thrown = await ResolveThrows(resolver, content);
+
+        thrown.Kind.Should().Be(EvaluationLimitKind.Memory);
+    }
+
+    [Fact]
     public void Meter_AccumulatesAcrossScopes()
     {
         var meter = new EvaluationMeter(ObjectBindingLimits.Default, TimeProvider.System);

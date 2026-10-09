@@ -89,6 +89,36 @@ public class MeteringHookTests
     }
 
     [Theory]
+    [InlineData("""{ "$eval": "len(join(xs, ''))" }""")]
+    [InlineData("""{ "$json": { "$eval": "xs" } }""")]
+    [InlineData("""{ "k": "${s}${s}${s}${s}${s}${s}${s}${s}${s}${s}" }""")]
+    public void SharedStringPrimitives_ReserveBeforeBuilding(string template)
+    {
+        // Ten references to one 100,000-character string: 1,000,000 characters (2 MB) once flattened.
+        var s = new string('x', 100_000);
+        var context = new JsonObject { ["s"] = s, ["xs"] = new JsonArray(Enumerable.Range(0, 10).Select(_ => (JsonNode?)JsonValue.Create(s)).ToArray()) };
+        var meter = new CountingMeter(maxReservedBytes: 1_000_000);
+
+        var act = () => Json.JsonE.JsonE.Evaluate(JsonNode.Parse(template), context, meter);
+
+        act.Should().Throw<MeterStopException>().Which.Reason.Should().Be("reserve");
+    }
+
+    [Fact]
+    public void SharedStringPrimitives_ReserveTheirResultSize()
+    {
+        var meter = new CountingMeter();
+        var context = new JsonObject { ["s"] = "abc", ["xs"] = new JsonArray("ab", "cd") };
+
+        var joined = Json.JsonE.JsonE.Evaluate(JsonNode.Parse("""{ "$eval": "join(xs, '-')" }"""), context.DeepClone(), meter);
+        var interpolated = Json.JsonE.JsonE.Evaluate(JsonValue.Create("${s}/${s}"), context.DeepClone(), meter);
+
+        joined!.ToJsonString().Should().Be("\"ab-cd\"");
+        interpolated!.ToJsonString().Should().Be("\"abc/abc\"");
+        meter.MaxReservedBytes.Should().BeInRange(10, 1_000);
+    }
+
+    [Theory]
     [InlineData("!", 15_000, "true")]
     [InlineData("-", 50_000, "1")]
     public void Parse_DeepUnaryChain_StopsOnFramesInsteadOfStackOverflow(string op, int count, string operand)

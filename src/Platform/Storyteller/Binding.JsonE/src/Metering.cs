@@ -25,6 +25,13 @@ public interface IEvaluationMeter
 	/// Reports that the interpreter leaves one level of recursion.
 	/// </summary>
 	void ExitFrame();
+
+	/// <summary>
+	/// Announces that the interpreter is about to allocate a value of about <paramref name="bytes"/> bytes in one step.
+	/// Called before primitives that flatten shared values (string instances are shared between copies) into one value,
+	/// so a meter can stop them before the value exists.
+	/// </summary>
+	void Reserve(long bytes);
 }
 
 internal static class Metering
@@ -42,6 +49,15 @@ internal static class Metering
 	internal static void Tick(int weight = 1)
 	{
 		_current?.Tick(weight);
+	}
+
+	/// <summary>
+	/// Reserves the UTF-16 size of a string of <paramref name="chars"/> characters.
+	/// </summary>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal static void ReserveChars(long chars)
+	{
+		_current?.Reserve(chars * sizeof(char));
 	}
 
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]

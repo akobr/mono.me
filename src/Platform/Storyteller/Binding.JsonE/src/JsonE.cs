@@ -143,6 +143,26 @@ public static class JsonE
 		}
 	}
 
+	// Storyteller patch: string.Replace replaces every occurrence at once, and the replacement may be a large shared
+	// string, so the size of the result is reserved first. Counting scans the already allocated string. See VENDORED.md.
+	private static string ReplaceReserved(string interpolated, string textToReplace, string? replacement)
+	{
+		if (Metering.Current is not null && !string.IsNullOrEmpty(replacement))
+		{
+			long occurrences = 0;
+			for (var at = interpolated.IndexOf(textToReplace, StringComparison.Ordinal);
+			     at >= 0;
+			     at = interpolated.IndexOf(textToReplace, at + textToReplace.Length, StringComparison.Ordinal))
+			{
+				occurrences++;
+			}
+
+			Metering.ReserveChars(interpolated.Length + (occurrences * (replacement.Length - textToReplace.Length)));
+		}
+
+		return interpolated.Replace(textToReplace, replacement);
+	}
+
 	private static string Interpolate(string value, EvaluationContext context)
 	{
 		if (value.Length <= 2) return value;
@@ -187,7 +207,7 @@ public static class JsonE
 			if (start != 0 && source[start - 1] == '$')
 			{
 				var unescaped = source[(start + 1)..end].ToString();
-				interpolated = interpolated.Replace(textToReplace, unescaped);
+				interpolated = ReplaceReserved(interpolated, textToReplace, unescaped);
 				continue;
 			}
 
@@ -199,7 +219,7 @@ public static class JsonE
 			var evaluated = expr!.Evaluate(context);
 			if (evaluated is null)
 			{
-				interpolated = interpolated.Replace(textToReplace, string.Empty);
+				interpolated = ReplaceReserved(interpolated, textToReplace, string.Empty);
 				continue;
 			}
 
@@ -208,17 +228,17 @@ public static class JsonE
 				var n = val.GetNumber();
 				if (n.HasValue)
 				{
-					interpolated = interpolated.Replace(textToReplace, n.ToString());
+					interpolated = ReplaceReserved(interpolated, textToReplace, n.ToString());
 					continue;
 				}
 				if (val.TryGetValue(out string? s))
 				{
-					interpolated = interpolated.Replace(textToReplace, s);
+					interpolated = ReplaceReserved(interpolated, textToReplace, s);
 					continue;
 				}
 				if (val.TryGetValue(out bool b))
 				{
-					interpolated = interpolated.Replace(textToReplace, b ? "true" : "false");
+					interpolated = ReplaceReserved(interpolated, textToReplace, b ? "true" : "false");
 					continue;
 				}
 			}

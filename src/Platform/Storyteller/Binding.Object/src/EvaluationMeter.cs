@@ -120,6 +120,44 @@ internal sealed class EvaluationMeter : IEvaluationMeter
         }
     }
 
+    /// <summary>
+    /// Fails with <see cref="EvaluationLimitKind.Memory"/> before a primitive allocates a value of <paramref name="bytes"/>
+    /// that would pass the allocation budget. The value is not charged here; the real allocation is measured afterwards.
+    /// </summary>
+    public void Reserve(long bytes)
+    {
+        ThrowIfExceeded();
+
+        if (_active && _closedAllocatedBytes + ScopeAllocatedBytes() + bytes > Limits.MaxAllocatedBytes)
+        {
+            Fail(EvaluationLimitKind.Memory);
+        }
+    }
+
+    /// <summary>
+    /// Checks allocation and time without sampling. Called when an engine returns, so the work of its last primitive,
+    /// which no later step observes, still counts.
+    /// </summary>
+    public void CheckResources()
+    {
+        ThrowIfExceeded();
+
+        if (!_active)
+        {
+            return;
+        }
+
+        if (_closedAllocatedBytes + ScopeAllocatedBytes() > Limits.MaxAllocatedBytes)
+        {
+            Fail(EvaluationLimitKind.Memory);
+        }
+
+        if (_closedTimestampTicks + ScopeTimestampTicks() > _maxTimestampTicks)
+        {
+            Fail(EvaluationLimitKind.Time);
+        }
+    }
+
     public void ThrowIfExceeded()
     {
         if (_exceeded is { } kind)
