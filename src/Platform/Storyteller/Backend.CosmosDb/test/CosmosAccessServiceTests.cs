@@ -265,6 +265,20 @@ public class CosmosAccessServiceTests(Startup startup)
         await act.Should().ThrowAsync<NotFoundException>();
     }
 
+    [Fact]
+    public async Task GetAccessPoints_ReturnsOnlyThePointsTheAccountAdministers()
+    {
+        var administered = await CreateProjectAsync();
+        var contributed = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, administered, AccountRole.Administrator));
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, contributed, AccountRole.Contributor));
+
+        var points = await Access.GetAccessPointsAsync(memberId);
+
+        points.Select(point => point.Key).Should().Equal(administered);
+    }
+
     [Theory]
     [InlineData("Billing")]
     [InlineData("bill.ing")]

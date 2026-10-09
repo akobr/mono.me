@@ -23,7 +23,9 @@ internal sealed class TestFunctionContext : FunctionContext
 
     public override IServiceProvider InstanceServices { get; set; }
 
-    public override FunctionDefinition FunctionDefinition => throw new NotSupportedException();
+    public override FunctionDefinition FunctionDefinition => Definition ?? throw new NotSupportedException();
+
+    public FunctionDefinition? Definition { get; set; }
 
     public override IDictionary<object, object> Items { get; set; }
 
