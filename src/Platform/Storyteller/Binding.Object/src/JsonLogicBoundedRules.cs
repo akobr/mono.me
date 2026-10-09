@@ -58,9 +58,34 @@ internal static class JsonLogicBoundedRules
         RuleRegistry.AddRule(name, new Metered(inner, strict, invert));
     }
 
-    private static void CountIteration()
+    private static void ChargeIteration(JsonNode? rule)
     {
-        (_read ?? throw new BindingEvaluationException("JSON Logic evaluation has no step budget.")).AddStep();
+        Charge(RuleNodes(rule));
+    }
+
+    private static int RuleNodes(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonArray array:
+                var arrayCount = 1;
+                foreach (var item in array)
+                {
+                    arrayCount += RuleNodes(item);
+                }
+
+                return arrayCount;
+            case JsonObject obj:
+                var objectCount = 1;
+                foreach (var property in obj)
+                {
+                    objectCount += RuleNodes(property.Value);
+                }
+
+                return objectCount;
+            default:
+                return 1;
+        }
     }
 
     private static void Charge(int count)
@@ -123,7 +148,7 @@ internal static class JsonLogicBoundedRules
 
     private static bool ApplyElement(JsonNode? rule, JsonNode? element, EvaluationContext context)
     {
-        CountIteration();
+        ChargeIteration(rule);
         context.Push(element);
         try
         {
@@ -216,7 +241,7 @@ internal static class JsonLogicBoundedRules
 
             foreach (var element in items)
             {
-                CountIteration();
+                ChargeIteration(rule);
                 var intermediary = new JsonObject
                 {
                     ["current"] = element?.DeepClone(),
@@ -269,7 +294,7 @@ internal static class JsonLogicBoundedRules
             var used = 0;
             foreach (var element in items)
             {
-                CountIteration();
+                ChargeIteration(rule);
                 context.Push(element);
                 JsonNode? mapped;
                 try

@@ -139,6 +139,7 @@ internal static class JsonELimits
 
     public static JsonNode? Let(JsonNode?[] arguments, JsonESizeBudget budget)
     {
+        _ = budget;
         var value = arguments.Length == 0 ? null : arguments[0];
         if (value is JsonObject obj)
         {
@@ -151,12 +152,21 @@ internal static class JsonELimits
             }
         }
 
-        return Bound(arguments, budget);
+        return value;
     }
 
     public static JsonNode? Step(JsonNode?[] arguments, JsonESizeBudget budget)
     {
-        budget.AddStep();
+        var weight = 1;
+        if (arguments.Length > 1 &&
+            TryInteger(arguments[1], out var parsed) &&
+            parsed > 0 &&
+            parsed <= int.MaxValue)
+        {
+            weight = (int)parsed;
+        }
+
+        budget.AddSteps(weight);
         var value = arguments.Length == 0 ? null : arguments[0];
         return value is JsonArray { Count: > 0 };
     }
@@ -459,7 +469,18 @@ internal static class JsonELimits
                         var text = property.Value.Value<string>() ?? string.Empty;
                         if (IsExpressionSlot(property.Name, isSort, isFind))
                         {
-                            property.Value = JsonEExpressionRewriter.RewritePlus(text);
+                            var expression = JsonEExpressionRewriter.RewritePlus(text);
+                            if (isFind && IsNamedClause(property.Name, "each"))
+                            {
+                                var weight = BodyWeight(new JValue(expression));
+                                property.Value = JsonEExpressionRewriter.StepFunction +
+                                    "([0], " + weight.ToString(CultureInfo.InvariantCulture) + ") && (" + expression + ")";
+                            }
+                            else
+                            {
+                                property.Value = expression;
+                            }
+
                             continue;
                         }
 
@@ -687,17 +708,24 @@ internal static class JsonELimits
 
     private static JObject BoundWrap(JToken body)
     {
-        return ChargeWrap(body, JsonEExpressionRewriter.BoundFunction);
+        return ChargeWrap(body, JsonEExpressionRewriter.BoundFunction + "(v[0])");
     }
 
     private static JObject LetWrap(JToken body)
     {
-        return ChargeWrap(body, JsonEExpressionRewriter.LetFunction);
+        var call = JsonEExpressionRewriter.LetFunction + "(v[0])";
+        if (body is JObject obj && HasOperator(obj))
+        {
+            call = JsonEExpressionRewriter.BoundFunction + "(" + call + ")";
+        }
+
+        return ChargeWrap(body, call);
     }
 
-    private static JObject ChargeWrap(JToken body, string function)
+    private static JObject ChargeWrap(JToken body, string resultExpression)
     {
         // An array drops a delete marker, so $if without else still removes the value.
+        var weight = BodyWeight(body);
         var held = new JArray();
         held.Add(body.DeepClone());
         return new JObject
@@ -708,13 +736,58 @@ internal static class JsonELimits
             },
             ["in"] = new JObject
             {
-                ["$if"] = JsonEExpressionRewriter.StepFunction + "(v)",
+                ["$if"] = JsonEExpressionRewriter.StepFunction +
+                    "(v, " + weight.ToString(CultureInfo.InvariantCulture) + ")",
                 ["then"] = new JObject
                 {
-                    ["$eval"] = function + "(v[0])",
+                    ["$eval"] = resultExpression,
                 },
             },
         };
+    }
+
+    private static int BodyWeight(JToken token)
+    {
+        var nodes = 0;
+        var characters = 0;
+        Count(token);
+        var weight = (long)nodes + (characters / 8);
+        if (weight < 1)
+        {
+            return 1;
+        }
+
+        if (weight > int.MaxValue)
+        {
+            return int.MaxValue;
+        }
+
+        return (int)weight;
+
+        void Count(JToken current)
+        {
+            nodes++;
+            switch (current)
+            {
+                case JObject obj:
+                    foreach (var property in obj.Properties())
+                    {
+                        Count(property.Value);
+                    }
+
+                    break;
+                case JArray array:
+                    foreach (var item in array)
+                    {
+                        Count(item);
+                    }
+
+                    break;
+                case JValue value when value.Type == JTokenType.String:
+                    characters += value.Value<string>()?.Length ?? 0;
+                    break;
+            }
+        }
     }
 
     private static void Walk(JToken token, int depth, ref int max)

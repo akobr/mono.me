@@ -1221,11 +1221,10 @@ public class ConfigurationBindingResolverTests
     [Fact]
     public async Task Resolve_SiblingEnvelopesShareStepLimit_Throws()
     {
-        var width = CubicWidthPastStepLimit() - 1;
-        width.Should().BeInRange(1, 49);
-        var one = (long)width + ((long)width * width) + ((long)width * width * width);
-        one.Should().BeLessThanOrEqualTo(ConfigurationBindingResolver.MaxEvaluationSteps);
-        (one * 2).Should().BeGreaterThan(ConfigurationBindingResolver.MaxEvaluationSteps);
+        // Each iteration charges the rewritten body, so the old 1-step cubic width no longer fits.
+        // Width 26 keeps one 3-level deleted map under the cap and puts it beside the same-width all over the cap.
+        var width = 26;
+        width.Should().BeInRange(1, 40);
 
         var single = new JObject
         {
@@ -1268,6 +1267,84 @@ public class ConfigurationBindingResolverTests
 
         await act.Should().ThrowAsync<BindingException>()
             .WithMessage($"*exceeds {ConfigurationBindingResolver.MaxEvaluationSteps} steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEFind_ChargesBody()
+    {
+        var found = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$find"] = new JArray(1, 2, 3),
+                ["each(x)"] = "x == 2",
+            });
+        await _resolver.ResolveAsync(found, includeSecrets: true, _scope);
+        found["value"]!.Value<decimal>().Should().Be(2);
+
+        var content = Envelope("jsone", NestedFind(36));
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonEMapIf_ChargesBody()
+    {
+        var literal = new string('a', (ConfigurationBindingResolver.MaxEvaluationSteps * 8) + 8);
+        var inner = new JObject
+        {
+            ["$map"] = new JArray(0, 1),
+            ["each(y)"] = new JObject
+            {
+                ["$if"] = "'" + literal + "' == 'b'",
+                ["then"] = 1,
+            },
+        };
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$map"] = new JArray(0, 1),
+                ["each(x)"] = inner,
+            });
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonLogicFilter_ChargesBody()
+    {
+        var kept = Envelope(
+            "jlogic",
+            Parse("""{ "filter": [[1, 2], { ">": [{ "var": "" }, 1] }] }"""));
+        await _resolver.ResolveAsync(kept, includeSecrets: true, _scope);
+        kept["value"].Should().BeOfType<JArray>().Which.Select(item => item!.Value<decimal>()).Should().Equal(2m);
+
+        var content = Envelope("jlogic", NestedFilter(20, 300));
+        var act = () => _resolver.ResolveAsync(content, includeSecrets: true, _scope).AsTask();
+        await act.Should().ThrowAsync<BindingException>().WithMessage("*steps*");
+    }
+
+    [Fact]
+    public async Task Resolve_JsonELet_PassesLargeValue()
+    {
+        var text = new string('a', 40_000);
+        var content = Envelope(
+            "jsone",
+            new JObject
+            {
+                ["$let"] = new JObject
+                {
+                    ["big"] = new JObject { ["$eval"] = "s" },
+                },
+                ["in"] = new JObject
+                {
+                    ["k"] = new JObject { ["$eval"] = "big" },
+                },
+            },
+            new JObject { ["s"] = text });
+        await _resolver.ResolveAsync(content, includeSecrets: true, _scope);
+        content["value"]!["k"]!.Value<string>().Should().Be(text);
     }
 
     [Fact]
@@ -2213,6 +2290,62 @@ public class ConfigurationBindingResolverTests
         }
 
         return body;
+    }
+
+    private static JToken NestedFind(int count)
+    {
+        var items = new JArray();
+        for (var index = 0; index < count; index++)
+        {
+            items.Add(index);
+        }
+
+        return new JObject
+        {
+            ["$map"] = items.DeepClone(),
+            ["each(x)"] = new JObject
+            {
+                ["$map"] = items,
+                ["each(y)"] = new JObject
+                {
+                    ["$find"] = items.DeepClone(),
+                    ["each(z)"] = "z == -1",
+                },
+            },
+        };
+    }
+
+    private static JToken NestedFilter(int count, int keys)
+    {
+        var names = new JArray();
+        for (var index = 0; index < keys; index++)
+        {
+            names.Add("k" + index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        JToken rule = new JObject
+        {
+            ["!"] = new JArray
+            {
+                new JObject { ["missing"] = names },
+            },
+        };
+
+        for (var level = 0; level < 2; level++)
+        {
+            var items = new JArray();
+            for (var index = 0; index < count; index++)
+            {
+                items.Add(index);
+            }
+
+            rule = new JObject
+            {
+                ["filter"] = new JArray { items, rule },
+            };
+        }
+
+        return rule;
     }
 
     private static JToken NestedJsonLogicMaps(int depth, int count, string leaf)
