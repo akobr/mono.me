@@ -74,15 +74,7 @@
     <Project Path="src/Platform/Aspire.ServiceDefaults/src/Aspire.ServiceDefaults.csproj" />
     <Project Path="src/Platform/Cli/src/Cli.csproj" />
     <Project Path="src/Platform/Cli/test/Cli.UnitTests.csproj" />
-    <Project Path="src/Platform/sdk.typescript/src/sdk.typescript.esproj">
-      <Build />
-      <Deploy />
-    </Project>
     <Project Path="src/Platform/Sdk/src/Sdk.csproj" />
-    <Project Path="src/Platform/ui.admin/src/ui.admin.esproj">
-      <Build />
-      <Deploy />
-    </Project>
   </Folder>
   <Folder Name="/Platform/Examples/">
     <Project Path="src/Platform/Examples/CustomClientApp/src/CustomClientApp.csproj" />
