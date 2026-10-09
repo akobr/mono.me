@@ -13,6 +13,12 @@ internal sealed class TestInvocationFeatures : IInvocationFeatures
         _features[typeof(T)] = instance!;
     }
 
+    // For worker features whose interface is internal and can't be named as a type argument.
+    public void Set(Type featureType, object instance)
+    {
+        _features[featureType] = instance;
+    }
+
     public T Get<T>()
     {
         return _features.TryGetValue(typeof(T), out var feature) ? (T)feature : default!;
