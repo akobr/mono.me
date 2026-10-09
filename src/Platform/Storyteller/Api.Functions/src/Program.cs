@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.ErrorHandling;
+using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
@@ -9,6 +10,10 @@ using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Json;
 
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Extensions.OpenApi;
+using Microsoft.Azure.Functions.Worker.Extensions.OpenApi.Functions;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -29,6 +34,12 @@ var host = new HostBuilder()
     })
     .ConfigureServices((context, services) =>
     {
+        // Registered after the OpenAPI extension's own singleton, so this one is used.
+        // The extension's schema dictionary throws if two documents are built at once.
+        services.AddSingleton<IOpenApiTriggerFunction>(sp =>
+            new SerialOpenApiTriggerFunction(
+                new OpenApiTriggerFunction(sp.GetRequiredService<IOpenApiHttpTriggerContext>())));
+
         services.AddApplicationInsightsTelemetryWorkerService();
         services.ConfigureFunctionsApplicationInsights();
 
@@ -74,8 +85,6 @@ var host = new HostBuilder()
         services.AddCertificateMachineAccess(context.Configuration);
         // Override to Key Vault CA in production (comment out for local dev)
         //services.AddKeyVaultCertificateAuthority(context.Configuration);
-        // Add authentication by Azure Entra
-        //services.AddAzureAdMachineAccess();
 
         // One user identity provider per deployment. A missing Auth:Provider keeps Entra ID.
         var authProvider = context.Configuration.GetSection(UserAuthenticationOptions.SectionName)["Provider"];
@@ -93,6 +102,22 @@ var host = new HostBuilder()
         {
             throw new InvalidOperationException($"Auth:Provider '{authProvider}' is not a known identity provider.");
         }
+
+        // ClientCredentials machine access: at most one identity provider issues machine client
+        // credentials, independently of the user provider. Projects opt in with the ClientCredentials policy.
+        var authKitOptions = context.Configuration.GetSection($"{UserAuthenticationOptions.SectionName}:AuthKit").Get<AuthKitOptions>();
+
+        if (authKitOptions?.HasMachineAccess() == true)
+        {
+            // AuthKit M2M applications. AuthKitDomain alone only describes the OpenAPI flows;
+            // the machine organization opts in.
+            services.AddAuthKitMachineAccess(context.Configuration);
+        }
+
+        // Or Entra ID app registrations (MachineAuth:AzureAd:TenantId, Auth:ClientId, Auth:AppRoles):
+        // services.AddAzureAdMachineAccess(context.Configuration);
+        // Or Keycloak confidential clients (Keycloak section):
+        // services.AddKeycloakMachineAccess(context.Configuration);
 
         // Add data-bindings for configurations
         services.AddSingleton<ConfigBindingFunction>();

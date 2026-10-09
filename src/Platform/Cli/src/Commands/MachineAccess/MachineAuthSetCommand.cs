@@ -20,7 +20,7 @@ public class MachineAuthSetCommand : BaseContextCommand
         _accessApi = accessApi;
     }
 
-    [Option("-k|--credential-kind", CommandOptionType.SingleValue, Description = "Required credential kind: ApiKey, Certificate, or CertificateAndApiKey.")]
+    [Option("-k|--credential-kind", CommandOptionType.SingleValue, Description = "Required credential kind: ApiKey, Certificate, CertificateAndApiKey, or ClientCredentials (AuthKit M2M).")]
     public string? CredentialKind { get; set; }
 
     [Option("-l|--lifetime-days", CommandOptionType.SingleValue, Description = "Default certificate lifetime in days for this project.")]
@@ -28,12 +28,14 @@ public class MachineAuthSetCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
+        // client-credentials is accepted for ClientCredentials, like other kebab-case CLI values.
         if (string.IsNullOrWhiteSpace(CredentialKind)
             || !Enum.TryParse<MachineAuthenticationPolicyCredentialKind>(
-                    CredentialKind, ignoreCase: true, out var credentialKind))
+                    CredentialKind.Replace("-", string.Empty), ignoreCase: true, out var credentialKind)
+            || !Enum.IsDefined(credentialKind))
         {
             Console.WriteImportant(
-                "A valid --credential-kind is required: ApiKey, Certificate, or CertificateAndApiKey.");
+                "A valid --credential-kind is required: ApiKey, Certificate, CertificateAndApiKey, or ClientCredentials.");
             return ExitCodes.ERROR_INPUT_PARSING;
         }
 

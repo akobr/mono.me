@@ -259,15 +259,15 @@ A template item written directly into Cosmos, bypassing the service, leaves exis
 | Read | Template content |
 | --- | --- |
 | `GetRawConfigurationAsync` | Included. This is the calculated document. |
-| `GetResolvedConfigurationAsync` and the with-secrets / without-secrets variants | Included, then walked for `@` bindings. |
+| `GetResolvedConfigurationAsync` and the with-secrets / without-secrets variants | Included, then resolved. `@` strings and `$binding` envelopes are evaluated. |
 | `GetConfigurationHierarchyViewAsync` | Omitted. The view is a map of each annotation key to its stored `Content`. |
 | `GetConfigurationVersionContentAsync` | Omitted. A version stores the document that was written. |
 
-`GetResolvedConfigurationInternalAsync` loads the calculated document first. Its binding snapshot is a deep clone of that document, so `@config` sees values that arrived from a template. Strings contributed by a template are bound with the same rules as strings stored on the annotation. See [binding.md](binding.md).
+`GetResolvedConfigurationInternalAsync` loads the calculated document first. Its binding snapshot is a deep clone of that document, so `@config` sees values that arrived from a template. Strings contributed by a template are bound with the same rules as strings stored on the annotation. An object envelope contributed by a template is still an envelope in this calculated document. The resolved read evaluates it. See [binding.md](binding.md).
 
-While that walk visits nested objects it records a follow-up for logic operations and template processing (`TODO: [P3]` in `GetResolvedConfigurationInternalAsync`). Today a nested object is only queued so its strings can be bound. Type templates have already been merged during calculation.
+That resolved walk is object binding. An envelope whose `$binding` is `jlogic` or `jsone` resolves `$context` first and passes the untouched `$definition` to JSON Logic or JSON-e. The engine result replaces the envelope and is walked again. Type templates have already been merged during calculation. A template contributes the envelope as data, and the resolved read is what evaluates it.
 
-Schema validation runs on stored `Content` inside `CreateOrUpdateConfigurationAsync` and `PatchConfigurationAsync`. It sees the document being written. Template content and the calculated merge are outside that check.
+Schema validation runs on stored `Content` inside `CreateOrUpdateConfigurationAsync` and `PatchConfigurationAsync`. It sees the document being written, including an envelope stored as `$binding`, `$definition`, and `$context`. It does not see the engine result. Template content and the calculated merge are outside that check.
 
 ## CLI
 

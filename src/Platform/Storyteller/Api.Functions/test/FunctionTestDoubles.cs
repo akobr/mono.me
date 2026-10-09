@@ -11,7 +11,8 @@ internal static class FunctionTestDoubles
 {
     public static ServiceProvider CreateServices(
         IBearerTokenValidator validator,
-        UserAuthenticationOptions? options = null)
+        UserAuthenticationOptions? options = null,
+        params IMachineTokenValidator[] machineValidators)
     {
         var resolved = Options.Create(options ?? new UserAuthenticationOptions
         {
@@ -27,6 +28,12 @@ internal static class FunctionTestDoubles
         services.AddSingleton(validator);
         services.AddSingleton(resolved);
         services.AddSingleton(normalizer);
+
+        foreach (var machineValidator in machineValidators)
+        {
+            services.AddSingleton(machineValidator);
+        }
+
         return services.BuildServiceProvider();
     }
 

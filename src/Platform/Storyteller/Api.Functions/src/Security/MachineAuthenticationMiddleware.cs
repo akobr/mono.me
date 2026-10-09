@@ -182,6 +182,9 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
             MachineCredentialKind.ApiKey => hasApiKey,
             MachineCredentialKind.Certificate => hasCert,
             MachineCredentialKind.CertificateAndApiKey => hasCert && hasApiKey,
+
+            // Such projects accept only identity provider tokens, handled by BearerAuthenticationMiddleware.
+            MachineCredentialKind.ClientCredentials => false,
             _ => false,
         };
 

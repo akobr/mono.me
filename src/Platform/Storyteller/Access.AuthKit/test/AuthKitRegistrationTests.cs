@@ -144,6 +144,123 @@ public class AuthKitRegistrationTests
         exception.Message.ShouldContain("Auth:AuthKit:ClientId");
     }
 
+    [Theory]
+    [InlineData("https://example.authkit.app", "org_machines", true)]
+    [InlineData("https://example.authkit.app", null, false)]
+    [InlineData("", "org_machines", false)]
+    public void HasMachineAccess_NeedsTheDomainAndTheMachineOrganization(string domain, string? organization, bool expected)
+    {
+        var options = new AuthKitOptions { AuthKitDomain = domain, MachineOrganizationId = organization };
+
+        options.HasMachineAccess().ShouldBe(expected);
+        new AuthKitOptions { AuthKitDomain = "https://example.authkit.app/" }.GetMachineJwksUri()
+            .ShouldBe("https://example.authkit.app/oauth2/jwks");
+    }
+
+    [Fact]
+    public async Task AddAuthKitMachineAccess_RegistersTheIdentityProviderMachineService()
+    {
+        using var host = BuildHost(
+            new Dictionary<string, string?>
+            {
+                ["Auth:Provider"] = "AuthKit",
+                ["Auth:AuthKit:ClientId"] = "client_123",
+                ["Auth:AuthKit:ApiKey"] = "sk_test",
+                ["Auth:AuthKit:AuthKitDomain"] = "https://example.authkit.app",
+                ["Auth:AuthKit:MachineOrganizationId"] = "org_machines",
+            },
+            withMachineAccess: true);
+
+        await host.StartAsync();
+
+        host.Services.GetRequiredService<IIdentityProviderMachineAccessService>().ShouldBeOfType<AuthKitMachineAccessService>();
+        host.Services.GetRequiredService<IMachineTokenValidator>().ShouldBeOfType<AuthKitMachineTokenValidator>();
+        host.Services.GetRequiredService<WorkOsManagementClient>().IsConfigured.ShouldBeTrue();
+
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public async Task AddAuthKitMachineAccess_WorksWithoutAuthKitUsers()
+    {
+        var builder = Host.CreateApplicationBuilder();
+        builder.Environment.EnvironmentName = Environments.Production;
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Auth:Provider"] = "EntraId",
+            ["Auth:TenantId"] = "tenant-id",
+            ["Auth:ClientId"] = "api-client",
+            ["Auth:AuthKit:ClientId"] = "client_123",
+            ["Auth:AuthKit:ApiKey"] = "sk_test",
+            ["Auth:AuthKit:AuthKitDomain"] = "https://example.authkit.app",
+            ["Auth:AuthKit:MachineOrganizationId"] = "org_machines",
+        });
+        builder.Services.AddAuthKitMachineAccess(builder.Configuration);
+        using var host = builder.Build();
+
+        await host.StartAsync();
+
+        host.Services.GetRequiredService<IIdentityProviderMachineAccessService>().ShouldBeOfType<AuthKitMachineAccessService>();
+        host.Services.GetRequiredService<IMachineTokenValidator>().ShouldBeOfType<AuthKitMachineTokenValidator>();
+        host.Services.GetService<IBearerTokenValidator>().ShouldBeNull();
+
+        await host.StopAsync();
+    }
+
+    [Fact]
+    public void UserAndMachineRegistration_BindTheOptionsOnce()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Auth:Provider"] = "AuthKit",
+            ["Auth:AuthKit:ClientId"] = "client_123",
+            ["Auth:AuthKit:ApiKey"] = "sk_test",
+            ["Auth:AuthKit:AuthKitDomain"] = "https://example.authkit.app",
+            ["Auth:AuthKit:MachineOrganizationId"] = "org_machines",
+            ["Auth:AuthKit:DefaultUserScopes:0"] = "User.Impersonation",
+            ["Auth:AuthKit:DefaultUserScopes:1"] = "Default.Read",
+        }).Build();
+        var services = new ServiceCollection();
+
+        services.AddAuthKitUserAuthentication(configuration);
+        services.AddAuthKitMachineAccess(configuration);
+        using var provider = services.BuildServiceProvider();
+
+        provider.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value.AuthKit.DefaultUserScopes
+            .ShouldBe(["User.Impersonation", "Default.Read"]);
+    }
+
+    [Fact]
+    public void AddAuthKitMachineAccess_AfterAnotherMachineProvider_Throws()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IIdentityProviderMachineAccessService>(_ => throw new NotSupportedException());
+
+        var exception = Should.Throw<InvalidOperationException>(
+            () => services.AddAuthKitMachineAccess(new ConfigurationBuilder().Build()));
+
+        exception.Message.ShouldContain("AuthKit");
+    }
+
+    [Fact]
+    public async Task AddAuthKitMachineAccess_MissingKeyOrDomain_FailsWhenTheHostStarts()
+    {
+        using var host = BuildHost(
+            new Dictionary<string, string?>
+            {
+                ["Auth:Provider"] = "AuthKit",
+                ["Auth:AuthKit:ClientId"] = "client_123",
+                ["Auth:AuthKit:ApiKey"] = string.Empty,
+                ["Auth:AuthKit:AuthKitDomain"] = "http://example.authkit.app",
+                ["Auth:AuthKit:MachineOrganizationId"] = "org_machines",
+            },
+            withMachineAccess: true);
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
+        exception.Message.ShouldContain("Auth:AuthKit:ApiKey");
+        exception.Message.ShouldContain("Auth:AuthKit:AuthKitDomain");
+    }
+
     private static UserAuthenticationOptions AuthKitOptions(Action<AuthKitOptions> configure)
     {
         var authKit = new AuthKitOptions { ClientId = "client_123" };
@@ -160,12 +277,18 @@ public class AuthKitRegistrationTests
         return provider.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value;
     }
 
-    private static IHost BuildHost(Dictionary<string, string?> values)
+    private static IHost BuildHost(Dictionary<string, string?> values, bool withMachineAccess = false)
     {
         var builder = Host.CreateApplicationBuilder();
         builder.Environment.EnvironmentName = Environments.Production;
         builder.Configuration.AddInMemoryCollection(values);
         builder.Services.AddAuthKitUserAuthentication(builder.Configuration);
+
+        if (withMachineAccess)
+        {
+            builder.Services.AddAuthKitMachineAccess(builder.Configuration);
+        }
+
         return builder.Build();
     }
 }

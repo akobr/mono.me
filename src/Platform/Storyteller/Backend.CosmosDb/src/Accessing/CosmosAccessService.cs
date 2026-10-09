@@ -354,7 +354,7 @@ public class CosmosAccessService : IAccessService
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var machineAccess = await repository.Container.TryReadItemAsync(
             id,
-            new PartitionKey(project),
+            new PartitionKey($"{project}.access"),
             stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
         return machineAccess is not null
             ? machineAccess.ToMachineAccess()
@@ -403,7 +403,7 @@ public class CosmosAccessService : IAccessService
             // Compensate: remove the hash entity stored by the machine access service
             try
             {
-                await MachineAccessService.DeleteMachineAccessAsync(machineAccess.Id, model.Organization, model.Project);
+                await MachineAccessService.DeleteMachineAccessAsync(machineAccess, model.Organization, model.Project);
             }
             catch
             {
@@ -430,7 +430,7 @@ public class CosmosAccessService : IAccessService
             throw new InvalidOperationException($"The machine access {appId} has not been found.");
         }
 
-        var accessKey = await MachineAccessService.ResetMachineAccessAsync(machineAccess.Id, organization, project);
+        var accessKey = await MachineAccessService.ResetMachineAccessAsync(machineAccess.ToMachineAccess(), organization, project);
 
         if (accessKey is null)
         {
@@ -462,8 +462,8 @@ public class CosmosAccessService : IAccessService
             return false;
         }
 
-        // Delete hash entity first (idempotent).
-        await MachineAccessService.DeleteMachineAccessAsync(machineAccess.ObjectId, organization, project);
+        // Delete the credential first (hash entity or identity provider application; idempotent).
+        await MachineAccessService.DeleteMachineAccessAsync(machineAccess.ToMachineAccess(), organization, project);
 
         // Delete the machine access entity.
         try

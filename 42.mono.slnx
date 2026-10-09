@@ -100,9 +100,11 @@
     <Project Path="src/Platform/Storyteller/Access.Certificates.Azure.KeyVault/src/Access.Certificates.Azure.KeyVault.csproj" />
     <Project Path="src/Platform/Storyteller/Access.AuthKit/src/Access.AuthKit.csproj" />
     <Project Path="src/Platform/Storyteller/Access.AuthKit/test/Access.AuthKit.UnitTests.csproj" />
+    <Project Path="src/Platform/Storyteller/Access.AuthKit/testint/Access.AuthKit.IntegrationTests.csproj" />
     <Project Path="src/Platform/Storyteller/Access.AzureAd/src/Access.AzureAd.csproj" />
     <Project Path="src/Platform/Storyteller/Access.AzureAd/test/Access.AzureAd.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Access.Keycloak/src/Access.Keycloak.csproj" />
+    <Project Path="src/Platform/Storyteller/Access.Keycloak/test/Access.Keycloak.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Functions/src/Api.Functions.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Functions/test/Api.Functions.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Web/src/Api.Web.csproj" />
@@ -112,8 +114,12 @@
     <Project Path="src/Platform/Storyteller/Binding.Abstractions/src/Binding.Abstractions.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Azure.KeyVault/src/Binding.Azure.KeyVault.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Core/src/Binding.Core.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.JsonE/src/Binding.JsonE.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.JsonE/test/Binding.JsonE.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Language/src/Binding.Language.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Language/test/Binding.Language.UnitTests.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.Object/src/Binding.Object.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.Object/test/Binding.Object.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/DbCreator/src/DbCreator.csproj" />
     <Project Path="src/Platform/Storyteller/Sdk.NSwag/src/Sdk.NSwag.csproj" />
     <Project Path="src/Platform/Storyteller/Sdk.Kiota/src/Sdk.Kiota.csproj" />
