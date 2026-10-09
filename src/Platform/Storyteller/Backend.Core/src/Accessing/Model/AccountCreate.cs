@@ -8,7 +8,8 @@ public record class AccountCreate
 
     public required string Name { get; init; }
 
-    public required string Organization { get; init; }
+    // Both or neither. Without them the account starts with no memberships, for example from an invitation.
+    public string? Organization { get; init; }
 
-    public required string Project { get; init; }
+    public string? Project { get; init; }
 }

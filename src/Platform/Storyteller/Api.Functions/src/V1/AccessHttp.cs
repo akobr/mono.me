@@ -86,6 +86,11 @@ public class AccessHttp
             return new BadRequestResult();
         }
 
+        if (string.IsNullOrWhiteSpace(accountModel.Organization) != string.IsNullOrWhiteSpace(accountModel.Project))
+        {
+            return new BadRequestObjectResult(new ErrorResponse("The organization and the project are given together, or not at all."));
+        }
+
         var (userName, name) = await request.GetIdentityProfileAsync(_profileResolver);
         var internalAccountModel = new AccountCreate
         {

@@ -265,6 +265,201 @@ public class CosmosAccessServiceTests(Startup startup)
         await act.Should().ThrowAsync<NotFoundException>();
     }
 
+    [Fact]
+    public async Task CreateAccount_WithoutProject_StoresAnAccountWithoutMemberships()
+    {
+        var id = $"acc-{Guid.NewGuid():N}";
+
+        var account = await Access.CreateAccountAsync(new AccountCreate { IdentityId = id, UserName = $"{id}@example.com", Name = "Invitee" });
+
+        account.Id.Should().Be(id);
+        account.AccessMap.Should().BeEmpty();
+        (await Access.GetAccountAsync(id))!.UserName.Should().Be($"{id}@example.com");
+    }
+
+    [Fact]
+    public async Task CreateAccount_OnlyOrganization_ThrowsArgumentException()
+    {
+        var act = () => Access.CreateAccountAsync(new AccountCreate { IdentityId = $"acc-{Guid.NewGuid():N}", UserName = "u", Name = "n", Organization = Organization });
+
+        await act.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task GetMembers_ByAdministrator_ReturnsNamesOwnersFirst()
+    {
+        var pointKey = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+
+        var members = await Access.GetMembersAsync(pointKey, OwnerId);
+
+        members.Select(member => (member.AccountId, member.Role)).Should().Equal((OwnerId, AccountRole.Owner), (memberId, AccountRole.Reader));
+        members[0].Name.Should().Be("Owner");
+        members[1].UserName.Should().Be($"{memberId}@example.com");
+    }
+
+    [Fact]
+    public async Task GetMembers_ByContributor_ThrowsAccessDenied()
+    {
+        var pointKey = await CreateProjectAsync();
+        var contributorId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, contributorId, pointKey, AccountRole.Contributor));
+
+        var act = () => Access.GetMembersAsync(pointKey, contributorId);
+
+        await act.Should().ThrowAsync<AccessDeniedException>();
+    }
+
+    [Fact]
+    public async Task SetMemberRole_LowersAndRaisesTheRoleInBothDocuments()
+    {
+        var pointKey = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Administrator));
+
+        var lowered = await Access.SetMemberRoleAsync(pointKey, memberId, AccountRole.Reader, OwnerId);
+
+        lowered.Role.Should().Be(AccountRole.Reader);
+        lowered.UserName.Should().Be($"{memberId}@example.com");
+        (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().Contain(memberId, AccountRole.Reader);
+        (await Access.GetAccountAsync(memberId))!.AccessMap.Should().Contain(pointKey, AccountRole.Reader);
+
+        var raised = await Access.SetMemberRoleAsync(pointKey, memberId, AccountRole.ContributorWithSecrets, OwnerId);
+        raised.Role.Should().Be(AccountRole.ContributorWithSecrets);
+    }
+
+    [Fact]
+    public async Task SetMemberRole_OwnerByAdministrator_ThrowsAccessDenied()
+    {
+        var pointKey = await CreateProjectAsync();
+        var adminId = await CreateBareAccountAsync();
+        var memberId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, adminId, pointKey, AccountRole.Administrator));
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+
+        var promote = () => Access.SetMemberRoleAsync(pointKey, memberId, AccountRole.Owner, adminId);
+        var demoteOwner = () => Access.SetMemberRoleAsync(pointKey, OwnerId, AccountRole.Reader, adminId);
+
+        await promote.Should().ThrowAsync<AccessDeniedException>();
+        await demoteOwner.Should().ThrowAsync<AccessDeniedException>();
+    }
+
+    [Fact]
+    public async Task SetMemberRole_OwnRole_ThrowsSelfRoleChange()
+    {
+        var pointKey = await CreateProjectAsync();
+        var adminId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, adminId, pointKey, AccountRole.Administrator));
+
+        var act = () => Access.SetMemberRoleAsync(pointKey, adminId, AccountRole.Reader, adminId);
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.SelfRoleChange);
+    }
+
+    [Fact]
+    public async Task SetMemberRole_NotAMember_ThrowsMemberNotFound()
+    {
+        var pointKey = await CreateProjectAsync();
+        var outsiderId = await CreateBareAccountAsync();
+
+        var act = () => Access.SetMemberRoleAsync(pointKey, outsiderId, AccountRole.Reader, OwnerId);
+
+        (await act.Should().ThrowAsync<NotFoundException>()).Which.ErrorCode.Should().Be(ErrorCodes.MemberNotFound);
+    }
+
+    [Fact]
+    public async Task SetMemberRole_DemoteTheOtherOwner_Succeeds()
+    {
+        var pointKey = await CreateProjectAsync();
+        var secondOwnerId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, secondOwnerId, pointKey, AccountRole.Owner));
+
+        var member = await Access.SetMemberRoleAsync(pointKey, secondOwnerId, AccountRole.Administrator, OwnerId);
+
+        member.Role.Should().Be(AccountRole.Administrator);
+    }
+
+    [Fact]
+    public async Task RemoveMember_ByAdministrator_RemovesFromBothDocuments()
+    {
+        var pointKey = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Contributor));
+
+        await Access.RemoveMemberAsync(pointKey, memberId, OwnerId);
+
+        (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().NotContainKey(memberId);
+        (await Access.GetAccountAsync(memberId))!.AccessMap.Should().NotContainKey(pointKey);
+    }
+
+    [Fact]
+    public async Task RemoveMember_Self_Leaves()
+    {
+        var pointKey = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+
+        await Access.RemoveMemberAsync(pointKey, memberId, memberId);
+
+        (await Access.GetAccountRoleAsync(memberId, pointKey)).Should().Be(AccountRole.None);
+    }
+
+    [Fact]
+    public async Task RemoveMember_OtherByContributor_ThrowsAccessDenied()
+    {
+        var pointKey = await CreateProjectAsync();
+        var contributorId = await CreateBareAccountAsync();
+        var memberId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, contributorId, pointKey, AccountRole.Contributor));
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+
+        var act = () => Access.RemoveMemberAsync(pointKey, memberId, contributorId);
+
+        await act.Should().ThrowAsync<AccessDeniedException>();
+    }
+
+    [Fact]
+    public async Task RemoveMember_LastOwnerLeaving_ThrowsLastOwner()
+    {
+        var pointKey = await CreateProjectAsync();
+
+        var act = () => Access.RemoveMemberAsync(pointKey, OwnerId, OwnerId);
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.LastOwner);
+    }
+
+    [Fact]
+    public async Task JoinAccessPoint_RaisesButNeverLowers()
+    {
+        var pointKey = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+
+        var joined = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Contributor);
+        var lower = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Reader);
+        var higher = await Access.JoinAccessPointAsync(pointKey, memberId, AccountRole.Administrator);
+
+        joined.Should().Be(AccountRole.Contributor);
+        lower.Should().Be(AccountRole.Contributor);
+        higher.Should().Be(AccountRole.Administrator);
+        (await Access.GetAccountAsync(memberId))!.AccessMap.Should().Contain(pointKey, AccountRole.Administrator);
+    }
+
+    [Fact]
+    public async Task ConcurrentGrants_BothLandInBothDocuments()
+    {
+        // The ETag-guarded batch retries once on a concurrent change instead of losing an update.
+        var pointKey = await CreateProjectAsync();
+        var firstId = await CreateBareAccountAsync();
+        var secondId = await CreateBareAccountAsync();
+
+        await Task.WhenAll(
+            Access.GrantPermissionAsync(Permission(OwnerId, firstId, pointKey, AccountRole.Reader)),
+            Access.GrantPermissionAsync(Permission(OwnerId, secondId, pointKey, AccountRole.Reader)));
+
+        (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().ContainKeys(firstId, secondId);
+    }
+
     private static Permission Permission(string creatorId, string accountId, string pointKey, AccountRole role)
     {
         return new Permission

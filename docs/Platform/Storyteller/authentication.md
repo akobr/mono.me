@@ -36,7 +36,8 @@ The value is case-insensitive. Settings are validated at startup, so a missing r
 | `Auth:AuthKit:Audience` | no, but set it in production | | When set, tokens must carry this `aud`. When empty, the audience is not checked. |
 | `Auth:AuthKit:DefaultUserScopes:*` | no | none | Scopes given to every signed-in user. |
 | `Auth:AuthKit:PermissionMap:<slug>` | no | none | Maps a WorkOS permission slug to one or more Storyteller scopes. |
-| `Auth:AuthKit:ApiKey` | no | | WorkOS management key (`sk_…`). Used to look up a user's email and name at account registration when the token lacks them. Keep it in Key Vault, never in plain settings. |
+| `Auth:AuthKit:ApiKey` | no | | WorkOS management key (`sk_…`). Used to look up a user's email and name at account registration when the token lacks them, and to send invitation emails. Keep it in Key Vault, never in plain settings. |
+| `Auth:AuthKit:RequireVerifiedEmail` | no | `true` | Accepting an invitation needs a verified email. When the token has no `email_verified` claim, the email counts as verified only if this is `false`. |
 | `Auth:AuthKit:AuthKitDomain` | no | | `https://<subdomain>.authkit.app` or your custom domain. Enables the AuthKit OAuth flows in the OpenAPI document and is returned by the discovery endpoint. Together with `MachineOrganizationId` it turns on M2M machine access. |
 | `Auth:AuthKit:MachineOrganizationId` | no | | WorkOS organization (`org_…`) that owns the M2M applications Storyteller creates. Setting it (with `AuthKitDomain`) turns on M2M machine access, which then also requires `ApiKey`. |
 
@@ -113,13 +114,15 @@ A `PermissionMap` value may list several scopes separated by spaces, for example
    {
      "aud": "https://storyteller.42for.net",
      "email": {{ user.email }},
+     "email_verified": {{ user.email_verified }},
      "name": "{{ user.first_name }} {{ user.last_name }}"
    }
    ```
 
-   Set `Auth:AuthKit:Audience` to the same `aud`. When a user has no first or last name, the template renders a blank or partial `name`, and Storyteller falls back as described above.
+   Set `Auth:AuthKit:Audience` to the same `aud`. `email_verified` is needed to accept invitations (see [Members and invitations](access.md)). Without it, invitations can only be accepted when `Auth:AuthKit:RequireVerifiedEmail` is `false`. When a user has no first or last name, the template renders a blank or partial `name`, and Storyteller falls back as described above.
 4. If you use role-driven scopes, create the permissions (for example `storyteller:annotation-read`) and assign them to organization roles.
 5. Enable **CLI Auth** for the environment so `sform` can use the device sign-in. Without it, `POST /user_management/authorize/device` is rejected and `sform account` reports the WorkOS message.
+6. For invitation emails, set `Auth:AuthKit:ApiKey` (the management key) and point the environment's invitation link at the admin UI's accept page, for example `https://admin.42for.net/invitations/accept`. Without the key, invitations are still created, but no email is sent.
 
 ## Discovery endpoint
 
@@ -358,7 +361,7 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | `409` | `ElevatedRole` | Revoke names a lower role than the member holds. Revoke the stored role instead. |
 | `409` | `LastOwner` | The revoke would leave the access point without an `Owner`. |
 
-Grant only raises a role. To lower one, revoke the current role and grant the new one.
+Grant only raises a role. To lower one, revoke the current role and grant the new one, or set the exact role through the members endpoint. Members and invitations, with their own error codes, are described in [Members and invitations](access.md).
 
 ## Switching an existing deployment
 
