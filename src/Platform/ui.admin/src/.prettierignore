@@ -1,0 +1,6 @@
+dist
+coverage
+package-lock.json
+app/typed-router.d.ts
+app/auto-imports.d.ts
+app/components.d.ts

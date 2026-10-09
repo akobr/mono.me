@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.6887863">
+  <PropertyGroup>
+    <StartupCommand>npm run dev</StartupCommand>
+    <JavaScriptTestRoot>test\</JavaScriptTestRoot>
+    <JavaScriptTestFramework>Vitest</JavaScriptTestFramework>
+    <!-- dotnet build src must not require Node; opt in with -p:BuildJavaScript=true -->
+    <ShouldRunNpmInstall Condition="'$(BuildJavaScript)' != 'true'">false</ShouldRunNpmInstall>
+    <ShouldRunBuildScript Condition="'$(BuildJavaScript)' != 'true'">false</ShouldRunBuildScript>
+    <BuildCommand>npm run build</BuildCommand>
+    <PublishAssetsDirectory>$(MSBuildProjectDirectory)\dist</PublishAssetsDirectory>
+    <!-- The SDK sets TargetPlatformIdentifier=None, which NuGet of the .NET 10 SDK rejects (NU1012: net6.0-none). -->
+    <TargetPlatformIdentifier />
+    <TargetPlatformMoniker />
+  </PropertyGroup>
+</Project>
