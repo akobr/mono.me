@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.Binding.JsonE.UnitTests</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller.Binding.JsonE.UnitTests</RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="YamlDotNet" />
+
+    <!-- The unpatched upstream binary, only for parity checks against the vendored fork. -->
+    <PackageReference Include="JsonE.Net" Aliases="upstream" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\src\Binding.JsonE.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Specification\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

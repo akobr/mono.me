@@ -114,6 +114,8 @@
     <Project Path="src/Platform/Storyteller/Binding.Abstractions/src/Binding.Abstractions.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Azure.KeyVault/src/Binding.Azure.KeyVault.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Core/src/Binding.Core.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.JsonE/src/Binding.JsonE.csproj" />
+    <Project Path="src/Platform/Storyteller/Binding.JsonE/test/Binding.JsonE.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Language/src/Binding.Language.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Language/test/Binding.Language.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Object/src/Binding.Object.csproj" />

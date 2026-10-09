@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Vendored JsonE.Net 3.0.1 (json-everything 8b8ab34, MIT) with Storyteller metering hooks. See VENDORED.md. -->
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.Binding.JsonE</AssemblyName>
+    <RootNamespace>Json.JsonE</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsAotCompatible>true</IsAotCompatible>
+
+    <!-- Upstream formatting is kept so the source stays diffable against json-everything. -->
+    <EnableStyleCop>false</EnableStyleCop>
+    <NoWarn>$(NoWarn);CS1570;CS1591;IDE0290;CA1805;CA1823</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Json.More.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="42.Platform.Storyteller.Binding.JsonE.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="LICENSE" />
+    <None Include="VENDORED.md" />
+  </ItemGroup>
+
+</Project>

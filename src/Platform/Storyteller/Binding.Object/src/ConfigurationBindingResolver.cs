@@ -6,27 +6,30 @@ namespace _42.Platform.Storyteller.Binding.Object;
 /// <summary>
 /// Resolves <c>@</c> strings and <c>$binding</c> envelopes on a configuration object.
 /// <c>$context</c> is resolved before the engine runs. <c>$definition</c> is the program and is passed through.
+/// One <see cref="EvaluationMeter"/> bounds the work of all envelopes in one read (see <see cref="ObjectBindingLimits"/>).
 /// </summary>
 public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
 {
-    public const int MaxEnvelopeDepth = 32;
-    public const int MaxEnvelopeEvaluations = 256;
-    public const int MaxJsonEOperatorDepth = 16;
-    public const int MaxRangeItems = 1000;
-    public const int MaxMergeItems = 1000;
-    public const int MaxReduceItems = 1000;
-    public const int MaxConcatLength = 100_000;
-    public const int MaxEvaluationSteps = 100_000;
-
     private const string BindingProperty = "$binding";
     private const string DefinitionProperty = "$definition";
     private const string ContextProperty = "$context";
 
     private readonly IBindingExecutor _stringBindings;
+    private readonly ILogger<ConfigurationBindingResolver>? _logger;
+    private readonly ObjectBindingLimits _limits;
+    private readonly TimeProvider _timeProvider;
 
-    public ConfigurationBindingResolver(IBindingExecutor stringBindings, ILogger<ConfigurationBindingResolver>? logger = null)
+    public ConfigurationBindingResolver(
+        IBindingExecutor stringBindings,
+        ILogger<ConfigurationBindingResolver>? logger = null,
+        ObjectBindingLimits? limits = null,
+        TimeProvider? timeProvider = null)
     {
         _stringBindings = stringBindings ?? throw new ArgumentNullException(nameof(stringBindings));
+        _logger = logger;
+        _limits = limits ?? ObjectBindingLimits.Default;
+        _limits.Validate();
+        _timeProvider = timeProvider ?? TimeProvider.System;
         if (logger is not null)
         {
             ObjectBindingEngine.UseLogger(logger);
@@ -37,7 +40,19 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
     {
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(scope);
-        await ResolveTokenAsync(content, includeSecrets, scope, depth: 0, isRoot: true, new EvaluationBudget());
+        var budget = new EvaluationBudget(_limits, _timeProvider);
+        await ResolveTokenAsync(content, includeSecrets, scope, depth: 0, isRoot: true, budget);
+
+        if (budget.Count > 0 && _logger?.IsEnabled(LogLevel.Debug) == true)
+        {
+            _logger.LogDebug(
+                "Object bindings of {Configuration} evaluated {Envelopes} envelopes in {Steps} steps, {ElapsedMs} ms, {AllocatedBytes} bytes.",
+                scope.Context,
+                budget.Count,
+                budget.Meter.Steps,
+                budget.Meter.Elapsed.TotalMilliseconds,
+                budget.Meter.AllocatedBytes);
+        }
     }
 
     private async ValueTask<JToken> ResolveTokenAsync(
@@ -84,34 +99,63 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
             var path = DisplayPath(obj);
             if (error is not null)
             {
-                throw new BindingEvaluationException($"Failed to process the object binding for '{path}': {error}");
+                throw new BindingEvaluationException(
+                    $"Failed to process the object binding for '{path}': {error}",
+                    path,
+                    innerException: null);
             }
 
-            if (depth >= MaxEnvelopeDepth)
+            if (depth >= _limits.MaxEnvelopeDepth)
             {
-                throw new BindingEvaluationException(
-                    $"Failed to process the object binding for '{path}': nested object bindings exceed {MaxEnvelopeDepth}.");
-            }
-
-            if (kind == ObjectBindingEngine.JsonEKind &&
-                JsonELimits.OperatorDepth(definition!) > MaxJsonEOperatorDepth)
-            {
-                throw new BindingEvaluationException(
-                    $"Failed to process the object binding for '{path}': JSON-e template nesting exceeds {MaxJsonEOperatorDepth}.");
+                throw LimitExceeded(
+                    new EvaluationLimitExceededException(
+                        EvaluationLimitKind.EnvelopeDepth,
+                        _limits.MaxEnvelopeDepth,
+                        $"Failed to process the object binding for '{path}': nested object bindings exceed {_limits.MaxEnvelopeDepth}.",
+                        path,
+                        innerException: null),
+                    budget,
+                    scope);
             }
 
             var resolvedContext = await ResolveContextAsync(context, includeSecrets, scope, depth + 1, path, budget);
-            if (budget.Count >= MaxEnvelopeEvaluations)
+            if (budget.Count >= _limits.MaxEnvelopeEvaluations)
             {
-                throw new BindingEvaluationException(
-                    $"Failed to process the object binding for '{path}': object bindings exceed {MaxEnvelopeEvaluations} evaluations.");
+                throw LimitExceeded(
+                    new EvaluationLimitExceededException(
+                        EvaluationLimitKind.EnvelopeCount,
+                        _limits.MaxEnvelopeEvaluations,
+                        $"Failed to process the object binding for '{path}': object bindings exceed {_limits.MaxEnvelopeEvaluations} evaluations.",
+                        path,
+                        innerException: null),
+                    budget,
+                    scope);
             }
 
             budget.Count++;
             JToken result;
             try
             {
-                result = ObjectBindingEngine.Evaluate(kind!, definition!, resolvedContext, budget);
+                result = ObjectBindingEngine.Evaluate(kind!, definition!, resolvedContext, budget.Meter);
+            }
+            catch (EvaluationLimitExceededException exception)
+            {
+                throw LimitExceeded(
+                    new EvaluationLimitExceededException(
+                        exception.Kind,
+                        exception.Limit,
+                        $"Failed to process the object binding for '{path}': {exception.Message}",
+                        path,
+                        exception),
+                    budget,
+                    scope);
+            }
+            catch (BindingEvaluationException exception)
+            {
+                throw new BindingEvaluationException(
+                    $"Failed to process the object binding for '{path}': {exception.Message}",
+                    path,
+                    exception);
             }
             catch (BindingException exception)
             {
@@ -125,7 +169,9 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
                 if (result is not JObject resultObject)
                 {
                     throw new BindingEvaluationException(
-                        $"Failed to process the object binding for '{path}': the root configuration binding must evaluate to a JSON object.");
+                        $"Failed to process the object binding for '{path}': the root configuration binding must evaluate to a JSON object.",
+                        path,
+                        innerException: null);
                 }
 
                 ReplaceContents(obj, resultObject);
@@ -160,7 +206,9 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         if (resolved is not JObject resolvedObject)
         {
             throw new BindingEvaluationException(
-                $"Failed to process the object binding for '{path}': $context must resolve to a JSON object.");
+                $"Failed to process the object binding for '{path}': $context must resolve to a JSON object.",
+                path,
+                innerException: null);
         }
 
         return resolvedObject;
@@ -191,6 +239,28 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         var holder = new JObject { ["v"] = value };
         await _stringBindings.TryBinding((JValue)holder["v"]!, includeSecrets, scope);
         return holder["v"]!.DeepClone();
+    }
+
+    private EvaluationLimitExceededException LimitExceeded(
+        EvaluationLimitExceededException exception,
+        EvaluationBudget budget,
+        BindingScope scope)
+    {
+        if (_logger?.IsEnabled(LogLevel.Warning) == true)
+        {
+            _logger.LogWarning(
+                "Object binding limit {Kind} ({Limit}) exceeded at {Path} of {Configuration} after {Envelopes} envelopes, {Steps} steps, {ElapsedMs} ms, {AllocatedBytes} bytes.",
+                exception.Kind,
+                exception.Limit,
+                exception.Path,
+                scope.Context,
+                budget.Count,
+                budget.Meter.Steps,
+                budget.Meter.Elapsed.TotalMilliseconds,
+                budget.Meter.AllocatedBytes);
+        }
+
+        return exception;
     }
 
     private static bool TryReadEnvelope(
@@ -262,29 +332,13 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
 
     internal sealed class EvaluationBudget
     {
+        public EvaluationBudget(ObjectBindingLimits limits, TimeProvider timeProvider)
+        {
+            Meter = new EvaluationMeter(limits, timeProvider);
+        }
+
+        public EvaluationMeter Meter { get; }
+
         public int Count { get; set; }
-
-        public int Steps { get; private set; }
-
-        public void AddStep()
-        {
-            AddSteps(1);
-        }
-
-        public void AddSteps(int count)
-        {
-            if (count <= 0)
-            {
-                return;
-            }
-
-            if ((long)Steps + count > MaxEvaluationSteps)
-            {
-                throw new BindingEvaluationException(
-                    $"Evaluation exceeds {MaxEvaluationSteps} steps.");
-            }
-
-            Steps += count;
-        }
     }
 }

@@ -17,7 +17,7 @@ internal static class ObjectBindingEngine
     {
         // LogRule.Logger falls back to a console logger. Pin our sink before any rule runs.
         LogRule.Logger = JsonLogicDebugLogger.Instance;
-        JsonLogicBoundedRules.Register();
+        JsonLogicMetering.Install();
     }
 
     public static void UseLogger(ILogger? logger)
@@ -25,36 +25,41 @@ internal static class ObjectBindingEngine
         JsonLogicDebugLogger.Instance.Use(logger);
     }
 
-    public static JToken Evaluate(
-        string kind,
-        JToken definition,
-        JObject context,
-        ConfigurationBindingResolver.EvaluationBudget budget)
+    /// <summary>
+    /// Evaluates one envelope. The engine call is metered by the read's <paramref name="meter"/>. The conversions around it
+    /// are linear in data that is already bounded (the stored document and the checked result) and are not metered.
+    /// Every failure is a <see cref="BindingException"/>; anything thrown by an engine for author-supplied input becomes
+    /// <see cref="BindingEvaluationException"/>.
+    /// </summary>
+    public static JToken Evaluate(string kind, JToken definition, JObject context, EvaluationMeter meter)
     {
         try
         {
-            if (kind == JsonEKind)
-            {
-                return EvaluateJsonE(definition, context, budget);
-            }
-
-            var definitionNode = JsonTokenConverter.ToNode(definition);
+            var definitionNode = JsonTokenConverter.ToNode(definition, meter.Limits.MaxDepth);
             if (definitionNode is null)
             {
                 return JValue.CreateNull();
             }
 
-            var contextNode = JsonTokenConverter.ToNode(context)
-                ?? throw new BindingEvaluationException("Object binding $context must be a JSON object.");
-
-            JsonLogicBoundedRules.UseBudget(budget);
-            JsonNode? result = kind switch
+            if (JsonTokenConverter.ToNode(context, meter.Limits.MaxDepth) is not JsonObject contextNode)
             {
-                JsonLogicKind => JsonLogic.Apply(definitionNode, contextNode),
-                _ => throw new BindingEvaluationException($"Unknown object binding '{kind}'."),
-            };
+                throw new BindingEvaluationException("Object binding $context must be a JSON object.");
+            }
 
-            EnsureResultFits(result);
+            JsonNode? result;
+            using (meter.Enter())
+            {
+                result = kind switch
+                {
+                    JsonLogicKind => JsonLogic.Apply(definitionNode, contextNode),
+                    JsonEKind => JsonE.Evaluate(definitionNode, contextNode, meter),
+                    _ => throw new BindingEvaluationException($"Unknown object binding '{kind}'."),
+                };
+            }
+
+            // A library catch block could have swallowed the meter's exception. The limit is latched.
+            meter.ThrowIfExceeded();
+            ResultCheck.Ensure(result, meter.Limits);
             return JsonTokenConverter.ToToken(result);
         }
         catch (BindingException)
@@ -69,63 +74,19 @@ internal static class ObjectBindingEngine
         {
             throw new BindingEvaluationException(exception.Message, exception);
         }
-    }
-
-    private static JToken EvaluateJsonE(
-        JToken definition,
-        JObject context,
-        ConfigurationBindingResolver.EvaluationBudget budget)
-    {
-        var prepared = JsonELimits.PrepareDefinition(definition);
-        var definitionNode = JsonTokenConverter.ToNode(prepared);
-        if (definitionNode is null)
+        catch (InsufficientExecutionStackException exception)
         {
-            return JValue.CreateNull();
+            throw new EvaluationLimitExceededException(
+                EvaluationLimitKind.Depth,
+                meter.Limits.MaxDepth,
+                $"Object binding evaluation exceeds nesting depth {meter.Limits.MaxDepth} or the available stack.",
+                path: null,
+                exception);
         }
-
-        if (JsonTokenConverter.ToNode(context) is not JsonObject contextNode)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            throw new BindingEvaluationException("Object binding $context must be a JSON object.");
-        }
-
-        // A context function overrides the built-in of the same name, including one supplied by the caller.
-        var sizeBudget = new JsonESizeBudget(budget);
-        contextNode["range"] = JsonFunction.Create(JsonELimits.Range);
-        contextNode["join"] = JsonFunction.Create((arguments, _) => JsonELimits.Join(arguments, sizeBudget));
-        contextNode["split"] = JsonFunction.Create((arguments, _) => JsonELimits.Split(arguments, sizeBudget));
-        contextNode["len"] = JsonFunction.Create((arguments, _) => JsonELimits.Len(arguments, sizeBudget));
-        contextNode[JsonEExpressionRewriter.IndexFunction] = JsonFunction.Create(
-            (arguments, _) => JsonELimits.Index(arguments, sizeBudget));
-        contextNode[JsonEExpressionRewriter.SliceFunction] = JsonFunction.Create(
-            (arguments, _) => JsonELimits.Slice(arguments, sizeBudget));
-        contextNode["lowercase"] = JsonFunction.Create((arguments, _) => JsonELimits.Lowercase(arguments, sizeBudget));
-        contextNode["uppercase"] = JsonFunction.Create((arguments, _) => JsonELimits.Uppercase(arguments, sizeBudget));
-        contextNode["strip"] = JsonFunction.Create((arguments, _) => JsonELimits.Strip(arguments, sizeBudget));
-        contextNode["lstrip"] = JsonFunction.Create((arguments, _) => JsonELimits.LStrip(arguments, sizeBudget));
-        contextNode["rstrip"] = JsonFunction.Create((arguments, _) => JsonELimits.RStrip(arguments, sizeBudget));
-        contextNode[JsonEExpressionRewriter.AddFunction] = JsonFunction.Create(JsonELimits.Add);
-        contextNode[JsonEExpressionRewriter.InFunction] = JsonFunction.Create(
-            (arguments, _) => JsonELimits.In(arguments, sizeBudget));
-        contextNode[JsonEExpressionRewriter.EqualsFunction] = JsonFunction.Create(
-            (arguments, _) => JsonELimits.Equals(arguments, sizeBudget));
-        contextNode[JsonEExpressionRewriter.ConcatFunction] = JsonFunction.Create(JsonELimits.Concat);
-        contextNode[JsonEExpressionRewriter.BoundFunction] = JsonFunction.Create(
-            (arguments, _) => JsonELimits.Bound(arguments, sizeBudget));
-        contextNode[JsonEExpressionRewriter.LetFunction] = JsonFunction.Create(
-            (arguments, _) => JsonELimits.Let(arguments, sizeBudget));
-        contextNode[JsonEExpressionRewriter.StepFunction] = JsonFunction.Create(
-            (arguments, _) => JsonELimits.Step(arguments, sizeBudget));
-        var result = JsonE.Evaluate(definitionNode, contextNode);
-        EnsureResultFits(result);
-        return JsonTokenConverter.ToToken(result);
-    }
-
-    private static void EnsureResultFits(JsonNode? result)
-    {
-        if (EvaluationSize.SerializedLength(result) > ConfigurationBindingResolver.MaxConcatLength)
-        {
-            throw new BindingEvaluationException(
-                $"Object binding result exceeds {ConfigurationBindingResolver.MaxConcatLength} characters.");
+            // The input is author-supplied, so an engine failure is a client error, not a server fault.
+            throw new BindingEvaluationException($"Object binding evaluation failed: {exception.Message}", exception);
         }
     }
 }

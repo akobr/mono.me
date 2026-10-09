@@ -1,4 +1,5 @@
 using _42.Platform.Storyteller.Api.Models;
+using _42.Platform.Storyteller.Binding;
 
 namespace _42.Platform.Storyteller.Api.ErrorHandling;
 
@@ -18,7 +19,12 @@ public static class ExceptionExtensions
 
     public static string? TryGetErrorCode(this Exception @this)
     {
-        return null;
+        return @this switch
+        {
+            EvaluationLimitExceededException limit => $"binding.limit.{ToCodeName(limit.Kind)}",
+            BindingEvaluationException => "binding.evaluation",
+            _ => null,
+        };
     }
 
     public static ErrorResponse ToErrorResponse(this Exception @this)
@@ -30,5 +36,11 @@ public static class ExceptionExtensions
             ErrorCode = @this.TryGetErrorCode(),
             Hint = @this.TryGetErrorHint(),
         };
+    }
+
+    private static string ToCodeName(EvaluationLimitKind kind)
+    {
+        var name = kind.ToString();
+        return char.ToLowerInvariant(name[0]) + name[1..];
     }
 }
