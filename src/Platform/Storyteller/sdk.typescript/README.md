@@ -79,7 +79,13 @@ npm run build          # tsup → dist/ (ESM + .d.ts per entry point)
 
 To generate from a specific document: `SPEC=../open.api.v0.9.0.json npm run generate` (PowerShell: `$env:SPEC='../open.api.v0.9.0.json'; npm run generate`). The package version follows `info.version` of the document (`0.8.91.29486` → `0.8.91`).
 
-Before generation, `scripts/openapi-transformer.mjs` (an Orval input transformer) corrects the document: the API documents the `application/json-patch+json` bodies of `PatchConfiguration` and `PatchTemplate` as `object`, so the transformer replaces them with a required array of `JsonPatchOperation` (`op`, `path`, `from`, `value`). Remove it once the API documents the array itself.
+Before generation, `scripts/openapi-transformer.mjs` (an Orval input transformer) corrects the document:
+
+- The `application/json-patch+json` bodies of `PatchConfiguration` and `PatchTemplate` are documented as `object`; the transformer replaces them with a required array of `JsonPatchOperation` (`op`, `path`, `from`, `value`).
+- `Values` of annotations and configurations is `IReadOnlyDictionary<string, object>` in C#, documented as a map of objects; the transformer widens it to a map of any JSON value, so the Zod schemas accept numbers and strings.
+- `GrantUserAccess` and `RevokeUserAccess` are marked deprecated (the members endpoints replace them in browser clients).
+
+Remove a correction once the API documents it itself.
 
 ```ts
 await patchConfiguration(org, project, view, key, [

@@ -6,6 +6,10 @@
 //
 // Grant and revoke stay in the API for the CLI (sform); browser clients set exact roles through the members
 // endpoints (setMemberRole, removeMember). They are marked deprecated here only, so NSwag emits no [Obsolete].
+//
+// Values of annotations and configurations are IReadOnlyDictionary<string, object> in C#, so each value can be any
+// JSON (a number, a string, an array). The document says "additionalProperties: { type: object }", which would make
+// the generated Zod schemas reject primitive values; the transformer widens them to any JSON value.
 
 const jsonPatchContentType = 'application/json-patch+json'
 const deprecatedOperations = new Set(['GrantUserAccess', 'RevokeUserAccess'])
@@ -26,6 +30,14 @@ export default function transform(document) {
   document.components ??= {}
   document.components.schemas ??= {}
   document.components.schemas.JsonPatchOperation = jsonPatchOperation
+
+  for (const schema of Object.values(document.components.schemas)) {
+    const values = schema?.properties?.Values
+
+    if (values?.type === 'object' && values.additionalProperties?.type === 'object') {
+      values.additionalProperties = {}
+    }
+  }
 
   for (const pathItem of Object.values(document.paths ?? {})) {
     for (const operation of Object.values(pathItem ?? {})) {

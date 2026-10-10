@@ -1,7 +1,7 @@
 import { setupWorker } from 'msw/browser'
 import { getStorytellerMock } from '@42for.net/2splatform.sdk/msw'
 import { resetDb, type MockScenario } from './db'
-import { mockHandlers } from './handlers'
+import { mockHandlers } from './all-handlers'
 
 declare global {
   interface Window {
