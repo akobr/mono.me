@@ -7,7 +7,7 @@ namespace _42.Platform.Storyteller;
 // Only new names are checked; documents created before these rules stay readable.
 public static partial class NameRules
 {
-    public const string Pattern = "^[a-z0-9][a-z0-9-]{1,62}$";
+    public const string Pattern = @"^[a-z0-9][a-z0-9-]{1,62}\z";
 
     public static readonly IReadOnlySet<string> ReservedOrganizationNames = new HashSet<string>(StringComparer.Ordinal)
     {

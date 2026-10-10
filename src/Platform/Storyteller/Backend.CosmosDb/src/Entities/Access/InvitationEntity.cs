@@ -34,6 +34,9 @@ public record class InvitationEntity
 
     public required DateTimeOffset ExpiresAt { get; init; }
 
+    // The validity chosen at creation, reused by every resend. Null for invitations stored before it existed.
+    public int? ValidityDays { get; init; }
+
     public string? AcceptedById { get; init; }
 
     public DateTimeOffset? RespondedAt { get; init; }
