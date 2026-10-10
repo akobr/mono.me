@@ -14,14 +14,10 @@ const segments = computed(() => props.value.split('.'))
   <span class="inline-flex min-w-0 items-center gap-1">
     <code class="min-w-0 font-mono text-xs" :class="truncate ? 'truncate' : 'break-all'" :title="value">
       <template v-for="(segment, index) in segments" :key="index">
-        <span v-if="index > 0" class="text-dimmed">.</span>
+        <span v-if="index > 0" class="text-muted">.</span>
         <span
           :class="
-            index === 0
-              ? 'text-dimmed'
-              : index === segments.length - 1
-                ? 'font-semibold text-highlighted'
-                : 'text-muted'
+            index === 0 ? 'text-muted' : index === segments.length - 1 ? 'font-semibold text-highlighted' : 'text-muted'
           "
           >{{ segment }}</span
         >

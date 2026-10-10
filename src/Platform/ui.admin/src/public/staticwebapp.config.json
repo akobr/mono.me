@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json.schemastore.org/staticwebapp.config.json",
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/assets/*", "/*.{js,css,svg,png,ico,json,woff2,txt}"]
+  },
+  "routes": [
+    {
+      "route": "/assets/*",
+      "headers": { "Cache-Control": "public, max-age=31536000, immutable" }
+    }
+  ],
+  "globalHeaders": {
+    "Cache-Control": "no-cache",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' __API_ORIGIN__ https://api.workos.com https://__AUTH_HOSTNAME__; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://__AUTH_HOSTNAME__",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "X-Content-Type-Options": "nosniff"
+  },
+  "mimeTypes": {
+    ".json": "application/json",
+    ".woff2": "font/woff2"
+  }
+}

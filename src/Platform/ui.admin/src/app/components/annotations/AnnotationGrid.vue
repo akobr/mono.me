@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import { computed, ref, useTemplateRef, watch, watchEffect } from 'vue'
 import type { ColumnSizingState, RowSelectionState, SortingState, VisibilityState } from '@tanstack/vue-table'
 import type { ConfigurationSummary } from '@42for.net/2splatform.sdk'
 import { useNow } from '@vueuse/core'
@@ -26,7 +26,7 @@ const rowSelection = defineModel<RowSelectionState>('rowSelection', { default: (
 const preferences = usePreferencesStore()
 const gridPreferences = preferences.grid('annotations')
 const now = useNow({ interval: 60_000 })
-const table = useTemplateRef<{ $el: HTMLElement }>('table')
+const table = useTemplateRef<{ $el: HTMLElement; tableRef: HTMLTableElement | null }>('table')
 
 const sorting = ref<SortingState>([])
 const columnVisibility = ref<VisibilityState>(
@@ -78,6 +78,18 @@ function hideableColumns() {
   return columns.value.filter((column) => column.enableHiding !== false && column.id)
 }
 
+// The grid role belongs on the <table> itself (its rows and cells then map to row and gridcell); UTable puts
+// attributes on its scroll container.
+watchEffect(() => {
+  const element = table.value?.tableRef
+  if (element) {
+    element.setAttribute('role', 'grid')
+    element.setAttribute('aria-label', 'Annotations')
+    element.setAttribute('aria-rowcount', String(props.rows.length + 1))
+    element.setAttribute('aria-multiselectable', 'true')
+  }
+})
+
 defineExpose({ scrollToKey, columnVisibility, hideableColumns })
 </script>
 
@@ -108,7 +120,5 @@ defineExpose({ scrollToKey, columnVisibility, hideableColumns })
     }"
     :on-select="(_event: Event, row: { original: TreeNode }) => emit('open', row.original.key)"
     empty="No annotations match the filter."
-    role="grid"
-    aria-label="Annotations"
   />
 </template>

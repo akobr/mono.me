@@ -6,7 +6,10 @@ import { removeTerm, type ParsedFilter } from '@/utils/filter-parser'
 import type { ListMode } from '@/composables/useAnnotationFilter'
 import type { TreePerspective } from '@/utils/tree-projection'
 
-/** Filter box with chips for the parsed qualifiers, the Grid | Tree switch and the list tools (spec section 8). */
+/**
+ * Filter box with chips for the parsed qualifiers, the Grid | Tree switch and the list tools (spec section 8).
+ * Compact (below md): the box and a button for the filter bottom sheet.
+ */
 const props = defineProps<{
   query: string
   parsed: ParsedFilter
@@ -117,6 +120,7 @@ defineExpose({ focus })
         </template>
       </UInput>
 
+      <AnnotationFilterSheet v-if="compact" :query="text" @update:query="(value) => (text = value)" />
       <UTabs
         v-if="!compact"
         :model-value="mode"

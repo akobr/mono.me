@@ -82,6 +82,25 @@ describe('schema validation', () => {
     expect(isBinding('x@y')).toBe(false)
   })
 
+  it('reports one issue per problem: forbidden properties, alternatives and nested items', () => {
+    const closed = {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        retries: { type: 'integer', maximum: 10 },
+        delivery: { oneOf: [{ required: ['to'] }, { required: ['url'] }] },
+        tiers: { type: 'array', items: { type: 'number' } },
+      },
+    }
+    expect(validateAgainst(closed, { retries: 20, delivery: {}, tiers: [1, 'x'], extra: true })).toEqual([
+      { pointer: '/retries', message: 'must be <= 10', keyword: 'maximum' },
+      { pointer: '/delivery', message: 'must match exactly one schema in oneOf', keyword: 'oneOf' },
+      { pointer: '/tiers/1', message: 'must be number', keyword: 'type' },
+      { pointer: '/extra', message: 'extra is not allowed', keyword: 'additionalProperties' },
+    ])
+    expect(validateAgainst(closed, undefined)).toEqual([])
+  })
+
   it('selects the draft from $schema and tolerates broken schemas', () => {
     expect(
       validateAgainst({ $schema: 'https://json-schema.org/draft/2020-12/schema', prefixItems: [{ type: 'number' }] }, [

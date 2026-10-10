@@ -16,12 +16,18 @@ export default defineConfig(({ command, mode }) => ({
       autoImport: { dirs: ['app/composables', 'app/stores'], dts: 'app/auto-imports.d.ts' },
       components: { dirs: ['app/components'], dts: 'app/components.d.ts' },
       // Bundle the lucide icons used in the source, so no request goes to the Iconify API (CSP connect-src).
-      icon: { clientBundle: { scan: true } },
+      // TypeScript files are scanned too: type, status and navigation icons are defined there.
+      icon: { clientBundle: { scan: { globInclude: ['app/**/*.{vue,ts}'] } } },
     }),
     command === 'serve' && mode === 'development' && vueDevTools(),
     mode === 'e2e' && mockServiceWorker(),
   ],
   resolve: { alias: { '@': fileURLToPath(new URL('./app', import.meta.url)) } },
   worker: { format: 'es' },
-  build: { target: 'es2022', sourcemap: true },
+  build: {
+    target: 'es2022',
+    sourcemap: true,
+    // Fonts stay files: inlined data: fonts would need font-src data: in the CSP (spec section 16).
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/.test(file) ? false : undefined),
+  },
 }))

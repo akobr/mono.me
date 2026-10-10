@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "vite --port 5173 --strictPort",
     "dev:mock": "vite --mode e2e --port 5174 --strictPort",
+    "dev:aspire": "vite --strictPort",
     "build": "vue-tsc --build && vite build",
     "build:e2e": "vite build --mode e2e",
     "preview": "vite preview",
@@ -19,10 +20,14 @@
     "lint": "oxlint && eslint .",
     "lint:fix": "oxlint --fix && eslint . --fix",
     "format": "prettier --write .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test --project=desktop --project=mobile",
+    "test:visual": "playwright test --project=visual",
+    "test:visual:docker": "node test/e2e/run-in-container.mjs"
   },
   "dependencies": {
     "@42for.net/2splatform.sdk": "file:../../Storyteller/sdk.typescript/src",
+    "@cfworker/json-schema": "^4.1.1",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.11.1",
     "@codemirror/lang-json": "^6.0.2",
@@ -46,7 +51,6 @@
     "@vueuse/core": "^14.4.0",
     "@workos-inc/authkit-js": "^0.20.4",
     "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1",
     "d3-force": "^3.0.0",
     "d3-quadtree": "^3.0.1",
     "d3-selection": "^3.0.0",
@@ -63,6 +67,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@faker-js/faker": "^10.6.0",
     "@iconify-json/lucide": "^1.2.142",
     "@playwright/test": "^1.64.0",

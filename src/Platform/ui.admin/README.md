@@ -26,12 +26,16 @@ After a change of the SDK, rebuild it and reinstall it here: `rm -rf node_module
 | --- | --- |
 | `dev` | Vite dev server on port 5173 against the API in `.env.development` / `.env.local` |
 | `dev:mock` | Vite in the `e2e` mode on port 5174: MSW mock API (`app/mock`) and a fake user |
+| `dev:aspire` | Vite without a fixed port; used by the Aspire host, which passes `--port 5173` |
 | `build` | `vue-tsc --build` and `vite build` → `dist/` |
 | `build:e2e` | Build with the mock API, for Playwright |
 | `typecheck` | `vue-tsc --build` |
 | `lint` / `lint:fix` | oxlint, then ESLint (Vue templates; `eslint-plugin-oxlint` turns off the rules oxlint covers) |
 | `format` | Prettier |
 | `test` | Vitest (happy-dom) |
+| `test:e2e` | Playwright flows and axe accessibility checks, desktop 1440×900 and mobile 390×844, against the e2e build |
+| `test:visual` | Playwright screenshots of key screens (both themes, both viewports); compared only in the Linux container |
+| `test:visual:docker` | Runs `test:visual` in the Playwright Docker image; `-- --update` writes new baselines |
 
 `dotnet build` builds `ui.admin.esproj` without Node. Pass `-p:BuildJavaScript=true` to run `npm install` and `npm run build` as well.
 
@@ -41,6 +45,32 @@ After a change of the SDK, rebuild it and reinstall it here: `rm -rf node_module
 
 - `?mock-scenario=new-user` starts without an account (onboarding); `?mock-scenario=invited` starts without an account but with a pending invitation; `?mock-scenario=large` puts 16,317 annotations into `acme/billing/default` (performance of the grid and the graph); `?mock-scenario=default` returns to the seeded data.
 - `window.storytellerMock.reset()` resets the data of the current scenario.
+
+### End-to-end and visual tests
+
+`npm run test:e2e` builds the app in the `e2e` mode, serves it with `vite preview` on port 4174 and runs `test/e2e/*.spec.ts`:
+
+- sign-in and onboarding;
+- grid filter, detail edit and save;
+- a schema violation saved anyway;
+- the conflict dialog;
+- a version comparison;
+- an invitation;
+- a machine with a `.pfx` download;
+- a graph node opened by mouse and by keyboard;
+- axe (WCAG 2.1 AA) on the main screens.
+
+Each test gets a fresh context, so the mock data starts from the scenario's seed. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of `npx playwright install chromium`.
+
+Fonts render differently per platform, so the visual baselines in `test/e2e/__screenshots__` come from the Playwright Linux image. `npm run test:visual:docker` (Docker required) copies the SDK and the app into the container, installs, and compares. Add `-- --update` after an intended UI change, and review the new PNGs. CI runs both suites in the same image.
+
+### Aspire
+
+`dotnet run --project src/Platform/Aspire.Host/src` starts the `ui-admin` resource:
+
+- It runs `npm run dev:aspire` on port 5173 (the WorkOS redirect URI).
+- It sets `VITE_API_BASE_URL` to the `api-functions` endpoint.
+- It does not install packages. Run `npm ci` here, and build the SDK, once before the first start.
 
 ## Configuration
 
@@ -65,6 +95,36 @@ The sign-in provider and the AuthKit client ID come from the API (`GET v1/auth/c
 - A custom authentication domain (`auth.42for.net`) for every deployed environment.
 
 The admin origin must also be in the CORS settings of the Function App.
+
+### Deployment
+
+`.github/workflows/ui-admin.yml` covers SDK and UI changes. On pull requests and on `main`, it runs these steps:
+
+- `npm ci`, and a check that the generated SDK matches the OpenAPI document;
+- lint, unit tests and the build;
+- the Playwright suites in the Playwright image.
+
+On `main` it also deploys `dist/` to Azure Static Web Apps (`skip_app_build`). The `ui-admin` GitHub environment provides:
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `UI_ADMIN_API_BASE_URL` | variable | `apiBaseUrl`; its origin goes into the CSP `connect-src` |
+| `UI_ADMIN_AUTH_API_HOSTNAME` | variable | `authApiHostname`; goes into `connect-src` and `form-action` |
+| `UI_ADMIN_ENVIRONMENT_NAME` | variable | optional `environmentName` |
+| `AZURE_STATIC_WEB_APPS_API_TOKEN_UI_ADMIN` | secret | deployment token of the Static Web App |
+
+The deploy step writes `dist/app-config.json` and replaces `__API_ORIGIN__` and `__AUTH_HOSTNAME__` in `dist/staticwebapp.config.json`. That file (from `public/`) sets the following:
+
+- the SPA navigation fallback;
+- the headers: CSP, `Referrer-Policy`, `X-Content-Type-Options`;
+- caching: `no-cache` by default, a year and `immutable` for the hashed `/assets/*`.
+
+The CSP allows no `eval`. Keep these in mind when adding code:
+
+- **Icons:** they are bundled at build time (the lucide icons used in `app/**/*.{vue,ts}`). An icon name built at runtime from parts is not found, and it would be fetched from the Iconify API, which the CSP blocks.
+- **Fonts:** they are never inlined as `data:` URLs.
+- **Validation:** JSON Schema validation uses `@cfworker/json-schema`, which interprets schemas, instead of Ajv, which generates code with `new Function`.
+- **Zod:** it runs `jitless`.
 
 ## Architecture
 
