@@ -146,7 +146,7 @@ public class InvitationsHttp
     [OpenApiOperation(Definitions.RouteIds.Access.GetMyInvitations, Definitions.Tags.Access, Description = "Pending invitations for the email of the signed-in user. Works before the account exists.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<Invitation>), Description = "Pending, unexpired invitations; empty when the token has no email.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<Invitation>), Description = "Pending, unexpired invitations; empty when the token has no verified email.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetMyInvitations(
@@ -154,7 +154,8 @@ public class InvitationsHttp
         HttpRequestData request)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var email = request.GetClaim(EmailClaimTypes);
+        // An unverified email is treated as absent, the same rule as accepting or declining.
+        var email = IsEmailVerified(request, _authOptions) ? request.GetClaim(EmailClaimTypes) : null;
         IReadOnlyList<Invitation> invitations = email is null
             ? []
             : await _invitations.GetPendingInvitationsAsync(email);

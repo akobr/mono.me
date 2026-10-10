@@ -264,6 +264,14 @@ public class CosmosInvitationServiceTests(Startup startup)
         resent.ExternalInvitationId.Should().NotBe(invitation.ExternalInvitationId);
         _sender.Revoked.Should().Equal(invitation.ExternalInvitationId);
         _sender.Sent.Should().HaveCount(2);
+        _sender.SentInvitations[^1].CreatedAt.Should().Be(_clock.Now);
+
+        _clock.Now = _clock.Now.AddDays(2);
+        var resentAgain = await Invitations.ResendInvitationAsync(pointKey, invitation.Id, OwnerId);
+
+        resentAgain.ExpiresAt.Should().Be(_clock.Now.AddDays(3));
+        _sender.Sent.Should().HaveCount(3);
+        (_sender.SentInvitations[^1].ExpiresAt - _sender.SentInvitations[^1].CreatedAt).Should().Be(TimeSpan.FromDays(3));
     }
 
     [Fact]
@@ -336,6 +344,8 @@ public class CosmosInvitationServiceTests(Startup startup)
     {
         public List<(string Email, string ExternalId)> Sent { get; } = [];
 
+        public List<Invitation> SentInvitations { get; } = [];
+
         public List<string> Revoked { get; } = [];
 
         public Exception? Failure { get; set; }
@@ -349,6 +359,7 @@ public class CosmosInvitationServiceTests(Startup startup)
 
             var externalId = $"invitation_{Guid.NewGuid():N}";
             Sent.Add((invitation.Email, externalId));
+            SentInvitations.Add(invitation);
             return Task.FromResult<string?>(externalId);
         }
 

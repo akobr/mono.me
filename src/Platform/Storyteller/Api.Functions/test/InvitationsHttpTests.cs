@@ -84,6 +84,23 @@ public class InvitationsHttpTests
     }
 
     [Fact]
+    public async Task Mine_WithUnverifiedEmail_ReturnsEmptyWithoutQuerying()
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+
+        var result = await http.GetMyInvitations(Request(
+        [
+            new("sub", "user_01"),
+            new("email", "ada@example.com"),
+            new("email_verified", "false"),
+        ]));
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IReadOnlyList<Invitation>>()!.ShouldBeEmpty();
+        service.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Create_ServiceRejectsInput_ReturnsBadRequest()
     {
         var service = new RecordingInvitations { CreateError = new ArgumentException("'x' is not a valid email address.") };

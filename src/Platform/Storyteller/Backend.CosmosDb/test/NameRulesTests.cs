@@ -31,6 +31,7 @@ public class NameRulesTests
     [InlineData("-acme")]
     [InlineData("acme_billing")]
     [InlineData("acme billing")]
+    [InlineData("acme\n")]
     [InlineData("ěščř")]
     public void InvalidNames_ThrowInvalidName(string? name)
     {
@@ -74,6 +75,6 @@ public class NameRulesTests
         FluentActions.Invoking(() => NameRules.EnsureProjectName("orgs")).Should().NotThrow();
         FluentActions.Invoking(() => NameRules.EnsureOrganizationName("views")).Should().NotThrow();
         string.Join(',', NameRules.ReservedOrganizationNames).Should().NotBeNullOrEmpty();
-        StringComparer.Ordinal.Equals(NameRules.Pattern, "^[a-z0-9][a-z0-9-]{1,62}$").Should().BeTrue();
+        StringComparer.Ordinal.Equals(NameRules.Pattern, @"^[a-z0-9][a-z0-9-]{1,62}\z").Should().BeTrue();
     }
 }

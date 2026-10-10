@@ -102,6 +102,7 @@ public class CosmosInvitationService : IInvitationService
             InvitedByName = actorName,
             CreatedAt = now,
             ExpiresAt = now.AddDays(days),
+            ValidityDays = days,
         };
 
         var externalId = await TrySendAsync(entity.ToInvitation(now));
@@ -128,11 +129,14 @@ public class CosmosInvitationService : IInvitationService
 
         // WorkOS only resends pending invitations with their old expiry, so the old one is revoked and a new one sent.
         var now = Now;
-        var days = Math.Clamp((int)Math.Ceiling((entity.ExpiresAt - entity.CreatedAt).TotalDays), 1, _options.MaxExpiresInDays);
-        var renewed = entity with { ExpiresAt = now.AddDays(days) };
+        var days = entity.ValidityDays
+            ?? Math.Clamp((int)Math.Ceiling((entity.ExpiresAt - entity.CreatedAt).TotalDays), 1, _options.MaxExpiresInDays);
+        var renewed = entity with { ValidityDays = days, ExpiresAt = now.AddDays(days) };
 
         await TryRevokeExternalAsync(entity.ExternalInvitationId);
-        var externalId = await TrySendAsync(renewed.ToInvitation(now));
+
+        // The sender derives the validity from CreatedAt and ExpiresAt, so it sees the restarted period.
+        var externalId = await TrySendAsync(renewed.ToInvitation(now) with { CreatedAt = now });
         renewed = renewed with { ExternalInvitationId = externalId, IsEmailSent = externalId is not null };
 
         await ReplaceAsync(renewed, eTag);
@@ -177,16 +181,15 @@ public class CosmosInvitationService : IInvitationService
         if (entity.Status == InvitationStatus.Accepted
             && string.Equals(entity.AcceptedById, invitee.AccountId, StringComparison.Ordinal))
         {
-            // Accepting twice is harmless: the first acceptance already granted the role.
+            // Accepting twice is harmless; joining again repairs a first acceptance that failed after the claim.
+            await _accessService.JoinAccessPointAsync(entity.AccessPointKey, invitee.AccountId, entity.Role);
             return await GetAccountAsync(invitee.AccountId);
         }
 
         EnsurePending(entity, allowExpired: false);
         await EnsureAccountAsync(invitee, entity.Email);
 
-        // The role was authorized when the invitation was created, so the inviter's current role is not checked again.
-        await _accessService.JoinAccessPointAsync(entity.AccessPointKey, invitee.AccountId, entity.Role);
-
+        // The invitation is claimed first, so a concurrent revoke or decline that wins the ETag grants nothing.
         var accepted = entity with
         {
             Status = InvitationStatus.Accepted,
@@ -194,6 +197,9 @@ public class CosmosInvitationService : IInvitationService
             RespondedAt = Now,
         };
         await ReplaceAsync(accepted, eTag);
+
+        // The role was authorized when the invitation was created, so the inviter's current role is not checked again.
+        await _accessService.JoinAccessPointAsync(entity.AccessPointKey, invitee.AccountId, entity.Role);
         return await GetAccountAsync(invitee.AccountId);
     }
 

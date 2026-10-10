@@ -6,7 +6,7 @@ An organization role does not grant access to the organization's projects. Each 
 
 ## Names
 
-New organizations, projects, and views follow one rule: 2 to 63 characters from `a-z`, `0-9`, and `-`, starting with a letter or a digit (`^[a-z0-9][a-z0-9-]{1,62}$`). Names become route segments, container names (`org.{organization}`), and parts of keys, where `.` separates the segments, so upper case and dots are not allowed. Some words are reserved because the API or the admin UI uses them in addresses:
+New organizations, projects, and views follow one rule: 2 to 63 characters from `a-z`, `0-9`, and `-`, starting with a letter or a digit (`^[a-z0-9][a-z0-9-]{1,62}\z`). Names become route segments, container names (`org.{organization}`), and parts of keys, where `.` separates the segments, so upper case and dots are not allowed. Some words are reserved because the API or the admin UI uses them in addresses:
 
 | Kind | Reserved |
 | --- | --- |
@@ -63,7 +63,7 @@ An invitation offers a role on an access point to an email address. It is a Stor
 | POST | `v1/access/points/{key}/invitations` | Administrator (Owner to offer `Owner`): `{ "Email", "Role", "ExpiresInDays" }` |
 | POST | `v1/access/points/{key}/invitations/{id}/resend` | Administrator: sends the email again and restarts the validity |
 | DELETE | `v1/access/points/{key}/invitations/{id}` | Administrator: revokes a pending invitation |
-| GET | `v1/access/invitations/mine` | Any signed-in user: pending invitations for the email in the token |
+| GET | `v1/access/invitations/mine` | Any signed-in user: pending invitations for the verified email in the token |
 | POST | `v1/access/invitations/{id}/accept` | The invitee: joins with the offered role |
 | POST | `v1/access/invitations/{id}/decline` | The invitee |
 
