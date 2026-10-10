@@ -54,6 +54,7 @@ const viewItems = computed<DropdownMenuItem[][]>(() => {
       to: viewTarget(route.path, context.org!, context.project!, name),
       active: name === context.view,
     })),
+    [{ label: 'Manage views', icon: 'i-lucide-settings-2', to: `/${context.org}/${context.project}/views` }],
   ]
 })
 </script>

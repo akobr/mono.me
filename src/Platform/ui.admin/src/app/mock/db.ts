@@ -1,4 +1,13 @@
-import type { AccessPoint, Account, AccountRole, Annotation, View } from '@42for.net/2splatform.sdk'
+import type {
+  AccessPoint,
+  Account,
+  AccountRole,
+  Annotation,
+  Invitation,
+  MachineAccess,
+  SharedCertificate,
+  View,
+} from '@42for.net/2splatform.sdk'
 import { generateAnnotations, type ScopeSeed } from './annotations'
 
 // In-memory data of the mock API (vite --mode e2e). It is kept in sessionStorage, so it survives the full-page
@@ -28,15 +37,27 @@ export interface MockDb {
   annotations: Record<string, AnnotationOverrides>
   /** Changed versioned documents (configurations, templates, schemas) per scope; null marks a deletion. */
   documents?: Record<string, Record<string, { versions: unknown[] } | null>>
+  invitations?: Invitation[]
+  /** Machines per project key. */
+  machines?: Record<string, MachineAccess[]>
+  /** Shared certificates per project key. */
+  certificates?: Record<string, SharedCertificate[]>
 }
 
-export type MockScenario = 'default' | 'new-user' | 'large'
+export type MockScenario = 'default' | 'new-user' | 'invited' | 'large'
 
-const scenarios: MockScenario[] = ['default', 'new-user', 'large']
+const scenarios: MockScenario[] = ['default', 'new-user', 'invited', 'large']
 const storageKey = '2s-admin:mock-db'
 const scenarioKey = '2s-admin:mock-scenario'
 
 export const mockUser: MockUser = { id: 'user_01MOCKADA', name: 'Ada Lovelace', email: 'ada@example.com' }
+
+/** Accounts of the mock data, for member names. */
+export const mockDirectory: Record<string, { name: string; email: string }> = {
+  user_01MOCKADA: { name: 'Ada Lovelace', email: 'ada@example.com' },
+  user_01MOCKGRACE: { name: 'Grace Hopper', email: 'grace@example.com' },
+  user_01MOCKALAN: { name: 'Alan Turing', email: 'alan@example.com' },
+}
 
 const now = () => new Date().toISOString()
 
@@ -61,8 +82,38 @@ export function scopeSeed(scenario: MockScenario, org: string, project: string, 
 }
 
 export function createSeed(scenario: MockScenario): MockDb {
-  if (scenario === 'new-user') {
-    return { scenario, user: mockUser, account: null, accessPoints: {}, views: {}, annotations: {} }
+  if (scenario === 'new-user' || scenario === 'invited') {
+    const seed = createSeed('default')
+    // The same organizations exist, but the user is a member of none of them.
+    const accessPoints = Object.fromEntries(
+      Object.entries(seed.accessPoints).map(([key, point]) => {
+        const { [mockUser.id]: _removed, ...members } = point.AccessMap ?? {}
+        return [key, { ...point, AccessMap: members }]
+      }),
+    )
+    return {
+      ...seed,
+      scenario,
+      account: null,
+      accessPoints,
+      invitations:
+        scenario === 'invited'
+          ? [
+              {
+                Id: 'inv_01MOCKBILLING',
+                AccessPointKey: 'acme.billing',
+                Email: mockUser.email,
+                Role: 'Contributor',
+                Status: 'Pending',
+                InvitedById: 'user_01MOCKGRACE',
+                InvitedByName: 'Grace Hopper',
+                CreatedAt: now(),
+                ExpiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+                IsEmailSent: true,
+              },
+            ]
+          : [],
+    }
   }
 
   const id = mockUser.id
@@ -109,6 +160,51 @@ export function createSeed(scenario: MockScenario): MockDb {
       ],
     },
     annotations: {},
+    invitations: [
+      {
+        Id: 'inv_01MOCKKATHERINE',
+        AccessPointKey: 'acme.billing',
+        Email: 'katherine@example.com',
+        Role: 'Reader',
+        Status: 'Pending',
+        InvitedById: id,
+        InvitedByName: mockUser.name,
+        CreatedAt: now(),
+        ExpiresAt: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+        IsEmailSent: true,
+      },
+    ],
+    machines: {
+      'acme.billing': [
+        {
+          Id: 'mach-invoicing-worker',
+          ObjectId: 'obj_01',
+          Scope: 'DefaultRead',
+          CredentialKind: 'ApiKey',
+          LastRenewalAt: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+        },
+        {
+          Id: 'mach-billing-sync',
+          ObjectId: 'obj_02',
+          Scope: 'ConfigurationReadWrite',
+          AnnotationKey: 'exe.northwind.invoicing.prod',
+          CredentialKind: 'Certificate',
+          CertificateThumbprint: 'A1B2C3D4E5F60718293A4B5C6D7E8F9012345678',
+          LastRenewalAt: new Date(Date.now() - 70 * 86_400_000).toISOString(),
+        },
+      ],
+    },
+    certificates: {
+      'acme.billing': [
+        {
+          Thumbprint: '9F8E7D6C5B4A39281706F5E4D3C2B1A098765432',
+          Label: 'ci-pipeline',
+          NotBefore: new Date(Date.now() - 340 * 86_400_000).toISOString(),
+          NotAfter: new Date(Date.now() + 25 * 86_400_000).toISOString(),
+          IsRevoked: false,
+        },
+      ],
+    },
   }
 }
 

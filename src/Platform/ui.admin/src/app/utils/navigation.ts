@@ -55,11 +55,30 @@ export function buildNavigation(
     })
   }
 
+  if (org && project) {
+    const base = `/${org}/${project}`
+    sections.push({
+      id: 'project',
+      label: 'Project',
+      entries: [
+        { label: 'Views', icon: 'i-lucide-eye', to: `${base}/views` },
+        { label: 'Members', icon: 'i-lucide-users', to: `${base}/members`, minRole: 'Administrator' },
+        { label: 'Invitations', icon: 'i-lucide-mail', to: `${base}/invitations`, minRole: 'Administrator' },
+        { label: 'Machines', icon: 'i-lucide-cpu', to: `${base}/machines`, minRole: 'Contributor' },
+        { label: 'Certificates', icon: 'i-lucide-shield-check', to: `${base}/certificates`, minRole: 'Administrator' },
+        { label: 'Settings', icon: 'i-lucide-settings', to: `${base}/settings` },
+      ],
+    })
+  }
+
   if (org) {
     sections.push({
       id: 'org',
       label: 'Organization',
-      entries: [{ label: 'Overview', icon: 'i-lucide-building-2', to: `/${org}`, exact: true }],
+      entries: [
+        { label: 'Overview', icon: 'i-lucide-building-2', to: `/${org}`, exact: true },
+        { label: 'Members', icon: 'i-lucide-users', to: `/${org}/members`, minRole: 'Administrator' },
+      ],
     })
   }
 

@@ -6,7 +6,7 @@ import { useSessionStore } from '@/stores/session'
  * Spec section 3:
  * - without a working auth configuration every route shows /unsupported;
  * - public routes pass; a signed-out user is sent to AuthKit with the target as returnTo;
- * - the account is loaded once; a user without one goes to onboarding.
+ * - the account is loaded once; a user without one goes to their pending invitations, or to onboarding.
  */
 export async function authGuard(to: RouteLocationNormalized): Promise<boolean | RouteLocationRaw> {
   const boot = useBootState().value
@@ -30,7 +30,11 @@ export async function authGuard(to: RouteLocationNormalized): Promise<boolean | 
   await session.loadAccount()
 
   if (session.accountStatus === 'missing') {
-    return to.meta.allowWithoutAccount ? true : { path: '/onboarding', replace: true }
+    if (to.meta.allowWithoutAccount) {
+      return true
+    }
+    // Invited users accept first; everyone else creates an organization.
+    return { path: (await session.hasPendingInvitations()) ? '/invitations' : '/onboarding', replace: true }
   }
 
   if (session.accountStatus === 'ready' && to.path === '/onboarding') {

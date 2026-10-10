@@ -210,6 +210,62 @@ declare module 'vue-router/auto-routes' {
       { org: ParamValue<false>, project: ParamValue<false>, type: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
+    '/[org]/[project]/certificates': RouteRecordInfo<
+      '/[org]/[project]/certificates',
+      '/:org/:project/certificates',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/invitations': RouteRecordInfo<
+      '/[org]/[project]/invitations',
+      '/:org/:project/invitations',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/machines': RouteRecordInfo<
+      '/[org]/[project]/machines',
+      '/:org/:project/machines',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | '/[org]/[project]/machines/[id]'
+    >,
+    '/[org]/[project]/machines/[id]': RouteRecordInfo<
+      '/[org]/[project]/machines/[id]',
+      '/:org/:project/machines/:id',
+      { id: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true> },
+      { id: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/members': RouteRecordInfo<
+      '/[org]/[project]/members',
+      '/:org/:project/members',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/settings': RouteRecordInfo<
+      '/[org]/[project]/settings',
+      '/:org/:project/settings',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/views': RouteRecordInfo<
+      '/[org]/[project]/views',
+      '/:org/:project/views',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
+    '/[org]/members': RouteRecordInfo<
+      '/[org]/members',
+      '/:org/members',
+      { org: ParamValue<true> },
+      { org: ParamValue<false> },
+      | never
+    >,
     '/[...path]': RouteRecordInfo<
       '/[...path]',
       '/:path(.*)',
@@ -227,6 +283,20 @@ declare module 'vue-router/auto-routes' {
     '/callback': RouteRecordInfo<
       '/callback',
       '/callback',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/invitations/': RouteRecordInfo<
+      '/invitations/',
+      '/invitations',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/invitations/accept': RouteRecordInfo<
+      '/invitations/accept',
+      '/invitations/accept',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -480,6 +550,71 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | 'type'
     }
+    'app/pages/[org]/[project]/certificates.vue': {
+      routes:
+        | '/[org]/[project]/certificates'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/invitations.vue': {
+      routes:
+        | '/[org]/[project]/invitations'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/machines.vue': {
+      routes:
+        | '/[org]/[project]/machines'
+        | '/[org]/[project]/machines/[id]'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/machines/[id].vue': {
+      routes:
+        | '/[org]/[project]/machines/[id]'
+      views:
+        | never
+      pathParamNames:
+        | 'id'
+    }
+    'app/pages/[org]/[project]/members.vue': {
+      routes:
+        | '/[org]/[project]/members'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/settings.vue': {
+      routes:
+        | '/[org]/[project]/settings'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/views.vue': {
+      routes:
+        | '/[org]/[project]/views'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/members.vue': {
+      routes:
+        | '/[org]/members'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
     'app/pages/[...path].vue': {
       routes:
         | '/[...path]'
@@ -499,6 +634,22 @@ declare module 'vue-router/auto-routes' {
     'app/pages/callback.vue': {
       routes:
         | '/callback'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/invitations/index.vue': {
+      routes:
+        | '/invitations/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/invitations/accept.vue': {
+      routes:
+        | '/invitations/accept'
       views:
         | never
       pathParamNames:
