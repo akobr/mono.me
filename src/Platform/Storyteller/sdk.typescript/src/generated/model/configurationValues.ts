@@ -6,4 +6,4 @@
  * OpenAPI spec version: 0.8.91.29486
  */
 
-export type ConfigurationValues = { [key: string]: { [key: string]: unknown } };
+export type ConfigurationValues = { [key: string]: unknown };

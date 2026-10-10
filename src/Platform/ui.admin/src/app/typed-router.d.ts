@@ -57,6 +57,21 @@ declare module 'vue-router/auto-routes' {
       '/:org/:project/:view/annotations',
       { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
       { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/annotations/[key]'
+      | '/[org]/[project]/[view]/annotations/[key]/'
+    >,
+    '/[org]/[project]/[view]/annotations/[key]': RouteRecordInfo<
+      '/[org]/[project]/[view]/annotations/[key]',
+      '/:org/:project/:view/annotations/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/annotations/[key]/'
+    >,
+    '/[org]/[project]/[view]/annotations/[key]/': RouteRecordInfo<
+      '/[org]/[project]/[view]/annotations/[key]/',
+      '/:org/:project/:view/annotations/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
     '/[...path]': RouteRecordInfo<
@@ -148,6 +163,25 @@ declare module 'vue-router/auto-routes' {
     'app/pages/[org]/[project]/[view]/annotations.vue': {
       routes:
         | '/[org]/[project]/[view]/annotations'
+        | '/[org]/[project]/[view]/annotations/[key]'
+        | '/[org]/[project]/[view]/annotations/[key]/'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/annotations/[key].vue': {
+      routes:
+        | '/[org]/[project]/[view]/annotations/[key]'
+        | '/[org]/[project]/[view]/annotations/[key]/'
+      views:
+        | 'default'
+      pathParamNames:
+        | 'key'
+    }
+    'app/pages/[org]/[project]/[view]/annotations/[key]/index.vue': {
+      routes:
+        | '/[org]/[project]/[view]/annotations/[key]/'
       views:
         | never
       pathParamNames:

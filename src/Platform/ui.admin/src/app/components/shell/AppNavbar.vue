@@ -24,7 +24,7 @@ const { toggle } = useSidebar()
     </template>
 
     <template #title>
-      <span :class="context.org ? 'hidden md:inline' : ''">{{ title }}</span>
+      <span :class="context.org ? 'hidden 2xl:inline' : ''">{{ title }}</span>
     </template>
 
     <template #right>

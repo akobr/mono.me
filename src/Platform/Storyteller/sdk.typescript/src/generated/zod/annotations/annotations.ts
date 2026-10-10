@@ -49,7 +49,7 @@ export const GetAnnotationsResponse = zod.object({
         Description: zod.string().optional(),
         DocumentationLink: zod.string().optional(),
         Labels: zod.array(zod.string()).optional(),
-        Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+        Values: zod.record(zod.string(), zod.unknown()).optional(),
       }),
     )
     .optional(),
@@ -89,7 +89,7 @@ export const SetAnnotationsBodyItem = zod.object({
   Description: zod.string().optional(),
   DocumentationLink: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 export const SetAnnotationsBody = zod.array(SetAnnotationsBodyItem);
 
@@ -128,7 +128,7 @@ export const GetAnnotationResponse = zod.object({
   Description: zod.string().optional(),
   DocumentationLink: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 export const SetAnnotationParams = zod.object({
@@ -164,7 +164,7 @@ export const SetAnnotationBody = zod.object({
   Description: zod.string().optional(),
   DocumentationLink: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 export const setAnnotationResponseAnnotationTypeDefault = `Responsibility`;
@@ -193,7 +193,7 @@ export const SetAnnotationResponse = zod.object({
   Description: zod.string().optional(),
   DocumentationLink: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 export const DeleteAnnotationParams = zod.object({
@@ -253,7 +253,7 @@ export const GetDescendantsResponse = zod.object({
         Description: zod.string().optional(),
         DocumentationLink: zod.string().optional(),
         Labels: zod.array(zod.string()).optional(),
-        Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+        Values: zod.record(zod.string(), zod.unknown()).optional(),
       }),
     )
     .optional(),
@@ -293,7 +293,7 @@ export const SetAnnotationsSimpleBodyItem = zod.object({
   Description: zod.string().optional(),
   DocumentationLink: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 export const SetAnnotationsSimpleBody = zod.array(SetAnnotationsSimpleBodyItem);
 
@@ -348,7 +348,7 @@ export const GetResponsibilitiesResponse = zod.object({
           Description: zod.string().optional(),
           DocumentationLink: zod.string().optional(),
           Labels: zod.array(zod.string()).optional(),
-          Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+          Values: zod.record(zod.string(), zod.unknown()).optional(),
         })
         .and(
           zod.object({
@@ -415,7 +415,7 @@ export const GetSubjectsResponse = zod.object({
           Description: zod.string().optional(),
           DocumentationLink: zod.string().optional(),
           Labels: zod.array(zod.string()).optional(),
-          Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+          Values: zod.record(zod.string(), zod.unknown()).optional(),
         })
         .and(
           zod.object({
@@ -485,7 +485,7 @@ export const GetUsagesResponse = zod.object({
           Description: zod.string().optional(),
           DocumentationLink: zod.string().optional(),
           Labels: zod.array(zod.string()).optional(),
-          Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+          Values: zod.record(zod.string(), zod.unknown()).optional(),
         })
         .and(
           zod.object({
@@ -560,7 +560,7 @@ export const GetContextsResponse = zod.object({
           Description: zod.string().optional(),
           DocumentationLink: zod.string().optional(),
           Labels: zod.array(zod.string()).optional(),
-          Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+          Values: zod.record(zod.string(), zod.unknown()).optional(),
         })
         .and(
           zod.object({
@@ -637,7 +637,7 @@ export const GetExecutionsResponse = zod.object({
           Description: zod.string().optional(),
           DocumentationLink: zod.string().optional(),
           Labels: zod.array(zod.string()).optional(),
-          Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+          Values: zod.record(zod.string(), zod.unknown()).optional(),
         })
         .and(
           zod.object({
@@ -709,7 +709,7 @@ export const GetUnitsResponse = zod.object({
           Description: zod.string().optional(),
           DocumentationLink: zod.string().optional(),
           Labels: zod.array(zod.string()).optional(),
-          Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+          Values: zod.record(zod.string(), zod.unknown()).optional(),
         })
         .and(
           zod.object({
@@ -793,7 +793,7 @@ export const GetUnitsOfExecutionResponse = zod.object({
           Description: zod.string().optional(),
           DocumentationLink: zod.string().optional(),
           Labels: zod.array(zod.string()).optional(),
-          Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+          Values: zod.record(zod.string(), zod.unknown()).optional(),
         })
         .and(
           zod.object({

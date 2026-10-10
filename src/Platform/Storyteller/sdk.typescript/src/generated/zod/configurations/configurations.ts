@@ -79,7 +79,7 @@ export const GetConfigurationResponse = zod.object({
   Author: zod.string().optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 export const SetConfigurationParams = zod.object({
@@ -107,7 +107,7 @@ export const SetConfigurationResponse = zod.object({
   Author: zod.string().optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 export const PatchConfigurationParams = zod.object({
@@ -153,7 +153,7 @@ export const PatchConfigurationResponse = zod.object({
   Author: zod.string().optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 export const DeleteConfigurationParams = zod.object({
@@ -179,7 +179,7 @@ export const GetResolvedConfigurationResponse = zod.object({
   Author: zod.string().optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 export const GetConfigurationVersionsParams = zod.object({
@@ -214,7 +214,7 @@ export const GetConfigurationVersionResponse = zod.object({
   Author: zod.string().optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
-  Values: zod.record(zod.string(), zod.looseObject({})).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
 });
 
 export const GetConfigurationVersionDiffParams = zod.object({

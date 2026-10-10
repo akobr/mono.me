@@ -9,17 +9,25 @@
 export {}
 declare global {
   const capabilityRoles: typeof import('./composables/useRole').capabilityRoles
+  const chunk: typeof import('./composables/useAnnotationActions').chunk
   const defaultPreferences: typeof import('./stores/preferences').defaultPreferences
   const defineLocale: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineLocale').defineLocale
   const defineShortcuts: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts').defineShortcuts
   const extendLocale: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineLocale').extendLocale
   const extractShortcuts: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts').extractShortcuts
+  const hasUnsavedChanges: typeof import('./composables/useUnsavedChanges').hasUnsavedChanges
   const onSignOut: typeof import('./stores/session').onSignOut
+  const runLimited: typeof import('./composables/useAnnotationActions').runLimited
   const shortcutGroups: typeof import('./composables/useShortcutsHelp').shortcutGroups
+  const useAnnotationActions: typeof import('./composables/useAnnotationActions').useAnnotationActions
+  const useAnnotationCreate: typeof import('./composables/useAnnotationCreate').useAnnotationCreate
+  const useAnnotationFilter: typeof import('./composables/useAnnotationFilter').useAnnotationFilter
   const useAppConfig: typeof import('../node_modules/@nuxt/ui/dist/runtime/vue/composables/useAppConfig.js').useAppConfig
   const useAppContext: typeof import('./composables/useAppContext').useAppContext
   const useAuth: typeof import('./composables/useAuth').useAuth
   const useCan: typeof import('./composables/useRole').useCan
+  const useCatalogStore: typeof import('./stores/catalog').useCatalogStore
+  const useConfirm: typeof import('./composables/useConfirm').useConfirm
   const useContentSearch: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useContentSearch').useContentSearch
   const useContextStore: typeof import('./stores/context').useContextStore
   const useFileUpload: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFileUpload').useFileUpload
@@ -37,15 +45,25 @@ declare global {
   const useSidebar: typeof import('./composables/useSidebar').useSidebar
   const useToast: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useToast').useToast
   const useTour: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useTour').useTour
+  const useUnsavedChanges: typeof import('./composables/useUnsavedChanges').useUnsavedChanges
 }
 // for type re-export
 declare global {
+  // @ts-ignore
+  export type { ListMode } from './composables/useAnnotationFilter'
+  import('./composables/useAnnotationFilter')
+  // @ts-ignore
+  export type { ConfirmOptions } from './composables/useConfirm'
+  import('./composables/useConfirm')
   // @ts-ignore
   export type { Capability, RoleScope } from './composables/useRole'
   import('./composables/useRole')
   // @ts-ignore
   export type { ShortcutGroup } from './composables/useShortcutsHelp'
   import('./composables/useShortcutsHelp')
+  // @ts-ignore
+  export type { CatalogStatus } from './stores/catalog'
+  import('./stores/catalog')
   // @ts-ignore
   export type { Scope, ContextAccess } from './stores/context'
   import('./stores/context')

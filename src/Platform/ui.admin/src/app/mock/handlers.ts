@@ -204,5 +204,3 @@ export const viewHandlers: HttpHandler[] = [
     }),
   ),
 ]
-
-export const mockHandlers: HttpHandler[] = [...accessHandlers, ...viewHandlers]
