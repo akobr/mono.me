@@ -181,8 +181,18 @@ public class CosmosInvitationService : IInvitationService
         if (entity.Status == InvitationStatus.Accepted
             && string.Equals(entity.AcceptedById, invitee.AccountId, StringComparison.Ordinal))
         {
-            // Accepting twice is harmless; joining again repairs a first acceptance that failed after the claim.
-            await _accessService.JoinAccessPointAsync(entity.AccessPointKey, invitee.AccountId, entity.Role);
+            // Accepting twice is harmless and never restores a membership removed or lowered since;
+            // only a first acceptance that failed between the claim and the join is completed, while still valid.
+            if (entity.IsJoinPending)
+            {
+                if (entity.ExpiresAt <= Now)
+                {
+                    throw new ConflictException("The invitation has expired, ask for a new one.", ErrorCodes.InvitationExpired);
+                }
+
+                await JoinAsync(entity, invitee.AccountId, eTag);
+            }
+
             return await GetAccountAsync(invitee.AccountId);
         }
 
@@ -195,11 +205,11 @@ public class CosmosInvitationService : IInvitationService
             Status = InvitationStatus.Accepted,
             AcceptedById = invitee.AccountId,
             RespondedAt = Now,
+            IsJoinPending = true,
         };
-        await ReplaceAsync(accepted, eTag);
+        var acceptedETag = await ReplaceAsync(accepted, eTag);
 
-        // The role was authorized when the invitation was created, so the inviter's current role is not checked again.
-        await _accessService.JoinAccessPointAsync(entity.AccessPointKey, invitee.AccountId, entity.Role);
+        await JoinAsync(accepted, invitee.AccountId, acceptedETag);
         return await GetAccountAsync(invitee.AccountId);
     }
 
@@ -317,15 +327,32 @@ public class CosmosInvitationService : IInvitationService
             : throw new NotFoundException($"The invitation '{invitationId}' doesn't exist in '{accessPointKey}'.");
     }
 
-    private async Task ReplaceAsync(InvitationEntity entity, string? eTag)
+    // The role was authorized when the invitation was created, so the inviter's current role is not checked again.
+    private async Task JoinAsync(InvitationEntity accepted, string accountId, string? eTag)
+    {
+        await _accessService.JoinAccessPointAsync(accepted.AccessPointKey, accountId, accepted.Role);
+
+        try
+        {
+            await ReplaceAsync(accepted with { IsJoinPending = false }, eTag);
+        }
+        catch (ConflictException exception)
+        {
+            // A parallel accept of the same user completed it; at worst a later accept joins once more.
+            _logger.LogWarning(exception, "Completing the accepted invitation {InvitationId} failed.", accepted.InvitationId);
+        }
+    }
+
+    private async Task<string?> ReplaceAsync(InvitationEntity entity, string? eTag)
     {
         try
         {
-            await Container.ReplaceItemAsync(
+            var response = await Container.ReplaceItemAsync(
                 entity,
                 entity.Id,
                 new PartitionKey(MainPartitionKey),
                 new ItemRequestOptions { IfMatchEtag = eTag });
+            return response.ETag;
         }
         catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.PreconditionFailed)
         {

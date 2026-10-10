@@ -39,6 +39,9 @@ public record class InvitationEntity
 
     public string? AcceptedById { get; init; }
 
+    // Set when the invitation is claimed and cleared once the role is granted; only then may a repeated accept join again.
+    public bool IsJoinPending { get; init; }
+
     public DateTimeOffset? RespondedAt { get; init; }
 
     public string? ExternalInvitationId { get; init; }
