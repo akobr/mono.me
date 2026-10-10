@@ -23,19 +23,19 @@ export function formatRelative(date: Date, now: Date = new Date()): string {
 
 /** Date and time in the given IANA zone (or the browser's), with the zone name. */
 export function formatDateTime(date: Date, timeZone?: string): string {
+  // dateStyle/timeStyle cannot be combined with timeZoneName, so the fields are listed one by one.
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  }
   try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZone,
-      timeZoneName: 'short',
-    }).format(date)
+    return new Intl.DateTimeFormat(undefined, { ...options, timeZone }).format(date)
   } catch {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-      timeZoneName: 'short',
-    }).format(date)
+    return new Intl.DateTimeFormat(undefined, options).format(date)
   }
 }
 

@@ -134,6 +134,7 @@ defineShortcuts({
   '[': () => sidebar.toggleFor(preferences.sidebarPinned),
   'g-o': () => go('/orgs'),
   'g-a': () => go(viewBase.value && `${viewBase.value}/annotations`),
+  'g-c': () => go(viewBase.value && `${viewBase.value}/configurations`),
 })
 </script>
 

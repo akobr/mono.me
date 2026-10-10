@@ -26,6 +26,8 @@ export interface MockDb {
   views: Record<string, View[]>
   /** Changed annotations per scope ("org/project/view"). */
   annotations: Record<string, AnnotationOverrides>
+  /** Changed versioned documents (configurations, templates, schemas) per scope; null marks a deletion. */
+  documents?: Record<string, Record<string, { versions: unknown[] } | null>>
 }
 
 export type MockScenario = 'default' | 'new-user' | 'large'

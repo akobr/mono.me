@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useClipboard, useNow } from '@vueuse/core'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import type { Annotation } from '@42for.net/2splatform.sdk'
+import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { annotationStatus } from '@/utils/annotation-status'
 import { errorMessage } from '@/utils/errors'
@@ -16,6 +17,7 @@ const emit = defineEmits<{ close: [] }>()
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
+const catalog = useCatalogStore()
 const actions = useAnnotationActions()
 const canEdit = useCan('edit')
 const toast = useToast()
@@ -31,11 +33,36 @@ const perspective = computed<TreePerspective>(() =>
 )
 const status = computed(() => (props.annotation ? annotationStatus(props.annotation, now.value.getTime()) : undefined))
 
+const configurationVersion = computed(() => catalog.configurations?.get(props.annotationKey)?.Version)
+const tabQuery = computed(() => ({ ...route.query, cfg: undefined, v: undefined, from: undefined }))
+
 const tabs = computed(() => [
-  { label: 'Annotation', icon: 'i-lucide-tag', to: { path: base.value, query: route.query }, exact: true },
+  { label: 'Annotation', icon: 'i-lucide-tag', to: { path: base.value, query: tabQuery.value }, exact: true },
+  {
+    label: 'Configuration',
+    icon: 'i-lucide-settings-2',
+    to: { path: `${base.value}/configuration`, query: tabQuery.value },
+    badge: configurationVersion.value
+      ? {
+          label: `v${configurationVersion.value}`,
+          size: 'sm' as const,
+          color: 'neutral' as const,
+          variant: 'outline' as const,
+        }
+      : undefined,
+  },
+  { label: 'Versions', icon: 'i-lucide-history', to: { path: `${base.value}/versions`, query: tabQuery.value } },
+  { label: 'Schema', icon: 'i-lucide-braces', to: { path: `${base.value}/schema`, query: tabQuery.value } },
 ])
 
 const menu = computed<DropdownMenuItem[][]>(() => [
+  [
+    {
+      label: 'Open configuration',
+      icon: 'i-lucide-settings-2',
+      to: `/${context.org}/${context.project}/${context.view}/configurations/${props.annotationKey}`,
+    },
+  ],
   [
     {
       label: 'Copy link',

@@ -1,6 +1,11 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc", "vue"],
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "vue"
+  ],
   "categories": {
     "correctness": "error",
     "suspicious": "warn"
@@ -19,5 +24,15 @@
   ],
   "rules": {
     "unicorn/consistent-function-scoping": "off"
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "app/components/configuration/renderers/*.vue"
+      ],
+      "rules": {
+        "vue/valid-define-props": "off"
+      }
+    }
+  ]
 }

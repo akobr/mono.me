@@ -59,6 +59,9 @@ declare module 'vue-router/auto-routes' {
       { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | '/[org]/[project]/[view]/annotations/[key]'
       | '/[org]/[project]/[view]/annotations/[key]/'
+      | '/[org]/[project]/[view]/annotations/[key]/configuration'
+      | '/[org]/[project]/[view]/annotations/[key]/schema'
+      | '/[org]/[project]/[view]/annotations/[key]/versions'
     >,
     '/[org]/[project]/[view]/annotations/[key]': RouteRecordInfo<
       '/[org]/[project]/[view]/annotations/[key]',
@@ -66,10 +69,99 @@ declare module 'vue-router/auto-routes' {
       { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
       { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | '/[org]/[project]/[view]/annotations/[key]/'
+      | '/[org]/[project]/[view]/annotations/[key]/configuration'
+      | '/[org]/[project]/[view]/annotations/[key]/schema'
+      | '/[org]/[project]/[view]/annotations/[key]/versions'
     >,
     '/[org]/[project]/[view]/annotations/[key]/': RouteRecordInfo<
       '/[org]/[project]/[view]/annotations/[key]/',
       '/:org/:project/:view/annotations/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/annotations/[key]/configuration': RouteRecordInfo<
+      '/[org]/[project]/[view]/annotations/[key]/configuration',
+      '/:org/:project/:view/annotations/:key/configuration',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/annotations/[key]/schema': RouteRecordInfo<
+      '/[org]/[project]/[view]/annotations/[key]/schema',
+      '/:org/:project/:view/annotations/:key/schema',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/annotations/[key]/versions': RouteRecordInfo<
+      '/[org]/[project]/[view]/annotations/[key]/versions',
+      '/:org/:project/:view/annotations/:key/versions',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/compare': RouteRecordInfo<
+      '/[org]/[project]/[view]/compare',
+      '/:org/:project/:view/compare',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/configurations': RouteRecordInfo<
+      '/[org]/[project]/[view]/configurations',
+      '/:org/:project/:view/configurations',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/configurations/[key]'
+      | '/[org]/[project]/[view]/configurations/[key]/'
+      | '/[org]/[project]/[view]/configurations/[key]/effective'
+      | '/[org]/[project]/[view]/configurations/[key]/resolved'
+      | '/[org]/[project]/[view]/configurations/[key]/schema'
+      | '/[org]/[project]/[view]/configurations/[key]/versions'
+    >,
+    '/[org]/[project]/[view]/configurations/[key]': RouteRecordInfo<
+      '/[org]/[project]/[view]/configurations/[key]',
+      '/:org/:project/:view/configurations/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/configurations/[key]/'
+      | '/[org]/[project]/[view]/configurations/[key]/effective'
+      | '/[org]/[project]/[view]/configurations/[key]/resolved'
+      | '/[org]/[project]/[view]/configurations/[key]/schema'
+      | '/[org]/[project]/[view]/configurations/[key]/versions'
+    >,
+    '/[org]/[project]/[view]/configurations/[key]/': RouteRecordInfo<
+      '/[org]/[project]/[view]/configurations/[key]/',
+      '/:org/:project/:view/configurations/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/configurations/[key]/effective': RouteRecordInfo<
+      '/[org]/[project]/[view]/configurations/[key]/effective',
+      '/:org/:project/:view/configurations/:key/effective',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/configurations/[key]/resolved': RouteRecordInfo<
+      '/[org]/[project]/[view]/configurations/[key]/resolved',
+      '/:org/:project/:view/configurations/:key/resolved',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/configurations/[key]/schema': RouteRecordInfo<
+      '/[org]/[project]/[view]/configurations/[key]/schema',
+      '/:org/:project/:view/configurations/:key/schema',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/configurations/[key]/versions': RouteRecordInfo<
+      '/[org]/[project]/[view]/configurations/[key]/versions',
+      '/:org/:project/:view/configurations/:key/versions',
       { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
       { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
@@ -165,6 +257,9 @@ declare module 'vue-router/auto-routes' {
         | '/[org]/[project]/[view]/annotations'
         | '/[org]/[project]/[view]/annotations/[key]'
         | '/[org]/[project]/[view]/annotations/[key]/'
+        | '/[org]/[project]/[view]/annotations/[key]/configuration'
+        | '/[org]/[project]/[view]/annotations/[key]/schema'
+        | '/[org]/[project]/[view]/annotations/[key]/versions'
       views:
         | 'default'
       pathParamNames:
@@ -174,6 +269,9 @@ declare module 'vue-router/auto-routes' {
       routes:
         | '/[org]/[project]/[view]/annotations/[key]'
         | '/[org]/[project]/[view]/annotations/[key]/'
+        | '/[org]/[project]/[view]/annotations/[key]/configuration'
+        | '/[org]/[project]/[view]/annotations/[key]/schema'
+        | '/[org]/[project]/[view]/annotations/[key]/versions'
       views:
         | 'default'
       pathParamNames:
@@ -182,6 +280,105 @@ declare module 'vue-router/auto-routes' {
     'app/pages/[org]/[project]/[view]/annotations/[key]/index.vue': {
       routes:
         | '/[org]/[project]/[view]/annotations/[key]/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/annotations/[key]/configuration.vue': {
+      routes:
+        | '/[org]/[project]/[view]/annotations/[key]/configuration'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/annotations/[key]/schema.vue': {
+      routes:
+        | '/[org]/[project]/[view]/annotations/[key]/schema'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/annotations/[key]/versions.vue': {
+      routes:
+        | '/[org]/[project]/[view]/annotations/[key]/versions'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/compare.vue': {
+      routes:
+        | '/[org]/[project]/[view]/compare'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/configurations.vue': {
+      routes:
+        | '/[org]/[project]/[view]/configurations'
+        | '/[org]/[project]/[view]/configurations/[key]'
+        | '/[org]/[project]/[view]/configurations/[key]/'
+        | '/[org]/[project]/[view]/configurations/[key]/effective'
+        | '/[org]/[project]/[view]/configurations/[key]/resolved'
+        | '/[org]/[project]/[view]/configurations/[key]/schema'
+        | '/[org]/[project]/[view]/configurations/[key]/versions'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/configurations/[key].vue': {
+      routes:
+        | '/[org]/[project]/[view]/configurations/[key]'
+        | '/[org]/[project]/[view]/configurations/[key]/'
+        | '/[org]/[project]/[view]/configurations/[key]/effective'
+        | '/[org]/[project]/[view]/configurations/[key]/resolved'
+        | '/[org]/[project]/[view]/configurations/[key]/schema'
+        | '/[org]/[project]/[view]/configurations/[key]/versions'
+      views:
+        | 'default'
+      pathParamNames:
+        | 'key'
+    }
+    'app/pages/[org]/[project]/[view]/configurations/[key]/index.vue': {
+      routes:
+        | '/[org]/[project]/[view]/configurations/[key]/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/configurations/[key]/effective.vue': {
+      routes:
+        | '/[org]/[project]/[view]/configurations/[key]/effective'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/configurations/[key]/resolved.vue': {
+      routes:
+        | '/[org]/[project]/[view]/configurations/[key]/resolved'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/configurations/[key]/schema.vue': {
+      routes:
+        | '/[org]/[project]/[view]/configurations/[key]/schema'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/configurations/[key]/versions.vue': {
+      routes:
+        | '/[org]/[project]/[view]/configurations/[key]/versions'
       views:
         | never
       pathParamNames:
