@@ -71,6 +71,17 @@ public class CosmosViewServiceTests(Startup startup)
     }
 
     [Fact]
+    public async Task UpdateView_LegacyName_ThrowsInvalidNameInsteadOfRegisteringAnotherCase()
+    {
+        var project = NewProject();
+
+        var act = () => Views.UpdateViewAsync(Organization, project, "Prod", new ViewUpdate(), "author");
+
+        (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidName);
+        (await Views.GetViewsAsync(Organization, project, discover: false)).Select(view => view.Name).Should().NotContain("prod");
+    }
+
+    [Fact]
     public async Task UpdateView_RegistersAndDescribesTheDefaultAndNewViews()
     {
         var project = NewProject();

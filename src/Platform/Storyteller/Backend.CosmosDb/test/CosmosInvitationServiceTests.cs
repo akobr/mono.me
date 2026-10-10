@@ -112,6 +112,7 @@ public class CosmosInvitationServiceTests(Startup startup)
     [InlineData("not-an-email", AccountRole.Reader, null)]
     [InlineData("Ada <ada@example.com>", AccountRole.Reader, null)]
     [InlineData("ada@example.com", AccountRole.None, null)]
+    [InlineData("ada@example.com", (AccountRole)42, null)]
     [InlineData("ada@example.com", AccountRole.Reader, 0)]
     [InlineData("ada@example.com", AccountRole.Reader, 31)]
     public async Task Create_InvalidInput_ThrowsArgumentException(string email, AccountRole role, int? days)

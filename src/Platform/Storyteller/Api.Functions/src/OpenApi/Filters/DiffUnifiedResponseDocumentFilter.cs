@@ -13,6 +13,12 @@ public class DiffUnifiedResponseDocumentFilter : IDocumentFilter
         "GetConfigurationViewDiff",
         "GetTemplateVersionDiff",
         "GetTemplateVersionDiffCustom",
+        "GetSchemaVersionDiff",
+        "GetSchemaVersionDiffCustom",
+        "GetAnnotationSchemaVersionDiff",
+        "GetAnnotationSchemaVersionDiffCustom",
+        "GetDescendantTypeSchemaVersionDiff",
+        "GetDescendantTypeSchemaVersionDiffCustom",
     ];
 
     private const string UnifiedDiffExample =

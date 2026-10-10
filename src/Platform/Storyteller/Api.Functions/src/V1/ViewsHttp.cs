@@ -45,6 +45,12 @@ public class ViewsHttp
         [FromQuery] bool discover = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
+
+        if (discover)
+        {
+            EnsureNotMachine(request);
+        }
+
         await request.CheckAccessToProjectAsync(_access, organization, project, discover ? AccountRole.Administrator : AccountRole.Reader);
 
         var views = await _views.GetViewsAsync(organization, project, discover);
@@ -71,6 +77,7 @@ public class ViewsHttp
         string project)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
+        EnsureNotMachine(request);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
 
         if (model is null)
@@ -103,9 +110,19 @@ public class ViewsHttp
         string view)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
+        EnsureNotMachine(request);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
 
         var updated = await _views.UpdateViewAsync(organization, project, view, model ?? new ViewUpdate(), request.GetAuthor());
         return new OkObjectResult(updated);
+    }
+
+    // Machine access is checked per project without roles, so Administrator operations are for users only.
+    private static void EnsureNotMachine(HttpRequestData request)
+    {
+        if (request.TryGetApplicationIdentity(out _))
+        {
+            throw new AccessDeniedException("Managing views needs a user with the Administrator role.");
+        }
     }
 }
