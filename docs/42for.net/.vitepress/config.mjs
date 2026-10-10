@@ -84,6 +84,7 @@ export default withMermaid({
           { text: 'Configuration', link: '/platform/configuration' },
           { text: 'How to model', link: '/platform/modeling' },
           { text: 'Using the platform', link: '/platform/using-the-platform' },
+          { text: 'Administration UI', link: '/platform/admin-ui' },
           {
             text: 'Examples',
             collapsed: false,

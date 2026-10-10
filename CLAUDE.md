@@ -183,6 +183,8 @@ npm run dev       # dev server against the real API and AuthKit (port 5173)
 npm run build     # vue-tsc + vite build
 npm run lint      # oxlint, then ESLint
 npm test          # Vitest
+npm run test:e2e  # Playwright flows + axe, desktop and mobile (mocked API)
+npm run test:visual:docker  # visual screenshots in the Playwright Linux image (Docker)
 ```
 
 ---

@@ -1,0 +1,170 @@
+name: Administration UI
+
+# Lint, type-check, test and build the Administration UI and its TypeScript SDK, run the Playwright suites against
+# the mocked API, and deploy main to Azure Static Web Apps (spec section 17).
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - src/Platform/ui.admin/**
+      - src/Platform/Storyteller/sdk.typescript/**
+      - .github/workflows/ui-admin.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/Platform/ui.admin/**
+      - src/Platform/Storyteller/sdk.typescript/**
+      - .github/workflows/ui-admin.yml
+
+concurrency:
+  group: ui-admin-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SDK_DIR: src/Platform/Storyteller/sdk.typescript/src
+  UI_DIR: src/Platform/ui.admin/src
+
+jobs:
+  verify:
+    name: Lint, type-check, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/Platform/ui.admin/src/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            src/Platform/Storyteller/sdk.typescript/src/package-lock.json
+            src/Platform/ui.admin/src/package-lock.json
+
+      - name: npm 11
+        run: npm install --global npm@11
+
+      - name: SDK – install and build
+        working-directory: ${{ env.SDK_DIR }}
+        run: npm ci
+
+      - name: SDK – generated client matches the OpenAPI document
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          npm run generate
+          git diff --exit-code -- generated
+
+      - name: SDK – lint, type-check and test
+        working-directory: ${{ env.SDK_DIR }}
+        run: |
+          npm run lint
+          npm run typecheck
+          npm test
+
+      - name: UI – install
+        working-directory: ${{ env.UI_DIR }}
+        run: npm ci
+
+      - name: UI – lint
+        working-directory: ${{ env.UI_DIR }}
+        run: npm run lint
+
+      - name: UI – unit tests
+        working-directory: ${{ env.UI_DIR }}
+        run: npm test
+
+      - name: UI – type-check and build
+        working-directory: ${{ env.UI_DIR }}
+        run: npm run build
+
+  e2e:
+    name: Playwright (mocked API)
+    needs: verify
+    runs-on: ubuntu-latest
+    # The Playwright image of the installed version: the visual baselines are made in it (npm run test:visual:docker).
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install
+        run: |
+          npm install --global npm@11
+          (cd "$SDK_DIR" && npm ci)
+          (cd "$UI_DIR" && npm ci)
+
+      - name: Flows and accessibility (desktop and mobile)
+        working-directory: ${{ env.UI_DIR }}
+        run: npm run test:e2e
+
+      - name: Visual
+        working-directory: ${{ env.UI_DIR }}
+        run: npm run test:visual
+
+      - name: Report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            ${{ env.UI_DIR }}/playwright-report
+            ${{ env.UI_DIR }}/test-results
+          retention-days: 7
+
+  deploy:
+    name: Deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verify, e2e]
+    runs-on: ubuntu-latest
+    environment: ui-admin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: src/Platform/ui.admin/src/.nvmrc
+          cache: npm
+          cache-dependency-path: |
+            src/Platform/Storyteller/sdk.typescript/src/package-lock.json
+            src/Platform/ui.admin/src/package-lock.json
+
+      - name: Build
+        run: |
+          npm install --global npm@11
+          (cd "$SDK_DIR" && npm ci)
+          (cd "$UI_DIR" && npm ci && npm run build)
+
+      # One build serves every environment: app-config.json and the CSP origins are written per deployment.
+      - name: Environment configuration
+        working-directory: ${{ env.UI_DIR }}
+        env:
+          API_BASE_URL: ${{ vars.UI_ADMIN_API_BASE_URL }}
+          AUTH_API_HOSTNAME: ${{ vars.UI_ADMIN_AUTH_API_HOSTNAME }}
+          ENVIRONMENT_NAME: ${{ vars.UI_ADMIN_ENVIRONMENT_NAME }}
+        run: |
+          node --input-type=module -e "
+            import { readFileSync, writeFileSync } from 'node:fs'
+            const { API_BASE_URL, AUTH_API_HOSTNAME, ENVIRONMENT_NAME } = process.env
+            if (!API_BASE_URL || !AUTH_API_HOSTNAME) throw new Error('UI_ADMIN_API_BASE_URL and UI_ADMIN_AUTH_API_HOSTNAME are required.')
+            writeFileSync('dist/app-config.json', JSON.stringify({ apiBaseUrl: API_BASE_URL, authApiHostname: AUTH_API_HOSTNAME, environmentName: ENVIRONMENT_NAME || undefined }, null, 2))
+            const file = 'dist/staticwebapp.config.json'
+            const config = readFileSync(file, 'utf8')
+              .replaceAll('__API_ORIGIN__', new URL(API_BASE_URL).origin)
+              .replaceAll('__AUTH_HOSTNAME__', AUTH_API_HOSTNAME)
+            writeFileSync(file, config)
+          "
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_UI_ADMIN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: upload
+          skip_app_build: true
+          app_location: src/Platform/ui.admin/src/dist
+          api_location: ""
+          output_location: ""

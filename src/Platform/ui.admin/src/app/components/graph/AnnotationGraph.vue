@@ -535,6 +535,7 @@ const waitingForFocus = computed(() => hasData.value && large.value && !focusKey
           class="pointer-events-auto"
           :counts="typeCounts"
           :hidden="hidden"
+          :collapsed="bounds.width.value > 0 && bounds.width.value < 640"
           @toggle="toggleType"
           @show-all="hidden = new Set()"
         />

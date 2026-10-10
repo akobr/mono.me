@@ -143,6 +143,12 @@ const columnItems = computed<DropdownMenuItem[]>(() =>
     })),
 )
 
+// The row under the keyboard cursor (J/K) is announced; the rows themselves are virtualized.
+const activeLabel = computed(() => {
+  const annotation = activeKey.value ? catalog.byKey.get(activeKey.value) : undefined
+  return annotation ? `${annotation.Name}, ${annotation.AnnotationKey}` : ''
+})
+
 const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(catalog.loadedCount)} annotations…`)
 </script>
 
@@ -236,6 +242,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
       />
       <AnnotationList v-else :rows="rows" :selected-key="selectedKey" class="min-h-0 flex-1" @open="open" />
 
+      <p class="sr-only" aria-live="polite">{{ activeLabel }}</p>
       <AnnotationCreateDialog v-if="canEdit" v-model:open="creating" @created="open" />
     </template>
   </UDashboardPanel>

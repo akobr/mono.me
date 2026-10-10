@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useMediaQuery } from '@vueuse/core'
 import type { NavigationMenuItem } from '@nuxt/ui'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useContextStore } from '@/stores/context'
@@ -38,6 +39,10 @@ const items = computed<NavigationMenuItem[][]>(() =>
 
 // The slideover closes after navigation.
 watch(() => route.fullPath, close)
+
+// Between lg and xl the docked sidebar starts as the icon rail (spec section 15); "[" still toggles it.
+const wide = useMediaQuery('(min-width: 1280px)')
+watch(wide, (value) => (sidebarCollapsed.value = !value), { immediate: true })
 </script>
 
 <template>

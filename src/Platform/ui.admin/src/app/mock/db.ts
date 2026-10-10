@@ -208,14 +208,21 @@ export function createSeed(scenario: MockScenario): MockDb {
   }
 }
 
-export function currentScenario(): MockScenario {
+/**
+ * Applies `?mock-scenario=` of the page load: selects the scenario and resets its data. It runs once at start-up,
+ * not per request, so the parameter does not wipe edits while it stays in the URL, and a redirect (for example to
+ * /login) before the first request does not lose it.
+ */
+export function applyScenarioFromUrl(): void {
   const fromUrl = new URLSearchParams(location.search).get('mock-scenario') as MockScenario | null
 
   if (fromUrl && scenarios.includes(fromUrl)) {
     sessionStorage.setItem(scenarioKey, fromUrl)
     sessionStorage.removeItem(storageKey)
   }
+}
 
+export function currentScenario(): MockScenario {
   return (sessionStorage.getItem(scenarioKey) as MockScenario | null) ?? 'default'
 }
 

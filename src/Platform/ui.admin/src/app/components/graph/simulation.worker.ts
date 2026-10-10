@@ -67,16 +67,31 @@ function post() {
   scope.postMessage(frame, [positions.buffer])
 }
 
-/** Ticks while the simulation is hot, one tick per frame (requestAnimationFrame exists in dedicated workers). */
+/**
+ * Ticks while the simulation is hot, one tick per frame (requestAnimationFrame exists in dedicated workers).
+ * With reduced motion the layout is not animated: it settles in 12 ms slices and is posted once, except while
+ * a node is dragged.
+ */
 let loopId = 0
 
 function loop(id: number) {
   if (!simulation || !running || id !== loopId) {
     return
   }
-  simulation.tick(reducedMotion ? 5 : 1)
-  post()
-  if (simulation.alpha() < simulation.alphaMin()) {
+  const quiet = reducedMotion && simulation.alphaTarget() === 0
+  if (quiet) {
+    const until = performance.now() + 12
+    while (simulation.alpha() >= simulation.alphaMin() && performance.now() < until) {
+      simulation.tick()
+    }
+  } else {
+    simulation.tick()
+  }
+  const settled = simulation.alpha() < simulation.alphaMin()
+  if (!quiet || settled) {
+    post()
+  }
+  if (settled) {
     running = false
     return
   }

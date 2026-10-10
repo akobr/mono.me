@@ -2,6 +2,7 @@ import './assets/css/main.css'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { VueQueryPlugin } from '@tanstack/vue-query'
+import { z } from 'zod'
 import ui from '@nuxt/ui/vue-plugin'
 import type { Router } from 'vue-router'
 import App from './App.vue'
@@ -40,6 +41,9 @@ if (isMock) {
 
 const app = createApp(App)
 const queryClient = createQueryClient()
+// Zod would probe `new Function` for its JIT, which the production CSP (script-src 'self') reports as a violation.
+z.config({ jitless: true })
+
 const router = createAppRouter()
 
 app.use(createPinia())
