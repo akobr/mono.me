@@ -47,9 +47,13 @@ jobs:
       - name: npm 11
         run: npm install --global npm@11
 
+      # dist/ is not committed and the UI installs the SDK as a packed copy (install-links=true, files: dist),
+      # so the SDK has to be built before the UI npm ci.
       - name: SDK – install and build
         working-directory: ${{ env.SDK_DIR }}
-        run: npm ci
+        run: |
+          npm ci
+          npm run build
 
       - name: SDK – generated client matches the OpenAPI document
         working-directory: ${{ env.SDK_DIR }}
@@ -94,7 +98,7 @@ jobs:
       - name: Install
         run: |
           npm install --global npm@11
-          (cd "$SDK_DIR" && npm ci)
+          (cd "$SDK_DIR" && npm ci && npm run build)
           (cd "$UI_DIR" && npm ci)
 
       - name: Flows and accessibility (desktop and mobile)
@@ -135,7 +139,7 @@ jobs:
       - name: Build
         run: |
           npm install --global npm@11
-          (cd "$SDK_DIR" && npm ci)
+          (cd "$SDK_DIR" && npm ci && npm run build)
           (cd "$UI_DIR" && npm ci && npm run build)
 
       # One build serves every environment: app-config.json and the CSP origins are written per deployment.
