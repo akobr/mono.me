@@ -10,6 +10,8 @@ using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Json;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -25,13 +27,15 @@ public class CosmosConfigurationService : IConfigurationService
     private readonly IJsonSerializationSettingsProvider _jsonSettingsProvider;
     private readonly JsonSerializerSettings _serializerOptions;
     private readonly JsonContentDiffer _differ;
+    private readonly ILogger<CosmosConfigurationService> _logger;
 
     public CosmosConfigurationService(
         IContainerRepositoryProvider repositoryProvider,
         IJsonSerializationSettingsProvider jsonSettingsProvider,
         IOptions<JsonSerializerSettings> serializerOptions,
         IConfigurationBindingResolver bindingResolver = null,
-        IConfigurationSchemaService schemaService = null)
+        IConfigurationSchemaService schemaService = null,
+        ILogger<CosmosConfigurationService> logger = null)
     {
         _repositoryProvider = repositoryProvider;
         _bindingResolver = bindingResolver;
@@ -39,6 +43,7 @@ public class CosmosConfigurationService : IConfigurationService
         _jsonSettingsProvider = jsonSettingsProvider;
         _serializerOptions = serializerOptions.Value;
         _differ = new JsonContentDiffer(jsonSettingsProvider);
+        _logger = logger ?? NullLogger<CosmosConfigurationService>.Instance;
     }
 
     public async Task<bool> HasConfigurationContentAsync(FullKey key)
@@ -490,8 +495,16 @@ public class CosmosConfigurationService : IConfigurationService
 
         if (!response.IsSuccessStatusCode)
         {
+            // the database details stay in the log, the caller gets only the status
+            _logger.LogError(
+                "Patching the configuration {AnnotationKey} in {PartitionKey} failed with {StatusCode} (activity {ActivityId}): {ErrorMessage}",
+                annotationKey,
+                partitionKeyValue,
+                response.StatusCode,
+                response.ActivityId,
+                response.ErrorMessage);
             throw new ConfigurationStorageException(
-                $"Failed to patch configuration '{annotationKey}' with status {response.StatusCode}: {response.ErrorMessage}",
+                $"Failed to patch configuration '{annotationKey}' with status {response.StatusCode}.",
                 response.StatusCode);
         }
 

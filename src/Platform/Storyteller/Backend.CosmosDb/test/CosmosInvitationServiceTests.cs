@@ -166,6 +166,59 @@ public class CosmosInvitationServiceTests(Startup startup)
     }
 
     [Fact]
+    public async Task Accept_Again_DoesNotRestoreARemovedMembership()
+    {
+        var pointKey = await CreateProjectAsync();
+        var email = NewEmail();
+        var invitation = await Invitations.CreateInvitationAsync(pointKey, Create(email, AccountRole.Contributor), OwnerId, null);
+        var invitee = Invitee(email);
+        await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
+        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, OwnerId);
+
+        var again = await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
+
+        again.AccessMap.Should().NotContainKey(pointKey);
+        (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().NotContainKey(invitee.AccountId);
+    }
+
+    [Fact]
+    public async Task Accept_Again_CompletesAJoinThatFailedAfterTheClaim()
+    {
+        var pointKey = await CreateProjectAsync();
+        var email = NewEmail();
+        var invitation = await Invitations.CreateInvitationAsync(pointKey, Create(email, AccountRole.Contributor), OwnerId, null);
+        var invitee = Invitee(email);
+        await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
+        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, OwnerId);
+        await MarkJoinPendingAsync(invitation.Id);
+
+        var again = await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
+        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, OwnerId);
+        var third = await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
+
+        again.AccessMap.Should().Contain(pointKey, AccountRole.Contributor);
+        third.AccessMap.Should().NotContainKey(pointKey);
+    }
+
+    [Fact]
+    public async Task Accept_Again_PendingJoinOfAnExpiredInvitation_ThrowsInvitationExpired()
+    {
+        var pointKey = await CreateProjectAsync();
+        var email = NewEmail();
+        var invitation = await Invitations.CreateInvitationAsync(pointKey, Create(email, AccountRole.Contributor) with { ExpiresInDays = 1 }, OwnerId, null);
+        var invitee = Invitee(email);
+        await Invitations.AcceptInvitationAsync(invitation.Id, invitee);
+        await Access.RemoveMemberAsync(pointKey, invitee.AccountId, OwnerId);
+        await MarkJoinPendingAsync(invitation.Id);
+        _clock.Now = _clock.Now.AddDays(2);
+
+        var act = () => Invitations.AcceptInvitationAsync(invitation.Id, invitee);
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvitationExpired);
+        (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().NotContainKey(invitee.AccountId);
+    }
+
+    [Fact]
     public async Task Accept_ExistingMemberWithHigherRole_KeepsTheHigherRole()
     {
         var pointKey = await CreateProjectAsync();
@@ -328,6 +381,16 @@ public class CosmosInvitationServiceTests(Startup startup)
             OwnerId = OwnerId,
         });
         return point.Key;
+    }
+
+    // Simulates an acceptance that stopped between the claim and the join.
+    private async Task MarkJoinPendingAsync(string invitationId)
+    {
+        var container = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetCore().Container;
+        await container.PatchItemAsync<object>(
+            $"{InvitationEntity.IdPrefix}{invitationId}",
+            new PartitionKey("access"),
+            [PatchOperation.Set($"/{nameof(InvitationEntity.IsJoinPending)}", true)]);
     }
 
     private async Task<string> CreateMemberAsync(string pointKey, AccountRole role)
