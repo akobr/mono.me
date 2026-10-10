@@ -44,8 +44,12 @@ export const withDb =
   ): HttpResponseResolver<Params, DefaultBodyType> =>
   async (info) => {
     const db = loadDb()
+    const before = JSON.stringify(db)
     const response = await handler(db, info)
-    saveDb(db)
+    // Only writes persist: a read that finishes late must not overwrite a newer write.
+    if (JSON.stringify(db) !== before) {
+      saveDb(db)
+    }
     return response
   }
 

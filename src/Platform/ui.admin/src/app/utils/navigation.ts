@@ -45,7 +45,11 @@ export function buildNavigation(
     sections.push({
       id: 'view',
       label: view === 'default' ? 'View' : `View · ${view}`,
-      entries: [{ label: 'Annotations', icon: 'i-lucide-tags', to: `${base}/annotations`, editRole: 'Contributor' }],
+      entries: [
+        { label: 'Annotations', icon: 'i-lucide-tags', to: `${base}/annotations`, editRole: 'Contributor' },
+        { label: 'Configurations', icon: 'i-lucide-settings-2', to: `${base}/configurations`, editRole: 'Contributor' },
+        { label: 'Compare views', icon: 'i-lucide-git-compare', to: `${base}/compare` },
+      ],
     })
   }
 

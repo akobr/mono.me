@@ -1,5 +1,5 @@
 import { http, HttpResponse, type HttpHandler } from 'msw'
-import type { Annotation, ConfigurationSummary } from '@42for.net/2splatform.sdk'
+import type { Annotation } from '@42for.net/2splatform.sdk'
 import {
   codeOfKey,
   getAllAncestors,
@@ -86,26 +86,6 @@ function invalidAnnotation(annotation: Annotation, key?: string): Response | und
     return errorResponse(400, 'The annotation key in the body does not match the route.', 'InvalidInput')
   }
   return undefined
-}
-
-/** Deterministic configuration summaries: about a third of the annotations has a configuration. */
-export function configurationSummaries(db: MockDb, params: ScopeParams): ConfigurationSummary[] {
-  return listOf(db, params)
-    .filter((annotation) => {
-      let value = 0
-      for (const char of annotation.AnnotationKey) {
-        value = (value * 31 + char.charCodeAt(0)) >>> 0
-      }
-      return value % 3 === 0
-    })
-    .map((annotation, index) => ({
-      AnnotationKey: annotation.AnnotationKey,
-      AnnotationType: annotation.AnnotationType,
-      Version: (index % 12) + 1,
-      Author: index % 2 ? 'Grace Hopper' : 'Ada Lovelace',
-      UpdatedAt: new Date(Date.now() - (index % 40) * 86_400_000).toISOString(),
-      HasContent: true,
-    }))
 }
 
 export const annotationHandlers: HttpHandler[] = [
@@ -208,21 +188,6 @@ export const annotationHandlers: HttpHandler[] = [
       delete overrides.upserts[params.key]
       overrides.deleted.push(params.key)
       return new HttpResponse(null, { status: 204 })
-    }),
-  ),
-
-  http.get<ScopeParams>(
-    `${api}/configurations`,
-    withDb((db, { params, request }) => {
-      const denied = requireRole(db, projectKey(params), 'Reader')
-      return (
-        denied ??
-        page(configurationSummaries(db, params), request, (items, token) => ({
-          Configurations: items,
-          ContinuationToken: token,
-          Count: items.length,
-        }))
-      )
     }),
   ),
 ]

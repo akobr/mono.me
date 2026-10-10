@@ -29,11 +29,11 @@ export async function invalidateTemplate(client: QueryClient, scope: Scope, type
   ])
 }
 
+/** Every schema kind, and the combined schemas (`/configuration-schema/{key}/definition`) below the same prefix. */
 export async function invalidateSchemas(client: QueryClient, scope: Scope): Promise<void> {
   await Promise.all([
     invalidateByPath(client, `${base(scope)}/configuration-schema`),
     invalidateByPath(client, `${base(scope)}/configuration-schemas`),
-    invalidateByPath(client, `${base(scope)}/definition`),
   ])
 }
 

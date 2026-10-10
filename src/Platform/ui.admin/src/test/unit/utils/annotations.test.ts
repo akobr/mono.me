@@ -127,3 +127,15 @@ describe('small helpers', () => {
     )
   })
 })
+
+describe('dates', () => {
+  it('formats a date and time in a zone, falling back to the browser zone', async () => {
+    const { formatDateTime, formatRelative } = await import('@/utils/dates')
+    const date = new Date('2026-10-10T12:00:00Z')
+
+    expect(formatDateTime(date, 'Europe/Prague')).toMatch(/2026/)
+    expect(formatDateTime(date, 'Not/AZone')).toMatch(/2026/)
+    expect(formatRelative(new Date('2026-10-10T09:00:00Z'), date)).toBe('3 hours ago')
+    expect(formatRelative(new Date('2026-10-10T11:59:40Z'), date)).toBe('just now')
+  })
+})

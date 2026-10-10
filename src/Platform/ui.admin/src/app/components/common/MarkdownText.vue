@@ -13,6 +13,10 @@ const html = computed(() => renderInlineMarkdown(props.source))
 </script>
 
 <template>
-  <div v-if="html" class="space-y-2 [&_code]:rounded [&_code]:bg-elevated [&_code]:px-1 [&_code]:font-mono" v-html="html" />
+  <div
+    v-if="html"
+    class="space-y-2 [&_code]:rounded [&_code]:bg-elevated [&_code]:px-1 [&_code]:font-mono"
+    v-html="html"
+  />
   <p v-else-if="empty" class="text-dimmed">{{ empty }}</p>
 </template>
