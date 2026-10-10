@@ -362,24 +362,4 @@ export const configurationHandlers: HttpHandler[] = [
         : errorResponse(404, `No schema applies to ${params.key}.`, 'NotFound')
     }),
   ),
-
-  http.get<ScopeParams & { type: string }>(
-    `${api}/template/:type`,
-    withDb((db, { params }) => {
-      const denied = requireRole(db, projectKey(params), 'Reader')
-      if (denied) {
-        return denied
-      }
-      const code = metaOf(params.type)?.code
-      const version = code ? latest(getDocument(db, scopeOf(params), `template:${code}`)) : undefined
-      return version?.Content
-        ? HttpResponse.json({
-            AnnotationType: metaOf(code)?.type,
-            Version: version.Version,
-            Author: version.Author,
-            Content: version.Content,
-          })
-        : errorResponse(404, `There is no template for ${params.type}.`, 'NotFound')
-    }),
-  ),
 ]

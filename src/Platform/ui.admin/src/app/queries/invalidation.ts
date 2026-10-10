@@ -22,6 +22,14 @@ export async function invalidateConfiguration(client: QueryClient, scope: Scope,
   ])
 }
 
+/** Every configuration of the view (a template or schema change alters their effective documents). */
+export async function invalidateAllConfigurations(client: QueryClient, scope: Scope): Promise<void> {
+  await Promise.all([
+    invalidateByPath(client, `${base(scope)}/configuration`),
+    invalidateByPath(client, `${base(scope)}/configurations`),
+  ])
+}
+
 export async function invalidateTemplate(client: QueryClient, scope: Scope, type: string): Promise<void> {
   await Promise.all([
     invalidateByPath(client, `${base(scope)}/template/${type}`),

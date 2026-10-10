@@ -166,6 +166,50 @@ declare module 'vue-router/auto-routes' {
       { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
+    '/[org]/[project]/[view]/schemas': RouteRecordInfo<
+      '/[org]/[project]/[view]/schemas',
+      '/:org/:project/:view/schemas',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/schemas/annotation/[key]/'
+      | '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]'
+      | '/[org]/[project]/[view]/schemas/type/[type]'
+    >,
+    '/[org]/[project]/[view]/schemas/annotation/[key]/': RouteRecordInfo<
+      '/[org]/[project]/[view]/schemas/annotation/[key]/',
+      '/:org/:project/:view/schemas/annotation/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]': RouteRecordInfo<
+      '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]',
+      '/:org/:project/:view/schemas/annotation/:key/type/:type',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, type: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, type: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/schemas/type/[type]': RouteRecordInfo<
+      '/[org]/[project]/[view]/schemas/type/[type]',
+      '/:org/:project/:view/schemas/type/:type',
+      { org: ParamValue<true>, project: ParamValue<true>, type: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, type: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/templates': RouteRecordInfo<
+      '/[org]/[project]/[view]/templates',
+      '/:org/:project/:view/templates',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/templates/[type]'
+    >,
+    '/[org]/[project]/[view]/templates/[type]': RouteRecordInfo<
+      '/[org]/[project]/[view]/templates/[type]',
+      '/:org/:project/:view/templates/:type',
+      { org: ParamValue<true>, project: ParamValue<true>, type: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, type: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
     '/[...path]': RouteRecordInfo<
       '/[...path]',
       '/:path(.*)',
@@ -383,6 +427,58 @@ declare module 'vue-router/auto-routes' {
         | never
       pathParamNames:
         | never
+    }
+    'app/pages/[org]/[project]/[view]/schemas.vue': {
+      routes:
+        | '/[org]/[project]/[view]/schemas'
+        | '/[org]/[project]/[view]/schemas/annotation/[key]/'
+        | '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]'
+        | '/[org]/[project]/[view]/schemas/type/[type]'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/schemas/annotation/[key]/index.vue': {
+      routes:
+        | '/[org]/[project]/[view]/schemas/annotation/[key]/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/schemas/annotation/[key]/type/[type].vue': {
+      routes:
+        | '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]'
+      views:
+        | never
+      pathParamNames:
+        | 'type'
+    }
+    'app/pages/[org]/[project]/[view]/schemas/type/[type].vue': {
+      routes:
+        | '/[org]/[project]/[view]/schemas/type/[type]'
+      views:
+        | never
+      pathParamNames:
+        | 'type'
+    }
+    'app/pages/[org]/[project]/[view]/templates.vue': {
+      routes:
+        | '/[org]/[project]/[view]/templates'
+        | '/[org]/[project]/[view]/templates/[type]'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/templates/[type].vue': {
+      routes:
+        | '/[org]/[project]/[view]/templates/[type]'
+      views:
+        | never
+      pathParamNames:
+        | 'type'
     }
     'app/pages/[...path].vue': {
       routes:
