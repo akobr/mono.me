@@ -175,6 +175,20 @@ describe('storytellerFetch', () => {
     expect(aborted.message).toBe('The request was aborted.')
   })
 
+  it('turns network failures into status 0 also with a relative base URL', async () => {
+    const cause = new TypeError('fetch failed')
+    const failing = vi.fn(async () => {
+      throw cause
+    }) as unknown as typeof globalThis.fetch
+    configureStoryteller({ baseUrl: '/api', fetch: failing })
+
+    const error = (await storytellerFetch('/v1/access/account').catch((caught: unknown) => caught)) as StorytellerError
+    expect(error).toBeInstanceOf(StorytellerError)
+    expect(error.status).toBe(0)
+    expect(error.message).toContain('(/api/v1/access/account)')
+    expect(error.cause).toBe(cause)
+  })
+
   it('requires configuration first', () => {
     expect(getStorytellerConfig().baseUrl).toBe('http://unused')
   })
