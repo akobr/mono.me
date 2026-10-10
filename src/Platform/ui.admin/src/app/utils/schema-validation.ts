@@ -141,3 +141,23 @@ export function parseServerErrors(
         : { pointer: '', message: text, keyword: 'server' }
     })
 }
+
+/**
+ * Checks a JSON Schema document against its meta-schema (draft-07, or 2019-09 / 2020-12 when `$schema` says so),
+ * for the schema editor (spec section 14).
+ */
+export function validateSchemaDocument(schema: unknown): ValidationIssue[] {
+  if (!schema || typeof schema !== 'object' || Array.isArray(schema)) {
+    return [{ pointer: '', message: 'A schema must be an object.', keyword: 'type' }]
+  }
+  const ajv = ajvFor(schema)
+  const { $schema: _declared, ...rest } = schema as { $schema?: string }
+  if (ajv.validateSchema(rest)) {
+    return []
+  }
+  return (ajv.errors ?? []).map((error) => ({
+    pointer: error.instancePath,
+    message: describe(error),
+    keyword: error.keyword,
+  }))
+}
