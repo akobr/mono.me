@@ -479,7 +479,21 @@ public class CosmosConfigurationService : IConfigurationService
         var batch = repository.Container.CreateTransactionalBatch(partitionKey);
         batch.CreateItem(history);
         batch.UpsertItem(newConfiguration);
-        await batch.ExecuteAsync();
+        using var response = await batch.ExecuteAsync();
+
+        // the version was already archived by a concurrent writer (409); the read can't guard the upsert by ETag,
+        // because invalidating the dependent configurations above may rewrite this document too
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new ConflictException($"The configuration '{annotationKey}' was changed concurrently, try again.", ErrorCodes.Conflict);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new ConfigurationStorageException(
+                $"Failed to patch configuration '{annotationKey}' with status {response.StatusCode}: {response.ErrorMessage}",
+                response.StatusCode);
+        }
 
         return newConfiguration.ToConfigurationFromContent();
     }

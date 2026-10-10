@@ -69,9 +69,9 @@ public class CosmosInvitationService : IInvitationService
         var email = NormalizeEmail(model.Email)
             ?? throw new ArgumentException($"'{model.Email}' is not a valid email address.", nameof(model));
 
-        if (model.Role == AccountRole.None)
+        if (model.Role == AccountRole.None || !Enum.IsDefined(model.Role))
         {
-            throw new ArgumentException("The role None can't be offered.", nameof(model));
+            throw new ArgumentException($"The role {model.Role} can't be offered.", nameof(model));
         }
 
         var days = model.ExpiresInDays ?? _options.DefaultExpiresInDays;

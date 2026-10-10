@@ -25,6 +25,8 @@ Views are implicit: the first write to a view creates it, and a write is never b
 | POST | `v1/{organization}/{project}/views` | Administrator | `{ "Name", "Description" }` → `View`; `409 ViewExists` when registered, or for `default` |
 | PUT | `v1/{organization}/{project}/views/{view}` | Administrator | `{ "Description" }` → `View`; registers the view when needed, including `default` |
 
+Administrator operations (POST, PUT and `?discover=true`) need a user; machine credentials get `403`. PUT keeps the name as given: a legacy name that breaks the name rules (for example `Prod`) returns `400 InvalidName` instead of registering a different id.
+
 A `View` has `Name`, `Description`, `CreatedAt`, `CreatedBy`, `IsDefault`, and `IsRegistered`. `default` is always listed, also when it is not registered. Registrations live in the organization container, partition `{project}.meta`, id `view.{name}`.
 
 `?discover=true` also lists every view that holds documents of the project (annotations, configurations, templates, schemas, and their history) with `IsRegistered = false`. It is a cross-partition `SELECT DISTINCT VALUE c.ViewName` over the organization container, so it is meant for an administrator's occasional check, not for every page load.

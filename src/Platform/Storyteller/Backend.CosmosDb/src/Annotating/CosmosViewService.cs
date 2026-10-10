@@ -82,7 +82,8 @@ public class CosmosViewService : IViewService
 
     public async Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate model, string author)
     {
-        var name = view.Trim().ToLowerInvariant();
+        // The name is kept as given: legacy names that break the rules are rejected, never registered under another id.
+        var name = view.Trim();
 
         // "default" predates the name rules and is always valid; any other new registration follows them.
         if (name != Constants.DefaultViewName)

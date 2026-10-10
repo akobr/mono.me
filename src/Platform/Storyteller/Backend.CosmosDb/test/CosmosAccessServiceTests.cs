@@ -114,6 +114,28 @@ public class CosmosAccessServiceTests(Startup startup)
     }
 
     [Fact]
+    public async Task Join_UndefinedRole_ThrowsArgumentException()
+    {
+        var pointKey = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+
+        var act = () => Access.JoinAccessPointAsync(pointKey, memberId, (AccountRole)42);
+
+        await act.Should().ThrowAsync<ArgumentException>();
+    }
+
+    [Fact]
+    public async Task CreateAccessPoint_ExistingProjectAsOrganization_ThrowsInvalidName()
+    {
+        // An existing project key is not an organization: "acme.web" + "x" would create a dotted project "web.x".
+        var pointKey = await CreateProjectAsync();
+
+        var act = () => Access.CreateAccessPointAsync(new AccessPointCreate { Organization = pointKey, Project = NewProjectName(), OwnerId = OwnerId });
+
+        (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidName);
+    }
+
+    [Fact]
     public async Task Revoke_ByOwner_RemovesMembershipFromPointAndAccount()
     {
         var pointKey = await CreateProjectAsync();

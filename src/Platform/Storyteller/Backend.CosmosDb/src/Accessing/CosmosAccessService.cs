@@ -165,7 +165,8 @@ public class CosmosAccessService : IAccessService
         var organizationAccessPoint = await GetAccessPointAsync(model.Organization);
 
         // Only new names are checked: projects of an organization created before the rules can still be added.
-        if (organizationAccessPoint is null)
+        // A dotted name is never an organization, even when it matches an existing project.
+        if (organizationAccessPoint is null || model.Organization.Contains('.'))
         {
             NameRules.EnsureOrganizationName(model.Organization);
         }
@@ -374,9 +375,9 @@ public class CosmosAccessService : IAccessService
 
     public async Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole role)
     {
-        if (role == AccountRole.None)
+        if (role == AccountRole.None || !Enum.IsDefined(role))
         {
-            throw new ArgumentException("The role None can't be joined with.", nameof(role));
+            throw new ArgumentException($"The role {role} can't be joined with.", nameof(role));
         }
 
         var (_, resultRole) = await UpdateMembershipAsync(accessPointKey, accountId, (point, _) =>
