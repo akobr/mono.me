@@ -98,8 +98,14 @@ function configurationContent(annotation: Annotation, version: number): Record<s
   }
 }
 
+const configurationKeysCache = new WeakMap<ReadonlyMap<string, Annotation>, Map<string, number>>()
+
 /** About a third of the annotations has a configuration, with 1-12 versions. */
-function configurationKeys(annotations: Map<string, Annotation>): Map<string, number> {
+function configurationKeys(annotations: ReadonlyMap<string, Annotation>): Map<string, number> {
+  const cached = configurationKeysCache.get(annotations)
+  if (cached) {
+    return cached
+  }
   const result = new Map<string, number>()
   let index = 0
   for (const key of annotations.keys()) {
@@ -107,6 +113,7 @@ function configurationKeys(annotations: Map<string, Annotation>): Map<string, nu
       result.set(key, (index++ % 12) + 1)
     }
   }
+  configurationKeysCache.set(annotations, result)
   return result
 }
 

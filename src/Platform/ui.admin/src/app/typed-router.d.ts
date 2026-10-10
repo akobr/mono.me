@@ -166,6 +166,55 @@ declare module 'vue-router/auto-routes' {
       { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
+    '/[org]/[project]/[view]/graph': RouteRecordInfo<
+      '/[org]/[project]/[view]/graph',
+      '/:org/:project/:view/graph',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/graph/[key]'
+      | '/[org]/[project]/[view]/graph/[key]/'
+      | '/[org]/[project]/[view]/graph/[key]/configuration'
+      | '/[org]/[project]/[view]/graph/[key]/schema'
+      | '/[org]/[project]/[view]/graph/[key]/versions'
+    >,
+    '/[org]/[project]/[view]/graph/[key]': RouteRecordInfo<
+      '/[org]/[project]/[view]/graph/[key]',
+      '/:org/:project/:view/graph/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/graph/[key]/'
+      | '/[org]/[project]/[view]/graph/[key]/configuration'
+      | '/[org]/[project]/[view]/graph/[key]/schema'
+      | '/[org]/[project]/[view]/graph/[key]/versions'
+    >,
+    '/[org]/[project]/[view]/graph/[key]/': RouteRecordInfo<
+      '/[org]/[project]/[view]/graph/[key]/',
+      '/:org/:project/:view/graph/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/graph/[key]/configuration': RouteRecordInfo<
+      '/[org]/[project]/[view]/graph/[key]/configuration',
+      '/:org/:project/:view/graph/:key/configuration',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/graph/[key]/schema': RouteRecordInfo<
+      '/[org]/[project]/[view]/graph/[key]/schema',
+      '/:org/:project/:view/graph/:key/schema',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/graph/[key]/versions': RouteRecordInfo<
+      '/[org]/[project]/[view]/graph/[key]/versions',
+      '/:org/:project/:view/graph/:key/versions',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
     '/[org]/[project]/[view]/schemas': RouteRecordInfo<
       '/[org]/[project]/[view]/schemas',
       '/:org/:project/:view/schemas',
@@ -493,6 +542,63 @@ declare module 'vue-router/auto-routes' {
     'app/pages/[org]/[project]/[view]/configurations/[key]/versions.vue': {
       routes:
         | '/[org]/[project]/[view]/configurations/[key]/versions'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/graph.vue': {
+      routes:
+        | '/[org]/[project]/[view]/graph'
+        | '/[org]/[project]/[view]/graph/[key]'
+        | '/[org]/[project]/[view]/graph/[key]/'
+        | '/[org]/[project]/[view]/graph/[key]/configuration'
+        | '/[org]/[project]/[view]/graph/[key]/schema'
+        | '/[org]/[project]/[view]/graph/[key]/versions'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/graph/[key].vue': {
+      routes:
+        | '/[org]/[project]/[view]/graph/[key]'
+        | '/[org]/[project]/[view]/graph/[key]/'
+        | '/[org]/[project]/[view]/graph/[key]/configuration'
+        | '/[org]/[project]/[view]/graph/[key]/schema'
+        | '/[org]/[project]/[view]/graph/[key]/versions'
+      views:
+        | 'default'
+      pathParamNames:
+        | 'key'
+    }
+    'app/pages/[org]/[project]/[view]/graph/[key]/index.vue': {
+      routes:
+        | '/[org]/[project]/[view]/graph/[key]/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/graph/[key]/configuration.vue': {
+      routes:
+        | '/[org]/[project]/[view]/graph/[key]/configuration'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/graph/[key]/schema.vue': {
+      routes:
+        | '/[org]/[project]/[view]/graph/[key]/schema'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/graph/[key]/versions.vue': {
+      routes:
+        | '/[org]/[project]/[view]/graph/[key]/versions'
       views:
         | never
       pathParamNames:

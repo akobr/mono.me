@@ -239,9 +239,14 @@ export function resetDb(scenario: MockScenario = currentScenario()): MockDb {
 }
 
 const generated = new Map<string, Annotation[]>()
+// The last result per scope: the large scenario asks for 16,000 annotations on every request.
+const merged = new Map<string, { signature: string; result: ReadonlyMap<string, Annotation> }>()
 
-/** The annotations of a scope: the generated base with the stored overrides applied. */
-export function annotationsOf(db: MockDb, org: string, project: string, view: string): Map<string, Annotation> {
+/**
+ * The annotations of a scope: the generated base with the stored overrides applied. The same map is returned
+ * while nothing changed, so callers can cache derived data on it; it must not be mutated.
+ */
+export function annotationsOf(db: MockDb, org: string, project: string, view: string): ReadonlyMap<string, Annotation> {
   const id = `${org}/${project}/${view}`
   const seed = scopeSeed(db.scenario, org, project, view)
   const cacheKey = `${db.scenario}:${id}`
@@ -251,6 +256,12 @@ export function annotationsOf(db: MockDb, org: string, project: string, view: st
   }
 
   const overrides = db.annotations[id]
+  const signature = `${cacheKey}:${JSON.stringify(overrides ?? null)}`
+  const cached = merged.get(id)
+  if (cached?.signature === signature) {
+    return cached.result
+  }
+
   const result = new Map((generated.get(cacheKey) ?? []).map((annotation) => [annotation.AnnotationKey, annotation]))
 
   for (const key of overrides?.deleted ?? []) {
@@ -260,6 +271,7 @@ export function annotationsOf(db: MockDb, org: string, project: string, view: st
     result.set(key, annotation)
   }
 
+  merged.set(id, { signature, result })
   return result
 }
 
