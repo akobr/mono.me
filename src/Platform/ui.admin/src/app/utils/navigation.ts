@@ -48,6 +48,7 @@ export function buildNavigation(
       entries: [
         { label: 'Annotations', icon: 'i-lucide-tags', to: `${base}/annotations`, editRole: 'Contributor' },
         { label: 'Configurations', icon: 'i-lucide-settings-2', to: `${base}/configurations`, editRole: 'Contributor' },
+        { label: 'Graph', icon: 'i-lucide-waypoints', to: `${base}/graph` },
         { label: 'Templates', icon: 'i-lucide-layout-template', to: `${base}/templates`, editRole: 'Contributor' },
         { label: 'Schemas', icon: 'i-lucide-braces', to: `${base}/schemas`, editRole: 'Contributor' },
         { label: 'Compare views', icon: 'i-lucide-git-compare', to: `${base}/compare` },

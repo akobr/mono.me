@@ -11,7 +11,15 @@ import { errorMessage } from '@/utils/errors'
 import type { TreePerspective } from '@/utils/tree-projection'
 
 /** Header, breadcrumb and tab navigation of the annotation detail (spec section 11.1). */
-const props = defineProps<{ annotationKey: string; annotation?: Annotation }>()
+const props = withDefaults(
+  defineProps<{
+    annotationKey: string
+    annotation?: Annotation
+    /** The screen hosting the panel: tabs, breadcrumb and lineage links stay on it. */
+    section?: 'annotations' | 'graph'
+  }>(),
+  { annotation: undefined, section: 'annotations' },
+)
 const emit = defineEmits<{ close: [] }>()
 
 const route = useRoute()
@@ -27,7 +35,8 @@ const { copy } = useClipboard({ legacy: true })
 const confirmDelete = ref(false)
 const deleting = ref(false)
 
-const base = computed(() => `/${context.org}/${context.project}/${context.view}/annotations/${props.annotationKey}`)
+const viewBase = computed(() => `/${context.org}/${context.project}/${context.view}`)
+const base = computed(() => `${viewBase.value}/${props.section}/${props.annotationKey}`)
 const perspective = computed<TreePerspective>(() =>
   route.query.by === 'responsibility' ? 'responsibility' : 'subject',
 )
@@ -60,15 +69,22 @@ const menu = computed<DropdownMenuItem[][]>(() => [
     {
       label: 'Open configuration',
       icon: 'i-lucide-settings-2',
-      to: `/${context.org}/${context.project}/${context.view}/configurations/${props.annotationKey}`,
+      to: `${viewBase.value}/configurations/${props.annotationKey}`,
     },
+    props.section === 'graph'
+      ? { label: 'Show in list', icon: 'i-lucide-table', to: `${viewBase.value}/annotations/${props.annotationKey}` }
+      : {
+          label: 'Show in graph',
+          icon: 'i-lucide-waypoints',
+          to: { path: `${viewBase.value}/graph/${props.annotationKey}`, query: { focus: props.annotationKey } },
+        },
   ],
   [
     {
       label: 'Copy link',
       icon: 'i-lucide-link',
       onSelect: async () => {
-        await copy(`${location.origin}${base.value}`)
+        await copy(`${location.origin}${viewBase.value}/annotations/${props.annotationKey}`)
         toast.add({ title: 'Link copied', icon: 'i-lucide-link' })
       },
     },
@@ -101,7 +117,7 @@ async function remove() {
     }
     confirmDelete.value = false
     toast.add({ title: `${props.annotationKey} deleted`, color: 'success', icon: 'i-lucide-trash-2' })
-    await router.push({ path: `/${context.org}/${context.project}/${context.view}/annotations`, query: route.query })
+    await router.push({ path: `${viewBase.value}/${props.section}`, query: route.query })
   } catch (error) {
     toast.add({ title: 'Delete failed', description: errorMessage(error), color: 'error' })
   } finally {
@@ -151,9 +167,10 @@ async function remove() {
         :annotation-key="annotationKey"
         :perspective="perspective"
         :query="route.query"
+        :section="section"
         class="min-w-0 flex-1"
       />
-      <AnnotationLineage :annotation-key="annotationKey" />
+      <AnnotationLineage :annotation-key="annotationKey" :section="section" />
     </div>
 
     <UNavigationMenu :items="tabs" highlight class="-mb-3" :ui="{ link: 'text-sm' }" />

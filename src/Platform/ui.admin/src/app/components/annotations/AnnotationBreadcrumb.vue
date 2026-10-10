@@ -10,7 +10,16 @@ import { parentKey, type TreePerspective } from '@/utils/tree-projection'
  * The chain of parents in the current tree perspective, built from the key segments (spec section 11.1), for
  * example "Subject northwind › Context prod › Execution prod". Ancestors missing from the catalog are struck through.
  */
-const props = defineProps<{ annotationKey: string; perspective: TreePerspective; query?: LocationQuery }>()
+const props = withDefaults(
+  defineProps<{
+    annotationKey: string
+    perspective: TreePerspective
+    query?: LocationQuery
+    /** The screen the links stay on. */
+    section?: 'annotations' | 'graph'
+  }>(),
+  { query: undefined, section: 'annotations' },
+)
 
 const catalog = useCatalogStore()
 const context = useContextStore()
@@ -29,7 +38,7 @@ const chain = computed(() => {
     meta: metaOf(key.slice(0, 3)),
     name: key.split('.').at(-1),
     missing: !catalog.byKey.has(key) && catalog.status === 'ready',
-    to: { path: `/${context.org}/${context.project}/${context.view}/annotations/${key}`, query: props.query },
+    to: { path: `/${context.org}/${context.project}/${context.view}/${props.section}/${key}`, query: props.query },
   }))
 })
 </script>

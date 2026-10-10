@@ -135,6 +135,7 @@ defineShortcuts({
   'g-o': () => go('/orgs'),
   'g-a': () => go(viewBase.value && `${viewBase.value}/annotations`),
   'g-c': () => go(viewBase.value && `${viewBase.value}/configurations`),
+  'g-g': () => go(viewBase.value && `${viewBase.value}/graph`),
   'g-t': () => go(viewBase.value && `${viewBase.value}/templates`),
   'g-s': () => go(viewBase.value && `${viewBase.value}/schemas`),
 })

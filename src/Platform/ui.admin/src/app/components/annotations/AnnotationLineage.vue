@@ -8,7 +8,9 @@ import { getDirectAncestors, metaOf } from '@/utils/annotation-key'
  * Every ancestor as a small layered DAG in merge order (spec section 11.1): the level closest to the annotation
  * first, each level in merge order. Configurations inherit in this order.
  */
-const props = defineProps<{ annotationKey: string }>()
+const props = withDefaults(defineProps<{ annotationKey: string; section?: 'annotations' | 'graph' }>(), {
+  section: 'annotations',
+})
 
 const catalog = useCatalogStore()
 const context = useContextStore()
@@ -30,7 +32,7 @@ const levels = computed(() => {
   return result.toReversed()
 })
 
-const link = (key: string) => `/${context.org}/${context.project}/${context.view}/annotations/${key}`
+const link = (key: string) => `/${context.org}/${context.project}/${context.view}/${props.section}/${key}`
 </script>
 
 <template>
