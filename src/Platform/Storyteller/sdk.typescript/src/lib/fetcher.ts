@@ -85,10 +85,11 @@ async function send(current: StorytellerConfig, target: string, init: RequestIni
     return await (current.fetch ?? globalThis.fetch)(target, { ...init, headers })
   } catch (error) {
     // The token never leaves this function: the error carries only the URL path and the cause.
+    // A relative base URL (same origin, a dev proxy) is resolved against a placeholder origin just to read the path.
     const aborted = error instanceof DOMException && error.name === 'AbortError'
     throw new StorytellerError({
       status: 0,
-      message: aborted ? 'The request was aborted.' : `The Storyteller API is not reachable (${new URL(target).pathname}).`,
+      message: aborted ? 'The request was aborted.' : `The Storyteller API is not reachable (${new URL(target, 'http://localhost').pathname}).`,
       cause: error,
     })
   }
