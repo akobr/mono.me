@@ -27,7 +27,7 @@ async function onCopy() {
 </script>
 
 <template>
-  <UTooltip :text="copied ? 'Copied' : 'Copy'">
+  <UTooltip :text="copied ? 'Copied' : 'Copy'" :disabled="!!label">
     <UButton
       :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
       :label="label"

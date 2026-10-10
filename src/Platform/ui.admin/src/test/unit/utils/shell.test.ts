@@ -87,7 +87,7 @@ describe('navigation', () => {
       orgRole: 'None',
     })
 
-    expect(sections.map((section) => section.id)).toEqual(['view', 'org', 'global'])
+    expect(sections.map((section) => section.id)).toEqual(['view', 'project', 'org', 'global'])
     expect(sections[0]!.items[0]).toMatchObject({
       label: 'Annotations',
       to: '/acme/billing/default/annotations',

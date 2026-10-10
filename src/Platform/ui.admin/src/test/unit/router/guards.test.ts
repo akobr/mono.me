@@ -56,9 +56,19 @@ describe('auth guard', () => {
     expect(auth.signIn).toHaveBeenCalledWith({ returnTo: '/acme/billing/default/annotations?q=x' })
   })
 
+  it('sends a user without an account to their pending invitations', async () => {
+    server.use(
+      http.get('*/api/v1/access/account', () => HttpResponse.json({ Message: 'No account.' }, { status: 404 })),
+      http.get('*/api/v1/access/invitations/mine', () => HttpResponse.json([{ Id: 'inv_1', Status: 'Pending' }])),
+    )
+
+    await expect(authGuard(route('/orgs'))).resolves.toEqual({ path: '/invitations', replace: true })
+  })
+
   it('sends a user without an account to onboarding', async () => {
     server.use(
       http.get('*/api/v1/access/account', () => HttpResponse.json({ Message: 'No account.' }, { status: 404 })),
+      http.get('*/api/v1/access/invitations/mine', () => HttpResponse.json([{ Id: 'inv_1', Status: 'Declined' }])),
     )
 
     await expect(authGuard(route('/orgs'))).resolves.toEqual({ path: '/onboarding', replace: true })

@@ -1,6 +1,12 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import { getAccount, isNotFound, type Account, type AccountAccessMap } from '@42for.net/2splatform.sdk'
+import {
+  getAccount,
+  getMyInvitations,
+  isNotFound,
+  type Account,
+  type AccountAccessMap,
+} from '@42for.net/2splatform.sdk'
 import { getAuthService } from '@/boot/state'
 import type { AuthUser, SignInOptions } from '@/boot/auth'
 
@@ -59,6 +65,16 @@ export const useSessionStore = defineStore('session', () => {
     return pending
   }
 
+  let invitationsChecked: Promise<boolean> | undefined
+
+  /** Whether the user has pending invitations (asked once per session, for users without an account). */
+  function hasPendingInvitations(): Promise<boolean> {
+    invitationsChecked ??= getMyInvitations()
+      .then((invitations) => invitations.some((invitation) => invitation.Status === 'Pending'))
+      .catch(() => false)
+    return invitationsChecked
+  }
+
   async function signIn(returnTo?: string, options: Omit<SignInOptions, 'returnTo'> = {}): Promise<void> {
     await getAuthService()?.signIn({ ...options, returnTo })
   }
@@ -83,6 +99,7 @@ export const useSessionStore = defineStore('session', () => {
     accessMap,
     refreshUser,
     setAccount,
+    hasPendingInvitations,
     loadAccount,
     signIn,
     signOut,
