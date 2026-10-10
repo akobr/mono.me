@@ -50,6 +50,8 @@ export async function storytellerFetch<T>(url: string, init: RequestInit = {}): 
   let response = await send(current, target, init)
 
   if (response.status === 401 && current.getAccessToken) {
+    // The unread body would keep the first connection busy.
+    await response.body?.cancel().catch(() => undefined)
     response = await send(current, target, init)
 
     if (response.status === 401) {

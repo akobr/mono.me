@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { configureStoryteller, getStorytellerConfig, storytellerFetch, type StorytellerConfig } from '../lib/fetcher'
 import { hasErrorCode, isForbidden, isPreconditionFailed, StorytellerError } from '../lib/errors'
+import { deleteAnnotation } from '../generated/client/annotations/annotations'
 
 interface Call {
   url: string
@@ -146,6 +147,25 @@ describe('storytellerFetch', () => {
     const error = await storytellerFetch('/v1/access/account').catch((caught: unknown) => caught)
     expect((error as StorytellerError).status).toBe(401)
     expect(onUnauthorized).toHaveBeenCalledOnce()
+  })
+
+  it('cancels the body of the rejected 401 response before retrying', async () => {
+    const rejected = new Response('{"Message":"expired"}', { status: 401, headers: { 'content-type': 'application/json' } })
+    const cancel = vi.spyOn(rejected.body!, 'cancel')
+    const { fetch } = fakeFetch(rejected, json({ Id: 'user-1' }))
+    configure({ fetch, getAccessToken: () => 'token' })
+
+    await expect(storytellerFetch('/v1/access/account')).resolves.toEqual({ Id: 'user-1' })
+    expect(cancel).toHaveBeenCalledOnce()
+  })
+
+  it('encodes path parameters of the generated functions, so "#", "?" and "%" stay in the key', async () => {
+    const { fetch, calls } = fakeFetch(new Response(null, { status: 204 }))
+    configure({ fetch })
+
+    await deleteAnnotation('acme', 'web', 'default', 'sbt.c#1?x=%2')
+
+    expect(calls[0]!.url).toBe('https://api.example.com/api/v1/acme/web/default/annotations/sbt.c%231%3Fx%3D%252')
   })
 
   it('does not retry a 401 without a token provider', async () => {

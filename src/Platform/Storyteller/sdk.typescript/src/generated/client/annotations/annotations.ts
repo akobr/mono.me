@@ -49,8 +49,8 @@ export const getGetAnnotationsUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/annotations?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/annotations`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations`;
 };
 
 export const getAnnotations = async (
@@ -74,7 +74,7 @@ export const getSetAnnotationsUrl = (
   project: string,
   view: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/annotations`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations`;
 };
 
 export const setAnnotations = async (
@@ -125,7 +125,7 @@ export const getGetAnnotationUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/annotations/${key}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
 };
 
 export const getAnnotation = async (
@@ -150,7 +150,7 @@ export const getSetAnnotationUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/annotations/${key}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
 };
 
 export const setAnnotation = async (
@@ -202,7 +202,7 @@ export const getDeleteAnnotationUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/annotations/${key}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
 };
 
 export const deleteAnnotation = async (
@@ -240,8 +240,8 @@ export const getGetDescendantsUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/annotations/${key}/${descendants}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/annotations/${key}/${descendants}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}/${encodeURIComponent(String(descendants))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}/${encodeURIComponent(String(descendants))}`;
 };
 
 export const getDescendants = async (
@@ -267,7 +267,7 @@ export const getSetAnnotationsSimpleUrl = (
   project: string,
   view: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/annotations/simple`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/simple`;
 };
 
 export const setAnnotationsSimple = async (
@@ -329,8 +329,8 @@ export const getGetResponsibilitiesUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/responsibilities?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/responsibilities`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/responsibilities?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/responsibilities`;
 };
 
 export const getResponsibilities = async (
@@ -366,8 +366,8 @@ export const getGetSubjectsUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/subjects?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/subjects`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/subjects?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/subjects`;
 };
 
 export const getSubjects = async (
@@ -403,8 +403,8 @@ export const getGetUsagesUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/usages?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/usages`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/usages?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/usages`;
 };
 
 export const getUsages = async (
@@ -440,8 +440,8 @@ export const getGetContextsUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/contexts?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/contexts`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/contexts?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/contexts`;
 };
 
 export const getContexts = async (
@@ -477,8 +477,8 @@ export const getGetExecutionsUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/executions?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/executions`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/executions?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/executions`;
 };
 
 export const getExecutions = async (
@@ -514,8 +514,8 @@ export const getGetUnitsUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/units?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/units`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/units?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/units`;
 };
 
 export const getUnits = async (
@@ -551,8 +551,8 @@ export const getGetUnitsOfExecutionUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/units-of-execution?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/units-of-execution`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/units-of-execution?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/units-of-execution`;
 };
 
 export const getUnitsOfExecution = async (
@@ -587,8 +587,8 @@ export const getGetViewsUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/views?${stringifiedParams}`
-    : `/v1/${organization}/${project}/views`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/views?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/views`;
 };
 
 /**
@@ -610,7 +610,7 @@ export const getViews = async (
 };
 
 export const getCreateViewUrl = (organization: string, project: string) => {
-  return `/v1/${organization}/${project}/views`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/views`;
 };
 
 /**
@@ -659,7 +659,7 @@ export const getUpdateViewUrl = (
   project: string,
   view: string,
 ) => {
-  return `/v1/${organization}/${project}/views/${view}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/views/${encodeURIComponent(String(view))}`;
 };
 
 /**

@@ -23,7 +23,7 @@ export const getGetTemplatesUrl = (
   project: string,
   view: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/templates`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/templates`;
 };
 
 /**
@@ -50,7 +50,7 @@ export const getGetTemplateUrl = (
   view: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/template/${annotationType}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const getTemplate = async (
@@ -75,7 +75,7 @@ export const getSetTemplateUrl = (
   view: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/template/${annotationType}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const setTemplate = async (
@@ -127,7 +127,7 @@ export const getPatchTemplateUrl = (
   view: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/template/${annotationType}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const patchTemplate = async (
@@ -179,7 +179,7 @@ export const getDeleteTemplateUrl = (
   view: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/template/${annotationType}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const deleteTemplate = async (
@@ -204,7 +204,7 @@ export const getGetTemplateVersionsUrl = (
   view: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/template/${annotationType}/versions`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}/versions`;
 };
 
 export const getTemplateVersions = async (
@@ -230,7 +230,7 @@ export const getGetTemplateVersionUrl = (
   annotationType: string,
   version: number,
 ) => {
-  return `/v1/${organization}/${project}/${view}/template/${annotationType}/versions/${version}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}`;
 };
 
 export const getTemplateVersion = async (
@@ -275,8 +275,8 @@ export const getGetTemplateVersionDiffUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/template/${annotationType}/versions/${version}/diff?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/template/${annotationType}/versions/${version}/diff`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff`;
 };
 
 export const getTemplateVersionDiff = async (
@@ -324,8 +324,8 @@ export const getGetTemplateVersionDiffCustomUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/template/${annotationType}/versions/${version}/diff/${versionFrom}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/template/${annotationType}/versions/${version}/diff/${versionFrom}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/template/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}`;
 };
 
 export const getTemplateVersionDiffCustom = async (

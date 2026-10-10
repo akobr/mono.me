@@ -54,7 +54,7 @@ export const getGetConfigurationSchemaUrl = (
   view: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const getConfigurationSchema = async (
@@ -218,8 +218,8 @@ export const getSetConfigurationSchemaUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const setConfigurationSchema = async (
@@ -370,7 +370,7 @@ export const getDeleteConfigurationSchemaUrl = (
   view: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const deleteConfigurationSchema = async (
@@ -485,7 +485,7 @@ export const getGetAnnotationSchemaUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/${key}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}`;
 };
 
 export const getAnnotationSchema = async (
@@ -648,8 +648,8 @@ export const getSetAnnotationSchemaUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration-schema/${key}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration-schema/${key}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}`;
 };
 
 export const setAnnotationSchema = async (
@@ -793,7 +793,7 @@ export const getDeleteAnnotationSchemaUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/${key}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}`;
 };
 
 export const deleteAnnotationSchema = async (
@@ -904,7 +904,7 @@ export const getGetDescendantTypeSchemaUrl = (
   key: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const getDescendantTypeSchema = async (
@@ -1085,8 +1085,8 @@ export const getSetDescendantTypeSchemaUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const setDescendantTypeSchema = async (
@@ -1242,7 +1242,7 @@ export const getDeleteDescendantTypeSchemaUrl = (
   key: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}`;
 };
 
 export const deleteDescendantTypeSchema = async (
@@ -1361,7 +1361,7 @@ export const getGetCombinedConfigurationSchemaUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/${key}/definition`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/definition`;
 };
 
 export const getCombinedConfigurationSchema = async (
@@ -1513,7 +1513,7 @@ export const getGetConfigurationSchemasUrl = (
   project: string,
   view: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schemas`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schemas`;
 };
 
 /**
@@ -1651,7 +1651,7 @@ export const getGetSchemaVersionsUrl = (
   view: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}/versions`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}/versions`;
 };
 
 export const getSchemaVersions = async (
@@ -1805,7 +1805,7 @@ export const getGetSchemaVersionUrl = (
   annotationType: string,
   version: number,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}/versions/${version}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}`;
 };
 
 export const getSchemaVersion = async (
@@ -1987,8 +1987,8 @@ export const getGetSchemaVersionDiffUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}/versions/${version}/diff?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}/versions/${version}/diff`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff`;
 };
 
 export const getSchemaVersionDiff = async (
@@ -2181,8 +2181,8 @@ export const getGetSchemaVersionDiffCustomUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}/versions/${version}/diff/${versionFrom}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration-schema/type/${annotationType}/versions/${version}/diff/${versionFrom}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}`;
 };
 
 export const getSchemaVersionDiffCustom = async (
@@ -2373,7 +2373,7 @@ export const getGetAnnotationSchemaVersionsUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/${key}/versions`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/versions`;
 };
 
 export const getAnnotationSchemaVersions = async (
@@ -2527,7 +2527,7 @@ export const getGetAnnotationSchemaVersionUrl = (
   key: string,
   version: number,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/${key}/versions/${version}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}`;
 };
 
 export const getAnnotationSchemaVersion = async (
@@ -2703,8 +2703,8 @@ export const getGetAnnotationSchemaVersionDiffUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration-schema/${key}/versions/${version}/diff?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration-schema/${key}/versions/${version}/diff`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/diff?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/diff`;
 };
 
 export const getAnnotationSchemaVersionDiff = async (
@@ -2897,8 +2897,8 @@ export const getGetAnnotationSchemaVersionDiffCustomUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration-schema/${key}/versions/${version}/diff/${versionFrom}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration-schema/${key}/versions/${version}/diff/${versionFrom}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}`;
 };
 
 export const getAnnotationSchemaVersionDiffCustom = async (
@@ -3089,7 +3089,7 @@ export const getGetDescendantTypeSchemaVersionsUrl = (
   key: string,
   annotationType: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}/versions`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}/versions`;
 };
 
 export const getDescendantTypeSchemaVersions = async (
@@ -3261,7 +3261,7 @@ export const getGetDescendantTypeSchemaVersionUrl = (
   annotationType: string,
   version: number,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}/versions/${version}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}`;
 };
 
 export const getDescendantTypeSchemaVersion = async (
@@ -3456,8 +3456,8 @@ export const getGetDescendantTypeSchemaVersionDiffUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}/versions/${version}/diff?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}/versions/${version}/diff`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff`;
 };
 
 export const getDescendantTypeSchemaVersionDiff = async (
@@ -3663,8 +3663,8 @@ export const getGetDescendantTypeSchemaVersionDiffCustomUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}/versions/${version}/diff/${versionFrom}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration-schema/${key}/type/${annotationType}/versions/${version}/diff/${versionFrom}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration-schema/${encodeURIComponent(String(key))}/type/${encodeURIComponent(String(annotationType))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}`;
 };
 
 export const getDescendantTypeSchemaVersionDiffCustom = async (
