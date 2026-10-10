@@ -425,7 +425,7 @@ export const useCreateAccessPoint = <
   return useMutation(getCreateAccessPointMutationOptions(options), queryClient);
 };
 export const getGetAccessPointUrl = (key: string) => {
-  return `/v1/access/points/${key}`;
+  return `/v1/access/points/${encodeURIComponent(String(key))}`;
 };
 
 export const getAccessPoint = async (
@@ -747,7 +747,7 @@ export const getGetMachineAccessesUrl = (
   organization: string,
   project: string,
 ) => {
-  return `/v1/${organization}/${project}/access/machines`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/machines`;
 };
 
 export const getMachineAccesses = async (
@@ -867,7 +867,7 @@ export const getCreateMachineAccessUrl = (
   organization: string,
   project: string,
 ) => {
-  return `/v1/${organization}/${project}/access/machines`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/machines`;
 };
 
 export const createMachineAccess = async (
@@ -994,7 +994,7 @@ export const getGetMachineAccessUrl = (
   project: string,
   id: string,
 ) => {
-  return `/v1/${organization}/${project}/access/machines/${id}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/machines/${encodeURIComponent(String(id))}`;
 };
 
 export const getMachineAccess = async (
@@ -1122,7 +1122,7 @@ export const getResetMachineAccessUrl = (
   project: string,
   id: string,
 ) => {
-  return `/v1/${organization}/${project}/access/machines/${id}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/machines/${encodeURIComponent(String(id))}`;
 };
 
 export const resetMachineAccess = async (
@@ -1222,7 +1222,7 @@ export const getDeleteMachineAccessUrl = (
   project: string,
   id: string,
 ) => {
-  return `/v1/${organization}/${project}/access/machines/${id}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/machines/${encodeURIComponent(String(id))}`;
 };
 
 export const deleteMachineAccess = async (
@@ -1402,7 +1402,7 @@ export function useGetCertificateAuthority<
 }
 
 export const getSetMachineAuthenticationUrl = (key: string) => {
-  return `/v1/access/points/${key}/machine-authentication`;
+  return `/v1/access/points/${encodeURIComponent(String(key))}/machine-authentication`;
 };
 
 export const setMachineAuthentication = async (
@@ -1615,7 +1615,7 @@ export const getRenewMachineCertificateUrl = (
   project: string,
   id: string,
 ) => {
-  return `/v1/${organization}/${project}/access/machines/${id}/certificate/renew`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/machines/${encodeURIComponent(String(id))}/certificate/renew`;
 };
 
 export const renewMachineCertificate = async (
@@ -1714,7 +1714,7 @@ export const getGetSharedCertificatesUrl = (
   organization: string,
   project: string,
 ) => {
-  return `/v1/${organization}/${project}/access/certificates`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/certificates`;
 };
 
 export const getSharedCertificates = async (
@@ -1834,7 +1834,7 @@ export const getIssueSharedCertificateUrl = (
   organization: string,
   project: string,
 ) => {
-  return `/v1/${organization}/${project}/access/certificates`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/certificates`;
 };
 
 export const issueSharedCertificate = async (
@@ -1962,7 +1962,7 @@ export const getRevokeSharedCertificateUrl = (
   project: string,
   thumbprint: string,
 ) => {
-  return `/v1/${organization}/${project}/access/certificates/${thumbprint}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/certificates/${encodeURIComponent(String(thumbprint))}`;
 };
 
 export const revokeSharedCertificate = async (
@@ -2064,7 +2064,7 @@ export const useRevokeSharedCertificate = <
   );
 };
 export const getGetInvitationsUrl = (key: string) => {
-  return `/v1/access/points/${key}/invitations`;
+  return `/v1/access/points/${encodeURIComponent(String(key))}/invitations`;
 };
 
 /**
@@ -2155,7 +2155,7 @@ export function useGetInvitations<
 }
 
 export const getCreateInvitationUrl = (key: string) => {
-  return `/v1/access/points/${key}/invitations`;
+  return `/v1/access/points/${encodeURIComponent(String(key))}/invitations`;
 };
 
 /**
@@ -2273,7 +2273,7 @@ export const useCreateInvitation = <
   return useMutation(getCreateInvitationMutationOptions(options), queryClient);
 };
 export const getResendInvitationUrl = (key: string, id: string) => {
-  return `/v1/access/points/${key}/invitations/${id}/resend`;
+  return `/v1/access/points/${encodeURIComponent(String(key))}/invitations/${encodeURIComponent(String(id))}/resend`;
 };
 
 /**
@@ -2361,7 +2361,7 @@ export const useResendInvitation = <
   return useMutation(getResendInvitationMutationOptions(options), queryClient);
 };
 export const getRevokeInvitationUrl = (key: string, id: string) => {
-  return `/v1/access/points/${key}/invitations/${id}`;
+  return `/v1/access/points/${encodeURIComponent(String(key))}/invitations/${encodeURIComponent(String(id))}`;
 };
 
 /**
@@ -2532,7 +2532,7 @@ export function useGetMyInvitations<
 }
 
 export const getAcceptInvitationUrl = (id: string) => {
-  return `/v1/access/invitations/${id}/accept`;
+  return `/v1/access/invitations/${encodeURIComponent(String(id))}/accept`;
 };
 
 /**
@@ -2619,7 +2619,7 @@ export const useAcceptInvitation = <
   return useMutation(getAcceptInvitationMutationOptions(options), queryClient);
 };
 export const getDeclineInvitationUrl = (id: string) => {
-  return `/v1/access/invitations/${id}/decline`;
+  return `/v1/access/invitations/${encodeURIComponent(String(id))}/decline`;
 };
 
 /**
@@ -2706,7 +2706,7 @@ export const useDeclineInvitation = <
   return useMutation(getDeclineInvitationMutationOptions(options), queryClient);
 };
 export const getGetMembersUrl = (key: string) => {
-  return `/v1/access/points/${key}/members`;
+  return `/v1/access/points/${encodeURIComponent(String(key))}/members`;
 };
 
 /**
@@ -2793,7 +2793,7 @@ export function useGetMembers<
 }
 
 export const getSetMemberRoleUrl = (key: string, accountId: string) => {
-  return `/v1/access/points/${key}/members/${accountId}`;
+  return `/v1/access/points/${encodeURIComponent(String(key))}/members/${encodeURIComponent(String(accountId))}`;
 };
 
 /**
@@ -2914,7 +2914,7 @@ export const useSetMemberRole = <
   return useMutation(getSetMemberRoleMutationOptions(options), queryClient);
 };
 export const getRemoveMemberUrl = (key: string, accountId: string) => {
-  return `/v1/access/points/${key}/members/${accountId}`;
+  return `/v1/access/points/${encodeURIComponent(String(key))}/members/${encodeURIComponent(String(accountId))}`;
 };
 
 /**

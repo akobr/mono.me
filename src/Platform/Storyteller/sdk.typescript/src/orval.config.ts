@@ -1,7 +1,11 @@
 import { defineConfig } from 'orval'
 
 // The OpenAPI document is passed by scripts/generate.mjs (SPEC), newest open.api.v*.json by default.
-const spec = process.env.SPEC ?? '../open.api.v0.8.91.json'
+const spec = process.env.SPEC
+
+if (!spec) {
+  throw new Error('SPEC is not set: generate the SDK with "npm run generate", which picks the OpenAPI document.')
+}
 const mutator = { path: 'lib/fetcher.ts', name: 'storytellerFetch' }
 
 // Corrections of the document before generation, see the script.
@@ -17,6 +21,8 @@ export default defineConfig({
       schemas: 'generated/model',
       client: 'fetch',
       httpClient: 'fetch',
+      // Annotation names may contain '#', '?' or '%', so every path parameter is encoded.
+      urlEncodeParameters: true,
       formatter: 'prettier',
       override: {
         mutator,
@@ -33,6 +39,8 @@ export default defineConfig({
       schemas: 'generated/model',
       client: 'vue-query',
       httpClient: 'fetch',
+      // Annotation names may contain '#', '?' or '%', so every path parameter is encoded.
+      urlEncodeParameters: true,
       formatter: 'prettier',
       mock: {
         generators: [{ type: 'msw', useExamples: true, delay: false, baseUrl: '*/api' }],

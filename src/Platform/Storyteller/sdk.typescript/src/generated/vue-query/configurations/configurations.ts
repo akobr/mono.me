@@ -60,8 +60,8 @@ export const getGetConfigurationsUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configurations?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configurations`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configurations?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configurations`;
 };
 
 /**
@@ -213,7 +213,7 @@ export const getGetConfigurationUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration/${key}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}`;
 };
 
 export const getConfiguration = async (
@@ -369,8 +369,8 @@ export const getSetConfigurationUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration/${key}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration/${key}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}`;
 };
 
 export const setConfiguration = async (
@@ -523,8 +523,8 @@ export const getPatchConfigurationUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration/${key}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration/${key}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}`;
 };
 
 export const patchConfiguration = async (
@@ -667,7 +667,7 @@ export const getDeleteConfigurationUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration/${key}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}`;
 };
 
 export const deleteConfiguration = async (
@@ -776,7 +776,7 @@ export const getGetResolvedConfigurationUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration/${key}/resolved`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/resolved`;
 };
 
 export const getResolvedConfiguration = async (
@@ -929,7 +929,7 @@ export const getGetConfigurationVersionsUrl = (
   view: string,
   key: string,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration/${key}/versions`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions`;
 };
 
 export const getConfigurationVersions = async (
@@ -1083,7 +1083,7 @@ export const getGetConfigurationVersionUrl = (
   key: string,
   version: number,
 ) => {
-  return `/v1/${organization}/${project}/${view}/configuration/${key}/versions/${version}`;
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}`;
 };
 
 export const getConfigurationVersion = async (
@@ -1258,8 +1258,8 @@ export const getGetConfigurationVersionDiffUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration/${key}/versions/${version}/diff?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration/${key}/versions/${version}/diff`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/diff?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/diff`;
 };
 
 export const getConfigurationVersionDiff = async (
@@ -1452,8 +1452,8 @@ export const getGetConfigurationVersionDiffCustomUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration/${key}/versions/${version}/diff/${versionFrom}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration/${key}/versions/${version}/diff/${versionFrom}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/versions/${encodeURIComponent(String(version))}/diff/${encodeURIComponent(String(versionFrom))}`;
 };
 
 export const getConfigurationVersionDiffCustom = async (
@@ -1656,8 +1656,8 @@ export const getGetConfigurationViewDiffUrl = (
   const stringifiedParams = normalizedParams.toString();
 
   return stringifiedParams.length > 0
-    ? `/v1/${organization}/${project}/${view}/configuration/${key}/diff/${viewTo}?${stringifiedParams}`
-    : `/v1/${organization}/${project}/${view}/configuration/${key}/diff/${viewTo}`;
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/diff/${encodeURIComponent(String(viewTo))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/diff/${encodeURIComponent(String(viewTo))}`;
 };
 
 export const getConfigurationViewDiff = async (
