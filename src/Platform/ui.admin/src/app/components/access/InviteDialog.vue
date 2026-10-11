@@ -9,8 +9,8 @@ import { errorMessage } from '@/utils/errors'
 import { assignableRoles, type AssignableRole } from '@/utils/roles'
 
 /**
- * Invite people (companion spec E3): one or more emails, a role and an expiry (7 days by default). Storyteller
- * stores the invitation; WorkOS sends the email.
+ * Invite people (companion spec E3): one or more emails, a role and an expiry (7 days by default, 30 at most:
+ * InvitationOptions.MaxExpiresInDays). Storyteller stores the invitation; WorkOS sends the email.
  */
 const props = defineProps<{ accessPointKey: string }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -87,7 +87,7 @@ async function send() {
             <USelect v-model="role" :items="roles" class="w-full" />
           </UFormField>
           <UFormField label="Expires after (days)">
-            <UInputNumber v-model="days" :min="1" :max="90" class="w-full" />
+            <UInputNumber v-model="days" :min="1" :max="30" class="w-full" />
           </UFormField>
         </div>
         <ul v-if="failures.length" class="space-y-0.5 text-xs text-error" role="alert">
