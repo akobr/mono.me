@@ -66,6 +66,20 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
     view.host.unmount()
   })
 
+  it('replaces an object array with a binding expression through the fx toggle', async () => {
+    const { view, updates } = mountForm({ modelValue: { retries: 1, tiers: [{ name: 'gold' }] } })
+    await settle(6)
+
+    await field(view, '/tiers')
+      .findAll('button')
+      .find((button) => button.text() === 'fx')!
+      .trigger('click')
+    await settle()
+
+    expect(updates.at(-1)).toEqual({ retries: 1, tiers: '@' })
+    view.host.unmount()
+  })
+
   it('emits the edited document and removes emptied values', async () => {
     const { view, updates } = mountForm({ modelValue: { retries: 1, title: 'x' } })
     await settle(6)
