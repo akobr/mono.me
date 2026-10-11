@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using _42.Platform.Storyteller.Annotating;
@@ -621,7 +622,7 @@ public class AnnotationsController : ControllerBase
 
         try
         {
-            await _annotations.CreateAnnotationAsync(tenant, typedAnnotation);
+            await _annotations.CreateAnnotationAsync(tenant, typedAnnotation, GetAuditActor());
         }
         catch (Exception e)
         {
@@ -652,5 +653,12 @@ public class AnnotationsController : ControllerBase
         return new OkObjectResult(jobGuid);
     }
 
+    private AuditActor GetAuditActor()
+    {
+        var id = User.FindFirst("sub")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
+        return id is null
+            ? AuditActor.System
+            : new AuditActor { Kind = AuditActorKind.Account, Id = id, Name = User.FindFirst("name")?.Value };
+    }
 }

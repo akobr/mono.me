@@ -26,15 +26,14 @@ public interface IConfigurationService
 
     Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key);
 
-    Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author, bool force = false);
+    // With an actor, the change is also recorded in the annotation's audit (best effort, after the write).
+    Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author, bool force = false, AuditActor? actor = null);
 
-    Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author, bool force = false);
+    Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author, bool force = false, AuditActor? actor = null);
 
-    Task ClearConfigurationAsync(FullKey key);
+    Task ClearConfigurationAsync(FullKey key, AuditActor? actor = null);
 
-    Task DeleteAsync(FullKey key);
-
-    Task DeleteWithDescendantsAsync(FullKey key);
+    Task DeleteAsync(FullKey key, AuditActor? actor = null);
 
     Task<IReadOnlyCollection<ConfigurationVersion>> GetConfigurationVersionsAsync(FullKey key);
 

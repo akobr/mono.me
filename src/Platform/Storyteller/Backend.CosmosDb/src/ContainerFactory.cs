@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Entities;
@@ -10,6 +13,10 @@ namespace _42.Platform.Storyteller;
 
 public class ContainerFactory : IContainerFactory
 {
+    // Organization containers: TTL on without a default expiry (only items with a ttl expire: versions, and the
+    // items of soft-deleted annotations), and the audit entries left out of the index.
+    public const string AuditEntriesPath = "/Entries/*";
+
     private readonly ICosmosClientProvider _cosmosClientProvider;
     private readonly CosmosDbOptions _options;
     private readonly AsyncLazy<Database> _database;
@@ -24,10 +31,20 @@ public class ContainerFactory : IContainerFactory
     public async Task<Container> CreateContainerIfNotExistsAsync(string containerName)
     {
         var database = await _database;
+        var properties = new ContainerProperties(containerName, $"/{nameof(Entity.PartitionKey)}");
+        var isOrganization = containerName.StartsWith(CosmosConstants.OrganizationContainerNamePrefix, StringComparison.Ordinal);
 
-        var containerResult = await database.CreateContainerIfNotExistsAsync(
-            id: containerName,
-            partitionKeyPath: $"/{nameof(Entity.PartitionKey)}");
+        if (isOrganization)
+        {
+            ApplySettings(properties);
+        }
+
+        var containerResult = await database.CreateContainerIfNotExistsAsync(properties);
+
+        if (isOrganization)
+        {
+            await EnsureContainerSettingsAsync(containerResult.Container);
+        }
 
         await containerResult.Container.UpsertStoredProcedureAsync(new StoredProcedureProperties
         {
@@ -131,6 +148,69 @@ public class ContainerFactory : IContainerFactory
         });
 
         return containerResult.Container;
+    }
+
+    // Containers created before the settings existed get them on the next start of DbCreator.
+    public async Task EnsureContainerSettingsAsync(Container container)
+    {
+        var response = await container.ReadContainerAsync();
+        var properties = response.Resource;
+
+        if (ApplySettings(properties))
+        {
+            await container.ReplaceContainerAsync(properties);
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> EnsureOrganizationContainersAsync()
+    {
+        var database = await _database;
+        var updated = new List<string>();
+        using var iterator = database.GetContainerQueryIterator<ContainerProperties>();
+
+        while (iterator.HasMoreResults)
+        {
+            foreach (var properties in await iterator.ReadNextAsync())
+            {
+                if (!properties.Id.StartsWith(CosmosConstants.OrganizationContainerNamePrefix, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                await EnsureContainerSettingsAsync(database.GetContainer(properties.Id));
+                updated.Add(properties.Id);
+            }
+        }
+
+        return updated;
+    }
+
+    // Returns whether anything changed.
+    private static bool ApplySettings(ContainerProperties properties)
+    {
+        var changed = false;
+
+        if (properties.DefaultTimeToLive is null)
+        {
+            properties.DefaultTimeToLive = -1;
+            changed = true;
+        }
+
+        var policy = properties.IndexingPolicy;
+
+        if (policy.IncludedPaths.Count == 0)
+        {
+            policy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
+            changed = true;
+        }
+
+        if (!policy.ExcludedPaths.Any(path => string.Equals(path.Path, AuditEntriesPath, StringComparison.Ordinal)))
+        {
+            policy.ExcludedPaths.Add(new ExcludedPath { Path = AuditEntriesPath });
+            changed = true;
+        }
+
+        return changed;
     }
 
     private async Task<Database> BuildDatabase()

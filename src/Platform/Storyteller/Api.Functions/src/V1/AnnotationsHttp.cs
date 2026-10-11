@@ -451,11 +451,11 @@ public class AnnotationsHttp
             // one is replaced. The decision was made on the method name, which never matched ("post" vs "POST").
             if (await _annotations.ExistAnnotationAsync(annotation.GetFullKey(organization)))
             {
-                await _annotations.UpdateAnnotationAsync(organization, annotation);
+                await _annotations.UpdateAnnotationAsync(organization, annotation, request.GetAuditActor());
             }
             else
             {
-                await _annotations.CreateAnnotationAsync(organization, annotation);
+                await _annotations.CreateAnnotationAsync(organization, annotation, request.GetAuditActor());
             }
         }
         catch (Exception exception)
@@ -499,7 +499,7 @@ public class AnnotationsHttp
             return new BadRequestObjectResult(new ErrorResponse($"The number of annotations to create is too large, maximum allowed is {ApiConstants.MaxInputItems}."));
         }
 
-        var createdAnnotations = await _annotations.CreateAnnotationsAsync(organization, annotationsToProcess);
+        var createdAnnotations = await _annotations.CreateAnnotationsAsync(organization, annotationsToProcess, request.GetAuditActor());
         return new OkObjectResult(createdAnnotations);
     }
 
@@ -531,7 +531,7 @@ public class AnnotationsHttp
             return new BadRequestObjectResult(new ErrorResponse($"The number of annotations to create is too large, maximum allowed is {ApiConstants.MaxInputItems}."));
         }
 
-        var createdAnnotations = await _annotations.CreateAnnotationsFromStringAsync(organization, annotations);
+        var createdAnnotations = await _annotations.CreateAnnotationsFromStringAsync(organization, annotations, request.GetAuditActor());
         return new OkObjectResult(createdAnnotations);
     }
 
@@ -572,7 +572,7 @@ public class AnnotationsHttp
             return new NotFoundResult();
         }
 
-        await _annotations.DeleteAnnotationAsync(fullKey);
+        await _annotations.DeleteAnnotationAsync(fullKey, request.GetAuditActor());
         return new OkObjectResult(annotation);
     }
 

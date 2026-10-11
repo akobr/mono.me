@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Entities.Annotations;
 
 namespace _42.Platform.Storyteller;
@@ -8,16 +9,18 @@ internal static class AnnotationMappings
 {
     public static Annotation ToModel(this AnnotationEntity entity)
     {
-        return entity switch
+        var annotation = ToTypedModel(entity);
+
+        return annotation with
         {
-            ResponsibilityEntity e => e.ToResponsibility(),
-            SubjectEntity e => e.ToSubject(),
-            UsageEntity e => e.ToUsage(),
-            ContextEntity e => e.ToContext(),
-            ExecutionEntity e => e.ToExecution(),
-            UnitEntity e => e.ToUnit(),
-            UnitOfExecutionEntity e => e.ToUnitOfExecution(),
-            _ => throw new NotSupportedException($"Unsupported annotation entity type: {entity.GetType().Name}"),
+            Created = entity.Created,
+            Modified = entity.Modified,
+            Deletion = entity.Deletion is null
+                ? null
+                : entity.Deletion with
+                {
+                    PurgeAt = DeletionRetention.GetPurgeAt(entity.LastUpdatedEpochTimestamp, entity.TimeToLiveInSeconds),
+                },
         };
     }
 
@@ -38,6 +41,21 @@ internal static class AnnotationMappings
             Unit m => m.ToUnitEntity(),
             UnitOfExecution m => m.ToUnitOfExecutionEntity(),
             _ => throw new NotSupportedException($"Unsupported annotation type: {annotation.GetType().Name}"),
+        };
+    }
+
+    private static Annotation ToTypedModel(AnnotationEntity entity)
+    {
+        return entity switch
+        {
+            ResponsibilityEntity e => e.ToResponsibility(),
+            SubjectEntity e => e.ToSubject(),
+            UsageEntity e => e.ToUsage(),
+            ContextEntity e => e.ToContext(),
+            ExecutionEntity e => e.ToExecution(),
+            UnitEntity e => e.ToUnit(),
+            UnitOfExecutionEntity e => e.ToUnitOfExecution(),
+            _ => throw new NotSupportedException($"Unsupported annotation entity type: {entity.GetType().Name}"),
         };
     }
 

@@ -32,4 +32,10 @@ public interface IAnnotation
     IReadOnlyList<string>? Labels { get; }
 
     IReadOnlyDictionary<string, object>? Values { get; }
+
+    AuditStamp? Created { get; }
+
+    AuditStamp? Modified { get; }
+
+    AnnotationDeletion? Deletion { get; }
 }

@@ -200,14 +200,26 @@ public class AnnotationBindingFunctionTests
 
         public Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request) => throw new NotSupportedException();
 
-        public Task<IEnumerable<Annotation>> CreateAnnotationAsync(string organization, Annotation annotation) => throw new NotSupportedException();
+        public Task<Annotation?> GetDeletedAnnotationAsync(FullKey fullKey) => throw new NotSupportedException();
 
-        public Task UpdateAnnotationAsync(string organization, Annotation annotation) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, IReadOnlyCollection<AnnotationKey> keys) => throw new NotSupportedException();
 
-        public Task<IEnumerable<Annotation>> CreateAnnotationsAsync(string organization, IEnumerable<Annotation> annotations) => throw new NotSupportedException();
+        public Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor) => throw new NotSupportedException();
 
-        public Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, IEnumerable<string> annotations) => throw new NotSupportedException();
+        public Task<IEnumerable<Annotation>> CreateAnnotationAsync(string organization, Annotation annotation, AuditActor actor) => throw new NotSupportedException();
 
-        public Task DeleteAnnotationAsync(FullKey fullKey) => throw new NotSupportedException();
+        public Task UpdateAnnotationAsync(string organization, Annotation annotation, AuditActor actor) => throw new NotSupportedException();
+
+        public Task<IEnumerable<Annotation>> CreateAnnotationsAsync(string organization, IEnumerable<Annotation> annotations, AuditActor actor) => throw new NotSupportedException();
+
+        public Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, IEnumerable<string> annotations, AuditActor actor) => throw new NotSupportedException();
+
+        public Task<AnnotationDeletionResult> DeleteAnnotationAsync(FullKey fullKey, AuditActor actor) => throw new NotSupportedException();
+
+        public Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, IReadOnlyCollection<AnnotationKey> keys, AuditActor actor, bool includeDescendants = true) => throw new NotSupportedException();
+
+        public Task<AnnotationPurgeResult> PurgeAnnotationAsync(FullKey fullKey, AuditActor actor) => throw new NotSupportedException();
+
+        public Task<AnnotationHistory?> GetAnnotationHistoryAsync(FullKey fullKey) => throw new NotSupportedException();
     }
 }

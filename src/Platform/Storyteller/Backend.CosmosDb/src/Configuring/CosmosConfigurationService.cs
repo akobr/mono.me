@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
@@ -28,6 +29,7 @@ public class CosmosConfigurationService : IConfigurationService
     private readonly JsonSerializerSettings _serializerOptions;
     private readonly JsonContentDiffer _differ;
     private readonly ILogger<CosmosConfigurationService> _logger;
+    private readonly AnnotationAuditStore? _auditStore;
 
     public CosmosConfigurationService(
         IContainerRepositoryProvider repositoryProvider,
@@ -35,8 +37,10 @@ public class CosmosConfigurationService : IConfigurationService
         IOptions<JsonSerializerSettings> serializerOptions,
         IConfigurationBindingResolver bindingResolver = null,
         IConfigurationSchemaService schemaService = null,
-        ILogger<CosmosConfigurationService> logger = null)
+        ILogger<CosmosConfigurationService> logger = null,
+        AnnotationAuditStore? auditStore = null)
     {
+        _auditStore = auditStore;
         _repositoryProvider = repositoryProvider;
         _bindingResolver = bindingResolver;
         _schemaService = schemaService;
@@ -56,7 +60,9 @@ public class CosmosConfigurationService : IConfigurationService
             id,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
-        return configuration is not null && configuration.Content.HasValues;
+        return configuration is not null
+               && configuration.AnnotationDeletionId is null
+               && configuration.Content.HasValues;
     }
 
     public async Task<ConfigurationsResponse> ListConfigurationsAsync(
@@ -70,7 +76,8 @@ public class CosmosConfigurationService : IConfigurationService
         var idPrefix = $"{view}.{EntityIdPrefixTypes.Configuration}.";
         var text = "SELECT c.AnnotationKey, c.Version, c.Author, c.CalculatedContentHash, c._ts, "
             + "(IS_OBJECT(c.Content) AND ARRAY_LENGTH(ObjectToArray(c.Content)) > 0) AS HasContent "
-            + "FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND STARTSWITH(c.id, @idPrefix)";
+            + "FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND STARTSWITH(c.id, @idPrefix) "
+            + "AND NOT IS_DEFINED(c.AnnotationDeletionId)";
 
         if (!string.IsNullOrWhiteSpace(annotationType))
         {
@@ -136,13 +143,16 @@ public class CosmosConfigurationService : IConfigurationService
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
 
-        if (configuration is null)
+        // the configuration of a soft-deleted annotation is hidden until a restore
+        if (configuration?.AnnotationDeletionId is not null)
         {
-            var annotationExist = await repository.Container.ExistsAsync(key);
-            if (!annotationExist)
-            {
-                return null;
-            }
+            return null;
+        }
+
+        if (configuration is null
+            && await AnnotationItemStore.ReadStateAsync(repository.Container, key) != AnnotationItemState.Active)
+        {
+            return null;
         }
 
         if (configuration?.CalculatedContent is not null)
@@ -187,8 +197,7 @@ public class CosmosConfigurationService : IConfigurationService
     public async Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
-        var annotationExist = await repository.Container.ExistsAsync(key);
-        if (!annotationExist)
+        if (await AnnotationItemStore.ReadStateAsync(repository.Container, key) != AnnotationItemState.Active)
         {
             return null;
         }
@@ -214,6 +223,13 @@ public class CosmosConfigurationService : IConfigurationService
     public async Task<IReadOnlyCollection<ConfigurationVersion>> GetConfigurationVersionsAsync(FullKey key)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
+
+        // the versions of a soft-deleted annotation are hidden until a restore
+        if (await AnnotationItemStore.ReadStateAsync(repository.Container, key) == AnnotationItemState.Deleted)
+        {
+            return [];
+        }
+
         var annotationKey = key.Annotation.ToString();
         var partitionKeyValue = key.GetPartitionKey();
         var partitionKey = new PartitionKey(partitionKeyValue);
@@ -251,6 +267,12 @@ public class CosmosConfigurationService : IConfigurationService
     public async Task<Configuration?> GetConfigurationVersionContentAsync(FullKey key, uint version)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
+
+        if (await AnnotationItemStore.ReadStateAsync(repository.Container, key) == AnnotationItemState.Deleted)
+        {
+            return null;
+        }
+
         var annotationKey = key.Annotation.ToString();
         var partitionKeyValue = key.GetPartitionKey();
         var partitionKey = new PartitionKey(partitionKeyValue);
@@ -304,7 +326,7 @@ public class CosmosConfigurationService : IConfigurationService
             $"Unknown configuration for {sourceKey.Annotation} in view {toView}.");
     }
 
-    public async Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author, bool force = false)
+    public async Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author, bool force = false, AuditActor? actor = null)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
@@ -317,6 +339,8 @@ public class CosmosConfigurationService : IConfigurationService
             id,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
 
         if (existingConfiguration is null)
         {
@@ -350,6 +374,7 @@ public class CosmosConfigurationService : IConfigurationService
             };
 
             await repository.Container.CreateItemAsync(configuration, partitionKey);
+            await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, configuration.Version);
             return configuration.ToConfiguration();
         }
 
@@ -416,11 +441,12 @@ public class CosmosConfigurationService : IConfigurationService
             CalculatedContentHash = null,
         };
         await repository.Container.UpsertItemAsync(newConfiguration, partitionKey);
+        await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, newConfiguration.Version);
 
         return newConfiguration.ToConfigurationFromContent();
     }
 
-    public async Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author, bool force = false)
+    public async Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author, bool force = false, AuditActor? actor = null)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
@@ -433,6 +459,8 @@ public class CosmosConfigurationService : IConfigurationService
             id,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
 
         if (existingConfiguration is null)
         {
@@ -508,10 +536,11 @@ public class CosmosConfigurationService : IConfigurationService
                 response.StatusCode);
         }
 
+        await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, newConfiguration.Version);
         return newConfiguration.ToConfigurationFromContent();
     }
 
-    public async Task ClearConfigurationAsync(FullKey key)
+    public async Task ClearConfigurationAsync(FullKey key, AuditActor? actor = null)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
@@ -524,6 +553,8 @@ public class CosmosConfigurationService : IConfigurationService
             id,
             partitionKey,
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
 
         if (existingConfiguration is null
             || !existingConfiguration.Content.HasValues)
@@ -554,130 +585,24 @@ public class CosmosConfigurationService : IConfigurationService
         transaction.DeleteItem(id);
         await transaction.ExecuteAsync();
         await InvalidateConfigurationsAsync(key, repository);
+        await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationDeleted, historyVersion);
     }
 
-    public async Task DeleteAsync(FullKey key)
+    public async Task DeleteAsync(FullKey key, AuditActor? actor = null)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
+        var existingConfiguration = await repository.Container.TryReadItemAsync(
+            $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{key.Annotation}",
+            key.GetCosmosPartitionKey(),
+            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+
+        await EnsureAnnotationNotDeletedAsync(key, repository, existingConfiguration);
         await ForceDeleteConfigurationAsync(key, repository);
         await InvalidateConfigurationsAsync(key, repository);
-    }
 
-    public async Task DeleteWithDescendantsAsync(FullKey key)
-    {
-        var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
-
-        switch (key.Annotation.Type)
+        if (existingConfiguration?.Content.HasValues == true)
         {
-            case AnnotationType.Responsibility:
-            {
-                // delete all units, usages, executions, unit-of-executions, and the responsibility (one responsibility partition)
-                // delete all configuration in one responsibility partition
-                await DeleteConfigurationsAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}."),
-                    key.GetCosmosPartitionKey());
-                return;
-            }
-
-            case AnnotationType.Unit:
-            {
-                // delete all unit-of-executions, and the unit (one responsibility partition)
-                await DeleteConfigurationsAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && ((config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.") && config.Id.EndsWith($".{key.Annotation.UnitName}"))
-                            || config.Id == key.Annotation.ToString()),
-                    key.GetCosmosPartitionKey());
-                return;
-            }
-
-            case AnnotationType.Usage:
-            {
-                // delete all executions, unit-of-executions, and the usage (one responsibility partition)
-                await DeleteConfigurationsAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.")
-                            || config.Id == key.Annotation.ToString()),
-                    key.GetCosmosPartitionKey());
-                return;
-            }
-
-            case AnnotationType.Subject:
-            {
-                // delete all usages, contexts, executions, unit-of-executions, and the subject
-                // delete the configurations in the responsibility partitions
-                await DeleteConfigurationsAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Usage}.{key.Annotation.SubjectName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.")
-                            || config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.")));
-
-                // delete the configurations in the subject partition
-                await DeleteConfigurationsAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Context}.")
-                            || config.Id == key.Annotation.ToString()),
-                    key.GetCosmosPartitionKey());
-                return;
-            }
-
-            case AnnotationType.Context:
-            {
-                // delete all executions, unit-of-executions, and the context
-                // delete the configurations in the responsibility partitions
-                await DeleteConfigurationsAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && ((config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.Execution}.{key.Annotation.SubjectName}.") && config.Id.EndsWith($".{key.Annotation.ContextName}"))
-                            || (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.") && config.Id.Contains($".{key.Annotation.ContextName}."))));
-                // delete the context (in subject partition)
-                await ForceDeleteConfigurationAsync(key, repository);
-                return;
-            }
-
-            case AnnotationType.Execution:
-            {
-                // delete all unit-of-executions and the execution (one responsibility partition)
-                await DeleteConfigurationsAsync(
-                    repository,
-                    config =>
-                        config.ProjectName == key.ProjectName
-                        && config.ViewName == key.ViewName
-                        && (config.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{AnnotationTypeCodes.UnitOfExecution}.{key.Annotation.SubjectName}.{key.Annotation.ResponsibilityName}.{key.Annotation.ContextName}.")
-                            || config.Id == key.Annotation.ToString()),
-                    key.GetCosmosPartitionKey());
-                return;
-            }
-
-            case AnnotationType.UnitOfExecution:
-            {
-                // delete only the unit-of-execution (it is the deepest configuration)
-                await ForceDeleteConfigurationAsync(key, repository);
-                return;
-            }
-
-            default:
-            {
-                throw new ArgumentOutOfRangeException(nameof(key.Annotation.Type));
-            }
+            await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationDeleted, existingConfiguration.Version);
         }
     }
 
@@ -1053,115 +978,38 @@ public class CosmosConfigurationService : IConfigurationService
         await transaction.ExecuteAsync();
     }
 
-    private static Task DeleteConfigurationsAsync(
-        IContainerRepository repository,
-        Expression<Func<ConfigurationEntity, bool>> predicate)
+    // A soft-deleted annotation's configuration cannot change until a restore.
+    private static async Task EnsureAnnotationNotDeletedAsync(FullKey key, IContainerRepository repository, ConfigurationEntity? existingConfiguration)
     {
-        var queryable = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
-            allowSynchronousQueryExecution: true);
+        var isDeleted = existingConfiguration is not null
+            ? existingConfiguration.AnnotationDeletionId is not null
+            : await AnnotationItemStore.ReadStateAsync(repository.Container, key) == AnnotationItemState.Deleted;
 
-        var groups = queryable
-            .Where(predicate)
-            .ToList()
-            .GroupBy(config => config.PartitionKey);
-
-        var transactionTasks = new List<Task>();
-
-        foreach (var group in groups)
+        if (isDeleted)
         {
-            var partitionKey = new PartitionKey(group.Key);
-            var batchItemCount = 0;
-            var batch = repository.Container.CreateTransactionalBatch(partitionKey);
-            foreach (var configEntity in group)
-            {
-                if (configEntity.Content.HasValues)
-                {
-                    var historyVersion = configEntity.Version;
-                    var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{configEntity.AnnotationKey}.{historyVersion}";
-                    var historyId = $"{configEntity.ViewName}.{historyKey}";
-
-                    ++batchItemCount;
-                    batch.CreateItem(new ConfigurationHistoryEntity
-                    {
-                        PartitionKey = group.Key,
-                        Id = historyId,
-                        AnnotationKey = configEntity.AnnotationKey,
-                        Version = historyVersion,
-                        Name = configEntity.Name,
-                        ProjectName = configEntity.ProjectName,
-                        ViewName = configEntity.ViewName,
-                        Content = configEntity.Content,
-                        CreationTime = configEntity.GetLastUpdatedTime(),
-                        Author = configEntity.Author,
-                    });
-                }
-
-                ++batchItemCount;
-                batch.DeleteItem(configEntity.Id);
-            }
-
-            if (batchItemCount > 0)
-            {
-                transactionTasks.Add(batch.ExecuteAsync());
-            }
+            throw new ConflictException(
+                $"The annotation '{key.Annotation}' is deleted; restore it before changing its configuration.",
+                ErrorCodes.AnnotationDeleted);
         }
-
-        return Task.WhenAll(transactionTasks);
     }
 
-    private static async Task DeleteConfigurationsAsync(
-        IContainerRepository repository,
-        Expression<Func<ConfigurationEntity, bool>> predicate,
-        PartitionKey partitionKey)
+    // Configuration changes appear in the annotation's history as version references. Best effort: the configuration
+    // is already written, so a failed append is logged and the request still succeeds.
+    private async Task AuditConfigurationAsync(FullKey key, IContainerRepository repository, AuditActor? actor, AnnotationAuditAction action, ulong version)
     {
-        var queryable = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
-            requestOptions: new QueryRequestOptions
-            {
-                PartitionKey = partitionKey,
-                MaxItemCount = CosmosConstants.MaxItemCountPerPage,
-            });
-
-        var feed = queryable
-            .Where(predicate)
-            .ToFeedIterator();
-
-        var batchItemCount = 0;
-        var batch = repository.Container.CreateTransactionalBatch(partitionKey);
-        while (feed.HasMoreResults)
+        if (actor is null || _auditStore is null)
         {
-            var ids = await feed.ReadNextAsync();
-            foreach (var configEntity in ids)
-            {
-                if (configEntity.Content.HasValues)
-                {
-                    var historyVersion = configEntity.Version;
-                    var historyKey = $"{EntityIdPrefixTypes.ConfigurationVersion}.{configEntity.AnnotationKey}.{historyVersion}";
-                    var historyId = $"{configEntity.ViewName}.{historyKey}";
-
-                    ++batchItemCount;
-                    batch.CreateItem(new ConfigurationHistoryEntity
-                    {
-                        PartitionKey = configEntity.PartitionKey,
-                        Id = historyId,
-                        AnnotationKey = configEntity.AnnotationKey,
-                        Version = historyVersion,
-                        Name = configEntity.Name,
-                        ProjectName = configEntity.ProjectName,
-                        ViewName = configEntity.ViewName,
-                        Content = configEntity.Content,
-                        CreationTime = configEntity.GetLastUpdatedTime(),
-                        Author = configEntity.Author,
-                    });
-                }
-
-                ++batchItemCount;
-                batch.DeleteItem(configEntity.Id);
-            }
+            return;
         }
 
-        if (batchItemCount > 0)
+        try
         {
-            await batch.ExecuteAsync();
+            var entry = AnnotationAuditStore.NewEntry(action, actor, _auditStore.GetNow()) with { ConfigurationVersion = version };
+            await _auditStore.AppendAsync(repository.Container, key, entry);
+        }
+        catch (Exception exception)
+        {
+            _logger.LogWarning(exception, "The configuration change of {AnnotationKey} was not recorded in its audit.", key.Annotation.ToString());
         }
     }
 

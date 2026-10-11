@@ -10,4 +10,5 @@ public static class EntityIdPrefixTypes
     public const string GenerateTemplate = "gen";
     public const string GenerateTemplateVersion = "gnv";
     public const string GenerateTemplateState = "gns";
+    public const string AnnotationAudit = "adt";
 }
