@@ -3,6 +3,7 @@ import type { Annotation } from '@42for.net/2splatform.sdk'
 import { annotationStatus } from '@/utils/annotation-status'
 import { expandableKeys, projectTree, type TreeNode } from '@/utils/tree-projection'
 import { codeOfKey, metaOf } from '@/utils/annotation-key'
+import { withRelations } from '@/utils/annotation-relations'
 import { labelColor, normalizeLabels } from '@/utils/labels'
 import { renderInlineMarkdown } from '@/utils/markdown'
 
@@ -103,6 +104,37 @@ describe('projectTree', () => {
       ['uxe.northwind.invoicing.prod.pdf', true, 3],
     ])
     expect(expandableKeys(roots)).toEqual(['sbt.northwind', 'cnt.northwind.prod', 'exe.northwind.invoicing.prod'])
+  })
+})
+
+describe('withRelations', () => {
+  it('derives the members the runtime types require from the key', () => {
+    expect(withRelations(annotation('exe.northwind.invoicing.prod'))).toMatchObject({
+      SubjectKey: 'sbt.northwind',
+      SubjectName: 'northwind',
+      ResponsibilityKey: 'rst.invoicing',
+      ResponsibilityName: 'invoicing',
+      ContextKey: 'cnt.northwind.prod',
+      ContextName: 'prod',
+      UsageKey: 'usg.northwind.invoicing',
+    })
+    expect(withRelations(annotation('uxe.northwind.invoicing.prod.worker'))).toMatchObject({
+      UnitKey: 'unt.invoicing.worker',
+      UnitName: 'worker',
+      ExecutionKey: 'exe.northwind.invoicing.prod',
+    })
+    expect(withRelations(annotation('sbt.northwind'))).not.toHaveProperty('SubjectKey')
+  })
+
+  it('gives a unit the API defaults and keeps members already present', () => {
+    expect(withRelations(annotation('unt.invoicing.worker'))).toMatchObject({
+      ResponsibilityKey: 'rst.invoicing',
+      UnitType: 'event',
+      UnitDefinition: 'unknown',
+    })
+    expect(withRelations({ ...annotation('unt.invoicing.worker'), UnitType: 'queue' } as Annotation)).toMatchObject({
+      UnitType: 'queue',
+    })
   })
 })
 
