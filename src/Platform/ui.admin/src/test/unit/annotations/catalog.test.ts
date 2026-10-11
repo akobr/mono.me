@@ -140,6 +140,37 @@ describe('catalog store', () => {
     expect([...catalog.byKey.keys()]).toEqual(['sbt.fresh'])
   })
 
+  it('keeps the local changes made while a fresh load replaces the snapshot', async () => {
+    server.use(...typeHandlers(), configurations)
+    await useCatalogStore().load(scope)
+
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    server.use(
+      ...Object.keys(types).map((segment) =>
+        http.get(`*/api/v1/acme/billing/default/${segment}`, async () => {
+          await gate
+          return HttpResponse.json({
+            Annotations: segment === 'subjects' ? [annotation('sbt.fresh'), annotation('sbt.stale')] : [],
+          })
+        }),
+      ),
+    )
+    const catalog = useCatalogStore()
+    catalog.reset()
+    const loading = catalog.load(scope)
+    await expect.poll(() => catalog.fromSnapshot).toBe(true)
+
+    // Deleted and created before the pages arrived: the pages must not bring them back or drop them.
+    catalog.remove('sbt.stale')
+    catalog.upsert(annotation('sbt.edited', ['new']))
+
+    release()
+    await loading
+
+    expect([...catalog.byKey.keys()].toSorted()).toEqual(['sbt.edited', 'sbt.fresh'])
+  })
+
   it('reports an error when nothing could be loaded', async () => {
     server.use(
       ...typeHandlers(

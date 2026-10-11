@@ -74,6 +74,8 @@ export const useCatalogStore = defineStore('catalog', () => {
   const revision = ref(0)
 
   let controller: AbortController | undefined
+  /** Local changes made while a load collects into its own map (null = removed); replayed before the swap. */
+  let pendingChanges: Map<string, Annotation | null> | undefined
   const partsCache = new Map<string, ParsedAnnotationKey | undefined>()
   const ancestorsCache = new Map<string, string[]>()
 
@@ -253,6 +255,8 @@ export const useCatalogStore = defineStore('catalog', () => {
 
     // A fresh load collects into its own map while a snapshot is shown, then replaces it at once.
     const fresh = fromSnapshot.value || sameScope ? new Map<string, Annotation>() : byKey.value
+    const changes = fresh === byKey.value ? undefined : new Map<string, Annotation | null>()
+    pendingChanges = changes
 
     try {
       const results = await Promise.allSettled(typeFetchers.map((fetcher) => pageAll(fetcher, target, signal, fresh)))
@@ -266,6 +270,14 @@ export const useCatalogStore = defineStore('catalog', () => {
       }
 
       if (fresh !== byKey.value) {
+        // Edits, creates and deletes made meanwhile win over the pages fetched before them.
+        for (const [key, change] of changes ?? []) {
+          if (change) {
+            fresh.set(key, change)
+          } else {
+            fresh.delete(key)
+          }
+        }
         byKey.value = fresh
       }
       loadedCount.value = byKey.value.size
@@ -280,16 +292,22 @@ export const useCatalogStore = defineStore('catalog', () => {
       }
       error.value = cause
       status.value = byKey.value.size > 0 ? 'ready' : 'error'
+    } finally {
+      if (pendingChanges === changes) {
+        pendingChanges = undefined
+      }
     }
   }
 
   function upsert(annotation: Annotation): void {
+    pendingChanges?.set(annotation.AnnotationKey, annotation)
     byKey.value.set(annotation.AnnotationKey, annotation)
     loadedCount.value = byKey.value.size
     publish()
   }
 
   function remove(key: string): void {
+    pendingChanges?.set(key, null)
     if (byKey.value.delete(key)) {
       loadedCount.value = byKey.value.size
       publish()
