@@ -126,6 +126,24 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
     view.host.unmount()
   })
 
+  it('treats a value as own, not inherited, when the saved own content has it', async () => {
+    // The effective document contains the own content too; a cleared own value has nothing to fall back to.
+    const { view } = mountForm({ modelValue: {}, effective: { retries: 4, title: 'Own' }, own: { retries: 4, title: 'Own' } })
+    await settle(6)
+
+    expect(field(view, '/title').text()).not.toContain('inherited')
+    expect(field(view, '/title').find('input').attributes('placeholder')).toBeUndefined()
+    view.host.unmount()
+
+    const saved = mountForm({ modelValue: { retries: 4 }, effective: { retries: 4 }, own: { retries: 4 } })
+    await settle(6)
+
+    expect(field(saved.view, '/retries').findAll('button').some((button) => button.text() === 'Reset to inherited')).toBe(
+      false,
+    )
+    saved.view.host.unmount()
+  })
+
   it('renders binding values as expressions and skips their schema check', async () => {
     const { view } = mountForm({ modelValue: { retries: '@rst.invoicing/retries' } })
     await settle(6)
