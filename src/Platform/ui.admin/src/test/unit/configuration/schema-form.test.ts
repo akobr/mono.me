@@ -66,6 +66,23 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
     view.host.unmount()
   })
 
+  it('edits map entries with dotted keys without nesting them', async () => {
+    const { view, updates } = mountForm({
+      modelValue: { retries: 1, headers: { 'X-A': '1', 'Microsoft.AspNetCore': 'Warning' } },
+    })
+    await settle(6)
+
+    const editor = field(view, '/headers').find('textarea[aria-label="Value of Microsoft.AspNetCore"]')
+    expect(editor.exists()).toBe(true)
+    expect(JSON.parse((editor.element as HTMLTextAreaElement).value)).toBe('Warning')
+
+    await editor.setValue('"Error"')
+    await settle()
+
+    expect(updates.at(-1)).toEqual({ retries: 1, headers: { 'X-A': '1', 'Microsoft.AspNetCore': 'Error' } })
+    view.host.unmount()
+  })
+
   it('replaces an object array with a binding expression through the fx toggle', async () => {
     const { view, updates } = mountForm({ modelValue: { retries: 1, tiers: [{ name: 'gold' }] } })
     await settle(6)
