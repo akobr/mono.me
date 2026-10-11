@@ -129,7 +129,7 @@ async function deleteSelected() {
     <ConfirmDialog
       v-model:open="confirmDelete"
       :title="`Delete ${count} annotations?`"
-      description="Their configurations and history stay, but the annotations disappear from the catalog. This cannot be undone."
+      description="The annotations and their configurations are deleted; a responsibility, subject, usage, context or unit takes its descendants with it. The configuration history stays. This cannot be undone."
       :confirm-text="String(keys.length)"
       :confirm-label="`Delete ${count}`"
       :loading="busy"

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Annotation } from '@42for.net/2splatform.sdk'
 import { annotationStatus } from '@/utils/annotation-status'
 import { expandableKeys, projectTree, type TreeNode } from '@/utils/tree-projection'
-import { codeOfKey, metaOf } from '@/utils/annotation-key'
+import { codeOfKey, deletedWith, metaOf } from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
 import { labelColor, normalizeLabels } from '@/utils/labels'
 import { renderInlineMarkdown } from '@/utils/markdown'
@@ -104,6 +104,44 @@ describe('projectTree', () => {
       ['uxe.northwind.invoicing.prod.pdf', true, 3],
     ])
     expect(expandableKeys(roots)).toEqual(['sbt.northwind', 'cnt.northwind.prod', 'exe.northwind.invoicing.prod'])
+  })
+})
+
+describe('deletedWith', () => {
+  const keys = [
+    'rst.invoicing',
+    'unt.invoicing.worker',
+    'sbt.northwind',
+    'cnt.northwind.prod',
+    'usg.northwind.invoicing',
+    'exe.northwind.invoicing.prod',
+    'uxe.northwind.invoicing.prod.worker',
+    'usg.contoso.invoicing',
+    'exe.contoso.invoicing.prod',
+  ]
+
+  it('follows the cascade of DeleteAnnotationAsync per type', () => {
+    expect(deletedWith('rst.invoicing', keys).toSorted()).toEqual(
+      [
+        'unt.invoicing.worker',
+        'usg.northwind.invoicing',
+        'exe.northwind.invoicing.prod',
+        'uxe.northwind.invoicing.prod.worker',
+        'usg.contoso.invoicing',
+        'exe.contoso.invoicing.prod',
+      ].toSorted(),
+    )
+    expect(deletedWith('sbt.northwind', keys).toSorted()).toEqual(
+      ['cnt.northwind.prod', 'usg.northwind.invoicing', 'exe.northwind.invoicing.prod', 'uxe.northwind.invoicing.prod.worker'].toSorted(),
+    )
+    expect(deletedWith('usg.northwind.invoicing', keys).toSorted()).toEqual(
+      ['exe.northwind.invoicing.prod', 'uxe.northwind.invoicing.prod.worker'].toSorted(),
+    )
+    expect(deletedWith('unt.invoicing.worker', keys)).toEqual(['uxe.northwind.invoicing.prod.worker'])
+    // A context takes its executions, not their units of execution; an execution goes alone.
+    expect(deletedWith('cnt.northwind.prod', keys)).toEqual(['exe.northwind.invoicing.prod'])
+    expect(deletedWith('exe.northwind.invoicing.prod', keys)).toEqual([])
+    expect(deletedWith('uxe.northwind.invoicing.prod.worker', keys)).toEqual([])
   })
 })
 
