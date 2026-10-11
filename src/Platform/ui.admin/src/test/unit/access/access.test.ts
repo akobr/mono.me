@@ -40,10 +40,18 @@ describe('member rules', () => {
     })
   })
 
-  it('stops Administrators from changing their own role, and everyone below Administrator', () => {
+  it('stops everyone from changing their own role, and everyone below Administrator', () => {
     expect(memberRules(members[1]!, members, 'admin', 'Administrator')).toMatchObject({
       canChange: false,
-      reason: 'Administrators cannot change their own role',
+      canRemove: false,
+      reason: 'You cannot change your own role',
+    })
+    // The API rejects a self change for Owners too (409 SelfRoleChange); an Owner who is not the last may leave.
+    const twoOwners = [...members, member('owner2', 'Owner')]
+    expect(memberRules(twoOwners[0]!, twoOwners, 'owner', 'Owner')).toMatchObject({
+      canChange: false,
+      canRemove: true,
+      reason: 'You cannot change your own role',
     })
     expect(memberRules(members[2]!, members, 'x', 'Contributor')).toMatchObject({
       canChange: false,

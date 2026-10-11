@@ -100,8 +100,8 @@ export const accessManagementHandlers: HttpHandler[] = [
       if ((Role === 'Owner' || current === 'Owner') && !callerOwner) {
         return errorResponse(403, 'Only Owners can grant or revoke Owner.', 'ElevatedRole')
       }
-      if (params.accountId === db.user.id && !callerOwner) {
-        return errorResponse(403, 'Administrators cannot change their own role.', 'SelfRoleChange')
+      if (params.accountId === db.user.id) {
+        return errorResponse(409, "Members can't change their own role.", 'SelfRoleChange')
       }
       if (current === 'Owner' && Role !== 'Owner' && ownerCount(db, params.key) <= 1) {
         return errorResponse(409, 'The last Owner cannot be demoted.', 'LastOwner')

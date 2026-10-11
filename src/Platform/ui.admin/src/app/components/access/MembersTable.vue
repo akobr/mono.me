@@ -42,7 +42,7 @@ const rows = computed(() =>
 const messages: Record<string, string> = {
   LastOwner: 'The last Owner cannot be demoted or removed.',
   ElevatedRole: 'Only Owners can grant or revoke Owner.',
-  SelfRoleChange: 'Administrators cannot change their own role.',
+  SelfRoleChange: 'You cannot change your own role.',
   MemberNotFound: 'The member no longer exists.',
 }
 
