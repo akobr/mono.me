@@ -39,10 +39,12 @@ internal static class FunctionTestDoubles
 
     public static (TestFunctionContext Context, TestHttpRequestData Request) CreateRequest(
         IServiceProvider services,
-        IDictionary<string, string>? headers = null)
+        IDictionary<string, string>? headers = null,
+        string method = "GET",
+        string? body = null)
     {
         var context = new TestFunctionContext(services);
-        var request = new TestHttpRequestData(context, headers);
+        var request = new TestHttpRequestData(context, headers, method, body);
         ((TestInvocationFeatures)context.Features).Set<IHttpRequestDataFeature>(new TestHttpRequestFeature(request));
         return (context, request);
     }
