@@ -94,7 +94,7 @@ const revert = () => resetForm({ values: toAnnotationDraft(props.annotation) })
 
 const modes: EditorMode[] = ['form', 'json', 'yaml']
 defineShortcuts({
-  meta_s: { usingInput: true, handler: () => canEdit.value && meta.value.dirty && void save() },
+  meta_s: { usingInput: true, handler: () => canEdit.value && meta.value.dirty && !isSubmitting.value && void save() },
   meta_shift_f: {
     usingInput: true,
     handler: () => (mode.value = modes[(modes.indexOf(mode.value) + 1) % modes.length]!),
@@ -274,7 +274,7 @@ const link = (key: string) => ({
         aria-label="Annotation document"
         @update:model-value="(value) => setValues(value as AnnotationForm)"
         @update:valid="(valid) => (textValid = valid)"
-        @save="canEdit && meta.dirty && save()"
+        @save="canEdit && meta.dirty && !isSubmitting && save()"
       />
       <ul v-if="errorList.length" class="mt-2 space-y-0.5 text-xs text-error" role="alert">
         <li v-for="[path, message] in errorList" :key="path">
