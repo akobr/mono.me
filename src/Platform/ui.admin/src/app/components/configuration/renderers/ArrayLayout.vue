@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { composePaths, createDefaultValue, Generate, type ControlElement, type JsonSchema } from '@jsonforms/core'
-import { DispatchRenderer, rendererProps, useJsonFormsArrayControl } from '@jsonforms/vue'
+import { DispatchRenderer, rendererProps, useJsonFormsArrayControl, useJsonFormsControl } from '@jsonforms/vue'
 
 // Arrays of objects: collapsible cards with add, remove and move up/down; titles from `title` or the first string
 // property of the item (spec section 10).
 const props = defineProps(rendererProps<ControlElement>())
 const { control, addItem, removeItems, moveUp, moveDown } = useJsonFormsArrayControl(props)
+// The array control has no handleChange; the "fx" toggle replaces the whole value with a binding expression.
+const { handleChange } = useJsonFormsControl(props)
 
 const items = computed(() =>
   Array.isArray(control.value.data) ? (control.value.data as Record<string, unknown>[]) : [],
@@ -39,7 +41,7 @@ function add() {
 </script>
 
 <template>
-  <ControlField :control="control" @change="(value) => addItem(control.path, value)">
+  <ControlField :control="control" @change="(value) => handleChange(control.path, value)">
     <template #default="{ readonly }">
       <div class="space-y-2">
         <div v-for="(item, index) in items" :key="index" class="rounded-md border border-default">
