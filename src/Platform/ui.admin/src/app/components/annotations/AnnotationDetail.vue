@@ -6,6 +6,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import type { Annotation } from '@42for.net/2splatform.sdk'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
+import { deletedWith } from '@/utils/annotation-key'
 import { annotationStatus } from '@/utils/annotation-status'
 import { errorMessage } from '@/utils/errors'
 import type { TreePerspective } from '@/utils/tree-projection'
@@ -34,6 +35,19 @@ const { copy } = useClipboard({ legacy: true })
 
 const confirmDelete = ref(false)
 const deleting = ref(false)
+
+// The API deletes descendants with a responsibility, subject, usage, context or unit; the confirmation says so.
+const cascade = computed(() => (confirmDelete.value ? deletedWith(props.annotationKey, catalog.byKey.keys()) : []))
+const deleteDescription = computed(() => {
+  const count = cascade.value.length
+  const descendants =
+    count === 0
+      ? ''
+      : ` The API also deletes its ${count} descendant${count === 1 ? '' : 's'} in this view (${cascade.value
+          .slice(0, 3)
+          .join(', ')}${count > 3 ? ', …' : ''}).`
+  return `The annotation and its configuration are deleted; the configuration history stays.${descendants} This cannot be undone.`
+})
 
 const viewBase = computed(() => `/${context.org}/${context.project}/${context.view}`)
 const base = computed(() => `${viewBase.value}/${props.section}/${props.annotationKey}`)
@@ -178,7 +192,7 @@ async function remove() {
     <ConfirmDialog
       v-model:open="confirmDelete"
       :title="`Delete ${annotationKey}?`"
-      description="The annotation disappears from the catalog and its descendants lose this ancestor. This cannot be undone."
+      :description="deleteDescription"
       :confirm-text="annotationKey"
       :loading="deleting"
       @confirm="remove"

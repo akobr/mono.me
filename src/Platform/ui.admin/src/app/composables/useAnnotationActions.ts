@@ -1,9 +1,10 @@
 import { ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
-import { deleteAnnotation, setAnnotation, type Annotation } from '@42for.net/2splatform.sdk'
+import { deleteAnnotation, isNotFound, setAnnotation, type Annotation } from '@42for.net/2splatform.sdk'
 import { forgetAnnotation, invalidateAnnotation } from '@/queries/invalidation'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
+import { deletedWith } from '@/utils/annotation-key'
 import { normalizeLabels } from '@/utils/labels'
 
 const writeConcurrency = 4
@@ -88,7 +89,11 @@ export function useAnnotationActions() {
     }
   }
 
-  /** DeleteAnnotation per key, four at a time. Returns the keys that failed. */
+  /**
+   * DeleteAnnotation per key, four at a time. Returns the keys that failed. The API deletes descendants with some
+   * types (see deletedWith), so they leave the catalog too, and a key already gone (404, for example a child of a
+   * parent deleted in the same batch) counts as deleted.
+   */
   async function removeMany(keys: string[]): Promise<string[]> {
     const target = scope()
     const failed: string[] = []
@@ -97,12 +102,17 @@ export function useAnnotationActions() {
       await runLimited(keys, deleteConcurrency, async (key) => {
         try {
           await deleteAnnotation(target.org, target.project, target.view, key)
-          catalog.remove(key)
-          forgetAnnotation(queryClient, target, key)
-        } catch {
-          failed.push(key)
+        } catch (error) {
+          if (!isNotFound(error)) {
+            failed.push(key)
+            return
+          }
         } finally {
           progress.value = { done: progress.value!.done + 1, total: keys.length }
+        }
+        for (const removed of [key, ...deletedWith(key, catalog.byKey.keys())]) {
+          catalog.remove(removed)
+          forgetAnnotation(queryClient, target, removed)
         }
       })
     } finally {
