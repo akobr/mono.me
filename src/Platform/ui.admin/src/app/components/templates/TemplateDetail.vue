@@ -113,7 +113,7 @@ async function afterSave() {
 }
 
 async function save() {
-  if (!context.scope) {
+  if (!context.scope || saving.value) {
     return
   }
   const { org, project, view } = context.scope

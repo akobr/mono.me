@@ -103,7 +103,7 @@ async function refreshOwn(): Promise<unknown> {
 }
 
 async function save(force = false): Promise<void> {
-  if (!context.scope || patch.value.length === 0) {
+  if (!context.scope || saving.value || patch.value.length === 0) {
     return
   }
 

@@ -89,7 +89,7 @@ const affected = computed(() => {
 const versionSource = computed<VersionSource>(() => ({ ...api.value.versions, current: schema.data.value?.Version }))
 
 async function save(force = false) {
-  if (!context.scope || !draft.value) {
+  if (!context.scope || !draft.value || saving.value) {
     return
   }
   saving.value = true

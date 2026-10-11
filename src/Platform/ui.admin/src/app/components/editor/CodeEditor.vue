@@ -85,7 +85,8 @@ onMounted(() => {
         highlightSelectionMatches(),
         search({ top: true }),
         keymap.of([
-          { key: 'Mod-s', preventDefault: true, run: () => (emit('save'), true) },
+          // The window shortcut (defineShortcuts meta_s) would save a second time without stopPropagation.
+          { key: 'Mod-s', preventDefault: true, stopPropagation: true, run: () => (emit('save'), true) },
           ...closeBracketsKeymap,
           ...defaultKeymap,
           ...searchKeymap,
