@@ -7,7 +7,7 @@ import {
   parseAnnotationKey,
   type AnnotationTypeCode,
 } from '@/utils/annotation-key'
-import { withRelations } from './annotations'
+import { withRelations } from '@/utils/annotation-relations'
 import { annotationsOf, overridesOf, type MockDb } from './db'
 import { errorResponse, requireRole, withDb } from './handlers'
 
@@ -78,12 +78,40 @@ function store(db: MockDb, params: ScopeParams, annotation: Annotation): Annotat
   return stored
 }
 
+/** The members the API's runtime types declare as required (Usage.cs, Execution.cs, …), besides the base fields. */
+const requiredMembers: Record<AnnotationTypeCode, string[]> = {
+  rst: [],
+  sbt: [],
+  unt: ['ResponsibilityKey', 'ResponsibilityName', 'UnitType', 'UnitDefinition'],
+  cnt: ['SubjectKey', 'SubjectName'],
+  usg: ['SubjectKey', 'ResponsibilityKey', 'SubjectName', 'ResponsibilityName'],
+  exe: ['ResponsibilityKey', 'SubjectKey', 'ContextKey', 'UsageKey', 'SubjectName', 'ResponsibilityName', 'ContextName'],
+  uxe: [
+    'ResponsibilityKey',
+    'UnitKey',
+    'SubjectKey',
+    'ContextKey',
+    'UsageKey',
+    'ExecutionKey',
+    'ResponsibilityName',
+    'UnitName',
+    'SubjectName',
+    'ContextName',
+  ],
+}
+
 function invalidAnnotation(annotation: Annotation, key?: string): Response | undefined {
   if (!isValidAnnotationKey(annotation.AnnotationKey ?? '')) {
     return errorResponse(400, `The annotation key '${annotation.AnnotationKey}' is not valid.`, 'InvalidInput')
   }
   if (key && annotation.AnnotationKey !== key) {
     return errorResponse(400, 'The annotation key in the body does not match the route.', 'InvalidInput')
+  }
+  // Like System.Text.Json with the API's runtime types: a body without the required members is rejected.
+  const record = annotation as unknown as Record<string, unknown>
+  const missing = requiredMembers[codeOfKey(annotation.AnnotationKey)!]?.filter((member) => !record[member])
+  if (missing?.length) {
+    return errorResponse(400, `Invalid annotation object in body: missing ${missing.join(', ')}.`, 'InvalidInput')
   }
   return undefined
 }

@@ -1,5 +1,6 @@
 import type { Annotation } from '@42for.net/2splatform.sdk'
 import { parseAnnotationKey, type AnnotationTypeCode } from '@/utils/annotation-key'
+import { withRelations } from '@/utils/annotation-relations'
 
 // Deterministic annotation data for the mock API. Each scope is generated from a seed; edits are stored as
 // overrides (see db.ts), so even the 20,000-annotation scenario fits into sessionStorage.
@@ -64,39 +65,6 @@ export interface ScopeSeed {
   project: string
   view: string
   subjects: number
-}
-
-/** Adds the per-type relation fields the API returns (SubjectKey, ContextName, …). */
-export function withRelations(annotation: Annotation): Annotation {
-  const parsed = parseAnnotationKey(annotation.AnnotationKey)
-  if (!parsed) {
-    return annotation
-  }
-
-  const { subject, responsibility, context, unit } = parsed
-  const relations: Record<string, unknown> = {}
-
-  if (subject && parsed.code !== 'sbt') {
-    Object.assign(relations, { SubjectKey: `sbt.${subject}`, SubjectName: subject })
-  }
-  if (responsibility && parsed.code !== 'rst') {
-    Object.assign(relations, { ResponsibilityKey: `rst.${responsibility}`, ResponsibilityName: responsibility })
-  }
-  if (context && parsed.code !== 'cnt') {
-    Object.assign(relations, { ContextKey: `cnt.${subject}.${context}`, ContextName: context })
-  }
-  if (parsed.code === 'exe' || parsed.code === 'uxe') {
-    relations.UsageKey = `usg.${subject}.${responsibility}`
-  }
-  if (parsed.code === 'uxe') {
-    Object.assign(relations, {
-      UnitKey: `unt.${responsibility}.${unit}`,
-      UnitName: unit,
-      ExecutionKey: `exe.${subject}.${responsibility}.${context}`,
-    })
-  }
-
-  return { ...annotation, ...relations }
 }
 
 /** Generates the annotations of a scope: about 40 per subject. */

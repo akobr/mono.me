@@ -12,12 +12,14 @@ import {
   type AnnotationKeyParts,
   type AnnotationTypeCode,
 } from '@/utils/annotation-key'
+import { withRelations } from '@/utils/annotation-relations'
 import { errorMessage } from '@/utils/errors'
 
 /**
  * New annotation (spec section 8): pick a type, fill the parent names it needs (suggested from the catalog,
- * new names allowed) and the name, with a live key preview. The API creates missing ancestors itself
- * (CosmosAnnotationService.TryCheckAndCreate*), so the dialog only lists them.
+ * new names allowed) and the name, with a live key preview. SetAnnotation creates a new key with its missing
+ * ancestors (CosmosAnnotationService.TryCheckAndCreate*), so the dialog only lists them; the body carries the
+ * relation members the runtime type requires, derived from the key.
  */
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ created: [key: string] }>()
@@ -107,14 +109,20 @@ async function create() {
   const { org, project, view } = context.scope
 
   try {
-    const created = await setAnnotation(org, project, view, key.value, {
-      ProjectName: project,
-      ViewName: view,
-      AnnotationKey: key.value,
-      Name: key.value.split('.').at(-1)!,
-      AnnotationType: meta.value.type,
-      Title: title.value.trim() || undefined,
-    })
+    const created = await setAnnotation(
+      org,
+      project,
+      view,
+      key.value,
+      withRelations({
+        ProjectName: project,
+        ViewName: view,
+        AnnotationKey: key.value,
+        Name: key.value.split('.').at(-1)!,
+        AnnotationType: meta.value.type,
+        Title: title.value.trim() || undefined,
+      }),
+    )
     catalog.upsert(created)
     // The API created the missing ancestors; a background refresh brings them into the catalog.
     if (missingAncestors.value.length) {
