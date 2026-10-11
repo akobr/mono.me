@@ -27,7 +27,7 @@ export interface MemberRules {
  * The member rules (spec section 13), enforced in the UI and again by the API:
  * - only Owners can grant or revoke Owner;
  * - the last Owner cannot be demoted or removed;
- * - Administrators cannot change their own role.
+ * - nobody changes their own role (SetMemberRoleAsync rejects it for every role); an Owner may still leave.
  */
 export function memberRules(
   member: AccessPointMember,
@@ -50,8 +50,8 @@ export function memberRules(
       reason: 'The last Owner cannot be demoted or removed',
     }
   }
-  if (self && !owner) {
-    return { roles: [], canChange: false, canRemove: false, reason: 'Administrators cannot change their own role' }
+  if (self) {
+    return { roles: [], canChange: false, canRemove: owner, reason: 'You cannot change your own role' }
   }
   if (member.Role === 'Owner' && !owner) {
     return { roles: [], canChange: false, canRemove: false, reason: 'Only Owners can change an Owner' }
