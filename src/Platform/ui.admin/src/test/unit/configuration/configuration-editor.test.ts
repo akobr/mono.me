@@ -3,6 +3,7 @@ import { setupServer } from 'msw/node'
 import ConfigurationEditor from '@/components/configuration/ConfigurationEditor.vue'
 import { mockHandlers } from '@/mock/all-handlers'
 import { loadDb, saveDb } from '@/mock/db'
+import { annotationsOf, loadDb as loadMockDb } from '@/mock/db'
 import { documentIds, putVersion } from '@/mock/documents'
 import { ownContent } from '@/mock/configuration-handlers'
 import { mountScreen, settle } from '../../helpers'
@@ -18,6 +19,15 @@ const scope = { org: 'acme', project: 'billing', view: 'default' }
 function configuredExecution(): string {
   const id = documentIds(loadDb(), scope, 'configuration:').find((entry) => entry.startsWith('configuration:exe.'))!
   return id.slice('configuration:'.length)
+}
+
+/** An execution of the seed without a stored configuration: GET answers 200 with Version 0, the version 0 is a 404. */
+function unconfiguredExecution(): string {
+  const db = loadMockDb()
+  const configured = new Set(documentIds(db, scope, 'configuration:').map((id) => id.slice('configuration:'.length)))
+  return [...annotationsOf(db, 'acme', 'billing', 'default').keys()].find(
+    (key) => key.startsWith('exe.') && !configured.has(key),
+  )!
 }
 
 async function mountEditor(key: string) {
@@ -51,6 +61,22 @@ describe('ConfigurationEditor (JSON Patch saves)', () => {
 
     expect(ownContent(loadDb(), scope, key)?.retries).toBe(7)
     expect(view.host.text()).not.toContain('1 change')
+    view.host.unmount()
+  })
+
+  it('offers the create flow when nothing is stored yet, instead of a patch that would fail', async () => {
+    const key = unconfiguredExecution()
+    const view = await mountEditor(key)
+
+    expect(view.host.text()).toContain('No configuration yet')
+
+    await view.host
+      .findAll('button')
+      .find((button) => button.text().includes('Create empty'))!
+      .trigger('click')
+    await settle(10)
+
+    expect(ownContent(loadDb(), scope, key)).toEqual({})
     view.host.unmount()
   })
 
