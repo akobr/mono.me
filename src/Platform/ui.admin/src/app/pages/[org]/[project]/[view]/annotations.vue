@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useMediaQuery } from '@vueuse/core'
+import { useEventListener, useMediaQuery } from '@vueuse/core'
 import type { RowSelectionState } from '@tanstack/vue-table'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { useCatalogStore } from '@/stores/catalog'
@@ -114,8 +114,28 @@ defineShortcuts({
   k: () => move(-1),
   arrowdown: () => move(1),
   arrowup: () => move(-1),
-  enter: () => activeKey.value && open(activeKey.value),
-  escape: () => selectedKey.value && router.push({ path: listPath.value, query: route.query }),
+})
+
+// Enter and Escape are not Nuxt UI shortcuts: those call preventDefault() before the handler, which would cancel
+// a focused button (Save, Delete, the confirm dialogs). They act only outside controls, menus and dialogs.
+useEventListener(window, 'keydown', (event: KeyboardEvent) => {
+  if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+    return
+  }
+  const target = event.target as HTMLElement | null
+  if (
+    target?.closest(
+      'input, textarea, select, button, a, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"]',
+    )
+  ) {
+    return
+  }
+  if (event.key === 'Enter' && activeKey.value) {
+    event.preventDefault()
+    open(activeKey.value)
+  } else if (event.key === 'Escape' && selectedKey.value) {
+    void router.push({ path: listPath.value, query: route.query })
+  }
 })
 
 // Focus returns to the originating row when the detail closes.
