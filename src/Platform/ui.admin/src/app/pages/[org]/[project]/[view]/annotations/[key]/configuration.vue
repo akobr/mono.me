@@ -27,8 +27,9 @@ const key = computed(() => props.annotation.AnnotationKey)
     <div class="px-4 pt-3">
       <UTabs v-model="tab" :items="tabs" :content="false" size="xs" variant="link" />
     </div>
-    <ConfigurationEditor v-if="tab === 'edit'" :key="key" :annotation-key="key" class="flex-1" />
-    <ConfigurationEffective v-else-if="tab === 'effective'" :annotation-key="key" />
-    <ConfigurationResolved v-else :annotation-key="key" />
+    <!-- The editor stays mounted (v-show): a sub-tab is only a query change, which skips the unsaved-changes guard. -->
+    <ConfigurationEditor v-show="tab === 'edit'" :key="key" :annotation-key="key" class="flex-1" />
+    <ConfigurationEffective v-if="tab === 'effective'" :annotation-key="key" />
+    <ConfigurationResolved v-if="tab === 'resolved'" :annotation-key="key" />
   </div>
 </template>
