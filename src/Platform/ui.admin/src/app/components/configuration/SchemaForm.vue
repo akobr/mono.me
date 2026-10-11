@@ -18,12 +18,14 @@ const props = withDefaults(
   defineProps<{
     schema: object
     modelValue: unknown
-    /** The effective (inherited) document, for placeholders and Override / Reset to inherited. */
+    /** The effective document (ancestors, template and own content merged), for placeholders and Override / Reset to inherited. */
     effective?: unknown
+    /** The own content as saved; values it holds are own, not inherited, even though the effective document has them too. */
+    own?: unknown
     readonly?: boolean
     serverErrors?: ValidationIssue[]
   }>(),
-  { effective: undefined, readonly: false, serverErrors: () => [] },
+  { effective: undefined, own: undefined, readonly: false, serverErrors: () => [] },
 )
 
 const emit = defineEmits<{ 'update:modelValue': [value: unknown]; 'update:valid': [valid: boolean] }>()
@@ -60,6 +62,7 @@ watch(
 
 provideSchemaForm({
   effective: toRef(props, 'effective'),
+  own: toRef(props, 'own'),
   readonly: toRef(props, 'readonly'),
   override: (pointer, value) => emit('update:modelValue', setAt(props.modelValue ?? {}, pointer, cloneJson(value))),
   reset: (pointer) => emit('update:modelValue', removeAt(props.modelValue ?? {}, pointer)),

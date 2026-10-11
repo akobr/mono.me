@@ -1,8 +1,10 @@
 import { inject, provide, type InjectionKey, type Ref } from 'vue'
 
 export interface SchemaFormContext {
-  /** The effective (inherited) document, for placeholders and the "inherited" chip. */
+  /** The effective document (ancestors, template and own content merged), for placeholders and the "inherited" chip. */
   effective: Ref<unknown>
+  /** The own content as saved. The effective document contains it too, so a value counts as inherited only where the own content has none. */
+  own: Ref<unknown>
   readonly: Ref<boolean>
   /** Copies the inherited value into the own content. */
   override: (pointer: string, value: unknown) => void

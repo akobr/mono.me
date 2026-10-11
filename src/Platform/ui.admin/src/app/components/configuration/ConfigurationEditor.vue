@@ -302,6 +302,7 @@ defineShortcuts({
           v-model="draft"
           :schema="schema"
           :effective="effective.data.value?.Content"
+          :own="original"
           :readonly="!canEdit"
           :server-errors="serverErrors"
           @update:valid="(valid: boolean) => (formValid = valid)"

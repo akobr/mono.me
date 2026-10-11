@@ -30,7 +30,10 @@ const emit = defineEmits<{ change: [value: unknown] }>()
 
 const form = useSchemaForm()
 const pointer = computed(() => fromDataPath(props.control.path))
-const inherited = computed(() => (form ? getAt(form.effective.value, pointer.value) : undefined))
+// The effective document already holds the own content, so only a path the saved own content lacks is inherited.
+const inherited = computed(() =>
+  form && !hasAt(form.own.value, pointer.value) ? getAt(form.effective.value, pointer.value) : undefined,
+)
 const hasOwn = computed(() => props.control.data !== undefined)
 const showInherited = computed(() => !hasOwn.value && inherited.value !== undefined)
 const binding = computed(() => isBinding(props.control.data))
@@ -47,7 +50,7 @@ function toExpression() {
   emit('change', `@${typeof props.control.data === 'string' ? props.control.data : ''}`)
 }
 
-const canReset = computed(() => hasOwn.value && form !== undefined && hasAt(form.effective.value, pointer.value))
+const canReset = computed(() => hasOwn.value && inherited.value !== undefined)
 </script>
 
 <template>
