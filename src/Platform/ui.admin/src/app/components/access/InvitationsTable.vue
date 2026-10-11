@@ -74,8 +74,12 @@ async function copyLink(invitation: Invitation) {
             <td class="px-3 py-2 text-muted">{{ invitation.InvitedByName ?? invitation.InvitedById }}</td>
             <td class="px-3 py-2"><RelativeTime :value="invitation.ExpiresAt" /></td>
             <td class="px-3 py-2">
-              <span v-if="invitation.Status === 'Pending'" class="flex justify-end gap-1">
-                <UTooltip text="Copy link">
+              <!-- An expired invitation is still pending for the API: Resend renews it, Revoke cleans it up. -->
+              <span
+                v-if="invitation.Status === 'Pending' || invitation.Status === 'Expired'"
+                class="flex justify-end gap-1"
+              >
+                <UTooltip v-if="invitation.Status === 'Pending'" text="Copy link">
                   <UButton
                     icon="i-lucide-link"
                     color="neutral"
