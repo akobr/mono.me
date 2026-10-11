@@ -94,6 +94,27 @@ describe('annotation form schema', () => {
     })
   })
 
+  it('keeps the type-specific members of the loaded annotation in the body', () => {
+    const loaded = {
+      ...annotation,
+      SubjectKey: 'sbt.northwind',
+      ResponsibilityKey: 'rst.invoicing',
+      ContextKey: 'cnt.northwind.prod',
+      UsageKey: 'usg.northwind.invoicing',
+      SubjectName: 'northwind',
+      ResponsibilityName: 'invoicing',
+      ContextName: 'prod',
+      Title: 'Old',
+    } as Annotation
+
+    const body = toAnnotationBody({ ...toAnnotationDraft(loaded), Title: 'New' }, loaded) as unknown as Record<string, unknown>
+
+    expect(body.Title).toBe('New')
+    expect(body.SubjectKey).toBe('sbt.northwind')
+    expect(body.UsageKey).toBe('usg.northwind.invoicing')
+    expect(body.ContextName).toBe('prod')
+  })
+
   it('blocks changes of key fields in the text modes', () => {
     expect(readOnlyIssues(annotation, { ...toAnnotationDraft(annotation), Title: 'new' })).toEqual([])
     expect(

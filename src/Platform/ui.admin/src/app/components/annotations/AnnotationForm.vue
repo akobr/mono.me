@@ -82,7 +82,7 @@ useUnsavedChanges(() => meta.value.dirty)
 
 const save = handleSubmit(async (draft) => {
   try {
-    const saved = await actions.save(toAnnotationBody(draft as AnnotationForm))
+    const saved = await actions.save(toAnnotationBody(draft as AnnotationForm, props.annotation))
     resetForm({ values: toAnnotationDraft(saved) })
     toast.add({ title: 'Annotation saved', color: 'success', icon: 'i-lucide-check' })
   } catch (error) {
