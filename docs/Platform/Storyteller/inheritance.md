@@ -67,8 +67,8 @@ Two nodes are shared:
 
 `GetRawConfigurationAsync` does the following.
 
-1. Load `{view}.cnf.{annotationKey}` from the annotation's partition.
-2. When that item is missing, require the annotation record (`{view}.{annotationKey}` in the same partition). A missing annotation and a missing configuration item return `null`. An empty effective document is returned when the annotation exists and nothing contributes JSON.
+1. Load `{view}.cnf.{annotationKey}` from the annotation's partition. An item stamped with `AnnotationDeletionId` belongs to a soft-deleted annotation and returns `null` ([annotation-lifecycle.md](annotation-lifecycle.md)).
+2. When that item is missing, require an active annotation record (`{view}.{annotationKey}` in the same partition, without `Deletion`). A missing or deleted annotation and a missing configuration item return `null`. An empty effective document is returned when the annotation exists and nothing contributes JSON.
 3. When the item already has `CalculatedContent`, return it. Ancestors and templates are left unread.
 4. Otherwise build the graph and run `CalculateAndCacheConfigurationAsync` on the requested node.
 5. Reload the configuration item so the response carries the hash just written.
@@ -207,6 +207,8 @@ The first insert, when no configuration item exists yet, saves `Content` and lea
 Replacing a type-template item also leaves existing `CalculatedContent` in place. The new template is applied on the next calculation. [templating.md](templating.md) covers that case.
 
 The call site comments this invalidation as ancestors. The queries select descendants: the items that merged this document in.
+
+The invalidation skips configuration items of soft-deleted annotations (`AnnotationDeletionId` set), so it never rewrites them and never pushes back their expiry. A restore clears `CalculatedContent` and `CalculatedContentHash` of every configuration it brings back, because templates or ancestors may have changed while the annotation was deleted.
 
 ## Other reads
 

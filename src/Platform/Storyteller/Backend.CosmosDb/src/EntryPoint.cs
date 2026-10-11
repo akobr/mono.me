@@ -9,6 +9,7 @@ using _42.Platform.Storyteller.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Serialization;
@@ -93,6 +94,22 @@ public static class EntryPoint
         services.AddSingleton<IMachineAuthenticationPolicyStore, CosmosMachineAuthenticationPolicyStore>();
         services.AddSingleton<ICertificateRenewalService, CosmosCertificateRenewalService>();
         services.AddSingleton<ISharedCertificateStore, CosmosSharedCertificateStore>();
+
+        // Annotations: soft-deleted ones expire after the retention, every change is audited within a size limit.
+        services.AddOptions<AnnotationOptions>()
+            .Bind(configuration.GetSection(AnnotationOptions.SectionName))
+            .Validate(
+                options => options.DeletedRetentionDays is >= AnnotationOptions.MinDeletedRetentionDays and <= AnnotationOptions.MaxDeletedRetentionDays,
+                $"{AnnotationOptions.SectionName}:{nameof(AnnotationOptions.DeletedRetentionDays)} must be between {AnnotationOptions.MinDeletedRetentionDays} and {AnnotationOptions.MaxDeletedRetentionDays}.");
+        services.AddOptions<AnnotationAuditOptions>()
+            .Bind(configuration.GetSection(AnnotationAuditOptions.SectionName))
+            .Validate(
+                options => options.MaxDocumentBytes is >= 1024 and <= AnnotationAuditOptions.MaxAllowedDocumentBytes && options.MaxValueLength >= 1,
+                $"{AnnotationAuditOptions.SectionName}:{nameof(AnnotationAuditOptions.MaxDocumentBytes)} must be between 1 KiB and 1.5 MiB, and {nameof(AnnotationAuditOptions.MaxValueLength)} positive.");
+        services.AddSingleton(provider => new AnnotationItemSerializer(
+            provider.GetRequiredService<IOptions<JsonSerializerOptions>>().Value,
+            provider.GetRequiredService<IOptions<JsonSerializerSettings>>().Value));
+        services.AddSingleton<AnnotationAuditStore>();
 
         services.AddSingleton<IAccessService, CosmosAccessService>();
         services.AddSingleton<IAnnotationService, CosmosAnnotationService>();

@@ -87,6 +87,30 @@ public static class HttpRequestDataExtensions
         return $"account: {accountId}";
     }
 
+    // Who makes the request, for the audit: the machine, or the account with a display name from the token.
+    // The profile resolver is not called, so recording the actor adds no latency.
+    public static AuditActor GetAuditActor(this HttpRequestData @this)
+    {
+#if DEV_AUTH
+        return AuditActor.System;
+#else
+        if (@this.TryGetApplicationIdentity(out var appId))
+        {
+            return new AuditActor { Kind = AuditActorKind.Machine, Id = appId };
+        }
+
+        var name = @this.GetClaim(NameClaimType)?.Trim();
+        var userName = @this.GetClaim(UniqueNameClaimTypes)?.Trim();
+
+        return new AuditActor
+        {
+            Kind = AuditActorKind.Account,
+            Id = @this.GetIdentityUniqueId(),
+            Name = string.IsNullOrEmpty(name) ? (string.IsNullOrEmpty(userName) ? null : userName) : name,
+        };
+#endif
+    }
+
     public static async Task CheckAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole = AccountRole.Reader)
     {
 #if DEV_AUTH

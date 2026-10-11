@@ -1,9 +1,87 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace _42.Platform.Storyteller;
 
 public static class AnnotationKeyExtensions
 {
+    /// <summary>
+    /// The direct parents of the key in the inheritance graph, in merge order (by <see cref="AnnotationType"/>):
+    /// a usage has its responsibility and subject, an execution its usage and context, a unit of execution its unit
+    /// and execution. Responsibilities and subjects have none.
+    /// </summary>
+    public static IReadOnlyList<AnnotationKey> GetDirectAncestorKeys(this AnnotationKey @this)
+    {
+        return @this.Type switch
+        {
+            AnnotationType.Responsibility or AnnotationType.Subject => [],
+            AnnotationType.Unit => [@this.GetResponsibilityKey()],
+            AnnotationType.Usage => [@this.GetResponsibilityKey(), @this.GetSubjectKey()],
+            AnnotationType.Context => [@this.GetSubjectKey()],
+            AnnotationType.Execution => [@this.GetUsageKey(), @this.GetContextKey()],
+            AnnotationType.UnitOfExecution => [@this.GetUnitKey(), @this.GetExecutionKey()],
+            _ => throw new ArgumentOutOfRangeException(nameof(@this), @this.Type, "Unknown annotation type."),
+        };
+    }
+
+    /// <summary>
+    /// Every ancestor of the key, roots first: each ancestor comes after all of its own ancestors. The key itself is
+    /// not included. A shared ancestor (the subject of an execution) is listed once.
+    /// </summary>
+    public static IReadOnlyList<AnnotationKey> GetAllAncestorKeys(this AnnotationKey @this)
+    {
+        var ancestors = new Dictionary<string, AnnotationKey>(StringComparer.Ordinal);
+        var pending = new Queue<AnnotationKey>(@this.GetDirectAncestorKeys());
+
+        while (pending.Count > 0)
+        {
+            var ancestor = pending.Dequeue();
+
+            if (!ancestors.TryAdd(ancestor.ToString(), ancestor))
+            {
+                continue;
+            }
+
+            foreach (var parent in ancestor.GetDirectAncestorKeys())
+            {
+                pending.Enqueue(parent);
+            }
+        }
+
+        // Depth in the graph orders roots first; the type and the key keep the order stable.
+        return ancestors.Values
+            .OrderBy(key => key.GetDepth())
+            .ThenBy(key => key.Type)
+            .ThenBy(key => key.ToString(), StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>
+    /// The longest path from the key to a root of the graph: 0 for responsibilities and subjects, 3 for units of
+    /// execution.
+    /// </summary>
+    public static int GetDepth(this AnnotationKey @this)
+    {
+        return @this.Type switch
+        {
+            AnnotationType.Responsibility or AnnotationType.Subject => 0,
+            AnnotationType.Unit or AnnotationType.Usage or AnnotationType.Context => 1,
+            AnnotationType.Execution => 2,
+            AnnotationType.UnitOfExecution => 3,
+            _ => throw new ArgumentOutOfRangeException(nameof(@this), @this.Type, "Unknown annotation type."),
+        };
+    }
+
+    /// <summary>
+    /// Whether <paramref name="ancestor"/> is one of the ancestors of the key in the inheritance graph.
+    /// </summary>
+    public static bool IsDescendantOf(this AnnotationKey @this, AnnotationKey ancestor)
+    {
+        var ancestorText = ancestor.ToString();
+        return @this.GetAllAncestorKeys().Any(key => string.Equals(key.ToString(), ancestorText, StringComparison.Ordinal));
+    }
+
     public static bool IsValid(this AnnotationKey @this)
     {
         return @this.Type switch

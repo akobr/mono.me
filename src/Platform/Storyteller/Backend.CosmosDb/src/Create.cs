@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using _42.Platform.Storyteller.Entities.Access;
@@ -15,6 +16,8 @@ public static class Create
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
+        var stamp = SystemStamp();
+
         return new ResponsibilityEntity
         {
             Id = string.Empty,
@@ -22,6 +25,8 @@ public static class Create
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Responsibility,
+            Created = stamp,
+            Modified = stamp,
             AnnotationKey = $"{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
             Name = responsibilityName,
             UnitNames = unitNames?.ToList() ?? [],
@@ -35,6 +40,8 @@ public static class Create
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
+        var stamp = SystemStamp();
+
         return new SubjectEntity
         {
             Id = string.Empty,
@@ -42,6 +49,8 @@ public static class Create
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Subject,
+            Created = stamp,
+            Modified = stamp,
             AnnotationKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
             Name = subjectName,
             ResponsibilityNames = responsibilityNames?.ToList() ?? [],
@@ -56,6 +65,8 @@ public static class Create
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
+        var stamp = SystemStamp();
+
         return new ContextEntity
         {
             Id = string.Empty,
@@ -63,6 +74,8 @@ public static class Create
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Context,
+            Created = stamp,
+            Modified = stamp,
             AnnotationKey = $"{AnnotationTypeCodes.Context}.{subjectName}.{contextName}",
             Name = contextName,
             SubjectKey = $"{AnnotationTypeCodes.Subject}.{subjectName}",
@@ -78,6 +91,8 @@ public static class Create
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
+        var stamp = SystemStamp();
+
         return new UsageEntity
         {
             Id = string.Empty,
@@ -85,6 +100,8 @@ public static class Create
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Usage,
+            Created = stamp,
+            Modified = stamp,
             AnnotationKey = $"{AnnotationTypeCodes.Usage}.{subjectName}.{responsibilityName}",
             Name = responsibilityName,
             ResponsibilityKey = $"{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
@@ -103,6 +120,8 @@ public static class Create
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
+        var stamp = SystemStamp();
+
         return new ExecutionEntity
         {
             Id = string.Empty,
@@ -110,6 +129,8 @@ public static class Create
             ProjectName = projectName,
             ViewName = viewName,
             AnnotationType = AnnotationType.Execution,
+            Created = stamp,
+            Modified = stamp,
             AnnotationKey = $"{AnnotationTypeCodes.Execution}.{subjectName}.{responsibilityName}.{contextName}",
             Name = contextName,
             ResponsibilityKey = $"{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
@@ -131,6 +152,8 @@ public static class Create
         string viewName = Constants.DefaultViewName,
         string projectName = Constants.DefaultProjectName)
     {
+        var stamp = SystemStamp();
+
         return new UnitOfExecutionEntity
         {
             Id = string.Empty,
@@ -138,7 +161,9 @@ public static class Create
                 responsibilityName),
             ProjectName = projectName,
             ViewName = viewName,
-            AnnotationType = AnnotationType.Execution,
+            AnnotationType = AnnotationType.UnitOfExecution,
+            Created = stamp,
+            Modified = stamp,
             AnnotationKey = $"{AnnotationTypeCodes.Execution}.{subjectName}.{responsibilityName}.{contextName}",
             Name = contextName,
             ResponsibilityKey = $"{AnnotationTypeCodes.Responsibility}.{responsibilityName}",
@@ -213,5 +238,11 @@ public static class Create
                 },
             }
         ];
+    }
+
+    // The seed is written by the system; like every stored annotation it carries both stamps.
+    private static AuditStamp SystemStamp()
+    {
+        return new AuditStamp { At = DateTimeOffset.UtcNow, By = AuditActor.System };
     }
 }

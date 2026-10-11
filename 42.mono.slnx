@@ -105,6 +105,7 @@
     <Project Path="src/Platform/Storyteller/Api.Functions/test/Api.Functions.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Web/src/Api.Web.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.Core/src/Backend.Core.csproj" />
+    <Project Path="src/Platform/Storyteller/Backend.Core/test/Backend.Core.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.CosmosDb/src/Backend.CosmosDb.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.CosmosDb/test/Backend.CosmosDb.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Binding.Abstractions/src/Binding.Abstractions.csproj" />

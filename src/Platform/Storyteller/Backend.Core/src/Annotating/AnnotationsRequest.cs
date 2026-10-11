@@ -18,6 +18,14 @@ public class AnnotationsRequest
 
     public string? ContinuationToken { get; set; }
 
+    public AnnotationDeletedFilter Deleted { get; set; } = AnnotationDeletedFilter.Exclude;
+
+    // With Deleted = Only: just the roots of deletions.
+    public bool DeletionRootsOnly { get; set; }
+
+    // With Deleted = Only or Include: just what one delete removed.
+    public string? DeletionId { get; set; }
+
     public interface ICondition
     {
         public AnnotationType Against { get; }

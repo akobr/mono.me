@@ -70,6 +70,7 @@ internal static class ConfigurationCacheInvalidator
         var feed = repository.Container.GetItemLinqQueryable<ConfigurationEntity>(
                 requestOptions: new QueryRequestOptions { MaxItemCount = CosmosConstants.MaxItemCountPerPage })
             .Where(predicate)
+            .Where(config => !config.AnnotationDeletionId.IsDefined())
             .Select(config => new EntityIndices { PartitionKey = config.PartitionKey, Id = config.Id })
             .ToFeedIterator();
 
@@ -97,6 +98,7 @@ internal static class ConfigurationCacheInvalidator
                     MaxItemCount = CosmosConstants.MaxItemCountPerPage,
                 })
             .Where(predicate)
+            .Where(config => !config.AnnotationDeletionId.IsDefined())
             .Select(config => config.Id)
             .ToFeedIterator();
 

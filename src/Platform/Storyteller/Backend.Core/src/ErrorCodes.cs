@@ -24,4 +24,9 @@ public static class ErrorCodes
 
     public const string PatchInvalid = "PatchInvalid";
     public const string PatchTestFailed = "PatchTestFailed";
+
+    public const string InvalidAnnotation = "InvalidAnnotation";
+    public const string InvalidKey = "InvalidKey";
+    public const string AnnotationDeleted = "AnnotationDeleted";
+    public const string AnnotationNotDeleted = "AnnotationNotDeleted";
 }
