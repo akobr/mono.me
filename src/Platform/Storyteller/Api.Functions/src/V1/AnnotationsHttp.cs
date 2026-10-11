@@ -23,6 +23,13 @@ namespace _42.Platform.Storyteller.Api.V1;
 
 public class AnnotationsHttp
 {
+    private static readonly JsonSerializerOptions AnnotationBodyOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() },
+    };
+
     private readonly IAnnotationService _annotations;
     private readonly IAccessService _access;
     private readonly ILogger<AnnotationsHttp> _logger;
@@ -376,7 +383,7 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(SetAnnotation))]
-    [OpenApiOperation(Definitions.RouteIds.Annotations.SetAnnotation, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.SetAnnotation, Definitions.Tags.Annotations, Description = "Creates the annotation (with its missing ancestors) or replaces it when it exists. The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...).")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -394,55 +401,61 @@ public class AnnotationsHttp
         string organization,
         string project,
         string view,
-        string key,
-        [FromBody] Annotation? annotation)
+        string key)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
 
-        if (annotation is not null)
-        {
-            var annotationType = AnnotationTypes.GetRuntimeType(annotation.AnnotationType);
-            using var reader = new StreamReader(request.Body);
+        // The body is read once, into the runtime type of its AnnotationType: the type-specific members
+        // (SubjectKey, UnitType, ...) are required there, so a body without them is rejected instead of stored.
+        Annotation annotation;
 
-            var deserializedObject = await JsonSerializer.DeserializeAsync(
-                request.Body,
-                annotationType,
-                new JsonSerializerOptions
-                {
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                    PropertyNameCaseInsensitive = true,
-                });
+        try
+        {
+            using var reader = new StreamReader(request.Body);
+            var body = await reader.ReadToEndAsync();
+            using var document = JsonDocument.Parse(body);
+
+            if (!document.RootElement.TryGetProperty(nameof(Annotation.AnnotationType), out var typeElement)
+                || !Enum.TryParse(typeElement.ToString(), ignoreCase: true, out AnnotationType type)
+                || !Enum.IsDefined(type))
+            {
+                return new BadRequestObjectResult(new ErrorResponse("The annotation has no known AnnotationType."));
+            }
+
+            var deserializedObject = JsonSerializer.Deserialize(body, AnnotationTypes.GetRuntimeType(type), AnnotationBodyOptions);
 
             if (deserializedObject is null)
             {
-                return new BadRequestObjectResult(new ErrorResponse("Invalid annotation object in body."));
+                return new BadRequestObjectResult(new ErrorResponse("No annotation object in body."));
             }
 
             // TODO: [P1] set system properties and validate the annotation
             annotation = (Annotation)deserializedObject;
-            annotation = annotation with
-            {
-                ProjectName = project,
-                ViewName = view,
-                AnnotationKey = key,
-            };
+        }
+        catch (JsonException exception)
+        {
+            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation object in body: {exception.Message}"));
         }
 
-        if (annotation is null)
+        annotation = annotation with
         {
-            return new BadRequestObjectResult(new ErrorResponse("No annotation object in body."));
-        }
+            ProjectName = project,
+            ViewName = view,
+            AnnotationKey = key,
+        };
 
         try
         {
-            if (request.Method == Definitions.Methods.Post)
+            // POST and PUT both store the annotation: a new key is created with its missing ancestors, an existing
+            // one is replaced. The decision was made on the method name, which never matched ("post" vs "POST").
+            if (await _annotations.ExistAnnotationAsync(annotation.GetFullKey(organization)))
             {
-                await _annotations.CreateAnnotationAsync(organization, annotation);
+                await _annotations.UpdateAnnotationAsync(organization, annotation);
             }
             else
             {
-                await _annotations.UpdateAnnotationAsync(organization, annotation);
+                await _annotations.CreateAnnotationAsync(organization, annotation);
             }
         }
         catch (Exception exception)
