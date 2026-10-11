@@ -1,12 +1,12 @@
 import { ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
-import { deleteAnnotation, setAnnotation, setAnnotations, type Annotation } from '@42for.net/2splatform.sdk'
+import { deleteAnnotation, setAnnotation, type Annotation } from '@42for.net/2splatform.sdk'
 import { forgetAnnotation, invalidateAnnotation } from '@/queries/invalidation'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { normalizeLabels } from '@/utils/labels'
 
-const batchSize = 100
+const writeConcurrency = 4
 const deleteConcurrency = 4
 
 /** Runs `worker` over the items with at most `limit` running at once. */
@@ -58,21 +58,33 @@ export function useAnnotationActions() {
     return saved
   }
 
-  /** SetAnnotations in batches of 100. */
+  /**
+   * SetAnnotation per key, four at a time. The bulk endpoint (SetAnnotations) only creates and silently skips every
+   * existing key, so edits go one by one, and the catalog takes what the server returned.
+   */
   async function saveMany(annotations: Annotation[]): Promise<void> {
     const target = scope()
+    const failed: string[] = []
     progress.value = { done: 0, total: annotations.length }
     try {
-      for (const batch of chunk(annotations, batchSize)) {
-        await setAnnotations(target.org, target.project, target.view, batch)
-        batch.forEach((annotation) => catalog.upsert(annotation))
-        progress.value = { done: progress.value.done + batch.length, total: annotations.length }
-      }
-      await Promise.all(
-        annotations.map((annotation) => invalidateAnnotation(queryClient, target, annotation.AnnotationKey)),
-      )
+      await runLimited(annotations, writeConcurrency, async (annotation) => {
+        try {
+          const saved = await setAnnotation(target.org, target.project, target.view, annotation.AnnotationKey, annotation)
+          catalog.upsert(saved)
+          await invalidateAnnotation(queryClient, target, saved.AnnotationKey)
+        } catch {
+          failed.push(annotation.AnnotationKey)
+        } finally {
+          progress.value = { done: progress.value!.done + 1, total: annotations.length }
+        }
+      })
     } finally {
       progress.value = undefined
+    }
+    if (failed.length) {
+      throw new Error(
+        `${failed.length} of ${annotations.length} annotations were not saved: ${failed.slice(0, 5).join(', ')}`,
+      )
     }
   }
 
