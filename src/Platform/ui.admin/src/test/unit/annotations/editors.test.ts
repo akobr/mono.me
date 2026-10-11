@@ -82,6 +82,15 @@ describe('ValuesEditor', () => {
     view.host.unmount()
   })
 
+  it('shows numbers with all their fraction digits', async () => {
+    const { view } = mountValues({ threshold: 0.12345, big: 1234567 })
+    await settle()
+
+    const values = view.host.findAll('input[aria-label="Value"]').map((input) => (input.element as HTMLInputElement).value)
+    expect(values).toEqual(['0.12345', '1234567'])
+    view.host.unmount()
+  })
+
   it('adds rows with unique keys and reports duplicates', async () => {
     const { view, model } = mountValues({ key1: 'a' })
     await settle()

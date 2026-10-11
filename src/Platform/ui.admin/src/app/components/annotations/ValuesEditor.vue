@@ -168,12 +168,14 @@ const preview = (value: unknown) => {
           :disabled="disabled"
           @update:model-value="emit"
         />
+        <!-- The default number format keeps 3 fraction digits and writes the rounded value back on blur. -->
         <UInputNumber
           v-else-if="row.type === 'number'"
           v-model="row.value as number"
           size="sm"
           aria-label="Value"
           :disabled="disabled"
+          :format-options="{ maximumFractionDigits: 20, useGrouping: false }"
           @update:model-value="emit"
         />
         <USwitch
