@@ -16,6 +16,15 @@ const entries = computed(() => Object.keys((control.value.data as Record<string,
 const newKey = ref('')
 const valueUiSchema: ControlElement = { type: 'Control', scope: '#' }
 
+// JSON Forms data paths are dot-delimited and lodash parses brackets, so such a key cannot be addressed by a
+// composed path ("Microsoft.AspNetCore" would become nested objects). Its value is edited inline as JSON and
+// written back by replacing the whole map.
+const needsInlineEditor = (key: string) => /[.[\]]/.test(key)
+
+function setEntry(key: string, value: unknown) {
+  handleChange(control.value.path, { ...(control.value.data as Record<string, unknown> | undefined), [key]: value })
+}
+
 function rename(oldKey: string, nextKey: string) {
   const trimmed = nextKey.trim()
   if (!trimmed || trimmed === oldKey || entries.value.includes(trimmed)) {
@@ -59,7 +68,18 @@ function add() {
             :disabled="readonly"
             @change="(event: Event) => rename(key, (event.target as HTMLInputElement).value)"
           />
+          <DocumentEditor
+            v-if="needsInlineEditor(key)"
+            :model-value="(control.data as Record<string, unknown>)[key] ?? null"
+            format="json"
+            :readonly="readonly"
+            :height="120"
+            hide-toggle
+            :aria-label="`Value of ${key}`"
+            @update:model-value="(value) => setEntry(key, value)"
+          />
           <DispatchRenderer
+            v-else
             :schema="valueSchema"
             :uischema="valueUiSchema"
             :path="composePaths(control.path, key)"
