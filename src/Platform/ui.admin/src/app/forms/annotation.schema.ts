@@ -52,7 +52,7 @@ export type AnnotationForm = z.input<typeof annotationFormSchema>
 /** Fields that are part of the key and cannot change through the editor. */
 export const readOnlyAnnotationFields = ['AnnotationKey', 'Name', 'AnnotationType', 'ProjectName', 'ViewName'] as const
 
-/** The editable document of an annotation: the base fields only (relation fields are derived by the API). */
+/** The editable document of an annotation: the base fields only; the type-specific members stay on the loaded annotation. */
 export function toAnnotationDraft(annotation: Annotation): AnnotationForm {
   return {
     ProjectName: annotation.ProjectName,
@@ -72,10 +72,15 @@ export function toAnnotationDraft(annotation: Annotation): AnnotationForm {
   }
 }
 
-/** The body for SetAnnotation: empty strings and collections become absent. */
-export function toAnnotationBody(draft: AnnotationForm): Annotation {
+/**
+ * The body for SetAnnotation: empty strings and collections become absent. SetAnnotation replaces the whole
+ * document and requires the type-specific members (SubjectKey, UnitType, ContextNames, …), which the form never
+ * edits, so they are taken from the loaded `original`.
+ */
+export function toAnnotationBody(draft: AnnotationForm, original?: Annotation): Annotation {
   const blank = (value: string | undefined) => (value && value.trim() ? value.trim() : undefined)
   return {
+    ...original,
     ProjectName: draft.ProjectName,
     ViewName: draft.ViewName,
     AnnotationKey: draft.AnnotationKey,
