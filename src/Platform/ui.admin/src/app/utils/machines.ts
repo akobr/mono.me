@@ -40,6 +40,7 @@ export function machineSecret(machine: MachineAccess, title: string, baseUrl?: s
     title,
     id: machine.Id,
     apiKey: machine.AccessKey,
+    credentialKind: machine.CredentialKind,
     certificate: machine.Certificate,
     certificatePassword: machine.CertificatePassword,
     tokenEndpoint: machine.TokenEndpoint,

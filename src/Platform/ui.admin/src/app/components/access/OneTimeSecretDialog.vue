@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import type { MachineAccess } from '@42for.net/2splatform.sdk'
 
 export interface OneTimeSecret {
   title: string
-  /** Shown as an identifier, not secret (machine id, certificate thumbprint). */
+  /** Shown as an identifier, not secret (machine id, certificate thumbprint; the client ID for ClientCredentials). */
   id?: string
+  /** The API key, or the client secret for ClientCredentials (MachineAccess.AccessKey). */
   apiKey?: string
+  /** Decides the labels and snippets: a client secret is exchanged for a token, never sent as an API key. */
+  credentialKind?: MachineAccess['CredentialKind']
   /** Base64 PKCS#12 (.pfx). */
   certificate?: string
   certificatePassword?: string
@@ -30,6 +34,7 @@ watch(
 )
 
 const open = computed(() => !!props.secret)
+const clientCredentials = computed(() => props.secret?.credentialKind === 'ClientCredentials')
 
 function downloadPfx() {
   if (!props.secret?.certificate) {
@@ -51,15 +56,19 @@ const snippets = computed(() => {
   }
   const base = secret.baseUrl ?? 'https://<api-host>/api'
   const result: { label: string; code: string }[] = []
-  if (secret.apiKey) {
+  if (clientCredentials.value) {
+    // A reset response omits the token endpoint and scope (MachineAccess: create only), hence the placeholders.
+    result.push({
+      label: 'Token request',
+      code:
+        `curl -X POST ${secret.tokenEndpoint ?? '<token-endpoint>'} \\\n` +
+        `  -d grant_type=client_credentials -d client_id=${secret.id ?? '<client-id>'} \\\n` +
+        `  -d client_secret=${secret.apiKey ?? '<client-secret>'} -d scope=${secret.tokenScope ?? '<scope>'}`,
+    })
+    result.push({ label: 'curl', code: `curl -H "Authorization: Bearer <access_token>" ${base}/v1/...` })
+  } else if (secret.apiKey) {
     result.push({ label: 'curl', code: `curl -H "Authorization: ApiKey ${secret.apiKey}" ${base}/v1/...` })
     result.push({ label: '.env', code: `STORYTELLER_API_URL=${base}\nSTORYTELLER_API_KEY=${secret.apiKey}` })
-  }
-  if (secret.tokenEndpoint) {
-    result.push({
-      label: 'Client credentials',
-      code: `curl -X POST ${secret.tokenEndpoint} \\\n  -d grant_type=client_credentials -d scope=${secret.tokenScope ?? ''}`,
-    })
   }
   return result
 })
@@ -91,11 +100,11 @@ function close() {
         />
 
         <div v-if="secret.id" class="text-sm">
-          <span class="text-muted">Id</span>
+          <span class="text-muted">{{ clientCredentials ? 'Client ID' : 'Id' }}</span>
           <code class="ms-2 font-mono">{{ secret.id }}</code>
         </div>
 
-        <UFormField v-if="secret.apiKey" label="API key">
+        <UFormField v-if="secret.apiKey" :label="clientCredentials ? 'Client secret' : 'API key'">
           <div class="flex items-center gap-2">
             <code class="min-w-0 flex-1 truncate rounded bg-elevated px-2 py-1.5 font-mono text-xs">{{
               secret.apiKey

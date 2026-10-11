@@ -75,10 +75,33 @@ describe('machines', () => {
         baseUrl: 'https://api',
       },
     )
+    expect(machineSecret({ Id: 'client_1', AccessKey: 'sk', CredentialKind: 'ClientCredentials' }, 'Reset')).toMatchObject({
+      id: 'client_1',
+      apiKey: 'sk',
+      credentialKind: 'ClientCredentials',
+    })
   })
 })
 
 describe('OneTimeSecretDialog', () => {
+  it('shows client credentials as a client ID and secret with a token request, never as an API key', async () => {
+    const view = mountInApp(OneTimeSecretDialog, {
+      secret: { title: 'New credentials', id: 'client_1', apiKey: 'sk_secret', credentialKind: 'ClientCredentials' },
+      onClose: () => {},
+    })
+    await settle()
+
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('Client ID')
+    expect(text).toContain('Client secret')
+    expect(text).not.toContain('API key')
+    expect(text).toContain('-d client_id=client_1')
+    expect(text).toContain('-d client_secret=sk_secret')
+    expect(text).toContain('<token-endpoint>')
+    expect(text).not.toContain('ApiKey')
+    view.host.unmount()
+  })
+
   it('cannot be closed before the credentials are acknowledged, and downloads the .pfx', async () => {
     const createObjectURL = vi.fn((_blob: Blob) => 'blob:pfx')
     URL.createObjectURL = createObjectURL
