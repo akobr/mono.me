@@ -43,7 +43,7 @@ const confirm = useConfirm()
 const toast = useToast()
 const canEdit = useCan('edit')
 
-const { effective, own, missing, schema, version } = useConfiguration(() => props.annotationKey)
+const { effective, own, missing, noOwn, schema, version } = useConfiguration(() => props.annotationKey)
 
 const original = ref<unknown>()
 const draft = ref<unknown>()
@@ -238,8 +238,9 @@ defineShortcuts({
   <div class="flex min-h-full flex-col">
     <LoadingState v-if="effective.isPending.value" />
 
+    <!-- Also when nothing is stored yet (own 404, effective Version 0): a patch would fail, the first content is created. -->
     <EmptyState
-      v-else-if="missing"
+      v-else-if="missing || noOwn"
       icon="i-lucide-file-plus"
       title="No configuration yet"
       description="This annotation has no own configuration. It still inherits values from its ancestors and the type template."

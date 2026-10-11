@@ -10,7 +10,8 @@ import { useScope } from './useAppContext'
 /**
  * The documents of one configuration (spec section 11.2):
  * - effective: GetConfiguration (ancestors, then the type template, then the own content, merged), with `Version`;
- * - own: GetConfigurationVersion(key, Version), the stored own content that the editor patches;
+ * - own: GetConfigurationVersion(key, Version), the stored own content that the editor patches; it answers 404
+ *   when nothing is stored yet (the effective document then has Version 0), and a PATCH would fail the same way;
  * - schema: GetCombinedConfigurationSchema (MergedContent and the applied layers).
  */
 export function useConfiguration(key: MaybeRefOrGetter<string>) {
@@ -31,7 +32,10 @@ export function useConfiguration(key: MaybeRefOrGetter<string>) {
     query: { enabled, staleTime: 5 * 60_000 },
   })
 
+  /** The annotation does not exist (GetConfiguration 404). */
   const missing = computed(() => effective.isError.value && isNotFound(effective.error.value))
+  /** Nothing is stored for the annotation yet: the first content has to be created (POST), not patched. */
+  const noOwn = computed(() => own.isError.value && isNotFound(own.error.value))
 
   /** The merged JSON Schema, or undefined when no schema applies (Form mode is then hidden). */
   const schema = computed(() => {
@@ -39,5 +43,5 @@ export function useConfiguration(key: MaybeRefOrGetter<string>) {
     return merged && Object.keys(merged).some((name) => name !== '$schema') ? merged : undefined
   })
 
-  return { effective, own, combined, missing, version, schema }
+  return { effective, own, combined, missing, noOwn, version, schema }
 }

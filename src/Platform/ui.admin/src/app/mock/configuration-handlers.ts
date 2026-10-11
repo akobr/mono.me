@@ -131,8 +131,8 @@ function configurationResponse(db: MockDb, scope: ScopeRef, key: string, content
   const version = latest(getDocument(db, scope, `configuration:${key}`))
   return {
     AnnotationKey: key,
-    Version: version?.Version,
-    Author: version?.Author,
+    Version: version?.Version ?? 0,
+    Author: version?.Author ?? 'system',
     Content: content,
     Hash: ((JSON.stringify(content).length * 2654435761) >>> 0).toString(16),
   }
@@ -170,8 +170,10 @@ export const configurationHandlers: HttpHandler[] = [
         return denied
       }
       const scope = scopeOf(params)
-      if (!ownContent(db, scope, params.key) && !latest(getDocument(db, scope, `configuration:${params.key}`))) {
-        return errorResponse(404, `There is no configuration for ${params.key}.`, 'NotFound')
+      // Like GetRawConfigurationAsync: 404 only for an unknown annotation; without a stored entity the inherited
+      // content comes back with Version 0.
+      if (!annotationsOf(db, params.org, params.project, params.view).has(params.key)) {
+        return errorResponse(404, `The annotation ${params.key} does not exist.`, 'NotFound')
       }
       return HttpResponse.json(configurationResponse(db, scope, params.key, effectiveContent(db, scope, params.key)))
     }),
