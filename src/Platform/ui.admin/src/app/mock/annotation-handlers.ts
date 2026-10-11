@@ -164,8 +164,12 @@ export const annotationHandlers: HttpHandler[] = [
           return invalid
         }
       }
-      body.forEach((annotation) => store(db, params, annotation))
-      return HttpResponse.text(`${body.length} annotations stored.`)
+      // Like CreateAnnotationsAsync: an existing key is skipped, the created annotations come back.
+      const existing = annotationsOf(db, params.org, params.project, params.view)
+      const created = body
+        .filter((annotation) => !existing.has(annotation.AnnotationKey))
+        .map((annotation) => store(db, params, annotation))
+      return HttpResponse.json(created)
     }),
   ),
 
