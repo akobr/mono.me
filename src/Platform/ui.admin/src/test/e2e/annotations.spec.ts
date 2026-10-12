@@ -16,6 +16,17 @@ test('filters the grid, edits an annotation in the detail and saves it', async (
   await expect(page.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
 
   await page.getByRole('textbox', { name: 'Title' }).fill('Northwind Traders')
+
+  // The description is Markdown: the Preview tab renders headings, lists and tables.
+  await page
+    .getByRole('textbox', { name: 'Description' })
+    .fill('## Endpoints\n\n- api\n- web\n\n| Name | URL |\n| --- | --- |\n| api | `/api` |')
+  await page.getByRole('tab', { name: 'Preview' }).click()
+  const preview = page.locator('.markdown')
+  await expect(preview.getByRole('heading', { name: 'Endpoints' })).toBeVisible()
+  await expect(preview.getByRole('listitem')).toHaveText(['api', 'web'])
+  await expect(preview.getByRole('table').getByRole('cell', { name: '/api' })).toBeVisible()
+
   await page.getByRole('button', { name: /^Save/ }).click()
   await expect(page.getByText('Annotation saved', { exact: true })).toBeVisible()
 
