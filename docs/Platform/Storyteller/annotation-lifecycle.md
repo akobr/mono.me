@@ -132,6 +132,20 @@ The configuration routes of a deleted annotation answer `404` with `ErrorCode` `
 
 **Creating in clients.** Before a create, a client looks up the keys and their ancestors (`AnnotationKeyExtensions.GetAllAncestorKeys`, `getAllAncestors` in the TypeScript SDK). When one is deleted, it shows who deleted it and when, and offers **Restore and update** (restore with `Descendants = false`, then send the content as an update), **Create new** (send the content; the API re-creates the deleted keys empty), or **Cancel**.
 
+## CLI
+
+The `sform story` commands (`src/Platform/Cli/src/Commands/Storyteller/`) work on the current organization, project and view, or on `-p|--projectKey` and `-v|--view`.
+
+| Command | What it does |
+| --- | --- |
+| `sform story delete <key>` | Soft delete. It prints the number of descendants and the date of the automatic purge (`PurgeAt`). A repeated delete changes nothing and exits with `42`. |
+| `sform story delete <key> --permanent [-y]` | It confirms first (`-y` skips the question), naming the number of descendants. It then tries the permanent delete. An active key answers `409 AnnotationNotDeleted`; the command then deletes the key and tries again. Without the role, `403` prints "Only an Administrator or Owner can delete permanently." and nothing changes. `-p` is taken by `--projectKey`, so `--permanent` has no short form. |
+| `sform story restore <key>... [--without-descendants]` | Restores many keys, in requests of at most 100. It lists the restored keys, marks the ancestors it had to create, and lists the failures. Any failure exits with `2`. |
+| `sform story deleted [-a] [-k <token>]` (alias `trash`) | A table of the deleted roots: key, type, deleted, by, descendants, and purge date. `--all` lists every deleted annotation, with a Root column. |
+| `sform story history <key> [-n N] [--json]` | A table of the newest entries first: when, who, action, and changes on one line, for example `Title: "Old" → "New"; +eu −us; plan: "pro" → "ent"; Description changed; config v7`. Objects and arrays show only their kind (`{…}`, `[…]`), and cut strings end with `…`. Machines print as `machine:<id>`. |
+| `sform story get <key>` | For a deleted key, it says who deleted it and when, the purge date, and the restore command. |
+| `sform story set <key> [--restore-deleted\|--recreate]` | Before writing, it looks up the key and its ancestors. When some are deleted, it lists them and asks: **Restore and update** (restore them alone, then write), **Create new** (write, which re-creates them empty), or **Cancel**. The options answer the question in advance. When the input is redirected and neither option is given, it stops with `2` and names both. A rejected body prints the server's message (for example `InvalidAnnotation`). |
+
 ## Validation
 
 Every create, re-create and update checks the content (`AnnotationRules`):
