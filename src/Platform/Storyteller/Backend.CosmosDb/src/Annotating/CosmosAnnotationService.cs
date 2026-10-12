@@ -181,7 +181,7 @@ public partial class CosmosAnnotationService : IAnnotationService
         return createdAnnotations;
     }
 
-    public async Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, IEnumerable<string> annotations, AuditActor actor)
+    public async Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, string project, string view, IEnumerable<string> annotations, AuditActor actor)
     {
         var annotationsToProcess = new List<Annotation>();
 
@@ -219,7 +219,7 @@ public partial class CosmosAnnotationService : IAnnotationService
                 continue;
             }
 
-            annotationsToProcess.Add(AnnotationFactory.CreateDefault(annotationKey, Constants.DefaultProjectName, Constants.DefaultViewName));
+            annotationsToProcess.Add(AnnotationFactory.CreateDefault(annotationKey, project, view));
         }
 
         return await CreateAnnotationsAsync(organization, annotationsToProcess, actor);
