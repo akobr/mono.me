@@ -403,7 +403,8 @@ public partial class AnnotationsHttp
             return new BadRequestObjectResult(new ErrorResponse($"The number of annotations to create is too large, maximum allowed is {ApiConstants.MaxInputItems}."));
         }
 
-        var createdAnnotations = await _annotations.CreateAnnotationsFromStringAsync(organization, annotations, request.GetAuditActor());
+        // the lines are created in the project and view of the route, the one the access check covered
+        var createdAnnotations = await _annotations.CreateAnnotationsFromStringAsync(organization, project, view, annotations, request.GetAuditActor());
         return new OkObjectResult(createdAnnotations);
     }
 

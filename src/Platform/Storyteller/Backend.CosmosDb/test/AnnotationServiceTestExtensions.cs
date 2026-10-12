@@ -26,7 +26,7 @@ public static class AnnotationServiceTestExtensions
 
     public static Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(this IAnnotationService @this, string organization, IEnumerable<string> annotations)
     {
-        return @this.CreateAnnotationsFromStringAsync(organization, annotations, TestActor);
+        return @this.CreateAnnotationsFromStringAsync(organization, Constants.DefaultProjectName, Constants.DefaultViewName, annotations, TestActor);
     }
 
     public static Task<AnnotationDeletionResult> DeleteAnnotationAsync(this IAnnotationService @this, FullKey fullKey)

@@ -83,6 +83,17 @@ public class AnnotationsHttpTests
     }
 
     [Fact]
+    public async Task SetSimple_CreatesInTheProjectAndViewOfTheRoute()
+    {
+        var annotations = new RecordingAnnotations();
+
+        var result = await Http(annotations).SetAnnotationsSimple(Request("POST"), "acme", "billing", "staging", ["northwind.invoicing"]);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        annotations.Calls.ShouldBe(["simple:acme:billing:staging:northwind.invoicing"]);
+    }
+
+    [Fact]
     public async Task Delete_ReturnsTheDeletion()
     {
         var annotations = new RecordingAnnotations();
@@ -317,7 +328,11 @@ public class AnnotationsHttpTests
 
         public Task<IEnumerable<Annotation>> CreateAnnotationsAsync(string organization, IEnumerable<Annotation> annotations, AuditActor actor) => throw new NotImplementedException();
 
-        public Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, IEnumerable<string> annotations, AuditActor actor) => throw new NotImplementedException();
+        public Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, string project, string view, IEnumerable<string> annotations, AuditActor actor)
+        {
+            Calls.Add($"simple:{organization}:{project}:{view}:{string.Join(",", annotations)}");
+            return Task.FromResult<IEnumerable<Annotation>>([]);
+        }
     }
 
     // The signed-in user is a Contributor of every project.

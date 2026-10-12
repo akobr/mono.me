@@ -174,6 +174,17 @@ The CLI commands and the admin UI screens are Phases 3 and 4. Only what the rege
 
 - **Audit entry in the same batch as the configuration write.** The spec (1.9, "Configuration events") decided on a separate, best-effort append after the write. A failed append must not fail a configuration write, and the audit's ETag must not make configuration writes contend with annotation writes.
 - **History TTL when container TTL is enabled.** Version items already carry a 365-day `ttl`, and their expiry is the decided behavior (decision 14). No real data exists yet.
-- **`SetAnnotationsSimple` writes to `main/default` whatever the route says.** This behavior predates these phases and is documented on the public site. The access check uses the route's project, though, so it needs its own follow-up.
+- **`SetAnnotationsSimple` writes to `main/default` whatever the route says.** Fixed afterwards; see the next section.
 
 **Tests after the follow-up:** `Backend.CosmosDb` 262, `Api.Functions` 177, CLI 75, TypeScript SDK 59, `ui.admin` 157. All pass.
+
+### Follow-up of 2026-10-12: simple bulk create in the route's project and view
+
+- **Before:** `SetAnnotationsSimple` (`POST …/annotations/simple`) checked `Contributor` on the route's project, but created the annotations in `main` / `default`. So a Contributor of any project could write into `main`.
+- **Change:** `IAnnotationService.CreateAnnotationsFromStringAsync` takes `project` and `view`, and `AnnotationFactory.CreateDefault` uses them. The endpoint passes the route's values, so the write goes to the project the access check covered. Callers that relied on the old behavior must now call the `main` / `default` route.
+- **OpenAPI:** unchanged, because the route and the bodies stay the same, so the SDKs need no regeneration.
+- **Tests:**
+  - New: `CreateAnnotationsFromString_UsesTheGivenProjectAndView` (Cosmos) and `SetSimple_CreatesInTheProjectAndViewOfTheRoute` (API).
+  - The existing string-create test calls the `main` / `default` overload of `AnnotationServiceTestExtensions`.
+  - `Backend.CosmosDb` 263 and `Api.Functions` 178 pass.
+- **Docs:** the public [using-the-platform.md](../../../../42for.net/platform/using-the-platform.md) no longer says that compact lines go to `main` / `default`.

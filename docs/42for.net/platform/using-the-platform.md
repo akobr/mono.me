@@ -82,7 +82,7 @@ You can also post a list of compact lines to `POST /v1/{org}/{project}/{view}/an
 | `cnt.northwind.production` | Context |
 | `unt.invoicing.nightly-export` | Unit, with type `event` until you set a real trigger |
 
-Those compact lines are stored in the default project and view (`main` / `default`). For any other project or view, send the annotation objects so `projectName` and `viewName` travel with the record.
+The records are stored in the project and view of the route, like every other write.
 
 Creating an execution creates the missing subject, context, responsibility, and usage, and records the names on the parents. Creating a unit of execution does the same, including the unit and the execution. After that, set titles and configuration on the parents you care about.
 

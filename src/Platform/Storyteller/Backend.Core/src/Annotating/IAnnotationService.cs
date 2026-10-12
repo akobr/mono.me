@@ -41,7 +41,8 @@ public interface IAnnotationService
     // Creates the annotations that are not active yet; active ones are skipped.
     Task<IEnumerable<Annotation>> CreateAnnotationsAsync(string organization, IEnumerable<Annotation> annotations, AuditActor actor);
 
-    Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, IEnumerable<string> annotations, AuditActor actor);
+    // Creates annotations from compact lines (keys, or names read by their count) in the given project and view.
+    Task<IEnumerable<Annotation>> CreateAnnotationsFromStringAsync(string organization, string project, string view, IEnumerable<string> annotations, AuditActor actor);
 
     // Soft delete of the annotation and all its descendants.
     Task<AnnotationDeletionResult> DeleteAnnotationAsync(FullKey fullKey, AuditActor actor);

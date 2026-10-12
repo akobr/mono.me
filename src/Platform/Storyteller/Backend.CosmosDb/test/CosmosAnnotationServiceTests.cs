@@ -521,6 +521,26 @@ public class CosmosAnnotationServiceTests(Startup startup)
     }
 
     [Fact]
+    public async Task CreateAnnotationsFromString_UsesTheGivenProjectAndView()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+
+        var created = (await annotations.CreateAnnotationsFromStringAsync(
+            TestConstants.Organization,
+            "simple-project",
+            "staging",
+            ["simple-subject.simple-responsibility"],
+            AnnotationServiceTestExtensions.TestActor)).ToList();
+
+        created.Should().NotBeEmpty();
+        created.Should().OnlyContain(a => a.ProjectName == "simple-project" && a.ViewName == "staging");
+
+        var usageKey = AnnotationKey.Parse("usg.simple-subject.simple-responsibility");
+        (await annotations.GetAnnotationAsync(FullKey.Create(usageKey, TestConstants.Organization, "simple-project", "staging"))).Should().NotBeNull();
+        (await annotations.GetAnnotationAsync(FullKey.Create(usageKey, TestConstants.Organization, Constants.DefaultProjectName, Constants.DefaultViewName))).Should().BeNull();
+    }
+
+    [Fact]
     public async Task SetAnnotationsBulk()
     {
         var annotations = Context.Services.GetRequiredService<IAnnotationService>();
