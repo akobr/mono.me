@@ -3,6 +3,7 @@ using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
+using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
@@ -53,7 +54,18 @@ public class StorytellerGetCommand : BaseContextCommand
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {
-            Console.WriteLine($"The annotation '{AnnotationKey}' has not been found.");
+            // a deleted annotation reads as missing; say so, with the way back
+            var deleted = await _annotationsApi.TryGetDeletedAnnotationAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                Context.ViewName,
+                AnnotationKey);
+
+            Console.WriteLine(deleted?.Deletion is { } deletion
+                ? $"The annotation '{AnnotationKey}' is deleted ({AuditConsoleExtensions.FormatDeletion(deletion)})"
+                  + (deletion.PurgeAt is { } purgeAt ? $" and will be purged on {AuditConsoleExtensions.FormatDate(purgeAt)}" : string.Empty)
+                  + $". Restore it with 'sform story restore {AnnotationKey}'."
+                : $"The annotation '{AnnotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 

@@ -48,6 +48,10 @@ public static class CommandNames
     public const string RESET = "reset";
     public const string DIFF = "diff";
     public const string VERSIONS = "versions";
+    public const string RESTORE = "restore";
+    public const string HISTORY = "history";
+    public const string DELETED = "deleted";
+    public const string TRASH = "trash";
 
     public const string RENEW = "renew";
     public const string DOWNLOAD = "download";

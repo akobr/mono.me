@@ -142,6 +142,22 @@ The relation is the structure. These fields are the catalog you can show to a pe
 
 `values` is the bridge into configuration. A resolved document can pull a field from the annotation, or from an ancestor, with an `@annotation(...)` expression. The customer tier can live on the subject, and every execution can refer to it, without copying the tier into every document.
 
+## Deleting and restoring
+
+Deleting an annotation deletes everything below it in the graph: a subject takes its contexts, usages, executions and units of execution with it. Nothing is lost at once. The deleted records leave the catalog and every configuration read, and wait 90 days for a restore. Then they are removed for good.
+
+```text
+sform story delete sbt.northwind          # delete; prints the date it is purged
+sform story deleted                       # what was deleted, newest first
+sform story restore sbt.northwind         # bring it back with everything it took
+sform story history sbt.northwind         # who changed it, when, and what
+sform story delete sbt.northwind --permanent   # remove it now (Administrator or Owner)
+```
+
+Every change is recorded with the account or machine that made it: creates, updates (with the old and new values), deletes, restores, and configuration versions.
+
+Writing a key that is deleted creates it again with an empty configuration. `sform story set` asks first and can restore the old record instead, so its configuration and history come back.
+
 ## Why this stays small
 
 The model refuses a new entity type for every new business idea. A legal entity, a datacenter, a trim level, and a software version are all contexts. An add-on, a microservice, and a physical subsystem are all responsibilities. The platform stays fast at a large number of these records, including a subject per end customer, because the key shape does not change as the catalog grows.
