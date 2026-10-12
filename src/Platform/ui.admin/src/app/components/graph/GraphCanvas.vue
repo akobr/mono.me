@@ -32,6 +32,8 @@ const emit = defineEmits<{
   dragEnd: [index: number]
   releaseAll: []
   interact: []
+  /** The zoom and pan after a gesture, a fit or a reveal ends. */
+  transform: [value: { k: number; x: number; y: number }]
 }>()
 
 const canvas = ref<HTMLCanvasElement>()
@@ -378,6 +380,11 @@ function fit(indexes?: readonly number[]) {
   )
 }
 
+/** Puts back a zoom and pan the user had (through the zoom behaviour, so its state stays in sync). */
+function restore(value: { k: number; x: number; y: number }) {
+  apply(zoomIdentity.translate(value.x, value.y).scale(value.k))
+}
+
 /** Pans so the node is well inside the canvas, keeping the zoom. */
 function reveal(index: number) {
   const [sx, sy] = transform.value.apply([x(index), y(index)])
@@ -559,6 +566,9 @@ onMounted(() => {
       transform.value = event.transform
       schedule()
     })
+    .on('end', ({ transform: { k, x: tx, y: ty } }: D3ZoomEvent<HTMLCanvasElement, unknown>) =>
+      emit('transform', { k, x: tx, y: ty }),
+    )
   select(canvas.value!).call(behavior).on('dblclick.zoom', null)
 })
 
@@ -592,6 +602,7 @@ watch(
 
 defineExpose({
   fit,
+  restore,
   reveal,
   toBlob,
   redraw: schedule,

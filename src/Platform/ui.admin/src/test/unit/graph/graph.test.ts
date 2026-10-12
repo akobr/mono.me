@@ -205,6 +205,39 @@ describe('simulation worker', () => {
     expect(Math.abs(first.positions[0]! - 10)).toBeLessThan(15)
     expect(Math.abs(first.positions[3]! - 40)).toBeLessThan(15)
   })
+
+  it('resumes a remembered layout where it was left, with its dragged nodes pinned', async () => {
+    send = (await import('@/components/graph/simulation.worker')).handleCommand
+    const seed = [10, 20, 30, 40, 50, 60]
+    const init = {
+      type: 'init',
+      tiers: new Float32Array([0, 1, 1]),
+      radii: new Float32Array([6, 4, 4]),
+      links: new Uint32Array([0, 1, 0, 2]),
+      layout: 'layered',
+      prewarm: 0,
+      reducedMotion: false,
+    } as const
+
+    // A layout that had settled is posted exactly as it was and stays at rest.
+    send({ ...init, generation: 9, seed: Float32Array.from(seed), resume: { alpha: 0, pinned: new Uint32Array() } })
+    expect(frames).toHaveLength(1)
+    expect([...frames[0]!.positions]).toEqual(seed)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(frames).toHaveLength(1)
+
+    // A layout left while still moving goes on, and the dragged node stays where it was.
+    send({
+      ...init,
+      generation: 10,
+      seed: Float32Array.from(seed),
+      resume: { alpha: 0.5, pinned: new Uint32Array([1]) },
+    })
+    await vi.waitFor(() => expect(frames.filter((frame) => frame.generation === 10).length).toBeGreaterThan(3))
+    const last = frames.at(-1)!.positions
+    expect([last[2], last[3]]).toEqual([30, 40])
+    expect([last[0], last[1]]).not.toEqual([10, 20])
+  })
 })
 
 describe('graph screen', () => {
@@ -281,6 +314,19 @@ describe('graph screen', () => {
     await settle()
     expect(host.text()).toContain('around sbt.big (depth 2)')
     host.unmount()
+  })
+
+  it('keeps the hidden types for the next visit of the view', async () => {
+    const first = await mountGraph(keys)
+    await first.host.find('button[title="Hide subjects"]').trigger('click')
+    await settle()
+    expect(first.host.text()).toContain('4 annotations')
+    first.host.unmount()
+
+    const again = await mountGraph(keys)
+    expect(again.host.text()).toContain('4 annotations')
+    expect(again.host.find('button[title="Show subjects"]').exists()).toBe(true)
+    again.host.unmount()
   })
 })
 

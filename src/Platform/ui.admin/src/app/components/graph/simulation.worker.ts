@@ -192,13 +192,29 @@ export function handleCommand(message: SimulationCommand): void {
       // The seed is already close to the final layout; a graph that mostly keeps its nodes only settles gently.
       simulation.alpha(known > nodes.length / 2 ? 0.3 : 0.6)
 
+      // A remembered layout continues where it was left, with its dragged nodes pinned.
+      const resume = message.resume && known === nodes.length ? message.resume : undefined
+      if (resume) {
+        simulation.alpha(resume.alpha)
+        for (const index of resume.pinned) {
+          const node = nodes[index]
+          if (node) {
+            node.fx = node.x
+            node.fy = node.y
+          }
+        }
+      }
+
       const deadline = performance.now() + prewarmBudgetMs
       for (let tick = 0; tick < message.prewarm && performance.now() < deadline; tick++) {
         simulation.tick()
       }
       post()
       running = false
-      start()
+      // A remembered layout that had settled stays exactly as it was until the user drags or reheats it.
+      if (!resume || simulation.alpha() >= simulation.alphaMin()) {
+        start()
+      }
       break
     }
     case 'layout': {
