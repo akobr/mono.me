@@ -1,4 +1,5 @@
 ﻿using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Abstractions;
+using Microsoft.OpenApi.Any;
 using Microsoft.OpenApi.Models;
 
 namespace _42.Platform.Storyteller.Api.OpenApi.Filters;
@@ -10,6 +11,13 @@ public class AnnotationDocumentFilter : IDocumentFilter
         if (document.Components.Schemas == null)
         {
             return;
+        }
+
+        // a restore brings the descendants back unless the client says otherwise; generated clients keep the default
+        if (document.Components.Schemas.TryGetValue("AnnotationRestoreRequest", out var restoreSchema)
+            && restoreSchema.Properties.TryGetValue("Descendants", out var descendants))
+        {
+            descendants.Default = new OpenApiBoolean(true);
         }
 
         if (!document.Components.Schemas.TryGetValue("Annotation", out var annotationSchema))

@@ -53,6 +53,13 @@ public static class Definitions
                 public const string AnnotationsSimple = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/simple";
                 public const string Annotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}";
                 public const string Descendants = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}/{{{Parameters.Descendants}}}";
+                public const string History = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/{{{Parameters.Key}}}/history";
+
+                // Literal segments win over {key}; an annotation key always starts with a type code and a dot.
+                public const string Deleted = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/deleted";
+                public const string DeletedAnnotation = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/deleted/{{{Parameters.Key}}}";
+                public const string DeletedLookup = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/deleted/lookup";
+                public const string DeletedRestore = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/annotations/deleted/restore";
 
                 public const string Responsibilities = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/responsibilities";
                 public const string Subjects = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/subjects";
@@ -192,6 +199,13 @@ public static class Definitions
             public const string SetAnnotation = nameof(SetAnnotation);
             public const string DeleteAnnotation = nameof(DeleteAnnotation);
             public const string GetDescendants = nameof(GetDescendants);
+            public const string GetAnnotationHistory = nameof(GetAnnotationHistory);
+
+            public const string GetDeletedAnnotations = nameof(GetDeletedAnnotations);
+            public const string GetDeletedAnnotation = nameof(GetDeletedAnnotation);
+            public const string FindDeletedAnnotations = nameof(FindDeletedAnnotations);
+            public const string RestoreAnnotations = nameof(RestoreAnnotations);
+            public const string PurgeAnnotation = nameof(PurgeAnnotation);
 
             public const string GetResponsibilities = nameof(GetResponsibilities);
             public const string GetSubjects = nameof(GetSubjects);
@@ -286,6 +300,8 @@ public static class Definitions
         public const string KeyPrefix = "keyPrefix";
         public const string Format = "format";
         public const string Force = "force";
+        public const string Roots = "roots";
+        public const string DeletionId = "deletionId";
     }
 
     public static class Tags
@@ -303,6 +319,8 @@ public static class Definitions
         public const string ResponseBadRequest = "The request is not well formed.";
         public const string ResponseUnauthorized = "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): ";
         public const string ResponseForbidden = "The caller is authenticated, but its role on the organization or project does not allow the operation.";
+        public const string ResponseConfigurationNotFound = "The configuration doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).";
+        public const string ResponseConcurrentChange = "The annotations changed concurrently three times in a row (Conflict); try again.";
         public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";
         public const string ResponseInternalServerError = "Unexpected error occurred on the service.";
 

@@ -166,6 +166,39 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
     }
 
     [Fact]
+    public async Task Delete_AfterARestoreWithoutDescendants_StartsANewDeletion()
+    {
+        await CreateAsync("cnt.ud-s.ud-c");
+        var first = await Annotations.DeleteAnnotationAsync(Key("sbt.ud-s"));
+        await RestoreAsync(includeDescendants: false, "sbt.ud-s");
+
+        var second = await Annotations.DeleteAnnotationAsync(Key("sbt.ud-s"));
+
+        second.Deletion.DeletionId.Should().NotBe(first.Deletion.DeletionId, "the context deleted earlier belongs to the previous deletion");
+        second.Deletion.DeletedAt.Should().BeAfter(first.Deletion.DeletedAt);
+        second.DeletedKeys.Should().Equal("sbt.ud-s");
+    }
+
+    [Fact]
+    public async Task Restore_WithoutTheDeletionSnapshot_StillRestoresTheConfiguration()
+    {
+        await CreateAsync("sbt.ms-s");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.ms-s"), JObject.Parse("""{ "a": 1 }"""), "tester");
+        await Annotations.DeleteAnnotationAsync(Key("sbt.ms-s"));
+
+        var partitionKey = $"{Project}.sbt.ms-s";
+        using (await Container.DeleteItemStreamAsync("default.cfv.sbt.ms-s.1", new PartitionKey(partitionKey)))
+        {
+            // the snapshot expired or was removed
+        }
+
+        var result = await RestoreAsync(includeDescendants: true, "sbt.ms-s");
+
+        result.Failed.Should().BeEmpty();
+        (await Configurations.GetRawConfigurationAsync(Key("sbt.ms-s")))!.Content["a"]!.Value<int>().Should().Be(1);
+    }
+
+    [Fact]
     public async Task Restore_WithDescendants_BringsBackTheTreeAndItsConfiguration()
     {
         await CreateAsync("exe.rd-s.rd-r.rd-c");
@@ -374,6 +407,43 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
     }
 
     [Fact]
+    public async Task DeletedListing_IsNewestFirstAndFiltersRootsAndDeletions()
+    {
+        await CreateAsync("sbt.dl-a");
+        await CreateAsync("usg.dl-b.dl-r");
+        await Annotations.DeleteAnnotationAsync(Key("sbt.dl-a"));
+        await Task.Delay(50);
+        var deletion = await Annotations.DeleteAnnotationAsync(Key("sbt.dl-b"));
+
+        var roots = await ListDeletedAsync(rootsOnly: true);
+        roots.Should().ContainInOrder("sbt.dl-b", "sbt.dl-a");
+        roots.Should().NotContain("usg.dl-b.dl-r");
+
+        (await ListDeletedAsync(rootsOnly: false)).Should().Contain("usg.dl-b.dl-r");
+
+        var one = await Annotations.GetDeletedAnnotationsAsync(TestConstants.Organization, Project, Constants.DefaultViewName, rootsOnly: false, deletionId: deletion.Deletion.DeletionId);
+        one.Annotations.Select(a => a.AnnotationKey).Should().BeEquivalentTo("sbt.dl-b", "usg.dl-b.dl-r");
+        one.Annotations.Should().OnlyContain(a => a.Deletion != null && a.Deletion.PurgeAt != null);
+    }
+
+    [Fact]
+    public async Task Descendants_FollowTheInheritanceGraph()
+    {
+        await CreateAsync("uxe.dg-s.dg-r.dg-c.dg-u");
+        await CreateAsync("uxe.dg-s.dg-r.dg-c2.dg-u");
+        await CreateAsync("uxe.dg-s.dg-r.dg-c.dg-u2");
+
+        var ofContext = await DescendantsAsync("cnt.dg-s.dg-c");
+        ofContext.Should().BeEquivalentTo("exe.dg-s.dg-r.dg-c", "uxe.dg-s.dg-r.dg-c.dg-u", "uxe.dg-s.dg-r.dg-c.dg-u2");
+
+        var ofUnit = await DescendantsAsync("unt.dg-r.dg-u");
+        ofUnit.Should().BeEquivalentTo("uxe.dg-s.dg-r.dg-c.dg-u", "uxe.dg-s.dg-r.dg-c2.dg-u");
+
+        await Annotations.DeleteAnnotationAsync(Key("exe.dg-s.dg-r.dg-c2"));
+        (await DescendantsAsync("unt.dg-r.dg-u")).Should().BeEquivalentTo("uxe.dg-s.dg-r.dg-c.dg-u");
+    }
+
+    [Fact]
     public async Task DeletedAnnotation_HidesItsConfigurationAndRejectsChanges()
     {
         await CreateAsync("sbt.cf-s");
@@ -473,6 +543,36 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
         while (token is not null);
 
         return keys;
+    }
+
+    private async Task<List<string>> ListDeletedAsync(bool rootsOnly)
+    {
+        var keys = new List<string>();
+        string token = null;
+
+        do
+        {
+            var page = await Annotations.GetDeletedAnnotationsAsync(TestConstants.Organization, Project, Constants.DefaultViewName, rootsOnly, continuationToken: token);
+            keys.AddRange(page.Annotations.Select(a => a.AnnotationKey));
+            token = page.ContinuationToken;
+        }
+        while (token is not null);
+
+        return keys;
+    }
+
+    private async Task<List<string>> DescendantsAsync(string key)
+    {
+        var response = await Annotations.GetAnnotationsAsync(new AnnotationsRequest
+        {
+            Organization = TestConstants.Organization,
+            Project = Project,
+            View = Constants.DefaultViewName,
+            Types = Enum.GetValues<AnnotationType>(),
+            DescendantsOf = AnnotationKey.Parse(key),
+        });
+
+        return response.Annotations.Select(a => a.AnnotationKey).ToList();
     }
 
     private async Task<JsonElement?> ReadRawAsync(string id, string partitionKey)

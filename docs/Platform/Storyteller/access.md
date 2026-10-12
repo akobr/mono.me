@@ -40,6 +40,11 @@ A `View` has `Name`, `Description`, `CreatedAt`, `CreatedBy`, `IsDefault`, and `
 | List members, set roles, remove members, manage invitations | `Administrator` on the access point |
 | Give, change, or remove the role `Owner` | `Owner` |
 | Leave an access point (remove yourself) | any membership |
+| Read deleted annotations and the history of an annotation | `Reader` on the project |
+| Delete, restore, and re-create annotations | `Contributor` on the project; machines with annotation write |
+| Delete an annotation permanently (`DELETE …/annotations/deleted/{key}`) | `Administrator` on the project, users only: machine credentials get `403` |
+
+See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
 
 Every access point keeps at least one `Owner`. The last owner can't be demoted, removed, or leave (`409`, `LastOwner`).
 

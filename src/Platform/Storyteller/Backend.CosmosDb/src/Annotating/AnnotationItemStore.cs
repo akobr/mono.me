@@ -169,6 +169,20 @@ internal sealed class AnnotationItemStore
         return nodes;
     }
 
+    // Whether an item exists, by a point read of its stream.
+    public async Task<bool> ExistsAsync(string id, string partitionKey)
+    {
+        using var response = await _container.ReadItemStreamAsync(id, new PartitionKey(partitionKey));
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        EnsureSuccess(response);
+        return true;
+    }
+
     // The annotation items of the keys in one request; missing keys are left out.
     public async Task<IReadOnlyList<AnnotationNode>> ReadManyAsync(IEnumerable<FullKey> keys)
     {
@@ -211,6 +225,36 @@ internal sealed class AnnotationItemStore
         }
 
         return found;
+    }
+
+    // One page of annotation items of a query, with the continuation of the next page.
+    public async Task<(IReadOnlyList<AnnotationEntity> Entities, string? ContinuationToken)> QueryPageAsync(QueryDefinition query, string? continuationToken)
+    {
+        using var iterator = _container.GetItemQueryStreamIterator(
+            query,
+            string.IsNullOrWhiteSpace(continuationToken) ? null : continuationToken,
+            new QueryRequestOptions { MaxItemCount = CosmosConstants.MaxItemCountPerPage });
+
+        if (!iterator.HasMoreResults)
+        {
+            return ([], null);
+        }
+
+        using var response = await iterator.ReadNextAsync();
+        EnsureSuccess(response);
+
+        var entities = new List<AnnotationEntity>();
+        using var page = await JsonDocument.ParseAsync(response.Content);
+
+        foreach (var element in page.RootElement.GetProperty("Documents").EnumerateArray())
+        {
+            if (_serializer.ReadAnnotation(element) is { } entity)
+            {
+                entities.Add(entity);
+            }
+        }
+
+        return (entities, response.ContinuationToken);
     }
 
     private static AnnotationNode? GetNode(Dictionary<string, AnnotationNode> nodes, FullKey root, string keyText)

@@ -19,6 +19,16 @@ public interface IAnnotationService
 
     Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request);
 
+    // The deleted annotations of a view, newest deletion first, with their Deletion. One query over every partition
+    // of the project, up to 1000 per page.
+    Task<AnnotationsResponse> GetDeletedAnnotationsAsync(
+        string organization,
+        string project,
+        string view,
+        bool rootsOnly = true,
+        string? deletionId = null,
+        string? continuationToken = null);
+
     // Creates, updates, or re-creates a deleted key. A body equal to the stored active annotation writes nothing.
     // Returns the stored annotation.
     Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor);

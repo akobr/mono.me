@@ -33,6 +33,45 @@ public partial class CosmosAnnotationService
             .ToList();
     }
 
+    public async Task<AnnotationsResponse> GetDeletedAnnotationsAsync(
+        string organization,
+        string project,
+        string view,
+        bool rootsOnly = true,
+        string? deletionId = null,
+        string? continuationToken = null)
+    {
+        // every partition of the project; only annotation items carry both AnnotationType and Deletion
+        var text = "SELECT * FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND c.ProjectName = @project "
+                   + "AND c.ViewName = @view AND IS_DEFINED(c.AnnotationType) AND IS_DEFINED(c.Deletion)";
+
+        if (rootsOnly)
+        {
+            text += " AND c.Deletion.IsRoot = true";
+        }
+
+        if (!string.IsNullOrEmpty(deletionId))
+        {
+            text += " AND c.Deletion.DeletionId = @deletionId";
+        }
+
+        var query = new QueryDefinition(text + " ORDER BY c.Deletion.DeletedAt DESC")
+            .WithParameter("@projectPrefix", $"{project}.")
+            .WithParameter("@project", project)
+            .WithParameter("@view", view)
+            .WithParameter("@deletionId", deletionId);
+
+        var (entities, nextToken) = await Store(organization).QueryPageAsync(query, continuationToken);
+        var annotations = entities.Select(entity => entity.ToModel()).ToList();
+
+        return new AnnotationsResponse
+        {
+            Annotations = annotations,
+            ContinuationToken = nextToken,
+            Count = annotations.Count,
+        };
+    }
+
     public Task<AnnotationDeletionResult> DeleteAnnotationAsync(FullKey fullKey, AuditActor actor)
     {
         return RetryAsync(() => DeleteCoreAsync(fullKey, actor));
@@ -147,10 +186,13 @@ public partial class CosmosAnnotationService
         var descendants = await store.LoadDescendantsAsync(fullKey);
         var now = _timeProvider.GetUtcNow();
 
-        // a delete that did not finish is completed with its own deletion, so its parts expire and restore together
+        // a delete that did not finish is completed with its own deletion, so its parts expire and restore together;
+        // descendants deleted with an earlier lifetime of the root (restored or re-created without them) stay apart
+        var activeSince = root.Entity!.Modified?.At ?? root.Entity.Created?.At ?? DateTimeOffset.MinValue;
         var unfinished = descendants.Values
             .Where(node => node.State == AnnotationItemState.Deleted
-                           && string.Equals(node.Entity!.Deletion!.RootKey, root.KeyText, StringComparison.Ordinal))
+                           && string.Equals(node.Entity!.Deletion!.RootKey, root.KeyText, StringComparison.Ordinal)
+                           && node.Entity.Deletion.DeletedAt >= activeSince)
             .Select(node => node.Entity!.Deletion!)
             .OrderByDescending(deletion => deletion.DeletedAt)
             .FirstOrDefault();
@@ -182,6 +224,7 @@ public partial class CosmosAnnotationService
             var nodeDeletion = deletion with { IsRoot = isRoot, DescendantCount = isRoot ? descendantCount : null };
             var entity = node.Entity! with { Deletion = nodeDeletion, TimeToLiveInSeconds = ttl };
             var stream = plan.Keep(_serializer.WriteAnnotation(entity));
+            var payloadBytes = stream.Length;
             var operations = new List<Action<TransactionalBatch>>
             {
                 batch => batch.ReplaceItemStream(node.AnnotationId, stream, new TransactionalBatchItemRequestOptions { IfMatchEtag = node.ETag }),
@@ -194,6 +237,7 @@ public partial class CosmosAnnotationService
                 {
                     var snapshot = ToHistorySnapshot(configuration);
                     operations.Add(batch => batch.UpsertItem(snapshot));
+                    payloadBytes += EstimateBytes(snapshot);
                 }
 
                 operations.Add(batch => batch.PatchItem(
@@ -212,7 +256,7 @@ public partial class CosmosAnnotationService
             };
             var audit = plan.Keep(_audit.Prepare(node, [entry], ttl, out _));
             operations.Add(AnnotationAuditStore.Write(node, audit));
-            plan.Add(GetDeleteWave(node, root), node.PartitionKey, operations);
+            plan.Add(GetDeleteWave(node, root), node.PartitionKey, payloadBytes + audit.Length, operations);
         }
 
         // the active parents outside of the deleted tree drop the names of their deleted children
@@ -375,6 +419,23 @@ public partial class CosmosAnnotationService
 
         AddToParents(writes, keyText => known.GetValueOrDefault(keyText), relations, updates);
 
+        // the snapshot written by the deletion duplicates the current version and is removed; a delete of an absent
+        // item fails the whole batch, so only the snapshots that still exist are deleted
+        var snapshotIds = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var write in writes.Where(write => write.Kind == PendingKind.Restore))
+        {
+            if (write.Node.Configuration is { AnnotationDeletionId: not null } configuration && configuration.Content.HasValues)
+            {
+                var snapshotId = AnnotationItemIds.ConfigurationVersion(configuration.ViewName, configuration.AnnotationKey, configuration.Version);
+
+                if (await store.ExistsAsync(snapshotId, write.Node.PartitionKey))
+                {
+                    snapshotIds.Add(snapshotId);
+                }
+            }
+        }
+
         using var plan = new BatchPlan(store.Container);
 
         foreach (var write in writes)
@@ -412,10 +473,10 @@ public partial class CosmosAnnotationService
 
                     operations.Add(batch => batch.PatchItem(node.ConfigurationId, patch));
 
-                    // the snapshot written by the deletion (in the same batch as the stamp) duplicates the current version
-                    if (configuration.AnnotationDeletionId is not null && configuration.Content.HasValues)
+                    var snapshotId = AnnotationItemIds.ConfigurationVersion(configuration.ViewName, configuration.AnnotationKey, configuration.Version);
+
+                    if (snapshotIds.Contains(snapshotId))
                     {
-                        var snapshotId = AnnotationItemIds.ConfigurationVersion(configuration.ViewName, configuration.AnnotationKey, configuration.Version);
                         operations.Add(batch => batch.DeleteItem(snapshotId));
                     }
                 }
@@ -423,7 +484,7 @@ public partial class CosmosAnnotationService
 
             var audit = plan.Keep(_audit.Prepare(node, [write.Entry], timeToLiveSeconds: null, out _));
             operations.Add(AnnotationAuditStore.Write(node, audit));
-            plan.Add(node.Key.Annotation.GetDepth(), node.PartitionKey, operations);
+            plan.Add(node.Key.Annotation.GetDepth(), node.PartitionKey, stream.Length + audit.Length, operations);
         }
 
         AddRelationUpdates(plan, relations, updates);
@@ -490,6 +551,7 @@ public partial class CosmosAnnotationService
         foreach (var node in purging)
         {
             var operations = new List<Action<TransactionalBatch>>();
+            var payloadBytes = 0L;
 
             if (node.Configuration is { } configuration)
             {
@@ -497,6 +559,7 @@ public partial class CosmosAnnotationService
                 {
                     var snapshot = ToHistorySnapshot(configuration);
                     operations.Add(batch => batch.UpsertItem(snapshot));
+                    payloadBytes += EstimateBytes(snapshot);
                 }
 
                 operations.Add(batch => batch.DeleteItem(node.ConfigurationId));
@@ -509,7 +572,7 @@ public partial class CosmosAnnotationService
                 operations.Add(batch => batch.DeleteItem(node.AuditId));
             }
 
-            plan.Add(GetDeleteWave(node, root), node.PartitionKey, operations);
+            plan.Add(GetDeleteWave(node, root), node.PartitionKey, payloadBytes, operations);
         }
 
         await plan.ExecuteAsync();

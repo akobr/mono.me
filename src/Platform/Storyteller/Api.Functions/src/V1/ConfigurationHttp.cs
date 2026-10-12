@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
@@ -21,15 +22,18 @@ namespace _42.Platform.Storyteller.Api.V1;
 public class ConfigurationHttp
 {
     private readonly IConfigurationService _configuration;
+    private readonly IAnnotationService _annotations;
     private readonly IAccessService _access;
     private readonly ILogger<ConfigurationHttp> _logger;
 
     public ConfigurationHttp(
         IConfigurationService configuration,
+        IAnnotationService annotations,
         IAccessService access,
         ILogger<ConfigurationHttp> logger)
     {
         _configuration = configuration;
+        _annotations = annotations;
         _access = access;
         _logger = logger;
     }
@@ -81,7 +85,7 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The configuration model.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The requested configuration doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConfigurationNotFound)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetConfiguration(
@@ -105,7 +109,7 @@ public class ConfigurationHttp
 
         if (configurationModel is null)
         {
-            return new NotFoundResult();
+            return await NotFoundAsync(fullKey);
         }
 
         return new OkObjectResult(configurationModel);
@@ -122,7 +126,7 @@ public class ConfigurationHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The configuration model with resolved substitutions.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.UnprocessableEntity, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A binding in the configuration cannot be evaluated or exceeds an evaluation limit. ErrorCode is binding.evaluation or binding.limit.<kind>.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The requested configuration doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConfigurationNotFound)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetConfigurationResolved(
@@ -154,7 +158,7 @@ public class ConfigurationHttp
 
         if (configurationModel is null)
         {
-            return new NotFoundResult();
+            return await NotFoundAsync(fullKey);
         }
 
         return new OkObjectResult(configurationModel);
@@ -172,7 +176,7 @@ public class ConfigurationHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(JObject), Description = "The configuration model.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The created or updated configuration.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The configuration violates the schema.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The configuration violates the schema, or the annotation is deleted (ErrorCode AnnotationDeleted).")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -210,8 +214,13 @@ public class ConfigurationHttp
         try
         {
             var author = request.GetAuthor();
-            var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author, IsForce(request));
+            var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author, IsForce(request), request.GetAuditActor());
             return new OkObjectResult(outputModel);
+        }
+        catch (StorytellerException ex)
+        {
+            // a deleted annotation answers 409 AnnotationDeleted
+            return ErrorResponseMapping.ToActionResult(ex);
         }
         catch (JsonPatchException ex)
         {
@@ -250,7 +259,7 @@ public class ConfigurationHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The patched configuration.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The configuration doesn't exist or has no content to patch.")]
-    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The patch violates the configuration schema.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "The patch violates the configuration schema, or the annotation is deleted (ErrorCode AnnotationDeleted).")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -288,8 +297,13 @@ public class ConfigurationHttp
         try
         {
             var author = request.GetAuthor();
-            var outputModel = await _configuration.PatchConfigurationAsync(fullKey, patchOperations, author, IsForce(request));
+            var outputModel = await _configuration.PatchConfigurationAsync(fullKey, patchOperations, author, IsForce(request), request.GetAuditActor());
             return new OkObjectResult(outputModel);
+        }
+        catch (StorytellerException ex)
+        {
+            // a deleted annotation answers 409 AnnotationDeleted
+            return ErrorResponseMapping.ToActionResult(ex);
         }
         catch (ConfigurationNotFoundException ex)
         {
@@ -329,6 +343,7 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The configuration doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The annotation is deleted (ErrorCode AnnotationDeleted).")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -352,10 +367,14 @@ public class ConfigurationHttp
 
         if (!await _configuration.HasConfigurationContentAsync(fullKey))
         {
-            return new NotFoundResult();
+            return await _annotations.GetDeletedAnnotationAsync(fullKey) is null
+                ? new NotFoundResult()
+                : ErrorResponseMapping.ToActionResult(new ConflictException(
+                    $"The annotation '{fullKey.Annotation}' is deleted; restore it before changing its configuration.",
+                    ErrorCodes.AnnotationDeleted));
         }
 
-        await _configuration.ClearConfigurationAsync(fullKey);
+        await _configuration.ClearConfigurationAsync(fullKey, request.GetAuditActor());
         return new OkResult();
     }
 
@@ -389,7 +408,11 @@ public class ConfigurationHttp
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
         var versions = await _configuration.GetConfigurationVersionsAsync(fullKey);
-        return new OkObjectResult(versions);
+
+        // the versions of a deleted annotation are hidden until a restore
+        return versions.Count == 0
+            ? await NotFoundAsync(fullKey, new OkObjectResult(versions))
+            : new OkObjectResult(versions);
     }
 
     [Function(nameof(GetConfigurationVersion))]
@@ -403,7 +426,7 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Version, In = ParameterLocation.Path, Required = true, Type = typeof(uint), Description = "The version number.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The configuration of the version.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The requested version doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The requested version doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetConfigurationVersion(
@@ -428,7 +451,7 @@ public class ConfigurationHttp
 
         if (configurationModel is null)
         {
-            return new NotFoundResult();
+            return await NotFoundAsync(fullKey);
         }
 
         return new OkObjectResult(configurationModel);
@@ -446,7 +469,7 @@ public class ConfigurationHttp
     [OpenApiParameter(Definitions.Parameters.Format, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.DiffFormat)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(DiffResult), Description = "The diff between this and previous version. When ?format=unified, returns text/plain instead.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The requested version doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The requested version doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetConfigurationVersionDiff(
@@ -467,9 +490,10 @@ public class ConfigurationHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        return await _configuration
+        var diff = await _configuration
             .GetConfigurationVersionChangesAsync(fullKey, version)
             .ToDiffResponseAsync(request);
+        return diff is NotFoundObjectResult ? await NotFoundAsync(fullKey, diff) : diff;
     }
 
     [Function(nameof(GetConfigurationVersionDiffCustom))]
@@ -507,9 +531,10 @@ public class ConfigurationHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        return await _configuration
+        var diff = await _configuration
             .GetConfigurationVersionChangesAsync(fullKey, versionFrom, version)
             .ToDiffResponseAsync(request);
+        return diff is NotFoundObjectResult ? await NotFoundAsync(fullKey, diff) : diff;
     }
 
     [Function(nameof(GetConfigurationViewDiff))]
@@ -545,9 +570,10 @@ public class ConfigurationHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        return await _configuration
+        var diff = await _configuration
             .GetConfigurationViewChangesAsync(fullKey, viewTo)
             .ToDiffResponseAsync(request);
+        return diff is NotFoundObjectResult ? await NotFoundAsync(fullKey, diff) : diff;
     }
 
     private bool TryParseAnnotationKey(
@@ -564,6 +590,21 @@ public class ConfigurationHttp
         _logger.LogWarning("Invalid request; unknown annotation key '{annotationKey}'", annotationKey);
         badRequestResult = new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {annotationKey}"));
         return false;
+    }
+
+    // A read that found nothing: a deleted annotation answers 404 with ErrorCode AnnotationDeleted, so clients can tell
+    // it from a missing one; otherwise the fallback (a plain 404). Costs one point read, only on this path.
+    private async Task<IActionResult> NotFoundAsync(FullKey key, IActionResult? fallback = null)
+    {
+        if (await _annotations.GetDeletedAnnotationAsync(key) is null)
+        {
+            return fallback ?? new NotFoundResult();
+        }
+
+        return new NotFoundObjectResult(new ErrorResponse($"The annotation '{key.Annotation}' is deleted; restore it to see its configuration.")
+        {
+            ErrorCode = ErrorCodes.AnnotationDeleted,
+        });
     }
 
     private static bool IsForce(HttpRequestData request)
