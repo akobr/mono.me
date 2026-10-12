@@ -100,6 +100,25 @@ public class StorytellerDeleteCommandTests
     }
 
     [Fact]
+    public async Task Permanent_FailingAfterTheSoftDelete_SaysTheKeyIsStillRestorable()
+    {
+        ActiveKey(descendants: 0);
+        var deletion = AnnotationCommandFixture.Deletion(Key);
+        _fixture.Api
+            .SetupSequence(api => api.PurgeAnnotationAsync("org1", "proj1", "default", Key))
+            .ThrowsAsync(AnnotationCommandFixture.Error(409, "AnnotationNotDeleted", "The annotation is not deleted."))
+            .ThrowsAsync(AnnotationCommandFixture.Error(503));
+        _fixture.Api
+            .Setup(api => api.DeleteAnnotationAsync("org1", "proj1", "default", Key))
+            .ReturnsAsync(new AnnotationDeletionResult { Deletion = deletion, DeletedKeys = [Key] });
+
+        await Should.ThrowAsync<ApiException>(() => Execute(permanent: true, yes: true));
+
+        _fixture.Line("The annotation").ShouldBe("The annotation 'sbt.northwind' was deleted, but not permanently.");
+        _fixture.Line("Restore").ShouldContain(AuditConsoleExtensions.FormatDate(deletion.PurgeAt!.Value));
+    }
+
+    [Fact]
     public async Task Permanent_WithoutTheRole_ChangesNothing()
     {
         ActiveKey(descendants: 0);

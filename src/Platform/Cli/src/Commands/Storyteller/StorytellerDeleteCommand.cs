@@ -141,8 +141,19 @@ public class StorytellerDeleteCommand : BaseContextCommand
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Conflict && e.GetErrorCode() == AnnotationNotDeleted)
         {
-            await _annotationsApi.DeleteAnnotationAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, annotationKey);
-            return await _annotationsApi.PurgeAnnotationAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, annotationKey);
+            var deletion = await _annotationsApi.DeleteAnnotationAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, annotationKey);
+
+            try
+            {
+                return await _annotationsApi.PurgeAnnotationAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, annotationKey);
+            }
+            catch (ApiException)
+            {
+                // the soft delete stays: say so, with the way back, before the failure is reported
+                Console.WriteLine($"The annotation '{annotationKey}' was deleted, but not permanently.");
+                WriteRestoreHint(annotationKey, deletion.Deletion);
+                throw;
+            }
         }
     }
 

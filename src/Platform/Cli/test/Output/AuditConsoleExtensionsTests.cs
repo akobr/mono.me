@@ -85,6 +85,23 @@ public class AuditConsoleExtensionsTests
         AuditConsoleExtensions.FormatChanges(configuration).ShouldBe("config v7");
     }
 
+    [Fact]
+    public void Timestamps_KeepSecondsAndFractions()
+    {
+        var entry = Entry(AnnotationAuditEntryAction.Updated);
+        entry.Fields =
+        [
+            new AnnotationFieldChange
+            {
+                Field = "ValidFrom",
+                Previous = new DateTimeOffset(2026, 10, 11, 12, 0, 0, TimeSpan.Zero),
+                Value = new DateTimeOffset(2026, 10, 11, 12, 0, 30, 250, TimeSpan.Zero),
+            },
+        ];
+
+        AuditConsoleExtensions.FormatChanges(entry).ShouldBe("ValidFrom: 2026-10-11 12:00:00 +00:00 → 2026-10-11 12:00:30.25 +00:00");
+    }
+
     [Theory]
     [InlineData(AuditActorKind.Account, "user_1", "Ales Kobr", "Ales Kobr")]
     [InlineData(AuditActorKind.Account, "user_1", null, "user_1")]

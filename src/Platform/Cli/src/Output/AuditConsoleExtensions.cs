@@ -169,8 +169,9 @@ public static class AuditConsoleExtensions
             null => "null",
             string text => $"\"{text}{(isTruncated ? "…" : string.Empty)}\"",
             bool flag => flag ? "true" : "false",
-            DateTime time => time.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
-            DateTimeOffset time => FormatTime(time),
+            // changed timestamps keep seconds and fractions, so two close values stay distinct
+            DateTime time => time.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture) + (time.Kind == DateTimeKind.Utc ? "Z" : string.Empty),
+            DateTimeOffset time => time.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFF zzz", CultureInfo.InvariantCulture),
             JValue token => FormatValue(token.Value, isTruncated),
             JToken token => token.ToString(Formatting.None),
             IFormattable number => number.ToString(null, CultureInfo.InvariantCulture),
