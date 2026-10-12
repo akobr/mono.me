@@ -8,6 +8,7 @@ using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Json;
+using _42.Platform.Storyteller.KeyValues;
 
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Extensions.OpenApi;
@@ -79,6 +80,10 @@ var host = new HostBuilder()
         // Add persistant and logic layer
         services.AddCosmosDbAnnotations(context.Configuration, "cosmos");
 
+        // Key/value secrets: the Standard level wraps its data keys in the vault AzureKeyVaults:{KeyValues:Protection:Standard:VaultName};
+        // without that vault only public pairs can be written.
+        services.AddKeyVaultKeyProtection(context.Configuration, context.HostingEnvironment);
+
         // Add authentication by API keys
         services.AddApiKeyMachineAccess();
         // Add certificate-based machine authentication (must be after AddApiKeyMachineAccess)
@@ -130,7 +135,8 @@ var host = new HostBuilder()
                 .AddFunction<AnnotationBindingFunction>("annotation"))
             .AddAzureKeyVaultBindings(
                 context.Configuration,
-                context.HostingEnvironment);
+                context.HostingEnvironment)
+            .AddKeyValueBindings();
     })
     .Build();
 

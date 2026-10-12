@@ -25,9 +25,19 @@ var dbCreator = builder.AddProject<Projects.DbCreator>("db-creator")
     .WaitFor(cosmos)
     .WithExplicitStart();
 
+// Local Key Vault emulator (Lowkey Vault): the key-encryption keys of the Standard level of key/value secrets.
+// Relaxed ports let the vault answer on the host port that Aspire maps to 8443.
+var keyVault = builder.AddContainer("keyvault", "nagyesta/lowkey-vault", "7.3.112")
+    .WithHttpsEndpoint(targetPort: 8443, name: "https")
+    .WithEnvironment("LOWKEY_ARGS", "--LOWKEY_VAULT_RELAXED_PORTS=true")
+    .WithLifetime(ContainerLifetime.Persistent);
+
 var apiFunctions = builder.AddProject<Projects.Api_Functions>("api-functions")
     .WithReference(cosmos)
-    .WaitFor(cosmos);
+    .WaitFor(cosmos)
+    .WithEnvironment("AzureKeyVaults__default", keyVault.GetEndpoint("https"))
+    .WithEnvironment("KeyValues__Protection__Emulator", "true")
+    .WaitFor(keyVault);
 
 // Administration UI (src/Platform/ui.admin): the Vite dev server on the fixed port 5173, which is the redirect URI
 // registered in the WorkOS staging environment. Run `npm ci` in ui.admin/src (and build the TypeScript SDK) first.

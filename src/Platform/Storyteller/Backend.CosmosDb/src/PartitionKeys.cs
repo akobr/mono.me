@@ -6,6 +6,7 @@ namespace _42.Platform.Storyteller;
 public static class PartitionKeys
 {
     public const string TemplatePartitionSuffix = "template";
+    public const string KeyValuesPartitionInfix = "kv";
 
     public static string GetResponsibility(string projectName, string responsibilityName)
     {
@@ -20,6 +21,12 @@ public static class PartitionKeys
     public static string GetTemplate(string projectName)
     {
         return $"{projectName}.{TemplatePartitionSuffix}";
+    }
+
+    // Key/value pairs of one view; an annotation partition always has ".rst." or ".sbt." after the project, so they never collide.
+    public static string GetKeyValues(string projectName, string viewName)
+    {
+        return $"{projectName}.{KeyValuesPartitionInfix}.{viewName}";
     }
 
     public static string GetKey(IAnnotation annotation)
@@ -65,5 +72,10 @@ public static class PartitionKeys
     public static PartitionKey GetCosmosTemplate(string projectName)
     {
         return new PartitionKey(GetTemplate(projectName));
+    }
+
+    public static PartitionKey GetCosmosKeyValues(string projectName, string viewName)
+    {
+        return new PartitionKey(GetKeyValues(projectName, viewName));
     }
 }

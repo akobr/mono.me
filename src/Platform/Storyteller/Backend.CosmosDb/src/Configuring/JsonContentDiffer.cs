@@ -44,6 +44,12 @@ internal sealed class JsonContentDiffer
         var fromText = !fromJson.HasValues ? string.Empty : JsonConvert.SerializeObject(fromJson, Formatting.Indented, serializerSettings);
         var toText = !toJson.HasValues ? string.Empty : JsonConvert.SerializeObject(toJson, Formatting.Indented, serializerSettings);
 
+        return GetTextChanges(fromText, toText);
+    }
+
+    // The line and word diff of two texts; key/value pairs use it directly.
+    public DiffResult GetTextChanges(string fromText, string toText)
+    {
         var diff = InlineDiffBuilder.Diff(fromText, toText);
 
         // Build annotated lines with line numbers

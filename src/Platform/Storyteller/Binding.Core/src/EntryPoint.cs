@@ -1,5 +1,6 @@
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Binding.Object;
+using _42.Platform.Storyteller.KeyValues;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -17,13 +18,26 @@ public static class EntryPoint
         {
             var options = provider.GetRequiredService<IOptions<BindingsOptions>>();
             var executor = new BindingExecutor();
+            var sources = options.Value.ResolveSources(provider).ToList();
+            var functions = options.Value.ResolveFunctions(provider).ToList();
 
-            foreach (var (key, source) in options.Value.ResolveSources(provider))
+            // @name(path) is a source call when name is a source, so a name must not be both
+            var clashes = sources.Select(source => source.Key)
+                .Intersect(functions.Select(function => function.Key), StringComparer.Ordinal)
+                .ToList();
+
+            if (clashes.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"The binding name(s) {string.Join(", ", clashes.Select(name => $"'{name}'"))} are registered as both a source and a function.");
+            }
+
+            foreach (var (key, source) in sources)
             {
                 executor.RegisterSource(key, source);
             }
 
-            foreach (var (name, function) in options.Value.ResolveFunctions(provider))
+            foreach (var (name, function) in functions)
             {
                 executor.RegisterFunction(name, function);
             }
@@ -43,6 +57,27 @@ public static class EntryPoint
         {
             @this.Configure(configure);
         }
+
+        return @this;
+    }
+
+    /// <summary>
+    /// Registers the native key/value store as the <c>default</c>, <c>public</c> and <c>secret</c> binding sources.
+    /// Call it after the other source registrations, so it owns those names.
+    /// </summary>
+    public static IServiceCollection AddKeyValueBindings(this IServiceCollection @this)
+    {
+        @this.Configure<BindingsOptions>(options =>
+        {
+            foreach (var (key, kind) in KeyValueBindingSources.Kinds)
+            {
+                options.AddSource(
+                    provider => new KeyValueBindingSource(
+                        new Lazy<IKeyValueService>(() => provider.GetRequiredService<IKeyValueService>()),
+                        kind),
+                    key);
+            }
+        });
 
         return @this;
     }

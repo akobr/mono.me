@@ -255,7 +255,7 @@ Versioning follows configuration and template versioning.
   | Descendant type | `{view}.csv.d.{descendantType}.{annotationKey}.{version}` |
 
 - A delete writes the history item of the deleted version. A schema created again later continues after the highest version ever allocated for that id, including after history has expired. The counter is kept on a state item (`{view}.css.…` in the same partition) that survives deletion.
-- History items expire after 365 days. The current version does not expire.
+- History items expire after 365 days. The current version does not expire. The expiry is enforced since the containers got item-level TTL with the [key/value pairs](key-values.md#lifecycle) (`DefaultTimeToLive = -1`, set by `ContainerFactory` on new organization containers and by `2sInitDb` on existing ones); before that, the `ttl` was stored but ignored.
 - `ConfigurationVersion` describes a version: `Version`, `Author`, `CreationTime`, `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
 - Diffs compare stored schema documents. Version `0` is an empty object. The diff of version `N` is `N-1 → N`. Any pair can be requested.
 

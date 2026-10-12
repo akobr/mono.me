@@ -13,6 +13,10 @@ public class BindingsOptions
     /// </summary>
     public ObjectBindingLimits ObjectBindingLimits { get; set; } = ObjectBindingLimits.Default;
 
+    public IReadOnlyCollection<string> SourceKeys => _sources.Keys;
+
+    public IReadOnlyCollection<string> FunctionNames => _functions.Keys;
+
     public BindingsOptions AddSource(
         Func<IServiceProvider, IBindingSource> registration,
         string key = BindingExecutor.DefaultSourceKey)

@@ -131,7 +131,7 @@ Versioning follows configuration versioning:
 - A new template starts at version `1`. Each change that alters the content increments `Version`.
 - Before a change, the current item is copied into a `GenerateTemplateHistoryEntity` with id `{viewName}.gnv.{typeCode}.{version}`, in the same `{project}.template` partition. Every view has its own version sequence. The copy and the change are written in one transactional batch.
 - A delete also writes the history item of the deleted version. A template created again later continues the numbering after `LastVersion` of the state record, even when the history has already expired. Templates written before the state record existed fall back to the highest history version.
-- History items expire after 365 days (`ttl`). The current version never expires.
+- History items expire after 365 days (`ttl`). The current version never expires. The expiry is enforced since the containers got item-level TTL with the [key/value pairs](key-values.md#lifecycle) (`DefaultTimeToLive = -1`, set by `ContainerFactory` on new organization containers and by `2sInitDb` on existing ones); before that, the `ttl` was stored but ignored.
 - `ConfigurationVersion` describes a version: `Version`, `Author`, `CreationTime`, `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
 
 ## Merge
