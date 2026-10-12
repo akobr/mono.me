@@ -19,6 +19,7 @@ import {
   setDescendantTypeSchema,
   type ConfigurationSchema,
   type ConfigurationSchemaSummary,
+  type DiffResult,
 } from '@42for.net/2splatform.sdk'
 import type { VersionSource } from '@/components/versions/version-source'
 import type { Scope } from '@/stores/context'
@@ -70,7 +71,9 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
           content: async (version, signal) =>
             (await getSchemaVersion(org, project, view, target.type, version, { signal })).Content,
           diff: (version, from, signal) =>
-            getSchemaVersionDiffCustom(org, project, view, target.type, version, from, undefined, { signal }),
+            getSchemaVersionDiffCustom(org, project, view, target.type, version, from, undefined, {
+              signal,
+            }) as Promise<DiffResult>,
         },
         appliesTo: (key) => metaOf(key.slice(0, 3))?.code === target.type,
       }
@@ -93,7 +96,9 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
           content: async (version, signal) =>
             (await getAnnotationSchemaVersion(org, project, view, target.key, version, { signal })).Content,
           diff: (version, from, signal) =>
-            getAnnotationSchemaVersionDiffCustom(org, project, view, target.key, version, from, undefined, { signal }),
+            getAnnotationSchemaVersionDiffCustom(org, project, view, target.key, version, from, undefined, {
+              signal,
+            }) as Promise<DiffResult>,
         },
         appliesTo: (key) => key === target.key,
       }
@@ -127,7 +132,7 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
               from,
               undefined,
               { signal },
-            ),
+            ) as Promise<DiffResult>,
         },
         appliesTo: (key, ancestors) => metaOf(key.slice(0, 3))?.code === target.type && ancestors.includes(target.key),
       }

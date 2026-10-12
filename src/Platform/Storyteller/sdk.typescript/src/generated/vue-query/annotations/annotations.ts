@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.8.91.29486
+ * OpenAPI spec version: 0.9.1.3549
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -23,6 +23,12 @@ import type { MaybeRefOrGetter } from "vue";
 
 import type {
   Annotation,
+  AnnotationDeletionResult,
+  AnnotationHistory,
+  AnnotationKeysRequest,
+  AnnotationPurgeResult,
+  AnnotationRestoreRequest,
+  AnnotationRestoreResult,
   AnnotationsResponse,
   AnnotationsResponseContext,
   AnnotationsResponseExecution,
@@ -34,6 +40,7 @@ import type {
   ErrorResponse,
   GetAnnotationsParams,
   GetContextsParams,
+  GetDeletedAnnotationsParams,
   GetDescendantsParams,
   GetExecutionsParams,
   GetResponsibilitiesParams,
@@ -219,7 +226,7 @@ export const setAnnotations = async (
   view: string,
   annotation?: Annotation[],
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<string> => {
+): Promise<Annotation[]> => {
   const getHeaders = (
     h?: NonNullable<RequestInit["headers"]>,
   ): Record<string, string | readonly string[]> => {
@@ -241,7 +248,7 @@ export const setAnnotations = async (
     }
     return headers;
   };
-  return storytellerFetch<string>(
+  return storytellerFetch<Annotation[]>(
     getSetAnnotationsUrl(organization, project, view),
     {
       ...options,
@@ -469,6 +476,9 @@ export const getSetAnnotationUrl = (
   return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
 };
 
+/**
+ * Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+ */
 export const setAnnotation = async (
   organization: string,
   project: string,
@@ -603,14 +613,17 @@ export const getDeleteAnnotationUrl = (
   return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
 };
 
+/**
+ * Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
+ */
 export const deleteAnnotation = async (
   organization: string,
   project: string,
   view: string,
   key: string,
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<void> => {
-  return storytellerFetch<void>(
+): Promise<AnnotationDeletionResult> => {
+  return storytellerFetch<AnnotationDeletionResult>(
     getDeleteAnnotationUrl(organization, project, view, key),
     {
       ...options,
@@ -881,9 +894,9 @@ export const setAnnotationsSimple = async (
   organization: string,
   project: string,
   view: string,
-  annotation?: Annotation[],
+  setAnnotationsSimpleBody?: string[],
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<string> => {
+): Promise<Annotation[]> => {
   const getHeaders = (
     h?: NonNullable<RequestInit["headers"]>,
   ): Record<string, string | readonly string[]> => {
@@ -905,7 +918,7 @@ export const setAnnotationsSimple = async (
     }
     return headers;
   };
-  return storytellerFetch<string>(
+  return storytellerFetch<Annotation[]>(
     getSetAnnotationsSimpleUrl(organization, project, view),
     {
       ...options,
@@ -914,7 +927,7 @@ export const setAnnotationsSimple = async (
         "Content-Type": "application/json",
         ...getHeaders(options?.headers),
       },
-      body: JSON.stringify(annotation),
+      body: JSON.stringify(setAnnotationsSimpleBody),
     },
   );
 };
@@ -969,14 +982,13 @@ export const getSetAnnotationsSimpleMutationOptions = <
 export type SetAnnotationsSimpleMutationResult = NonNullable<
   Awaited<ReturnType<typeof setAnnotationsSimple>>
 >;
-export type SetAnnotationsSimpleMutationBody =
-  BodyType<Annotation[]> | undefined;
+export type SetAnnotationsSimpleMutationBody = BodyType<string[]> | undefined;
 export type SetAnnotationsSimpleMutationError = ErrorType<ErrorResponse | void>;
 export type SetAnnotationsSimpleMutationVariables = {
   organization: string;
   project: string;
   view: string;
-  data?: BodyType<Annotation[]>;
+  data?: BodyType<string[]>;
 };
 
 export const useSetAnnotationsSimple = <
@@ -2038,6 +2050,860 @@ export function useGetUnitsOfExecution<
     project,
     view,
     params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getGetDeletedAnnotationsUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  params?: GetDeletedAnnotationsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted`;
+};
+
+/**
+ * The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
+ */
+export const getDeletedAnnotations = async (
+  organization: string,
+  project: string,
+  view: string,
+  params?: GetDeletedAnnotationsParams,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AnnotationsResponse> => {
+  return storytellerFetch<AnnotationsResponse>(
+    getGetDeletedAnnotationsUrl(organization, project, view, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetDeletedAnnotationsQueryKey = (
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetDeletedAnnotationsParams>,
+) => {
+  return [
+    "v1",
+    organization,
+    project,
+    view,
+    "annotations",
+    "deleted",
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getGetDeletedAnnotationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDeletedAnnotations>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetDeletedAnnotationsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getDeletedAnnotations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetDeletedAnnotationsQueryKey(
+    organization,
+    project,
+    view,
+    params,
+  );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDeletedAnnotations>>
+  > = ({ signal }) =>
+    getDeletedAnnotations(
+      toValue(organization),
+      toValue(project),
+      toValue(view),
+      toValue(params),
+      { signal, ...requestOptions },
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(organization) !== null &&
+        toValue(organization) !== undefined &&
+        toValue(project) !== null &&
+        toValue(project) !== undefined &&
+        toValue(view) !== null &&
+        toValue(view) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDeletedAnnotations>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetDeletedAnnotationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDeletedAnnotations>>
+>;
+export type GetDeletedAnnotationsQueryError = ErrorType<void | ErrorResponse>;
+
+export function useGetDeletedAnnotations<
+  TData = Awaited<ReturnType<typeof getDeletedAnnotations>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetDeletedAnnotationsParams>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getDeletedAnnotations>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetDeletedAnnotationsQueryOptions(
+    organization,
+    project,
+    view,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getGetDeletedAnnotationUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted/${encodeURIComponent(String(key))}`;
+};
+
+/**
+ * A deleted annotation with its Deletion.
+ */
+export const getDeletedAnnotation = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<Annotation> => {
+  return storytellerFetch<Annotation>(
+    getGetDeletedAnnotationUrl(organization, project, view, key),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetDeletedAnnotationQueryKey = (
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  key: MaybeRefOrGetter<string>,
+) => {
+  return [
+    "v1",
+    organization,
+    project,
+    view,
+    "annotations",
+    "deleted",
+    key,
+  ] as const;
+};
+
+export const getGetDeletedAnnotationQueryOptions = <
+  TData = Awaited<ReturnType<typeof getDeletedAnnotation>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  key: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getDeletedAnnotation>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetDeletedAnnotationQueryKey(
+    organization,
+    project,
+    view,
+    key,
+  );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getDeletedAnnotation>>
+  > = ({ signal }) =>
+    getDeletedAnnotation(
+      toValue(organization),
+      toValue(project),
+      toValue(view),
+      toValue(key),
+      { signal, ...requestOptions },
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(organization) !== null &&
+        toValue(organization) !== undefined &&
+        toValue(project) !== null &&
+        toValue(project) !== undefined &&
+        toValue(view) !== null &&
+        toValue(view) !== undefined &&
+        toValue(key) !== null &&
+        toValue(key) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getDeletedAnnotation>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetDeletedAnnotationQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getDeletedAnnotation>>
+>;
+export type GetDeletedAnnotationQueryError = ErrorType<ErrorResponse | void>;
+
+export function useGetDeletedAnnotation<
+  TData = Awaited<ReturnType<typeof getDeletedAnnotation>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  key: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getDeletedAnnotation>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetDeletedAnnotationQueryOptions(
+    organization,
+    project,
+    view,
+    key,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getPurgeAnnotationUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted/${encodeURIComponent(String(key))}`;
+};
+
+/**
+ * Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
+ */
+export const purgeAnnotation = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AnnotationPurgeResult> => {
+  return storytellerFetch<AnnotationPurgeResult>(
+    getPurgeAnnotationUrl(organization, project, view, key),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getPurgeAnnotationMutationKey = () => ["purgeAnnotation"] as const;
+
+export const getPurgeAnnotationMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof purgeAnnotation>>,
+    TError,
+    PurgeAnnotationMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof purgeAnnotation>>,
+  TError,
+  PurgeAnnotationMutationVariables,
+  TContext
+> => {
+  const mutationKey = getPurgeAnnotationMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof purgeAnnotation>>,
+    PurgeAnnotationMutationVariables
+  > = (props) => {
+    const { organization, project, view, key } = props ?? {};
+
+    return purgeAnnotation(organization, project, view, key, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type PurgeAnnotationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof purgeAnnotation>>
+>;
+
+export type PurgeAnnotationMutationError = ErrorType<ErrorResponse | void>;
+export type PurgeAnnotationMutationVariables = {
+  organization: string;
+  project: string;
+  view: string;
+  key: string;
+};
+
+export const usePurgeAnnotation = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof purgeAnnotation>>,
+      TError,
+      PurgeAnnotationMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof purgeAnnotation>>,
+  TError,
+  PurgeAnnotationMutationVariables,
+  TContext
+> => {
+  return useMutation(getPurgeAnnotationMutationOptions(options), queryClient);
+};
+export const getFindDeletedAnnotationsUrl = (
+  organization: string,
+  project: string,
+  view: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted/lookup`;
+};
+
+/**
+ * The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
+ */
+export const findDeletedAnnotations = async (
+  organization: string,
+  project: string,
+  view: string,
+  annotationKeysRequest?: AnnotationKeysRequest,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<Annotation[]> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<Annotation[]>(
+    getFindDeletedAnnotationsUrl(organization, project, view),
+    {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(annotationKeysRequest),
+    },
+  );
+};
+
+export const getFindDeletedAnnotationsMutationKey = () =>
+  ["findDeletedAnnotations"] as const;
+
+export const getFindDeletedAnnotationsMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof findDeletedAnnotations>>,
+    TError,
+    FindDeletedAnnotationsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof findDeletedAnnotations>>,
+  TError,
+  FindDeletedAnnotationsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getFindDeletedAnnotationsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof findDeletedAnnotations>>,
+    FindDeletedAnnotationsMutationVariables
+  > = (props) => {
+    const { organization, project, view, data } = props ?? {};
+
+    return findDeletedAnnotations(
+      organization,
+      project,
+      view,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type FindDeletedAnnotationsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof findDeletedAnnotations>>
+>;
+export type FindDeletedAnnotationsMutationBody =
+  BodyType<AnnotationKeysRequest> | undefined;
+export type FindDeletedAnnotationsMutationError =
+  ErrorType<ErrorResponse | void>;
+export type FindDeletedAnnotationsMutationVariables = {
+  organization: string;
+  project: string;
+  view: string;
+  data?: BodyType<AnnotationKeysRequest>;
+};
+
+export const useFindDeletedAnnotations = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof findDeletedAnnotations>>,
+      TError,
+      FindDeletedAnnotationsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof findDeletedAnnotations>>,
+  TError,
+  FindDeletedAnnotationsMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getFindDeletedAnnotationsMutationOptions(options),
+    queryClient,
+  );
+};
+export const getRestoreAnnotationsUrl = (
+  organization: string,
+  project: string,
+  view: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted/restore`;
+};
+
+/**
+ * Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
+ */
+export const restoreAnnotations = async (
+  organization: string,
+  project: string,
+  view: string,
+  annotationRestoreRequest?: AnnotationRestoreRequest,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AnnotationRestoreResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<AnnotationRestoreResult>(
+    getRestoreAnnotationsUrl(organization, project, view),
+    {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(annotationRestoreRequest),
+    },
+  );
+};
+
+export const getRestoreAnnotationsMutationKey = () =>
+  ["restoreAnnotations"] as const;
+
+export const getRestoreAnnotationsMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof restoreAnnotations>>,
+    TError,
+    RestoreAnnotationsMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof restoreAnnotations>>,
+  TError,
+  RestoreAnnotationsMutationVariables,
+  TContext
+> => {
+  const mutationKey = getRestoreAnnotationsMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof restoreAnnotations>>,
+    RestoreAnnotationsMutationVariables
+  > = (props) => {
+    const { organization, project, view, data } = props ?? {};
+
+    return restoreAnnotations(
+      organization,
+      project,
+      view,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type RestoreAnnotationsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof restoreAnnotations>>
+>;
+export type RestoreAnnotationsMutationBody =
+  BodyType<AnnotationRestoreRequest> | undefined;
+export type RestoreAnnotationsMutationError = ErrorType<ErrorResponse | void>;
+export type RestoreAnnotationsMutationVariables = {
+  organization: string;
+  project: string;
+  view: string;
+  data?: BodyType<AnnotationRestoreRequest>;
+};
+
+export const useRestoreAnnotations = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof restoreAnnotations>>,
+      TError,
+      RestoreAnnotationsMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof restoreAnnotations>>,
+  TError,
+  RestoreAnnotationsMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getRestoreAnnotationsMutationOptions(options),
+    queryClient,
+  );
+};
+export const getGetAnnotationHistoryUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}/history`;
+};
+
+/**
+ * What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
+ */
+export const getAnnotationHistory = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AnnotationHistory> => {
+  return storytellerFetch<AnnotationHistory>(
+    getGetAnnotationHistoryUrl(organization, project, view, key),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetAnnotationHistoryQueryKey = (
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  key: MaybeRefOrGetter<string>,
+) => {
+  return [
+    "v1",
+    organization,
+    project,
+    view,
+    "annotations",
+    key,
+    "history",
+  ] as const;
+};
+
+export const getGetAnnotationHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getAnnotationHistory>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  key: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getAnnotationHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetAnnotationHistoryQueryKey(
+    organization,
+    project,
+    view,
+    key,
+  );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getAnnotationHistory>>
+  > = ({ signal }) =>
+    getAnnotationHistory(
+      toValue(organization),
+      toValue(project),
+      toValue(view),
+      toValue(key),
+      { signal, ...requestOptions },
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(organization) !== null &&
+        toValue(organization) !== undefined &&
+        toValue(project) !== null &&
+        toValue(project) !== undefined &&
+        toValue(view) !== null &&
+        toValue(view) !== undefined &&
+        toValue(key) !== null &&
+        toValue(key) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getAnnotationHistory>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetAnnotationHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getAnnotationHistory>>
+>;
+export type GetAnnotationHistoryQueryError = ErrorType<ErrorResponse | void>;
+
+export function useGetAnnotationHistory<
+  TData = Awaited<ReturnType<typeof getAnnotationHistory>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  key: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getAnnotationHistory>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetAnnotationHistoryQueryOptions(
+    organization,
+    project,
+    view,
+    key,
     options,
   );
 

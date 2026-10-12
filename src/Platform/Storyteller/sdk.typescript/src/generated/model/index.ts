@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.8.91.29486
+ * OpenAPI spec version: 0.9.1.3549
  */
 
 export * from "./accessPoint";
@@ -17,6 +17,23 @@ export * from "./accountCreate";
 export * from "./accountRole";
 export * from "./annotation";
 export * from "./annotationAnnotationType";
+export * from "./annotationAuditCause";
+export * from "./annotationAuditCauseKind";
+export * from "./annotationAuditEntry";
+export * from "./annotationAuditEntryAction";
+export * from "./annotationDeletion";
+export * from "./annotationDeletionResult";
+export * from "./annotationFieldChange";
+export * from "./annotationFieldChangePrevious";
+export * from "./annotationFieldChangeValue";
+export * from "./annotationHistory";
+export * from "./annotationHistoryState";
+export * from "./annotationKeyFailure";
+export * from "./annotationKeysRequest";
+export * from "./annotationLabelChanges";
+export * from "./annotationPurgeResult";
+export * from "./annotationRestoreRequest";
+export * from "./annotationRestoreResult";
 export * from "./annotationsResponse";
 export * from "./annotationsResponseContext";
 export * from "./annotationsResponseExecution";
@@ -25,7 +42,16 @@ export * from "./annotationsResponseSubject";
 export * from "./annotationsResponseUnit";
 export * from "./annotationsResponseUnitOfExecution";
 export * from "./annotationsResponseUsage";
+export * from "./annotationValueChange";
+export * from "./annotationValueChangeChange";
+export * from "./annotationValueChangePrevious";
+export * from "./annotationValueChangePreviousKind";
+export * from "./annotationValueChangeValue";
+export * from "./annotationValueChangeValueKind";
 export * from "./annotationValues";
+export * from "./auditActor";
+export * from "./auditActorKind";
+export * from "./auditStamp";
 export * from "./authConfiguration";
 export * from "./certificateRenewalResult";
 export * from "./certificateRenewalResultOutcome";
@@ -65,6 +91,7 @@ export * from "./getConfigurationVersionDiffCustomParams";
 export * from "./getConfigurationVersionDiffParams";
 export * from "./getConfigurationViewDiffParams";
 export * from "./getContextsParams";
+export * from "./getDeletedAnnotationsParams";
 export * from "./getDescendantsParams";
 export * from "./getDescendantTypeSchemaVersionDiffCustomParams";
 export * from "./getDescendantTypeSchemaVersionDiffParams";

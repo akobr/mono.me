@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.8.91.29486
+ * OpenAPI spec version: 0.9.1.3549
  */
 import * as zod from "zod";
 
@@ -21,6 +21,15 @@ export const GetAnnotationsQueryParams = zod.object({
 });
 
 export const getAnnotationsResponseAnnotationsItemAnnotationTypeDefault = `Responsibility`;
+export const getAnnotationsResponseAnnotationsItemTitleMax = 200;
+
+export const getAnnotationsResponseAnnotationsItemDescriptionMax = 10000;
+
+export const getAnnotationsResponseAnnotationsItemDocumentationLinkMax = 2048;
+
+export const getAnnotationsResponseAnnotationsItemCreatedByKindDefault = `Account`;
+export const getAnnotationsResponseAnnotationsItemModifiedByKindDefault = `Account`;
+export const getAnnotationsResponseAnnotationsItemDeletionDeletedByKindDefault = `Account`;
 
 export const GetAnnotationsResponse = zod.object({
   Annotations: zod
@@ -45,11 +54,73 @@ export const GetAnnotationsResponse = zod.object({
         ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
         ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
         TimeZone: zod.string().optional(),
-        Title: zod.string().optional(),
-        Description: zod.string().optional(),
-        DocumentationLink: zod.string().optional(),
+        Title: zod
+          .string()
+          .max(getAnnotationsResponseAnnotationsItemTitleMax)
+          .optional(),
+        Description: zod
+          .string()
+          .max(getAnnotationsResponseAnnotationsItemDescriptionMax)
+          .optional(),
+        DocumentationLink: zod
+          .string()
+          .max(getAnnotationsResponseAnnotationsItemDocumentationLinkMax)
+          .optional(),
         Labels: zod.array(zod.string()).optional(),
         Values: zod.record(zod.string(), zod.unknown()).optional(),
+        Created: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getAnnotationsResponseAnnotationsItemCreatedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        Modified: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getAnnotationsResponseAnnotationsItemModifiedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        Deletion: zod
+          .object({
+            DeletionId: zod.string().optional(),
+            RootKey: zod.string().optional(),
+            DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+            DeletedBy: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getAnnotationsResponseAnnotationsItemDeletionDeletedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+            IsRoot: zod.boolean().optional(),
+            DescendantCount: zod.int().nullish(),
+            PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+          })
+          .optional(),
       }),
     )
     .optional(),
@@ -64,6 +135,15 @@ export const SetAnnotationsParams = zod.object({
 });
 
 export const setAnnotationsBodyAnnotationTypeDefault = `Responsibility`;
+export const setAnnotationsBodyTitleMax = 200;
+
+export const setAnnotationsBodyDescriptionMax = 10000;
+
+export const setAnnotationsBodyDocumentationLinkMax = 2048;
+
+export const setAnnotationsBodyCreatedByKindDefault = `Account`;
+export const setAnnotationsBodyModifiedByKindDefault = `Account`;
+export const setAnnotationsBodyDeletionDeletedByKindDefault = `Account`;
 
 export const SetAnnotationsBodyItem = zod.object({
   ProjectName: zod.string(),
@@ -85,15 +165,155 @@ export const SetAnnotationsBodyItem = zod.object({
   ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
   ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
   TimeZone: zod.string().optional(),
-  Title: zod.string().optional(),
-  Description: zod.string().optional(),
-  DocumentationLink: zod.string().optional(),
+  Title: zod.string().max(setAnnotationsBodyTitleMax).optional(),
+  Description: zod.string().max(setAnnotationsBodyDescriptionMax).optional(),
+  DocumentationLink: zod
+    .string()
+    .max(setAnnotationsBodyDocumentationLinkMax)
+    .optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationsBodyCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationsBodyModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationsBodyDeletionDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
 });
 export const SetAnnotationsBody = zod.array(SetAnnotationsBodyItem);
 
-export const SetAnnotationsResponse = zod.uuid();
+export const setAnnotationsResponseAnnotationTypeDefault = `Responsibility`;
+export const setAnnotationsResponseTitleMax = 200;
+
+export const setAnnotationsResponseDescriptionMax = 10000;
+
+export const setAnnotationsResponseDocumentationLinkMax = 2048;
+
+export const setAnnotationsResponseCreatedByKindDefault = `Account`;
+export const setAnnotationsResponseModifiedByKindDefault = `Account`;
+export const setAnnotationsResponseDeletionDeletedByKindDefault = `Account`;
+
+export const SetAnnotationsResponseItem = zod.object({
+  ProjectName: zod.string(),
+  ViewName: zod.string(),
+  AnnotationKey: zod.string(),
+  Name: zod.string(),
+  AnnotationType: zod
+    .enum([
+      "Responsibility",
+      "Unit",
+      "Subject",
+      "Usage",
+      "Context",
+      "Execution",
+      "UnitOfExecution",
+    ])
+    .default(setAnnotationsResponseAnnotationTypeDefault),
+  IsDisabled: zod.boolean().nullish(),
+  ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
+  ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
+  TimeZone: zod.string().optional(),
+  Title: zod.string().max(setAnnotationsResponseTitleMax).optional(),
+  Description: zod
+    .string()
+    .max(setAnnotationsResponseDescriptionMax)
+    .optional(),
+  DocumentationLink: zod
+    .string()
+    .max(setAnnotationsResponseDocumentationLinkMax)
+    .optional(),
+  Labels: zod.array(zod.string()).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationsResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationsResponseDeletionDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
+});
+export const SetAnnotationsResponse = zod.array(SetAnnotationsResponseItem);
 
 export const GetAnnotationParams = zod.object({
   organization: zod.string().describe("Target organization name."),
@@ -103,6 +323,15 @@ export const GetAnnotationParams = zod.object({
 });
 
 export const getAnnotationResponseAnnotationTypeDefault = `Responsibility`;
+export const getAnnotationResponseTitleMax = 200;
+
+export const getAnnotationResponseDescriptionMax = 10000;
+
+export const getAnnotationResponseDocumentationLinkMax = 2048;
+
+export const getAnnotationResponseCreatedByKindDefault = `Account`;
+export const getAnnotationResponseModifiedByKindDefault = `Account`;
+export const getAnnotationResponseDeletionDeletedByKindDefault = `Account`;
 
 export const GetAnnotationResponse = zod.object({
   ProjectName: zod.string(),
@@ -124,13 +353,66 @@ export const GetAnnotationResponse = zod.object({
   ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
   ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
   TimeZone: zod.string().optional(),
-  Title: zod.string().optional(),
-  Description: zod.string().optional(),
-  DocumentationLink: zod.string().optional(),
+  Title: zod.string().max(getAnnotationResponseTitleMax).optional(),
+  Description: zod.string().max(getAnnotationResponseDescriptionMax).optional(),
+  DocumentationLink: zod
+    .string()
+    .max(getAnnotationResponseDocumentationLinkMax)
+    .optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getAnnotationResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getAnnotationResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getAnnotationResponseDeletionDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
 });
 
+/**
+ * Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+ */
 export const SetAnnotationParams = zod.object({
   organization: zod.string().describe("Target organization name."),
   project: zod.string().describe("Target project name."),
@@ -139,6 +421,15 @@ export const SetAnnotationParams = zod.object({
 });
 
 export const setAnnotationBodyAnnotationTypeDefault = `Responsibility`;
+export const setAnnotationBodyTitleMax = 200;
+
+export const setAnnotationBodyDescriptionMax = 10000;
+
+export const setAnnotationBodyDocumentationLinkMax = 2048;
+
+export const setAnnotationBodyCreatedByKindDefault = `Account`;
+export const setAnnotationBodyModifiedByKindDefault = `Account`;
+export const setAnnotationBodyDeletionDeletedByKindDefault = `Account`;
 
 export const SetAnnotationBody = zod.object({
   ProjectName: zod.string(),
@@ -160,14 +451,73 @@ export const SetAnnotationBody = zod.object({
   ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
   ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
   TimeZone: zod.string().optional(),
-  Title: zod.string().optional(),
-  Description: zod.string().optional(),
-  DocumentationLink: zod.string().optional(),
+  Title: zod.string().max(setAnnotationBodyTitleMax).optional(),
+  Description: zod.string().max(setAnnotationBodyDescriptionMax).optional(),
+  DocumentationLink: zod
+    .string()
+    .max(setAnnotationBodyDocumentationLinkMax)
+    .optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationBodyCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationBodyModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationBodyDeletionDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
 });
 
 export const setAnnotationResponseAnnotationTypeDefault = `Responsibility`;
+export const setAnnotationResponseTitleMax = 200;
+
+export const setAnnotationResponseDescriptionMax = 10000;
+
+export const setAnnotationResponseDocumentationLinkMax = 2048;
+
+export const setAnnotationResponseCreatedByKindDefault = `Account`;
+export const setAnnotationResponseModifiedByKindDefault = `Account`;
+export const setAnnotationResponseDeletionDeletedByKindDefault = `Account`;
 
 export const SetAnnotationResponse = zod.object({
   ProjectName: zod.string(),
@@ -189,13 +539,66 @@ export const SetAnnotationResponse = zod.object({
   ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
   ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
   TimeZone: zod.string().optional(),
-  Title: zod.string().optional(),
-  Description: zod.string().optional(),
-  DocumentationLink: zod.string().optional(),
+  Title: zod.string().max(setAnnotationResponseTitleMax).optional(),
+  Description: zod.string().max(setAnnotationResponseDescriptionMax).optional(),
+  DocumentationLink: zod
+    .string()
+    .max(setAnnotationResponseDocumentationLinkMax)
+    .optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationResponseDeletionDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
 });
 
+/**
+ * Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
+ */
 export const DeleteAnnotationParams = zod.object({
   organization: zod.string().describe("Target organization name."),
   project: zod.string().describe("Target project name."),
@@ -203,7 +606,30 @@ export const DeleteAnnotationParams = zod.object({
   key: zod.string().describe("The key of the requested annotation."),
 });
 
-export const DeleteAnnotationResponse = zod.unknown();
+export const deleteAnnotationResponseDeletionDeletedByKindDefault = `Account`;
+
+export const DeleteAnnotationResponse = zod.object({
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(deleteAnnotationResponseDeletionDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
+  DeletedKeys: zod.array(zod.string()).optional(),
+});
 
 export const GetDescendantsParams = zod.object({
   organization: zod.string().describe("Target organization name."),
@@ -225,6 +651,15 @@ export const GetDescendantsQueryParams = zod.object({
 });
 
 export const getDescendantsResponseAnnotationsItemAnnotationTypeDefault = `Responsibility`;
+export const getDescendantsResponseAnnotationsItemTitleMax = 200;
+
+export const getDescendantsResponseAnnotationsItemDescriptionMax = 10000;
+
+export const getDescendantsResponseAnnotationsItemDocumentationLinkMax = 2048;
+
+export const getDescendantsResponseAnnotationsItemCreatedByKindDefault = `Account`;
+export const getDescendantsResponseAnnotationsItemModifiedByKindDefault = `Account`;
+export const getDescendantsResponseAnnotationsItemDeletionDeletedByKindDefault = `Account`;
 
 export const GetDescendantsResponse = zod.object({
   Annotations: zod
@@ -249,11 +684,73 @@ export const GetDescendantsResponse = zod.object({
         ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
         ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
         TimeZone: zod.string().optional(),
-        Title: zod.string().optional(),
-        Description: zod.string().optional(),
-        DocumentationLink: zod.string().optional(),
+        Title: zod
+          .string()
+          .max(getDescendantsResponseAnnotationsItemTitleMax)
+          .optional(),
+        Description: zod
+          .string()
+          .max(getDescendantsResponseAnnotationsItemDescriptionMax)
+          .optional(),
+        DocumentationLink: zod
+          .string()
+          .max(getDescendantsResponseAnnotationsItemDocumentationLinkMax)
+          .optional(),
         Labels: zod.array(zod.string()).optional(),
         Values: zod.record(zod.string(), zod.unknown()).optional(),
+        Created: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getDescendantsResponseAnnotationsItemCreatedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        Modified: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getDescendantsResponseAnnotationsItemModifiedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        Deletion: zod
+          .object({
+            DeletionId: zod.string().optional(),
+            RootKey: zod.string().optional(),
+            DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+            DeletedBy: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getDescendantsResponseAnnotationsItemDeletionDeletedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+            IsRoot: zod.boolean().optional(),
+            DescendantCount: zod.int().nullish(),
+            PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+          })
+          .optional(),
       }),
     )
     .optional(),
@@ -267,9 +764,21 @@ export const SetAnnotationsSimpleParams = zod.object({
   view: zod.string().describe("The target view inside the project."),
 });
 
-export const setAnnotationsSimpleBodyAnnotationTypeDefault = `Responsibility`;
+export const SetAnnotationsSimpleBodyItem = zod.string();
+export const SetAnnotationsSimpleBody = zod.array(SetAnnotationsSimpleBodyItem);
 
-export const SetAnnotationsSimpleBodyItem = zod.object({
+export const setAnnotationsSimpleResponseAnnotationTypeDefault = `Responsibility`;
+export const setAnnotationsSimpleResponseTitleMax = 200;
+
+export const setAnnotationsSimpleResponseDescriptionMax = 10000;
+
+export const setAnnotationsSimpleResponseDocumentationLinkMax = 2048;
+
+export const setAnnotationsSimpleResponseCreatedByKindDefault = `Account`;
+export const setAnnotationsSimpleResponseModifiedByKindDefault = `Account`;
+export const setAnnotationsSimpleResponseDeletionDeletedByKindDefault = `Account`;
+
+export const SetAnnotationsSimpleResponseItem = zod.object({
   ProjectName: zod.string(),
   ViewName: zod.string(),
   AnnotationKey: zod.string(),
@@ -284,20 +793,73 @@ export const SetAnnotationsSimpleBodyItem = zod.object({
       "Execution",
       "UnitOfExecution",
     ])
-    .default(setAnnotationsSimpleBodyAnnotationTypeDefault),
+    .default(setAnnotationsSimpleResponseAnnotationTypeDefault),
   IsDisabled: zod.boolean().nullish(),
   ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
   ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
   TimeZone: zod.string().optional(),
-  Title: zod.string().optional(),
-  Description: zod.string().optional(),
-  DocumentationLink: zod.string().optional(),
+  Title: zod.string().max(setAnnotationsSimpleResponseTitleMax).optional(),
+  Description: zod
+    .string()
+    .max(setAnnotationsSimpleResponseDescriptionMax)
+    .optional(),
+  DocumentationLink: zod
+    .string()
+    .max(setAnnotationsSimpleResponseDocumentationLinkMax)
+    .optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationsSimpleResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationsSimpleResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationsSimpleResponseDeletionDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
 });
-export const SetAnnotationsSimpleBody = zod.array(SetAnnotationsSimpleBodyItem);
-
-export const SetAnnotationsSimpleResponse = zod.uuid();
+export const SetAnnotationsSimpleResponse = zod.array(
+  SetAnnotationsSimpleResponseItem,
+);
 
 export const GetResponsibilitiesParams = zod.object({
   organization: zod.string().describe("Target organization name."),
@@ -317,6 +879,15 @@ export const GetResponsibilitiesQueryParams = zod.object({
 });
 
 export const getResponsibilitiesResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
+export const getResponsibilitiesResponseAnnotationsItemOneTitleMax = 200;
+
+export const getResponsibilitiesResponseAnnotationsItemOneDescriptionMax = 10000;
+
+export const getResponsibilitiesResponseAnnotationsItemOneDocumentationLinkMax = 2048;
+
+export const getResponsibilitiesResponseAnnotationsItemOneCreatedByKindDefault = `Account`;
+export const getResponsibilitiesResponseAnnotationsItemOneModifiedByKindDefault = `Account`;
+export const getResponsibilitiesResponseAnnotationsItemOneDeletionDeletedByKindDefault = `Account`;
 
 export const GetResponsibilitiesResponse = zod.object({
   Annotations: zod
@@ -344,11 +915,75 @@ export const GetResponsibilitiesResponse = zod.object({
           ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
           ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
           TimeZone: zod.string().optional(),
-          Title: zod.string().optional(),
-          Description: zod.string().optional(),
-          DocumentationLink: zod.string().optional(),
+          Title: zod
+            .string()
+            .max(getResponsibilitiesResponseAnnotationsItemOneTitleMax)
+            .optional(),
+          Description: zod
+            .string()
+            .max(getResponsibilitiesResponseAnnotationsItemOneDescriptionMax)
+            .optional(),
+          DocumentationLink: zod
+            .string()
+            .max(
+              getResponsibilitiesResponseAnnotationsItemOneDocumentationLinkMax,
+            )
+            .optional(),
           Labels: zod.array(zod.string()).optional(),
           Values: zod.record(zod.string(), zod.unknown()).optional(),
+          Created: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getResponsibilitiesResponseAnnotationsItemOneCreatedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Modified: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getResponsibilitiesResponseAnnotationsItemOneModifiedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Deletion: zod
+            .object({
+              DeletionId: zod.string().optional(),
+              RootKey: zod.string().optional(),
+              DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+              DeletedBy: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getResponsibilitiesResponseAnnotationsItemOneDeletionDeletedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+              IsRoot: zod.boolean().optional(),
+              DescendantCount: zod.int().nullish(),
+              PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+            })
+            .optional(),
         })
         .and(
           zod.object({
@@ -384,6 +1019,15 @@ export const GetSubjectsQueryParams = zod.object({
 });
 
 export const getSubjectsResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
+export const getSubjectsResponseAnnotationsItemOneTitleMax = 200;
+
+export const getSubjectsResponseAnnotationsItemOneDescriptionMax = 10000;
+
+export const getSubjectsResponseAnnotationsItemOneDocumentationLinkMax = 2048;
+
+export const getSubjectsResponseAnnotationsItemOneCreatedByKindDefault = `Account`;
+export const getSubjectsResponseAnnotationsItemOneModifiedByKindDefault = `Account`;
+export const getSubjectsResponseAnnotationsItemOneDeletionDeletedByKindDefault = `Account`;
 
 export const GetSubjectsResponse = zod.object({
   Annotations: zod
@@ -411,11 +1055,73 @@ export const GetSubjectsResponse = zod.object({
           ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
           ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
           TimeZone: zod.string().optional(),
-          Title: zod.string().optional(),
-          Description: zod.string().optional(),
-          DocumentationLink: zod.string().optional(),
+          Title: zod
+            .string()
+            .max(getSubjectsResponseAnnotationsItemOneTitleMax)
+            .optional(),
+          Description: zod
+            .string()
+            .max(getSubjectsResponseAnnotationsItemOneDescriptionMax)
+            .optional(),
+          DocumentationLink: zod
+            .string()
+            .max(getSubjectsResponseAnnotationsItemOneDocumentationLinkMax)
+            .optional(),
           Labels: zod.array(zod.string()).optional(),
           Values: zod.record(zod.string(), zod.unknown()).optional(),
+          Created: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getSubjectsResponseAnnotationsItemOneCreatedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Modified: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getSubjectsResponseAnnotationsItemOneModifiedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Deletion: zod
+            .object({
+              DeletionId: zod.string().optional(),
+              RootKey: zod.string().optional(),
+              DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+              DeletedBy: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getSubjectsResponseAnnotationsItemOneDeletionDeletedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+              IsRoot: zod.boolean().optional(),
+              DescendantCount: zod.int().nullish(),
+              PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+            })
+            .optional(),
         })
         .and(
           zod.object({
@@ -456,6 +1162,15 @@ export const GetUsagesQueryParams = zod.object({
 });
 
 export const getUsagesResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
+export const getUsagesResponseAnnotationsItemOneTitleMax = 200;
+
+export const getUsagesResponseAnnotationsItemOneDescriptionMax = 10000;
+
+export const getUsagesResponseAnnotationsItemOneDocumentationLinkMax = 2048;
+
+export const getUsagesResponseAnnotationsItemOneCreatedByKindDefault = `Account`;
+export const getUsagesResponseAnnotationsItemOneModifiedByKindDefault = `Account`;
+export const getUsagesResponseAnnotationsItemOneDeletionDeletedByKindDefault = `Account`;
 
 export const GetUsagesResponse = zod.object({
   Annotations: zod
@@ -481,11 +1196,73 @@ export const GetUsagesResponse = zod.object({
           ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
           ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
           TimeZone: zod.string().optional(),
-          Title: zod.string().optional(),
-          Description: zod.string().optional(),
-          DocumentationLink: zod.string().optional(),
+          Title: zod
+            .string()
+            .max(getUsagesResponseAnnotationsItemOneTitleMax)
+            .optional(),
+          Description: zod
+            .string()
+            .max(getUsagesResponseAnnotationsItemOneDescriptionMax)
+            .optional(),
+          DocumentationLink: zod
+            .string()
+            .max(getUsagesResponseAnnotationsItemOneDocumentationLinkMax)
+            .optional(),
           Labels: zod.array(zod.string()).optional(),
           Values: zod.record(zod.string(), zod.unknown()).optional(),
+          Created: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getUsagesResponseAnnotationsItemOneCreatedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Modified: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getUsagesResponseAnnotationsItemOneModifiedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Deletion: zod
+            .object({
+              DeletionId: zod.string().optional(),
+              RootKey: zod.string().optional(),
+              DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+              DeletedBy: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getUsagesResponseAnnotationsItemOneDeletionDeletedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+              IsRoot: zod.boolean().optional(),
+              DescendantCount: zod.int().nullish(),
+              PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+            })
+            .optional(),
         })
         .and(
           zod.object({
@@ -529,6 +1306,15 @@ export const GetContextsQueryParams = zod.object({
 });
 
 export const getContextsResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
+export const getContextsResponseAnnotationsItemOneTitleMax = 200;
+
+export const getContextsResponseAnnotationsItemOneDescriptionMax = 10000;
+
+export const getContextsResponseAnnotationsItemOneDocumentationLinkMax = 2048;
+
+export const getContextsResponseAnnotationsItemOneCreatedByKindDefault = `Account`;
+export const getContextsResponseAnnotationsItemOneModifiedByKindDefault = `Account`;
+export const getContextsResponseAnnotationsItemOneDeletionDeletedByKindDefault = `Account`;
 
 export const GetContextsResponse = zod.object({
   Annotations: zod
@@ -556,11 +1342,73 @@ export const GetContextsResponse = zod.object({
           ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
           ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
           TimeZone: zod.string().optional(),
-          Title: zod.string().optional(),
-          Description: zod.string().optional(),
-          DocumentationLink: zod.string().optional(),
+          Title: zod
+            .string()
+            .max(getContextsResponseAnnotationsItemOneTitleMax)
+            .optional(),
+          Description: zod
+            .string()
+            .max(getContextsResponseAnnotationsItemOneDescriptionMax)
+            .optional(),
+          DocumentationLink: zod
+            .string()
+            .max(getContextsResponseAnnotationsItemOneDocumentationLinkMax)
+            .optional(),
           Labels: zod.array(zod.string()).optional(),
           Values: zod.record(zod.string(), zod.unknown()).optional(),
+          Created: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getContextsResponseAnnotationsItemOneCreatedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Modified: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getContextsResponseAnnotationsItemOneModifiedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Deletion: zod
+            .object({
+              DeletionId: zod.string().optional(),
+              RootKey: zod.string().optional(),
+              DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+              DeletedBy: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getContextsResponseAnnotationsItemOneDeletionDeletedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+              IsRoot: zod.boolean().optional(),
+              DescendantCount: zod.int().nullish(),
+              PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+            })
+            .optional(),
         })
         .and(
           zod.object({
@@ -606,6 +1454,15 @@ export const GetExecutionsQueryParams = zod.object({
 });
 
 export const getExecutionsResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
+export const getExecutionsResponseAnnotationsItemOneTitleMax = 200;
+
+export const getExecutionsResponseAnnotationsItemOneDescriptionMax = 10000;
+
+export const getExecutionsResponseAnnotationsItemOneDocumentationLinkMax = 2048;
+
+export const getExecutionsResponseAnnotationsItemOneCreatedByKindDefault = `Account`;
+export const getExecutionsResponseAnnotationsItemOneModifiedByKindDefault = `Account`;
+export const getExecutionsResponseAnnotationsItemOneDeletionDeletedByKindDefault = `Account`;
 
 export const GetExecutionsResponse = zod.object({
   Annotations: zod
@@ -633,11 +1490,73 @@ export const GetExecutionsResponse = zod.object({
           ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
           ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
           TimeZone: zod.string().optional(),
-          Title: zod.string().optional(),
-          Description: zod.string().optional(),
-          DocumentationLink: zod.string().optional(),
+          Title: zod
+            .string()
+            .max(getExecutionsResponseAnnotationsItemOneTitleMax)
+            .optional(),
+          Description: zod
+            .string()
+            .max(getExecutionsResponseAnnotationsItemOneDescriptionMax)
+            .optional(),
+          DocumentationLink: zod
+            .string()
+            .max(getExecutionsResponseAnnotationsItemOneDocumentationLinkMax)
+            .optional(),
           Labels: zod.array(zod.string()).optional(),
           Values: zod.record(zod.string(), zod.unknown()).optional(),
+          Created: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getExecutionsResponseAnnotationsItemOneCreatedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Modified: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getExecutionsResponseAnnotationsItemOneModifiedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Deletion: zod
+            .object({
+              DeletionId: zod.string().optional(),
+              RootKey: zod.string().optional(),
+              DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+              DeletedBy: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getExecutionsResponseAnnotationsItemOneDeletionDeletedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+              IsRoot: zod.boolean().optional(),
+              DescendantCount: zod.int().nullish(),
+              PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+            })
+            .optional(),
         })
         .and(
           zod.object({
@@ -680,6 +1599,15 @@ export const GetUnitsQueryParams = zod.object({
 });
 
 export const getUnitsResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
+export const getUnitsResponseAnnotationsItemOneTitleMax = 200;
+
+export const getUnitsResponseAnnotationsItemOneDescriptionMax = 10000;
+
+export const getUnitsResponseAnnotationsItemOneDocumentationLinkMax = 2048;
+
+export const getUnitsResponseAnnotationsItemOneCreatedByKindDefault = `Account`;
+export const getUnitsResponseAnnotationsItemOneModifiedByKindDefault = `Account`;
+export const getUnitsResponseAnnotationsItemOneDeletionDeletedByKindDefault = `Account`;
 
 export const GetUnitsResponse = zod.object({
   Annotations: zod
@@ -705,11 +1633,73 @@ export const GetUnitsResponse = zod.object({
           ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
           ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
           TimeZone: zod.string().optional(),
-          Title: zod.string().optional(),
-          Description: zod.string().optional(),
-          DocumentationLink: zod.string().optional(),
+          Title: zod
+            .string()
+            .max(getUnitsResponseAnnotationsItemOneTitleMax)
+            .optional(),
+          Description: zod
+            .string()
+            .max(getUnitsResponseAnnotationsItemOneDescriptionMax)
+            .optional(),
+          DocumentationLink: zod
+            .string()
+            .max(getUnitsResponseAnnotationsItemOneDocumentationLinkMax)
+            .optional(),
           Labels: zod.array(zod.string()).optional(),
           Values: zod.record(zod.string(), zod.unknown()).optional(),
+          Created: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getUnitsResponseAnnotationsItemOneCreatedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Modified: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getUnitsResponseAnnotationsItemOneModifiedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Deletion: zod
+            .object({
+              DeletionId: zod.string().optional(),
+              RootKey: zod.string().optional(),
+              DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+              DeletedBy: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getUnitsResponseAnnotationsItemOneDeletionDeletedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+              IsRoot: zod.boolean().optional(),
+              DescendantCount: zod.int().nullish(),
+              PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+            })
+            .optional(),
         })
         .and(
           zod.object({
@@ -762,6 +1752,15 @@ export const GetUnitsOfExecutionQueryParams = zod.object({
 });
 
 export const getUnitsOfExecutionResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
+export const getUnitsOfExecutionResponseAnnotationsItemOneTitleMax = 200;
+
+export const getUnitsOfExecutionResponseAnnotationsItemOneDescriptionMax = 10000;
+
+export const getUnitsOfExecutionResponseAnnotationsItemOneDocumentationLinkMax = 2048;
+
+export const getUnitsOfExecutionResponseAnnotationsItemOneCreatedByKindDefault = `Account`;
+export const getUnitsOfExecutionResponseAnnotationsItemOneModifiedByKindDefault = `Account`;
+export const getUnitsOfExecutionResponseAnnotationsItemOneDeletionDeletedByKindDefault = `Account`;
 
 export const GetUnitsOfExecutionResponse = zod.object({
   Annotations: zod
@@ -789,11 +1788,75 @@ export const GetUnitsOfExecutionResponse = zod.object({
           ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
           ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
           TimeZone: zod.string().optional(),
-          Title: zod.string().optional(),
-          Description: zod.string().optional(),
-          DocumentationLink: zod.string().optional(),
+          Title: zod
+            .string()
+            .max(getUnitsOfExecutionResponseAnnotationsItemOneTitleMax)
+            .optional(),
+          Description: zod
+            .string()
+            .max(getUnitsOfExecutionResponseAnnotationsItemOneDescriptionMax)
+            .optional(),
+          DocumentationLink: zod
+            .string()
+            .max(
+              getUnitsOfExecutionResponseAnnotationsItemOneDocumentationLinkMax,
+            )
+            .optional(),
           Labels: zod.array(zod.string()).optional(),
           Values: zod.record(zod.string(), zod.unknown()).optional(),
+          Created: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getUnitsOfExecutionResponseAnnotationsItemOneCreatedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Modified: zod
+            .object({
+              At: zod.iso.datetime({ offset: true }).optional(),
+              By: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getUnitsOfExecutionResponseAnnotationsItemOneModifiedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+            })
+            .optional(),
+          Deletion: zod
+            .object({
+              DeletionId: zod.string().optional(),
+              RootKey: zod.string().optional(),
+              DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+              DeletedBy: zod
+                .object({
+                  Kind: zod
+                    .enum(["Account", "Machine", "System"])
+                    .default(
+                      getUnitsOfExecutionResponseAnnotationsItemOneDeletionDeletedByKindDefault,
+                    ),
+                  Id: zod.string().optional(),
+                  Name: zod.string().optional(),
+                })
+                .optional(),
+              IsRoot: zod.boolean().optional(),
+              DescendantCount: zod.int().nullish(),
+              PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+            })
+            .optional(),
         })
         .and(
           zod.object({
@@ -818,6 +1881,623 @@ export const GetUnitsOfExecutionResponse = zod.object({
     .optional(),
   ContinuationToken: zod.string().optional(),
   Count: zod.int().optional(),
+});
+
+/**
+ * The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
+ */
+export const GetDeletedAnnotationsParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+});
+
+export const GetDeletedAnnotationsQueryParams = zod.object({
+  roots: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Only the roots of deletions (default true); false lists every deleted annotation.",
+    ),
+  deletionId: zod.string().optional().describe("Only what one delete removed."),
+  continuationToken: zod
+    .string()
+    .optional()
+    .describe("The continuation token for multi-page queries."),
+});
+
+export const getDeletedAnnotationsResponseAnnotationsItemAnnotationTypeDefault = `Responsibility`;
+export const getDeletedAnnotationsResponseAnnotationsItemTitleMax = 200;
+
+export const getDeletedAnnotationsResponseAnnotationsItemDescriptionMax = 10000;
+
+export const getDeletedAnnotationsResponseAnnotationsItemDocumentationLinkMax = 2048;
+
+export const getDeletedAnnotationsResponseAnnotationsItemCreatedByKindDefault = `Account`;
+export const getDeletedAnnotationsResponseAnnotationsItemModifiedByKindDefault = `Account`;
+export const getDeletedAnnotationsResponseAnnotationsItemDeletionDeletedByKindDefault = `Account`;
+
+export const GetDeletedAnnotationsResponse = zod.object({
+  Annotations: zod
+    .array(
+      zod.object({
+        ProjectName: zod.string(),
+        ViewName: zod.string(),
+        AnnotationKey: zod.string(),
+        Name: zod.string(),
+        AnnotationType: zod
+          .enum([
+            "Responsibility",
+            "Unit",
+            "Subject",
+            "Usage",
+            "Context",
+            "Execution",
+            "UnitOfExecution",
+          ])
+          .default(
+            getDeletedAnnotationsResponseAnnotationsItemAnnotationTypeDefault,
+          ),
+        IsDisabled: zod.boolean().nullish(),
+        ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
+        ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
+        TimeZone: zod.string().optional(),
+        Title: zod
+          .string()
+          .max(getDeletedAnnotationsResponseAnnotationsItemTitleMax)
+          .optional(),
+        Description: zod
+          .string()
+          .max(getDeletedAnnotationsResponseAnnotationsItemDescriptionMax)
+          .optional(),
+        DocumentationLink: zod
+          .string()
+          .max(getDeletedAnnotationsResponseAnnotationsItemDocumentationLinkMax)
+          .optional(),
+        Labels: zod.array(zod.string()).optional(),
+        Values: zod.record(zod.string(), zod.unknown()).optional(),
+        Created: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getDeletedAnnotationsResponseAnnotationsItemCreatedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        Modified: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getDeletedAnnotationsResponseAnnotationsItemModifiedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        Deletion: zod
+          .object({
+            DeletionId: zod.string().optional(),
+            RootKey: zod.string().optional(),
+            DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+            DeletedBy: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getDeletedAnnotationsResponseAnnotationsItemDeletionDeletedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+            IsRoot: zod.boolean().optional(),
+            DescendantCount: zod.int().nullish(),
+            PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
+  ContinuationToken: zod.string().optional(),
+  Count: zod.int().optional(),
+});
+
+/**
+ * A deleted annotation with its Deletion.
+ */
+export const GetDeletedAnnotationParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+  key: zod.string().describe("The key of the requested annotation."),
+});
+
+export const getDeletedAnnotationResponseAnnotationTypeDefault = `Responsibility`;
+export const getDeletedAnnotationResponseTitleMax = 200;
+
+export const getDeletedAnnotationResponseDescriptionMax = 10000;
+
+export const getDeletedAnnotationResponseDocumentationLinkMax = 2048;
+
+export const getDeletedAnnotationResponseCreatedByKindDefault = `Account`;
+export const getDeletedAnnotationResponseModifiedByKindDefault = `Account`;
+export const getDeletedAnnotationResponseDeletionDeletedByKindDefault = `Account`;
+
+export const GetDeletedAnnotationResponse = zod.object({
+  ProjectName: zod.string(),
+  ViewName: zod.string(),
+  AnnotationKey: zod.string(),
+  Name: zod.string(),
+  AnnotationType: zod
+    .enum([
+      "Responsibility",
+      "Unit",
+      "Subject",
+      "Usage",
+      "Context",
+      "Execution",
+      "UnitOfExecution",
+    ])
+    .default(getDeletedAnnotationResponseAnnotationTypeDefault),
+  IsDisabled: zod.boolean().nullish(),
+  ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
+  ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
+  TimeZone: zod.string().optional(),
+  Title: zod.string().max(getDeletedAnnotationResponseTitleMax).optional(),
+  Description: zod
+    .string()
+    .max(getDeletedAnnotationResponseDescriptionMax)
+    .optional(),
+  DocumentationLink: zod
+    .string()
+    .max(getDeletedAnnotationResponseDocumentationLinkMax)
+    .optional(),
+  Labels: zod.array(zod.string()).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getDeletedAnnotationResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getDeletedAnnotationResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getDeletedAnnotationResponseDeletionDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
+});
+
+/**
+ * Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
+ */
+export const PurgeAnnotationParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+  key: zod.string().describe("The key of the requested annotation."),
+});
+
+export const PurgeAnnotationResponse = zod.object({
+  PurgedKeys: zod.array(zod.string()).optional(),
+});
+
+/**
+ * The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
+ */
+export const FindDeletedAnnotationsParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+});
+
+export const FindDeletedAnnotationsBody = zod.object({
+  Keys: zod.array(zod.string()).optional(),
+});
+
+export const findDeletedAnnotationsResponseAnnotationTypeDefault = `Responsibility`;
+export const findDeletedAnnotationsResponseTitleMax = 200;
+
+export const findDeletedAnnotationsResponseDescriptionMax = 10000;
+
+export const findDeletedAnnotationsResponseDocumentationLinkMax = 2048;
+
+export const findDeletedAnnotationsResponseCreatedByKindDefault = `Account`;
+export const findDeletedAnnotationsResponseModifiedByKindDefault = `Account`;
+export const findDeletedAnnotationsResponseDeletionDeletedByKindDefault = `Account`;
+
+export const FindDeletedAnnotationsResponseItem = zod.object({
+  ProjectName: zod.string(),
+  ViewName: zod.string(),
+  AnnotationKey: zod.string(),
+  Name: zod.string(),
+  AnnotationType: zod
+    .enum([
+      "Responsibility",
+      "Unit",
+      "Subject",
+      "Usage",
+      "Context",
+      "Execution",
+      "UnitOfExecution",
+    ])
+    .default(findDeletedAnnotationsResponseAnnotationTypeDefault),
+  IsDisabled: zod.boolean().nullish(),
+  ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
+  ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
+  TimeZone: zod.string().optional(),
+  Title: zod.string().max(findDeletedAnnotationsResponseTitleMax).optional(),
+  Description: zod
+    .string()
+    .max(findDeletedAnnotationsResponseDescriptionMax)
+    .optional(),
+  DocumentationLink: zod
+    .string()
+    .max(findDeletedAnnotationsResponseDocumentationLinkMax)
+    .optional(),
+  Labels: zod.array(zod.string()).optional(),
+  Values: zod.record(zod.string(), zod.unknown()).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(findDeletedAnnotationsResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(findDeletedAnnotationsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Deletion: zod
+    .object({
+      DeletionId: zod.string().optional(),
+      RootKey: zod.string().optional(),
+      DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+      DeletedBy: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(
+              findDeletedAnnotationsResponseDeletionDeletedByKindDefault,
+            ),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+      IsRoot: zod.boolean().optional(),
+      DescendantCount: zod.int().nullish(),
+      PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+    })
+    .optional(),
+});
+export const FindDeletedAnnotationsResponse = zod.array(
+  FindDeletedAnnotationsResponseItem,
+);
+
+/**
+ * Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
+ */
+export const RestoreAnnotationsParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+});
+
+export const restoreAnnotationsBodyDescendantsDefault = true;
+
+export const RestoreAnnotationsBody = zod.object({
+  Keys: zod.array(zod.string()).optional(),
+  Descendants: zod.boolean().default(restoreAnnotationsBodyDescendantsDefault),
+});
+
+export const restoreAnnotationsResponseAnnotationsItemAnnotationTypeDefault = `Responsibility`;
+export const restoreAnnotationsResponseAnnotationsItemTitleMax = 200;
+
+export const restoreAnnotationsResponseAnnotationsItemDescriptionMax = 10000;
+
+export const restoreAnnotationsResponseAnnotationsItemDocumentationLinkMax = 2048;
+
+export const restoreAnnotationsResponseAnnotationsItemCreatedByKindDefault = `Account`;
+export const restoreAnnotationsResponseAnnotationsItemModifiedByKindDefault = `Account`;
+export const restoreAnnotationsResponseAnnotationsItemDeletionDeletedByKindDefault = `Account`;
+
+export const RestoreAnnotationsResponse = zod.object({
+  Annotations: zod
+    .array(
+      zod.object({
+        ProjectName: zod.string(),
+        ViewName: zod.string(),
+        AnnotationKey: zod.string(),
+        Name: zod.string(),
+        AnnotationType: zod
+          .enum([
+            "Responsibility",
+            "Unit",
+            "Subject",
+            "Usage",
+            "Context",
+            "Execution",
+            "UnitOfExecution",
+          ])
+          .default(
+            restoreAnnotationsResponseAnnotationsItemAnnotationTypeDefault,
+          ),
+        IsDisabled: zod.boolean().nullish(),
+        ValidFrom: zod.iso.datetime({ offset: true }).nullish(),
+        ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
+        TimeZone: zod.string().optional(),
+        Title: zod
+          .string()
+          .max(restoreAnnotationsResponseAnnotationsItemTitleMax)
+          .optional(),
+        Description: zod
+          .string()
+          .max(restoreAnnotationsResponseAnnotationsItemDescriptionMax)
+          .optional(),
+        DocumentationLink: zod
+          .string()
+          .max(restoreAnnotationsResponseAnnotationsItemDocumentationLinkMax)
+          .optional(),
+        Labels: zod.array(zod.string()).optional(),
+        Values: zod.record(zod.string(), zod.unknown()).optional(),
+        Created: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    restoreAnnotationsResponseAnnotationsItemCreatedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        Modified: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    restoreAnnotationsResponseAnnotationsItemModifiedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        Deletion: zod
+          .object({
+            DeletionId: zod.string().optional(),
+            RootKey: zod.string().optional(),
+            DeletedAt: zod.iso.datetime({ offset: true }).optional(),
+            DeletedBy: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    restoreAnnotationsResponseAnnotationsItemDeletionDeletedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+            IsRoot: zod.boolean().optional(),
+            DescendantCount: zod.int().nullish(),
+            PurgeAt: zod.iso.datetime({ offset: true }).nullish(),
+          })
+          .optional(),
+      }),
+    )
+    .optional(),
+  CreatedKeys: zod.array(zod.string()).optional(),
+  Failed: zod
+    .array(
+      zod.object({
+        Key: zod.string().optional(),
+        ErrorCode: zod.string().optional(),
+        Message: zod.string().optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
+ */
+export const GetAnnotationHistoryParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+  key: zod.string().describe("The key of the requested annotation."),
+});
+
+export const getAnnotationHistoryResponseStateDefault = `Active`;
+export const getAnnotationHistoryResponseEntriesItemActionDefault = `Created`;
+export const getAnnotationHistoryResponseEntriesItemActorKindDefault = `Account`;
+export const getAnnotationHistoryResponseEntriesItemCauseKindDefault = `Cascade`;
+export const getAnnotationHistoryResponseEntriesItemValuesItemChangeDefault = `Added`;
+export const getAnnotationHistoryResponseEntriesItemValuesItemPreviousKindDefault = `Null`;
+export const getAnnotationHistoryResponseEntriesItemValuesItemValueKindDefault = `Null`;
+
+export const GetAnnotationHistoryResponse = zod.object({
+  AnnotationKey: zod.string().optional(),
+  State: zod
+    .enum(["Active", "Deleted"])
+    .default(getAnnotationHistoryResponseStateDefault),
+  Entries: zod
+    .array(
+      zod.object({
+        Id: zod.string().optional(),
+        At: zod.iso.datetime({ offset: true }).optional(),
+        Action: zod
+          .enum([
+            "Created",
+            "Recreated",
+            "Updated",
+            "Deleted",
+            "Restored",
+            "ConfigurationChanged",
+            "ConfigurationDeleted",
+          ])
+          .default(getAnnotationHistoryResponseEntriesItemActionDefault),
+        Actor: zod
+          .object({
+            Kind: zod
+              .enum(["Account", "Machine", "System"])
+              .default(getAnnotationHistoryResponseEntriesItemActorKindDefault),
+            Id: zod.string().optional(),
+            Name: zod.string().optional(),
+          })
+          .optional(),
+        Cause: zod
+          .object({
+            Kind: zod
+              .enum(["Cascade", "Ancestor"])
+              .default(getAnnotationHistoryResponseEntriesItemCauseKindDefault),
+            Key: zod.string().optional(),
+          })
+          .optional(),
+        DeletionId: zod.string().optional(),
+        DescendantCount: zod.int().nullish(),
+        Fields: zod
+          .array(
+            zod.object({
+              Field: zod.string().optional(),
+              Previous: zod.looseObject({}).optional(),
+              IsPreviousTruncated: zod.boolean().optional(),
+              Value: zod.looseObject({}).optional(),
+              IsValueTruncated: zod.boolean().optional(),
+            }),
+          )
+          .optional(),
+        Labels: zod
+          .object({
+            Added: zod.array(zod.string()).optional(),
+            Removed: zod.array(zod.string()).optional(),
+          })
+          .optional(),
+        Values: zod
+          .array(
+            zod.object({
+              Key: zod.string().optional(),
+              Change: zod
+                .enum(["Added", "Removed", "Changed"])
+                .default(
+                  getAnnotationHistoryResponseEntriesItemValuesItemChangeDefault,
+                ),
+              PreviousKind: zod
+                .union([
+                  zod.literal("Null"),
+                  zod.literal("String"),
+                  zod.literal("Number"),
+                  zod.literal("Boolean"),
+                  zod.literal("Object"),
+                  zod.literal("Array"),
+                  zod.literal(null),
+                ])
+                .nullish()
+                .default(
+                  getAnnotationHistoryResponseEntriesItemValuesItemPreviousKindDefault,
+                ),
+              Previous: zod.looseObject({}).optional(),
+              IsPreviousTruncated: zod.boolean().optional(),
+              ValueKind: zod
+                .union([
+                  zod.literal("Null"),
+                  zod.literal("String"),
+                  zod.literal("Number"),
+                  zod.literal("Boolean"),
+                  zod.literal("Object"),
+                  zod.literal("Array"),
+                  zod.literal(null),
+                ])
+                .nullish()
+                .default(
+                  getAnnotationHistoryResponseEntriesItemValuesItemValueKindDefault,
+                ),
+              Value: zod.looseObject({}).optional(),
+              IsValueTruncated: zod.boolean().optional(),
+            }),
+          )
+          .optional(),
+        ConfigurationVersion: zod.int().nullish(),
+      }),
+    )
+    .optional(),
+  IsTrimmed: zod.boolean().optional(),
 });
 
 /**

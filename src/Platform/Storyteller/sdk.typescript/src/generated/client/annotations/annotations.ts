@@ -3,10 +3,16 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.8.91.29486
+ * OpenAPI spec version: 0.9.1.3549
  */
 import type {
   Annotation,
+  AnnotationDeletionResult,
+  AnnotationHistory,
+  AnnotationKeysRequest,
+  AnnotationPurgeResult,
+  AnnotationRestoreRequest,
+  AnnotationRestoreResult,
   AnnotationsResponse,
   AnnotationsResponseContext,
   AnnotationsResponseExecution,
@@ -17,6 +23,7 @@ import type {
   AnnotationsResponseUsage,
   GetAnnotationsParams,
   GetContextsParams,
+  GetDeletedAnnotationsParams,
   GetDescendantsParams,
   GetExecutionsParams,
   GetResponsibilitiesParams,
@@ -83,7 +90,7 @@ export const setAnnotations = async (
   view: string,
   annotation?: Annotation[],
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<string> => {
+): Promise<Annotation[]> => {
   const getHeaders = (
     h?: NonNullable<RequestInit["headers"]>,
   ): Record<string, string | readonly string[]> => {
@@ -105,7 +112,7 @@ export const setAnnotations = async (
     }
     return headers;
   };
-  return storytellerFetch<string>(
+  return storytellerFetch<Annotation[]>(
     getSetAnnotationsUrl(organization, project, view),
     {
       ...options,
@@ -153,6 +160,9 @@ export const getSetAnnotationUrl = (
   return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
 };
 
+/**
+ * Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+ */
 export const setAnnotation = async (
   organization: string,
   project: string,
@@ -205,14 +215,17 @@ export const getDeleteAnnotationUrl = (
   return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
 };
 
+/**
+ * Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
+ */
 export const deleteAnnotation = async (
   organization: string,
   project: string,
   view: string,
   key: string,
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<void> => {
-  return storytellerFetch<void>(
+): Promise<AnnotationDeletionResult> => {
+  return storytellerFetch<AnnotationDeletionResult>(
     getDeleteAnnotationUrl(organization, project, view, key),
     {
       ...options,
@@ -274,9 +287,9 @@ export const setAnnotationsSimple = async (
   organization: string,
   project: string,
   view: string,
-  annotation?: Annotation[],
+  setAnnotationsSimpleBody?: string[],
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<string> => {
+): Promise<Annotation[]> => {
   const getHeaders = (
     h?: NonNullable<RequestInit["headers"]>,
   ): Record<string, string | readonly string[]> => {
@@ -298,7 +311,7 @@ export const setAnnotationsSimple = async (
     }
     return headers;
   };
-  return storytellerFetch<string>(
+  return storytellerFetch<Annotation[]>(
     getSetAnnotationsSimpleUrl(organization, project, view),
     {
       ...options,
@@ -307,7 +320,7 @@ export const setAnnotationsSimple = async (
         "Content-Type": "application/json",
         ...getHeaders(options?.headers),
       },
-      body: JSON.stringify(annotation),
+      body: JSON.stringify(setAnnotationsSimpleBody),
     },
   );
 };
@@ -564,6 +577,236 @@ export const getUnitsOfExecution = async (
 ): Promise<AnnotationsResponseUnitOfExecution> => {
   return storytellerFetch<AnnotationsResponseUnitOfExecution>(
     getGetUnitsOfExecutionUrl(organization, project, view, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetDeletedAnnotationsUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  params?: GetDeletedAnnotationsParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted`;
+};
+
+/**
+ * The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
+ */
+export const getDeletedAnnotations = async (
+  organization: string,
+  project: string,
+  view: string,
+  params?: GetDeletedAnnotationsParams,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AnnotationsResponse> => {
+  return storytellerFetch<AnnotationsResponse>(
+    getGetDeletedAnnotationsUrl(organization, project, view, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetDeletedAnnotationUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted/${encodeURIComponent(String(key))}`;
+};
+
+/**
+ * A deleted annotation with its Deletion.
+ */
+export const getDeletedAnnotation = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<Annotation> => {
+  return storytellerFetch<Annotation>(
+    getGetDeletedAnnotationUrl(organization, project, view, key),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getPurgeAnnotationUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted/${encodeURIComponent(String(key))}`;
+};
+
+/**
+ * Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
+ */
+export const purgeAnnotation = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AnnotationPurgeResult> => {
+  return storytellerFetch<AnnotationPurgeResult>(
+    getPurgeAnnotationUrl(organization, project, view, key),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getFindDeletedAnnotationsUrl = (
+  organization: string,
+  project: string,
+  view: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted/lookup`;
+};
+
+/**
+ * The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
+ */
+export const findDeletedAnnotations = async (
+  organization: string,
+  project: string,
+  view: string,
+  annotationKeysRequest?: AnnotationKeysRequest,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<Annotation[]> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<Annotation[]>(
+    getFindDeletedAnnotationsUrl(organization, project, view),
+    {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(annotationKeysRequest),
+    },
+  );
+};
+
+export const getRestoreAnnotationsUrl = (
+  organization: string,
+  project: string,
+  view: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/deleted/restore`;
+};
+
+/**
+ * Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
+ */
+export const restoreAnnotations = async (
+  organization: string,
+  project: string,
+  view: string,
+  annotationRestoreRequest?: AnnotationRestoreRequest,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AnnotationRestoreResult> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<AnnotationRestoreResult>(
+    getRestoreAnnotationsUrl(organization, project, view),
+    {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(annotationRestoreRequest),
+    },
+  );
+};
+
+export const getGetAnnotationHistoryUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}/history`;
+};
+
+/**
+ * What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
+ */
+export const getAnnotationHistory = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AnnotationHistory> => {
+  return storytellerFetch<AnnotationHistory>(
+    getGetAnnotationHistoryUrl(organization, project, view, key),
     {
       ...options,
       method: "GET",

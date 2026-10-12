@@ -3,10 +3,12 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.8.91.29486
+ * OpenAPI spec version: 0.9.1.3549
  */
 import type { AnnotationAnnotationType } from "./annotationAnnotationType";
+import type { AnnotationDeletion } from "./annotationDeletion";
 import type { AnnotationValues } from "./annotationValues";
+import type { AuditStamp } from "./auditStamp";
 
 export interface Annotation {
   ProjectName: string;
@@ -21,9 +23,15 @@ export interface Annotation {
   /** @nullable */
   ExpiresAt?: string | null;
   TimeZone?: string;
+  /** @maxLength 200 */
   Title?: string;
+  /** @maxLength 10000 */
   Description?: string;
+  /** @maxLength 2048 */
   DocumentationLink?: string;
   Labels?: string[];
   Values?: AnnotationValues;
+  Created?: AuditStamp;
+  Modified?: AuditStamp;
+  Deletion?: AnnotationDeletion;
 }

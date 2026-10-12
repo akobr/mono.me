@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.8.91.29486
+ * OpenAPI spec version: 0.9.1.3549
  */
 import { faker } from "@faker-js/faker";
 
@@ -12,6 +12,10 @@ import type { RequestHandlerOptions } from "msw";
 
 import type {
   Annotation,
+  AnnotationDeletionResult,
+  AnnotationHistory,
+  AnnotationPurgeResult,
+  AnnotationRestoreResult,
   AnnotationsResponse,
   AnnotationsResponseContext,
   AnnotationsResponseExecution,
@@ -58,15 +62,15 @@ export const getGetAnnotationsResponseMock = (
         undefined,
       ]),
       Title: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        faker.string.alpha({ length: { min: 10, max: 200 } }),
         undefined,
       ]),
       Description: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        faker.string.alpha({ length: { min: 10, max: 10000 } }),
         undefined,
       ]),
       DocumentationLink: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        faker.string.alpha({ length: { min: 10, max: 2048 } }),
         undefined,
       ]),
       Labels: faker.helpers.arrayElement([
@@ -82,6 +86,107 @@ export const getGetAnnotationsResponseMock = (
         },
         undefined,
       ]),
+      Created: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Deletion: faker.helpers.arrayElement([
+        {
+          DeletionId: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          RootKey: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          DeletedAt: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          DeletedBy: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          IsRoot: faker.helpers.arrayElement([
+            faker.datatype.boolean(),
+            undefined,
+          ]),
+          DescendantCount: faker.helpers.arrayElement([
+            faker.number.int(),
+            null,
+          ]),
+          PurgeAt: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            null,
+          ]),
+        },
+        undefined,
+      ]),
     })),
     undefined,
   ]),
@@ -93,7 +198,161 @@ export const getGetAnnotationsResponseMock = (
   ...overrideResponse,
 });
 
-export const getSetAnnotationsResponseMock = (): string => faker.word.sample();
+export const getSetAnnotationsResponseMock = (): Annotation[] =>
+  Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => ({
+    ProjectName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    ViewName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    AnnotationKey: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    Name: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    AnnotationType: faker.helpers.arrayElement([
+      "Responsibility",
+      "Unit",
+      "Subject",
+      "Usage",
+      "Context",
+      "Execution",
+      "UnitOfExecution",
+    ] as const),
+    IsDisabled: faker.helpers.arrayElement([faker.datatype.boolean(), null]),
+    ValidFrom: faker.helpers.arrayElement([
+      faker.date.past().toISOString().slice(0, 19) + "Z",
+      null,
+    ]),
+    ExpiresAt: faker.helpers.arrayElement([
+      faker.date.past().toISOString().slice(0, 19) + "Z",
+      null,
+    ]),
+    TimeZone: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    Title: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 200 } }),
+      undefined,
+    ]),
+    Description: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 10000 } }),
+      undefined,
+    ]),
+    DocumentationLink: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 2048 } }),
+      undefined,
+    ]),
+    Labels: faker.helpers.arrayElement([
+      Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+      undefined,
+    ]),
+    Values: faker.helpers.arrayElement([
+      {
+        [faker.string.alphanumeric(5)]: {},
+      },
+      undefined,
+    ]),
+    Created: faker.helpers.arrayElement([
+      {
+        At: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        By: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
+      undefined,
+    ]),
+    Modified: faker.helpers.arrayElement([
+      {
+        At: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        By: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
+      undefined,
+    ]),
+    Deletion: faker.helpers.arrayElement([
+      {
+        DeletionId: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        RootKey: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        DeletedAt: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        DeletedBy: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+        IsRoot: faker.helpers.arrayElement([
+          faker.datatype.boolean(),
+          undefined,
+        ]),
+        DescendantCount: faker.helpers.arrayElement([faker.number.int(), null]),
+        PurgeAt: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          null,
+        ]),
+      },
+      undefined,
+    ]),
+  }));
 
 export const getGetAnnotationResponseMock = (
   overrideResponse: Partial<Extract<Annotation, object>> = {},
@@ -125,15 +384,15 @@ export const getGetAnnotationResponseMock = (
     undefined,
   ]),
   Title: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    faker.string.alpha({ length: { min: 10, max: 200 } }),
     undefined,
   ]),
   Description: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    faker.string.alpha({ length: { min: 10, max: 10000 } }),
     undefined,
   ]),
   DocumentationLink: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    faker.string.alpha({ length: { min: 10, max: 2048 } }),
     undefined,
   ]),
   Labels: faker.helpers.arrayElement([
@@ -146,6 +405,101 @@ export const getGetAnnotationResponseMock = (
   Values: faker.helpers.arrayElement([
     {
       [faker.string.alphanumeric(5)]: {},
+    },
+    undefined,
+  ]),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  Deletion: faker.helpers.arrayElement([
+    {
+      DeletionId: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      RootKey: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DeletedAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      DeletedBy: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      IsRoot: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
+      DescendantCount: faker.helpers.arrayElement([faker.number.int(), null]),
+      PurgeAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        null,
+      ]),
     },
     undefined,
   ]),
@@ -182,15 +536,15 @@ export const getSetAnnotationResponseMock = (
     undefined,
   ]),
   Title: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    faker.string.alpha({ length: { min: 10, max: 200 } }),
     undefined,
   ]),
   Description: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    faker.string.alpha({ length: { min: 10, max: 10000 } }),
     undefined,
   ]),
   DocumentationLink: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    faker.string.alpha({ length: { min: 10, max: 2048 } }),
     undefined,
   ]),
   Labels: faker.helpers.arrayElement([
@@ -204,6 +558,155 @@ export const getSetAnnotationResponseMock = (
     {
       [faker.string.alphanumeric(5)]: {},
     },
+    undefined,
+  ]),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  Deletion: faker.helpers.arrayElement([
+    {
+      DeletionId: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      RootKey: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DeletedAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      DeletedBy: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      IsRoot: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
+      DescendantCount: faker.helpers.arrayElement([faker.number.int(), null]),
+      PurgeAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        null,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getDeleteAnnotationResponseMock = (
+  overrideResponse: Partial<Extract<AnnotationDeletionResult, object>> = {},
+): AnnotationDeletionResult => ({
+  Deletion: faker.helpers.arrayElement([
+    {
+      DeletionId: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      RootKey: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DeletedAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      DeletedBy: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      IsRoot: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
+      DescendantCount: faker.helpers.arrayElement([faker.number.int(), null]),
+      PurgeAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        null,
+      ]),
+    },
+    undefined,
+  ]),
+  DeletedKeys: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
     undefined,
   ]),
   ...overrideResponse,
@@ -244,15 +747,15 @@ export const getGetDescendantsResponseMock = (
         undefined,
       ]),
       Title: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        faker.string.alpha({ length: { min: 10, max: 200 } }),
         undefined,
       ]),
       Description: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        faker.string.alpha({ length: { min: 10, max: 10000 } }),
         undefined,
       ]),
       DocumentationLink: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        faker.string.alpha({ length: { min: 10, max: 2048 } }),
         undefined,
       ]),
       Labels: faker.helpers.arrayElement([
@@ -268,6 +771,107 @@ export const getGetDescendantsResponseMock = (
         },
         undefined,
       ]),
+      Created: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Deletion: faker.helpers.arrayElement([
+        {
+          DeletionId: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          RootKey: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          DeletedAt: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          DeletedBy: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          IsRoot: faker.helpers.arrayElement([
+            faker.datatype.boolean(),
+            undefined,
+          ]),
+          DescendantCount: faker.helpers.arrayElement([
+            faker.number.int(),
+            null,
+          ]),
+          PurgeAt: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            null,
+          ]),
+        },
+        undefined,
+      ]),
     })),
     undefined,
   ]),
@@ -279,8 +883,161 @@ export const getGetDescendantsResponseMock = (
   ...overrideResponse,
 });
 
-export const getSetAnnotationsSimpleResponseMock = (): string =>
-  faker.word.sample();
+export const getSetAnnotationsSimpleResponseMock = (): Annotation[] =>
+  Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => ({
+    ProjectName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    ViewName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    AnnotationKey: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    Name: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    AnnotationType: faker.helpers.arrayElement([
+      "Responsibility",
+      "Unit",
+      "Subject",
+      "Usage",
+      "Context",
+      "Execution",
+      "UnitOfExecution",
+    ] as const),
+    IsDisabled: faker.helpers.arrayElement([faker.datatype.boolean(), null]),
+    ValidFrom: faker.helpers.arrayElement([
+      faker.date.past().toISOString().slice(0, 19) + "Z",
+      null,
+    ]),
+    ExpiresAt: faker.helpers.arrayElement([
+      faker.date.past().toISOString().slice(0, 19) + "Z",
+      null,
+    ]),
+    TimeZone: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    Title: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 200 } }),
+      undefined,
+    ]),
+    Description: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 10000 } }),
+      undefined,
+    ]),
+    DocumentationLink: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 2048 } }),
+      undefined,
+    ]),
+    Labels: faker.helpers.arrayElement([
+      Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+      undefined,
+    ]),
+    Values: faker.helpers.arrayElement([
+      {
+        [faker.string.alphanumeric(5)]: {},
+      },
+      undefined,
+    ]),
+    Created: faker.helpers.arrayElement([
+      {
+        At: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        By: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
+      undefined,
+    ]),
+    Modified: faker.helpers.arrayElement([
+      {
+        At: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        By: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
+      undefined,
+    ]),
+    Deletion: faker.helpers.arrayElement([
+      {
+        DeletionId: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        RootKey: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        DeletedAt: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        DeletedBy: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+        IsRoot: faker.helpers.arrayElement([
+          faker.datatype.boolean(),
+          undefined,
+        ]),
+        DescendantCount: faker.helpers.arrayElement([faker.number.int(), null]),
+        PurgeAt: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          null,
+        ]),
+      },
+      undefined,
+    ]),
+  }));
 
 export const getGetResponsibilitiesResponseMock = (
   overrideResponse: Partial<
@@ -324,15 +1081,15 @@ export const getGetResponsibilitiesResponseMock = (
             undefined,
           ]),
           Title: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 200 } }),
             undefined,
           ]),
           Description: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 10000 } }),
             undefined,
           ]),
           DocumentationLink: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 2048 } }),
             undefined,
           ]),
           Labels: faker.helpers.arrayElement([
@@ -345,6 +1102,107 @@ export const getGetResponsibilitiesResponseMock = (
           Values: faker.helpers.arrayElement([
             {
               [faker.string.alphanumeric(5)]: {},
+            },
+            undefined,
+          ]),
+          Created: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Modified: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Deletion: faker.helpers.arrayElement([
+            {
+              DeletionId: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              RootKey: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              DeletedAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              DeletedBy: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+              IsRoot: faker.helpers.arrayElement([
+                faker.datatype.boolean(),
+                undefined,
+              ]),
+              DescendantCount: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              PurgeAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                null,
+              ]),
             },
             undefined,
           ]),
@@ -408,15 +1266,15 @@ export const getGetSubjectsResponseMock = (
             undefined,
           ]),
           Title: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 200 } }),
             undefined,
           ]),
           Description: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 10000 } }),
             undefined,
           ]),
           DocumentationLink: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 2048 } }),
             undefined,
           ]),
           Labels: faker.helpers.arrayElement([
@@ -429,6 +1287,107 @@ export const getGetSubjectsResponseMock = (
           Values: faker.helpers.arrayElement([
             {
               [faker.string.alphanumeric(5)]: {},
+            },
+            undefined,
+          ]),
+          Created: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Modified: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Deletion: faker.helpers.arrayElement([
+            {
+              DeletionId: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              RootKey: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              DeletedAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              DeletedBy: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+              IsRoot: faker.helpers.arrayElement([
+                faker.datatype.boolean(),
+                undefined,
+              ]),
+              DescendantCount: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              PurgeAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                null,
+              ]),
             },
             undefined,
           ]),
@@ -496,15 +1455,15 @@ export const getGetUsagesResponseMock = (
             undefined,
           ]),
           Title: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 200 } }),
             undefined,
           ]),
           Description: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 10000 } }),
             undefined,
           ]),
           DocumentationLink: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 2048 } }),
             undefined,
           ]),
           Labels: faker.helpers.arrayElement([
@@ -517,6 +1476,107 @@ export const getGetUsagesResponseMock = (
           Values: faker.helpers.arrayElement([
             {
               [faker.string.alphanumeric(5)]: {},
+            },
+            undefined,
+          ]),
+          Created: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Modified: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Deletion: faker.helpers.arrayElement([
+            {
+              DeletionId: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              RootKey: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              DeletedAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              DeletedBy: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+              IsRoot: faker.helpers.arrayElement([
+                faker.datatype.boolean(),
+                undefined,
+              ]),
+              DescendantCount: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              PurgeAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                null,
+              ]),
             },
             undefined,
           ]),
@@ -588,15 +1648,15 @@ export const getGetContextsResponseMock = (
             undefined,
           ]),
           Title: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 200 } }),
             undefined,
           ]),
           Description: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 10000 } }),
             undefined,
           ]),
           DocumentationLink: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 2048 } }),
             undefined,
           ]),
           Labels: faker.helpers.arrayElement([
@@ -609,6 +1669,107 @@ export const getGetContextsResponseMock = (
           Values: faker.helpers.arrayElement([
             {
               [faker.string.alphanumeric(5)]: {},
+            },
+            undefined,
+          ]),
+          Created: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Modified: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Deletion: faker.helpers.arrayElement([
+            {
+              DeletionId: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              RootKey: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              DeletedAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              DeletedBy: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+              IsRoot: faker.helpers.arrayElement([
+                faker.datatype.boolean(),
+                undefined,
+              ]),
+              DescendantCount: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              PurgeAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                null,
+              ]),
             },
             undefined,
           ]),
@@ -674,15 +1835,15 @@ export const getGetExecutionsResponseMock = (
             undefined,
           ]),
           Title: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 200 } }),
             undefined,
           ]),
           Description: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 10000 } }),
             undefined,
           ]),
           DocumentationLink: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 2048 } }),
             undefined,
           ]),
           Labels: faker.helpers.arrayElement([
@@ -695,6 +1856,107 @@ export const getGetExecutionsResponseMock = (
           Values: faker.helpers.arrayElement([
             {
               [faker.string.alphanumeric(5)]: {},
+            },
+            undefined,
+          ]),
+          Created: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Modified: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Deletion: faker.helpers.arrayElement([
+            {
+              DeletionId: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              RootKey: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              DeletedAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              DeletedBy: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+              IsRoot: faker.helpers.arrayElement([
+                faker.datatype.boolean(),
+                undefined,
+              ]),
+              DescendantCount: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              PurgeAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                null,
+              ]),
             },
             undefined,
           ]),
@@ -769,15 +2031,15 @@ export const getGetUnitsResponseMock = (
             undefined,
           ]),
           Title: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 200 } }),
             undefined,
           ]),
           Description: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 10000 } }),
             undefined,
           ]),
           DocumentationLink: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 2048 } }),
             undefined,
           ]),
           Labels: faker.helpers.arrayElement([
@@ -790,6 +2052,107 @@ export const getGetUnitsResponseMock = (
           Values: faker.helpers.arrayElement([
             {
               [faker.string.alphanumeric(5)]: {},
+            },
+            undefined,
+          ]),
+          Created: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Modified: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Deletion: faker.helpers.arrayElement([
+            {
+              DeletionId: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              RootKey: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              DeletedAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              DeletedBy: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+              IsRoot: faker.helpers.arrayElement([
+                faker.datatype.boolean(),
+                undefined,
+              ]),
+              DescendantCount: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              PurgeAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                null,
+              ]),
             },
             undefined,
           ]),
@@ -859,15 +2222,15 @@ export const getGetUnitsOfExecutionResponseMock = (
             undefined,
           ]),
           Title: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 200 } }),
             undefined,
           ]),
           Description: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 10000 } }),
             undefined,
           ]),
           DocumentationLink: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            faker.string.alpha({ length: { min: 10, max: 2048 } }),
             undefined,
           ]),
           Labels: faker.helpers.arrayElement([
@@ -880,6 +2243,107 @@ export const getGetUnitsOfExecutionResponseMock = (
           Values: faker.helpers.arrayElement([
             {
               [faker.string.alphanumeric(5)]: {},
+            },
+            undefined,
+          ]),
+          Created: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Modified: faker.helpers.arrayElement([
+            {
+              At: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              By: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          Deletion: faker.helpers.arrayElement([
+            {
+              DeletionId: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              RootKey: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              DeletedAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                undefined,
+              ]),
+              DeletedBy: faker.helpers.arrayElement([
+                {
+                  Kind: faker.helpers.arrayElement([
+                    "Account",
+                    "Machine",
+                    "System",
+                  ] as const),
+                  Id: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  Name: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                },
+                undefined,
+              ]),
+              IsRoot: faker.helpers.arrayElement([
+                faker.datatype.boolean(),
+                undefined,
+              ]),
+              DescendantCount: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              PurgeAt: faker.helpers.arrayElement([
+                faker.date.past().toISOString().slice(0, 19) + "Z",
+                null,
+              ]),
             },
             undefined,
           ]),
@@ -910,6 +2374,855 @@ export const getGetUnitsOfExecutionResponseMock = (
     undefined,
   ]),
   Count: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  ...overrideResponse,
+});
+
+export const getGetDeletedAnnotationsResponseMock = (
+  overrideResponse: Partial<Extract<AnnotationsResponse, object>> = {},
+): AnnotationsResponse => ({
+  Annotations: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      ProjectName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+      ViewName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+      AnnotationKey: faker.string.alpha({ length: { min: 10, max: 20 } }),
+      Name: faker.string.alpha({ length: { min: 10, max: 20 } }),
+      AnnotationType: faker.helpers.arrayElement([
+        "Responsibility",
+        "Unit",
+        "Subject",
+        "Usage",
+        "Context",
+        "Execution",
+        "UnitOfExecution",
+      ] as const),
+      IsDisabled: faker.helpers.arrayElement([faker.datatype.boolean(), null]),
+      ValidFrom: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        null,
+      ]),
+      ExpiresAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        null,
+      ]),
+      TimeZone: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Title: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 200 } }),
+        undefined,
+      ]),
+      Description: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 10000 } }),
+        undefined,
+      ]),
+      DocumentationLink: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 2048 } }),
+        undefined,
+      ]),
+      Labels: faker.helpers.arrayElement([
+        Array.from(
+          { length: faker.number.int({ min: 1, max: 10 }) },
+          (_, i) => i + 1,
+        ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        undefined,
+      ]),
+      Values: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: {},
+        },
+        undefined,
+      ]),
+      Created: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Deletion: faker.helpers.arrayElement([
+        {
+          DeletionId: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          RootKey: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          DeletedAt: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          DeletedBy: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          IsRoot: faker.helpers.arrayElement([
+            faker.datatype.boolean(),
+            undefined,
+          ]),
+          DescendantCount: faker.helpers.arrayElement([
+            faker.number.int(),
+            null,
+          ]),
+          PurgeAt: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            null,
+          ]),
+        },
+        undefined,
+      ]),
+    })),
+    undefined,
+  ]),
+  ContinuationToken: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Count: faker.helpers.arrayElement([faker.number.int(), undefined]),
+  ...overrideResponse,
+});
+
+export const getGetDeletedAnnotationResponseMock = (
+  overrideResponse: Partial<Extract<Annotation, object>> = {},
+): Annotation => ({
+  ProjectName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  ViewName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  AnnotationKey: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Name: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  AnnotationType: faker.helpers.arrayElement([
+    "Responsibility",
+    "Unit",
+    "Subject",
+    "Usage",
+    "Context",
+    "Execution",
+    "UnitOfExecution",
+  ] as const),
+  IsDisabled: faker.helpers.arrayElement([faker.datatype.boolean(), null]),
+  ValidFrom: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
+  ExpiresAt: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
+  TimeZone: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Title: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 200 } }),
+    undefined,
+  ]),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 10000 } }),
+    undefined,
+  ]),
+  DocumentationLink: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 2048 } }),
+    undefined,
+  ]),
+  Labels: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    undefined,
+  ]),
+  Values: faker.helpers.arrayElement([
+    {
+      [faker.string.alphanumeric(5)]: {},
+    },
+    undefined,
+  ]),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
+    undefined,
+  ]),
+  Deletion: faker.helpers.arrayElement([
+    {
+      DeletionId: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      RootKey: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DeletedAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      DeletedBy: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      IsRoot: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
+      DescendantCount: faker.helpers.arrayElement([faker.number.int(), null]),
+      PurgeAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        null,
+      ]),
+    },
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getPurgeAnnotationResponseMock = (
+  overrideResponse: Partial<Extract<AnnotationPurgeResult, object>> = {},
+): AnnotationPurgeResult => ({
+  PurgedKeys: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getFindDeletedAnnotationsResponseMock = (): Annotation[] =>
+  Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => ({
+    ProjectName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    ViewName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    AnnotationKey: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    Name: faker.string.alpha({ length: { min: 10, max: 20 } }),
+    AnnotationType: faker.helpers.arrayElement([
+      "Responsibility",
+      "Unit",
+      "Subject",
+      "Usage",
+      "Context",
+      "Execution",
+      "UnitOfExecution",
+    ] as const),
+    IsDisabled: faker.helpers.arrayElement([faker.datatype.boolean(), null]),
+    ValidFrom: faker.helpers.arrayElement([
+      faker.date.past().toISOString().slice(0, 19) + "Z",
+      null,
+    ]),
+    ExpiresAt: faker.helpers.arrayElement([
+      faker.date.past().toISOString().slice(0, 19) + "Z",
+      null,
+    ]),
+    TimeZone: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    Title: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 200 } }),
+      undefined,
+    ]),
+    Description: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 10000 } }),
+      undefined,
+    ]),
+    DocumentationLink: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 2048 } }),
+      undefined,
+    ]),
+    Labels: faker.helpers.arrayElement([
+      Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+      undefined,
+    ]),
+    Values: faker.helpers.arrayElement([
+      {
+        [faker.string.alphanumeric(5)]: {},
+      },
+      undefined,
+    ]),
+    Created: faker.helpers.arrayElement([
+      {
+        At: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        By: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
+      undefined,
+    ]),
+    Modified: faker.helpers.arrayElement([
+      {
+        At: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        By: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
+      undefined,
+    ]),
+    Deletion: faker.helpers.arrayElement([
+      {
+        DeletionId: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        RootKey: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        DeletedAt: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        DeletedBy: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+        IsRoot: faker.helpers.arrayElement([
+          faker.datatype.boolean(),
+          undefined,
+        ]),
+        DescendantCount: faker.helpers.arrayElement([faker.number.int(), null]),
+        PurgeAt: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          null,
+        ]),
+      },
+      undefined,
+    ]),
+  }));
+
+export const getRestoreAnnotationsResponseMock = (
+  overrideResponse: Partial<Extract<AnnotationRestoreResult, object>> = {},
+): AnnotationRestoreResult => ({
+  Annotations: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      ProjectName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+      ViewName: faker.string.alpha({ length: { min: 10, max: 20 } }),
+      AnnotationKey: faker.string.alpha({ length: { min: 10, max: 20 } }),
+      Name: faker.string.alpha({ length: { min: 10, max: 20 } }),
+      AnnotationType: faker.helpers.arrayElement([
+        "Responsibility",
+        "Unit",
+        "Subject",
+        "Usage",
+        "Context",
+        "Execution",
+        "UnitOfExecution",
+      ] as const),
+      IsDisabled: faker.helpers.arrayElement([faker.datatype.boolean(), null]),
+      ValidFrom: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        null,
+      ]),
+      ExpiresAt: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        null,
+      ]),
+      TimeZone: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Title: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 200 } }),
+        undefined,
+      ]),
+      Description: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 10000 } }),
+        undefined,
+      ]),
+      DocumentationLink: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 2048 } }),
+        undefined,
+      ]),
+      Labels: faker.helpers.arrayElement([
+        Array.from(
+          { length: faker.number.int({ min: 1, max: 10 }) },
+          (_, i) => i + 1,
+        ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        undefined,
+      ]),
+      Values: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: {},
+        },
+        undefined,
+      ]),
+      Created: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Deletion: faker.helpers.arrayElement([
+        {
+          DeletionId: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          RootKey: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          DeletedAt: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          DeletedBy: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+          IsRoot: faker.helpers.arrayElement([
+            faker.datatype.boolean(),
+            undefined,
+          ]),
+          DescendantCount: faker.helpers.arrayElement([
+            faker.number.int(),
+            null,
+          ]),
+          PurgeAt: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            null,
+          ]),
+        },
+        undefined,
+      ]),
+    })),
+    undefined,
+  ]),
+  CreatedKeys: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    undefined,
+  ]),
+  Failed: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Key: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      ErrorCode: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Message: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+    })),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getGetAnnotationHistoryResponseMock = (
+  overrideResponse: Partial<Extract<AnnotationHistory, object>> = {},
+): AnnotationHistory => ({
+  AnnotationKey: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  State: faker.helpers.arrayElement(["Active", "Deleted"] as const),
+  Entries: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Id: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      Action: faker.helpers.arrayElement([
+        "Created",
+        "Recreated",
+        "Updated",
+        "Deleted",
+        "Restored",
+        "ConfigurationChanged",
+        "ConfigurationDeleted",
+      ] as const),
+      Actor: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Cause: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement(["Cascade", "Ancestor"] as const),
+          Key: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      DeletionId: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      DescendantCount: faker.helpers.arrayElement([faker.number.int(), null]),
+      Fields: faker.helpers.arrayElement([
+        Array.from(
+          { length: faker.number.int({ min: 1, max: 10 }) },
+          (_, i) => i + 1,
+        ).map(() => ({
+          Field: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Previous: faker.helpers.arrayElement([{}, undefined]),
+          IsPreviousTruncated: faker.helpers.arrayElement([
+            faker.datatype.boolean(),
+            undefined,
+          ]),
+          Value: faker.helpers.arrayElement([{}, undefined]),
+          IsValueTruncated: faker.helpers.arrayElement([
+            faker.datatype.boolean(),
+            undefined,
+          ]),
+        })),
+        undefined,
+      ]),
+      Labels: faker.helpers.arrayElement([
+        {
+          Added: faker.helpers.arrayElement([
+            Array.from(
+              { length: faker.number.int({ min: 1, max: 10 }) },
+              (_, i) => i + 1,
+            ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+            undefined,
+          ]),
+          Removed: faker.helpers.arrayElement([
+            Array.from(
+              { length: faker.number.int({ min: 1, max: 10 }) },
+              (_, i) => i + 1,
+            ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Values: faker.helpers.arrayElement([
+        Array.from(
+          { length: faker.number.int({ min: 1, max: 10 }) },
+          (_, i) => i + 1,
+        ).map(() => ({
+          Key: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Change: faker.helpers.arrayElement([
+            "Added",
+            "Removed",
+            "Changed",
+          ] as const),
+          PreviousKind: faker.helpers.arrayElement([
+            faker.helpers.arrayElement([
+              "Null",
+              "String",
+              "Number",
+              "Boolean",
+              "Object",
+              "Array",
+            ] as const),
+            null,
+          ]),
+          Previous: faker.helpers.arrayElement([{}, undefined]),
+          IsPreviousTruncated: faker.helpers.arrayElement([
+            faker.datatype.boolean(),
+            undefined,
+          ]),
+          ValueKind: faker.helpers.arrayElement([
+            faker.helpers.arrayElement([
+              "Null",
+              "String",
+              "Number",
+              "Boolean",
+              "Object",
+              "Array",
+            ] as const),
+            null,
+          ]),
+          Value: faker.helpers.arrayElement([{}, undefined]),
+          IsValueTruncated: faker.helpers.arrayElement([
+            faker.datatype.boolean(),
+            undefined,
+          ]),
+        })),
+        undefined,
+      ]),
+      ConfigurationVersion: faker.helpers.arrayElement([
+        faker.number.int(),
+        null,
+      ]),
+    })),
+    undefined,
+  ]),
+  IsTrimmed: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
   ...overrideResponse,
 });
 
@@ -1024,10 +3337,10 @@ export const getGetAnnotationsMockHandler = (
 
 export const getSetAnnotationsMockHandler = (
   overrideResponse?:
-    | string
+    | Annotation[]
     | ((
         info: Parameters<Parameters<typeof http.post>[1]>[0],
-      ) => Promise<string> | string),
+      ) => Promise<Annotation[]> | Annotation[]),
   options?: RequestHandlerOptions,
 ) => {
   return http.post(
@@ -1096,20 +3409,23 @@ export const getSetAnnotationMockHandler = (
 
 export const getDeleteAnnotationMockHandler = (
   overrideResponse?:
-    | void
+    | AnnotationDeletionResult
     | ((
         info: Parameters<Parameters<typeof http.delete>[1]>[0],
-      ) => Promise<void> | void),
+      ) => Promise<AnnotationDeletionResult> | AnnotationDeletionResult),
   options?: RequestHandlerOptions,
 ) => {
   return http.delete(
     "*/api/v1/:organization/:project/:view/annotations/:key",
     async (info: Parameters<Parameters<typeof http.delete>[1]>[0]) => {
-      if (typeof overrideResponse === "function") {
-        await overrideResponse(info);
-      }
-
-      return new HttpResponse(null, { status: 200 });
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getDeleteAnnotationResponseMock(),
+        { status: 200 },
+      );
     },
     options,
   );
@@ -1141,10 +3457,10 @@ export const getGetDescendantsMockHandler = (
 
 export const getSetAnnotationsSimpleMockHandler = (
   overrideResponse?:
-    | string
+    | Annotation[]
     | ((
         info: Parameters<Parameters<typeof http.post>[1]>[0],
-      ) => Promise<string> | string),
+      ) => Promise<Annotation[]> | Annotation[]),
   options?: RequestHandlerOptions,
 ) => {
   return http.post(
@@ -1336,6 +3652,150 @@ export const getGetUnitsOfExecutionMockHandler = (
   );
 };
 
+export const getGetDeletedAnnotationsMockHandler = (
+  overrideResponse?:
+    | AnnotationsResponse
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<AnnotationsResponse> | AnnotationsResponse),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/:organization/:project/:view/annotations/deleted",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetDeletedAnnotationsResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getGetDeletedAnnotationMockHandler = (
+  overrideResponse?:
+    | Annotation
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<Annotation> | Annotation),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/:organization/:project/:view/annotations/deleted/:key",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetDeletedAnnotationResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getPurgeAnnotationMockHandler = (
+  overrideResponse?:
+    | AnnotationPurgeResult
+    | ((
+        info: Parameters<Parameters<typeof http.delete>[1]>[0],
+      ) => Promise<AnnotationPurgeResult> | AnnotationPurgeResult),
+  options?: RequestHandlerOptions,
+) => {
+  return http.delete(
+    "*/api/v1/:organization/:project/:view/annotations/deleted/:key",
+    async (info: Parameters<Parameters<typeof http.delete>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getPurgeAnnotationResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getFindDeletedAnnotationsMockHandler = (
+  overrideResponse?:
+    | Annotation[]
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<Annotation[]> | Annotation[]),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/:organization/:project/:view/annotations/deleted/lookup",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getFindDeletedAnnotationsResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getRestoreAnnotationsMockHandler = (
+  overrideResponse?:
+    | AnnotationRestoreResult
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<AnnotationRestoreResult> | AnnotationRestoreResult),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/:organization/:project/:view/annotations/deleted/restore",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getRestoreAnnotationsResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getGetAnnotationHistoryMockHandler = (
+  overrideResponse?:
+    | AnnotationHistory
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<AnnotationHistory> | AnnotationHistory),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/:organization/:project/:view/annotations/:key/history",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetAnnotationHistoryResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGetViewsMockHandler = (
   overrideResponse?:
     | View[]
@@ -1422,6 +3882,12 @@ export const getAnnotationsMock = () => [
   getGetExecutionsMockHandler(),
   getGetUnitsMockHandler(),
   getGetUnitsOfExecutionMockHandler(),
+  getGetDeletedAnnotationsMockHandler(),
+  getGetDeletedAnnotationMockHandler(),
+  getPurgeAnnotationMockHandler(),
+  getFindDeletedAnnotationsMockHandler(),
+  getRestoreAnnotationsMockHandler(),
+  getGetAnnotationHistoryMockHandler(),
   getGetViewsMockHandler(),
   getCreateViewMockHandler(),
   getUpdateViewMockHandler(),
