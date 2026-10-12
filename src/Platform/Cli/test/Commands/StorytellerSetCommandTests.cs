@@ -118,6 +118,20 @@ public class StorytellerSetCommandTests
     }
 
     [Fact]
+    public async Task FailingLookup_PrintsTheServerMessage()
+    {
+        _fixture.Api
+            .Setup(api => api.FindDeletedAnnotationsAsync("org1", "proj1", "default", It.IsAny<AnnotationKeysRequest>()))
+            .ThrowsAsync(AnnotationCommandFixture.Error(400, "InvalidKey", "Too many annotation keys."));
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _fixture.Console.Lines.ShouldContain("Too many annotation keys.");
+        _calls.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task BothOptions_AreRejected()
     {
         var exitCode = await Execute(restoreDeleted: true, recreate: true);

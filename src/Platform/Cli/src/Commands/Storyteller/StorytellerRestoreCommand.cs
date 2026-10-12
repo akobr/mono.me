@@ -66,6 +66,9 @@ public class StorytellerRestoreCommand : BaseContextCommand
             }
             catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.BadRequest)
             {
+                // the earlier requests may have restored keys already
+                WriteRestored(restored, created);
+                WriteFailed(failed);
                 Console.WriteLine(e.GetErrorMessage());
                 return ExitCodes.ERROR_WRONG_INPUT;
             }

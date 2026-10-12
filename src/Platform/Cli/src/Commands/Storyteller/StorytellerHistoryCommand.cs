@@ -5,6 +5,7 @@ using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
+using Newtonsoft.Json;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
@@ -57,7 +58,9 @@ public class StorytellerHistoryCommand : BaseContextCommand
                 history.Entries = history.Entries?.OrderByDescending(entry => entry.At).Take(Top.Value).ToList();
             }
 
-            Console.WriteJson(history);
+            // plain JSON, without the line numbers and colors of the display, so it can be piped
+            var json = JsonConvert.SerializeObject(history, Formatting.Indented);
+            (Console.Console?.Out ?? System.Console.Out).WriteLine(json);
             return ExitCodes.SUCCESS;
         }
 

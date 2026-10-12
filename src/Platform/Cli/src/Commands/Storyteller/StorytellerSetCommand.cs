@@ -180,15 +180,16 @@ public class StorytellerSetCommand : BaseContextCommand
             };
         }
 
-        var deletedResult = await HandleDeletedKeysAsync(annotationKey);
-
-        if (deletedResult.HasValue)
-        {
-            return deletedResult.Value;
-        }
-
         try
         {
+            // the lookup and the restore of deleted keys fail like the write: with the server's message
+            var deletedResult = await HandleDeletedKeysAsync(annotationKey);
+
+            if (deletedResult.HasValue)
+            {
+                return deletedResult.Value;
+            }
+
             var resultAnnotation = await _annotationsApi.SetAnnotationAsync(
                 Context.OrganizationName,
                 Context.ProjectName,
