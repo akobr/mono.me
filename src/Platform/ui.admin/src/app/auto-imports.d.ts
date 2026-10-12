@@ -17,7 +17,9 @@ declare global {
   const extendLocale: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineLocale').extendLocale
   const extractShortcuts: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts').extractShortcuts
   const hasUnsavedChanges: typeof import('./composables/useUnsavedChanges').hasUnsavedChanges
+  const isRememberedSection: typeof import('./stores/page-memory').isRememberedSection
   const onSignOut: typeof import('./stores/session').onSignOut
+  const rememberedSections: typeof import('./stores/page-memory').rememberedSections
   const runLimited: typeof import('./composables/useAnnotationActions').runLimited
   const shortcutGroups: typeof import('./composables/useShortcutsHelp').shortcutGroups
   const typeColorsStyleId: typeof import('./stores/type-appearance').typeColorsStyleId
@@ -43,11 +45,14 @@ declare global {
   const useKbd: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useKbd').useKbd
   const useNavigationContext: typeof import('./composables/useNavigationContext').useNavigationContext
   const useOverlay: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useOverlay').useOverlay
+  const usePageMemory: typeof import('./composables/usePageMemory').usePageMemory
+  const usePageMemoryStore: typeof import('./stores/page-memory').usePageMemoryStore
   const usePreferencesStore: typeof import('./stores/preferences').usePreferencesStore
   const useProjectSettingsStore: typeof import('./stores/project-settings').useProjectSettingsStore
   const useResizable: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useResizable').useResizable
   const useRole: typeof import('./composables/useRole').useRole
   const useScope: typeof import('./composables/useAppContext').useScope
+  const useScrollMemory: typeof import('./composables/useScrollMemory').useScrollMemory
   const useScrollShadow: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useScrollShadow').useScrollShadow
   const useScrollspy: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useScrollspy').useScrollspy
   const useSessionStore: typeof import('./stores/session').useSessionStore
@@ -84,6 +89,9 @@ declare global {
   // @ts-ignore
   export type { Scope, ContextAccess } from './stores/context'
   import('./stores/context')
+  // @ts-ignore
+  export type { RememberedSection, AnnotationsMemory, ConfigurationsMemory, GraphLayoutMemory, GraphTransform, GraphMemory, SectionMemories } from './stores/page-memory'
+  import('./stores/page-memory')
   // @ts-ignore
   export type { DocumentFormat, EditorMode, Density, GridPreferences, Preferences } from './stores/preferences'
   import('./stores/preferences')

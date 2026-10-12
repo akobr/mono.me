@@ -175,3 +175,40 @@ test('new annotations start in the default time zone of the project', async ({ p
   await goto(page, '/acme/billing/default/annotations/sbt.cyberdyne')
   await expect(page.getByRole('button', { name: 'Time zone', exact: true })).toContainText('Asia/Tokyo')
 })
+
+test('comes back to the filter, the detail and its tab after another section', async ({ page }, testInfo) => {
+  // The sidebar is a slideover below lg, and on a phone the detail covers the screen until it is closed.
+  const phone = isMobile(testInfo)
+  const navigate = async (name: string) => {
+    if (phone) {
+      await page.getByRole('button', { name: 'Open navigation' }).click()
+      await page.getByRole('dialog').getByRole('link', { name, exact: true }).click()
+    } else {
+      await page.getByRole('link', { name, exact: true }).first().click()
+    }
+  }
+
+  await openApp(page, '/acme/billing/default/annotations')
+  await page.getByRole('textbox', { name: 'Filter annotations' }).fill('type:sbt')
+  await expect(page).toHaveURL(/q=type(%3A|:)sbt/)
+  if (!phone) {
+    await openFromList(page, 'sbt.northwind', testInfo)
+    await page.getByRole('link', { name: 'History', exact: true }).click()
+    await expect(page).toHaveURL(/\/annotations\/sbt\.northwind\/history/)
+  }
+
+  await navigate('Configurations')
+  await expect(page).toHaveURL(/\/acme\/billing\/default\/configurations$/)
+  await navigate('Annotations')
+
+  await expect(page.getByRole('textbox', { name: 'Filter annotations' })).toHaveValue('type:sbt')
+  if (!phone) {
+    await expect(page).toHaveURL(/\/annotations\/sbt\.northwind\/history\?.*q=type(%3A|:)sbt/)
+    await expect(page.getByRole('region', { name: 'History' })).toBeVisible()
+
+    // Selecting the open section again starts over.
+    await navigate('Annotations')
+    await expect(page).toHaveURL(/\/acme\/billing\/default\/annotations$/)
+    await expect(page.getByRole('textbox', { name: 'Filter annotations' })).toHaveValue('')
+  }
+})

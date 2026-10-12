@@ -21,6 +21,8 @@ const virtualizer = useVirtualizer(
   })),
 )
 const items = computed(() => virtualizer.value.getVirtualItems())
+
+defineExpose({ scrollElement: () => scroller.value ?? undefined })
 </script>
 
 <template>
