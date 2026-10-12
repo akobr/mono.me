@@ -4,7 +4,7 @@ This document describes the concept and implementation of the data binding syste
 
 ## Overview
 
-The data binding system lets configuration values, stored as JSON, reference external data such as Azure Key Vault, compute values with string interpolation and math, and evaluate an object as a JSON Logic rule or a JSON-e template. Secrets and environment-specific values can live in a source and be filled in on the resolved read.
+The data binding system lets configuration values, stored as JSON, reference external data such as the native [key/value pairs](key-values.md) or Azure Key Vault, compute values with string interpolation and math, and evaluate an object as a JSON Logic rule or a JSON-e template. Secrets and environment-specific values can live in a source and be filled in on the resolved read.
 
 Resolution runs on the resolved read (`GetResolvedConfigurationAsync` and the with-secrets / without-secrets variants). Writes, `GetRawConfigurationAsync`, the hierarchy view, and version content keep the stored JSON, including any object-binding envelope.
 
@@ -12,7 +12,7 @@ The system is split into five binding projects, plus built-in functions contribu
 - **Binding.Abstractions**: Core interfaces and data structures (`IBindingExecutor`, `IConfigurationBindingResolver`, `IBindingRegistry`, `IBindingSource`, `IBindingFunction`, `BindingScope`).
 - **Binding.Language**: The `@` string interpreter (tokenizer, parser, evaluator), the `IBindingExecutor` entry point, the `JsonQuery` structured-query helper, and the built-in `@config` function.
 - **Binding.Object**: The object-binding walker. An envelope whose `$binding` is `jlogic` or `jsone` is evaluated with JSON Logic or JSON-e.
-- **Binding.Core**: Dependency-injection registration and options for wiring up sources, functions, and the object-binding resolver.
+- **Binding.Core**: Dependency-injection registration and options for wiring up sources, functions, and the object-binding resolver, plus `KeyValueBindingSource`, the native key/value store as the `default`, `public` and `secret` sources.
 - **Binding.Azure.KeyVault**: A concrete `IBindingSource` backed by Azure Key Vault.
 - **Backend.Core**: The built-in `@annotation` function on top of `IAnnotationService`.
 
@@ -23,16 +23,17 @@ The system is split into five binding projects, plus built-in functions contribu
 Binding is triggered whenever a string value starts with the `@` character. The whole string is parsed as a single binding expression. Five forms are supported:
 
 1.  **Path (default source)**: `@path.to.value`
-    - Resolves `path.to.value` against the source registered with the `"default"` key.
+    - Resolves `path.to.value` against the source registered with the `"default"` key. That is the native [key/value store](key-values.md) of the configuration's own organization, project and view: `@db.host` is the pair `db.host`. A public pair always binds; a secret binds only when the caller may receive secrets, and stays as stored otherwise.
     - Example: `@database.connectionString`
 2.  **Sourced path**: `@(path.to.value, source)`
-    - Resolves the path against the source registered under the given name.
+    - Resolves the path against the source registered under the given name. `public` and `secret` are the native store limited to one kind: `@(db.host, public)` declines a secret, `@(db.password, secret)` declines a public pair.
     - Example: `@(db.password, primaryVault)`
     - The path and the source name are identifiers. A hyphen is not an identifier character, so `@(db-password, primary-vault)` does not parse. `KeyVaultBindingSource` turns each dot in the path into `--` when it asks Key Vault for the secret (`db.password` becomes `db--password`).
 3.  **Function call**: `@name(arg1, arg2, ...)`
     - Invokes the `IBindingFunction` registered under `name`. Each argument is itself a path, a string literal (`"..."`), or a nested `@...` statement.
     - Example: `@myFunction(some.path, "literal", @another.path)`
     - **Quoting matters**: a bare identifier/path argument (e.g. `some.path`) is resolved through the default source *before* the function ever runs, exactly like a top-level `@some.path` statement. If an argument is meant to be literal text for the function itself to interpret (as with `@config`/`@annotation` below), it **must** be a quoted string literal, or it will be treated as an unrelated configuration lookup instead.
+    - **Source call form**: when `name` is a registered source and not a function, and the call has exactly one bare path argument, `@name(path)` means `@(path, name)`. The path is not resolved first. `@public(db.host)`, `@secret(db.password)` and `@primaryVault(db.password)` are source calls. A name registered as both a source and a function fails the startup, so the form is never ambiguous.
 4.  **Interpolation**: `@[ literal text @statement more text ]`
     - Concatenates literal text with the stringified results of one or more nested statements. Use `\@`, `\]`, and `\\` to escape those characters within the literal text.
     - Example: `@[https://@host.value:@port.value/api]`
@@ -137,7 +138,7 @@ Defines the fundamental building blocks:
 - `IBindingExecutor`: Executes the `@` string language on a `JProperty`/`JValue`.
 - `IConfigurationBindingResolver`: Walks a configuration `JObject` and resolves `@` strings and object-binding envelopes in place.
 - `IBindingRegistry`: Registers named `IBindingSource`s and `IBindingFunction`s.
-- `IBindingSource`: Resolves a `BindingRequest` (a path plus `IncludeSecrets`) to a `BindingValue`.
+- `IBindingSource`: Resolves a `BindingRequest` (a path, `IncludeSecrets`, and the `Context` of the resolution pass, e.g. the configuration being resolved) to a `BindingValue`.
 - `IBindingFunction`: Resolves a `BindingFunctionRequest` (a function name plus already-evaluated `BindingValue` arguments) to a `BindingValue`.
 - `BindingValue`: A thin wrapper around a `Newtonsoft.Json.Linq.JToken`.
 - `BindingException`: Base exception type for binding failures.
@@ -170,11 +171,13 @@ Contains dependency-injection registration:
 - `EntryPoint.AddConfigurationBindings`: Registers `BindingExecutor` as `IBindingExecutor`/`IBindingRegistry`, registers `ConfigurationBindingResolver` as `IConfigurationBindingResolver` over that same executor, and applies `BindingsOptions`.
 - `BindingsOptions` / `BindingsOptionsExtensions`: Fluent API for registering sources (keyed, defaulting to `"default"`) and functions (by name) during startup. `BindingsOptions.ObjectBindingLimits` sets the object-binding evaluation limits (defaults in "Evaluation limits" above).
 
+`EntryPoint.AddKeyValueBindings` registers `KeyValueBindingSource` three times: as `default` (public pairs and secrets), `public` and `secret`. Call it after the other source registrations, so the native store owns those names. The source reads the organization, project and view from the `ConfigurationBindingContext` in `BindingRequest.Context` and declines outside a configuration read. Each key is looked up at most once per resolved read; the memo lives with the read's context, so a changed pair takes effect on the next read. A key-encryption key that is unavailable fails the read (`503`) instead of declining, because a silently unbound secret would look like a configuration error.
+
 ### Binding.Azure.KeyVault
 
 Provides integration with Azure Key Vault:
 - `KeyVaultBindingSource`: Implements `IBindingSource`. Declines (`null`) unless `IncludeSecrets` is set, and transforms configuration paths (using dots) to Key Vault secret names (using double dashes, e.g., `db.password` becomes `db--password`).
-- `EntryPoint`: Provides the `AddAzureKeyVaultBindings` extension method to configure multiple Key Vaults and register a `KeyVaultBindingSource` per vault.
+- `EntryPoint`: Provides the `AddAzureKeyVaultBindings` extension method to configure multiple Key Vaults and register a `KeyVaultBindingSource` per vault. A vault entry named `default`, `public` or `secret` gets a `SecretClient` but no binding source, because the native store owns those names; give such a vault another entry name to read it as `@(db.password, shared)`.
 
 ## Built-in Functions
 
@@ -235,6 +238,9 @@ services.AddConfigurationBindings(options =>
 
 // Register Azure Key Vault bindings (one source per configured vault)
 services.AddAzureKeyVaultBindings(configuration);
+
+// Register the native key/value store as the default, public and secret sources (last, so it owns the names)
+services.AddKeyValueBindings();
 ```
 
 ### Configuration Example
@@ -242,15 +248,18 @@ services.AddAzureKeyVaultBindings(configuration);
 ```json
 {
   "ConnectionStrings": {
-    "Default": "@sql-connection-string"
+    "Default": "@sql.connectionString"
   },
   "ThirdPartyApi": {
-    "ApiKey": "@(prod.apiKey, securityVault)",
+    "ApiKey": "@secret(thirdParty.apiKey)",
+    "LegacyKey": "@(prod.apiKey, securityVault)",
     "BaseUrl": "@[https://@host.value:@port.value/api]",
     "TimeoutMs": "@{@baseTimeout.value * 2}"
   }
 }
 ```
+
+`sql.connectionString`, `thirdParty.apiKey`, `host.value`, `port.value` and `baseTimeout.value` are key/value pairs of the configuration's view; `prod.apiKey` is the secret `prod--apiKey` of the vault registered as `securityVault`.
 
 ### Dependency Injection
 

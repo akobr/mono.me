@@ -6,6 +6,8 @@ using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Json;
+using _42.Platform.Storyteller.KeyValues;
+using _42.Platform.Storyteller.KeyValues.Protection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -117,6 +119,11 @@ public static class EntryPoint
         services.AddSingleton<IConfigurationSchemaService, CosmosConfigurationSchemaService>();
         services.AddSingleton<IConfigurationTemplateService, CosmosConfigurationTemplateService>();
         services.AddSingleton<IViewService, CosmosViewService>();
+
+        // Key/value pairs: the Key Vault providers of the protection levels are added by the deployment.
+        services.Configure<KeyValueOptions>(configuration.GetSection(KeyValueOptions.SectionName));
+        services.TryAddSingleton<IValueProtector, EnvelopeValueProtector>();
+        services.AddSingleton<IKeyValueService, CosmosKeyValueService>();
 
         // Invitations: the identity provider may replace the sender (AuthKit sends the email through WorkOS).
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));

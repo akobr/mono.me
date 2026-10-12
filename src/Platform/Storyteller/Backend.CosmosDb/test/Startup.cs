@@ -6,10 +6,13 @@ using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.DbCreator.Logic;
+using _42.Platform.Storyteller.KeyValues;
+using _42.Platform.Storyteller.KeyValues.Protection;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Testcontainers.CosmosDb;
@@ -105,7 +108,10 @@ public class Startup : IAsyncLifetime, ITestContext
 
     private void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
-        services.AddLogging(builder => builder.AddConsole());
+        // the key/value service logs the request charge of every Cosmos operation at Debug
+        services.AddLogging(builder => builder
+            .AddConsole()
+            .AddFilter("_42.Platform.Storyteller.KeyValues", LogLevel.Debug));
         services.AddCosmosDbAnnotations(configuration);
         services.AddSingleton<CoreDbStructureBuilder>();
 
@@ -118,5 +124,13 @@ public class Startup : IAsyncLifetime, ITestContext
             .AddFunction<ConfigBindingFunction>("config")
             .AddFunction<AnnotationBindingFunction>("annotation")
             .AddSource<DecliningSecretSource>(DecliningSecretSource.VaultKey));
+
+        // key/value pairs: an in-memory key-encryption provider, and a counting decorator for the binding tests
+        services.AddSingleton<FakeKeyEncryptionProvider>();
+        services.AddSingleton<IKeyEncryptionProvider>(provider => provider.GetRequiredService<FakeKeyEncryptionProvider>());
+        services.AddSingleton<CosmosKeyValueService>();
+        services.AddSingleton<CountingKeyValueService>();
+        services.Replace(ServiceDescriptor.Singleton<IKeyValueService>(provider => provider.GetRequiredService<CountingKeyValueService>()));
+        services.AddKeyValueBindings();
     }
 }

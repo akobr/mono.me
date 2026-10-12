@@ -14,13 +14,16 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Polly" />
     <PackageReference Include="Testcontainers.CosmosDb" />
+    <PackageReference Include="Testcontainers.LowkeyVault" />
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Binding.Azure.KeyVault\src\Binding.Azure.KeyVault.csproj" />
     <ProjectReference Include="..\..\Binding.Core\src\Binding.Core.csproj" />
     <ProjectReference Include="..\..\DbCreator\src\DbCreator.csproj" />
+    <ProjectReference Include="..\..\KeyValues.Azure.KeyVault\src\KeyValues.Azure.KeyVault.csproj" />
     <ProjectReference Include="..\src\Backend.CosmosDb.csproj" />
   </ItemGroup>
 

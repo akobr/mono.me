@@ -90,7 +90,14 @@ public class Program
             .UseEnvironment(Environments.Production)
 #endif
             .UseCommandLineApplication<InitDbCommand>(args, ConfigureConsoleApplication)
-            .UseStartup<Startup>();
+            .UseStartup<Startup>()
+            // the Cosmos registration brings services of the API (certificate renewal) whose dependencies this tool
+            // does not register; the tool resolves only the container factory and the structure builder
+            .UseDefaultServiceProvider(options =>
+            {
+                options.ValidateOnBuild = false;
+                options.ValidateScopes = false;
+            });
     }
 
     private static void ConfigureConsoleApplication(CommandLineApplication<InitDbCommand> application)

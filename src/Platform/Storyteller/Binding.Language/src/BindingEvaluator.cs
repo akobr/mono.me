@@ -125,7 +125,7 @@ public sealed class BindingEvaluator
             return null;
         }
 
-        var request = new BindingRequest { Path = path, IncludeSecrets = _includeSecrets };
+        var request = new BindingRequest { Path = path, IncludeSecrets = _includeSecrets, Context = _scope?.Context };
         var value = await source.ResolveAsync(request);
         return value?.Token;
     }
@@ -134,6 +134,14 @@ public sealed class BindingEvaluator
     {
         if (!_functions.TryGetValue(function.Name, out var binding))
         {
+            // the source call form: @name(path) is @(path, name) when name is a source and not a function
+            if (_sources.ContainsKey(function.Name)
+                && function.Arguments.Count == 1
+                && function.Arguments[0] is PathNode sourcePath)
+            {
+                return await ResolveSourceAsync(function.Name, sourcePath.Segments);
+            }
+
             return null;
         }
 

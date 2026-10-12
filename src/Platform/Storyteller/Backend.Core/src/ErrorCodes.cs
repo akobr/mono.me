@@ -29,4 +29,18 @@ public static class ErrorCodes
     public const string InvalidKey = "InvalidKey";
     public const string AnnotationDeleted = "AnnotationDeleted";
     public const string AnnotationNotDeleted = "AnnotationNotDeleted";
+
+    public const string ValueTooLarge = "ValueTooLarge";
+    public const string ProtectionRequired = "ProtectionRequired";
+    public const string ImportInvalid = "ImportInvalid";
+    public const string SecretValueMissing = "SecretValueMissing";
+    public const string NotSupportedForProtection = "NotSupportedForProtection";
+    public const string ReprotectNotPossible = "ReprotectNotPossible";
+    public const string KeyValueNotFound = "KeyValueNotFound";
+    public const string KeyValueBusy = "KeyValueBusy";
+    public const string KeyValueVersionMismatch = "KeyValueVersionMismatch";
+    public const string KeyValueIntegrity = "KeyValueIntegrity";
+    public const string ProtectionNotAllowed = "ProtectionNotAllowed";
+    public const string ProtectionNotConfigured = "ProtectionNotConfigured";
+    public const string KeyEncryptionUnavailable = "KeyEncryptionUnavailable";
 }
