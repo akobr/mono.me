@@ -23,6 +23,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ open: [key: string, id: string]; toggle: [id: string] }>()
 const rowSelection = defineModel<RowSelectionState>('rowSelection', { default: () => ({}) })
+const sorting = defineModel<SortingState>('sorting', { default: () => [] })
 
 // The model is keyed by annotation key and UTable by row id, so every copy of a selected annotation is selected.
 const tableSelection = computed<RowSelectionState>({
@@ -35,7 +36,6 @@ const gridPreferences = preferences.grid('annotations')
 const now = useNow({ interval: 60_000 })
 const table = useTemplateRef<{ $el: HTMLElement; tableRef: HTMLTableElement | null }>('table')
 
-const sorting = ref<SortingState>([])
 const columnVisibility = ref<VisibilityState>(
   gridPreferences.columnVisibility ?? Object.fromEntries(defaultHiddenColumns.map((id) => [id, false])),
 )
@@ -97,7 +97,12 @@ watchEffect(() => {
   }
 })
 
-defineExpose({ scrollToId, columnVisibility, hideableColumns })
+defineExpose({
+  scrollToId,
+  columnVisibility,
+  hideableColumns,
+  scrollElement: () => table.value?.$el as HTMLElement | undefined,
+})
 </script>
 
 <template>

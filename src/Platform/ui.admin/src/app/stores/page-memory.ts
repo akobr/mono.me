@@ -14,10 +14,13 @@ export const isRememberedSection = (value: string): value is RememberedSection =
   (rememberedSections as readonly string[]).includes(value)
 
 export interface AnnotationsMemory {
+  /** Row ids: in the tree, an annotation with several parents has a row (and an expansion) per path. */
   expanded: Set<string>
+  /** By annotation key, so every copy of a selected annotation stays selected. */
   selection: RowSelectionState
   sorting: SortingState
-  activeKey?: string
+  /** Row id of the keyboard cursor. */
+  activeId?: string
   scrollTop: number
 }
 

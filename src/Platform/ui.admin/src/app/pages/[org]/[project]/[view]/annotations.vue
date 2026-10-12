@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import { computed, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useEventListener, useMediaQuery } from '@vueuse/core'
-import type { RowSelectionState } from '@tanstack/vue-table'
+import type { RowSelectionState, SortingState } from '@tanstack/vue-table'
 import type { DropdownMenuItem } from '@nuxt/ui'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
@@ -10,7 +10,9 @@ import { columnLabels } from '@/components/annotations/grid/annotation-columns'
 import { expandableIds, projectTree, type TreeNode } from '@/utils/tree-projection'
 
 // Annotation grid or tree. The detail is a nested route (<RouterView>), so the list keeps its scroll position,
-// selection and filter while the detail changes (spec section 5).
+// selection and filter while the detail changes (spec section 5). What the URL does not hold (tree expansion,
+// selection, sorting, keyboard cursor, scroll position) lives in the page memory of the view, so the page comes
+// back as it was left.
 const route = useRoute()
 const router = useRouter()
 const catalog = useCatalogStore()
@@ -24,21 +26,37 @@ const grid = useTemplateRef<{
   scrollToId: (id: string) => void
   columnVisibility: Record<string, boolean>
   hideableColumns: () => { id?: string }[]
+  scrollElement: () => HTMLElement | undefined
 }>('grid')
-const rowSelection = ref<RowSelectionState>({})
-// Row ids: in the tree, an annotation with several parents has a row (and an expansion) per path.
-const expanded = ref(new Set<string>())
-const activeId = ref<string>()
+const list = useTemplateRef<{ scrollElement: () => HTMLElement | undefined }>('list')
+const memory = usePageMemory('annotations')
+// The selection is keyed by annotation key; the expansion and the cursor by row id, since in the tree an annotation
+// with several parents has a row (and an expansion) per path.
+const rowSelection = computed<RowSelectionState>({
+  get: () => memory.value.selection,
+  set: (value) => (memory.value.selection = value),
+})
+const expanded = computed<Set<string>>({
+  get: () => memory.value.expanded,
+  set: (value) => (memory.value.expanded = value),
+})
+const sorting = computed<SortingState>({
+  get: () => memory.value.sorting,
+  set: (value) => (memory.value.sorting = value),
+})
+const activeId = computed<string | undefined>({
+  get: () => memory.value.activeId,
+  set: (value) => (memory.value.activeId = value),
+})
+const scrollTop = computed({
+  get: () => memory.value.scrollTop,
+  set: (value: number) => (memory.value.scrollTop = value),
+})
 const { open: creating } = useAnnotationCreate()
 
 watch(
   () => context.scope,
-  (scope) => {
-    if (scope) {
-      void catalog.load(scope)
-      rowSelection.value = {}
-    }
-  },
+  (scope) => scope && void catalog.load(scope),
   { immediate: true },
 )
 
@@ -84,7 +102,16 @@ const rows = computed<TreeNode[]>(() => {
   return flat
 })
 
-const selectedKeys = computed(() => Object.keys(rowSelection.value).filter((key) => rowSelection.value[key]))
+// A remembered selection may name annotations deleted meanwhile; those never reach a bulk action.
+const selectedKeys = computed(() =>
+  Object.keys(rowSelection.value).filter((key) => rowSelection.value[key] && catalog.byKey.has(key)),
+)
+
+useScrollMemory(
+  () => (desktop.value ? grid.value?.scrollElement() : list.value?.scrollElement()),
+  scrollTop,
+  () => rows.value.length > 0,
+)
 
 function toggle(id: string) {
   const next = new Set(expanded.value)
@@ -271,6 +298,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
         v-else-if="desktop"
         ref="grid"
         v-model:row-selection="rowSelection"
+        v-model:sorting="sorting"
         :rows="rows"
         :tree="filter.mode.value === 'tree'"
         :selected-key="selectedKey"
@@ -281,7 +309,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
         @open="open"
         @toggle="toggle"
       />
-      <AnnotationList v-else :rows="rows" :selected-key="selectedKey" class="min-h-0 flex-1" @open="open" />
+      <AnnotationList v-else ref="list" :rows="rows" :selected-key="selectedKey" class="min-h-0 flex-1" @open="open" />
 
       <p class="sr-only" aria-live="polite">{{ activeLabel }}</p>
       <AnnotationCreateDialog v-if="canEdit" v-model:open="creating" @created="open" />

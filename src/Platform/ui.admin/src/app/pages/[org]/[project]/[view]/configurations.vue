@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, watch } from 'vue'
+import { computed, h, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
@@ -18,7 +18,7 @@ interface Row {
 }
 
 // Configurations of the view (companion spec E6) with the same filter language as the annotations; the detail
-// is a nested route, like the annotation grid.
+// is a nested route, like the annotation grid. The scroll position is kept in the page memory of the view.
 const route = useRoute()
 const router = useRouter()
 const catalog = useCatalogStore()
@@ -26,6 +26,9 @@ const context = useContextStore()
 const filter = useAnnotationFilter()
 const desktop = useMediaQuery('(min-width: 768px)')
 const detail = useDetailPanel()
+const memory = usePageMemory('configurations')
+const table = useTemplateRef<{ $el: HTMLElement }>('table')
+const list = useTemplateRef<HTMLElement>('list')
 
 watch(
   () => context.scope,
@@ -54,6 +57,15 @@ const rows = computed<Row[]>(() => {
     })
     .toSorted((a, b) => a.key.localeCompare(b.key))
 })
+
+useScrollMemory(
+  () => (desktop.value ? table.value?.$el : list.value),
+  computed({
+    get: () => memory.value.scrollTop,
+    set: (value: number) => (memory.value.scrollTop = value),
+  }),
+  () => rows.value.length > 0,
+)
 
 const selectedKey = computed(() => (route.params as { key?: string }).key)
 const base = computed(() => `/${context.org}/${context.project}/${context.view}/configurations`)
@@ -129,6 +141,7 @@ const rowClass = (row: { original: Row }) =>
       />
       <UTable
         v-else-if="desktop"
+        ref="table"
         :data="rows"
         :columns="columns"
         :get-row-id="(row: Row) => row.key"
@@ -139,7 +152,7 @@ const rowClass = (row: { original: Row }) =>
         :ui="{ td: 'py-2 text-sm', th: 'py-2 text-xs', tr: 'cursor-pointer' }"
         :on-select="(_event: Event, row: { original: Row }) => open(row.original.key)"
       />
-      <ul v-else class="divide-y divide-default overflow-auto">
+      <ul v-else ref="list" class="divide-y divide-default overflow-auto">
         <li v-for="row in rows" :key="row.key">
           <button type="button" class="flex w-full flex-col gap-1 px-4 py-3 text-start" @click="open(row.key)">
             <span class="flex items-center gap-2">
