@@ -3,15 +3,43 @@ using System.Security.Claims;
 using System.Text;
 
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.KeyValues;
+using _42.Platform.Storyteller.KeyValues.Policy;
 
+using Microsoft.Azure.Functions.Worker;
 using Microsoft.IdentityModel.Tokens;
 
 using HttpRequestData = Microsoft.Azure.Functions.Worker.Http.HttpRequestData;
 
 namespace _42.Platform.Storyteller.Api.Security;
 
+// The outcome of GetSecretRightsAsync: the caller, and whether secrets were withheld because the machine has no mTLS.
+public sealed record SecretRights(KeyValueCaller Caller, bool IsWithheldByMtls)
+{
+    public const string WithheldHeader = "X-2S-Secrets-Withheld";
+
+    public const string WithheldByMtls = "mtls-required";
+
+    public bool CanReadSecrets => Caller.CanReadSecrets;
+
+    // Makes the caller the ambient one of the request, for the paths without a caller parameter (binding reads).
+    // Called by the handler itself: an AsyncLocal set inside an awaited method would not reach the handler's later calls.
+    public SecretRights AsAmbient()
+    {
+        KeyValueCallerContext.Current = Caller;
+        return this;
+    }
+}
+
 public static class HttpRequestDataExtensions
 {
+    // Debug builds skip the scope and role checks (DEV_AUTH); tests of those checks look at this.
+#if DEV_AUTH
+    public const bool IsDevelopmentAuthentication = true;
+#else
+    public const bool IsDevelopmentAuthentication = false;
+#endif
+
     private const string NameClaimType = "name";
 
     private static readonly string[] UniqueNameClaimTypes = ["preferred_username", "unique_name", ClaimTypes.Upn];
@@ -109,6 +137,62 @@ public static class HttpRequestDataExtensions
             Name = string.IsNullOrEmpty(name) ? (string.IsNullOrEmpty(userName) ? null : userName) : name,
         };
 #endif
+    }
+
+    // Who the caller is for key/value secrets, and whether it may receive secret values: a user needs
+    // ContributorWithSecrets (or the Configuration.Secrets scope), a machine needs the scope and, when the project
+    // says so, an mTLS certificate. Handlers call AsAmbient() on the result before they resolve bindings.
+    public static async Task<SecretRights> GetSecretRightsAsync(
+        this HttpRequestData @this,
+        IAccessService accessService,
+        IKeyValuePolicyStore policies,
+        string organization,
+        string project)
+    {
+        var author = @this.GetAuthor();
+        var correlationId = @this.FunctionContext.InvocationId;
+        var hasSecretScope = @this.TryCheckScope(Scopes.Configuration.Secrets);
+
+        if (@this.TryGetApplicationIdentity(out _))
+        {
+            var channel = @this.FunctionContext.Items.ContainsKey(FunctionContextItemKeys.PresentingCertificateThumbprint)
+                ? KeyValueChannel.MachineMtls
+                : KeyValueChannel.MachineToken;
+            var policy = await policies.GetAsync(organization, project);
+            var withheld = hasSecretScope && policy.RequireMtlsForSecretDelivery && channel != KeyValueChannel.MachineMtls;
+            var allowed = hasSecretScope && !withheld;
+            var machine = new KeyValueCaller(author, allowed, allowed, channel) { CorrelationId = correlationId };
+            return new SecretRights(machine, withheld);
+        }
+
+        var canUseSecrets = hasSecretScope;
+
+        if (!canUseSecrets && @this.TryCheckScope(Scopes.User.Impersonation))
+        {
+            var accountId = @this.GetIdentityUniqueId();
+            var accessRole = await accessService.GetAccountRoleAsync(accountId, $"{organization}.{project}");
+            canUseSecrets = accessRole >= AccountRole.ContributorWithSecrets;
+        }
+
+        var user = new KeyValueCaller(author, canUseSecrets, canUseSecrets, KeyValueChannel.User) { CorrelationId = correlationId };
+        return new SecretRights(user, IsWithheldByMtls: false);
+    }
+
+    // Response headers through the ASP.NET Core integration; a test context without it is left alone.
+    public static void SetResponseHeader(this HttpRequestData @this, string name, string value)
+    {
+        var httpContext = @this.FunctionContext.GetHttpContext();
+
+        if (httpContext is not null)
+        {
+            httpContext.Response.Headers[name] = value;
+        }
+    }
+
+    // Responses that carry a secret value are never cached.
+    public static void MarkNoStore(this HttpRequestData @this)
+    {
+        @this.SetResponseHeader("Cache-Control", "no-store");
     }
 
     public static async Task CheckAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole = AccountRole.Reader)

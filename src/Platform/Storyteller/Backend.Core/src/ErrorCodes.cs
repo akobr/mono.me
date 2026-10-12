@@ -42,5 +42,18 @@ public static class ErrorCodes
     public const string KeyValueIntegrity = "KeyValueIntegrity";
     public const string ProtectionNotAllowed = "ProtectionNotAllowed";
     public const string ProtectionNotConfigured = "ProtectionNotConfigured";
+    public const string ProtectionInUse = "ProtectionInUse";
     public const string KeyEncryptionUnavailable = "KeyEncryptionUnavailable";
+    public const string CustomerKeyUnavailable = "CustomerKeyUnavailable";
+    public const string CustomerKeyInvalid = "CustomerKeyInvalid";
+    public const string ByokNotConfigured = "ByokNotConfigured";
+    public const string MtlsRequired = "MtlsRequired";
+    public const string HttpsRequired = "HttpsRequired";
+    public const string InvalidClientEncryptedValue = "InvalidClientEncryptedValue";
+    public const string UnknownRecipient = "UnknownRecipient";
+    public const string RecipientExists = "RecipientExists";
+    public const string RecipientNotFound = "RecipientNotFound";
+    public const string RecipientInvalid = "RecipientInvalid";
+    public const string InvalidSecretReference = "InvalidSecretReference";
+    public const string PolicyVersionMismatch = "PolicyVersionMismatch";
 }

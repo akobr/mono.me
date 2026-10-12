@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
@@ -125,9 +126,13 @@ public class Startup : IAsyncLifetime, ITestContext
             .AddFunction<AnnotationBindingFunction>("annotation")
             .AddSource<DecliningSecretSource>(DecliningSecretSource.VaultKey));
 
-        // key/value pairs: an in-memory key-encryption provider, and a counting decorator for the binding tests
-        services.AddSingleton<FakeKeyEncryptionProvider>();
-        services.AddSingleton<IKeyEncryptionProvider>(provider => provider.GetRequiredService<FakeKeyEncryptionProvider>());
+        // key/value pairs: in-memory key-encryption providers for every level, and a counting decorator for the binding tests
+        var standardProvider = new FakeKeyEncryptionProvider();
+        services.AddSingleton(standardProvider);
+        services.AddSingleton<IKeyEncryptionProvider>(standardProvider);
+        services.AddSingleton<IKeyEncryptionProvider>(new FakeKeyEncryptionProvider(KeyValueProtection.Hsm));
+        services.AddSingleton<FakeCustomerKeyProvider>();
+        services.AddSingleton<IKeyEncryptionProvider>(provider => provider.GetRequiredService<FakeCustomerKeyProvider>());
         services.AddSingleton<CosmosKeyValueService>();
         services.AddSingleton<CountingKeyValueService>();
         services.Replace(ServiceDescriptor.Singleton<IKeyValueService>(provider => provider.GetRequiredService<CountingKeyValueService>()));

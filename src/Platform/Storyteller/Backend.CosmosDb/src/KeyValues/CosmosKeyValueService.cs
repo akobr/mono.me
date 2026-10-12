@@ -8,7 +8,10 @@ using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.KeyValues;
 using _42.Platform.Storyteller.Json;
+using _42.Platform.Storyteller.KeyValues.Audit;
+using _42.Platform.Storyteller.KeyValues.Policy;
 using _42.Platform.Storyteller.KeyValues.Protection;
+using _42.Platform.Storyteller.KeyValues.Usage;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Logging;
@@ -30,12 +33,11 @@ public class CosmosKeyValueService : IKeyValueService
     private const int MaxBulkPrefixKeys = 1000;
     private const int MaxParallelProtections = 8;
 
-    // Phase 1a: the project policy of Phase 1b replaces this list.
-    private static readonly IReadOnlySet<KeyValueProtection> AllowedProtections =
-        new HashSet<KeyValueProtection> { KeyValueProtection.Public, KeyValueProtection.Standard };
-
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly IValueProtector _protector;
+    private readonly IKeyValuePolicyStore _policies;
+    private readonly IKeyValueAuditLog? _audit;
+    private readonly IKeyValueUsageRecorder? _usage;
     private readonly KeyValueOptions _options;
     private readonly JsonSerializerSettings _serializerOptions;
     private readonly JsonContentDiffer _differ;
@@ -45,14 +47,20 @@ public class CosmosKeyValueService : IKeyValueService
     public CosmosKeyValueService(
         IContainerRepositoryProvider repositoryProvider,
         IValueProtector protector,
+        IKeyValuePolicyStore policies,
         IOptions<KeyValueOptions> options,
         IJsonSerializationSettingsProvider jsonSettingsProvider,
         IOptions<JsonSerializerSettings> serializerOptions,
+        IKeyValueAuditLog? audit = null,
+        IKeyValueUsageRecorder? usage = null,
         TimeProvider? timeProvider = null,
         ILogger<CosmosKeyValueService>? logger = null)
     {
         _repositoryProvider = repositoryProvider;
         _protector = protector;
+        _policies = policies;
+        _audit = audit;
+        _usage = usage;
         _options = options.Value;
         _serializerOptions = serializerOptions.Value;
         _differ = new JsonContentDiffer(jsonSettingsProvider);
@@ -78,6 +86,7 @@ public class CosmosKeyValueService : IKeyValueService
 
         var page = await iterator.ReadNextAsync();
         LogCharge("list", place, page.RequestCharge);
+        _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.ReadsApi);
         var now = _timeProvider.GetUtcNow();
         var items = page.Select(row => row.ToSummary(now)).ToList();
 
@@ -103,6 +112,13 @@ public class CosmosKeyValueService : IKeyValueService
         }
 
         var value = await ResolveValueAsync(place, entity, options.Reveal, caller);
+        _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.ReadsApi);
+
+        if (value is not null && entity.Content.Protection.IsSecret())
+        {
+            await RecordRevealAsync(place, caller, entity.Key, entity.Version, entity.Content.Protection, KeyValueAuditOperation.Reveal);
+        }
+
         return entity.ToKeyValue(value, _timeProvider.GetUtcNow());
     }
 
@@ -114,6 +130,7 @@ public class CosmosKeyValueService : IKeyValueService
         KeyValueRules.EnsureContentType(write.ContentType);
         var place = GetPlace(organization, project, view);
         var normalizedKey = KeyValueRules.Normalize(key);
+        var policy = await _policies.GetAsync(organization, project);
 
         for (var attempt = 0; attempt < MaxRetries; attempt++)
         {
@@ -124,8 +141,9 @@ public class CosmosKeyValueService : IKeyValueService
             if (existing is null)
             {
                 var protection = write.Protection ?? throw KeyValueErrors.ProtectionRequired(key);
-                EnsureProtectionAllowed(protection);
+                EnsureProtectionAllowed(policy, protection);
                 KeyValueRules.EnsureValue(write.Value, protection);
+                EnsureReference(protection, write.Value, write.ContentType);
 
                 if (protection.IsSecret() && !caller.CanWriteSecrets)
                 {
@@ -159,6 +177,7 @@ public class CosmosKeyValueService : IKeyValueService
                 {
                     var response = await place.Container.CreateItemAsync(created, place.PartitionKey);
                     LogCharge("create", place, response.RequestCharge);
+                    await RecordWriteAsync(place, caller, created, KeyValueAuditOperation.Create, previous: null);
                     return created.ToKeyValue(write.Value, now);
                 }
                 catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.Conflict)
@@ -169,8 +188,9 @@ public class CosmosKeyValueService : IKeyValueService
             }
 
             var targetProtection = write.Protection ?? existing.Content.Protection;
-            EnsureProtectionAllowed(targetProtection);
+            EnsureProtectionAllowed(policy, targetProtection);
             KeyValueRules.EnsureValue(write.Value, targetProtection);
+            EnsureReference(targetProtection, write.Value, write.ContentType);
             EnsureSecretWriteRights(existing, targetProtection, caller);
             EnsureExpectedVersion(existing, write.ExpectedVersion);
 
@@ -187,6 +207,7 @@ public class CosmosKeyValueService : IKeyValueService
 
             if (updated is not null)
             {
+                await RecordWriteAsync(place, caller, updated, KeyValueAuditOperation.Update, existing.Content.Protection);
                 return updated.ToKeyValue(write.Value, now);
             }
         }
@@ -217,11 +238,13 @@ public class CosmosKeyValueService : IKeyValueService
             if (options.Permanent)
             {
                 await PermanentlyDeleteAsync(place, existing, etag!);
+                await RecordWriteAsync(place, caller, existing, KeyValueAuditOperation.PermanentDelete, previous: null);
                 return true;
             }
 
             if (await TrySoftDeleteAsync(place, existing, etag!, caller.Author))
             {
+                await RecordWriteAsync(place, caller, existing, KeyValueAuditOperation.Delete, previous: null);
                 return true;
             }
         }
@@ -239,14 +262,15 @@ public class CosmosKeyValueService : IKeyValueService
         return RunBulkAsync(organization, project, view, request, caller, KeyValueState.Deleted, PurgeOneAsync);
     }
 
-    public Task<KeyValueBulkResult> ProtectAsync(string organization, string project, string view, KeyValueBulkRequest request, KeyValueCaller caller)
+    public async Task<KeyValueBulkResult> ProtectAsync(string organization, string project, string view, KeyValueBulkRequest request, KeyValueCaller caller)
     {
         ArgumentNullException.ThrowIfNull(request);
         var target = request.Protection
             ?? throw new InvalidInputException("The target protection level is required.", ErrorCodes.ProtectionRequired);
-        EnsureProtectionAllowed(target);
+        var policy = await _policies.GetAsync(organization, project);
+        EnsureProtectionAllowed(policy, target);
 
-        return RunBulkAsync(organization, project, view, request, caller, KeyValueState.Active, (place, key, bulkCaller) => ProtectOneAsync(place, key, target, bulkCaller));
+        return await RunBulkAsync(organization, project, view, request, caller, KeyValueState.Active, (place, key, bulkCaller) => ProtectOneAsync(place, key, target, bulkCaller));
     }
 
     public async Task<IReadOnlyList<KeyValueVersion>> GetVersionsAsync(string organization, string project, string view, string key)
@@ -371,6 +395,15 @@ public class CosmosKeyValueService : IKeyValueService
             }
         }));
 
+        _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.ReadsApi);
+        var revealedSecrets = entities.Count(entity => entity.Content.Protection.IsSecret() && request.IncludeSecrets);
+
+        if (revealedSecrets > 0)
+        {
+            _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.Reveals, revealedSecrets);
+            await AuditAsync(place, caller, KeyValueAuditOperation.Export, key: null, version: null, protection: null, $"{revealedSecrets} secret value(s)");
+        }
+
         return new KeyValueDocument
         {
             Items = entities.Select((entity, index) => new KeyValueDocumentItem
@@ -400,8 +433,9 @@ public class CosmosKeyValueService : IKeyValueService
         }
 
         var place = GetPlace(organization, project, view);
+        var policy = await _policies.GetAsync(organization, project);
         var normalizedPrefix = string.IsNullOrWhiteSpace(options.KeyPrefix) ? null : KeyValueRules.Normalize(options.KeyPrefix.Trim());
-        var errors = ValidateImportItems(document, options, normalizedPrefix);
+        var errors = ValidateImportItems(document, options, normalizedPrefix, policy);
         var invalidKeys = errors.Select(error => error.Key).ToHashSet(StringComparer.Ordinal);
 
         // a caller without secret rights submits no secret values, and never makes the plan decrypt existing secrets
@@ -458,6 +492,20 @@ public class CosmosKeyValueService : IKeyValueService
         }
 
         var results = await ExecuteImportAsync(place, plan, caller);
+        var written = results.Count(result => result.ErrorCode is null && result.Action is KeyValueImportAction.Create or KeyValueImportAction.Update or KeyValueImportAction.Delete);
+        _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.Writes, written);
+        await AuditAsync(
+            place,
+            caller,
+            KeyValueAuditOperation.Import,
+            key: null,
+            version: null,
+            protection: null,
+            $"{options.Mode}: {results.Count(result => result.Action == KeyValueImportAction.Create)} created, "
+            + $"{results.Count(result => result.Action == KeyValueImportAction.Update)} updated, "
+            + $"{results.Count(result => result.Action == KeyValueImportAction.Delete)} deleted, "
+            + $"{results.Count(result => result.ErrorCode is not null)} failed");
+
         return new KeyValueImportResult
         {
             IsDryRun = false,
@@ -487,6 +535,15 @@ public class CosmosKeyValueService : IKeyValueService
         }
 
         var value = await _protector.UnprotectAsync(place.Identity(entity), entity.Content);
+        _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.ReadsBinding);
+
+        if (entity.Content.Protection.IsSecret())
+        {
+            // the binding path has no caller parameter; the API set the ambient caller of the request
+            _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.Reveals);
+            _audit?.RecordBindingRead(place.Organization, place.Project, place.View, entity.Key, entity.Content.Protection, KeyValueCallerContext.Current ?? KeyValueCaller.System());
+        }
+
         return new KeyValueLookup(entity.Key, entity.Content.Protection, value, entity.Content.ContentType);
     }
 
@@ -505,11 +562,30 @@ public class CosmosKeyValueService : IKeyValueService
         return $"{GetVersionIdPrefix(normalizedKey)}{version}";
     }
 
-    private static void EnsureProtectionAllowed(KeyValueProtection protection)
+    private static void EnsureProtectionAllowed(KeyValuePolicy policy, KeyValueProtection protection)
     {
-        if (!AllowedProtections.Contains(protection))
+        if (!policy.AllowedProtections.Contains(protection))
         {
             throw KeyValueErrors.ProtectionNotAllowed(protection);
+        }
+    }
+
+    // A reference is a public pair whose value names a secret elsewhere; the shape is checked, the secret never read.
+    private static void EnsureReference(KeyValueProtection protection, string? value, string? contentType)
+    {
+        if (!KeyValueContentTypes.IsReference(contentType))
+        {
+            return;
+        }
+
+        if (protection != KeyValueProtection.Public)
+        {
+            throw new InvalidInputException("A secret reference is a public pair; the platform never resolves it.", ErrorCodes.InvalidSecretReference);
+        }
+
+        if (value is not null)
+        {
+            SecretReferences.Ensure(value, contentType!);
         }
     }
 
@@ -1031,6 +1107,7 @@ public class CosmosKeyValueService : IKeyValueService
 
             if (await TryRestoreAsync(place, existing, etag!))
             {
+                await RecordWriteAsync(place, caller, existing with { DeletedAt = null, DeletedBy = null }, KeyValueAuditOperation.Restore, previous: null);
                 return new KeyValueBulkItemResult { Key = key, Outcome = KeyValueBulkOutcome.Done, Version = existing.Version };
             }
         }
@@ -1053,6 +1130,7 @@ public class CosmosKeyValueService : IKeyValueService
         }
 
         await PermanentlyDeleteAsync(place, existing, etag!);
+        await RecordWriteAsync(place, caller, existing, KeyValueAuditOperation.Purge, previous: null);
         return new KeyValueBulkItemResult { Key = key, Outcome = KeyValueBulkOutcome.Done, Version = existing.Version };
     }
 
@@ -1096,6 +1174,7 @@ public class CosmosKeyValueService : IKeyValueService
 
             if (updated is not null)
             {
+                await RecordWriteAsync(place, caller, updated, KeyValueAuditOperation.Reprotect, existing.Content.Protection);
                 return new KeyValueBulkItemResult { Key = key, Outcome = KeyValueBulkOutcome.Done, Version = updated.Version };
             }
         }
@@ -1103,7 +1182,7 @@ public class CosmosKeyValueService : IKeyValueService
         return ToFailure(key, KeyValueErrors.Busy(place.View, key, MaxRetries));
     }
 
-    private List<KeyValueImportItemResult> ValidateImportItems(KeyValueDocument document, KeyValueImportOptions options, string? normalizedPrefix)
+    private static List<KeyValueImportItemResult> ValidateImportItems(KeyValueDocument document, KeyValueImportOptions options, string? normalizedPrefix, KeyValuePolicy policy)
     {
         var errors = new List<KeyValueImportItemResult>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -1114,11 +1193,12 @@ public class CosmosKeyValueService : IKeyValueService
             {
                 KeyValueRules.EnsureKey(item.Key);
                 KeyValueRules.EnsureContentType(item.ContentType);
-                EnsureProtectionAllowed(item.Protection);
+                EnsureProtectionAllowed(policy, item.Protection);
 
                 if (item.Value is not null)
                 {
                     KeyValueRules.EnsureValue(item.Value, item.Protection);
+                    EnsureReference(item.Protection, item.Value, item.ContentType);
                 }
                 else if (!item.Protection.IsSecret())
                 {
@@ -1422,6 +1502,48 @@ public class CosmosKeyValueService : IKeyValueService
     private void LogCharge(string operation, Place place, double requestCharge)
     {
         _logger.LogDebug("kv {Operation} in {PartitionKey}: {RequestCharge} RU", operation, place.PartitionKeyValue, requestCharge);
+    }
+
+    // Every write is metered; writes that touch a secret are audited.
+    private async Task RecordWriteAsync(Place place, KeyValueCaller caller, KeyValueEntity entity, KeyValueAuditOperation operation, KeyValueProtection? previous)
+    {
+        _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.Writes);
+
+        if (entity.Content.Protection.IsSecret() || (previous?.IsSecret() ?? false))
+        {
+            var detail = previous is not null && previous != entity.Content.Protection ? $"{previous} -> {entity.Content.Protection}" : null;
+            await AuditAsync(place, caller, operation, entity.Key, entity.Version, entity.Content.Protection, detail);
+        }
+    }
+
+    private async Task RecordRevealAsync(Place place, KeyValueCaller caller, string key, ulong version, KeyValueProtection protection, KeyValueAuditOperation operation)
+    {
+        _usage?.Add(place.Organization, place.Project, KeyValueUsageMeters.Reveals);
+        await AuditAsync(place, caller, operation, key, version, protection, detail: null);
+    }
+
+    private async Task AuditAsync(Place place, KeyValueCaller caller, KeyValueAuditOperation operation, string? key, ulong? version, KeyValueProtection? protection, string? detail)
+    {
+        if (_audit is null)
+        {
+            return;
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        await _audit.WriteAsync(place.Organization, place.Project, new KeyValueAuditEvent
+        {
+            Id = CosmosKeyValueAuditLog.NewId(now),
+            Time = now,
+            View = place.View,
+            Key = key,
+            Version = version,
+            Protection = protection,
+            Operation = operation,
+            Actor = caller.Author,
+            Channel = caller.Channel,
+            CorrelationId = caller.CorrelationId,
+            Detail = detail,
+        });
     }
 
     private sealed record Place(string Organization, string Project, string View, Container Container, string PartitionKeyValue, PartitionKey PartitionKey)

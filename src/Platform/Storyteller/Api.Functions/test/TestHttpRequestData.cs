@@ -13,10 +13,11 @@ internal sealed class TestHttpRequestData : HttpRequestData
         FunctionContext functionContext,
         IDictionary<string, string>? headers = null,
         string method = "GET",
-        string? body = null)
+        string? body = null,
+        Uri? url = null)
         : base(functionContext)
     {
-        Url = new Uri("https://localhost/api/test");
+        Url = url ?? new Uri("https://localhost/api/test");
         Method = method;
         Headers = headers is null
             ? new HttpHeadersCollection()

@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Configuring;
+using _42.Platform.Storyteller.KeyValues;
 using Microsoft.AspNetCore.Mvc;
 
 namespace _42.Platform.Storyteller.Api.ErrorHandling;
@@ -17,6 +18,11 @@ public static class ErrorResponseMapping
             NotFoundException e => (HttpStatusCode.NotFound, e.ErrorCode),
             ConflictException e => (HttpStatusCode.Conflict, e.ErrorCode),
             InvalidInputException e => (HttpStatusCode.BadRequest, e.ErrorCode),
+            KeyValueImportInvalidException e => (HttpStatusCode.BadRequest, e.ErrorCode),
+            PreconditionFailedException e => (HttpStatusCode.PreconditionFailed, e.ErrorCode),
+            FailedDependencyException e => (HttpStatusCode.FailedDependency, e.ErrorCode),
+            FeatureNotConfiguredException e => (HttpStatusCode.NotImplemented, e.ErrorCode),
+            ServiceUnavailableException e => (HttpStatusCode.ServiceUnavailable, e.ErrorCode),
             JsonPatchException { Kind: JsonPatchFailureKind.TestFailed } e => (HttpStatusCode.PreconditionFailed, e.ErrorCode),
             JsonPatchException e => (HttpStatusCode.BadRequest, e.ErrorCode),
             _ => (HttpStatusCode.InternalServerError, null),
@@ -32,6 +38,7 @@ public static class ErrorResponseMapping
         {
             ErrorCode = errorCode,
             Hint = exception.TryGetErrorHint(),
+            Details = (exception as KeyValueImportInvalidException)?.Items,
         };
         return true;
     }

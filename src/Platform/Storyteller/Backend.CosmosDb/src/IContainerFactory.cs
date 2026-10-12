@@ -13,4 +13,7 @@ public interface IContainerFactory
 
     // Applies the settings to every organization container of the database; returns their names.
     Task<IReadOnlyList<string>> EnsureOrganizationContainersAsync();
+
+    // Names of the containers of the platform database.
+    Task<IReadOnlyList<string>> GetContainerNamesAsync();
 }

@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\Abstractions.Access\src\Abstractions.Access.csproj" />
     <ProjectReference Include="..\..\Abstractions.Annotations\src\Abstractions.Annotations.csproj" />
     <ProjectReference Include="..\..\Binding.Abstractions\src\Binding.Abstractions.csproj" />
+    <ProjectReference Include="..\..\KeyValues.ClientEncryption\src\KeyValues.ClientEncryption.csproj" />
   </ItemGroup>
 
 </Project>

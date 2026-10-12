@@ -2,7 +2,7 @@
 
 Storyteller stores named values that configurations and applications share: endpoints, switches, connection strings, API keys. Every pair belongs to one organization, project and view, like configurations, schemas and templates. Public pairs are plaintext; secrets are envelope-encrypted with keys that live in Azure Key Vault. One catalog lists both kinds, and a configuration binds any of them with `@key`.
 
-The spec is [Native Key-Value Storage](specs/2026-10-11%20Native%20Key-Value%20Storage.md). Phase 1a (storage, the Standard level, lifecycle, import and export, binding) is reviewed in [Phase 1a of Native Key-Value Storage](specs/reviews/2026-10-12%20Phase%201a%20of%20Native%20Key-Value%20Storage.md). The HSM, BYOK and client-side levels, the project policy, the API, the CLI and the admin UI follow in later phases.
+The spec is [Native Key-Value Storage](specs/2026-10-11%20Native%20Key-Value%20Storage.md). Phase 1a (storage, the Standard level, lifecycle, import and export, binding) is reviewed in [Phase 1a of Native Key-Value Storage](specs/reviews/2026-10-12%20Phase%201a%20of%20Native%20Key-Value%20Storage.md), Phase 1b (the project policy, the HSM, BYOK and client-side levels, references, rotation, secret delivery, audit and usage) in [Phase 1b of Native Key-Value Storage](specs/reviews/2026-10-13%20Phase%201b%20of%20Native%20Key-Value%20Storage.md). The API, the CLI and the admin UI follow in later phases.
 
 ## Identity
 
@@ -22,17 +22,100 @@ Two content types mark a **reference**: `application/vnd.2s.secret-reference` an
 
 ### Protection levels
 
-| Level | Where the value is | Who reads it | Available |
+| Level | Where the value is | Who reads it | Server-side features |
 | --- | --- | --- | --- |
-| `Public` | Plaintext in Cosmos DB | Every reader of the project | Phase 1a |
-| `Standard` | Envelope-encrypted in Cosmos DB; the data key is wrapped by a software key of the project in a Standard vault | Callers with secret rights | Phase 1a |
-| `Hsm` | As Standard, with an HSM key (Key Vault Premium or Managed HSM) | Callers with secret rights | Phase 1b |
-| `Byok` | As Standard, with the customer's own key | Callers with secret rights, while the customer allows it | Phase 1b |
-| `Hyok` | A document the client encrypted for the project's recipients | Holders of a recipient key | Phase 1b |
+| `Public` | Plaintext in Cosmos DB | Every reader of the project | All |
+| `Standard` | Envelope-encrypted in Cosmos DB; the data key is wrapped by a software key of the project in a Standard vault | Callers with secret rights | All |
+| `Hsm` | As Standard, with an RSA-HSM key of the project in Key Vault Premium, or in the organization's own Managed HSM | Callers with secret rights | All, plus key rotation on the platform's side |
+| `Byok` | As Standard, with the customer's own key in the customer's vault and tenant | Callers with secret rights, while the customer allows it | All, plus the customer's revocation and the customer's own audit log |
+| `Hyok` | A JWE document the client encrypted for the project's recipients; the platform cannot read it | Holders of a recipient's private key | Storage, versions, listing, binding of the document. No preview, diff or server-side level change |
 
-Everything except `Public` is a secret. The level is chosen when a key is created and is required then, so a secret never becomes public because a client left the field out. An update without a level keeps the level. Until the project policy of Phase 1b exists, `Public` and `Standard` are the allowed levels; the others answer `409 ProtectionNotAllowed`.
+Everything except `Public` is a secret. The level is chosen when a key is created and is required then, so a secret never becomes public because a client left the field out. An update without a level keeps the level. The [project policy](#project-policy) decides which levels a project allows; a level it does not allow answers `409 ProtectionNotAllowed`.
 
 A write that turns a public pair into a secret or a secret into a public pair needs secret rights, because the old versions keep their old level until they expire.
+
+### Changing the level of a key
+
+`ProtectAsync` (`POST …/key-values/protect` in Phase 2) moves keys between the server-side levels `Standard`, `Hsm` and `Byok`: the current value is decrypted and written again under the target level as a **new version**. Older versions keep their level until they expire, so the history shows both. It takes a list of keys or a prefix, and each key gets its own outcome. `Public` and `Hyok` cannot be reached or left this way (`NotAllowed`, `ReprotectNotPossible`): they need a new value from the client through a normal write.
+
+## Project policy
+
+`KeyValuePolicy` lives on the project's access point (the `core` container, next to the machine authentication policy) and is cached for a minute. Without a stored policy the defaults apply: `Public` and `Standard` allowed, `Standard` the default secret level, and secrets delivered to machines only over mTLS.
+
+| Member | Meaning |
+| --- | --- |
+| `AllowedProtections` | The levels a write may use; `Public` can never be removed. Disabling a level that keys of the project still carry (active or deleted) fails with `409 ProtectionInUse` and the counts per view |
+| `DefaultSecretProtection` | A secret level the clients offer as default; it must be allowed |
+| `RequireMtlsForSecretDelivery` | Machines receive secret values only with an mTLS certificate (see [Secret delivery](#secret-delivery)) |
+| `Standard`, `Hsm.Key` | Read-only: the project's key-encryption keys, their current version, the next rotation |
+| `Hsm.Backend`, `Hsm.RotationInterval` | `KeyVaultPremium` or `ManagedHsm` (read-only), and how often the platform rotates the HSM key |
+| `Byok` | The customer's key: `KeyUri` (versionless) and `TenantId`, plus the read-only `VerifiedAt`, `CurrentKeyVersion`, `Health`, `LastCheckedAt`, `LastError` |
+| `Recipients` | The RSA public keys that client-encrypted values are made for |
+| `Rewrap` | Read-only: the re-wrap in progress after a rotation |
+| `Version` | Optimistic concurrency: an update with `ExpectedVersion` fails with `409 PolicyVersionMismatch` when it is stale |
+
+Readers see the policy; Administrators change it (`IKeyValuePolicyService`: `UpdateAsync`, `VerifyByokAsync`, `RotateAsync`, the recipient methods). Every change writes a `PolicyChange` audit event. Enabling a level has requirements:
+
+- `Hsm`: an HSM provider is configured; the project's HSM key is created and recorded, and the backend is noted.
+- `Byok`: the customer key is set and verified (`VerifiedAt`), otherwise `409 ByokNotConfigured`.
+- `Hyok`: at least one enabled recipient.
+
+### The HSM level
+
+One RSA-HSM 2048 key per project, named like the Standard key, in the Premium vault `AzureKeyVaults:{KeyValues:Protection:Hsm:VaultName}` (`premium` by default), or in the Managed HSM of the organization when `KeyValues:Protection:Hsm:OrganizationManagedHsms:{organization}` names one. Managed HSM pools are provisioned by hand (the pool, the security domain with a 3-of-5 quorum, the local roles `Managed HSM Crypto Officer` and `Managed HSM Crypto User` for the platform identity). RSA-2048 is the default because HSM RSA-3072 allows 500 operations per 10 seconds per vault, RSA-2048 2,000. Lowkey Vault has no HSM-protected keys, so emulator mode creates software keys for this level too.
+
+### The BYOK level
+
+The customer's key stays in the customer's vault and tenant. The platform reaches it as a **multi-tenant Entra application** (`KeyValues:Protection:Byok:ClientId`) whose federated credential is the Functions' **user-assigned managed identity** (`ManagedIdentityClientId`): `ClientAssertionCredential` exchanges the managed identity's token for `api://AzureADTokenExchange` for a token of the customer's tenant, so no client secret exists. Setup, as the admin UI and the CLI show it (`GetByokSetup`):
+
+1. The customer's administrator consents to the application (`https://login.microsoftonline.com/organizations/adminconsent?client_id=…`), which creates its service principal in their tenant.
+2. The customer grants that service principal **Key Vault Crypto Service Encryption User** on the key, and lets the platform reach the vault: an approved private endpoint, or a firewall rule for the platform's static egress IP.
+3. An Administrator sets `Byok.KeyUri` and `Byok.TenantId` in the policy; the key version in the URI is dropped.
+4. `VerifyByokAsync` checks that the key is enabled, RSA of at least 2048 bits, allows `wrapKey` and `unwrapKey`, and that a wrap and unwrap round trip of 32 random bytes works. It records `VerifiedAt`, `CurrentKeyVersion` and `Health`; a failed check answers `424 CustomerKeyInvalid`.
+
+When the customer disables or deletes the key, or removes the role, the vault answers 401, 403 or 404 and every BYOK read of an uncached version, write and binding of the project fails with `424 CustomerKeyUnavailable`. The daily check records `Health = Unavailable` with the error and writes a `ByokUnavailable` audit event once. Cached plaintexts keep working for at most `KeyValues:Protection:Byok:CacheDuration` (5 minutes): that is the revocation latency. The customer rotates the key; the daily check notices the new version and starts a re-wrap, and the customer must keep the old version enabled until the re-wrap is complete. Wrap and unwrap operations on the customer's key are billed by Azure to the customer. The Byok settings cannot be removed or changed while the level is allowed (`409 ProtectionInUse`).
+
+### The client-side level (HYOK)
+
+Values are encrypted before they reach the platform, for the RSA public keys registered as the project's recipients, and only the holder of a recipient's private key reads them. The format is JWE General JSON Serialization (RFC 7516): `A256GCM` content encryption, one `RSA-OAEP-256` entry per recipient with the recipient id as `kid`, and the protected header with `cty` and `2s` = `{organization}/{project}/{view}/{lower-cased key}`. The server validates a document without decrypting it: the format, `enc`, the place, and that every `kid` is an enabled recipient (`400 InvalidClientEncryptedValue`, `400 UnknownRecipient`); the recipient ids are stored for display.
+
+Recipients are RSA keys of at least 3072 bits, added as PEM or JWK, at most 20 per project, with an id of 1 to 64 letters, digits, `_` or `-` (generated when missing). The last enabled recipient cannot be disabled or removed while `Hyok` is allowed. Adding a recipient does not give it access to existing values, and removing one does not take access back: the values have to be encrypted again by a client that holds a recipient's private key.
+
+The project `KeyValues.ClientEncryption` (no dependencies beyond the BCL) has `ClientSecretEncryptor.Encrypt(value, recipients, place)`, `ClientSecretDecryptor.Decrypt(jwe, recipientId, privateKey)`, `JweDocument.Parse` and `RsaPublicJwk` for the key formats. The C# SDK, the CLI and the TypeScript SDK build on it in the next phases.
+
+### References
+
+A reference is a public pair with the content type `application/vnd.2s.secret-reference` and a value `https://{vault}.vault.azure.net/secrets/{name}[/{version}]` or the shorthand `kv://{vault}/{name}[/{version}]`, or with Azure App Configuration's `application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8` and its `{ "uri": … }` document. The shape is checked on write (`400 InvalidSecretReference`); a reference on a secret level is refused too, because the platform never resolves a reference. A binding inserts the value as the text it is, and the consuming application resolves it with its own identity.
+
+## Rotation and re-wrap
+
+The Standard and HSM keys carry a Key Vault rotation policy (`RotationInterval`, 365 days by default), and an Administrator rotates now with `RotateAsync` (`POST …/policy/rotate`), which also starts a **re-wrap**. New writes always wrap with the current key version. A re-wrap (`IKeyValueMaintenanceService.RewrapAsync`) finds every envelope of the level whose key id is not the current version, unwraps its data key with the old version and wraps it with the new one; the ciphertext does not change. The patch keeps the item's `ttl` (Cosmos counts it from the last write) and skips items that changed meanwhile. Progress is in `KeyValuePolicy.Rewrap`. Old key versions are never disabled; an unused HSM key version stops costing after 30 days.
+
+`KeyValueProtectionTimer` (hourly) runs `IKeyValueMaintenanceService.RunAsync`: for every project with a stored policy, the daily key check (at most once per 20 hours) and then the pending re-wrap. The check makes sure of the free Standard key, reads the current version of the HSM key once the level was enabled, records the customer key's health, and starts a re-wrap when a version changed. Timer triggers need `AzureWebJobsStorage`; the Functions host keeps serving HTTP when that storage is missing locally, and only the timers fail to listen.
+
+## Secret delivery
+
+A secret value is delivered by a reveal, a secret version or diff, an export with secrets, or a resolved configuration with secret bindings. `request.GetSecretRightsAsync` decides once per request:
+
+| Caller | Secrets are delivered when |
+| --- | --- |
+| User | The role is `ContributorWithSecrets` or higher on the project, or the token has the scope `Configuration.Secrets`. HTTPS with the bearer token |
+| Machine with an mTLS certificate (`PresentingCertificateThumbprint`) | The scope `Configuration.Secrets` |
+| Machine with an API key or a bearer token only | The scope, and the project policy has `RequireMtlsForSecretDelivery = false` |
+
+A withheld resolved configuration leaves the secrets unbound and carries the header `X-2S-Secrets-Withheld: mtls-required`. Explicit requests (reveal, export with secrets) answer `403 MtlsRequired` in Phase 2. Responses with a secret value are `Cache-Control: no-store`. The result is also the request's ambient caller (`KeyValueCallerContext`), which the audit trail and the usage meters use for binding reads.
+
+Machine certificates are in Cosmos now (`CosmosClientCertificateStore`, partition `{project}.access`, id `mcert.{thumbprint}`, expiring 30 days after the certificate), so a certificate issued on one instance authenticates on every other one and survives a restart; hits are cached for 5 minutes and misses for 30 seconds, which bounds the revocation latency. `TransportSecurityMiddleware` refuses plain HTTP outside Development (`400 HttpsRequired`, with `X-Forwarded-Proto` honoured behind the platform's proxy) and sends `Strict-Transport-Security`.
+
+## Audit trail
+
+Every secret-related operation writes a `KeyValueAuditEvent` into the organization container, partition `{project}.audit`, id `kva.{time}.{guid}`, with `ttl` = `KeyValues:AuditRetention` (400 days): the operation, time, view, key, version, level, actor, channel, correlation id (the Functions invocation id, also sent to Key Vault as `x-ms-client-request-id`) and a detail, never a value. Operations: `Create`, `Update`, `Delete`, `Restore`, `PermanentDelete`, `Purge`, `Reprotect`, `Reveal`, `Export`, `Import`, `PolicyChange`, `Rotate`, `Rewrap`, `ByokVerify`, `ByokUnavailable`, `RecipientAdded`, `RecipientChanged`, `RecipientRemoved`. Public writes are not audited. Binding reads of secrets are counted per actor, key and hour in memory and written as one `BindingRead` event with `Count` by the usage flush. `IKeyValueAuditLog.QueryAsync` pages through the events, newest first, filtered by view, key, operation and time.
+
+## Usage meters
+
+`IKeyValueUsageRecorder` counts operations in memory (`reads.api`, `reads.binding`, `reveals`, `writes`, `kms.standard`, `kms.hsm`, `kms.byok`); `KeyValueUsageFlushService` writes them every `KeyValues:Usage:FlushInterval` (60 seconds) and on shutdown into the day document `kvu.{yyyy-MM-dd}` of the project (organization container, partition `{project}.usage`, `ttl` 400 days). A crashed instance loses at most one interval. `KeyValueUsageSnapshotTimer` (daily at 00:10 UTC) counts the stored keys per level (`keys.public`, `keys.reference`, `keys.standard`, `keys.hsm`, `keys.byok`, `keys.hyok`), `versions` and `storage.bytes` of every project and writes them as gauges of the previous day.
+
+`IKeyValueUsageService.GetReportAsync(from, to)` (at most 400 days) sums the counters and averages the gauges over the range (key-months for a calendar month). With `KeyValues:Pricing` configured (priced item → unit price; `reads` prices `reads.binding` and `reads.api` together per 10,000), the report also carries `EstimatedCharges`. Invoicing is out of scope.
 
 ## Storage
 
@@ -92,6 +175,8 @@ Key Vault allows 4,000 operations per 10 seconds per vault for software RSA-2048
   "KeyValues": {
     "VersionRetention": "365.00:00:00",
     "DeletedRetention": "90.00:00:00",
+    "AuditRetention": "400.00:00:00",
+    "MaxRecipients": 20,
     "Protection": {
       "Emulator": false,                 // Lowkey Vault for local work, never in production
       "MaxConcurrentKeyOperations": 8,
@@ -102,24 +187,44 @@ Key Vault allows 4,000 operations per 10 seconds per vault for software RSA-2048
         "KeySize": 2048,
         "RotationInterval": "365.00:00:00",
         "CacheDuration": "00:10:00"      // 00:00:00 turns the cache off
+      },
+      "Hsm": {
+        "VaultName": "premium",          // a Key Vault Premium vault in AzureKeyVaults
+        "KeySize": 2048,
+        "RotationInterval": "365.00:00:00",
+        "CacheDuration": "00:05:00"
+      },
+      "OrganizationManagedHsms": {       // organizations with a dedicated Managed HSM
+        "acme": "https://acme.managedhsm.azure.net/"
+      },
+      "Byok": {
+        "ClientId": "<multi-tenant app id>",
+        "ManagedIdentityClientId": "<user-assigned identity client id>",
+        "CacheDuration": "00:05:00",     // the revocation latency
+        "RequiredRole": "Key Vault Crypto Service Encryption User"
       }
-    }
+    },
+    "Usage": { "FlushInterval": "00:01:00", "Retention": "400.00:00:00" },
+    "Pricing": { "keys.standard": 0.10, "keys.hsm": 0.40, "reads": 0.05 }   // optional, for the estimates
   },
-  "AzureKeyVaults": { "default": "https://<vault>.vault.azure.net/" }
+  "AzureKeyVaults": {
+    "default": "https://<standard vault>.vault.azure.net/",
+    "premium": "https://<premium vault>.vault.azure.net/"
+  }
 }
 ```
 
-`AddCosmosDbAnnotations` registers the service and the envelope protector. `AddKeyVaultKeyProtection(configuration, environment)` (project `KeyValues.Azure.KeyVault`) registers the Standard key provider when the vault is configured. Production uses the managed identity (`ManagedIdentityCredential`, then `EnvironmentCredential`); other environments use `DefaultAzureCredential`.
+`AddCosmosDbAnnotations` registers the service, the envelope protector, the policy store and service, the maintenance service, the audit log, the usage recorder, store and service, and the Cosmos certificate store. `AddKeyVaultKeyProtection(configuration, environment)` (project `KeyValues.Azure.KeyVault`) registers the Standard provider when its vault is configured, the HSM provider when the Premium vault or a Managed HSM is configured, and the BYOK provider when `Byok:ClientId` is set (or in emulator mode). Production uses the managed identity (`ManagedIdentityCredential`, then `EnvironmentCredential`); other environments use `DefaultAzureCredential`. The API registers `KeyValueUsageFlushService` as a hosted service and the two timer functions.
 
 ### Local development
 
-Microsoft ships no Key Vault emulator. The Aspire host runs [Lowkey Vault](https://github.com/nagyesta/lowkey-vault) (`nagyesta/lowkey-vault`) and passes its address to the API as `AzureKeyVaults__default` with `KeyValues__Protection__Emulator=true`. In emulator mode the client uses a dummy token, skips the challenge resource check, accepts the self-signed certificate, and creates its keys with the `encrypt` and `decrypt` operations too, because Lowkey Vault checks `decrypt` on an unwrap. Emulator mode fails the startup in the Production environment.
+Microsoft ships no Key Vault emulator. The Aspire host runs [Lowkey Vault](https://github.com/nagyesta/lowkey-vault) (`nagyesta/lowkey-vault`) and passes its address to the API as `AzureKeyVaults__default` with `KeyValues__Protection__Emulator=true`. In emulator mode the clients use a dummy token, skip the challenge resource check, accept the self-signed certificate, and create their keys with the `encrypt` and `decrypt` operations too, because Lowkey Vault checks `decrypt` on an unwrap; the HSM level creates software keys, and the BYOK level treats Lowkey Vault as the customer's vault with the same dummy credential. Unwraps always name the key version, because Lowkey Vault has no versionless unwrap route. Emulator mode fails the startup in the Production environment.
 
 The integration tests of `KeyValues.Azure.KeyVault/testint` start Lowkey Vault with Testcontainers, or use a running instance named by `LOWKEY_VAULT_URL`.
 
 ## Service
 
-`IKeyValueService` (`Backend.Core/src/KeyValues/`) is implemented by `CosmosKeyValueService`. Every call takes the organization, project and view, and the writes take a `KeyValueCaller`: the author, `CanReadSecrets`, `CanWriteSecrets`, and the channel. The API decides the rights; the service enforces them, because only the service knows whether a key is a secret.
+`IKeyValueService` (`Backend.Core/src/KeyValues/`) is implemented by `CosmosKeyValueService`. Every call takes the organization, project and view, and the writes take a `KeyValueCaller`: the author, `CanReadSecrets`, `CanWriteSecrets`, the channel and the correlation id. The API decides the rights; the service enforces them, because only the service knows whether a key is a secret. The service also checks the project policy, validates references and client-encrypted values, writes the audit events and counts the usage.
 
 | Method | Behaviour |
 | --- | --- |
@@ -133,7 +238,7 @@ The integration tests of `KeyValues.Azure.KeyVault/testint` start Lowkey Vault w
 | `ExportAsync`, `ImportAsync` | The document format below |
 | `LookupAsync` | For the binding sources: the current value, or null when missing, deleted, or a secret without secrets included |
 
-Error codes of this area: `InvalidKey`, `ValueTooLarge`, `ProtectionRequired`, `ProtectionNotAllowed`, `ProtectionNotConfigured`, `KeyValueNotFound`, `KeyValueBusy`, `KeyValueVersionMismatch`, `KeyEncryptionUnavailable`, `ImportInvalid`, `SecretValueMissing`, `NotSupportedForProtection`, `ReprotectNotPossible`, and `AccessDenied` for missing secret rights.
+Error codes of this area: `InvalidKey`, `ValueTooLarge`, `ProtectionRequired`, `ProtectionNotAllowed` (409), `ProtectionInUse` (409), `ProtectionNotConfigured` (501), `KeyValueNotFound`, `KeyValueBusy` (409), `KeyValueVersionMismatch` (412), `PolicyVersionMismatch` (409), `KeyEncryptionUnavailable` (503 with `Retry-After`), `CustomerKeyUnavailable` (424), `CustomerKeyInvalid`, `ByokNotConfigured` (409), `MtlsRequired` (403), `HttpsRequired` (400), `ImportInvalid` (400 with the failing items in `Details`), `SecretValueMissing`, `NotSupportedForProtection`, `ReprotectNotPossible`, `InvalidClientEncryptedValue`, `UnknownRecipient`, `RecipientExists`, `RecipientNotFound`, `RecipientInvalid`, `InvalidSecretReference`, and `AccessDenied` for missing secret rights.
 
 ## Import and export
 

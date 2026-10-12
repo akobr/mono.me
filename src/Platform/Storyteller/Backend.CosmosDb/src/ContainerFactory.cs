@@ -185,6 +185,20 @@ public class ContainerFactory : IContainerFactory
         return updated;
     }
 
+    public async Task<IReadOnlyList<string>> GetContainerNamesAsync()
+    {
+        var database = await _database;
+        var names = new List<string>();
+        using var iterator = database.GetContainerQueryIterator<ContainerProperties>();
+
+        while (iterator.HasMoreResults)
+        {
+            names.AddRange((await iterator.ReadNextAsync()).Select(properties => properties.Id));
+        }
+
+        return names;
+    }
+
     // Returns whether anything changed.
     private static bool ApplySettings(ContainerProperties properties)
     {

@@ -117,7 +117,7 @@ public class ExceptionHandlingMiddlewareTests
     }
 
     // A function whose HTTP response is its return value: no named output bindings.
-    private sealed class HttpFunctionDefinition : FunctionDefinition
+    internal sealed class HttpFunctionDefinition : FunctionDefinition
     {
         public override ImmutableArray<FunctionParameter> Parameters => [];
 

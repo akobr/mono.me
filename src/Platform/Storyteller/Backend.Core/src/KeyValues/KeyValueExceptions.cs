@@ -47,6 +47,29 @@ public static class KeyValueErrors
             cause);
     }
 
+    public static ConflictException ProtectionInUse(KeyValueProtection protection, IReadOnlyDictionary<string, int> countsPerView)
+    {
+        var detail = string.Join(", ", countsPerView.Select(entry => $"{entry.Key}: {entry.Value}"));
+        return new ConflictException(
+            $"The protection level '{protection}' is still used by keys of the project ({detail}); change them first.",
+            ErrorCodes.ProtectionInUse);
+    }
+
+    public static FailedDependencyException CustomerKeyUnavailable(string reason, Exception? cause = null)
+    {
+        return new FailedDependencyException(
+            $"The customer's key is not available: {reason}",
+            ErrorCodes.CustomerKeyUnavailable,
+            cause);
+    }
+
+    public static AccessDeniedException MtlsRequired()
+    {
+        return new AccessDeniedException(
+            "Secret values are delivered to machines only over mTLS in this project.",
+            ErrorCodes.MtlsRequired);
+    }
+
     public static InvalidInputException ProtectionRequired(string key)
     {
         return new InvalidInputException(

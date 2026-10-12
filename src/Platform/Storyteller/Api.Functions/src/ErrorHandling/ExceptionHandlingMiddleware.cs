@@ -92,6 +92,12 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
         }
 
         var httpErrorResponse = httpReqData.CreateResponse(statusCode);
+
+        if (exception is ServiceUnavailableException { RetryAfter: { } retryAfter })
+        {
+            httpErrorResponse.Headers.Add("Retry-After", ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
         await httpErrorResponse.WriteAsJsonAsync(errorResponse);
         context.SetInvocationResult(httpErrorResponse);
     }

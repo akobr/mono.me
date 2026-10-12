@@ -30,6 +30,7 @@ var host = new HostBuilder()
         // });
 
         worker.UseMiddleware<ExceptionHandlingMiddleware>();
+        worker.UseMiddleware<TransportSecurityMiddleware>();
         worker.UseMiddleware<MachineAuthenticationMiddleware>();
         worker.UseMiddleware<BearerAuthenticationMiddleware>();
     })
@@ -83,6 +84,9 @@ var host = new HostBuilder()
         // Key/value secrets: the Standard level wraps its data keys in the vault AzureKeyVaults:{KeyValues:Protection:Standard:VaultName};
         // without that vault only public pairs can be written.
         services.AddKeyVaultKeyProtection(context.Configuration, context.HostingEnvironment);
+
+        // The usage counters and the aggregated binding reads of key/value pairs are written every minute.
+        services.AddHostedService<KeyValueUsageFlushService>();
 
         // Add authentication by API keys
         services.AddApiKeyMachineAccess();
