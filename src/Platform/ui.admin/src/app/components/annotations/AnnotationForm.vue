@@ -172,6 +172,7 @@ const link = (key: string) => ({
             ? `${countFormat.format(descriptionLength)} / ${countFormat.format(annotationLimits.Description)}`
             : undefined
         "
+        help="Markdown: headings, lists, quotes, code blocks, tables and links."
       >
         <UTabs
           v-model="descriptionTab"
@@ -187,7 +188,7 @@ const link = (key: string) => ({
           v-if="descriptionTab === 'write'"
           v-model="description"
           autoresize
-          :rows="3"
+          :rows="4"
           :disabled="readonly"
           class="w-full"
         />
