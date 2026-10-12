@@ -2,7 +2,6 @@ import {
   annotationTypes,
   getAllAncestors,
   getAnnotationTypeInfo,
-  getDirectAncestors,
   type AnnotationType,
   type AnnotationTypeCode,
 } from '@42for.net/2splatform.sdk'
@@ -137,26 +136,17 @@ export function codeOfKey(key: string): AnnotationTypeCode | undefined {
 }
 
 /**
- * The keys the API deletes together with `key` (CosmosAnnotationService.DeleteAnnotationAsync): a responsibility,
- * subject, usage or unit takes every descendant with it, a context takes its executions, and an execution or a
- * unit of execution goes alone.
+ * The keys the API deletes together with `key` (CosmosAnnotationService.DeleteAnnotationAsync): every key that has
+ * `key` among its ancestors, for all seven types. A unit of execution has none.
  */
 export function deletedWith(key: string, keys: Iterable<string>): string[] {
-  const code = codeOfKey(key)
-  if (!code || code === 'exe' || code === 'uxe') {
+  if (!codeOfKey(key)) {
     return []
   }
 
   const result: string[] = []
   for (const candidate of keys) {
-    if (candidate === key) {
-      continue
-    }
-    const cascaded =
-      code === 'cnt'
-        ? codeOfKey(candidate) === 'exe' && getDirectAncestors(candidate).includes(key)
-        : getAllAncestors(candidate).includes(key)
-    if (cascaded) {
+    if (candidate !== key && getAllAncestors(candidate).includes(key)) {
       result.push(candidate)
     }
   }

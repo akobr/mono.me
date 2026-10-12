@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { setAnnotation } from '@42for.net/2splatform.sdk'
+import { setAnnotation, type Annotation } from '@42for.net/2splatform.sdk'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import {
@@ -19,13 +19,16 @@ import { errorMessage } from '@/utils/errors'
  * New annotation (spec section 8): pick a type, fill the parent names it needs (suggested from the catalog,
  * new names allowed) and the name, with a live key preview. SetAnnotation creates a new key with its missing
  * ancestors (CosmosAnnotationService.TryCheckAndCreate*), so the dialog only lists them; the body carries the
- * relation members the runtime type requires, derived from the key.
+ * relation members the runtime type requires, derived from the key. A deleted key or ancestor is looked up first
+ * (useDeletedKeyCheck): the user restores it, which keeps its configuration and history, or creates it new.
  */
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ created: [key: string] }>()
 
 const catalog = useCatalogStore()
 const context = useContextStore()
+const actions = useAnnotationActions()
+const deletedCheck = useDeletedKeyCheck()
 const toast = useToast()
 
 type Part = keyof AnnotationKeyParts
@@ -109,26 +112,50 @@ async function create() {
   const { org, project, view } = context.scope
 
   try {
+    const { choice, deleted } = await deletedCheck.check(key.value)
+    if (choice === 'cancel') {
+      return
+    }
+
+    // Restore and update: the deleted keys come back alone (their deleted children stay deleted), and a restored
+    // key keeps its content; the dialog's title is written over it.
+    let restored: Annotation | undefined
+    if (choice === 'restore') {
+      const outcome = await actions.restoreMany(
+        deleted.map((annotation: Annotation) => annotation.AnnotationKey),
+        { descendants: false },
+      )
+      if (outcome.failed.length) {
+        throw new Error(outcome.failed.map((failed) => `${failed.Key}: ${failed.Message}`).join(' '))
+      }
+      restored = outcome.restored.find((annotation) => annotation.AnnotationKey === key.value)
+    }
+
     const created = await setAnnotation(
       org,
       project,
       view,
       key.value,
       withRelations({
+        ...restored,
         ProjectName: project,
         ViewName: view,
         AnnotationKey: key.value,
         Name: key.value.split('.').at(-1)!,
         AnnotationType: meta.value.type,
-        Title: title.value.trim() || undefined,
+        Title: title.value.trim() || restored?.Title || undefined,
       }),
     )
     catalog.upsert(created)
-    // The API created the missing ancestors; a background refresh brings them into the catalog.
+    // The API created (or re-created) the missing ancestors; a background refresh brings them into the catalog.
     if (missingAncestors.value.length) {
       void catalog.load(context.scope, { force: true })
     }
-    toast.add({ title: `${created.AnnotationKey} created`, color: 'success', icon: 'i-lucide-plus' })
+    toast.add({
+      title: restored ? `${created.AnnotationKey} restored and updated` : `${created.AnnotationKey} created`,
+      color: 'success',
+      icon: restored ? 'i-lucide-archive-restore' : 'i-lucide-plus',
+    })
     open.value = false
     emit('created', created.AnnotationKey)
     parts.name = ''
@@ -186,6 +213,12 @@ async function create() {
         </div>
 
         <UAlert v-if="failure" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="failure" />
+
+        <DeletedKeysDialog
+          v-model:open="deletedCheck.open.value"
+          :deleted="deletedCheck.deleted.value"
+          @choose="deletedCheck.choose"
+        />
 
         <div class="flex justify-end gap-2">
           <UButton label="Cancel" color="neutral" variant="ghost" @click="open = false" />

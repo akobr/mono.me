@@ -15,10 +15,17 @@ export function forgetAnnotation(client: QueryClient, scope: Scope, key: string)
   removeByPath(client, `${base(scope)}/annotations/${key}`)
 }
 
+/** The lists and the entries of deleted annotations (`/annotations/deleted…`). */
+export function invalidateDeleted(client: QueryClient, scope: Scope): Promise<void> {
+  return invalidateByPath(client, `${base(scope)}/annotations/deleted`)
+}
+
 export async function invalidateConfiguration(client: QueryClient, scope: Scope, key: string): Promise<void> {
   await Promise.all([
     invalidateByPath(client, `${base(scope)}/configuration/${key}`),
     invalidateByPath(client, `${base(scope)}/configurations`),
+    // a configuration save is an entry in the annotation's history
+    invalidateByPath(client, `${base(scope)}/annotations/${key}/history`),
   ])
 }
 

@@ -45,6 +45,7 @@ After a change of the SDK, rebuild it and reinstall it here: `rm -rf node_module
 
 - `?mock-scenario=new-user` starts without an account (onboarding); `?mock-scenario=invited` starts without an account but with a pending invitation; `?mock-scenario=large` puts 16,317 annotations into `acme/billing/default` (performance of the grid and the graph); `?mock-scenario=default` returns to the seeded data.
 - `window.storytellerMock.reset()` resets the data of the current scenario.
+- The mock API keeps deleted annotations restorable and records a change history per key, like the API (`app/mock/annotation-handlers.ts`, `app/mock/audit.ts`). A re-created key starts without its configuration.
 
 ### End-to-end and visual tests
 
@@ -58,7 +59,8 @@ After a change of the SDK, rebuild it and reinstall it here: `rm -rf node_module
 - an invitation;
 - a machine with a `.pfx` download;
 - a graph node opened by mouse and by keyboard;
-- axe (WCAG 2.1 AA) on the main screens.
+- delete and Undo, restore from Deleted (with and without descendants), create over a deleted key, permanent delete for Administrators only, the history and the configuration link;
+- axe (WCAG 2.1 AA) on the main screens and on Deleted.
 
 Each test gets a fresh context, so the mock data starts from the scenario's seed. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of `npx playwright install chromium`.
 

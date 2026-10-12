@@ -9,6 +9,7 @@ const emit = defineEmits<{ clear: [] }>()
 
 const catalog = useCatalogStore()
 const actions = useAnnotationActions()
+const notifyDeleted = useDeletionToast()
 const toast = useToast()
 
 const label = ref<string>()
@@ -35,17 +36,20 @@ async function run(title: string, action: () => Promise<unknown>) {
 async function deleteSelected() {
   busy.value = true
   try {
-    const failed = await actions.removeMany(props.keys)
+    const { failed, deletions } = await actions.removeMany(props.keys)
     confirmDelete.value = false
-    toast.add(
-      failed.length
-        ? {
-            title: `${failed.length} annotations could not be deleted`,
-            description: failed.slice(0, 5).join(', '),
-            color: 'warning',
-          }
-        : { title: `${count.value} annotations deleted`, color: 'success', icon: 'i-lucide-trash-2' },
-    )
+    if (failed.length) {
+      toast.add({
+        title: `${failed.length} annotations could not be deleted`,
+        description: failed.slice(0, 5).join(', '),
+        color: 'warning',
+      })
+    }
+    // Undo restores every root of the batch with its descendants, 100 keys per request.
+    const deleted = props.keys.length - failed.length
+    if (deleted > 0) {
+      notifyDeleted(`${formatter.format(deleted)} annotations deleted`, deletions)
+    }
     emit('clear')
   } finally {
     busy.value = false
@@ -129,8 +133,7 @@ async function deleteSelected() {
     <ConfirmDialog
       v-model:open="confirmDelete"
       :title="`Delete ${count} annotations?`"
-      description="The annotations and their configurations are deleted; a responsibility, subject, usage, context or unit takes its descendants with it. The configuration history stays. This cannot be undone."
-      :confirm-text="String(keys.length)"
+      :description="`The ${count} annotations and their descendants move to Deleted, with their configuration. You can restore them from Deleted for 90 days.`"
       :confirm-label="`Delete ${count}`"
       :loading="busy"
       @confirm="deleteSelected"
