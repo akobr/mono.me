@@ -8,26 +8,33 @@ import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { deletedWith } from '@/utils/annotation-key'
 import { annotationStatus } from '@/utils/annotation-status'
+import { actorName } from '@/utils/audit'
 import { errorMessage } from '@/utils/errors'
 import type { TreePerspective } from '@/utils/tree-projection'
 
-/** Header, breadcrumb and tab navigation of the annotation detail (spec section 11.1). */
+/** Header, breadcrumb and tab navigation of the annotation detail (spec section 11.1, soft-delete spec 4.1). */
 const props = withDefaults(
   defineProps<{
     annotationKey: string
     annotation?: Annotation
     /** The screen hosting the panel: tabs, breadcrumb and lineage links stay on it. */
     section?: 'annotations' | 'graph'
+    /** The annotation is deleted: the panel shows its history and Restore instead of the tabs. */
+    deleted?: boolean
   }>(),
-  { annotation: undefined, section: 'annotations' },
+  { annotation: undefined, section: 'annotations', deleted: false },
 )
 const emit = defineEmits<{ close: [] }>()
+
+/** Days a deleted annotation stays restorable by default; the API does not publish its setting. */
+const retentionDays = 90
 
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
 const catalog = useCatalogStore()
 const actions = useAnnotationActions()
+const notifyDeleted = useDeletionToast()
 const canEdit = useCan('edit')
 const toast = useToast()
 const now = useNow({ interval: 60_000 })
@@ -36,17 +43,13 @@ const { copy } = useClipboard({ legacy: true })
 const confirmDelete = ref(false)
 const deleting = ref(false)
 
-// The API deletes descendants with a responsibility, subject, usage, context or unit; the confirmation says so.
+// The API deletes every descendant in the inheritance graph with the annotation; the confirmation says so.
 const cascade = computed(() => (confirmDelete.value ? deletedWith(props.annotationKey, catalog.byKey.keys()) : []))
 const deleteDescription = computed(() => {
   const count = cascade.value.length
-  const descendants =
-    count === 0
-      ? ''
-      : ` The API also deletes its ${count} descendant${count === 1 ? '' : 's'} in this view (${cascade.value
-          .slice(0, 3)
-          .join(', ')}${count > 3 ? ', …' : ''}).`
-  return `The annotation and its configuration are deleted; the configuration history stays.${descendants} This cannot be undone.`
+  return count === 0
+    ? `${props.annotationKey} moves to Deleted, with its configuration. You can restore it from Deleted for ${retentionDays} days.`
+    : `${props.annotationKey} and its ${count} descendant${count === 1 ? '' : 's'} move to Deleted, with their configuration. You can restore them from Deleted for ${retentionDays} days.`
 })
 
 const viewBase = computed(() => `/${context.org}/${context.project}/${context.view}`)
@@ -56,35 +59,24 @@ const perspective = computed<TreePerspective>(() =>
 )
 const status = computed(() => (props.annotation ? annotationStatus(props.annotation, now.value.getTime()) : undefined))
 
-const configurationVersion = computed(() => catalog.configurations?.get(props.annotationKey)?.Version)
 const tabQuery = computed(() => ({ ...route.query, cfg: undefined, v: undefined, from: undefined }))
+const historyLink = computed(() => ({ path: `${base.value}/history`, query: tabQuery.value }))
 
 const tabs = computed(() => [
   { label: 'Annotation', icon: 'i-lucide-tag', to: { path: base.value, query: tabQuery.value }, exact: true },
-  {
-    label: 'Configuration',
-    icon: 'i-lucide-settings-2',
-    to: { path: `${base.value}/configuration`, query: tabQuery.value },
-    badge: configurationVersion.value
-      ? {
-          label: `v${configurationVersion.value}`,
-          size: 'sm' as const,
-          color: 'neutral' as const,
-          variant: 'outline' as const,
-        }
-      : undefined,
-  },
-  { label: 'Versions', icon: 'i-lucide-history', to: { path: `${base.value}/versions`, query: tabQuery.value } },
-  { label: 'Schema', icon: 'i-lucide-braces', to: { path: `${base.value}/schema`, query: tabQuery.value } },
+  { label: 'History', icon: 'i-lucide-history', to: historyLink.value },
 ])
+
+// "Created 3 days ago · Updated 2 hours ago by Ada Lovelace", from the server-owned stamps.
+const created = computed(() => props.annotation?.Created)
+const modified = computed(() =>
+  props.annotation?.Modified && props.annotation.Modified.At !== props.annotation.Created?.At
+    ? props.annotation.Modified
+    : undefined,
+)
 
 const menu = computed<DropdownMenuItem[][]>(() => [
   [
-    {
-      label: 'Open configuration',
-      icon: 'i-lucide-settings-2',
-      to: `${viewBase.value}/configurations/${props.annotationKey}`,
-    },
     props.section === 'graph'
       ? { label: 'Show in list', icon: 'i-lucide-table', to: `${viewBase.value}/annotations/${props.annotationKey}` }
       : {
@@ -108,7 +100,7 @@ const menu = computed<DropdownMenuItem[][]>(() => [
       onSelect: () => void copy(props.annotationKey),
     },
   ],
-  ...(canEdit.value
+  ...(canEdit.value && !props.deleted
     ? [
         [
           {
@@ -124,13 +116,15 @@ const menu = computed<DropdownMenuItem[][]>(() => [
 
 async function remove() {
   deleting.value = true
+  const key = props.annotationKey
+  const detailPath = `${viewBase.value}/${props.section}/${key}`
   try {
-    const failed = await actions.remove(props.annotationKey)
+    const { failed, deletions } = await actions.remove(key)
     if (failed.length) {
-      throw new Error(`${props.annotationKey} could not be deleted.`)
+      throw new Error(`${key} could not be deleted.`)
     }
     confirmDelete.value = false
-    toast.add({ title: `${props.annotationKey} deleted`, color: 'success', icon: 'i-lucide-trash-2' })
+    notifyDeleted(`${key} deleted`, deletions, () => void router.push({ path: detailPath, query: route.query }))
     await router.push({ path: `${viewBase.value}/${props.section}`, query: route.query })
   } catch (error) {
     toast.add({ title: 'Delete failed', description: errorMessage(error), color: 'error' })
@@ -159,6 +153,7 @@ async function remove() {
             {{ annotation?.Name ?? annotationKey.split('.').at(-1) }}
           </h2>
           <AnnotationStatusBadge v-if="status" :status="status" size="xs" />
+          <UBadge v-if="deleted" label="Deleted" color="warning" variant="subtle" size="sm" icon="i-lucide-archive" />
         </div>
         <KeyText :value="annotationKey" copy />
       </div>
@@ -176,6 +171,22 @@ async function remove() {
       />
     </div>
 
+    <div v-if="!deleted" class="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <ConfigurationLink :annotation-key="annotationKey" />
+      <RouterLink
+        v-if="created"
+        :to="historyLink"
+        class="flex flex-wrap items-center gap-1 text-xs text-muted hover:text-highlighted"
+        data-testid="annotation-stamps"
+      >
+        <span>Created <RelativeTime :value="created.At" /></span>
+        <template v-if="modified">
+          <span aria-hidden="true">·</span>
+          <span>Updated <RelativeTime :value="modified.At" /> by {{ actorName(modified.By) }}</span>
+        </template>
+      </RouterLink>
+    </div>
+
     <div class="flex flex-wrap items-center gap-2">
       <AnnotationBreadcrumb
         :annotation-key="annotationKey"
@@ -187,13 +198,12 @@ async function remove() {
       <AnnotationLineage :annotation-key="annotationKey" :section="section" />
     </div>
 
-    <UNavigationMenu :items="tabs" highlight class="-mb-3" :ui="{ link: 'text-sm' }" />
+    <UNavigationMenu v-if="!deleted" :items="tabs" highlight class="-mb-3" :ui="{ link: 'text-sm' }" />
 
     <ConfirmDialog
       v-model:open="confirmDelete"
       :title="`Delete ${annotationKey}?`"
       :description="deleteDescription"
-      :confirm-text="annotationKey"
       :loading="deleting"
       @confirm="remove"
     />

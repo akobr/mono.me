@@ -1,5 +1,10 @@
 import { z } from 'zod'
-import { SetAnnotationBody } from '@42for.net/2splatform.sdk/zod'
+import {
+  SetAnnotationBody,
+  setAnnotationBodyDescriptionMax,
+  setAnnotationBodyDocumentationLinkMax,
+  setAnnotationBodyTitleMax,
+} from '@42for.net/2splatform.sdk/zod'
 import type { Annotation } from '@42for.net/2splatform.sdk'
 
 export function isValidTimeZone(timeZone: string): boolean {
@@ -12,17 +17,34 @@ export function isValidTimeZone(timeZone: string): boolean {
 
 const isHttpUrl = (value: string) => /^https?:\/\/\S+$/i.test(value) && URL.canParse(value)
 
+/** The limits of the API (AnnotationRules), published as maxLength in the OpenAPI document. */
+export const annotationLimits = {
+  Title: setAnnotationBodyTitleMax,
+  Description: setAnnotationBodyDescriptionMax,
+  DocumentationLink: setAnnotationBodyDocumentationLinkMax,
+} as const
+
+const count = new Intl.NumberFormat('en-US')
+
 /**
  * One schema for the Form, JSON and YAML modes (spec section 11.1): the generated SetAnnotationBody with the UI
- * rules: a title of at most 200 characters, an absolute http(s) link, an IANA time zone, unique non-empty labels,
- * non-empty value keys, and ValidFrom before ExpiresAt.
+ * rules: the API's length limits (title 200, description 10,000, link 2048), an absolute http(s) link, an IANA time
+ * zone, unique non-empty labels, non-empty value keys, and ValidFrom before ExpiresAt.
  */
 export const annotationFormSchema = SetAnnotationBody.extend({
-  Title: z.string().trim().max(200, 'At most 200 characters.').optional(),
-  Description: z.string().optional(),
+  Title: z
+    .string()
+    .trim()
+    .max(annotationLimits.Title, `At most ${count.format(annotationLimits.Title)} characters.`)
+    .optional(),
+  Description: z
+    .string()
+    .max(annotationLimits.Description, `At most ${count.format(annotationLimits.Description)} characters.`)
+    .optional(),
   DocumentationLink: z
     .string()
     .trim()
+    .max(annotationLimits.DocumentationLink, `At most ${annotationLimits.DocumentationLink} characters.`)
     .refine((value) => value === '' || isHttpUrl(value), 'Use an absolute http(s) URL.')
     .optional(),
   TimeZone: z
@@ -108,4 +130,23 @@ export function readOnlyIssues(original: Annotation, edited: unknown): { path: s
   return readOnlyAnnotationFields
     .filter((field) => record[field] !== original[field])
     .map((field) => ({ path: field, message: 'is part of the key and cannot change.' }))
+}
+
+/**
+ * The fields named in a 400 InvalidAnnotation of the API ("The annotation 'x' is not valid: Title has 201 characters,
+ * at most 200 are allowed. DocumentationLink must be an absolute http or https URL."), each with its sentence.
+ */
+export function invalidAnnotationFields(message: string): Partial<Record<keyof typeof annotationLimits, string>> {
+  const fields: Partial<Record<keyof typeof annotationLimits, string>> = {}
+  const separator = message.indexOf(': ')
+  const problems = separator >= 0 ? message.slice(separator + 2) : message
+  for (const sentence of problems.split(/(?<=\.)\s+/)) {
+    const field = (Object.keys(annotationLimits) as (keyof typeof annotationLimits)[]).find((name) =>
+      sentence.startsWith(`${name} `),
+    )
+    if (field) {
+      fields[field] = sentence.trim()
+    }
+  }
+  return fields
 }

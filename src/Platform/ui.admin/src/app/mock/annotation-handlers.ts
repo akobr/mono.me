@@ -1,22 +1,45 @@
 import { http, HttpResponse, type HttpHandler } from 'msw'
-import type { Annotation } from '@42for.net/2splatform.sdk'
+import type {
+  Annotation,
+  AnnotationAuditCause,
+  AnnotationDeletion,
+  AnnotationKeyFailure,
+  AnnotationKeysRequest,
+  AnnotationRestoreRequest,
+} from '@42for.net/2splatform.sdk'
 import {
   codeOfKey,
   getAllAncestors,
+  getDirectAncestors,
   isValidAnnotationKey,
   parseAnnotationKey,
   type AnnotationTypeCode,
 } from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
-import { annotationsOf, overridesOf, type MockDb } from './db'
+import {
+  appendAudit,
+  auditOf,
+  diffAnnotations,
+  dropAudit,
+  mockActor,
+  newEntry,
+  retentionDays,
+  stamp,
+  type MockScope,
+} from './audit'
+import { annotationsOf, overridesOf, type AnnotationOverrides, type MockDb } from './db'
+import { deleteDocument } from './documents'
 import { errorResponse, requireRole, withDb } from './handlers'
 
 const api = '*/api/v1/:org/:project/:view'
 const pageSize = 1000
+const maxKeys = 100
+const day = 24 * 3600 * 1000
 
 type ScopeParams = { org: string; project: string; view: string }
 
 const projectKey = (params: ScopeParams) => `${params.org}.${params.project}`
+const scopeOf = (params: ScopeParams): MockScope => ({ org: params.org, project: params.project, view: params.view })
 
 /** One page of a list, with the offset as the continuation token (like the API's 1000-item pages). */
 function page<T>(items: T[], request: Request, wrap: (items: T[], token?: string) => Record<string, unknown>) {
@@ -51,30 +74,119 @@ const typeNames: Record<AnnotationTypeCode, Annotation['AnnotationType']> = {
   uxe: 'UnitOfExecution',
 }
 
-/** Stores an annotation and, like the API, creates its missing ancestors. */
-function store(db: MockDb, params: ScopeParams, annotation: Annotation): Annotation {
-  const stored = withRelations({ ...annotation, ProjectName: params.project, ViewName: params.view })
-  const overrides = overridesOf(db, params.org, params.project, params.view)
-  const existing = annotationsOf(db, params.org, params.project, params.view)
+/** The longest path to a root of the graph (AnnotationKeyExtensions.GetDepth). */
+const depths: Record<AnnotationTypeCode, number> = { rst: 0, sbt: 0, unt: 1, usg: 1, cnt: 1, exe: 2, uxe: 3 }
+const depthOf = (key: string) => depths[codeOfKey(key) ?? 'rst']
 
-  for (const ancestor of getAllAncestors(annotation.AnnotationKey)) {
-    if (!existing.has(ancestor) && !overrides.upserts[ancestor]) {
-      const parsed = parseAnnotationKey(ancestor)!
-      overrides.upserts[ancestor] = withRelations({
-        ProjectName: params.project,
-        ViewName: params.view,
-        AnnotationKey: ancestor,
-        Name: parsed.name,
-        AnnotationType: typeNames[parsed.code],
-        TimeZone: annotation.TimeZone,
-        Labels: annotation.Labels,
-      })
-      overrides.deleted = overrides.deleted.filter((key) => key !== ancestor)
+const isDescendant = (candidate: string, key: string) => candidate !== key && getAllAncestors(candidate).includes(key)
+
+const trashOf = (overrides: AnnotationOverrides) => (overrides.trash ??= {})
+
+/** The catalog gets the annotation back (or for the first time); a deletion mark of the key goes away. */
+function put(overrides: AnnotationOverrides, annotation: Annotation): void {
+  overrides.upserts[annotation.AnnotationKey] = annotation
+  overrides.deleted = overrides.deleted.filter((key) => key !== annotation.AnnotationKey)
+}
+
+function remember(overrides: AnnotationOverrides, key: string): void {
+  delete overrides.upserts[key]
+  if (!overrides.deleted.includes(key)) {
+    overrides.deleted.push(key)
+  }
+}
+
+/**
+ * A deleted key written again is re-created: it leaves Deleted without its configuration, and the children
+ * deleted with it stay deleted as roots of Deleted.
+ */
+function leaveTrashRecreated(db: MockDb, params: ScopeParams, overrides: AnnotationOverrides, key: string): void {
+  const trash = trashOf(overrides)
+  const deletionId = trash[key]?.Deletion?.DeletionId
+  delete trash[key]
+  deleteDocument(db, scopeOf(params), `configuration:${key}`)
+  markChildrenAsRoots(trash, key, deletionId)
+}
+
+function markChildrenAsRoots(trash: Record<string, Annotation>, key: string, deletionId: string | undefined): void {
+  for (const [childKey, child] of Object.entries(trash)) {
+    if (child.Deletion?.DeletionId === deletionId && getDirectAncestors(childKey).includes(key)) {
+      trash[childKey] = { ...child, Deletion: { ...child.Deletion, IsRoot: true } }
+    }
+  }
+}
+
+function defaultAncestor(params: ScopeParams, key: string, from: Annotation): Annotation {
+  const parsed = parseAnnotationKey(key)!
+  return withRelations({
+    ProjectName: params.project,
+    ViewName: params.view,
+    AnnotationKey: key,
+    Name: parsed.name,
+    AnnotationType: typeNames[parsed.code],
+    TimeZone: from.TimeZone,
+    Labels: from.Labels,
+  })
+}
+
+/**
+ * Stores an annotation like SetAnnotation: a missing key is created with its missing ancestors, an active one is
+ * updated (nothing is written without a change), and a deleted key or ancestor is re-created empty.
+ */
+function store(db: MockDb, params: ScopeParams, annotation: Annotation): Annotation {
+  const scope = scopeOf(params)
+  const overrides = overridesOf(db, params.org, params.project, params.view)
+  const trash = trashOf(overrides)
+  const existing = annotationsOf(db, params.org, params.project, params.view)
+  const key = annotation.AnnotationKey
+  const now = new Date()
+
+  for (const ancestor of getAllAncestors(key)) {
+    if (existing.has(ancestor)) {
+      continue
+    }
+    const deletionId = trash[ancestor]?.Deletion?.DeletionId
+    const cause: AnnotationAuditCause = { Kind: 'Ancestor', Key: key }
+    put(overrides, {
+      ...defaultAncestor(params, ancestor, annotation),
+      Created: stamp(db, now),
+      Modified: stamp(db, now),
+    })
+    appendAudit(
+      db,
+      scope,
+      ancestor,
+      newEntry(db, deletionId ? 'Recreated' : 'Created', { Cause: cause, DeletionId: deletionId }),
+    )
+    if (deletionId) {
+      leaveTrashRecreated(db, params, overrides, ancestor)
     }
   }
 
-  overrides.upserts[annotation.AnnotationKey] = stored
-  overrides.deleted = overrides.deleted.filter((key) => key !== annotation.AnnotationKey)
+  const previous = existing.get(key)
+  const { Created: _created, Modified: _modified, Deletion: _deletion, ...body } = annotation
+  const stored = withRelations({
+    ...body,
+    ProjectName: params.project,
+    ViewName: params.view,
+    Created: previous?.Created ?? stamp(db, now),
+    Modified: stamp(db, now),
+  })
+
+  if (previous) {
+    const changes = diffAnnotations(previous, stored)
+    if (!changes) {
+      return previous
+    }
+    appendAudit(db, scope, key, newEntry(db, 'Updated', changes))
+  } else {
+    const deletionId = trash[key]?.Deletion?.DeletionId
+    appendAudit(db, scope, key, newEntry(db, deletionId ? 'Recreated' : 'Created', { DeletionId: deletionId }))
+    if (deletionId) {
+      leaveTrashRecreated(db, params, overrides, key)
+    }
+  }
+
+  put(overrides, stored)
   return stored
 }
 
@@ -85,7 +197,15 @@ const requiredMembers: Record<AnnotationTypeCode, string[]> = {
   unt: ['ResponsibilityKey', 'ResponsibilityName', 'UnitType', 'UnitDefinition'],
   cnt: ['SubjectKey', 'SubjectName'],
   usg: ['SubjectKey', 'ResponsibilityKey', 'SubjectName', 'ResponsibilityName'],
-  exe: ['ResponsibilityKey', 'SubjectKey', 'ContextKey', 'UsageKey', 'SubjectName', 'ResponsibilityName', 'ContextName'],
+  exe: [
+    'ResponsibilityKey',
+    'SubjectKey',
+    'ContextKey',
+    'UsageKey',
+    'SubjectName',
+    'ResponsibilityName',
+    'ContextName',
+  ],
   uxe: [
     'ResponsibilityKey',
     'UnitKey',
@@ -100,9 +220,16 @@ const requiredMembers: Record<AnnotationTypeCode, string[]> = {
   ],
 }
 
+// The limits of AnnotationRules: a violation answers 400 InvalidAnnotation and names the field.
+const limits: [keyof Annotation, number][] = [
+  ['Title', 200],
+  ['Description', 10_000],
+  ['DocumentationLink', 2048],
+]
+
 function invalidAnnotation(annotation: Annotation, key?: string): Response | undefined {
   if (!isValidAnnotationKey(annotation.AnnotationKey ?? '')) {
-    return errorResponse(400, `The annotation key '${annotation.AnnotationKey}' is not valid.`, 'InvalidInput')
+    return errorResponse(400, `The annotation key '${annotation.AnnotationKey}' is not valid.`, 'InvalidKey')
   }
   if (key && annotation.AnnotationKey !== key) {
     return errorResponse(400, 'The annotation key in the body does not match the route.', 'InvalidInput')
@@ -113,7 +240,205 @@ function invalidAnnotation(annotation: Annotation, key?: string): Response | und
   if (missing?.length) {
     return errorResponse(400, `Invalid annotation object in body: missing ${missing.join(', ')}.`, 'InvalidInput')
   }
+  const problems = limits
+    .map(([field, max]) => [field, String(record[field] ?? '').length, max] as const)
+    .filter(([, length, max]) => length > max)
+    .map(([field, length, max]) => `${field} has ${length} characters, at most ${max} are allowed.`)
+  if (problems.length) {
+    return errorResponse(
+      400,
+      `The annotation '${annotation.AnnotationKey}' is not valid: ${problems.join(' ')}`,
+      'InvalidAnnotation',
+    )
+  }
   return undefined
+}
+
+function keysOf(body: AnnotationKeysRequest | AnnotationRestoreRequest | null): string[] | Response {
+  const keys = body?.Keys ?? []
+  if (keys.length === 0 || keys.length > maxKeys) {
+    return errorResponse(400, `Send between 1 and ${maxKeys} annotation keys.`, 'InvalidKey')
+  }
+  const invalid = keys.filter((key) => !isValidAnnotationKey(key))
+  return invalid.length ? errorResponse(400, `Invalid annotation keys: ${invalid.join(', ')}`, 'InvalidKey') : keys
+}
+
+/** Soft delete of the key and its active descendants, like DeleteAnnotationAsync. */
+function softDelete(db: MockDb, params: ScopeParams, key: string): Response {
+  const scope = scopeOf(params)
+  const overrides = overridesOf(db, params.org, params.project, params.view)
+  const trash = trashOf(overrides)
+  const active = annotationsOf(db, params.org, params.project, params.view)
+
+  const existing = trash[key]?.Deletion
+  if (existing) {
+    return HttpResponse.json({ Deletion: existing, DeletedKeys: [] })
+  }
+  if (!active.has(key)) {
+    return errorResponse(404, `The annotation ${key} does not exist.`, 'NotFound')
+  }
+
+  const descendants = [...active.keys()]
+    .filter((candidate) => isDescendant(candidate, key))
+    .toSorted((a, b) => depthOf(b) - depthOf(a) || a.localeCompare(b))
+  const now = new Date()
+  const deletion: AnnotationDeletion = {
+    DeletionId: `del_${now.getTime().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`,
+    RootKey: key,
+    DeletedAt: now.toISOString(),
+    DeletedBy: mockActor(db),
+    IsRoot: false,
+    DescendantCount: null,
+    PurgeAt: new Date(now.getTime() + retentionDays * day).toISOString(),
+  }
+
+  for (const deletedKey of [...descendants, key]) {
+    const isRoot = deletedKey === key
+    trash[deletedKey] = {
+      ...active.get(deletedKey)!,
+      Deletion: { ...deletion, IsRoot: isRoot, DescendantCount: isRoot ? descendants.length : null },
+    }
+    remember(overrides, deletedKey)
+    appendAudit(
+      db,
+      scope,
+      deletedKey,
+      newEntry(db, 'Deleted', {
+        DeletionId: deletion.DeletionId,
+        Cause: isRoot ? undefined : { Kind: 'Cascade', Key: key },
+        DescendantCount: isRoot ? descendants.length : undefined,
+      }),
+    )
+  }
+
+  return HttpResponse.json({
+    Deletion: { ...deletion, IsRoot: true, DescendantCount: descendants.length },
+    DeletedKeys: [...descendants, key],
+  })
+}
+
+/** RestoreAnnotationsAsync: ancestors first; a failure of one key does not stop the others. */
+function restore(db: MockDb, params: ScopeParams, keys: string[], withDescendants: boolean) {
+  const scope = scopeOf(params)
+  const overrides = overridesOf(db, params.org, params.project, params.view)
+  const trash = trashOf(overrides)
+  const restored: Annotation[] = []
+  const createdKeys: string[] = []
+  const failed: AnnotationKeyFailure[] = []
+  const handled = new Set<string>()
+  const now = new Date()
+
+  const restoreOne = (key: string, cause?: AnnotationAuditCause, descendantCount?: number) => {
+    const deleted = trash[key]!
+    delete trash[key]
+    const { Deletion, ...annotation } = deleted
+    const back = { ...annotation, Modified: stamp(db, now) }
+    put(overrides, back)
+    appendAudit(
+      db,
+      scope,
+      key,
+      newEntry(db, 'Restored', { DeletionId: Deletion?.DeletionId, Cause: cause, DescendantCount: descendantCount }),
+    )
+    restored.push(back)
+    handled.add(key)
+  }
+
+  const ordered = [...new Set(keys)].toSorted((a, b) => depthOf(a) - depthOf(b) || a.localeCompare(b))
+
+  for (const key of ordered) {
+    if (handled.has(key)) {
+      continue
+    }
+
+    const active = annotationsOf(db, params.org, params.project, params.view)
+    const target = trash[key]
+    if (!target && !active.has(key)) {
+      failed.push({
+        Key: key,
+        ErrorCode: 'NotFound',
+        Message: `The annotation '${key}' does not exist or was deleted permanently.`,
+      })
+      continue
+    }
+
+    // keys restored without their deleted children, with the deletion they came from
+    const alone = new Map<string, string | undefined>()
+    const ancestorCause: AnnotationAuditCause = { Kind: 'Ancestor', Key: key }
+
+    for (const ancestor of getAllAncestors(key)) {
+      if (active.has(ancestor) || handled.has(ancestor)) {
+        continue
+      }
+      if (trash[ancestor]) {
+        alone.set(ancestor, trash[ancestor].Deletion?.DeletionId)
+        restoreOne(ancestor, ancestorCause)
+      } else {
+        const created = {
+          ...defaultAncestor(params, ancestor, target ?? active.get(key)!),
+          Created: stamp(db, now),
+          Modified: stamp(db, now),
+        }
+        put(overrides, created)
+        appendAudit(db, scope, ancestor, newEntry(db, 'Created', { Cause: ancestorCause }))
+        restored.push(created)
+        createdKeys.push(ancestor)
+        handled.add(ancestor)
+      }
+    }
+
+    const deletionId = target?.Deletion?.DeletionId
+    const descendants =
+      withDescendants && deletionId
+        ? Object.keys(trash)
+            .filter(
+              (candidate) => trash[candidate]!.Deletion?.DeletionId === deletionId && isDescendant(candidate, key),
+            )
+            .toSorted((a, b) => depthOf(a) - depthOf(b) || a.localeCompare(b))
+        : []
+
+    if (target) {
+      restoreOne(key, undefined, withDescendants ? descendants.length : undefined)
+      if (!withDescendants) {
+        alone.set(key, deletionId)
+      }
+    }
+
+    descendants.forEach((descendant) => restoreOne(descendant, { Kind: 'Cascade', Key: key }))
+
+    for (const [parent, parentDeletionId] of alone) {
+      markChildrenAsRoots(trash, parent, parentDeletionId)
+    }
+    handled.add(key)
+  }
+
+  return { Annotations: restored, CreatedKeys: createdKeys, Failed: failed }
+}
+
+function purge(db: MockDb, params: ScopeParams, key: string): Response {
+  const scope = scopeOf(params)
+  const overrides = overridesOf(db, params.org, params.project, params.view)
+  const trash = trashOf(overrides)
+
+  if (annotationsOf(db, params.org, params.project, params.view).has(key)) {
+    return errorResponse(
+      409,
+      `The annotation '${key}' is not deleted; delete it before deleting it permanently.`,
+      'AnnotationNotDeleted',
+    )
+  }
+  if (!trash[key]) {
+    return errorResponse(404, `The annotation ${key} does not exist.`, 'NotFound')
+  }
+
+  const purged = [...Object.keys(trash).filter((candidate) => isDescendant(candidate, key)), key]
+  for (const purgedKey of purged) {
+    delete trash[purgedKey]
+    dropAudit(db, scope, purgedKey)
+    deleteDocument(db, scope, `configuration:${purgedKey}`)
+    remember(overrides, purgedKey)
+  }
+  return HttpResponse.json({ PurgedKeys: purged })
 }
 
 export const annotationHandlers: HttpHandler[] = [
@@ -173,6 +498,119 @@ export const annotationHandlers: HttpHandler[] = [
     }),
   ),
 
+  // The literal segment "deleted" wins over {key}, like the API's route table.
+  http.get<ScopeParams>(
+    `${api}/annotations/deleted`,
+    withDb((db, { params, request }) => {
+      const denied = requireRole(db, projectKey(params), 'Reader')
+      if (denied) {
+        return denied
+      }
+      const query = new URL(request.url).searchParams
+      const roots = query.get('roots') !== 'false'
+      const deletionId = query.get('deletionId')
+      const items = Object.values(trashOf(overridesOf(db, params.org, params.project, params.view)))
+        .filter(
+          (annotation) =>
+            (!roots || annotation.Deletion?.IsRoot) && (!deletionId || annotation.Deletion?.DeletionId === deletionId),
+        )
+        .toSorted(
+          (a, b) =>
+            Date.parse(b.Deletion?.DeletedAt ?? '') - Date.parse(a.Deletion?.DeletedAt ?? '') ||
+            a.AnnotationKey.localeCompare(b.AnnotationKey),
+        )
+      return page(items, request, (slice, token) => ({
+        Annotations: slice,
+        ContinuationToken: token,
+        Count: slice.length,
+      }))
+    }),
+  ),
+
+  http.get<ScopeParams & { key: string }>(
+    `${api}/annotations/deleted/:key`,
+    withDb((db, { params }) => {
+      const denied = requireRole(db, projectKey(params), 'Reader')
+      if (denied) {
+        return denied
+      }
+      const deleted = overridesOf(db, params.org, params.project, params.view).trash?.[params.key]
+      return deleted
+        ? HttpResponse.json(deleted)
+        : errorResponse(404, `The annotation ${params.key} is not deleted.`, 'NotFound')
+    }),
+  ),
+
+  http.post<ScopeParams>(
+    `${api}/annotations/deleted/lookup`,
+    withDb(async (db, { params, request }) => {
+      const denied = requireRole(db, projectKey(params), 'Reader')
+      if (denied) {
+        return denied
+      }
+      const keys = keysOf((await request.json()) as AnnotationKeysRequest)
+      if (keys instanceof Response) {
+        return keys
+      }
+      const trash = overridesOf(db, params.org, params.project, params.view).trash ?? {}
+      return HttpResponse.json(keys.map((key) => trash[key]).filter((annotation) => !!annotation))
+    }),
+  ),
+
+  http.post<ScopeParams>(
+    `${api}/annotations/deleted/restore`,
+    withDb(async (db, { params, request }) => {
+      const denied = requireRole(db, projectKey(params), 'Contributor')
+      if (denied) {
+        return denied
+      }
+      const body = (await request.json()) as AnnotationRestoreRequest
+      const keys = keysOf(body)
+      if (keys instanceof Response) {
+        return keys
+      }
+      return HttpResponse.json(restore(db, params, keys, body.Descendants !== false))
+    }),
+  ),
+
+  http.delete<ScopeParams & { key: string }>(
+    `${api}/annotations/deleted/:key`,
+    withDb((db, { params }) => requireRole(db, projectKey(params), 'Administrator') ?? purge(db, params, params.key)),
+  ),
+
+  http.get<ScopeParams & { key: string }>(
+    `${api}/annotations/:key/history`,
+    withDb((db, { params }) => {
+      const denied = requireRole(db, projectKey(params), 'Reader')
+      if (denied) {
+        return denied
+      }
+      const active = annotationsOf(db, params.org, params.project, params.view).get(params.key)
+      const deleted = overridesOf(db, params.org, params.project, params.view).trash?.[params.key]
+      const annotation = active ?? deleted
+      if (!annotation) {
+        return errorResponse(404, `The annotation ${params.key} has no history.`, 'NotFound')
+      }
+
+      const entries = [...(auditOf(db, scopeOf(params), params.key) ?? [])]
+      // The seeded annotations were created before the mock recorded anything.
+      if (entries[0]?.Action !== 'Created') {
+        entries.unshift({
+          Id: `adt_seed_${params.key}`,
+          At: annotation.Created?.At ?? new Date(Date.now() - 30 * day).toISOString(),
+          Action: 'Created',
+          Actor: { Kind: 'System' },
+        })
+      }
+      return HttpResponse.json({
+        AnnotationKey: params.key,
+        State: deleted ? 'Deleted' : 'Active',
+        Entries: entries.toReversed(),
+        IsTrimmed: false,
+      })
+    }),
+  ),
+
   http.get<ScopeParams & { key: string }>(
     `${api}/annotations/:key`,
     withDb((db, { params }) => {
@@ -207,19 +645,8 @@ export const annotationHandlers: HttpHandler[] = [
 
   http.delete<ScopeParams & { key: string }>(
     `${api}/annotations/:key`,
-    withDb((db, { params }) => {
-      const denied = requireRole(db, projectKey(params), 'Contributor')
-      if (denied) {
-        return denied
-      }
-      if (!annotationsOf(db, params.org, params.project, params.view).has(params.key)) {
-        return errorResponse(404, `The annotation ${params.key} does not exist.`, 'NotFound')
-      }
-
-      const overrides = overridesOf(db, params.org, params.project, params.view)
-      delete overrides.upserts[params.key]
-      overrides.deleted.push(params.key)
-      return new HttpResponse(null, { status: 204 })
-    }),
+    withDb(
+      (db, { params }) => requireRole(db, projectKey(params), 'Contributor') ?? softDelete(db, params, params.key),
+    ),
   ),
 ]

@@ -45,14 +45,34 @@ Notes on the syntax:
 
 On a phone, the **Filters** button opens the same filters as toggles in a bottom sheet.
 
-The **detail** of an annotation has four tabs:
+The **detail** of an annotation has two tabs:
 
-- **Annotation:** the fields as a form, or as JSON or YAML.
-- **Configuration:** its own configuration, the effective (merged) document, and the resolved document.
-- **Versions:** the history of its configuration.
-- **Schema:** the schema that applies to it.
+- **Annotation:** the fields as a form, or as JSON or YAML. Title, description and documentation link have the same limits as the API (200, 10,000 and 2048 characters).
+- **History:** who changed it and when, newest first. An update lists every field with its old and new value; the description only shows that it changed. Deletes, restores and configuration saves are entries too, and a re-created annotation starts a new lifetime.
+
+The header links to the configuration, drawn by where the configuration comes from:
+
+| Link | Meaning |
+| --- | --- |
+| **Configuration · v7** | The annotation has its own values (version 7). The tooltip names what it also inherits. |
+| **Inherited configuration** | No own values; it inherits from ancestors or type templates. |
+| **No configuration** | Nothing applies to it. Contributors can create one from there. |
+
+The configuration itself is edited on its own page (see Configuration). The header also shows when the annotation was created and last updated, and by whom.
 
 The breadcrumb and **Lineage** show its ancestors in merge order.
+
+### Deleting and restoring
+
+**Delete** moves the annotation and everything below it in the graph to **Deleted**, with their configuration. The toast after a delete says until when they can be restored and offers **Undo**. The bulk bar deletes the same way.
+
+**Deleted** (in the sidebar of the view) lists what was deleted, newest first: who deleted it, how many descendants went with it, and when it is purged automatically (after 90 days). **Show cascaded** lists every deleted annotation, with the key whose delete took it.
+
+- **Restore** brings back the annotation with its descendants; **Restore without descendants** brings back only the annotation. Missing or deleted ancestors come back with it.
+- **Delete permanently** removes it for good, with its history. Only Administrators and Owners see it, and it asks you to type the key.
+- Opening a deleted key shows when and by whom it was deleted, its history, and **Restore**.
+
+Creating an annotation whose key, or an ancestor's key, is deleted asks first: **Restore and update** brings back the deleted annotation with its configuration and history; **Create new** replaces it with an empty one.
 
 The command palette (`Ctrl K` / `⌘ K`) finds annotations, pages, projects and actions.
 

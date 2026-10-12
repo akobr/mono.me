@@ -3,6 +3,7 @@ import type {
   Account,
   AccountRole,
   Annotation,
+  AnnotationAuditEntry,
   Invitation,
   MachineAccess,
   SharedCertificate,
@@ -22,7 +23,12 @@ export interface MockUser {
 
 export interface AnnotationOverrides {
   upserts: Record<string, Annotation>
+  /** Keys missing from the catalog: deleted (soft, then in `trash`) or deleted permanently. */
   deleted: string[]
+  /** Soft-deleted annotations, with their Deletion, until a restore, a re-create or a permanent delete. */
+  trash?: Record<string, Annotation>
+  /** The change history per key, oldest first; a key without one gets a synthetic Created entry. */
+  audit?: Record<string, AnnotationAuditEntry[]>
 }
 
 export interface MockDb {

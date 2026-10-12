@@ -2,9 +2,11 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useForm } from 'vee-validate'
-import type { Annotation } from '@42for.net/2splatform.sdk'
+import { hasErrorCode, type Annotation } from '@42for.net/2splatform.sdk'
 import {
   annotationFormSchema,
+  annotationLimits,
+  invalidAnnotationFields,
   readOnlyIssues,
   toAnnotationBody,
   toAnnotationDraft,
@@ -29,12 +31,11 @@ const actions = useAnnotationActions()
 const canEdit = useCan('edit')
 const toast = useToast()
 
-const { values, errors, meta, defineField, setValues, resetForm, handleSubmit, isSubmitting } = useForm<AnnotationForm>(
-  {
+const { values, errors, meta, defineField, setValues, setFieldError, resetForm, handleSubmit, isSubmitting } =
+  useForm<AnnotationForm>({
     validationSchema: toTypedSchema(annotationFormSchema),
     initialValues: toAnnotationDraft(props.annotation),
-  },
-)
+  })
 
 const [title, titleAttrs] = defineField('Title')
 const [description] = defineField('Description')
@@ -86,9 +87,20 @@ const save = handleSubmit(async (draft) => {
     resetForm({ values: toAnnotationDraft(saved) })
     toast.add({ title: 'Annotation saved', color: 'success', icon: 'i-lucide-check' })
   } catch (error) {
+    // 400 InvalidAnnotation names the field and its limit: the message goes to that field.
+    if (hasErrorCode(error, 'InvalidAnnotation')) {
+      for (const [field, message] of Object.entries(invalidAnnotationFields(error.message))) {
+        setFieldError(field as keyof AnnotationForm, message)
+      }
+    }
     toast.add({ title: 'The annotation was not saved', description: errorMessage(error), color: 'error' })
   }
 })
+
+// The description editor counts the characters near the limit.
+const descriptionLength = computed(() => description.value?.length ?? 0)
+const showDescriptionCount = computed(() => descriptionLength.value > annotationLimits.Description * 0.9)
+const countFormat = new Intl.NumberFormat('en-US')
 
 const revert = () => resetForm({ values: toAnnotationDraft(props.annotation) })
 
@@ -157,7 +169,16 @@ const link = (key: string) => ({
         <UInput v-model="title" v-bind="titleAttrs" :disabled="readonly" class="w-full" />
       </UFormField>
 
-      <UFormField label="Description" name="Description">
+      <UFormField
+        label="Description"
+        name="Description"
+        :error="errors.Description"
+        :hint="
+          showDescriptionCount
+            ? `${countFormat.format(descriptionLength)} / ${countFormat.format(annotationLimits.Description)}`
+            : undefined
+        "
+      >
         <UTabs
           v-model="descriptionTab"
           :items="[

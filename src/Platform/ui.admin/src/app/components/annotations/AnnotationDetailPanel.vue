@@ -2,7 +2,7 @@
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { isNotFound } from '@42for.net/2splatform.sdk'
-import { useAnnotation } from '@/queries/scope'
+import { useAnnotation, useDeletedAnnotation } from '@/queries/scope'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -10,6 +10,7 @@ import { usePreferencesStore } from '@/stores/preferences'
 /**
  * The annotation detail beside the grid or the graph (spec section 11.1). The detail always works on a fresh
  * GetAnnotation, never on the catalog snapshot; the tabs are child routes rendered by the inner <RouterView>.
+ * A key that is not found is asked for among the deleted annotations: a deleted one shows its history with Restore.
  */
 const props = withDefaults(defineProps<{ section?: 'annotations' | 'graph' }>(), { section: 'annotations' })
 
@@ -22,6 +23,8 @@ const preferences = usePreferencesStore()
 const key = computed(() => String((route.params as { key: string }).key))
 const query = useAnnotation(key)
 const annotation = computed(() => query.data.value ?? catalog.byKey.get(key.value))
+const notFound = computed(() => query.isError.value && isNotFound(query.error.value))
+const deleted = useDeletedAnnotation(key, notFound)
 
 watch(key, (value) => preferences.rememberKey(value), { immediate: true })
 
@@ -33,15 +36,23 @@ function close() {
 <template>
   <DetailPanel :id="`${section}-detail`" :title="annotation?.Name ?? key" @close="close">
     <template #header="{ close: closePanel }">
-      <AnnotationDetail :annotation-key="key" :annotation="annotation" :section="section" @close="closePanel" />
+      <AnnotationDetail
+        :annotation-key="key"
+        :annotation="notFound ? undefined : annotation"
+        :section="section"
+        :deleted="notFound && !!deleted.data.value"
+        @close="closePanel"
+      />
     </template>
 
     <LoadingState v-if="query.isPending.value && !annotation" />
+    <LoadingState v-else-if="notFound && deleted.isPending.value" />
+    <AnnotationHistory v-else-if="notFound && deleted.data.value" :annotation-key="key" @restored="query.refetch()" />
     <EmptyState
-      v-else-if="query.isError.value && isNotFound(query.error.value)"
+      v-else-if="notFound"
       icon="i-lucide-search-x"
       title="Annotation not found"
-      :description="`${key} does not exist in this view. It may have been deleted.`"
+      :description="`${key} does not exist in this view. It may have been deleted permanently.`"
     />
     <ErrorState v-else-if="query.isError.value" :error="query.error.value" @retry="query.refetch()" />
     <RouterView v-else-if="annotation" v-slot="{ Component }">

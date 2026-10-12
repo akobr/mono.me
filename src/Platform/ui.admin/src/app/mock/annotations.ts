@@ -74,6 +74,7 @@ export function generateAnnotations(seed: ScopeSeed): Annotation[] {
   const chance = (probability: number) => next() < probability
   const now = Date.now()
   const day = 24 * 3600 * 1000
+  const seededAt = new Date(now - 30 * day).toISOString()
   const result: Annotation[] = []
 
   const subjects = Array.from({ length: seed.subjects }, (_, index) =>
@@ -102,6 +103,9 @@ export function generateAnnotations(seed: ScopeSeed): Annotation[] {
         IsDisabled: status < 0.04 ? true : undefined,
         ValidFrom: status > 0.97 ? new Date(now + 10 * day).toISOString() : undefined,
         ExpiresAt: status > 0.94 && status <= 0.97 ? new Date(now - 5 * day).toISOString() : undefined,
+        // seeded by the system, like DbCreator's annotations
+        Created: { At: seededAt, By: { Kind: 'System' } },
+        Modified: { At: seededAt, By: { Kind: 'System' } },
         ...extra,
       }),
     )

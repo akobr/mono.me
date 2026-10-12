@@ -19,6 +19,7 @@ declare global {
   const onSignOut: typeof import('./stores/session').onSignOut
   const runLimited: typeof import('./composables/useAnnotationActions').runLimited
   const shortcutGroups: typeof import('./composables/useShortcutsHelp').shortcutGroups
+  const undoKeys: typeof import('./composables/useAnnotationActions').undoKeys
   const useAnnotationActions: typeof import('./composables/useAnnotationActions').useAnnotationActions
   const useAnnotationCreate: typeof import('./composables/useAnnotationCreate').useAnnotationCreate
   const useAnnotationFilter: typeof import('./composables/useAnnotationFilter').useAnnotationFilter
@@ -31,6 +32,8 @@ declare global {
   const useConfirm: typeof import('./composables/useConfirm').useConfirm
   const useContentSearch: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useContentSearch').useContentSearch
   const useContextStore: typeof import('./stores/context').useContextStore
+  const useDeletedKeyCheck: typeof import('./composables/useDeletedKeyCheck').useDeletedKeyCheck
+  const useDeletionToast: typeof import('./composables/useDeletionToast').useDeletionToast
   const useFileUpload: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFileUpload').useFileUpload
   const useFormField: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFormField').useFormField
   const useKbd: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useKbd').useKbd
@@ -51,11 +54,17 @@ declare global {
 // for type re-export
 declare global {
   // @ts-ignore
+  export type { DeletionOutcome, RestoreOutcome } from './composables/useAnnotationActions'
+  import('./composables/useAnnotationActions')
+  // @ts-ignore
   export type { ListMode } from './composables/useAnnotationFilter'
   import('./composables/useAnnotationFilter')
   // @ts-ignore
   export type { ConfirmOptions } from './composables/useConfirm'
   import('./composables/useConfirm')
+  // @ts-ignore
+  export type { DeletedKeyChoice, DeletedKeyCheck } from './composables/useDeletedKeyCheck'
+  import('./composables/useDeletedKeyCheck')
   // @ts-ignore
   export type { Capability, RoleScope } from './composables/useRole'
   import('./composables/useRole')

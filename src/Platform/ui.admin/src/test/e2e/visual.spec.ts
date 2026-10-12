@@ -1,14 +1,34 @@
-import { expect, test } from '@playwright/test'
-import { openApp, type MockScenario } from './support'
+import { expect, test, type Page } from '@playwright/test'
+import { goto, openApp, type MockScenario } from './support'
 
 // Key screens in both themes and both viewports (spec section 18), compared with a 0.2 % tolerance. Fonts render
 // differently per platform, so the baselines are made and compared in the Playwright Linux container only:
 //   npm run test:visual:docker              compare
 //   npm run test:visual:docker -- --update  write new baselines
-const screens: { name: string; path: string; scenario?: MockScenario }[] = [
+/** Moves an annotation to Deleted through the mock API, then shows `path` again. */
+const deleted = (key: string) => async (page: Page, path: string) => {
+  await page.waitForFunction(() => !!navigator.serviceWorker?.controller)
+  await page.evaluate(
+    (target) => fetch(`/api/v1/acme/billing/default/annotations/${target}`, { method: 'DELETE' }),
+    key,
+  )
+  await goto(page, path)
+}
+
+const screens: {
+  name: string
+  path: string
+  scenario?: MockScenario
+  prepare?: (page: Page, path: string) => Promise<void>
+}[] = [
   { name: 'organizations', path: '/orgs' },
   { name: 'annotations', path: '/acme/billing/default/annotations' },
   { name: 'annotation-detail', path: '/acme/billing/default/annotations/exe.northwind.invoicing.prod' },
+  {
+    name: 'annotation-history',
+    path: '/acme/billing/default/annotations/exe.northwind.invoicing.prod/history',
+  },
+  { name: 'deleted', path: '/acme/billing/default/deleted', prepare: deleted('sbt.contoso') },
   { name: 'template', path: '/acme/billing/default/templates/exe' },
   { name: 'schemas', path: '/acme/billing/default/schemas' },
   { name: 'members', path: '/acme/billing/members' },
@@ -31,6 +51,7 @@ for (const [device, options] of Object.entries(viewports)) {
           // The mock data is relative to "now": a fixed clock keeps dates and expiries stable.
           await page.clock.setFixedTime(new Date('2026-10-10T08:00:00Z'))
           await openApp(page, screen.path, screen.scenario)
+          await screen.prepare?.(page, screen.path)
           await page.evaluate(() => document.fonts.ready)
           await expect(page).toHaveScreenshot(`${screen.name}-${device}-${colorScheme}.png`)
         })

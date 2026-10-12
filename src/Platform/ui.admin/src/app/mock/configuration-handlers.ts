@@ -4,7 +4,8 @@ import type { ConfigurationSchema, ConfigurationSummary } from '@42for.net/2spla
 import { codeOfKey, getAllAncestors, metaOf, typeMeta, type AnnotationTypeCode } from '@/utils/annotation-key'
 import { getAt, parsePointer } from '@/utils/json-pointer'
 import { validateAgainst } from '@/utils/schema-validation'
-import { annotationsOf, type MockDb } from './db'
+import { appendAudit, newEntry } from './audit'
+import { annotationsOf, overridesOf, type MockDb } from './db'
 import { diffDocuments } from './diff'
 import {
   deepMerge,
@@ -26,6 +27,23 @@ type KeyParams = ScopeParams & { key: string }
 const projectKey = (params: ScopeParams) => `${params.org}.${params.project}`
 const scopeOf = (params: ScopeParams): ScopeRef => ({ org: params.org, project: params.project, view: params.view })
 const mergeOrder = (key: string) => typeMeta[codeOfKey(key) ?? 'rst'].mergeOrder
+
+const isDeleted = (db: MockDb, params: ScopeParams, key: string) =>
+  !!overridesOf(db, params.org, params.project, params.view).trash?.[key]
+
+/** Like the API: a deleted annotation reads as missing with AnnotationDeleted, and its configuration can't change. */
+function missingOrDeleted(db: MockDb, params: KeyParams, status: 404 | 409): Response | undefined {
+  if (isDeleted(db, params, params.key)) {
+    return errorResponse(
+      status,
+      `The annotation '${params.key}' is deleted; restore it to see or change its configuration.`,
+      'AnnotationDeleted',
+    )
+  }
+  return annotationsOf(db, params.org, params.project, params.view).has(params.key)
+    ? undefined
+    : errorResponse(404, `The annotation ${params.key} does not exist.`, 'NotFound')
+}
 
 export function ownContent(db: MockDb, scope: ScopeRef, key: string): Record<string, unknown> | undefined {
   return latest(getDocument(db, scope, `configuration:${key}`))?.Content
@@ -149,8 +167,11 @@ export const configurationHandlers: HttpHandler[] = [
         return denied
       }
       const scope = scopeOf(params)
+      const annotations = annotationsOf(db, params.org, params.project, params.view)
       const all = documentIds(db, scope, 'configuration:')
-        .map((id) => summary(db, scope, id.slice('configuration:'.length)))
+        .map((id) => id.slice('configuration:'.length))
+        .filter((key) => annotations.has(key))
+        .map((key) => summary(db, scope, key))
         .filter((entry): entry is ConfigurationSummary => !!entry)
       const offset = Number(new URL(request.url).searchParams.get('continuationToken') ?? 0) || 0
       const items = all.slice(offset, offset + pageSize)
@@ -170,10 +191,11 @@ export const configurationHandlers: HttpHandler[] = [
         return denied
       }
       const scope = scopeOf(params)
-      // Like GetRawConfigurationAsync: 404 only for an unknown annotation; without a stored entity the inherited
-      // content comes back with Version 0.
-      if (!annotationsOf(db, params.org, params.project, params.view).has(params.key)) {
-        return errorResponse(404, `The annotation ${params.key} does not exist.`, 'NotFound')
+      // Like GetRawConfigurationAsync: 404 only for an unknown or deleted annotation; without a stored entity the
+      // inherited content comes back with Version 0.
+      const missing = missingOrDeleted(db, params, 404)
+      if (missing) {
+        return missing
       }
       return HttpResponse.json(configurationResponse(db, scope, params.key, effectiveContent(db, scope, params.key)))
     }),
@@ -187,12 +209,14 @@ export const configurationHandlers: HttpHandler[] = [
         return denied
       }
       const scope = scopeOf(params)
-      if (!annotationsOf(db, params.org, params.project, params.view).has(params.key)) {
-        return errorResponse(404, `The annotation ${params.key} does not exist.`, 'NotFound')
+      const missing = missingOrDeleted(db, params, 409)
+      if (missing) {
+        return missing
       }
       const body = (await request.json()) as Record<string, unknown>
       const content = deepMerge(ownContent(db, scope, params.key) ?? {}, body) as Record<string, unknown>
-      putVersion(db, scope, `configuration:${params.key}`, content)
+      const saved = putVersion(db, scope, `configuration:${params.key}`, content)
+      appendAudit(db, scope, params.key, newEntry(db, 'ConfigurationChanged', { ConfigurationVersion: saved.Version }))
       return HttpResponse.json(configurationResponse(db, scope, params.key, effectiveContent(db, scope, params.key)))
     }),
   ),
@@ -205,6 +229,10 @@ export const configurationHandlers: HttpHandler[] = [
         return denied
       }
       const scope = scopeOf(params)
+      const deleted = missingOrDeleted(db, params, 409)
+      if (deleted) {
+        return deleted
+      }
       const operations = (await request.json()) as Operation[]
       const document = structuredClone(ownContent(db, scope, params.key) ?? {})
       let patched: Record<string, unknown>
@@ -236,7 +264,8 @@ export const configurationHandlers: HttpHandler[] = [
         )
       }
 
-      putVersion(db, scope, `configuration:${params.key}`, patched)
+      const saved = putVersion(db, scope, `configuration:${params.key}`, patched)
+      appendAudit(db, scope, params.key, newEntry(db, 'ConfigurationChanged', { ConfigurationVersion: saved.Version }))
       return HttpResponse.json(configurationResponse(db, scope, params.key, effectiveContent(db, scope, params.key)))
     }),
   ),
@@ -248,7 +277,15 @@ export const configurationHandlers: HttpHandler[] = [
       if (denied) {
         return denied
       }
-      deleteDocument(db, scopeOf(params), `configuration:${params.key}`)
+      if (isDeleted(db, params, params.key)) {
+        return missingOrDeleted(db, params, 409)!
+      }
+      const scope = scopeOf(params)
+      const version = latest(getDocument(db, scope, `configuration:${params.key}`))?.Version
+      deleteDocument(db, scope, `configuration:${params.key}`)
+      if (version) {
+        appendAudit(db, scope, params.key, newEntry(db, 'ConfigurationDeleted', { ConfigurationVersion: version }))
+      }
       return new HttpResponse(null, { status: 204 })
     }),
   ),

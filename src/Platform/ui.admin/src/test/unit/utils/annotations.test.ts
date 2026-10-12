@@ -120,7 +120,7 @@ describe('deletedWith', () => {
     'exe.contoso.invoicing.prod',
   ]
 
-  it('follows the cascade of DeleteAnnotationAsync per type', () => {
+  it('takes every descendant in the inheritance graph, for all seven types', () => {
     expect(deletedWith('rst.invoicing', keys).toSorted()).toEqual(
       [
         'unt.invoicing.worker',
@@ -132,15 +132,22 @@ describe('deletedWith', () => {
       ].toSorted(),
     )
     expect(deletedWith('sbt.northwind', keys).toSorted()).toEqual(
-      ['cnt.northwind.prod', 'usg.northwind.invoicing', 'exe.northwind.invoicing.prod', 'uxe.northwind.invoicing.prod.worker'].toSorted(),
+      [
+        'cnt.northwind.prod',
+        'usg.northwind.invoicing',
+        'exe.northwind.invoicing.prod',
+        'uxe.northwind.invoicing.prod.worker',
+      ].toSorted(),
     )
     expect(deletedWith('usg.northwind.invoicing', keys).toSorted()).toEqual(
       ['exe.northwind.invoicing.prod', 'uxe.northwind.invoicing.prod.worker'].toSorted(),
     )
     expect(deletedWith('unt.invoicing.worker', keys)).toEqual(['uxe.northwind.invoicing.prod.worker'])
-    // A context takes its executions, not their units of execution; an execution goes alone.
-    expect(deletedWith('cnt.northwind.prod', keys)).toEqual(['exe.northwind.invoicing.prod'])
-    expect(deletedWith('exe.northwind.invoicing.prod', keys)).toEqual([])
+    // A context takes its executions and their units of execution; an execution takes its units of execution.
+    expect(deletedWith('cnt.northwind.prod', keys).toSorted()).toEqual(
+      ['exe.northwind.invoicing.prod', 'uxe.northwind.invoicing.prod.worker'].toSorted(),
+    )
+    expect(deletedWith('exe.northwind.invoicing.prod', keys)).toEqual(['uxe.northwind.invoicing.prod.worker'])
     expect(deletedWith('uxe.northwind.invoicing.prod.worker', keys)).toEqual([])
   })
 })

@@ -1,14 +1,24 @@
 import { ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
-import { deleteAnnotation, isNotFound, setAnnotation, type Annotation } from '@42for.net/2splatform.sdk'
-import { forgetAnnotation, invalidateAnnotation } from '@/queries/invalidation'
+import {
+  deleteAnnotation,
+  isNotFound,
+  purgeAnnotation,
+  restoreAnnotations,
+  setAnnotation,
+  type Annotation,
+  type AnnotationDeletionResult,
+  type AnnotationKeyFailure,
+} from '@42for.net/2splatform.sdk'
+import { forgetAnnotation, invalidateAnnotation, invalidateDeleted } from '@/queries/invalidation'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
-import { deletedWith } from '@/utils/annotation-key'
 import { normalizeLabels } from '@/utils/labels'
 
 const writeConcurrency = 4
 const deleteConcurrency = 4
+/** RestoreAnnotations accepts at most this many keys in one request. */
+const restoreBatchSize = 100
 
 /** Runs `worker` over the items with at most `limit` running at once. */
 export async function runLimited<T>(
@@ -34,9 +44,29 @@ export function chunk<T>(items: readonly T[], size: number): T[][] {
   return chunks
 }
 
+export interface DeletionOutcome {
+  /** Keys the API did not delete. */
+  failed: string[]
+  /** The deletions of the keys deleted now; a key already deleted returns its existing deletion with no keys. */
+  deletions: AnnotationDeletionResult[]
+}
+
+export interface RestoreOutcome {
+  restored: Annotation[]
+  /** Missing ancestors the API created for the restored keys. */
+  created: string[]
+  failed: AnnotationKeyFailure[]
+}
+
+/** The keys a delete can be undone with: the roots of the deletions made now. */
+export const undoKeys = (deletions: readonly AnnotationDeletionResult[]) =>
+  deletions
+    .filter((deletion) => deletion.DeletedKeys?.length && deletion.Deletion?.RootKey)
+    .map((deletion) => deletion.Deletion!.RootKey!)
+
 /**
- * Saving, deleting and the bulk actions of the annotation screens (spec section 8). Every change updates the
- * catalog entry locally and invalidates the matching detail queries, so nothing reloads the whole catalog.
+ * Saving, deleting, restoring and the bulk actions of the annotation screens (spec section 8). Every change updates
+ * the catalog entry locally and invalidates the matching detail queries, so nothing reloads the whole catalog.
  */
 export function useAnnotationActions() {
   const catalog = useCatalogStore()
@@ -70,7 +100,13 @@ export function useAnnotationActions() {
     try {
       await runLimited(annotations, writeConcurrency, async (annotation) => {
         try {
-          const saved = await setAnnotation(target.org, target.project, target.view, annotation.AnnotationKey, annotation)
+          const saved = await setAnnotation(
+            target.org,
+            target.project,
+            target.view,
+            annotation.AnnotationKey,
+            annotation,
+          )
           catalog.upsert(saved)
           await invalidateAnnotation(queryClient, target, saved.AnnotationKey)
         } catch {
@@ -90,18 +126,20 @@ export function useAnnotationActions() {
   }
 
   /**
-   * DeleteAnnotation per key, four at a time. Returns the keys that failed. The API deletes descendants with some
-   * types (see deletedWith), so they leave the catalog too, and a key already gone (404, for example a child of a
-   * parent deleted in the same batch) counts as deleted.
+   * DeleteAnnotation per key, four at a time. The API moves the annotation and its descendants to Deleted and returns
+   * every key it took (DeletedKeys), so exactly those leave the catalog. A key already gone (404) counts as deleted.
    */
-  async function removeMany(keys: string[]): Promise<string[]> {
+  async function removeMany(keys: string[]): Promise<DeletionOutcome> {
     const target = scope()
     const failed: string[] = []
+    const deletions: AnnotationDeletionResult[] = []
     progress.value = { done: 0, total: keys.length }
     try {
       await runLimited(keys, deleteConcurrency, async (key) => {
+        let result: AnnotationDeletionResult | undefined
         try {
-          await deleteAnnotation(target.org, target.project, target.view, key)
+          result = await deleteAnnotation(target.org, target.project, target.view, key)
+          deletions.push(result)
         } catch (error) {
           if (!isNotFound(error)) {
             failed.push(key)
@@ -110,7 +148,7 @@ export function useAnnotationActions() {
         } finally {
           progress.value = { done: progress.value!.done + 1, total: keys.length }
         }
-        for (const removed of [key, ...deletedWith(key, catalog.byKey.keys())]) {
+        for (const removed of result?.DeletedKeys?.length ? result.DeletedKeys : [key]) {
           catalog.remove(removed)
           forgetAnnotation(queryClient, target, removed)
         }
@@ -118,6 +156,67 @@ export function useAnnotationActions() {
     } finally {
       progress.value = undefined
     }
+    await invalidateDeleted(queryClient, target)
+    void catalog.refreshConfigurations()
+    return { failed, deletions }
+  }
+
+  /**
+   * RestoreAnnotations, up to 100 keys per request. The restored annotations (and the ancestors created for them)
+   * go back into the catalog; a failure of one key does not stop the others.
+   */
+  async function restoreMany(keys: string[], options: { descendants?: boolean } = {}): Promise<RestoreOutcome> {
+    const target = scope()
+    const outcome: RestoreOutcome = { restored: [], created: [], failed: [] }
+
+    for (const batch of chunk([...new Set(keys)], restoreBatchSize)) {
+      const result = await restoreAnnotations(target.org, target.project, target.view, {
+        Keys: batch,
+        Descendants: options.descendants ?? true,
+      })
+      for (const annotation of result.Annotations ?? []) {
+        catalog.upsert(annotation)
+        outcome.restored.push(annotation)
+      }
+      outcome.created.push(...(result.CreatedKeys ?? []))
+      outcome.failed.push(...(result.Failed ?? []))
+    }
+
+    await Promise.all([
+      invalidateDeleted(queryClient, target),
+      ...outcome.restored.map((annotation) => invalidateAnnotation(queryClient, target, annotation.AnnotationKey)),
+    ])
+    void catalog.refreshConfigurations()
+    return outcome
+  }
+
+  /**
+   * PurgeAnnotation per key (Administrator), four at a time. Returns the keys that failed; a key already gone (404,
+   * for example a descendant of a key purged in the same batch) counts as purged.
+   */
+  async function purgeMany(keys: string[]): Promise<string[]> {
+    const target = scope()
+    const failed: string[] = []
+    progress.value = { done: 0, total: keys.length }
+    try {
+      await runLimited(keys, deleteConcurrency, async (key) => {
+        try {
+          const result = await purgeAnnotation(target.org, target.project, target.view, key)
+          for (const purged of result.PurgedKeys ?? [key]) {
+            forgetAnnotation(queryClient, target, purged)
+          }
+        } catch (error) {
+          if (!isNotFound(error)) {
+            failed.push(key)
+          }
+        } finally {
+          progress.value = { done: progress.value!.done + 1, total: keys.length }
+        }
+      })
+    } finally {
+      progress.value = undefined
+    }
+    await invalidateDeleted(queryClient, target)
     return failed
   }
 
@@ -130,6 +229,8 @@ export function useAnnotationActions() {
     saveMany,
     removeMany,
     remove: (key: string) => removeMany([key]),
+    restoreMany,
+    purgeMany,
     setDisabled: (keys: string[], disabled: boolean) =>
       saveMany(selected(keys).map((annotation) => ({ ...annotation, IsDisabled: disabled ? true : null }))),
     addLabel: (keys: string[], label: string) =>

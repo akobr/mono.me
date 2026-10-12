@@ -314,6 +314,13 @@ export const useCatalogStore = defineStore('catalog', () => {
     }
   }
 
+  /** Reloads only the configuration summaries (a delete hides configurations, a restore brings them back). */
+  async function refreshConfigurations(): Promise<void> {
+    if (scope.value) {
+      await loadConfigurations(scope.value, new AbortController().signal)
+    }
+  }
+
   function setConfiguration(key: string, summary: ConfigurationSummary | undefined): void {
     if (!configurations.value) {
       return
@@ -365,6 +372,7 @@ export const useCatalogStore = defineStore('catalog', () => {
     upsert,
     remove,
     setConfiguration,
+    refreshConfigurations,
     reset,
     forgetSnapshot,
   }

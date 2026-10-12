@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
   getRole,
@@ -19,7 +19,7 @@ import { memberRules } from '@/utils/roles'
  * Members of an organization or project (companion spec E2): name, user name or email, role and remove. Role
  * changes set the exact role (`PUT …/members/{accountId}`); the member rules are checked here and by the API.
  */
-const props = defineProps<{ accessPointKey: string }>()
+const props = withDefaults(defineProps<{ accessPointKey: string; highlight?: string }>(), { highlight: undefined })
 
 const session = useSessionStore()
 const queryClient = useQueryClient()
@@ -37,6 +37,18 @@ const rows = computed(() =>
       member,
       rules: memberRules(member, members.data.value ?? [], session.account?.Id, callerRole.value),
     })),
+)
+
+// ?highlight= of a history entry's actor: the row is marked and scrolled into view once the members are loaded.
+watch(
+  () => [props.highlight, members.data.value] as const,
+  async ([highlight, data]) => {
+    if (highlight && data?.some((member) => member.AccountId === highlight)) {
+      await nextTick()
+      document.getElementById(`member-${highlight}`)?.scrollIntoView({ block: 'center' })
+    }
+  },
+  { immediate: true },
 )
 
 const messages: Record<string, string> = {
@@ -107,7 +119,13 @@ async function remove() {
           </tr>
         </thead>
         <tbody class="divide-y divide-default">
-          <tr v-for="{ member, rules } in rows" :key="member.AccountId">
+          <tr
+            v-for="{ member, rules } in rows"
+            :id="`member-${member.AccountId}`"
+            :key="member.AccountId"
+            :class="member.AccountId === highlight ? 'bg-primary/10' : undefined"
+            :aria-current="member.AccountId === highlight ? 'true' : undefined"
+          >
             <td class="px-3 py-2">
               <span class="flex items-center gap-2">
                 <UAvatar :alt="member.Name ?? member.AccountId" size="2xs" />
