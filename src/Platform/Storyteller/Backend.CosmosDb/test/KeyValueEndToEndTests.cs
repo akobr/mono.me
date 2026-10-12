@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Json;
 using _42.Platform.Storyteller.KeyValues;
+using _42.Platform.Storyteller.KeyValues.Policy;
 using _42.Platform.Storyteller.KeyValues.Protection;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,11 +57,13 @@ public class KeyValueEndToEndTests(Startup startup)
     {
         var services = Context.Services;
         var options = Options.Create(new KeyValueOptions { Protection = new KeyValueProtectionOptions { Emulator = true } });
-        var provider = new KeyVaultStandardKeyProvider(KeyVaultClients.CreateKeyClient(_vaultUri, emulator: true, isProduction: false), options);
-        using var protector = new EnvelopeValueProtector([provider], options);
+        var provider = KeyVaultKeyProvider.CreateStandard(KeyVaultClients.CreateKeyClient(_vaultUri, emulator: true, isProduction: false), options);
+        var policies = services.GetRequiredService<IKeyValuePolicyStore>();
+        using var protector = new EnvelopeValueProtector([provider], policies, options);
         var keyValues = new CosmosKeyValueService(
             services.GetRequiredService<IContainerRepositoryProvider>(),
             protector,
+            policies,
             options,
             services.GetRequiredService<IJsonSerializationSettingsProvider>(),
             services.GetRequiredService<IOptions<JsonSerializerSettings>>());

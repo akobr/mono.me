@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <AssemblyName>42.Platform.Storyteller.KeyValues.ClientEncryption</AssemblyName>
+    <RootNamespace>_42.Platform.Storyteller.KeyValues.ClientEncryption</RootNamespace>
+
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <IsPackable>true</IsPackable>
+    <Description>Client-side encryption of 2S Platform key/value secrets (JWE, RSA-OAEP-256 and AES-256-GCM), without runtime dependencies.</Description>
+    <PackageTags>$(PackageTags);platform;2S;jwe;encryption</PackageTags>
+  </PropertyGroup>
+
+</Project>

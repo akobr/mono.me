@@ -7,6 +7,7 @@ using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Configuring;
+using _42.Platform.Storyteller.KeyValues.Policy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -24,17 +25,20 @@ public class ConfigurationHttp
     private readonly IConfigurationService _configuration;
     private readonly IAnnotationService _annotations;
     private readonly IAccessService _access;
+    private readonly IKeyValuePolicyStore _policies;
     private readonly ILogger<ConfigurationHttp> _logger;
 
     public ConfigurationHttp(
         IConfigurationService configuration,
         IAnnotationService annotations,
         IAccessService access,
+        IKeyValuePolicyStore policies,
         ILogger<ConfigurationHttp> logger)
     {
         _configuration = configuration;
         _annotations = annotations;
         _access = access;
+        _policies = policies;
         _logger = logger;
     }
 
@@ -145,20 +149,24 @@ public class ConfigurationHttp
             return badRequestResult;
         }
 
-        var hasRightsForSecrets = request.TryCheckScope(Scopes.Configuration.Secrets);
-        if (!hasRightsForSecrets && request.TryCheckScope(Scopes.User.Impersonation))
-        {
-            var accountId = request.GetIdentityUniqueId();
-            var accessRole = await _access.GetAccountRoleAsync(accountId, $"{organization}.{project}");
-            hasRightsForSecrets = accessRole >= AccountRole.ContributorWithSecrets;
-        }
-
+        // secrets go to machines only over mTLS when the project says so; a withheld read says why in a header
+        var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        var configurationModel = await _configuration.GetResolvedConfigurationAsync(fullKey, hasRightsForSecrets);
+        var configurationModel = await _configuration.GetResolvedConfigurationAsync(fullKey, rights.CanReadSecrets);
 
         if (configurationModel is null)
         {
             return await NotFoundAsync(fullKey);
+        }
+
+        if (rights.IsWithheldByMtls)
+        {
+            request.SetResponseHeader(SecretRights.WithheldHeader, SecretRights.WithheldByMtls);
+        }
+
+        if (rights.CanReadSecrets)
+        {
+            request.MarkNoStore();
         }
 
         return new OkObjectResult(configurationModel);

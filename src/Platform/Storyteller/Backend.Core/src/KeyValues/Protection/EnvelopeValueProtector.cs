@@ -1,6 +1,8 @@
 using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
+using _42.Platform.Storyteller.KeyValues.Policy;
+using _42.Platform.Storyteller.KeyValues.Usage;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -10,6 +12,7 @@ namespace _42.Platform.Storyteller.KeyValues.Protection;
 
 // Envelope encryption: a random 256-bit data key and a random 96-bit nonce per version, AES-256-GCM with the
 // place of the version as associated data, and the data key wrapped by the level's key-encryption key.
+// Client-encrypted (Hyok) values are validated against the project's recipients and stored as they are.
 public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
 {
     public const string AssociatedDataPrefix = "2s.kv.v1";
@@ -19,25 +22,38 @@ public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
     private const int TagSize = 16;
 
     private readonly IReadOnlyDictionary<KeyValueProtection, IKeyEncryptionProvider> _providers;
+    private readonly IKeyValuePolicyStore _policies;
     private readonly KeyValueProtectionOptions _options;
+    private readonly IKeyValueUsageRecorder? _usage;
     private readonly MemoryCache _cache;
     private readonly ILogger<EnvelopeValueProtector> _logger;
 
     public EnvelopeValueProtector(
         IEnumerable<IKeyEncryptionProvider> providers,
+        IKeyValuePolicyStore policies,
         IOptions<KeyValueOptions> options,
+        IKeyValueUsageRecorder? usage = null,
         ILogger<EnvelopeValueProtector>? logger = null)
     {
         _providers = providers.ToDictionary(provider => provider.Protection);
+        _policies = policies;
         _options = options.Value.Protection;
+        _usage = usage;
         _cache = new MemoryCache(new MemoryCacheOptions { SizeLimit = Math.Max(1, _options.CacheSizeLimit) });
         _logger = logger ?? NullLogger<EnvelopeValueProtector>.Instance;
     }
+
+    public IReadOnlyCollection<KeyValueProtection> ConfiguredProtections => _providers.Keys.ToList();
 
     public static byte[] BuildAssociatedData(KeyValueIdentity identity, KeyValueProtection protection)
     {
         return Encoding.UTF8.GetBytes(
             $"{AssociatedDataPrefix}|{identity.Organization}|{identity.Project}|{identity.View}|{identity.Key}|{identity.Version}|{protection}");
+    }
+
+    public bool IsConfigured(KeyValueProtection protection)
+    {
+        return protection is KeyValueProtection.Public or KeyValueProtection.Hyok || _providers.ContainsKey(protection);
     }
 
     public async Task<StoredValue> ProtectAsync(
@@ -50,8 +66,6 @@ public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
         ArgumentNullException.ThrowIfNull(identity);
         ArgumentNullException.ThrowIfNull(value);
 
-        var plaintext = Encoding.UTF8.GetBytes(value);
-
         switch (protection)
         {
             case KeyValueProtection.Public:
@@ -60,16 +74,27 @@ public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
                     Protection = protection,
                     ContentType = contentType,
                     Value = value,
-                    Length = plaintext.Length,
+                    Length = Encoding.UTF8.GetByteCount(value),
+                };
+
+            case KeyValueProtection.Hyok:
+                var policy = await _policies.GetAsync(identity.Organization, identity.Project, cancellationToken);
+                var recipients = ClientEncryptedValueValidator.Validate(value, identity, policy.Recipients);
+                return new StoredValue
+                {
+                    Protection = protection,
+                    ContentType = contentType,
+                    Value = value,
+                    Recipients = recipients,
+                    Length = value.Length,
                 };
 
             case KeyValueProtection.Standard:
             case KeyValueProtection.Hsm:
             case KeyValueProtection.Byok:
-                return await EncryptAsync(identity, protection, plaintext, contentType, cancellationToken);
+                return await EncryptAsync(identity, protection, Encoding.UTF8.GetBytes(value), contentType, cancellationToken);
 
             default:
-                // client-side encryption (Hyok) is validated and stored by Phase 1b
                 throw KeyValueErrors.ProtectionNotConfigured(protection);
         }
     }
@@ -114,8 +139,12 @@ public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
 
     private TimeSpan GetCacheDuration(KeyValueProtection protection)
     {
-        // the HSM and BYOK levels get their own durations in Phase 1b
-        return _options.Standard.CacheDuration;
+        return protection switch
+        {
+            KeyValueProtection.Hsm => _options.Hsm.CacheDuration,
+            KeyValueProtection.Byok => _options.Byok.CacheDuration,
+            _ => _options.Standard.CacheDuration,
+        };
     }
 
     private async Task<StoredValue> EncryptAsync(
@@ -126,6 +155,7 @@ public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
         CancellationToken cancellationToken)
     {
         var provider = GetProvider(protection);
+        var policy = await _policies.GetAsync(identity.Organization, identity.Project, cancellationToken);
         var dataKey = new byte[DataKeySize];
 
         try
@@ -144,7 +174,8 @@ public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
                     BuildAssociatedData(identity, protection));
             }
 
-            var wrapped = await provider.WrapAsync(identity.Scope, dataKey, cancellationToken);
+            var wrapped = await provider.WrapAsync(identity.Scope, policy, dataKey, cancellationToken);
+            _usage?.Add(identity.Organization, identity.Project, KeyValueUsageMeters.KmsOf(protection));
 
             return new StoredValue
             {
@@ -180,7 +211,9 @@ public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
             ?? throw new KeyValueIntegrityException($"The '{value.Protection}' value of '{identity.Key}' version {identity.Version} has no ciphertext.");
 
         var provider = GetProvider(value.Protection);
-        var dataKey = await provider.UnwrapAsync(identity.Scope, encrypted, cancellationToken);
+        var policy = await _policies.GetAsync(identity.Organization, identity.Project, cancellationToken);
+        var dataKey = await provider.UnwrapAsync(identity.Scope, policy, encrypted, cancellationToken);
+        _usage?.Add(identity.Organization, identity.Project, KeyValueUsageMeters.KmsOf(value.Protection));
         byte[]? plaintext = null;
 
         try

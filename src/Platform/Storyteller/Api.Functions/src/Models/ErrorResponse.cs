@@ -18,5 +18,8 @@ public class ErrorResponse
 
     public string? ErrorCode { get; set; }
 
+    // Structured details of some errors, e.g. the failing items of an import.
+    public object? Details { get; set; }
+
     public ExceptionWrapper? Error { get; set; }
 }

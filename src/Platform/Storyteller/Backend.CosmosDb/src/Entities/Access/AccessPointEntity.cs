@@ -17,4 +17,7 @@ public record class AccessPointEntity
     public required Dictionary<string, AccountRole> AccessMap { get; init; } = new();
 
     public MachineAuthenticationPolicy? MachineAuthentication { get; init; }
+
+    // The key/value policy of a project; null means the defaults.
+    public KeyValuePolicy? KeyValues { get; init; }
 }

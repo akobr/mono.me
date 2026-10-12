@@ -43,6 +43,8 @@ A `View` has `Name`, `Description`, `CreatedAt`, `CreatedBy`, `IsDefault`, and `
 | Read deleted annotations and the history of an annotation | `Reader` on the project |
 | Delete, restore, and re-create annotations | `Contributor` on the project; machines with annotation write |
 | Delete an annotation permanently (`DELETE …/annotations/deleted/{key}`) | `Administrator` on the project, users only: machine credentials get `403` |
+| Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, or the scope `Configuration.Secrets` (see [key-values.md](key-values.md#secret-delivery)) |
+| Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project |
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
 

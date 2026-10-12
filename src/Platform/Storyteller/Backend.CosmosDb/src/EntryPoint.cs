@@ -7,7 +7,10 @@ using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Json;
 using _42.Platform.Storyteller.KeyValues;
+using _42.Platform.Storyteller.KeyValues.Audit;
+using _42.Platform.Storyteller.KeyValues.Policy;
 using _42.Platform.Storyteller.KeyValues.Protection;
+using _42.Platform.Storyteller.KeyValues.Usage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -124,6 +127,16 @@ public static class EntryPoint
         services.Configure<KeyValueOptions>(configuration.GetSection(KeyValueOptions.SectionName));
         services.TryAddSingleton<IValueProtector, EnvelopeValueProtector>();
         services.AddSingleton<IKeyValueService, CosmosKeyValueService>();
+        services.AddSingleton<IKeyValuePolicyStore, CosmosKeyValuePolicyStore>();
+        services.AddSingleton<IKeyValuePolicyService, CosmosKeyValuePolicyService>();
+        services.AddSingleton<IKeyValueMaintenanceService, CosmosKeyValueMaintenanceService>();
+        services.AddSingleton<IKeyValueAuditLog, CosmosKeyValueAuditLog>();
+        services.AddSingleton<IKeyValueUsageRecorder, KeyValueUsageRecorder>();
+        services.AddSingleton<IKeyValueUsageStore, CosmosKeyValueUsageStore>();
+        services.AddSingleton<IKeyValueUsageService, CosmosKeyValueUsageService>();
+
+        // Machine certificates in Cosmos, so every instance recognizes them (AddCertificateMachineAccess keeps this one).
+        services.AddSingleton<IClientCertificateStore, CosmosClientCertificateStore>();
 
         // Invitations: the identity provider may replace the sender (AuthKit sends the email through WorkOS).
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));

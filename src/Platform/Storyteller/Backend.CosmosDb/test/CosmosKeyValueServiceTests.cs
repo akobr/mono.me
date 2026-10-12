@@ -656,6 +656,7 @@ public class CosmosKeyValueServiceTests(Startup startup)
         return new CosmosKeyValueService(
             services.GetRequiredService<IContainerRepositoryProvider>(),
             services.GetRequiredService<IValueProtector>(),
+            services.GetRequiredService<KeyValues.Policy.IKeyValuePolicyStore>(),
             options,
             services.GetRequiredService<Json.IJsonSerializationSettingsProvider>(),
             services.GetRequiredService<IOptions<JsonSerializerSettings>>());
