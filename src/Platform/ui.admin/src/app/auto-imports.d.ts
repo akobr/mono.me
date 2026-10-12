@@ -90,7 +90,7 @@ declare global {
   export type { Scope, ContextAccess } from './stores/context'
   import('./stores/context')
   // @ts-ignore
-  export type { RememberedSection, AnnotationsMemory, ConfigurationsMemory, GraphLayoutMemory, GraphTransform, GraphMemory, SectionMemories } from './stores/page-memory'
+  export type { RememberedSection, AnnotationsMemory, ConfigurationsMemory, GraphFrameMemory, GraphTransform, GraphMemory, SectionMemories } from './stores/page-memory'
   import('./stores/page-memory')
   // @ts-ignore
   export type { DocumentFormat, EditorMode, Density, GridPreferences, Preferences } from './stores/preferences'

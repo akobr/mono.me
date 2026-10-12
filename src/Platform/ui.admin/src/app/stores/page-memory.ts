@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import { defineStore } from 'pinia'
 import type { RowSelectionState, SortingState } from '@tanstack/vue-table'
+import type { GraphLayout } from '@/components/graph/graph-model'
 import type { AnnotationTypeCode } from '@/utils/annotation-key'
 import type { Scope } from './context'
 import { onSignOut } from './session'
@@ -28,8 +29,9 @@ export interface ConfigurationsMemory {
   scrollTop: number
 }
 
-/** A graph layout as it was left: positions by key, the alpha it had cooled to and the dragged nodes. */
-export interface GraphLayoutMemory {
+/** The last frame of the graph: its layout, positions by key, the alpha it had cooled to and the dragged nodes. */
+export interface GraphFrameMemory {
+  layout: GraphLayout
   keys: readonly string[]
   /** Interleaved x/y per key. */
   positions: Float32Array
@@ -47,7 +49,7 @@ export interface GraphMemory {
   hidden: Set<AnnotationTypeCode>
   transform?: GraphTransform
   /** Stored with markRaw: up to 20,000 positions are not made reactive. */
-  layout?: GraphLayoutMemory
+  frame?: GraphFrameMemory
 }
 
 export interface SectionMemories {

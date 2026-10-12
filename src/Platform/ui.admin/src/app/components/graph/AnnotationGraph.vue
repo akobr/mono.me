@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, markRaw, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useElementSize, useMutationObserver, usePreferredReducedMotion } from '@vueuse/core'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
+import type { GraphFrameMemory, GraphTransform } from '@/stores/page-memory'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useTypeAppearanceStore } from '@/stores/type-appearance'
 import { typeCodes, typeMeta, type AnnotationTypeCode } from '@/utils/annotation-key'
@@ -24,7 +25,8 @@ import type { SimulationCommand, SimulationFrame } from './simulation-protocol'
  * The annotation graph (spec section 12). The visible set is the whole view, or in focus mode the k-hop
  * neighbourhood of one annotation widened by the filter matches. Above 5,000 annotations the graph opens in focus
  * mode. The layout runs in a worker; GraphCanvas draws the positions it streams.
- * URL state: `q` (filter), `layout`, `focus`, `depth`, `all`.
+ * URL state: `q` (filter), `layout`, `focus`, `depth`, `all`. The page memory of the view keeps the hidden types,
+ * the last frame of the layout and the zoom, so the graph comes back exactly as it was left.
  */
 const props = defineProps<{ selectedKey?: string }>()
 const emit = defineEmits<{ open: [key: string]; close: [] }>()
@@ -39,6 +41,7 @@ const catalog = useCatalogStore()
 const context = useContextStore()
 const preferences = usePreferencesStore()
 const typeAppearance = useTypeAppearanceStore()
+const memory = usePageMemory('graph')
 const filter = useAnnotationFilter()
 const confirm = useConfirm()
 const toast = useToast()
@@ -47,6 +50,7 @@ const reducedMotion = usePreferredReducedMotion()
 const container = useTemplateRef<HTMLDivElement>('container')
 const canvas = useTemplateRef<{
   fit: (indexes?: readonly number[]) => void
+  restore: (value: GraphTransform) => void
   reveal: (index: number) => void
   toBlob: () => Promise<Blob | null>
   frames: () => number
@@ -80,7 +84,10 @@ const depth = computed({
   set: (value: number) => updateQuery({ depth: value === 2 ? undefined : String(value) }),
 })
 const showAll = computed(() => queryText('all') === '1')
-const hidden = ref(new Set<AnnotationTypeCode>())
+const hidden = computed<Set<AnnotationTypeCode>>({
+  get: () => memory.value.hidden,
+  set: (value) => (memory.value.hidden = value),
+})
 
 const hasData = computed(() => catalog.status === 'ready' || catalog.fromSnapshot)
 const large = computed(() => catalog.loadedCount > focusThreshold)
@@ -215,16 +222,38 @@ function post(command: SimulationCommand, transfer: Transferable[] = []) {
   worker?.postMessage(command, transfer)
 }
 
-function startSimulation(next: GraphData, previous: GraphData, previousPositions: Float32Array | undefined) {
+/** Where a new layout starts: positions by node key, and the remembered frame when they come from the memory. */
+interface LayoutSeed {
+  index: ReadonlyMap<string, number>
+  positions: Float32Array
+  remembered?: GraphFrameMemory
+}
+
+/** The current layout while there is one, otherwise the last frame of the view's graph from an earlier visit. */
+function layoutSeed(current: GraphData): LayoutSeed | undefined {
+  if (positions.value) {
+    return { index: current.index, positions: positions.value }
+  }
+  const frame = memory.value.frame
+  return (
+    frame && {
+      index: new Map(frame.keys.map((key, index) => [key, index])),
+      positions: frame.positions,
+      remembered: frame,
+    }
+  )
+}
+
+function startSimulation(next: GraphData, from: LayoutSeed | undefined) {
   const count = next.nodes.length
   const seed = new Float32Array(count * 2).fill(Number.NaN)
   let seeded = 0
-  if (previousPositions) {
+  if (from) {
     next.nodes.forEach((node, index) => {
-      const old = previous.index.get(node.key)
+      const old = from.index.get(node.key)
       if (old !== undefined) {
-        seed[index * 2] = previousPositions[old * 2]!
-        seed[index * 2 + 1] = previousPositions[old * 2 + 1]!
+        seed[index * 2] = from.positions[old * 2]!
+        seed[index * 2 + 1] = from.positions[old * 2 + 1]!
         seeded++
       }
     })
@@ -237,12 +266,20 @@ function startSimulation(next: GraphData, previous: GraphData, previousPositions
   const tiers = Float32Array.from(next.nodes, (node) => node.tier)
   const radii = Float32Array.from(next.nodes, (node) => node.radius)
   const keepsShape = seeded > count / 2
+  // The same nodes in the same layout as the remembered frame: it resumes with its alpha and its dragged nodes.
+  const resumed =
+    from?.remembered && seeded === count && from.remembered.layout === layout.value ? from.remembered : undefined
+  const pins =
+    resumed?.pinned.flatMap((key) => {
+      const index = next.index.get(key)
+      return index === undefined ? [] : [index]
+    }) ?? []
 
   generation++
   fitted = keepsShape
   settledFit = keepsShape
   layingOut.value = !!worker && count > 0
-  pinned.value = new Set()
+  pinned.value = new Set(pins)
   post(
     {
       type: 'init',
@@ -255,9 +292,21 @@ function startSimulation(next: GraphData, previous: GraphData, previousPositions
       // The large layered layout is pre-warmed before the first frame (spec section 12), then streamed.
       prewarm: keepsShape ? 0 : count > focusThreshold ? 300 : count > 1_500 ? 100 : 0,
       reducedMotion: reducedMotion.value === 'reduce',
+      resume: resumed ? { alpha: resumed.alpha, pinned: Uint32Array.from(pins) } : undefined,
     },
     [tiers.buffer, radii.buffer, links.buffer, seed.buffer],
   )
+
+  // A remembered layout that keeps its shape gets its zoom back; without a remembered zoom it is fitted.
+  if (from?.remembered && keepsShape) {
+    const view = memory.value.transform
+    if (view && canvas.value) {
+      canvas.value.restore(view)
+    } else {
+      fitted = false
+      settledFit = false
+    }
+  }
 }
 
 watch(
@@ -273,19 +322,29 @@ watch(
       return
     }
     const next = buildGraph(keys, descendants.value)
-    const previousPositions = positions.value
+    const seed = layoutSeed(current)
     graph.value = next
     positions.value = undefined
-    startSimulation(next, current, previousPositions)
+    startSimulation(next, seed)
   },
   { immediate: true },
 )
+
+const nodeKeys = computed(() => graph.value.nodes.map((node) => node.key))
 
 function onFrame(event: MessageEvent<SimulationFrame>) {
   if (event.data.generation !== generation) {
     return
   }
   positions.value = event.data.positions
+  // Every frame is remembered by reference: the worker transfers a new buffer each time and never reuses it.
+  memory.value.frame = markRaw({
+    layout: layout.value,
+    keys: nodeKeys.value,
+    positions: event.data.positions,
+    alpha: event.data.alpha,
+    pinned: [...pinned.value].map((index) => graph.value.nodes[index]!.key),
+  })
   layingOut.value = false
   if (!fitted) {
     fitted = true
@@ -305,7 +364,7 @@ onMounted(() => {
   worker = new Worker(new URL('./simulation.worker.ts', import.meta.url), { type: 'module' })
   worker.addEventListener('message', onFrame)
   if (graph.value.nodes.length) {
-    startSimulation(graph.value, graph.value, undefined)
+    startSimulation(graph.value, layoutSeed(graph.value))
   }
 })
 
@@ -530,6 +589,7 @@ const waitingForFocus = computed(() => hasData.value && large.value && !focusKey
         @drag-end="post({ type: 'dragEnd' })"
         @release-all="releaseAll"
         @interact="onInteract"
+        @transform="(value) => (memory.transform = value)"
       />
 
       <GraphTooltip

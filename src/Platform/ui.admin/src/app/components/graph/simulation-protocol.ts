@@ -16,6 +16,11 @@ export interface SimulationInit {
   layout: GraphLayout
   /** Ticks to run before the first frame (pre-warm for large graphs). */
   prewarm: number
+  /**
+   * Resumes a remembered layout of exactly these nodes (the seed knows every one): the alpha it had cooled to,
+   * and the indexes of the nodes the user had dragged, which stay pinned where they are.
+   */
+  resume?: { alpha: number; pinned: Uint32Array }
   reducedMotion: boolean
 }
 
