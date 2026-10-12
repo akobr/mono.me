@@ -268,6 +268,186 @@ namespace _42.Platform.Storyteller.Sdk
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task RevokeSharedCertificateAsync(string organization, string project, string thumbprint, System.Threading.CancellationToken cancellationToken);
 
+        /// <remarks>
+        /// Invitations to the organization or project, newest first. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <returns>The invitations. A pending invitation past its expiry has the status Expired.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Invitations to the organization or project, newest first. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <returns>The invitations. A pending invitation past its expiry has the status Expired.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Invites an email address with a role. Needs Administrator; Owner to offer Owner. With AuthKit and a management key, WorkOS sends the email.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="body">The email, the role, and optionally the validity in days (1 to 30, 7 by default).</param>
+        /// <returns>The pending invitation. IsEmailSent is false when no email went out; share the link instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Invites an email address with a role. Needs Administrator; Owner to offer Owner. With AuthKit and a management key, WorkOS sends the email.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="body">The email, the role, and optionally the validity in days (1 to 30, 7 by default).</param>
+        /// <returns>The pending invitation. IsEmailSent is false when no email went out; share the link instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Sends the invitation email again and restarts its validity. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The renewed invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Sends the invitation email again and restarts its validity. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The renewed invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Revokes a pending invitation. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The revoked invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Revokes a pending invitation. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The revoked invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Pending invitations for the email of the signed-in user. Works before the account exists.
+        /// </remarks>
+        /// <returns>Pending, unexpired invitations; empty when the token has no verified email.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync();
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Pending invitations for the email of the signed-in user. Works before the account exists.
+        /// </remarks>
+        /// <returns>Pending, unexpired invitations; empty when the token has no verified email.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync(System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Accepts the invitation: creates the account when needed and grants the role. The verified email of the token must match.
+        /// </remarks>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The account of the signed-in user, with the new membership.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Accepts the invitation: creates the account when needed and grants the role. The verified email of the token must match.
+        /// </remarks>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The account of the signed-in user, with the new membership.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Declines the invitation. The verified email of the token must match.
+        /// </remarks>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The declined invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Declines the invitation. The verified email of the token must match.
+        /// </remarks>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The declined invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Members of the organization or project, with their names. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <returns>The members, owners first.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Members of the organization or project, with their names. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <returns>The members, owners first.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
+        /// <returns>The member with the new role.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
+        /// <returns>The member with the new role.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <returns>The member was removed.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <returns>The member was removed.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId, System.Threading.CancellationToken cancellationToken);
+
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
@@ -380,7 +560,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -492,7 +682,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -586,7 +786,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -686,7 +896,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -786,7 +1006,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -886,7 +1116,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -986,7 +1226,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -1094,7 +1344,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -1208,7 +1468,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -1322,7 +1592,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -1437,7 +1717,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -1545,7 +1835,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -1746,7 +2046,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -2066,7 +2376,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -2170,7 +2490,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -2268,13 +2598,1400 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
                             throw new ApiException("The shared certificate was not found.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Invitations to the organization or project, newest first. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <returns>The invitations. A pending invitation past its expiry has the status Expired.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key)
+        {
+            return GetInvitationsAsync(key, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Invitations to the organization or project, newest first. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <returns>The invitations. A pending invitation past its expiry has the status Expired.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetInvitationsAsync(string key, System.Threading.CancellationToken cancellationToken)
+        {
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/points/{key}/invitations"
+                    urlBuilder_.Append("v1/access/points/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/invitations");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<Invitation>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The access point doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Invites an email address with a role. Needs Administrator; Owner to offer Owner. With AuthKit and a management key, WorkOS sends the email.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="body">The email, the role, and optionally the validity in days (1 to 30, 7 by default).</param>
+        /// <returns>The pending invitation. IsEmailSent is false when no email went out; share the link instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body)
+        {
+            return CreateInvitationAsync(key, body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Invites an email address with a role. Needs Administrator; Owner to offer Owner. With AuthKit and a management key, WorkOS sends the email.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="body">The email, the role, and optionally the validity in days (1 to 30, 7 by default).</param>
+        /// <returns>The pending invitation. IsEmailSent is false when no email went out; share the link instead.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<Invitation> CreateInvitationAsync(string key, InvitationCreate body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/points/{key}/invitations"
+                    urlBuilder_.Append("v1/access/points/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/invitations");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<Invitation>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Not an email address, the role None, or an invalid validity.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The access point doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A pending invitation for the email already exists (InvitationExists).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Sends the invitation email again and restarts its validity. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The renewed invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id)
+        {
+            return ResendInvitationAsync(key, id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Sends the invitation email again and restarts its validity. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The renewed invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<Invitation> ResendInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (id == null)
+                throw new System.ArgumentNullException("id");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Content = new System.Net.Http.StringContent(string.Empty, System.Text.Encoding.UTF8, "application/json");
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/points/{key}/invitations/{id}/resend"
+                    urlBuilder_.Append("v1/access/points/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/invitations/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(id, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/resend");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<Invitation>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The invitation doesn\'t exist in this access point.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The invitation was already answered or revoked (InvitationNotPending).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Revokes a pending invitation. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The revoked invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id)
+        {
+            return RevokeInvitationAsync(key, id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Revokes a pending invitation. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The revoked invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<Invitation> RevokeInvitationAsync(string key, string id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (id == null)
+                throw new System.ArgumentNullException("id");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("DELETE");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/points/{key}/invitations/{id}"
+                    urlBuilder_.Append("v1/access/points/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/invitations/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(id, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<Invitation>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The invitation doesn\'t exist in this access point.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The invitation was already answered or revoked (InvitationNotPending).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Pending invitations for the email of the signed-in user. Works before the account exists.
+        /// </remarks>
+        /// <returns>Pending, unexpired invitations; empty when the token has no verified email.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync()
+        {
+            return GetMyInvitationsAsync(System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Pending invitations for the email of the signed-in user. Works before the account exists.
+        /// </remarks>
+        /// <returns>Pending, unexpired invitations; empty when the token has no verified email.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Invitation>> GetMyInvitationsAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/invitations/mine"
+                    urlBuilder_.Append("v1/access/invitations/mine");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<Invitation>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Accepts the invitation: creates the account when needed and grants the role. The verified email of the token must match.
+        /// </remarks>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The account of the signed-in user, with the new membership.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id)
+        {
+            return AcceptInvitationAsync(id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Accepts the invitation: creates the account when needed and grants the role. The verified email of the token must match.
+        /// </remarks>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The account of the signed-in user, with the new membership.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<Account> AcceptInvitationAsync(string id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (id == null)
+                throw new System.ArgumentNullException("id");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Content = new System.Net.Http.StringContent(string.Empty, System.Text.Encoding.UTF8, "application/json");
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/invitations/{id}/accept"
+                    urlBuilder_.Append("v1/access/invitations/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(id, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/accept");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<Account>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The invitation doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The invitation is not pending (InvitationNotPending) or has expired (InvitationExpired).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Declines the invitation. The verified email of the token must match.
+        /// </remarks>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The declined invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id)
+        {
+            return DeclineInvitationAsync(id, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Declines the invitation. The verified email of the token must match.
+        /// </remarks>
+        /// <param name="id">The id of the invitation.</param>
+        /// <returns>The declined invitation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<Invitation> DeclineInvitationAsync(string id, System.Threading.CancellationToken cancellationToken)
+        {
+            if (id == null)
+                throw new System.ArgumentNullException("id");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Content = new System.Net.Http.StringContent(string.Empty, System.Text.Encoding.UTF8, "application/json");
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/invitations/{id}/decline"
+                    urlBuilder_.Append("v1/access/invitations/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(id, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/decline");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<Invitation>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The invitation doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The invitation was already answered or revoked (InvitationNotPending).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Members of the organization or project, with their names. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <returns>The members, owners first.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key)
+        {
+            return GetMembersAsync(key, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Members of the organization or project, with their names. Needs Administrator.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <returns>The members, owners first.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<AccessPointMember>> GetMembersAsync(string key, System.Threading.CancellationToken cancellationToken)
+        {
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/points/{key}/members"
+                    urlBuilder_.Append("v1/access/points/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/members");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<AccessPointMember>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The access point doesn\'t exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
+        /// <returns>The member with the new role.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body)
+        {
+            return SetMemberRoleAsync(key, accountId, body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Sets the exact role of a member, up or down. Needs Administrator; Owner to set or change Owner.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <param name="body">The new role. None is not allowed; remove the member instead.</param>
+        /// <returns>The member with the new role.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AccessPointMember> SetMemberRoleAsync(string key, string accountId, MemberRoleUpdate body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (accountId == null)
+                throw new System.ArgumentNullException("accountId");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PUT");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/points/{key}/members/{accountId}"
+                    urlBuilder_.Append("v1/access/points/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/members/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(accountId, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AccessPointMember>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The access point doesn\'t exist, or the account is not a member (MemberNotFound).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The last owner can\'t be demoted (LastOwner), and members can\'t change their own role (SelfRoleChange).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <returns>The member was removed.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId)
+        {
+            return RemoveMemberAsync(key, accountId, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Removes a member. Needs Administrator (Owner to remove an Owner); any member may remove themselves.
+        /// </remarks>
+        /// <param name="key">The key of the access point: organization, or organization.project.</param>
+        /// <param name="accountId">The id of the account (the identity provider's subject).</param>
+        /// <returns>The member was removed.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task RemoveMemberAsync(string key, string accountId, System.Threading.CancellationToken cancellationToken)
+        {
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            if (accountId == null)
+                throw new System.ArgumentNullException("accountId");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("DELETE");
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/points/{key}/members/{accountId}"
+                    urlBuilder_.Append("v1/access/points/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/members/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(accountId, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 204)
+                        {
+                            return;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The access point doesn\'t exist, or the account is not a member (MemberNotFound).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The last owner can\'t be removed (LastOwner).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         {
@@ -2452,18 +4169,18 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="body">The annotations to create.</param>
-        /// <returns>The id of the asynchronous create operation.</returns>
+        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Guid> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="body">The annotations to create.</param>
-        /// <returns>The id of the asynchronous create operation.</returns>
+        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Guid> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -2482,41 +4199,53 @@ namespace _42.Platform.Storyteller.Sdk
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
 
+        /// <remarks>
+        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+        /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="body">The annotation to create or update.</param>
-        /// <returns>The created or updated annotation.</returns>
+        /// <returns>The stored annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+        /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="body">The annotation to create or update.</param>
-        /// <returns>The created or updated annotation.</returns>
+        /// <returns>The stored annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body, System.Threading.CancellationToken cancellationToken);
 
+        /// <remarks>
+        /// Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
+        /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
+        /// <returns>The deletion and the deleted keys, descendants first and the annotation last.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteAnnotationAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
+        /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
+        /// <returns>The deletion and the deleted keys, descendants first and the annotation last.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task DeleteAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -2542,19 +4271,19 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The annotations to create.</param>
-        /// <returns>The id of the asynchronous create operation.</returns>
+        /// <param name="body">The keys, or compact lines, of the annotations to create.</param>
+        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Guid> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The annotations to create.</param>
-        /// <returns>The id of the asynchronous create operation.</returns>
+        /// <param name="body">The keys, or compact lines, of the annotations to create.</param>
+        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<System.Guid> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -2702,6 +4431,213 @@ namespace _42.Platform.Storyteller.Sdk
         /// <returns>The list of units of execution.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="roots">Only the roots of deletions (default true); false lists every deleted annotation.</param>
+        /// <param name="deletionId">Only what one delete removed.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of deleted annotations.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots, string deletionId, string continuationToken);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="roots">Only the roots of deletions (default true); false lists every deleted annotation.</param>
+        /// <param name="deletionId">Only what one delete removed.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of deleted annotations.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots, string deletionId, string continuationToken, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// A deleted annotation with its Deletion.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The deleted annotation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// A deleted annotation with its Deletion.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The deleted annotation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The purged keys, descendants first and the annotation last.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The purged keys, descendants first and the annotation last.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">Up to 100 annotation keys.</param>
+        /// <returns>The deleted annotations among the keys; active and unknown keys are left out.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">Up to 100 annotation keys.</param>
+        /// <returns>The deleted annotations among the keys; active and unknown keys are left out.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">Up to 100 annotation keys, and whether their descendants are restored too.</param>
+        /// <returns>The restored and created annotations, ancestors first, and the keys that failed.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">Up to 100 annotation keys, and whether their descendants are restored too.</param>
+        /// <returns>The restored and created annotations, ancestors first, and the keys that failed.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The history of the annotation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The history of the annotation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Registered views of the project and "default". With discover=true (Administrator), also views found in the project's data.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="discover">Also scan the project's data for views that are not registered (IsRegistered = false). Needs Administrator.</param>
+        /// <returns>The views, "default" first.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Registered views of the project and "default". With discover=true (Administrator), also views found in the project's data.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="discover">Also scan the project's data for views that are not registered (IsRegistered = false). Needs Administrator.</param>
+        /// <returns>The views, "default" first.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Registers a view with an optional description. Needs Administrator.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="body">The view name (2 to 63 lower-case letters, digits or hyphens) and an optional description.</param>
+        /// <returns>The registered view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Registers a view with an optional description. Needs Administrator.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="body">The view name (2 to 63 lower-case letters, digits or hyphens) and an optional description.</param>
+        /// <returns>The registered view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Sets the description of a view and registers it when needed. Needs Administrator.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">The new description; empty clears it.</param>
+        /// <returns>The registered view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Sets the description of a view and registers it when needed. Needs Administrator.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">The new description; empty clears it.</param>
+        /// <returns>The registered view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body, System.Threading.CancellationToken cancellationToken);
 
     }
 
@@ -2854,7 +4790,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -2890,9 +4836,9 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="body">The annotations to create.</param>
-        /// <returns>The id of the asynchronous create operation.</returns>
+        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Guid> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body)
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body)
         {
             return SetAnnotationsAsync(organization, project, view, body, System.Threading.CancellationToken.None);
         }
@@ -2902,9 +4848,9 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="body">The annotations to create.</param>
-        /// <returns>The id of the asynchronous create operation.</returns>
+        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Guid> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -2964,7 +4910,7 @@ namespace _42.Platform.Storyteller.Sdk
                         var status_ = (int)response_.StatusCode;
                         if (status_ == 200)
                         {
-                            var objectResponse_ = await ReadObjectResponseAsync<System.Guid>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<Annotation>>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -2985,7 +4931,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -3116,7 +5072,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -3154,12 +5120,15 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
+        /// <remarks>
+        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+        /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="body">The annotation to create or update.</param>
-        /// <returns>The created or updated annotation.</returns>
+        /// <returns>The stored annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body)
         {
@@ -3167,12 +5136,15 @@ namespace _42.Platform.Storyteller.Sdk
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
+        /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="body">The annotation to create or update.</param>
-        /// <returns>The created or updated annotation.</returns>
+        /// <returns>The stored annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<Annotation> SetAnnotationAsync(string organization, string project, string view, string key, Annotation body, System.Threading.CancellationToken cancellationToken)
         {
@@ -3259,7 +5231,27 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The annotations changed concurrently three times in a row (Conflict); try again.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -3291,25 +5283,31 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
+        /// <remarks>
+        /// Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
+        /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
+        /// <returns>The deletion and the deleted keys, descendants first and the annotation last.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task DeleteAnnotationAsync(string organization, string project, string view, string key)
+        public virtual System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key)
         {
             return DeleteAnnotationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.
+        /// </remarks>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
-        /// <returns>Acknowledge of the deletion.</returns>
+        /// <returns>The deletion and the deleted keys, descendants first and the annotation last.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task DeleteAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationDeletionResult> DeleteAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -3330,6 +5328,7 @@ namespace _42.Platform.Storyteller.Sdk
                 using (var request_ = new System.Net.Http.HttpRequestMessage())
                 {
                     request_.Method = new System.Net.Http.HttpMethod("DELETE");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
 
                     var urlBuilder_ = new System.Text.StringBuilder();
                     if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
@@ -3368,7 +5367,12 @@ namespace _42.Platform.Storyteller.Sdk
                         var status_ = (int)response_.StatusCode;
                         if (status_ == 200)
                         {
-                            return;
+                            var objectResponse_ = await ReadObjectResponseAsync<AnnotationDeletionResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
                         }
                         else
                         if (status_ == 400)
@@ -3384,13 +5388,33 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
                             throw new ApiException("The annotation doesn\'t exist.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The annotations changed concurrently three times in a row (Conflict); try again.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -3536,7 +5560,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -3571,10 +5605,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The annotations to create.</param>
-        /// <returns>The id of the asynchronous create operation.</returns>
+        /// <param name="body">The keys, or compact lines, of the annotations to create.</param>
+        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<System.Guid> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body)
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body)
         {
             return SetAnnotationsSimpleAsync(organization, project, view, body, System.Threading.CancellationToken.None);
         }
@@ -3583,10 +5617,10 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
-        /// <param name="body">The annotations to create.</param>
-        /// <returns>The id of the asynchronous create operation.</returns>
+        /// <param name="body">The keys, or compact lines, of the annotations to create.</param>
+        /// <returns>The created annotations, with the ancestors created for them; existing keys are skipped.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<System.Guid> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<Annotation> body, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> SetAnnotationsSimpleAsync(string organization, string project, string view, System.Collections.Generic.IEnumerable<string> body, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -3646,7 +5680,7 @@ namespace _42.Platform.Storyteller.Sdk
                         var status_ = (int)response_.StatusCode;
                         if (status_ == 200)
                         {
-                            var objectResponse_ = await ReadObjectResponseAsync<System.Guid>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<Annotation>>(response_, headers_, cancellationToken).ConfigureAwait(false);
                             if (objectResponse_.Object == null)
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
@@ -3667,7 +5701,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -3806,7 +5850,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -3945,7 +5999,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -4090,7 +6154,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -4235,7 +6309,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -4386,7 +6470,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -4525,7 +6619,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -4682,7 +6786,1364 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="roots">Only the roots of deletions (default true); false lists every deleted annotation.</param>
+        /// <param name="deletionId">Only what one delete removed.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of deleted annotations.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots, string deletionId, string continuationToken)
+        {
+            return GetDeletedAnnotationsAsync(organization, project, view, roots, deletionId, continuationToken, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="roots">Only the roots of deletions (default true); false lists every deleted annotation.</param>
+        /// <param name="deletionId">Only what one delete removed.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of deleted annotations.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool? roots, string deletionId, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/annotations/deleted"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/annotations/deleted");
+                    urlBuilder_.Append('?');
+                    if (roots != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("roots")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(roots, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (deletionId != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("deletionId")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(deletionId, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (continuationToken != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AnnotationsResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// A deleted annotation with its Deletion.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The deleted annotation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key)
+        {
+            return GetDeletedAnnotationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// A deleted annotation with its Deletion.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The deleted annotation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<Annotation> GetDeletedAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/annotations/deleted/{key}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/annotations/deleted/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<Annotation>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The key is not valid (InvalidKey).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The annotation is not deleted, or does not exist.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The purged keys, descendants first and the annotation last.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key)
+        {
+            return PurgeAnnotationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Deletes a deleted annotation permanently, with its descendants, their configurations (the content stays in the versions) and their history. Needs a user with the Administrator role.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The purged keys, descendants first and the annotation last.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AnnotationPurgeResult> PurgeAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("DELETE");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/annotations/deleted/{key}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/annotations/deleted/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AnnotationPurgeResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The key is not valid (InvalidKey).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The annotation does not exist.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The annotation is not deleted (AnnotationNotDeleted), or a descendant was restored meanwhile (Conflict).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">Up to 100 annotation keys.</param>
+        /// <returns>The deleted annotations among the keys; active and unknown keys are left out.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body)
+        {
+            return FindDeletedAnnotationsAsync(organization, project, view, body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The deleted annotations among the keys. Clients call it with the keys they are about to create and their ancestors, because a create re-creates a deleted key or ancestor.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">Up to 100 annotation keys.</param>
+        /// <returns>The deleted annotations among the keys; active and unknown keys are left out.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, AnnotationKeysRequest body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/annotations/deleted/lookup"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/annotations/deleted/lookup");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<Annotation>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("No keys, more than 100 keys, or an invalid key (InvalidKey).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">Up to 100 annotation keys, and whether their descendants are restored too.</param>
+        /// <returns>The restored and created annotations, ancestors first, and the keys that failed.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body)
+        {
+            return RestoreAnnotationsAsync(organization, project, view, body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Restores deleted annotations, ancestors first. Deleted ancestors are restored alone and missing ones created; with Descendants (default), also everything each key's deletion removed below it. A key that fails does not stop the others.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">Up to 100 annotation keys, and whether their descendants are restored too.</param>
+        /// <returns>The restored and created annotations, ancestors first, and the keys that failed.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AnnotationRestoreResult> RestoreAnnotationsAsync(string organization, string project, string view, AnnotationRestoreRequest body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/annotations/deleted/restore"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/annotations/deleted/restore");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AnnotationRestoreResult>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("No keys, more than 100 keys, or an invalid key (InvalidKey).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The history of the annotation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key)
+        {
+            return GetAnnotationHistoryAsync(organization, project, view, key, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// What happened with an active or deleted annotation and who did it, newest first. Updates carry the previous and the new values; the description is only flagged.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="key">The key of the requested annotation.</param>
+        /// <returns>The history of the annotation.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<AnnotationHistory> GetAnnotationHistoryAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/annotations/{key}/history"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/annotations/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/history");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<AnnotationHistory>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The key is not valid (InvalidKey).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 404)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The annotation does not exist or was deleted permanently.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Registered views of the project and "default". With discover=true (Administrator), also views found in the project's data.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="discover">Also scan the project's data for views that are not registered (IsRegistered = false). Needs Administrator.</param>
+        /// <returns>The views, "default" first.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover)
+        {
+            return GetViewsAsync(organization, project, discover, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Registered views of the project and "default". With discover=true (Administrator), also views found in the project's data.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="discover">Also scan the project's data for views that are not registered (IsRegistered = false). Needs Administrator.</param>
+        /// <returns>The views, "default" first.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<View>> GetViewsAsync(string organization, string project, bool? discover, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/views"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/views");
+                    urlBuilder_.Append('?');
+                    if (discover != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("discover")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(discover, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<View>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.Read, Annotation.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Registers a view with an optional description. Needs Administrator.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="body">The view name (2 to 63 lower-case letters, digits or hyphens) and an optional description.</param>
+        /// <returns>The registered view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body)
+        {
+            return CreateViewAsync(organization, project, body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Registers a view with an optional description. Needs Administrator.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="body">The view name (2 to 63 lower-case letters, digits or hyphens) and an optional description.</param>
+        /// <returns>The registered view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<View> CreateViewAsync(string organization, string project, ViewCreate body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("POST");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/views"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/views");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<View>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The name is not valid or reserved (InvalidName).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The view is already registered, or is \"default\" (ViewExists).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Sets the description of a view and registers it when needed. Needs Administrator.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">The new description; empty clears it.</param>
+        /// <returns>The registered view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body)
+        {
+            return UpdateViewAsync(organization, project, view, body, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Sets the description of a view and registers it when needed. Needs Administrator.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="body">The new description; empty clears it.</param>
+        /// <returns>The registered view.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate body, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    var json_ = Newtonsoft.Json.JsonConvert.SerializeObject(body, JsonSerializerSettings);
+                    var content_ = new System.Net.Http.StringContent(json_);
+                    content_.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json");
+                    request_.Content = content_;
+                    request_.Method = new System.Net.Http.HttpMethod("PUT");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/views/{view}"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/views/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<View>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The name is not valid or reserved (InvalidName).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -4849,6 +8310,33 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial interface IConfigurationsApiClient
     {
+        /// <remarks>
+        /// Configurations of the view without their documents, up to 1000 per page.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">Only this annotation type code (rst, unt, sbt, usg, cnt, exe, uxe).</param>
+        /// <param name="keyPrefix">Only annotation keys starting with this prefix.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of configuration summaries.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType, string keyPrefix, string continuationToken);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Configurations of the view without their documents, up to 1000 per page.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">Only this annotation type code (rst, unt, sbt, usg, cnt, exe, uxe).</param>
+        /// <param name="keyPrefix">Only annotation keys starting with this prefix.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of configuration summaries.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType, string keyPrefix, string continuationToken, System.Threading.CancellationToken cancellationToken);
+
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
@@ -5093,6 +8581,167 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
+        /// <remarks>
+        /// Configurations of the view without their documents, up to 1000 per page.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">Only this annotation type code (rst, unt, sbt, usg, cnt, exe, uxe).</param>
+        /// <param name="keyPrefix">Only annotation keys starting with this prefix.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of configuration summaries.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType, string keyPrefix, string continuationToken)
+        {
+            return GetConfigurationsAsync(organization, project, view, annotationType, keyPrefix, continuationToken, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Configurations of the view without their documents, up to 1000 per page.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <param name="annotationType">Only this annotation type code (rst, unt, sbt, usg, cnt, exe, uxe).</param>
+        /// <param name="keyPrefix">Only annotation keys starting with this prefix.</param>
+        /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <returns>One page of configuration summaries.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<ConfigurationsResponse> GetConfigurationsAsync(string organization, string project, string view, string annotationType, string keyPrefix, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configurations"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configurations");
+                    urlBuilder_.Append('?');
+                    if (annotationType != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("annotationType")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(annotationType, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (keyPrefix != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("keyPrefix")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(keyPrefix, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (continuationToken != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ConfigurationsResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
@@ -5192,13 +8841,27 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
                         {
-                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The requested configuration doesn\'t exist.", status_, responseText_, headers_, null);
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The configuration doesn\'t exist, or the annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -5343,7 +9006,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 409)
@@ -5353,7 +9026,17 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<SchemaValidationErrorResponse>("The configuration violates the schema.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<SchemaValidationErrorResponse>("The configuration violates the schema, or the annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 412)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -5498,7 +9181,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -5518,7 +9211,17 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<SchemaValidationErrorResponse>("The patch violates the configuration schema.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<SchemaValidationErrorResponse>("The patch violates the configuration schema, or the annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 412)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -5643,13 +9346,33 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
                             throw new ApiException("The configuration doesn\'t exist.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 409)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -5781,13 +9504,37 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
                         {
-                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The requested configuration doesn\'t exist.", status_, responseText_, headers_, null);
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The configuration doesn\'t exist, or the annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 422)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A binding in the configuration cannot be evaluated or exceeds an evaluation limit. ErrorCode is binding.evaluation or binding.limit.<kind>.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -5919,7 +9666,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -6057,13 +9814,27 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
                         {
-                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The requested version doesn\'t exist.", status_, responseText_, headers_, null);
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The requested version doesn\'t exist, or the annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -6210,13 +9981,27 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
                         {
-                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The requested version doesn\'t exist.", status_, responseText_, headers_, null);
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The requested version doesn\'t exist, or the annotation is deleted (ErrorCode AnnotationDeleted).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -6369,7 +10154,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -6521,7 +10316,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -6881,6 +10686,27 @@ namespace _42.Platform.Storyteller.Sdk
         /// <returns>The combined configuration schema from all applicable levels.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<CombinedConfigurationSchema> GetCombinedConfigurationSchemaAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+
+        /// <remarks>
+        /// Every schema document of the view (type, annotation, descendant type) without its content.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <returns>The schema summaries: type schemas first, then annotation and descendant-type schemas.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Every schema document of the view (type, annotation, descendant type) without its content.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <returns>The schema summaries: type schemas first, then annotation and descendant-type schemas.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -7279,7 +11105,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -7430,7 +11266,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 409)
@@ -7565,7 +11411,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -7712,7 +11568,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -7863,7 +11729,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 409)
@@ -7998,7 +11874,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -8152,7 +12038,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -8310,7 +12206,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 409)
@@ -8452,7 +12358,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -8600,13 +12516,154 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
                             throw new ApiException("No schemas found for the specified annotation.", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <remarks>
+        /// Every schema document of the view (type, annotation, descendant type) without its content.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <returns>The schema summaries: type schemas first, then annotation and descendant-type schemas.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view)
+        {
+            return GetConfigurationSchemasAsync(organization, project, view, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Every schema document of the view (type, annotation, descendant type) without its content.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <returns>The schema summaries: type schemas first, then annotation and descendant-type schemas.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>> GetConfigurationSchemasAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/configuration-schemas"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/configuration-schemas");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<ConfigurationSchemaSummary>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -8738,7 +12795,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -8876,7 +12943,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -9029,7 +13106,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -9192,7 +13279,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -9334,7 +13431,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -9472,7 +13579,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -9625,7 +13742,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -9788,7 +13915,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -9937,7 +14074,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -10082,7 +14229,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -10242,7 +14399,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -10412,7 +14579,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -10589,6 +14766,27 @@ namespace _42.Platform.Storyteller.Sdk
     [System.CodeDom.Compiler.GeneratedCode("NSwag", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial interface ITemplatesApiClient
     {
+        /// <remarks>
+        /// Templates of the view without their content.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <returns>The template summaries, by annotation type code.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Templates of the view without their content.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <returns>The template summaries, by annotation type code.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken);
+
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
@@ -10791,6 +14989,137 @@ namespace _42.Platform.Storyteller.Sdk
         partial void PrepareRequest(System.Net.Http.HttpClient client, System.Net.Http.HttpRequestMessage request, System.Text.StringBuilder urlBuilder);
         partial void ProcessResponse(System.Net.Http.HttpClient client, System.Net.Http.HttpResponseMessage response);
 
+        /// <remarks>
+        /// Templates of the view without their content.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <returns>The template summaries, by annotation type code.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view)
+        {
+            return GetTemplatesAsync(organization, project, view, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// Templates of the view without their content.
+        /// </remarks>
+        /// <param name="organization">Target organization name.</param>
+        /// <param name="project">Target project name.</param>
+        /// <param name="view">The target view inside the project.</param>
+        /// <returns>The template summaries, by annotation type code.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>> GetTemplatesAsync(string organization, string project, string view, System.Threading.CancellationToken cancellationToken)
+        {
+            if (organization == null)
+                throw new System.ArgumentNullException("organization");
+
+            if (project == null)
+                throw new System.ArgumentNullException("project");
+
+            if (view == null)
+                throw new System.ArgumentNullException("view");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/{organization}/{project}/{view}/templates"
+                    urlBuilder_.Append("v1/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(organization, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(project, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('/');
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/templates");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<System.Collections.Generic.ICollection<ConfigurationTemplateSummary>>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
@@ -10890,7 +15219,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -11033,7 +15372,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 409)
@@ -11044,6 +15393,16 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ErrorResponse>("The template was changed concurrently too many times, the request can be repeated.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 412)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -11180,7 +15539,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -11201,6 +15570,16 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             throw new ApiException<ErrorResponse>("The template was changed concurrently too many times, the request can be repeated.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 412)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -11325,7 +15704,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -11473,7 +15862,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -11611,7 +16010,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -11764,7 +16173,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -11927,7 +16346,17 @@ namespace _42.Platform.Storyteller.Sdk
                         if (status_ == 401)
                         {
                             string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("Authentication or authorization issues. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -12150,6 +16579,34 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AccessPointMember
+    {
+
+        [Newtonsoft.Json.JsonProperty("AccountId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AccountId { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("UserName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string UserName { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Name", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Name { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Role", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AccessPointMemberRole Role { get; set; } = _42.Platform.Storyteller.Sdk.AccessPointMemberRole.None;
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class Account
     {
 
@@ -12238,12 +16695,15 @@ namespace _42.Platform.Storyteller.Sdk
         public string TimeZone { get; set; }
 
         [Newtonsoft.Json.JsonProperty("Title", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [System.ComponentModel.DataAnnotations.StringLength(200)]
         public string Title { get; set; }
 
         [Newtonsoft.Json.JsonProperty("Description", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [System.ComponentModel.DataAnnotations.StringLength(10000)]
         public string Description { get; set; }
 
         [Newtonsoft.Json.JsonProperty("DocumentationLink", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [System.ComponentModel.DataAnnotations.StringLength(2048)]
         public string DocumentationLink { get; set; }
 
         [Newtonsoft.Json.JsonProperty("Labels", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -12251,6 +16711,369 @@ namespace _42.Platform.Storyteller.Sdk
 
         [Newtonsoft.Json.JsonProperty("Values", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.Collections.Generic.IDictionary<string, object> Values { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Created", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Created { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Deletion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AnnotationDeletion Deletion { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationAuditCause
+    {
+
+        [Newtonsoft.Json.JsonProperty("Kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AnnotationAuditCauseKind Kind { get; set; } = _42.Platform.Storyteller.Sdk.AnnotationAuditCauseKind.Cascade;
+
+        [Newtonsoft.Json.JsonProperty("Key", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Key { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationAuditEntry
+    {
+
+        [Newtonsoft.Json.JsonProperty("Id", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Id { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("At", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset At { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Action", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AnnotationAuditEntryAction Action { get; set; } = _42.Platform.Storyteller.Sdk.AnnotationAuditEntryAction.Created;
+
+        [Newtonsoft.Json.JsonProperty("Actor", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditActor Actor { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Cause", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AnnotationAuditCause Cause { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("DeletionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string DeletionId { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("DescendantCount", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? DescendantCount { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Fields", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AnnotationFieldChange> Fields { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Labels", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AnnotationLabelChanges Labels { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Values", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AnnotationValueChange> Values { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ConfigurationVersion", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long? ConfigurationVersion { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationDeletion
+    {
+
+        [Newtonsoft.Json.JsonProperty("DeletionId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string DeletionId { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("RootKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string RootKey { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("DeletedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset DeletedAt { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("DeletedBy", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditActor DeletedBy { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsRoot", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsRoot { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("DescendantCount", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? DescendantCount { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("PurgeAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? PurgeAt { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationDeletionResult
+    {
+
+        [Newtonsoft.Json.JsonProperty("Deletion", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AnnotationDeletion Deletion { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("DeletedKeys", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> DeletedKeys { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationFieldChange
+    {
+
+        [Newtonsoft.Json.JsonProperty("Field", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Field { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Previous", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public object Previous { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsPreviousTruncated", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsPreviousTruncated { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Value", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public object Value { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsValueTruncated", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsValueTruncated { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationHistory
+    {
+
+        [Newtonsoft.Json.JsonProperty("AnnotationKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AnnotationKey { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("State", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AnnotationHistoryState State { get; set; } = _42.Platform.Storyteller.Sdk.AnnotationHistoryState.Active;
+
+        [Newtonsoft.Json.JsonProperty("Entries", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AnnotationAuditEntry> Entries { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsTrimmed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsTrimmed { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationKeyFailure
+    {
+
+        [Newtonsoft.Json.JsonProperty("Key", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Key { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ErrorCode", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ErrorCode { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Message", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Message { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationKeysRequest
+    {
+
+        [Newtonsoft.Json.JsonProperty("Keys", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> Keys { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationLabelChanges
+    {
+
+        [Newtonsoft.Json.JsonProperty("Added", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> Added { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Removed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> Removed { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationPurgeResult
+    {
+
+        [Newtonsoft.Json.JsonProperty("PurgedKeys", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> PurgedKeys { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationRestoreRequest
+    {
+
+        [Newtonsoft.Json.JsonProperty("Keys", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> Keys { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Descendants", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool Descendants { get; set; } = true;
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationRestoreResult
+    {
+
+        [Newtonsoft.Json.JsonProperty("Annotations", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<Annotation> Annotations { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("CreatedKeys", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<string> CreatedKeys { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Failed", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<AnnotationKeyFailure> Failed { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AnnotationValueChange
+    {
+
+        [Newtonsoft.Json.JsonProperty("Key", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Key { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Change", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AnnotationValueChangeChange Change { get; set; } = _42.Platform.Storyteller.Sdk.AnnotationValueChangeChange.Added;
+
+        [Newtonsoft.Json.JsonProperty("PreviousKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AnnotationValueChangePreviousKind? PreviousKind { get; set; } = _42.Platform.Storyteller.Sdk.AnnotationValueChangePreviousKind.Null;
+
+        [Newtonsoft.Json.JsonProperty("Previous", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public object Previous { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsPreviousTruncated", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsPreviousTruncated { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ValueKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AnnotationValueChangeValueKind? ValueKind { get; set; } = _42.Platform.Storyteller.Sdk.AnnotationValueChangeValueKind.Null;
+
+        [Newtonsoft.Json.JsonProperty("Value", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public object Value { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsValueTruncated", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsValueTruncated { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -12456,6 +17279,52 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AuditActor
+    {
+
+        [Newtonsoft.Json.JsonProperty("Kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public AuditActorKind Kind { get; set; } = _42.Platform.Storyteller.Sdk.AuditActorKind.Account;
+
+        [Newtonsoft.Json.JsonProperty("Id", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Id { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Name", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Name { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class AuditStamp
+    {
+
+        [Newtonsoft.Json.JsonProperty("At", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset At { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("By", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditActor By { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class AuthConfiguration
     {
 
@@ -12616,6 +17485,77 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ConfigurationSchemaSummary
+    {
+
+        [Newtonsoft.Json.JsonProperty("Kind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ConfigurationSchemaSummaryKind Kind { get; set; } = _42.Platform.Storyteller.Sdk.ConfigurationSchemaSummaryKind.Type;
+
+        [Newtonsoft.Json.JsonProperty("AnnotationType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AnnotationType { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("AnnotationKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AnnotationKey { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long Version { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Author { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("UpdatedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? UpdatedAt { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ConfigurationSummary
+    {
+
+        [Newtonsoft.Json.JsonProperty("AnnotationKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AnnotationKey { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("AnnotationType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public ConfigurationSummaryAnnotationType AnnotationType { get; set; } = _42.Platform.Storyteller.Sdk.ConfigurationSummaryAnnotationType.Responsibility;
+
+        [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long Version { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Author { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Hash", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Hash { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("UpdatedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? UpdatedAt { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("HasContent", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool HasContent { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ConfigurationTemplate
     {
 
@@ -12643,6 +17583,33 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ConfigurationTemplateSummary
+    {
+
+        [Newtonsoft.Json.JsonProperty("AnnotationType", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AnnotationType { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public long Version { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Author { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("UpdatedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? UpdatedAt { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class ConfigurationVersion
     {
 
@@ -12657,6 +17624,30 @@ namespace _42.Platform.Storyteller.Sdk
 
         [Newtonsoft.Json.JsonProperty("ExpirationTime", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.DateTimeOffset ExpirationTime { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ConfigurationsResponse
+    {
+
+        [Newtonsoft.Json.JsonProperty("Configurations", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.Collections.Generic.ICollection<ConfigurationSummary> Configurations { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ContinuationToken", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ContinuationToken { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Count", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int Count { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -12902,6 +17893,87 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class Invitation
+    {
+
+        [Newtonsoft.Json.JsonProperty("Id", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Id { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("AccessPointKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AccessPointKey { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Email", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Email { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Role", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public InvitationRole Role { get; set; } = _42.Platform.Storyteller.Sdk.InvitationRole.None;
+
+        [Newtonsoft.Json.JsonProperty("Status", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public InvitationStatus Status { get; set; } = _42.Platform.Storyteller.Sdk.InvitationStatus.Pending;
+
+        [Newtonsoft.Json.JsonProperty("InvitedById", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string InvitedById { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("InvitedByName", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string InvitedByName { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("CreatedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset CreatedAt { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ExpiresAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset ExpiresAt { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("AcceptedById", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string AcceptedById { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("RespondedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? RespondedAt { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("ExternalInvitationId", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string ExternalInvitationId { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsEmailSent", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsEmailSent { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class InvitationCreate
+    {
+
+        [Newtonsoft.Json.JsonProperty("Email", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Email { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Role", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public InvitationCreateRole Role { get; set; } = _42.Platform.Storyteller.Sdk.InvitationCreateRole.None;
+
+        [Newtonsoft.Json.JsonProperty("ExpiresInDays", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? ExpiresInDays { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public partial class MachineAccess
     {
 
@@ -12995,6 +18067,25 @@ namespace _42.Platform.Storyteller.Sdk
 
         [Newtonsoft.Json.JsonProperty("CertificateLifetimeDays", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public int? CertificateLifetimeDays { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class MemberRoleUpdate
+    {
+
+        [Newtonsoft.Json.JsonProperty("Role", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MemberRoleUpdateRole Role { get; set; } = _42.Platform.Storyteller.Sdk.MemberRoleUpdateRole.None;
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -13243,6 +18334,78 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class View
+    {
+
+        [Newtonsoft.Json.JsonProperty("Name", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Name { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Description", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Description { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("CreatedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? CreatedAt { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("CreatedBy", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string CreatedBy { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsDefault", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsDefault { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("IsRegistered", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public bool IsRegistered { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ViewCreate
+    {
+
+        [Newtonsoft.Json.JsonProperty("Name", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Name { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("Description", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Description { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public partial class ViewUpdate
+    {
+
+        [Newtonsoft.Json.JsonProperty("Description", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public string Description { get; set; }
+
+        private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
+
+        [Newtonsoft.Json.JsonExtensionData]
+        public System.Collections.Generic.IDictionary<string, object> AdditionalProperties
+        {
+            get { return _additionalProperties ?? (_additionalProperties = new System.Collections.Generic.Dictionary<string, object>()); }
+            set { _additionalProperties = value; }
+        }
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum AccountRole
     {
 
@@ -13267,6 +18430,159 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AccessPointMemberRole
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"None")]
+        None = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Reader")]
+        Reader = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Contributor")]
+        Contributor = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ContributorWithSecrets")]
+        ContributorWithSecrets = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Administrator")]
+        Administrator = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Owner")]
+        Owner = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AnnotationAuditCauseKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Cascade")]
+        Cascade = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Ancestor")]
+        Ancestor = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AnnotationAuditEntryAction
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Created")]
+        Created = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Recreated")]
+        Recreated = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Updated")]
+        Updated = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Deleted")]
+        Deleted = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Restored")]
+        Restored = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ConfigurationChanged")]
+        ConfigurationChanged = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ConfigurationDeleted")]
+        ConfigurationDeleted = 6,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AnnotationHistoryState
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Active")]
+        Active = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Deleted")]
+        Deleted = 1,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AnnotationValueChangeChange
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Added")]
+        Added = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Removed")]
+        Removed = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Changed")]
+        Changed = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AnnotationValueChangePreviousKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Null")]
+        Null = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"String")]
+        String = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Number")]
+        Number = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Boolean")]
+        Boolean = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Object")]
+        Object = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Array")]
+        Array = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AnnotationValueChangeValueKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Null")]
+        Null = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"String")]
+        String = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Number")]
+        Number = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Boolean")]
+        Boolean = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Object")]
+        Object = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Array")]
+        Array = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum AuditActorKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Account")]
+        Account = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Machine")]
+        Machine = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"System")]
+        System = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum CertificateRenewalResultOutcome
     {
 
@@ -13285,6 +18601,48 @@ namespace _42.Platform.Storyteller.Sdk
     }
 
     [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ConfigurationSchemaSummaryKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Type")]
+        Type = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Annotation")]
+        Annotation = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"DescendantType")]
+        DescendantType = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum ConfigurationSummaryAnnotationType
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Responsibility")]
+        Responsibility = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Unit")]
+        Unit = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Subject")]
+        Subject = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Usage")]
+        Usage = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Context")]
+        Context = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Execution")]
+        Execution = 5,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"UnitOfExecution")]
+        UnitOfExecution = 6,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
     public enum DiffLineType
     {
 
@@ -13296,6 +18654,75 @@ namespace _42.Platform.Storyteller.Sdk
 
         [System.Runtime.Serialization.EnumMember(Value = @"Deletion")]
         Deletion = 2,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum InvitationRole
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"None")]
+        None = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Reader")]
+        Reader = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Contributor")]
+        Contributor = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ContributorWithSecrets")]
+        ContributorWithSecrets = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Administrator")]
+        Administrator = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Owner")]
+        Owner = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum InvitationStatus
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Pending")]
+        Pending = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Accepted")]
+        Accepted = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Declined")]
+        Declined = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Revoked")]
+        Revoked = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Expired")]
+        Expired = 4,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum InvitationCreateRole
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"None")]
+        None = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Reader")]
+        Reader = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Contributor")]
+        Contributor = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ContributorWithSecrets")]
+        ContributorWithSecrets = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Administrator")]
+        Administrator = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Owner")]
+        Owner = 5,
 
     }
 
@@ -13380,6 +18807,30 @@ namespace _42.Platform.Storyteller.Sdk
 
         [System.Runtime.Serialization.EnumMember(Value = @"ClientCredentials")]
         ClientCredentials = 3,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MemberRoleUpdateRole
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"None")]
+        None = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Reader")]
+        Reader = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Contributor")]
+        Contributor = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ContributorWithSecrets")]
+        ContributorWithSecrets = 3,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Administrator")]
+        Administrator = 4,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Owner")]
+        Owner = 5,
 
     }
 

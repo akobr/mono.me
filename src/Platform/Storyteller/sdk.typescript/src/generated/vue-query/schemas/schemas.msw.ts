@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.8.91.29486
+ * OpenAPI spec version: 0.9.1.3549
  */
 import { faker } from "@faker-js/faker";
 
@@ -278,52 +278,72 @@ export const getGetSchemaVersionResponseMock = (
 });
 
 export const getGetSchemaVersionDiffResponseMock = (
-  overrideResponse: Partial<Extract<DiffResult, object>> = {},
-): DiffResult => ({
-  Stats: faker.helpers.arrayElement([
+  overrideResponse: Partial<Extract<DiffResult | string, object>> = {},
+): DiffResult | string =>
+  faker.helpers.arrayElement([
     {
-      Additions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Deletions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Unchanged: faker.helpers.arrayElement([faker.number.int(), undefined]),
-    },
-    undefined,
-  ]),
-  Hunks: faker.helpers.arrayElement([
-    Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => ({
-      OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Lines: faker.helpers.arrayElement([
+      Stats: faker.helpers.arrayElement([
+        {
+          Additions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Deletions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Unchanged: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Hunks: faker.helpers.arrayElement([
         Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
         ).map(() => ({
-          Type: faker.helpers.arrayElement([
-            "Unchanged",
-            "Addition",
-            "Deletion",
-          ] as const),
-          Content: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
-            undefined,
-          ]),
-          OldLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          NewLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          Segments: faker.helpers.arrayElement([
+          OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          Lines: faker.helpers.arrayElement([
             Array.from(
               { length: faker.number.int({ min: 1, max: 10 }) },
               (_, i) => i + 1,
             ).map(() => ({
-              Text: faker.helpers.arrayElement([
+              Type: faker.helpers.arrayElement([
+                "Unchanged",
+                "Addition",
+                "Deletion",
+              ] as const),
+              Content: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
-              IsChange: faker.helpers.arrayElement([
-                faker.datatype.boolean(),
+              OldLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              NewLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              Segments: faker.helpers.arrayElement([
+                Array.from(
+                  { length: faker.number.int({ min: 1, max: 10 }) },
+                  (_, i) => i + 1,
+                ).map(() => ({
+                  Text: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  IsChange: faker.helpers.arrayElement([
+                    faker.datatype.boolean(),
+                    undefined,
+                  ]),
+                })),
                 undefined,
               ]),
             })),
@@ -332,59 +352,78 @@ export const getGetSchemaVersionDiffResponseMock = (
         })),
         undefined,
       ]),
-    })),
-    undefined,
-  ]),
-  ...overrideResponse,
-});
+      ...overrideResponse,
+    },
+    '@@ -1,4 +1,5 @@\n {\n-  "owner": "team-a",\n+  "owner": "team-b",\n+  "tag": "v2",\n   "version": 1\n }',
+  ]);
 
 export const getGetSchemaVersionDiffCustomResponseMock = (
-  overrideResponse: Partial<Extract<DiffResult, object>> = {},
-): DiffResult => ({
-  Stats: faker.helpers.arrayElement([
+  overrideResponse: Partial<Extract<DiffResult | string, object>> = {},
+): DiffResult | string =>
+  faker.helpers.arrayElement([
     {
-      Additions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Deletions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Unchanged: faker.helpers.arrayElement([faker.number.int(), undefined]),
-    },
-    undefined,
-  ]),
-  Hunks: faker.helpers.arrayElement([
-    Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => ({
-      OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Lines: faker.helpers.arrayElement([
+      Stats: faker.helpers.arrayElement([
+        {
+          Additions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Deletions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Unchanged: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Hunks: faker.helpers.arrayElement([
         Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
         ).map(() => ({
-          Type: faker.helpers.arrayElement([
-            "Unchanged",
-            "Addition",
-            "Deletion",
-          ] as const),
-          Content: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
-            undefined,
-          ]),
-          OldLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          NewLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          Segments: faker.helpers.arrayElement([
+          OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          Lines: faker.helpers.arrayElement([
             Array.from(
               { length: faker.number.int({ min: 1, max: 10 }) },
               (_, i) => i + 1,
             ).map(() => ({
-              Text: faker.helpers.arrayElement([
+              Type: faker.helpers.arrayElement([
+                "Unchanged",
+                "Addition",
+                "Deletion",
+              ] as const),
+              Content: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
-              IsChange: faker.helpers.arrayElement([
-                faker.datatype.boolean(),
+              OldLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              NewLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              Segments: faker.helpers.arrayElement([
+                Array.from(
+                  { length: faker.number.int({ min: 1, max: 10 }) },
+                  (_, i) => i + 1,
+                ).map(() => ({
+                  Text: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  IsChange: faker.helpers.arrayElement([
+                    faker.datatype.boolean(),
+                    undefined,
+                  ]),
+                })),
                 undefined,
               ]),
             })),
@@ -393,11 +432,10 @@ export const getGetSchemaVersionDiffCustomResponseMock = (
         })),
         undefined,
       ]),
-    })),
-    undefined,
-  ]),
-  ...overrideResponse,
-});
+      ...overrideResponse,
+    },
+    '@@ -1,4 +1,5 @@\n {\n-  "owner": "team-a",\n+  "owner": "team-b",\n+  "tag": "v2",\n   "version": 1\n }',
+  ]);
 
 export const getGetAnnotationSchemaVersionsResponseMock =
   (): ConfigurationVersion[] =>
@@ -445,52 +483,72 @@ export const getGetAnnotationSchemaVersionResponseMock = (
 });
 
 export const getGetAnnotationSchemaVersionDiffResponseMock = (
-  overrideResponse: Partial<Extract<DiffResult, object>> = {},
-): DiffResult => ({
-  Stats: faker.helpers.arrayElement([
+  overrideResponse: Partial<Extract<DiffResult | string, object>> = {},
+): DiffResult | string =>
+  faker.helpers.arrayElement([
     {
-      Additions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Deletions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Unchanged: faker.helpers.arrayElement([faker.number.int(), undefined]),
-    },
-    undefined,
-  ]),
-  Hunks: faker.helpers.arrayElement([
-    Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => ({
-      OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Lines: faker.helpers.arrayElement([
+      Stats: faker.helpers.arrayElement([
+        {
+          Additions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Deletions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Unchanged: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Hunks: faker.helpers.arrayElement([
         Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
         ).map(() => ({
-          Type: faker.helpers.arrayElement([
-            "Unchanged",
-            "Addition",
-            "Deletion",
-          ] as const),
-          Content: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
-            undefined,
-          ]),
-          OldLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          NewLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          Segments: faker.helpers.arrayElement([
+          OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          Lines: faker.helpers.arrayElement([
             Array.from(
               { length: faker.number.int({ min: 1, max: 10 }) },
               (_, i) => i + 1,
             ).map(() => ({
-              Text: faker.helpers.arrayElement([
+              Type: faker.helpers.arrayElement([
+                "Unchanged",
+                "Addition",
+                "Deletion",
+              ] as const),
+              Content: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
-              IsChange: faker.helpers.arrayElement([
-                faker.datatype.boolean(),
+              OldLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              NewLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              Segments: faker.helpers.arrayElement([
+                Array.from(
+                  { length: faker.number.int({ min: 1, max: 10 }) },
+                  (_, i) => i + 1,
+                ).map(() => ({
+                  Text: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  IsChange: faker.helpers.arrayElement([
+                    faker.datatype.boolean(),
+                    undefined,
+                  ]),
+                })),
                 undefined,
               ]),
             })),
@@ -499,59 +557,78 @@ export const getGetAnnotationSchemaVersionDiffResponseMock = (
         })),
         undefined,
       ]),
-    })),
-    undefined,
-  ]),
-  ...overrideResponse,
-});
+      ...overrideResponse,
+    },
+    '@@ -1,4 +1,5 @@\n {\n-  "owner": "team-a",\n+  "owner": "team-b",\n+  "tag": "v2",\n   "version": 1\n }',
+  ]);
 
 export const getGetAnnotationSchemaVersionDiffCustomResponseMock = (
-  overrideResponse: Partial<Extract<DiffResult, object>> = {},
-): DiffResult => ({
-  Stats: faker.helpers.arrayElement([
+  overrideResponse: Partial<Extract<DiffResult | string, object>> = {},
+): DiffResult | string =>
+  faker.helpers.arrayElement([
     {
-      Additions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Deletions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Unchanged: faker.helpers.arrayElement([faker.number.int(), undefined]),
-    },
-    undefined,
-  ]),
-  Hunks: faker.helpers.arrayElement([
-    Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => ({
-      OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Lines: faker.helpers.arrayElement([
+      Stats: faker.helpers.arrayElement([
+        {
+          Additions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Deletions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Unchanged: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Hunks: faker.helpers.arrayElement([
         Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
         ).map(() => ({
-          Type: faker.helpers.arrayElement([
-            "Unchanged",
-            "Addition",
-            "Deletion",
-          ] as const),
-          Content: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
-            undefined,
-          ]),
-          OldLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          NewLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          Segments: faker.helpers.arrayElement([
+          OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          Lines: faker.helpers.arrayElement([
             Array.from(
               { length: faker.number.int({ min: 1, max: 10 }) },
               (_, i) => i + 1,
             ).map(() => ({
-              Text: faker.helpers.arrayElement([
+              Type: faker.helpers.arrayElement([
+                "Unchanged",
+                "Addition",
+                "Deletion",
+              ] as const),
+              Content: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
-              IsChange: faker.helpers.arrayElement([
-                faker.datatype.boolean(),
+              OldLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              NewLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              Segments: faker.helpers.arrayElement([
+                Array.from(
+                  { length: faker.number.int({ min: 1, max: 10 }) },
+                  (_, i) => i + 1,
+                ).map(() => ({
+                  Text: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  IsChange: faker.helpers.arrayElement([
+                    faker.datatype.boolean(),
+                    undefined,
+                  ]),
+                })),
                 undefined,
               ]),
             })),
@@ -560,11 +637,10 @@ export const getGetAnnotationSchemaVersionDiffCustomResponseMock = (
         })),
         undefined,
       ]),
-    })),
-    undefined,
-  ]),
-  ...overrideResponse,
-});
+      ...overrideResponse,
+    },
+    '@@ -1,4 +1,5 @@\n {\n-  "owner": "team-a",\n+  "owner": "team-b",\n+  "tag": "v2",\n   "version": 1\n }',
+  ]);
 
 export const getGetDescendantTypeSchemaVersionsResponseMock =
   (): ConfigurationVersion[] =>
@@ -612,52 +688,72 @@ export const getGetDescendantTypeSchemaVersionResponseMock = (
 });
 
 export const getGetDescendantTypeSchemaVersionDiffResponseMock = (
-  overrideResponse: Partial<Extract<DiffResult, object>> = {},
-): DiffResult => ({
-  Stats: faker.helpers.arrayElement([
+  overrideResponse: Partial<Extract<DiffResult | string, object>> = {},
+): DiffResult | string =>
+  faker.helpers.arrayElement([
     {
-      Additions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Deletions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Unchanged: faker.helpers.arrayElement([faker.number.int(), undefined]),
-    },
-    undefined,
-  ]),
-  Hunks: faker.helpers.arrayElement([
-    Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => ({
-      OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Lines: faker.helpers.arrayElement([
+      Stats: faker.helpers.arrayElement([
+        {
+          Additions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Deletions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Unchanged: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Hunks: faker.helpers.arrayElement([
         Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
         ).map(() => ({
-          Type: faker.helpers.arrayElement([
-            "Unchanged",
-            "Addition",
-            "Deletion",
-          ] as const),
-          Content: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
-            undefined,
-          ]),
-          OldLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          NewLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          Segments: faker.helpers.arrayElement([
+          OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          Lines: faker.helpers.arrayElement([
             Array.from(
               { length: faker.number.int({ min: 1, max: 10 }) },
               (_, i) => i + 1,
             ).map(() => ({
-              Text: faker.helpers.arrayElement([
+              Type: faker.helpers.arrayElement([
+                "Unchanged",
+                "Addition",
+                "Deletion",
+              ] as const),
+              Content: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
-              IsChange: faker.helpers.arrayElement([
-                faker.datatype.boolean(),
+              OldLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              NewLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              Segments: faker.helpers.arrayElement([
+                Array.from(
+                  { length: faker.number.int({ min: 1, max: 10 }) },
+                  (_, i) => i + 1,
+                ).map(() => ({
+                  Text: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  IsChange: faker.helpers.arrayElement([
+                    faker.datatype.boolean(),
+                    undefined,
+                  ]),
+                })),
                 undefined,
               ]),
             })),
@@ -666,59 +762,78 @@ export const getGetDescendantTypeSchemaVersionDiffResponseMock = (
         })),
         undefined,
       ]),
-    })),
-    undefined,
-  ]),
-  ...overrideResponse,
-});
+      ...overrideResponse,
+    },
+    '@@ -1,4 +1,5 @@\n {\n-  "owner": "team-a",\n+  "owner": "team-b",\n+  "tag": "v2",\n   "version": 1\n }',
+  ]);
 
 export const getGetDescendantTypeSchemaVersionDiffCustomResponseMock = (
-  overrideResponse: Partial<Extract<DiffResult, object>> = {},
-): DiffResult => ({
-  Stats: faker.helpers.arrayElement([
+  overrideResponse: Partial<Extract<DiffResult | string, object>> = {},
+): DiffResult | string =>
+  faker.helpers.arrayElement([
     {
-      Additions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Deletions: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Unchanged: faker.helpers.arrayElement([faker.number.int(), undefined]),
-    },
-    undefined,
-  ]),
-  Hunks: faker.helpers.arrayElement([
-    Array.from(
-      { length: faker.number.int({ min: 1, max: 10 }) },
-      (_, i) => i + 1,
-    ).map(() => ({
-      OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Lines: faker.helpers.arrayElement([
+      Stats: faker.helpers.arrayElement([
+        {
+          Additions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Deletions: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+          Unchanged: faker.helpers.arrayElement([
+            faker.number.int(),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Hunks: faker.helpers.arrayElement([
         Array.from(
           { length: faker.number.int({ min: 1, max: 10 }) },
           (_, i) => i + 1,
         ).map(() => ({
-          Type: faker.helpers.arrayElement([
-            "Unchanged",
-            "Addition",
-            "Deletion",
-          ] as const),
-          Content: faker.helpers.arrayElement([
-            faker.string.alpha({ length: { min: 10, max: 20 } }),
-            undefined,
-          ]),
-          OldLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          NewLineNumber: faker.helpers.arrayElement([faker.number.int(), null]),
-          Segments: faker.helpers.arrayElement([
+          OldStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          OldCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewStart: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          NewCount: faker.helpers.arrayElement([faker.number.int(), undefined]),
+          Lines: faker.helpers.arrayElement([
             Array.from(
               { length: faker.number.int({ min: 1, max: 10 }) },
               (_, i) => i + 1,
             ).map(() => ({
-              Text: faker.helpers.arrayElement([
+              Type: faker.helpers.arrayElement([
+                "Unchanged",
+                "Addition",
+                "Deletion",
+              ] as const),
+              Content: faker.helpers.arrayElement([
                 faker.string.alpha({ length: { min: 10, max: 20 } }),
                 undefined,
               ]),
-              IsChange: faker.helpers.arrayElement([
-                faker.datatype.boolean(),
+              OldLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              NewLineNumber: faker.helpers.arrayElement([
+                faker.number.int(),
+                null,
+              ]),
+              Segments: faker.helpers.arrayElement([
+                Array.from(
+                  { length: faker.number.int({ min: 1, max: 10 }) },
+                  (_, i) => i + 1,
+                ).map(() => ({
+                  Text: faker.helpers.arrayElement([
+                    faker.string.alpha({ length: { min: 10, max: 20 } }),
+                    undefined,
+                  ]),
+                  IsChange: faker.helpers.arrayElement([
+                    faker.datatype.boolean(),
+                    undefined,
+                  ]),
+                })),
                 undefined,
               ]),
             })),
@@ -727,11 +842,10 @@ export const getGetDescendantTypeSchemaVersionDiffCustomResponseMock = (
         })),
         undefined,
       ]),
-    })),
-    undefined,
-  ]),
-  ...overrideResponse,
-});
+      ...overrideResponse,
+    },
+    '@@ -1,4 +1,5 @@\n {\n-  "owner": "team-a",\n+  "owner": "team-b",\n+  "tag": "v2",\n   "version": 1\n }',
+  ]);
 
 export const getGetConfigurationSchemaMockHandler = (
   overrideResponse?:
@@ -1040,22 +1154,24 @@ export const getGetSchemaVersionMockHandler = (
 export const getGetSchemaVersionDiffMockHandler = (
   overrideResponse?:
     | DiffResult
+    | string
     | ((
         info: Parameters<Parameters<typeof http.get>[1]>[0],
-      ) => Promise<DiffResult> | DiffResult),
+      ) => Promise<DiffResult | string> | DiffResult | string),
   options?: RequestHandlerOptions,
 ) => {
   return http.get(
     "*/api/v1/:organization/:project/:view/configuration-schema/type/:annotationType/versions/:version/diff",
     async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
-      return HttpResponse.json(
+      const resolvedBody =
         overrideResponse !== undefined
           ? typeof overrideResponse === "function"
             ? await overrideResponse(info)
             : overrideResponse
-          : getGetSchemaVersionDiffResponseMock(),
-        { status: 200 },
-      );
+          : getGetSchemaVersionDiffResponseMock();
+      return typeof resolvedBody === "string"
+        ? HttpResponse.text(resolvedBody, { status: 200 })
+        : HttpResponse.json(resolvedBody, { status: 200 });
     },
     options,
   );
@@ -1064,22 +1180,24 @@ export const getGetSchemaVersionDiffMockHandler = (
 export const getGetSchemaVersionDiffCustomMockHandler = (
   overrideResponse?:
     | DiffResult
+    | string
     | ((
         info: Parameters<Parameters<typeof http.get>[1]>[0],
-      ) => Promise<DiffResult> | DiffResult),
+      ) => Promise<DiffResult | string> | DiffResult | string),
   options?: RequestHandlerOptions,
 ) => {
   return http.get(
     "*/api/v1/:organization/:project/:view/configuration-schema/type/:annotationType/versions/:version/diff/:versionFrom",
     async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
-      return HttpResponse.json(
+      const resolvedBody =
         overrideResponse !== undefined
           ? typeof overrideResponse === "function"
             ? await overrideResponse(info)
             : overrideResponse
-          : getGetSchemaVersionDiffCustomResponseMock(),
-        { status: 200 },
-      );
+          : getGetSchemaVersionDiffCustomResponseMock();
+      return typeof resolvedBody === "string"
+        ? HttpResponse.text(resolvedBody, { status: 200 })
+        : HttpResponse.json(resolvedBody, { status: 200 });
     },
     options,
   );
@@ -1136,22 +1254,24 @@ export const getGetAnnotationSchemaVersionMockHandler = (
 export const getGetAnnotationSchemaVersionDiffMockHandler = (
   overrideResponse?:
     | DiffResult
+    | string
     | ((
         info: Parameters<Parameters<typeof http.get>[1]>[0],
-      ) => Promise<DiffResult> | DiffResult),
+      ) => Promise<DiffResult | string> | DiffResult | string),
   options?: RequestHandlerOptions,
 ) => {
   return http.get(
     "*/api/v1/:organization/:project/:view/configuration-schema/:key/versions/:version/diff",
     async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
-      return HttpResponse.json(
+      const resolvedBody =
         overrideResponse !== undefined
           ? typeof overrideResponse === "function"
             ? await overrideResponse(info)
             : overrideResponse
-          : getGetAnnotationSchemaVersionDiffResponseMock(),
-        { status: 200 },
-      );
+          : getGetAnnotationSchemaVersionDiffResponseMock();
+      return typeof resolvedBody === "string"
+        ? HttpResponse.text(resolvedBody, { status: 200 })
+        : HttpResponse.json(resolvedBody, { status: 200 });
     },
     options,
   );
@@ -1160,22 +1280,24 @@ export const getGetAnnotationSchemaVersionDiffMockHandler = (
 export const getGetAnnotationSchemaVersionDiffCustomMockHandler = (
   overrideResponse?:
     | DiffResult
+    | string
     | ((
         info: Parameters<Parameters<typeof http.get>[1]>[0],
-      ) => Promise<DiffResult> | DiffResult),
+      ) => Promise<DiffResult | string> | DiffResult | string),
   options?: RequestHandlerOptions,
 ) => {
   return http.get(
     "*/api/v1/:organization/:project/:view/configuration-schema/:key/versions/:version/diff/:versionFrom",
     async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
-      return HttpResponse.json(
+      const resolvedBody =
         overrideResponse !== undefined
           ? typeof overrideResponse === "function"
             ? await overrideResponse(info)
             : overrideResponse
-          : getGetAnnotationSchemaVersionDiffCustomResponseMock(),
-        { status: 200 },
-      );
+          : getGetAnnotationSchemaVersionDiffCustomResponseMock();
+      return typeof resolvedBody === "string"
+        ? HttpResponse.text(resolvedBody, { status: 200 })
+        : HttpResponse.json(resolvedBody, { status: 200 });
     },
     options,
   );
@@ -1232,22 +1354,24 @@ export const getGetDescendantTypeSchemaVersionMockHandler = (
 export const getGetDescendantTypeSchemaVersionDiffMockHandler = (
   overrideResponse?:
     | DiffResult
+    | string
     | ((
         info: Parameters<Parameters<typeof http.get>[1]>[0],
-      ) => Promise<DiffResult> | DiffResult),
+      ) => Promise<DiffResult | string> | DiffResult | string),
   options?: RequestHandlerOptions,
 ) => {
   return http.get(
     "*/api/v1/:organization/:project/:view/configuration-schema/:key/type/:annotationType/versions/:version/diff",
     async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
-      return HttpResponse.json(
+      const resolvedBody =
         overrideResponse !== undefined
           ? typeof overrideResponse === "function"
             ? await overrideResponse(info)
             : overrideResponse
-          : getGetDescendantTypeSchemaVersionDiffResponseMock(),
-        { status: 200 },
-      );
+          : getGetDescendantTypeSchemaVersionDiffResponseMock();
+      return typeof resolvedBody === "string"
+        ? HttpResponse.text(resolvedBody, { status: 200 })
+        : HttpResponse.json(resolvedBody, { status: 200 });
     },
     options,
   );
@@ -1256,22 +1380,24 @@ export const getGetDescendantTypeSchemaVersionDiffMockHandler = (
 export const getGetDescendantTypeSchemaVersionDiffCustomMockHandler = (
   overrideResponse?:
     | DiffResult
+    | string
     | ((
         info: Parameters<Parameters<typeof http.get>[1]>[0],
-      ) => Promise<DiffResult> | DiffResult),
+      ) => Promise<DiffResult | string> | DiffResult | string),
   options?: RequestHandlerOptions,
 ) => {
   return http.get(
     "*/api/v1/:organization/:project/:view/configuration-schema/:key/type/:annotationType/versions/:version/diff/:versionFrom",
     async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
-      return HttpResponse.json(
+      const resolvedBody =
         overrideResponse !== undefined
           ? typeof overrideResponse === "function"
             ? await overrideResponse(info)
             : overrideResponse
-          : getGetDescendantTypeSchemaVersionDiffCustomResponseMock(),
-        { status: 200 },
-      );
+          : getGetDescendantTypeSchemaVersionDiffCustomResponseMock();
+      return typeof resolvedBody === "string"
+        ? HttpResponse.text(resolvedBody, { status: 200 })
+        : HttpResponse.json(resolvedBody, { status: 200 });
     },
     options,
   );

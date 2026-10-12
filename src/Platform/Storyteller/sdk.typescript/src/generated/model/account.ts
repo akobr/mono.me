@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.8.91.29486
+ * OpenAPI spec version: 0.9.1.3549
  */
 import type { AccountAccessMap } from "./accountAccessMap";
 

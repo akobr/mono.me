@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.8.91.29486
+ * OpenAPI spec version: 0.9.1.3549
  */
 import type {
   CombinedConfigurationSchema,
@@ -551,8 +551,8 @@ export const getSchemaVersionDiff = async (
   version: number,
   params?: GetSchemaVersionDiffParams,
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<DiffResult> => {
-  return storytellerFetch<DiffResult>(
+): Promise<DiffResult | string> => {
+  return storytellerFetch<DiffResult | string>(
     getGetSchemaVersionDiffUrl(
       organization,
       project,
@@ -601,8 +601,8 @@ export const getSchemaVersionDiffCustom = async (
   versionFrom: number,
   params?: GetSchemaVersionDiffCustomParams,
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<DiffResult> => {
-  return storytellerFetch<DiffResult>(
+): Promise<DiffResult | string> => {
+  return storytellerFetch<DiffResult | string>(
     getGetSchemaVersionDiffCustomUrl(
       organization,
       project,
@@ -702,8 +702,8 @@ export const getAnnotationSchemaVersionDiff = async (
   version: number,
   params?: GetAnnotationSchemaVersionDiffParams,
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<DiffResult> => {
-  return storytellerFetch<DiffResult>(
+): Promise<DiffResult | string> => {
+  return storytellerFetch<DiffResult | string>(
     getGetAnnotationSchemaVersionDiffUrl(
       organization,
       project,
@@ -752,8 +752,8 @@ export const getAnnotationSchemaVersionDiffCustom = async (
   versionFrom: number,
   params?: GetAnnotationSchemaVersionDiffCustomParams,
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<DiffResult> => {
-  return storytellerFetch<DiffResult>(
+): Promise<DiffResult | string> => {
+  return storytellerFetch<DiffResult | string>(
     getGetAnnotationSchemaVersionDiffCustomUrl(
       organization,
       project,
@@ -872,8 +872,8 @@ export const getDescendantTypeSchemaVersionDiff = async (
   version: number,
   params?: GetDescendantTypeSchemaVersionDiffParams,
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<DiffResult> => {
-  return storytellerFetch<DiffResult>(
+): Promise<DiffResult | string> => {
+  return storytellerFetch<DiffResult | string>(
     getGetDescendantTypeSchemaVersionDiffUrl(
       organization,
       project,
@@ -925,8 +925,8 @@ export const getDescendantTypeSchemaVersionDiffCustom = async (
   versionFrom: number,
   params?: GetDescendantTypeSchemaVersionDiffCustomParams,
   options?: Parameters<typeof storytellerFetch>[1],
-): Promise<DiffResult> => {
-  return storytellerFetch<DiffResult>(
+): Promise<DiffResult | string> => {
+  return storytellerFetch<DiffResult | string>(
     getGetDescendantTypeSchemaVersionDiffCustomUrl(
       organization,
       project,
