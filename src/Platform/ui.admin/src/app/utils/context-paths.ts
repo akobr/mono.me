@@ -1,3 +1,5 @@
+import type { Scope } from '@/stores/context'
+
 /** Sections that live under /{org}/{project}/{view}/… */
 export const viewSections = ['annotations', 'configurations', 'graph', 'templates', 'schemas', 'compare'] as const
 
@@ -35,6 +37,23 @@ export function currentSection(path: string): CurrentSection {
   }
 
   return { kind: 'org', name: segments.length === 2 ? segments[1] : undefined }
+}
+
+export interface ViewLocation {
+  scope: Scope
+  section: ViewSection
+  /** The section's list itself, without a selected detail. */
+  root: boolean
+}
+
+/** The view and section of a path under /{org}/{project}/{view}/{section}/…, or undefined for any other path. */
+export function viewLocation(path: string): ViewLocation | undefined {
+  const section = currentSection(path)
+  if (section.kind !== 'view') {
+    return undefined
+  }
+  const [org, project, view, , ...rest] = path.split('?')[0]!.split('/').filter(Boolean)
+  return { scope: { org: org!, project: project!, view: view! }, section: section.name, root: rest.length === 0 }
 }
 
 /** Target of switching to another project: the same section, in the default view; the detail (key) is dropped. */
