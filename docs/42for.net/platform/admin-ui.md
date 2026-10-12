@@ -67,7 +67,7 @@ On a phone, the **Filters** button opens the same filters as toggles in a bottom
 
 The **detail** of an annotation has two tabs:
 
-- **Annotation:** the fields as a form, or as JSON or YAML. The form starts with the type icon and the key, with the name in bold: they are part of the key and cannot be edited. Title, description and documentation link have the same limits as the API (200, 10,000 and 2048 characters).
+- **Annotation:** the fields as a form, or as JSON or YAML. The form starts with the type icon and the key, with the name in bold: they are part of the key and cannot be edited. Title, description and documentation link have the same limits as the API (200, 10,000 and 2048 characters). The description is Markdown, and its **Preview** tab renders it. You can use headings, lists, block quotes, code blocks, tables, links and images. Raw HTML is shown as text, and only `http(s)`, `mailto` and relative links work.
 - **History:** who changed it and when, newest first. An update lists every field with its old and new value; the description only shows that it changed. Deletes, restores and configuration saves are entries too, and a re-created annotation starts a new lifetime.
 
 The header links to the configuration, drawn by where the configuration comes from:
@@ -102,7 +102,7 @@ The command palette (`Ctrl K` / `⌘ K`) finds annotations, pages, projects and 
 
 A configuration is edited:
 
-- as a **form**, generated from the JSON Schema that applies to the annotation;
+- as a **form**, generated from the JSON Schema that applies to the annotation (a property's `description` is the field's help, in Markdown);
 - or as **JSON** or **YAML**, with schema hints and validation as you type.
 
 Values inherited from ancestors appear as placeholders; **Reset to inherited** removes your own value. A field can also hold a binding (`@sbt.northwind/baseUrl`) instead of a value. The form shows bindings as expressions and does not validate them, because the platform evaluates them first.
