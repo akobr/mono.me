@@ -88,6 +88,18 @@ Creating an execution creates the missing subject, context, responsibility, and 
 
 Deleting a subject removes its contexts and the usages and executions that belong to it. Deleting a responsibility removes that capability's records: the responsibility, its units, and the usages and executions of that capability. The subject itself stays, so the customer remains in the catalog after a module is retired.
 
+A delete is reversible for 90 days. The deleted records, with their configuration, leave every read and wait under `.../annotations/deleted`:
+
+| You want | Call |
+| --- | --- |
+| What was deleted, newest first | `GET /v1/{org}/{project}/{view}/annotations/deleted` |
+| Which of these keys are deleted | `POST .../annotations/deleted/lookup` with `{ "Keys": [...] }` |
+| Bring records back, with what was deleted with them | `POST .../annotations/deleted/restore` with `{ "Keys": [...] }` |
+| Remove a deleted record now (Administrator) | `DELETE .../annotations/deleted/{key}` |
+| Who changed a record, and what | `GET .../annotations/{key}/history` |
+
+Writing a key that is deleted creates it again with the new content and an empty configuration. To keep the old configuration, restore the key first and then write it.
+
 ## Writing configuration
 
 ```text

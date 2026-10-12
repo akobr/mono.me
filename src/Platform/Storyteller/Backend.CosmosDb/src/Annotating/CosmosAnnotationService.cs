@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Annotations;
@@ -8,6 +9,7 @@ using _42.Platform.Storyteller.Entities.Configurations;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 
 using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
@@ -105,7 +107,8 @@ public partial class CosmosAnnotationService : IAnnotationService
 
             if (node.State == AnnotationItemState.Active)
             {
-                return await UpdateCoreAsync(store, fullKey, annotation, actor);
+                await store.LoadDetailsAsync(node, withConfiguration: false, withAudit: true);
+                return await UpdateCoreAsync(store, node, annotation, actor);
             }
 
             var created = await CreateCoreAsync(store, fullKey, annotation, actor);
@@ -124,7 +127,11 @@ public partial class CosmosAnnotationService : IAnnotationService
     {
         AnnotationRules.Validate(annotation);
         var fullKey = annotation.GetFullKey(organization);
-        await RetryAsync(() => UpdateCoreAsync(Store(organization), fullKey, annotation, actor));
+        await RetryAsync(async () =>
+        {
+            var store = Store(organization);
+            return await UpdateCoreAsync(store, await store.LoadAsync(fullKey, withConfiguration: false), annotation, actor);
+        });
     }
 
     public async Task<IEnumerable<Annotation>> CreateAnnotationsAsync(string organization, IEnumerable<Annotation> annotations, AuditActor actor)
@@ -155,7 +162,12 @@ public partial class CosmosAnnotationService : IAnnotationService
             }
             catch (ConflictException)
             {
-                // created concurrently: a bulk create skips existing keys
+                // created concurrently: a bulk create skips existing keys; retries exhausted by contention fail the request
+                if (!await ExistAnnotationAsync(fullKey))
+                {
+                    throw;
+                }
+
                 continue;
             }
 
@@ -253,6 +265,12 @@ public partial class CosmosAnnotationService : IAnnotationService
         };
     }
 
+    // The size of a configuration version in a batch; its content dominates, the rest is a small allowance.
+    private static long EstimateBytes(ConfigurationHistoryEntity snapshot)
+    {
+        return Encoding.UTF8.GetByteCount(snapshot.Content.ToString(Formatting.None)) + 1024;
+    }
+
     private static AuditStamp Stamp(AuditActor actor, DateTimeOffset now)
     {
         return new AuditStamp { At = now, By = actor };
@@ -342,6 +360,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             var node = write.Node;
             var operations = new List<Action<TransactionalBatch>>();
             var stream = plan.Keep(_serializer.WriteAnnotation(write.Entity));
+            var payloadBytes = stream.Length;
 
             if (node.State == AnnotationItemState.Missing)
             {
@@ -358,6 +377,7 @@ public partial class CosmosAnnotationService : IAnnotationService
                     {
                         var snapshot = ToHistorySnapshot(configuration);
                         operations.Add(batch => batch.UpsertItem(snapshot));
+                        payloadBytes += EstimateBytes(snapshot);
                     }
 
                     operations.Add(batch => batch.DeleteItem(node.ConfigurationId));
@@ -366,7 +386,7 @@ public partial class CosmosAnnotationService : IAnnotationService
 
             var audit = plan.Keep(_audit.Prepare(node, [write.Entry], timeToLiveSeconds: null, out _));
             operations.Add(AnnotationAuditStore.Write(node, audit));
-            plan.Add(node.Key.Annotation.GetDepth(), node.PartitionKey, operations);
+            plan.Add(node.Key.Annotation.GetDepth(), node.PartitionKey, payloadBytes + audit.Length, operations);
         }
 
         AddRelationUpdates(plan, relations, updates);
@@ -375,9 +395,10 @@ public partial class CosmosAnnotationService : IAnnotationService
         return writes.Select(write => write.Entity.ToModel()).ToList();
     }
 
-    private async Task<Annotation> UpdateCoreAsync(AnnotationItemStore store, FullKey fullKey, Annotation input, AuditActor actor)
+    // The node holds the annotation and its audit, read with their ETags.
+    private async Task<Annotation> UpdateCoreAsync(AnnotationItemStore store, AnnotationNode node, Annotation input, AuditActor actor)
     {
-        var node = await store.LoadAsync(fullKey, withConfiguration: false);
+        var fullKey = node.Key;
 
         if (node.State != AnnotationItemState.Active)
         {
@@ -413,6 +434,7 @@ public partial class CosmosAnnotationService : IAnnotationService
         plan.Add(
             0,
             node.PartitionKey,
+            stream.Length + audit.Length,
             batch => batch.ReplaceItemStream(node.AnnotationId, stream, new TransactionalBatchItemRequestOptions { IfMatchEtag = node.ETag }),
             AnnotationAuditStore.Write(node, audit));
         await plan.ExecuteAsync();
@@ -474,6 +496,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             plan.Add(
                 RelationsWave,
                 node.PartitionKey,
+                stream.Length,
                 batch => batch.ReplaceItemStream(node.AnnotationId, stream, new TransactionalBatchItemRequestOptions { IfMatchEtag = node.ETag }));
         }
     }
@@ -577,6 +600,30 @@ public partial class CosmosAnnotationService : IAnnotationService
             .Where(b => b.Against == annotationType)
             .Cast<AnnotationsRequest.Condition<TEntity>>();
 
+        // descendants of a key: the scope gives the partition and the key prefix of this type; the prefix can cover
+        // more (the units of execution of every unit of a responsibility), so the page is filtered by the graph
+        var descendantsOf = model.Request.DescendantsOf;
+        string? keyPrefix = null;
+        string? partitionPrefix = null;
+
+        if (descendantsOf is not null)
+        {
+            var typeCode = AnnotationTypeCodes.ValidCodes.First(pair => pair.Value == annotationType).Key;
+            var root = FullKey.Create(descendantsOf, model.Request.Organization, model.Request.Project, model.Request.View);
+            var scope = DescendantScope.Get(root)
+                .Select(candidate => (Scope: candidate, Prefix: candidate.KeyPrefixes.FirstOrDefault(prefix => prefix.StartsWith($"{typeCode}.", StringComparison.Ordinal))))
+                .FirstOrDefault(candidate => candidate.Prefix is not null);
+
+            if (scope.Prefix is null)
+            {
+                return;
+            }
+
+            keyPrefix = scope.Prefix;
+            partitionKey = scope.Scope.PartitionKey is null ? null : new PartitionKey(scope.Scope.PartitionKey);
+            partitionPrefix = scope.Scope.PartitionKey is null ? scope.Scope.PartitionPrefix : null;
+        }
+
         var repository = _repositoryProvider.GetOrganizationContainer(model.Request.Organization);
         var queryable = repository.Container.GetItemLinqQueryable<TEntity>(
             continuationToken: model.InputContinuationToken?.CosmosToken,
@@ -610,6 +657,16 @@ public partial class CosmosAnnotationService : IAnnotationService
             matches = matches.Where(r => r.Deletion!.DeletionId == deletionId);
         }
 
+        if (keyPrefix is not null)
+        {
+            matches = matches.Where(r => r.AnnotationKey.StartsWith(keyPrefix));
+        }
+
+        if (partitionPrefix is not null)
+        {
+            matches = matches.Where(r => r.PartitionKey.StartsWith(partitionPrefix));
+        }
+
         foreach (var by in dynamicConditions)
         {
             matches = matches.Where(by.Predicate);
@@ -623,9 +680,12 @@ public partial class CosmosAnnotationService : IAnnotationService
         }
 
         var results = await feed.ReadNextAsync();
-        var mapped = results.Select(entity => entity.ToModel<TEntity, TAnnotation>());
+        var mapped = results
+            .Where(entity => descendantsOf is null || (AnnotationKey.TryParse(entity.AnnotationKey, out var key) && key.IsDescendantOf(descendantsOf)))
+            .Select(entity => entity.ToModel<TEntity, TAnnotation>())
+            .ToList();
         model.Annotations = model.Annotations.Concat(mapped);
-        model.TotalCount += results.Count;
+        model.TotalCount += mapped.Count;
 
         if (feed.HasMoreResults)
         {

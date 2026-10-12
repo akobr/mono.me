@@ -202,6 +202,8 @@ public class AnnotationBindingFunctionTests
 
         public Task<Annotation?> GetDeletedAnnotationAsync(FullKey fullKey) => throw new NotSupportedException();
 
+        public Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool rootsOnly = true, string? deletionId = null, string? continuationToken = null) => throw new NotSupportedException();
+
         public Task<IReadOnlyList<Annotation>> FindDeletedAnnotationsAsync(string organization, string project, string view, IReadOnlyCollection<AnnotationKey> keys) => throw new NotSupportedException();
 
         public Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor) => throw new NotSupportedException();

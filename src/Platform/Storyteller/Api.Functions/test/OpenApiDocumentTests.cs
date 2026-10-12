@@ -27,4 +27,21 @@ public class OpenApiDocumentTests
         schemas.Keys.Count(key => key == "AccountCreate").ShouldBe(1);
         schemas["AccountCreate"].Properties.Keys.ShouldBe(["Organization", "Project"], ignoreOrder: true);
     }
+
+    [Fact]
+    public void AnnotationSchema_PublishesTheMaximalLengths()
+    {
+        var helper = new DocumentHelper(new RouteConstraintFilter(), new OpenApiSchemaAcceptor());
+        var methods = typeof(AnnotationsHttp).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly).ToList();
+
+        var schemas = helper.GetOpenApiSchemas(methods, new DefaultNamingStrategy(), VisitorCollection.CreateInstance());
+
+        var annotation = schemas["Annotation"];
+        annotation.Properties["Title"].MaxLength.ShouldBe(AnnotationLimits.TitleMaxLength);
+        annotation.Properties["Description"].MaxLength.ShouldBe(AnnotationLimits.DescriptionMaxLength);
+        annotation.Properties["DocumentationLink"].MaxLength.ShouldBe(AnnotationLimits.DocumentationLinkMaxLength);
+        schemas.Keys.ShouldContain("AnnotationHistory");
+        schemas.Keys.ShouldContain("AnnotationRestoreResult");
+        schemas.Keys.ShouldContain("AnnotationDeletionResult");
+    }
 }

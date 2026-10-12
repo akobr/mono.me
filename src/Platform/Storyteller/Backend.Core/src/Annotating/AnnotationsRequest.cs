@@ -26,6 +26,9 @@ public class AnnotationsRequest
     // With Deleted = Only or Include: just what one delete removed.
     public string? DeletionId { get; set; }
 
+    // Only the descendants of this key in the inheritance graph, of the requested types.
+    public AnnotationKey? DescendantsOf { get; set; }
+
     public interface ICondition
     {
         public AnnotationType Against { get; }

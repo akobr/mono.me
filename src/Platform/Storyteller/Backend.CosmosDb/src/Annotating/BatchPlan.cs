@@ -13,11 +13,14 @@ namespace _42.Platform.Storyteller.Annotating;
 
 // Writes grouped into transactional batches. A unit is the operations of one annotation and its items, always in
 // one partition; units run in waves (ascending), and within a wave every partition gets its own batches of at most
-// 100 operations. A failed batch stops the plan: the state stays valid because the waves run from the deepest
+// 100 operations and about 1.5 MB of payload (Cosmos rejects a batch above 2 MB). A failed batch stops the plan: the state stays valid because the waves run from the deepest
 // descendants to the root (deletes) or from the roots to the descendants (creates and restores).
 internal sealed class BatchPlan : IDisposable
 {
     private const int MaxOperationsPerBatch = 100;
+
+    // below the 2 MB request limit of a transactional batch, with room for the operation headers and estimates
+    private const long MaxPayloadBytesPerBatch = 1_500_000;
     private const int MaxParallelBatches = 8;
 
     private readonly Container _container;
@@ -31,14 +34,15 @@ internal sealed class BatchPlan : IDisposable
 
     public bool IsEmpty => _units.All(unit => unit.Operations.Count == 0);
 
-    public void Add(int wave, string partitionKey, params Action<TransactionalBatch>[] operations)
+    // payloadBytes: the estimated size of the documents the operations send
+    public void Add(int wave, string partitionKey, long payloadBytes, params Action<TransactionalBatch>[] operations)
     {
-        _units.Add(new Unit(wave, partitionKey, operations.ToList()));
+        _units.Add(new Unit(wave, partitionKey, operations.ToList(), payloadBytes));
     }
 
-    public void Add(int wave, string partitionKey, IEnumerable<Action<TransactionalBatch>> operations)
+    public void Add(int wave, string partitionKey, long payloadBytes, IEnumerable<Action<TransactionalBatch>> operations)
     {
-        _units.Add(new Unit(wave, partitionKey, operations.ToList()));
+        _units.Add(new Unit(wave, partitionKey, operations.ToList(), payloadBytes));
     }
 
     // A stream handed to a batch must stay open until the batch is executed.
@@ -59,16 +63,22 @@ internal sealed class BatchPlan : IDisposable
             foreach (var partition in wave.GroupBy(unit => unit.PartitionKey, StringComparer.Ordinal))
             {
                 var current = new List<Action<TransactionalBatch>>();
+                var currentBytes = 0L;
 
+                // a unit is never split: a unit above a limit gets a batch of its own
                 foreach (var unit in partition)
                 {
-                    if (current.Count > 0 && current.Count + unit.Operations.Count > MaxOperationsPerBatch)
+                    if (current.Count > 0
+                        && (current.Count + unit.Operations.Count > MaxOperationsPerBatch
+                            || currentBytes + unit.PayloadBytes > MaxPayloadBytesPerBatch))
                     {
                         batches.Add((partition.Key, current));
                         current = [];
+                        currentBytes = 0;
                     }
 
                     current.AddRange(unit.Operations);
+                    currentBytes += unit.PayloadBytes;
                 }
 
                 if (current.Count > 0)
@@ -130,5 +140,5 @@ internal sealed class BatchPlan : IDisposable
         }
     }
 
-    private sealed record Unit(int Wave, string PartitionKey, List<Action<TransactionalBatch>> Operations);
+    private sealed record Unit(int Wave, string PartitionKey, List<Action<TransactionalBatch>> Operations, long PayloadBytes);
 }

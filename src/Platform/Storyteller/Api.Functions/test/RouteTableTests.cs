@@ -50,6 +50,37 @@ public partial class RouteTableTests
         routes.ShouldContain(expected);
     }
 
+    [Theory]
+    [InlineData("GET v1/{}/{}/{}/annotations/deleted")]
+    [InlineData("GET v1/{}/{}/{}/annotations/deleted/{}")]
+    [InlineData("DELETE v1/{}/{}/{}/annotations/deleted/{}")]
+    [InlineData("POST v1/{}/{}/{}/annotations/deleted/lookup")]
+    [InlineData("POST v1/{}/{}/{}/annotations/deleted/restore")]
+    [InlineData("GET v1/{}/{}/{}/annotations/{}/history")]
+    [InlineData("DELETE v1/{}/{}/{}/annotations/{}")]
+    public void DeletedAnnotationRoutes_AreRegistered(string expected)
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"));
+
+        routes.ShouldContain(expected);
+    }
+
+    // The literal segments of the new routes can never be an annotation key, so they never shadow a key route.
+    [Theory]
+    [InlineData("deleted")]
+    [InlineData("lookup")]
+    [InlineData("restore")]
+    [InlineData("history")]
+    public void LiteralSegments_AreNotAnnotationKeys(string segment)
+    {
+        AnnotationKey.TryParse(segment, out _).ShouldBeFalse();
+    }
+
     [GeneratedRegex("{[^}]+}")]
     private static partial Regex Parameter();
 }

@@ -108,6 +108,30 @@ Audit entries are excluded from the index (`/Entries/*`), so a write is charged 
 
 Organization containers have TTL on without a default expiry (`DefaultTimeToLive = -1`) and the indexing policy excludes `/Entries/*`. Only items with a `ttl` expire: the versions of configurations, templates and schemas (365 days after their write) and the items of deleted annotations. DbCreator applies the settings to existing organization containers on every start; the `core` container is not changed.
 
+## API
+
+All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Functions/src/V1/AnnotationsHttp.cs` and `AnnotationsHttp.Deleted.cs`). Writes record the caller as the actor: an account with its id and name from the token, a machine with its id, or `System` in `DEV_AUTH` builds.
+
+| Method | Route | Role | Result |
+| --- | --- | --- | --- |
+| PUT, POST | `…/{key}` | Contributor | Creates, updates, or re-creates; `200` with the stored annotation, so the client receives the stamps. `400 InvalidAnnotation` or `InvalidKey`; `409` after three concurrent changes. |
+| POST | `…` and `…/simple` | Contributor | Bulk create (at most 100); deleted keys and deleted ancestors are re-created. |
+| DELETE | `…/{key}` | Contributor | Soft delete with the descendants; `200 AnnotationDeletionResult`. A repeated delete returns the existing deletion. `404` when missing. |
+| GET | `…/deleted` | Reader | `AnnotationsResponse` with `Deletion` on each item, newest deletion first. `?roots=true` (default) lists only the roots, `?roots=false` everything; `?deletionId=` what one delete removed; `?continuationToken=`. |
+| GET | `…/deleted/{key}` | Reader | The deleted annotation with `Deletion`; `404` when it is not deleted. |
+| POST | `…/deleted/lookup` | Reader | `AnnotationKeysRequest` (at most 100 keys) → the deleted annotations among them; active and unknown keys are left out. `400 InvalidKey` for an invalid key, no keys, or too many. |
+| POST | `…/deleted/restore` | Contributor | `AnnotationRestoreRequest` (`Keys`, at most 100, and `Descendants`, default `true`) → `200 AnnotationRestoreResult`; a partial success lists the failed keys in `Failed`. |
+| DELETE | `…/deleted/{key}` | Administrator, users only | Permanent delete; `200 AnnotationPurgeResult`. `409 AnnotationNotDeleted` for an active key, `404` when missing. |
+| GET | `…/{key}/history` | Reader | `AnnotationHistory`, for active and deleted keys; `404` for a purged or unknown key. |
+
+The literal segments `deleted` and `history` win over `{key}` and `{descendants}`; an annotation key always starts with a type code and a dot, so it can't be `deleted`, `lookup`, or `restore`.
+
+`GET …/{key}/{descendants}` follows the inheritance graph: the descendants of a context are its executions and their units of execution, and the descendants of a unit are its units of execution across executions.
+
+The configuration routes of a deleted annotation answer `404` with `ErrorCode` `AnnotationDeleted` on reads (also the versions and diffs), and `409 AnnotationDeleted` on writes, so clients can tell a deleted annotation from a missing one.
+
+**Creating in clients.** Before a create, a client looks up the keys and their ancestors (`AnnotationKeyExtensions.GetAllAncestorKeys`, `getAllAncestors` in the TypeScript SDK). When one is deleted, it shows who deleted it and when, and offers **Restore and update** (restore with `Descendants = false`, then send the content as an update), **Create new** (send the content; the API re-creates the deleted keys empty), or **Cancel**.
+
 ## Validation
 
 Every create, re-create and update checks the content (`AnnotationRules`):
@@ -125,6 +149,7 @@ A violation answers `InvalidInputException` with `ErrorCode` `InvalidAnnotation`
 | Code | Meaning |
 | --- | --- |
 | `InvalidAnnotation` | The content breaks a rule above. |
+| `InvalidKey` | A key in the route or the body can't be parsed, or a lookup or restore has no keys or more than 100. |
 | `AnnotationDeleted` | A configuration write for a deleted annotation. |
 | `AnnotationNotDeleted` | A permanent delete of an active annotation. |
 | `NotFound` | A restore of a key that does not exist or was purged. |

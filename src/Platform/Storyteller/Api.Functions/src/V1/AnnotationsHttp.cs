@@ -21,7 +21,7 @@ using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribut
 
 namespace _42.Platform.Storyteller.Api.V1;
 
-public class AnnotationsHttp
+public partial class AnnotationsHttp
 {
     private static readonly JsonSerializerOptions AnnotationBodyOptions = new()
     {
@@ -222,168 +222,39 @@ public class AnnotationsHttp
                 return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {key}"));
         }
 
+        AnnotationType[]? types = descendants switch
+        {
+            "usages" => [AnnotationType.Usage],
+            "contexts" => [AnnotationType.Context],
+            "executions" => [AnnotationType.Execution],
+            "units" => [AnnotationType.Unit],
+            "units-of-execution" => [AnnotationType.UnitOfExecution],
+            "all" => [AnnotationType.Unit, AnnotationType.Usage, AnnotationType.Context, AnnotationType.Execution, AnnotationType.UnitOfExecution],
+            _ => null,
+        };
+
+        if (types is null)
+        {
+            return new BadRequestObjectResult(new ErrorResponse("Invalid type of descendants, allowed types are: usages, contexts, executions, units, units-of-execution, or all."));
+        }
+
+        // the descendants in the inheritance graph: the service finds their partitions and key prefixes
         var dataRequest = new AnnotationsRequest
         {
             ContinuationToken = continuationToken,
             Organization = organization,
             Project = project,
             View = view,
+            Types = types,
+            DescendantsOf = annotationKey,
         };
-
-        switch (descendants)
-        {
-            case "usages":
-                dataRequest.Types = [AnnotationType.Usage];
-                break;
-
-            case "contexts":
-                dataRequest.Types = [AnnotationType.Context];
-                break;
-
-            case "executions":
-                dataRequest.Types = [AnnotationType.Execution];
-                break;
-
-            case "units":
-                dataRequest.Types = [AnnotationType.Unit];
-                break;
-
-            case "units-of-execution":
-                dataRequest.Types = [AnnotationType.UnitOfExecution];
-                break;
-
-            case "all":
-                switch (annotationKey.Type)
-                {
-                    case AnnotationType.Responsibility:
-                        dataRequest.Types =
-                        [
-                            AnnotationType.Unit,
-                            AnnotationType.Usage,
-                            AnnotationType.Execution,
-                            AnnotationType.UnitOfExecution
-                        ];
-                        break;
-
-                    case AnnotationType.Unit:
-                        dataRequest.Types = [AnnotationType.UnitOfExecution];
-                        break;
-
-                    case AnnotationType.Subject:
-                        dataRequest.Types =
-                        [
-                            AnnotationType.Context,
-                            AnnotationType.Usage,
-                            AnnotationType.Execution,
-                            AnnotationType.UnitOfExecution
-                        ];
-                        break;
-
-                    case AnnotationType.Usage:
-                    case AnnotationType.Context:
-                        dataRequest.Types = [AnnotationType.Execution, AnnotationType.UnitOfExecution];
-                        break;
-
-                    case AnnotationType.Execution:
-                        dataRequest.Types = [AnnotationType.UnitOfExecution];
-                        break;
-
-                    default:
-                        dataRequest.Types =
-                        [
-                            AnnotationType.Unit,
-                            AnnotationType.Context,
-                            AnnotationType.Usage,
-                            AnnotationType.Execution,
-                            AnnotationType.UnitOfExecution
-                        ];
-                        break;
-                }
-                break;
-
-            default:
-                return new BadRequestObjectResult(new ErrorResponse("Invalid type of descendants, allowed types are: usages, contexts, executions, units, units-of-execution, or all."));
-        }
-
-        switch (annotationKey.Type)
-        {
-            case AnnotationType.Responsibility:
-            {
-                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
-                dataRequest.Conditions =
-                [
-                    new AnnotationsRequest.Condition<Unit> { Predicate = u => u.ResponsibilityKey == key, },
-                    new AnnotationsRequest.Condition<Usage> { Predicate = u => u.ResponsibilityKey == key, },
-                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.ResponsibilityKey == key, },
-                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.ResponsibilityKey == key, },
-                ];
-                break;
-            }
-
-            case AnnotationType.Unit:
-            {
-                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
-                dataRequest.Conditions =
-                [
-                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.UnitKey == key, },
-                ];
-                break;
-            }
-
-            case AnnotationType.Subject:
-            {
-                dataRequest.Conditions =
-                [
-                    new AnnotationsRequest.Condition<Usage> { Predicate = u => u.SubjectKey == key, },
-                    new AnnotationsRequest.Condition<Context> { Predicate = c => c.SubjectKey == key, },
-                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.SubjectKey == key, },
-                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.SubjectKey == key, },
-                ];
-                break;
-            }
-
-            case AnnotationType.Usage:
-            {
-                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
-
-                dataRequest.Conditions =
-                [
-                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.UsageKey == key, },
-                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.UsageKey == key, },
-                ];
-                break;
-            }
-
-            case AnnotationType.Context:
-            {
-                dataRequest.Conditions =
-                [
-                    new AnnotationsRequest.Condition<Execution> { Predicate = e => e.ContextKey == key, },
-                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.ContextKey == key, },
-                ];
-                break;
-            }
-
-            case AnnotationType.Execution:
-            {
-                dataRequest.PartitionKey = PartitionKeys.GetResponsibility(project, annotationKey.ResponsibilityName);
-                dataRequest.Conditions =
-                [
-                    new AnnotationsRequest.Condition<UnitOfExecution> { Predicate = u => u.ExecutionKey == key, },
-                ];
-                break;
-            }
-
-            default:
-                return new BadRequestObjectResult(new ErrorResponse("Invalid annotation key, descendants can be returned only of a responsibility, unit, subject, context, usage or execution."));
-        }
 
         var response = await _annotations.GetAnnotationsAsync(dataRequest);
         return new OkObjectResult(response);
     }
 
     [Function(nameof(SetAnnotation))]
-    [OpenApiOperation(Definitions.RouteIds.Annotations.SetAnnotation, Definitions.Tags.Annotations, Description = "Creates the annotation (with its missing ancestors) or replaces it when it exists. The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...).")]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.SetAnnotation, Definitions.Tags.Annotations, Description = "Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -391,7 +262,8 @@ public class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Annotation), Description = "The annotation to create or update.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), Description = "The created or updated annotation.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), Description = "The stored annotation.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConcurrentChange)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -430,12 +302,16 @@ public class AnnotationsHttp
                 return new BadRequestObjectResult(new ErrorResponse("No annotation object in body."));
             }
 
-            // TODO: [P1] set system properties and validate the annotation
             annotation = (Annotation)deserializedObject;
         }
         catch (JsonException exception)
         {
             return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation object in body: {exception.Message}"));
+        }
+
+        if (!AnnotationKey.TryParse(key, out _))
+        {
+            return InvalidKey(key);
         }
 
         annotation = annotation with
@@ -447,24 +323,20 @@ public class AnnotationsHttp
 
         try
         {
-            // POST and PUT both store the annotation: a new key is created with its missing ancestors, an existing
-            // one is replaced. The decision was made on the method name, which never matched ("post" vs "POST").
-            if (await _annotations.ExistAnnotationAsync(annotation.GetFullKey(organization)))
-            {
-                await _annotations.UpdateAnnotationAsync(organization, annotation, request.GetAuditActor());
-            }
-            else
-            {
-                await _annotations.CreateAnnotationAsync(organization, annotation, request.GetAuditActor());
-            }
+            // POST and PUT both store the annotation: a new key is created with its missing ancestors, an active one
+            // is updated, and a deleted one is re-created. The server-owned members of the body are ignored.
+            var stored = await _annotations.SetAnnotationAsync(organization, annotation, request.GetAuditActor());
+            return new OkObjectResult(stored);
+        }
+        catch (StorytellerException exception)
+        {
+            return ErrorResponseMapping.ToActionResult(exception);
         }
         catch (Exception exception)
         {
             _logger.LogError(exception, "Failed to set annotation.");
             return new BadRequestObjectResult(exception.ToErrorResponse());
         }
-
-        return new OkObjectResult(annotation);
     }
 
     [Function(nameof(SetAnnotations))]
@@ -475,7 +347,7 @@ public class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(List<Annotation>), Description = "The annotations to create.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Guid), Description = "The id of the asynchronous create operation.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(List<Annotation>), Description = "The created annotations, with the ancestors created for them; existing keys are skipped.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -510,8 +382,8 @@ public class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
-    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(List<Annotation>), Description = "The annotations to create.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Guid), Description = "The id of the asynchronous create operation.")]
+    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(List<string>), Description = "The keys, or compact lines, of the annotations to create.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(List<Annotation>), Description = "The created annotations, with the ancestors created for them; existing keys are skipped.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -536,15 +408,16 @@ public class AnnotationsHttp
     }
 
     [Function(nameof(DeleteAnnotation))]
-    [OpenApiOperation(Definitions.RouteIds.Annotations.DeleteAnnotation, Definitions.Tags.Annotations)]
+    [OpenApiOperation(Definitions.RouteIds.Annotations.DeleteAnnotation, Definitions.Tags.Annotations, Description = "Deletes the annotation and all its descendants. They can be restored until an Administrator deletes them permanently or the retention runs out; a repeated delete returns the existing deletion.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationDeletionResult), Description = "The deletion and the deleted keys, descendants first and the annotation last.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The annotation doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConcurrentChange)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -565,15 +438,16 @@ public class AnnotationsHttp
         }
 
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        var annotation = await _annotations.GetAnnotationAsync(fullKey);
 
-        if (annotation is null)
+        try
+        {
+            var result = await _annotations.DeleteAnnotationAsync(fullKey, request.GetAuditActor());
+            return new OkObjectResult(result);
+        }
+        catch (NotFoundException)
         {
             return new NotFoundResult();
         }
-
-        await _annotations.DeleteAnnotationAsync(fullKey, request.GetAuditActor());
-        return new OkObjectResult(annotation);
     }
 
     [Function(nameof(GetResponsibilities))]
