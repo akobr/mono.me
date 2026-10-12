@@ -21,6 +21,15 @@ The sidebar always lists the pages of the view, project and organization you las
 
 The browser remembers this context, and the address `/` opens it again.
 
+**Annotations**, **Configurations** and **Graph** remember, per view, how you left them. When you leave one of these screens and come back, through the sidebar, the switcher or the command palette, it looks the same as before. The screen keeps:
+
+- the filter, the open annotation or configuration, and its tab;
+- on Annotations, the grid or tree mode, the expanded branches, the selected rows, the sort and the scroll position;
+- on Configurations, the scroll position;
+- on Graph, the layout, the focus, the hidden types, the dragged nodes, and the zoom and pan.
+
+To start over, select the screen you are already on in the sidebar. The memory lasts until you reload the page or sign out. An address you type or open from a bookmark is shown as it is.
+
 ## The catalog
 
 **Annotations** lists the catalog of the view in two modes:
