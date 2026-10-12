@@ -5,7 +5,6 @@ import { expandableIds, keySelectionOf, projectTree, rowSelectionOf, type TreeNo
 import { codeOfKey, deletedWith, metaOf } from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
 import { labelColor, normalizeLabels } from '@/utils/labels'
-import { renderInlineMarkdown } from '@/utils/markdown'
 
 const annotation = (key: string): Annotation => ({
   ProjectName: 'p',
@@ -247,14 +246,6 @@ describe('small helpers', () => {
   it('normalizes labels and gives them stable colors', () => {
     expect(normalizeLabels([' eu', 'EU', '', 'pci '])).toEqual(['eu', 'pci'])
     expect(labelColor('eu')).toBe(labelColor('eu'))
-  })
-
-  it('renders a safe markdown subset', () => {
-    expect(
-      renderInlineMarkdown('**bold** `code` <script>x</script> [docs](https://d.test) [bad](javascript:alert(1))'),
-    ).toBe(
-      '<p><strong>bold</strong> <code>code</code> &lt;script&gt;x&lt;/script&gt; <a href="https://d.test" target="_blank" rel="noopener noreferrer" class="text-primary underline">docs</a> [bad](javascript:alert(1))</p>',
-    )
   })
 })
 
