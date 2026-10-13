@@ -7,7 +7,7 @@ import type { DropdownMenuItem } from '@nuxt/ui'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { columnLabels } from '@/components/annotations/grid/annotation-columns'
-import { expandableKeys, projectTree, type TreeNode } from '@/utils/tree-projection'
+import { expandableIds, projectTree, type TreeNode } from '@/utils/tree-projection'
 
 // Annotation grid or tree. The detail is a nested route (<RouterView>), so the list keeps its scroll position,
 // selection and filter while the detail changes (spec section 5).
@@ -21,13 +21,14 @@ const desktop = useMediaQuery('(min-width: 768px)')
 const detail = useDetailPanel()
 
 const grid = useTemplateRef<{
-  scrollToKey: (key: string) => void
+  scrollToId: (id: string) => void
   columnVisibility: Record<string, boolean>
   hideableColumns: () => { id?: string }[]
 }>('grid')
 const rowSelection = ref<RowSelectionState>({})
+// Row ids: in the tree, an annotation with several parents has a row (and an expansion) per path.
 const expanded = ref(new Set<string>())
-const activeKey = ref<string>()
+const activeId = ref<string>()
 const { open: creating } = useAnnotationCreate()
 
 watch(
@@ -57,11 +58,12 @@ const tree = computed(() =>
 )
 
 // While filtering, the whole matching tree is open; otherwise the user's expansion applies.
-const isExpanded = (key: string) => filter.active.value || expanded.value.has(key)
+const isExpanded = (id: string) => filter.active.value || expanded.value.has(id)
 
 const rows = computed<TreeNode[]>(() => {
   if (filter.mode.value === 'grid' || !desktop.value) {
     return filter.filtered.value.map((annotation) => ({
+      id: annotation.AnnotationKey,
       key: annotation.AnnotationKey,
       annotation,
       missing: false,
@@ -74,7 +76,7 @@ const rows = computed<TreeNode[]>(() => {
   const flat: TreeNode[] = []
   const walk = (node: TreeNode) => {
     flat.push(node)
-    if (isExpanded(node.key)) {
+    if (isExpanded(node.id)) {
       node.children.forEach(walk)
     }
   }
@@ -84,29 +86,36 @@ const rows = computed<TreeNode[]>(() => {
 
 const selectedKeys = computed(() => Object.keys(rowSelection.value).filter((key) => rowSelection.value[key]))
 
-function toggle(key: string) {
+function toggle(id: string) {
   const next = new Set(expanded.value)
-  if (next.has(key)) {
-    next.delete(key)
+  if (next.has(id)) {
+    next.delete(id)
   } else {
-    next.add(key)
+    next.add(id)
   }
   expanded.value = next
 }
 
 const listPath = computed(() => `/${context.org}/${context.project}/${context.view}/annotations`)
 
-function open(key: string) {
-  activeKey.value = key
+// The row under the keyboard cursor (J/K); without one, the first row of the open annotation.
+const activeRow = computed(
+  () =>
+    rows.value.find((row) => row.id === activeId.value) ??
+    (selectedKey.value ? rows.value.find((row) => row.key === selectedKey.value) : undefined),
+)
+
+function open(key: string, id?: string) {
+  activeId.value = id ?? key
   void router.push({ path: `${listPath.value}/${key}`, query: route.query })
 }
 
 function move(step: number) {
-  const index = rows.value.findIndex((row) => row.key === (activeKey.value ?? selectedKey.value))
+  const index = activeRow.value ? rows.value.indexOf(activeRow.value) : -1
   const next = rows.value[Math.min(Math.max(index + step, 0), rows.value.length - 1)]
   if (next) {
-    activeKey.value = next.key
-    grid.value?.scrollToKey(next.key)
+    activeId.value = next.id
+    grid.value?.scrollToId(next.id)
   }
 }
 
@@ -131,23 +140,25 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
   ) {
     return
   }
-  if (event.key === 'Enter' && activeKey.value) {
+  if (event.key === 'Enter' && activeRow.value) {
     event.preventDefault()
-    open(activeKey.value)
+    open(activeRow.value.key, activeRow.value.id)
   } else if (event.key === 'Escape' && selectedKey.value) {
     void router.push({ path: listPath.value, query: route.query })
   }
 })
 
-// Focus returns to the originating row when the detail closes; after the render, so a grid hidden by a full-screen
-// detail is visible again.
+// The cursor follows the open annotation unless its row already shows it. Focus returns to that row when the
+// detail closes; after the render, so a grid hidden by a full-screen detail is visible again.
 watch(
   selectedKey,
   (key, previous) => {
     if (key) {
-      activeKey.value = key
-    } else if (previous) {
-      grid.value?.scrollToKey(previous)
+      if (activeRow.value?.key !== key) {
+        activeId.value = rows.value.find((row) => row.key === key)?.id ?? key
+      }
+    } else if (previous && activeRow.value) {
+      grid.value?.scrollToId(activeRow.value.id)
     }
   },
   { flush: 'post' },
@@ -171,7 +182,7 @@ const columnItems = computed<DropdownMenuItem[]>(() =>
 
 // The row under the keyboard cursor (J/K) is announced; the rows themselves are virtualized.
 const activeLabel = computed(() => {
-  const annotation = activeKey.value ? catalog.byKey.get(activeKey.value) : undefined
+  const annotation = activeRow.value ? catalog.byKey.get(activeRow.value.key) : undefined
   return annotation ? `${annotation.Name}, ${annotation.AnnotationKey}` : ''
 })
 
@@ -226,7 +237,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
           @update:query="(value) => (filter.query.value = value)"
           @update:mode="(value) => (filter.mode.value = value)"
           @update:perspective="(value) => (filter.perspective.value = value)"
-          @expand-all="expanded = new Set(expandableKeys(tree))"
+          @expand-all="expanded = new Set(expandableIds(tree))"
           @collapse-all="expanded = new Set()"
         />
       </UDashboardToolbar>
@@ -263,7 +274,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
         :rows="rows"
         :tree="filter.mode.value === 'tree'"
         :selected-key="selectedKey"
-        :active-key="activeKey"
+        :active-id="activeRow?.id"
         :configurations="catalog.configurations"
         :is-expanded="isExpanded"
         class="min-h-0 flex-1"

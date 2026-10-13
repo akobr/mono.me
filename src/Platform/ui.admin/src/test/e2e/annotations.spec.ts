@@ -61,6 +61,36 @@ test('opens the detail as an overlay, pins, resizes and shows it in full screen,
   await expect(page.getByRole('textbox', { name: 'Filter annotations' })).toBeVisible()
 })
 
+test('shows only subjects or only responsibilities at the root of the tree, with every path', async ({
+  page,
+}, testInfo) => {
+  test.skip(isMobile(testInfo), 'The tree mode is desktop only.')
+  // The orphaned unit of execution of the mock data: its execution and context are missing.
+  const key = 'uxe.northwind.invoicing.legacy.pdf'
+  const rows = page.getByRole('row')
+
+  // By subject: below the context and below the usage of its execution.
+  await openApp(page, `/acme/billing/default/annotations?mode=tree&q=key:${key}`)
+  await expect(rows.filter({ hasText: key })).toHaveCount(2)
+  await expect(rows.filter({ hasText: 'sbt.northwind' })).toHaveCount(1)
+  await expect(rows.filter({ hasText: 'cnt.northwind.legacy' })).toHaveCount(1)
+  await expect(rows.filter({ hasText: 'rst.invoicing' })).toHaveCount(0)
+
+  // Selecting one copy selects the annotation, so every copy shows selected.
+  const copies = page.getByRole('checkbox', { name: `Select ${key}` })
+  await copies.first().click()
+  await expect(copies.nth(0)).toBeChecked()
+  await expect(copies.nth(1)).toBeChecked()
+  await expect(page.getByText('1 selected')).toBeVisible()
+
+  // By responsibility: below the unit and below the usage of its execution.
+  await goto(page, `/acme/billing/default/annotations?mode=tree&by=responsibility&q=key:${key}`)
+  await expect(rows.filter({ hasText: key })).toHaveCount(2)
+  await expect(rows.filter({ hasText: 'rst.invoicing' })).toHaveCount(1)
+  await expect(rows.filter({ hasText: 'unt.invoicing.pdf' })).toHaveCount(1)
+  await expect(rows.filter({ hasText: 'sbt.northwind' })).toHaveCount(0)
+})
+
 test('filters with the bottom sheet on a phone', async ({ page }, testInfo) => {
   test.skip(!isMobile(testInfo), 'The bottom sheet replaces the filter tools below md.')
   await openApp(page, '/acme/billing/default/annotations')

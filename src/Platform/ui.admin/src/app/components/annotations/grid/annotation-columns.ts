@@ -18,8 +18,9 @@ export interface ColumnOptions {
   tree: boolean
   now: number
   configurations: ReadonlyMap<string, ConfigurationSummary> | null
-  isExpanded: (key: string) => boolean
-  toggle: (key: string) => void
+  /** By row id: in the tree, an annotation can have a row per path. */
+  isExpanded: (id: string) => boolean
+  toggle: (id: string) => void
 }
 
 export const columnLabels: Record<string, string> = {
@@ -88,8 +89,8 @@ export function annotationColumns(options: ColumnOptions): TableColumn<TreeNode>
         options.tree
           ? h(TreeCell, {
               node: row.original,
-              expanded: options.isExpanded(row.original.key),
-              onToggle: () => options.toggle(row.original.key),
+              expanded: options.isExpanded(row.original.id),
+              onToggle: () => options.toggle(row.original.id),
             })
           : h(AnnotationTypeBadge, { type: row.original.key.slice(0, 3), variant: 'label' }),
       meta: { style: width(options.tree ? 260 : 160) },
