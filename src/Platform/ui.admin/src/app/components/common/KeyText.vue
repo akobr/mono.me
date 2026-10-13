@@ -2,9 +2,10 @@
 import { computed } from 'vue'
 
 /** An annotation key in monospace: the type code and separators dimmed, the own name emphasized. */
-const props = withDefaults(defineProps<{ value: string; copy?: boolean; truncate?: boolean }>(), {
+const props = withDefaults(defineProps<{ value: string; copy?: boolean; truncate?: boolean; size?: 'xs' | 'sm' }>(), {
   copy: false,
   truncate: true,
+  size: 'xs',
 })
 
 const segments = computed(() => props.value.split('.'))
@@ -12,7 +13,11 @@ const segments = computed(() => props.value.split('.'))
 
 <template>
   <span class="inline-flex min-w-0 items-center gap-1">
-    <code class="min-w-0 font-mono text-xs" :class="truncate ? 'truncate' : 'break-all'" :title="value">
+    <code
+      class="min-w-0 font-mono"
+      :class="[size === 'sm' ? 'text-sm' : 'text-xs', truncate ? 'truncate' : 'break-all']"
+      :title="value"
+    >
       <template v-for="(segment, index) in segments" :key="index">
         <span v-if="index > 0" class="text-muted">.</span>
         <span
