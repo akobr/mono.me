@@ -153,17 +153,11 @@ const link = (key: string) => ({
     </div>
 
     <form v-if="mode === 'form'" class="flex-1 space-y-4 p-4" novalidate @submit.prevent="save">
-      <div class="grid gap-4 sm:grid-cols-3">
-        <UFormField label="Name"
-          ><UInput :model-value="annotation.Name" disabled class="w-full font-mono"
-        /></UFormField>
-        <UFormField label="Type"
-          ><UInput :model-value="annotation.AnnotationType" disabled class="w-full"
-        /></UFormField>
-        <UFormField label="Key"
-          ><UInput :model-value="annotation.AnnotationKey" disabled class="w-full font-mono"
-        /></UFormField>
-      </div>
+      <!-- Name, type and key are part of the key: text, not inputs. The name is the key's last, bold segment. -->
+      <p class="flex min-w-0 items-center gap-2" data-testid="annotation-identity">
+        <AnnotationTypeBadge :type="annotation.AnnotationType" variant="icon" />
+        <KeyText :value="annotation.AnnotationKey" size="sm" :truncate="false" />
+      </p>
 
       <UFormField label="Title" name="Title" :error="errors.Title">
         <UInput v-model="title" v-bind="titleAttrs" :disabled="readonly" class="w-full" />
