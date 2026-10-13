@@ -48,6 +48,18 @@ const viewItems = computed(() =>
   (views.data.value ?? []).map((view) => view.Name!).filter((name) => name && name !== context.view),
 )
 
+// With one other view there is nothing to pick: preselect it, unless ?to= already names a view (the Views page
+// can link to a discovered view, which is not in this list).
+watch(
+  viewItems,
+  (items) => {
+    if (!target.value && items.length === 1) {
+      target.value = items[0]
+    }
+  },
+  { immediate: true },
+)
+
 const ready = computed(() => !!key.value && !!target.value && !!context.scope)
 
 const diff = useQuery({

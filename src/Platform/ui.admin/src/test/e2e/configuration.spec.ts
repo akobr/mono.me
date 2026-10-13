@@ -63,3 +63,13 @@ test('saves a change and compares it with the previous version', async ({ page }
   await expect(page).toHaveURL(/from=\d+/)
   await expect(page.locator('.cm-mergeView, .cm-changedLine, .cm-deletedChunk').first()).toBeVisible()
 })
+
+test('compare views preselects the only other view', async ({ page }) => {
+  // The seeded project has the views default and staging.
+  await openApp(page, `/acme/billing/default/compare?key=${key}`)
+
+  await expect(page).toHaveURL(/[?&]to=staging(&|$)/)
+  await expect(page.getByRole('combobox', { name: 'Compare default with' })).toHaveText('staging')
+  await expect(page.getByText('Compare a configuration across views')).toBeHidden()
+  await expect(page.locator('.cm-editor').first()).toBeVisible()
+})
