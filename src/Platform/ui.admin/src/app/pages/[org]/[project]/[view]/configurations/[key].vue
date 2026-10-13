@@ -55,6 +55,7 @@ function close() {
             </h2>
             <KeyText :value="key" copy />
           </div>
+          <DetailPanelActions />
           <UButton
             icon="i-lucide-x"
             color="neutral"

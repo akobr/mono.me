@@ -160,6 +160,7 @@ async function remove() {
       <UDropdownMenu :items="menu" :content="{ align: 'end' }">
         <UButton icon="i-lucide-ellipsis" color="neutral" variant="ghost" size="sm" aria-label="More actions" />
       </UDropdownMenu>
+      <DetailPanelActions />
       <UButton
         icon="i-lucide-x"
         color="neutral"

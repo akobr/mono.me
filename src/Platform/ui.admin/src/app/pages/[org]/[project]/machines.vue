@@ -18,6 +18,7 @@ const toast = useToast()
 const canManage = useCan('machines')
 const canAdmin = useCan('manageAccess')
 const boot = useBootState()
+const detail = useDetailPanel()
 
 const machines = useGetMachineAccesses(
   () => context.org ?? '',
@@ -76,7 +77,7 @@ const daysLeft = (machine: MachineAccess) => certificateDaysLeft(machine, policy
 </script>
 
 <template>
-  <UDashboardPanel id="machines">
+  <UDashboardPanel id="machines" :class="{ hidden: detail.covers.value }">
     <template #header>
       <AppNavbar title="Machines">
         <template #right>

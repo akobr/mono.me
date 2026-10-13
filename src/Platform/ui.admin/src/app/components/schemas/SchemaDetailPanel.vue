@@ -41,6 +41,7 @@ function close() {
             {{ key }}
           </RouterLink>
         </div>
+        <DetailPanelActions />
         <UButton
           icon="i-lucide-x"
           color="neutral"

@@ -53,6 +53,7 @@ declare module 'vue' {
     DeletedAnnotationBanner: typeof import('./components/annotations/DeletedAnnotationBanner.vue')['default']
     DeletedKeysDialog: typeof import('./components/annotations/DeletedKeysDialog.vue')['default']
     DetailPanel: typeof import('./components/shell/DetailPanel.vue')['default']
+    DetailPanelActions: typeof import('./components/shell/DetailPanelActions.vue')['default']
     DiffEditor: typeof import('./components/editor/DiffEditor.vue')['default']
     DocumentEditor: typeof import('./components/editor/DocumentEditor.vue')['default']
     EmptyState: typeof import('./components/common/EmptyState.vue')['default']

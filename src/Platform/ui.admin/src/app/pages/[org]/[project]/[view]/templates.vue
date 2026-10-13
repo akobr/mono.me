@@ -12,6 +12,7 @@ const route = useRoute()
 const context = useContextStore()
 const catalog = useCatalogStore()
 const scope = useScope()
+const detail = useDetailPanel()
 
 watch(
   () => context.scope,
@@ -39,7 +40,7 @@ const selected = computed(() => (route.params as { type?: string }).type)
 </script>
 
 <template>
-  <UDashboardPanel id="templates">
+  <UDashboardPanel id="templates" :class="{ hidden: detail.covers.value }">
     <template #header>
       <AppNavbar title="Templates" />
     </template>
