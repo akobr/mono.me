@@ -26,7 +26,7 @@ const kinds = [
     description: 'Configurations of a type below one annotation.',
   },
 ]
-const types = typeCodes.map((code) => ({ label: typeMeta[code].label, value: code }))
+const types = computed(() => typeCodes.map((code) => ({ label: typeMeta[code].label, value: code })))
 const keys = computed(() => [...catalog.byKey.keys()].toSorted())
 
 const target = computed<SchemaTarget | undefined>(() => {

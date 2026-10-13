@@ -20,6 +20,7 @@ declare global {
   const onSignOut: typeof import('./stores/session').onSignOut
   const runLimited: typeof import('./composables/useAnnotationActions').runLimited
   const shortcutGroups: typeof import('./composables/useShortcutsHelp').shortcutGroups
+  const typeColorsStyleId: typeof import('./stores/type-appearance').typeColorsStyleId
   const undoKeys: typeof import('./composables/useAnnotationActions').undoKeys
   const useAnnotationActions: typeof import('./composables/useAnnotationActions').useAnnotationActions
   const useAnnotationCreate: typeof import('./composables/useAnnotationCreate').useAnnotationCreate
@@ -52,6 +53,7 @@ declare global {
   const useSidebar: typeof import('./composables/useSidebar').useSidebar
   const useToast: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useToast').useToast
   const useTour: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useTour').useTour
+  const useTypeAppearanceStore: typeof import('./stores/type-appearance').useTypeAppearanceStore
   const useUnsavedChanges: typeof import('./composables/useUnsavedChanges').useUnsavedChanges
 }
 // for type re-export

@@ -9,8 +9,8 @@ describe('project settings store', () => {
   it('starts every project in UTC', () => {
     const settings = useProjectSettingsStore()
 
-    expect(settings.settingsOf('acme.billing')).toEqual({ defaultTimeZone: 'UTC' })
-    expect(settings.settingsOf(undefined)).toEqual({ defaultTimeZone: 'UTC' })
+    expect(settings.settingsOf('acme.billing')).toEqual({ defaultTimeZone: 'UTC', types: {} })
+    expect(settings.settingsOf(undefined)).toEqual({ defaultTimeZone: 'UTC', types: {} })
     expect(settings.defaultTimeZone).toBe('UTC')
   })
 
@@ -48,6 +48,33 @@ describe('project settings store', () => {
     settings.update('acme.shipping', { defaultTimeZone: 'America/New_York' })
     settings.update('acme.shipping', { defaultTimeZone: 'Nowhere/City' })
     expect(settings.settingsOf('acme.shipping').defaultTimeZone).toBe('America/New_York')
+  })
+
+  it('keeps the type names, colors and icons per project, sanitized', async () => {
+    const settings = useProjectSettingsStore()
+
+    settings.update('acme.billing', { types: { exe: { label: ' Job ', color: 'red', icon: 'i-lucide-unknown' } } })
+    settings.update('acme.billing', { defaultTimeZone: 'Europe/Prague' })
+    await nextTick()
+
+    expect(settings.settingsOf('acme.billing').types).toEqual({ exe: { label: 'Job', color: 'red' } })
+    expect(settings.settingsOf('acme.shipping').types).toEqual({})
+    expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual({
+      'acme.billing': { defaultTimeZone: 'Europe/Prague', types: { exe: { label: 'Job', color: 'red' } } },
+    })
+
+    settings.update('acme.billing', { types: {} })
+    await nextTick()
+
+    expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual({
+      'acme.billing': { defaultTimeZone: 'Europe/Prague' },
+    })
+  })
+
+  it('ignores stored types it cannot show', () => {
+    localStorage.setItem(storageKey, JSON.stringify({ 'acme.billing': { types: { exe: { color: 'chartreuse' } } } }))
+
+    expect(useProjectSettingsStore().settingsOf('acme.billing').types).toEqual({})
   })
 
   it('resets a project to the defaults', () => {

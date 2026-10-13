@@ -1,3 +1,4 @@
+import { reactive } from 'vue'
 import {
   annotationTypes,
   getAllAncestors,
@@ -42,7 +43,8 @@ export interface AnnotationTypeMeta {
   parts: ('subject' | 'responsibility' | 'context' | 'unit' | 'name')[]
 }
 
-export const typeMeta: Record<AnnotationTypeCode, AnnotationTypeMeta> = {
+/** The built-in metadata; project settings and Preferences may override label, plural and icon (type-appearance.ts). */
+export const builtInTypeMeta: Readonly<Record<AnnotationTypeCode, Readonly<AnnotationTypeMeta>>> = {
   rst: {
     type: 'Responsibility',
     code: 'rst',
@@ -121,6 +123,12 @@ export const typeMeta: Record<AnnotationTypeCode, AnnotationTypeMeta> = {
     parts: ['subject', 'responsibility', 'context', 'unit'],
   },
 }
+
+/**
+ * The metadata the UI shows: reactive, so templates and computeds that read a label, plural or icon follow the
+ * overrides that `applyTypeAppearance` writes. The key model fields never change.
+ */
+export const typeMeta: Record<AnnotationTypeCode, AnnotationTypeMeta> = reactive(structuredClone(builtInTypeMeta))
 
 export const typeCodes = annotationTypes.map((info) => info.code)
 
