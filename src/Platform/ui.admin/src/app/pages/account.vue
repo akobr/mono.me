@@ -4,6 +4,7 @@ import { useColorMode } from '@vueuse/core'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSessionStore } from '@/stores/session'
 import { groupMemberships } from '@/utils/memberships'
+import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 
 const session = useSessionStore()
 const preferences = usePreferencesStore()
@@ -22,6 +23,14 @@ const memberships = computed(() =>
     })),
   ]),
 )
+
+// Personal names, colors and icons of the annotation types (424-13), in every project. The account page has no
+// project, so the editor shows the built-in values under the empty fields.
+const types = computed({
+  get: () => preferences.types,
+  set: (value: TypeAppearances) => preferences.setTypes(value),
+})
+const builtInTypes = resolveTypeAppearances()
 
 const colorModes = [
   { label: 'Light', value: 'light', icon: 'i-lucide-sun' },
@@ -124,6 +133,29 @@ const densities = [
                 variant="ghost"
                 size="sm"
                 @click="preferences.reset()"
+              />
+            </div>
+          </template>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <h2 class="font-semibold">Annotation types</h2>
+            <p class="mt-1 text-sm text-muted">
+              Your own names, colors and icons, in every project. Empty fields use the project's settings, or the
+              built-in ones.
+            </p>
+          </template>
+          <TypeAppearanceEditor v-model="types" :inherited="builtInTypes" />
+          <template #footer>
+            <div class="flex justify-end">
+              <UButton
+                label="Reset types"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :disabled="Object.keys(types).length === 0"
+                @click="types = {}"
               />
             </div>
           </template>
