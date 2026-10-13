@@ -229,12 +229,16 @@ interface LayoutSeed {
   remembered?: GraphFrameMemory
 }
 
-/** The current layout while there is one, otherwise the last frame of the view's graph from an earlier visit. */
+/**
+ * The current layout while it is the view's remembered frame, otherwise that frame from an earlier visit. After the
+ * view switcher changed the view, the live positions belong to the previous view: the new view starts from its own
+ * frame, and from the live positions only when it has none.
+ */
 function layoutSeed(current: GraphData): LayoutSeed | undefined {
-  if (positions.value) {
+  const frame = memory.value.frame
+  if (positions.value && (!frame || frame.positions === positions.value)) {
     return { index: current.index, positions: positions.value }
   }
-  const frame = memory.value.frame
   return (
     frame && {
       index: new Map(frame.keys.map((key, index) => [key, index])),
@@ -268,7 +272,12 @@ function startSimulation(next: GraphData, from: LayoutSeed | undefined) {
   const keepsShape = seeded > count / 2
   // The same nodes in the same layout as the remembered frame: it resumes with its alpha and its dragged nodes.
   const resumed =
-    from?.remembered && seeded === count && from.remembered.layout === layout.value ? from.remembered : undefined
+    from?.remembered &&
+    seeded === count &&
+    from.remembered.keys.length === count &&
+    from.remembered.layout === layout.value
+      ? from.remembered
+      : undefined
   const pins =
     resumed?.pinned.flatMap((key) => {
       const index = next.index.get(key)
