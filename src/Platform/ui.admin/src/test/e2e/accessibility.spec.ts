@@ -13,6 +13,11 @@ const screens: [string, string][] = [
   ['members', '/acme/billing/members'],
   ['machines', '/acme/billing/machines'],
   ['settings', '/acme/billing/settings'],
+  ['key values', '/acme/billing/default/key-values'],
+  ['key value detail', '/acme/billing/default/key-values/db.password'],
+  ['secrets settings', '/acme/billing/secrets'],
+  ['audit', '/acme/billing/audit'],
+  ['usage', '/acme/billing/usage'],
   ['account', '/account'],
 ]
 

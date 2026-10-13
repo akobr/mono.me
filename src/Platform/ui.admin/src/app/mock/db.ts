@@ -5,10 +5,13 @@ import type {
   Annotation,
   AnnotationAuditEntry,
   Invitation,
+  KeyValueAuditEvent,
+  KeyValuePolicy,
   MachineAccess,
   SharedCertificate,
   View,
 } from '@42for.net/2splatform.sdk'
+import type { KeyValueScopeStore } from './key-values'
 import { generateAnnotations, type ScopeSeed } from './annotations'
 
 // In-memory data of the mock API (vite --mode e2e). It is kept in sessionStorage, so it survives the full-page
@@ -48,6 +51,12 @@ export interface MockDb {
   machines?: Record<string, MachineAccess[]>
   /** Shared certificates per project key. */
   certificates?: Record<string, SharedCertificate[]>
+  /** Key/value pairs per scope ("org/project/view"), with their versions and the deleted state. */
+  keyValues?: Record<string, KeyValueScopeStore>
+  /** Key/value policies per project key. */
+  keyValuePolicies?: Record<string, KeyValuePolicy>
+  /** The secret audit trail per project key, newest last. */
+  keyValueAudit?: Record<string, KeyValueAuditEvent[]>
 }
 
 export type MockScenario = 'default' | 'new-user' | 'invited' | 'large'
