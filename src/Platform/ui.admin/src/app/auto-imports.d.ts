@@ -11,6 +11,7 @@ declare global {
   const capabilityRoles: typeof import('./composables/useRole').capabilityRoles
   const chunk: typeof import('./composables/useAnnotationActions').chunk
   const defaultPreferences: typeof import('./stores/preferences').defaultPreferences
+  const defaultProjectSettings: typeof import('./stores/project-settings').defaultProjectSettings
   const defineLocale: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineLocale').defineLocale
   const defineShortcuts: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts').defineShortcuts
   const extendLocale: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineLocale').extendLocale
@@ -39,6 +40,7 @@ declare global {
   const useKbd: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useKbd').useKbd
   const useOverlay: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useOverlay').useOverlay
   const usePreferencesStore: typeof import('./stores/preferences').usePreferencesStore
+  const useProjectSettingsStore: typeof import('./stores/project-settings').useProjectSettingsStore
   const useResizable: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useResizable').useResizable
   const useRole: typeof import('./composables/useRole').useRole
   const useScope: typeof import('./composables/useAppContext').useScope
@@ -80,6 +82,9 @@ declare global {
   // @ts-ignore
   export type { DocumentFormat, EditorMode, Density, GridPreferences, Preferences } from './stores/preferences'
   import('./stores/preferences')
+  // @ts-ignore
+  export type { ProjectSettings } from './stores/project-settings'
+  import('./stores/project-settings')
   // @ts-ignore
   export type { AccountStatus } from './stores/session'
   import('./stores/session')
