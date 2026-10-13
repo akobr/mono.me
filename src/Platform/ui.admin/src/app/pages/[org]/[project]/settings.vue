@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import {
   getCertificateAuthority,
@@ -9,16 +9,29 @@ import {
 import { useGetAccessPoint } from '@42for.net/2splatform.sdk/vue-query'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
+import { useProjectSettingsStore } from '@/stores/project-settings'
 import { errorMessage } from '@/utils/errors'
 import { credentialKindDescriptions, issuesCertificates } from '@/utils/machines'
 
 // Project settings (spec section 13): the machine authentication policy (Administrator), the CA certificate
-// download (PEM; the SDK fetcher returns non-JSON bodies as text) and project information.
+// download (PEM; the SDK fetcher returns non-JSON bodies as text) and project information. The default time zone of
+// new annotations (424-12) is kept in this browser, so it applies at once, like Preferences.
 const context = useContextStore()
+const projectSettings = useProjectSettingsStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const role = useRole()
 const canAdmin = useCan('manageAccess')
+const canEdit = useCan('edit')
+
+const defaultTimeZone = computed({
+  get: () => projectSettings.defaultTimeZone,
+  set: (value: string) => {
+    if (context.projectKey) {
+      projectSettings.update(context.projectKey, { defaultTimeZone: value })
+    }
+  },
+})
 
 const accessPoint = useGetAccessPoint(() => context.projectKey ?? '', {
   query: { enabled: () => !!context.projectKey && canAdmin.value, meta: { silent: true } },
@@ -84,6 +97,21 @@ async function downloadCa() {
               <dd>{{ Object.keys(accessPoint.data.value.AccessMap ?? {}).length }}</dd>
             </template>
           </dl>
+        </UCard>
+
+        <UCard>
+          <template #header><h2 class="font-semibold">Annotations</h2></template>
+          <UFormField
+            label="Default time zone"
+            help="New annotations in this project start in this time zone. Saved in this browser."
+          >
+            <TimeZoneSelect
+              v-model="defaultTimeZone"
+              :disabled="!canEdit"
+              aria-label="Default time zone"
+              class="max-w-sm"
+            />
+          </UFormField>
         </UCard>
 
         <UCard>
