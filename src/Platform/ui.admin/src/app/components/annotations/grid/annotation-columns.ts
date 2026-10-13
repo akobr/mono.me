@@ -32,12 +32,10 @@ export const columnLabels: Record<string, string> = {
   configuration: 'Configuration',
   validFrom: 'Valid from',
   expiresAt: 'Expires',
-  description: 'Description',
-  documentation: 'Documentation',
 }
 
 /** Columns hidden until the user shows them (spec section 8). */
-export const defaultHiddenColumns = ['validFrom', 'expiresAt', 'description', 'documentation']
+export const defaultHiddenColumns = ['validFrom', 'expiresAt']
 
 const width = (size: number, min = 60) => ({
   th: (header: { column: { getSize: () => number } }) => ({
@@ -176,34 +174,6 @@ export function annotationColumns(options: ColumnOptions): TableColumn<TreeNode>
       header: header('expiresAt'),
       cell: ({ row }) => dateCell(row.original.annotation?.ExpiresAt, row.original.annotation?.TimeZone),
       meta: { style: width(170) },
-    },
-    {
-      id: 'description',
-      size: 300,
-      accessorFn: (row) => row.annotation?.Description ?? '',
-      header: header('description'),
-      cell: ({ row }) => h('span', { class: 'block truncate text-muted' }, row.original.annotation?.Description ?? ''),
-      meta: { style: width(300) },
-    },
-    {
-      id: 'documentation',
-      size: 220,
-      accessorFn: (row) => row.annotation?.DocumentationLink ?? '',
-      header: header('documentation'),
-      cell: ({ row }) =>
-        row.original.annotation?.DocumentationLink
-          ? h(
-              'a',
-              {
-                href: row.original.annotation.DocumentationLink,
-                target: '_blank',
-                rel: 'noopener noreferrer',
-                class: 'block truncate text-primary hover:underline',
-              },
-              row.original.annotation.DocumentationLink,
-            )
-          : null,
-      meta: { style: width(220) },
     },
   ]
 }
