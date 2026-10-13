@@ -25,7 +25,8 @@ export interface Preferences {
   editorFormat: DocumentFormat
   annotationMode: EditorMode
   density: Density
-  lastContext?: Scope
+  /** The organization, project and view the user last worked in; the navigation menu and "/" use it. */
+  lastContext?: Partial<Scope>
   recentKeys: string[]
   grids: Record<string, GridPreferences>
   /** Personal names, colors and icons of the annotation types, in every project; they win over the project's. */
@@ -66,7 +67,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
     state.value.types = sanitizeTypeAppearances(value)
   }
 
-  function rememberContext(scope: Scope): void {
+  function rememberContext(scope: Partial<Scope>): void {
     state.value.lastContext = scope
   }
 

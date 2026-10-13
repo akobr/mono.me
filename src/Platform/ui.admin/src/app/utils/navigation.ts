@@ -1,4 +1,6 @@
-import { hasRole, type AccountRoleName } from '@42for.net/2splatform.sdk'
+import { hasRole, roleRank, type AccountRoleName } from '@42for.net/2splatform.sdk'
+import type { Scope } from '@/stores/context'
+import { hasOrganization } from '@/utils/memberships'
 
 export interface NavigationEntry {
   label: string
@@ -28,6 +30,49 @@ export interface NavigationContext {
 
 export interface NavigationItem extends NavigationEntry {
   locked: boolean
+}
+
+/**
+ * The current context completed by the remembered one: its project while the organization is the same, and its view
+ * while the project is the same too. Outside organizations, the remembered context stays as it is.
+ */
+export function mergeContext(current: Partial<Scope>, remembered: Partial<Scope> | undefined): Partial<Scope> {
+  if (!current.org) {
+    return { ...remembered }
+  }
+
+  const sameOrg = remembered?.org === current.org
+  const project = current.project ?? (sameOrg ? remembered?.project : undefined)
+  const view = current.view ?? (sameOrg && remembered?.project === project ? remembered?.view : undefined)
+  return { org: current.org, project, view }
+}
+
+/** The remembered context without the organization or project the caller is no longer a member of. */
+export function accessibleContext(
+  remembered: Partial<Scope> | undefined,
+  accessMap: Record<string, string> | undefined | null,
+): Partial<Scope> | undefined {
+  if (!remembered?.org || !hasOrganization(accessMap, remembered.org)) {
+    return undefined
+  }
+
+  return remembered.project && roleRank(accessMap?.[`${remembered.org}.${remembered.project}`]) > 0
+    ? { org: remembered.org, project: remembered.project, view: remembered.view }
+    : { org: remembered.org }
+}
+
+/**
+ * The context the navigation shows (424-17): the route's context completed by the remembered one, so a page of a
+ * less specific context keeps the sections of the project and view the user worked in. The route's own parts are
+ * always kept; a project without a known view shows its default view.
+ */
+export function navigationScope(
+  current: Partial<Scope>,
+  remembered: Partial<Scope> | undefined,
+  accessMap: Record<string, string> | undefined | null,
+): Partial<Scope> {
+  const scope = mergeContext(current, accessibleContext(remembered, accessMap))
+  return scope.project ? { ...scope, view: scope.view ?? 'default' } : scope
 }
 
 /**
