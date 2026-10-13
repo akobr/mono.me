@@ -90,7 +90,7 @@ const daysLeft = (machine: MachineAccess) => certificateDaysLeft(machine, policy
       <ErrorState v-else-if="machines.isError.value" :error="machines.error.value" @retry="machines.refetch()" />
       <EmptyState
         v-else-if="!machines.data.value?.length"
-        icon="i-lucide-cpu"
+        icon="i-lucide-computer"
         title="No machine access"
         description="Machines (services, pipelines) read and write the project's annotations and configurations with their own credentials."
       >

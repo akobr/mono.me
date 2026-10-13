@@ -27,7 +27,7 @@ function close() {
   <DetailPanel id="machine-detail" :title="id" @close="close">
     <template #header="{ close: closePanel }">
       <div class="flex items-center gap-2 border-b border-default px-4 py-3">
-        <UIcon name="i-lucide-cpu" class="size-5 text-muted" />
+        <UIcon name="i-lucide-computer" class="size-5 text-muted" />
         <h2 class="flex-1 truncate font-mono text-sm font-semibold">{{ id }}</h2>
         <DetailPanelActions />
         <UButton icon="i-lucide-x" color="neutral" variant="ghost" size="sm" aria-label="Close" @click="closePanel" />
