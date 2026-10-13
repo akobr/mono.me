@@ -17,6 +17,10 @@ After that, the address bar always names the context, like GitHub:
 
 The switcher at the top changes the organization, project or view and keeps the screen you are on. A link to an annotation or configuration opens the same screen for anyone with access to that project.
 
+The sidebar always lists the pages of the view, project and organization you last worked in. They stay there on project pages (Settings, Members, …), on the organization overview, and on Organizations and Account. Opening a page of another view, project or organization updates the sidebar. A project you have not opened a view of yet shows its `default` view.
+
+The browser remembers this context, and the address `/` opens it again.
+
 ## The catalog
 
 **Annotations** lists the catalog of the view in two modes:
