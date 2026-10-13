@@ -24,7 +24,12 @@ The switcher at the top changes the organization, project or view and keeps the 
 - **Grid:** sortable, resizable columns.
 - **Tree:** grouped by subject or by responsibility.
 
-Selecting a row opens the detail beside the list, so the list keeps its scroll position, selection and filter.
+Selecting a row opens its detail from the right, over the list. The list keeps its scroll position, selection and filter, and the part you can still see stays usable: selecting another row switches the detail. Two buttons in the detail header change how it opens:
+
+- **Pin** docks the detail beside the list. Drag the border between them to resize it, or focus the border and use `←` / `→`; a double-click restores the default width.
+- **Full screen** opens the detail as a page of its own, in place of the list.
+
+The UI remembers your choice and the width, and opens the next detail the same way. Configurations, templates, schemas and machines open their detail the same way.
 
 The filter box takes words and qualifiers:
 
@@ -135,8 +140,8 @@ New credentials (API keys, certificates with their password, client secrets) are
 The UI adapts to the screen:
 
 - **Phone:** the lists become cards, the detail opens full-screen, and the filters move to a bottom sheet.
-- **Tablet:** the detail slides in from the right.
-- **Desktop:** the sidebar, list and detail sit side by side and can be resized.
+- **Tablet:** the detail slides in from the right, or opens in full screen.
+- **Desktop:** the resizable sidebar sits beside the list; the detail opens over the list, pinned beside it and resizable, or in full screen.
 
 It follows the system light or dark theme unless you pick one on the account page.
 
