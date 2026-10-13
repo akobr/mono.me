@@ -11,14 +11,15 @@ import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useProjectSettingsStore } from '@/stores/project-settings'
+import { dateFormatItems, type DateFormat } from '@/utils/dates'
 import { errorMessage } from '@/utils/errors'
 import { credentialKindDescriptions, issuesCertificates } from '@/utils/machines'
 import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 
 // Project settings (spec section 13): the machine authentication policy (Administrator), the CA certificate
 // download (PEM; the SDK fetcher returns non-JSON bodies as text) and project information. The default time zone of
-// new annotations (424-12) and the names, colors and icons of the annotation types (424-13) are kept in this browser,
-// so they apply at once, like Preferences.
+// new annotations (424-12), the date format (424-23) and the names, colors and icons of the annotation types (424-13)
+// are kept in this browser, so they apply at once, like Preferences.
 const context = useContextStore()
 const projectSettings = useProjectSettingsStore()
 const preferences = usePreferencesStore()
@@ -36,6 +37,16 @@ const defaultTimeZone = computed({
     }
   },
 })
+
+const dateFormat = computed({
+  get: () => projectSettings.dateFormat,
+  set: (value: DateFormat) => {
+    if (context.projectKey) {
+      projectSettings.update(context.projectKey, { dateFormat: value })
+    }
+  },
+})
+const dateFormatOptions = dateFormatItems()
 
 const types = computed({
   get: () => projectSettings.current.types,
@@ -127,6 +138,25 @@ async function downloadCa() {
               class="max-w-sm"
             />
           </UFormField>
+        </UCard>
+
+        <UCard>
+          <template #header><h2 class="font-semibold">Dates</h2></template>
+          <UFormField
+            label="Date format"
+            help="How dates are shown on every page of this project, for everyone who opens it in this browser. Each person can pick their own format in Preferences."
+          >
+            <USelect v-model="dateFormat" :items="dateFormatOptions" :disabled="!canEdit" class="w-full max-w-sm" />
+          </UFormField>
+          <UAlert
+            v-if="preferences.dateFormat"
+            class="mt-4"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-user-cog"
+            :description="`Your own Preferences show dates as ${preferences.dateFormat}.`"
+            :actions="[{ label: 'Open Preferences', to: '/account', color: 'neutral', variant: 'outline' }]"
+          />
         </UCard>
 
         <UCard>

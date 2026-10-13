@@ -2,18 +2,22 @@ import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { isValidTimeZone } from '@/forms/annotation.schema'
+import { defaultDateFormat, isDateFormat, type DateFormat } from '@/utils/dates'
 import { sanitizeTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 import { useContextStore } from './context'
 
 export interface ProjectSettings {
   /** IANA time zone that new annotations of the project start in. */
   defaultTimeZone: string
+  /** How dates are shown in this project; Preferences can override it (424-23). */
+  dateFormat: DateFormat
   /** Names, colors and icons of the annotation types in this project; Preferences can override them (424-13). */
   types: TypeAppearances
 }
 
 export const defaultProjectSettings: ProjectSettings = {
   defaultTimeZone: 'UTC',
+  dateFormat: defaultDateFormat,
   types: {},
 }
 
@@ -35,19 +39,24 @@ export const useProjectSettingsStore = defineStore('project-settings', () => {
         stored?.defaultTimeZone && isValidTimeZone(stored.defaultTimeZone)
           ? stored.defaultTimeZone
           : defaultProjectSettings.defaultTimeZone,
+      dateFormat: isDateFormat(stored?.dateFormat) ? stored?.dateFormat : defaultProjectSettings.dateFormat,
       types: sanitizeTypeAppearances(stored?.types),
     }
   }
 
   const current = computed(() => settingsOf(context.projectKey))
   const defaultTimeZone = computed(() => current.value.defaultTimeZone)
+  const dateFormat = computed(() => current.value.dateFormat)
 
   /**
-   * Merges the change into the project's entry; a change to a time zone Intl does not know is ignored. Types are
-   * stored sanitized, and empty types leave the entry, so it keeps only what was changed.
+   * Merges the change into the project's entry; a change to a time zone Intl does not know, or to an unknown date
+   * format, is ignored. Types are stored sanitized, and empty types leave the entry, so it keeps only what was changed.
    */
   function update(projectKey: string, patch: Partial<ProjectSettings>): void {
     if (patch.defaultTimeZone !== undefined && !isValidTimeZone(patch.defaultTimeZone)) {
+      return
+    }
+    if (patch.dateFormat !== undefined && !isDateFormat(patch.dateFormat)) {
       return
     }
 
@@ -64,5 +73,5 @@ export const useProjectSettingsStore = defineStore('project-settings', () => {
     state.value = others
   }
 
-  return { state, settingsOf, current, defaultTimeZone, update, reset }
+  return { state, settingsOf, current, defaultTimeZone, dateFormat, update, reset }
 })
