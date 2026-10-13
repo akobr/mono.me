@@ -127,9 +127,16 @@ Saving sends only your changes. Two situations stop a save:
 | Invitations | Administrator | Invite by email with a role and an expiry; resend, revoke or copy the link. |
 | Machines | Contributor | Credentials for services: scope, an optional annotation restriction, reset and delete. |
 | Certificates | Administrator | Shared client certificates: issue, revoke, expiry warnings. |
-| Settings | Everyone (policy: Administrator, time zone and types: Contributor) | The default time zone of new annotations, the names, colors and icons of the annotation types, the machine authentication policy and the CA certificate download. |
+| Settings | Everyone (policy: Administrator, time zone, date format and types: Contributor) | The default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy and the CA certificate download. |
 
 The **default time zone** is `UTC` until you change it. It is kept in your browser, so other people and other browsers keep their own until the API stores project settings.
+
+Every date in the UI has the same format: `yyyy-mm-dd` (`2026-10-13`) until someone picks another one under **Date format** on Settings. The other formats are `dd.mm.yyyy`, `dd/mm/yyyy`, `mm/dd/yyyy` and `d mmm yyyy` (`13 Oct 2026`). Your own **Date format** on the account page wins over the project's, in every project. **Project default** follows each project again.
+
+- The format applies to the dates in lists, tooltips, banners and messages. A date with a time adds the time on the 24-hour clock and the zone (`2026-10-13 15:04 UTC`).
+- The date fields of annotations and configurations show their parts in the same order.
+- Like the time zone, the project's format is kept in your browser until the API stores project settings.
+- Relative times ("3 hours ago") and the values in documents and in the API (ISO 8601) do not change.
 
 **Annotation types** on Settings gives each of the seven types a name (and its plural), a color and an icon for the whole project: chips, the legend of the graph, lists, filters and dialogs all use them. Your own **Annotation types** on the account page win over the project's, in every project, field by field. A field you leave empty uses the project's value, and then the built-in one.
 
@@ -159,7 +166,7 @@ The UI adapts to the screen:
 - **Tablet:** the detail slides in from the right, or opens in full screen.
 - **Desktop:** the resizable sidebar sits beside the list; the detail opens over the list, pinned beside it and resizable, or in full screen.
 
-It follows the system light or dark theme unless you pick one on the account page. The account page also keeps your other preferences: row density, editor formats and your own names, colors and icons of the annotation types.
+It follows the system light or dark theme unless you pick one on the account page. The account page also keeps your other preferences: row density, editor formats, the date format and your own names, colors and icons of the annotation types.
 
 Accessibility:
 - The screens are tested against WCAG 2.1 AA (axe).
