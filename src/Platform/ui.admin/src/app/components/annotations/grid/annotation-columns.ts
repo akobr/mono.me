@@ -83,7 +83,7 @@ export function annotationColumns(options: ColumnOptions): TableColumn<TreeNode>
     },
     {
       id: 'type',
-      size: options.tree ? 220 : 96,
+      size: options.tree ? 260 : 160,
       accessorFn: (row) => metaOf(row.key.slice(0, 3))?.mergeOrder ?? 99,
       header: header('type'),
       cell: ({ row }) =>
@@ -93,8 +93,8 @@ export function annotationColumns(options: ColumnOptions): TableColumn<TreeNode>
               expanded: options.isExpanded(row.original.key),
               onToggle: () => options.toggle(row.original.key),
             })
-          : h(AnnotationTypeBadge, { type: row.original.key.slice(0, 3) }),
-      meta: { style: width(options.tree ? 220 : 96) },
+          : h(AnnotationTypeBadge, { type: row.original.key.slice(0, 3), variant: 'label' }),
+      meta: { style: width(options.tree ? 260 : 160) },
     },
     {
       id: 'name',
