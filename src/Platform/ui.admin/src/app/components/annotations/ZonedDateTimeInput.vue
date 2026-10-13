@@ -10,11 +10,12 @@ import {
   type CalendarDate,
 } from '@internationalized/date'
 import { isValidTimeZone } from '@/forms/annotation.schema'
-import { formatDateTime } from '@/utils/dates'
+import { dateInputLocale, formatDateTime } from '@/utils/dates'
 
 /**
  * A date and a time interpreted in the annotation's time zone (spec section 11.1). The model is an ISO instant
- * (UTC); the tooltip shows the same instant in the user's local zone.
+ * (UTC); the tooltip shows the same instant in the user's local zone. The date segments follow the date format in
+ * effect (424-23).
  */
 const model = defineModel<string | null | undefined>()
 const props = withDefaults(defineProps<{ timeZone?: string; disabled?: boolean; label: string }>(), {
@@ -39,6 +40,7 @@ const zoned = computed(() => {
 const date = computed(() => (zoned.value ? toCalendarDate(zoned.value) : undefined))
 const time = computed(() => (zoned.value ? toTime(zoned.value) : undefined))
 const local = computed(() => (model.value ? `Your time: ${formatDateTime(new Date(model.value))}` : ''))
+const locale = computed(() => dateInputLocale())
 
 function update(nextDate: CalendarDate | undefined, nextTime: Time | undefined) {
   if (!nextDate) {
@@ -55,6 +57,7 @@ function update(nextDate: CalendarDate | undefined, nextTime: Time | undefined) 
   <div class="flex flex-wrap items-center gap-2">
     <UInputDate
       :model-value="date"
+      :locale="locale"
       :disabled="disabled"
       :aria-label="`${label} date`"
       @update:model-value="(value) => update((value as CalendarDate | undefined) ?? undefined, time)"
