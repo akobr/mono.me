@@ -27,6 +27,17 @@ async function editJson(page: Page, change: (content: Record<string, unknown>) =
   await replaceEditorText(page, JSON.stringify(content, null, 2))
 }
 
+test('Lineage opens the configuration of an ancestor and keeps the filter', async ({ page }) => {
+  await openApp(page, `${path}?q=northwind`)
+  await page.getByRole('button', { name: 'Lineage' }).click()
+  await page.getByRole('link', { name: 'sbt.northwind', exact: true }).click()
+
+  await expect(page).toHaveURL(/\/acme\/billing\/default\/configurations\/sbt\.northwind\?q=northwind$/)
+  await expect(page.getByRole('link', { name: 'Effective' })).toBeVisible()
+  // a subject has no ancestors
+  await expect(page.getByRole('button', { name: 'Lineage' })).toBeDisabled()
+})
+
 test('a schema violation is reported and can be saved anyway', async ({ page }) => {
   await openFromTemplate(page)
   await editJson(page, (content) => (content.retries = 42))
