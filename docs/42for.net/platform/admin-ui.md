@@ -28,7 +28,7 @@ The browser remembers this context, and the address `/` opens it again.
 - on Configurations, the scroll position;
 - on Graph, the layout, the focus, the hidden types, the dragged nodes, and the zoom and pan.
 
-To start over, select the screen you are already on in the sidebar. The memory lasts until you reload the page or sign out. An address you type or open from a bookmark is shown as it is.
+Selecting the screen you are already on in the sidebar goes back to its start: the filter, the open annotation or configuration, the mode, the layout and the focus start over. The other things above stay as they were. The memory lasts until you reload the page or sign out. An address you type or open from a bookmark is shown as it is.
 
 ## The catalog
 
