@@ -132,6 +132,20 @@ The redirect keeps the push of the original navigation, so Back returns to the p
   - Desktop: filter, open `sbt.northwind`, open History, go to Configurations through the sidebar, come back through the sidebar, and find the same URL, filter and History region. Selecting Annotations again then gives the plain list.
   - Phone: the filter part of the same flow, through the navigation slideover.
 
+### 8. After the rebase on main
+
+`main` brought the detail panel (overlay, pinned or full screen) and the tree with a row per path. Two changes followed:
+
+- **Row ids.** In the tree, an annotation with several parents has a row per path, and `main` keys the expansion and the keyboard cursor by row id (the keys of the path, joined with `/`). `AnnotationsMemory.activeKey` became `activeId`. `expanded` holds row ids, and `selection` stays by annotation key, which the grid maps to every copy of a row. Both perspectives (by subject, by responsibility) share one `expanded` set; their ids never collide.
+- **Scroll behind a covering detail.** A full-screen detail, and every detail on a phone, hides the list with `display: none`. The browser drops the offset of a hidden element and reports the reset as a scroll once the list shows again, so `useScrollMemory` recorded 0 and the list stayed at the top, also after coming back. `useScrollMemory` now:
+  - ignores scrolls while the element is hidden (`checkVisibility()`, with `getClientRects()` as the fallback);
+  - watches the element with `useResizeObserver`; hiding and showing change its size, and when it shows again the remembered offset is put back;
+  - waits for the list to show when it was mounted hidden (a detail URL opened in full screen).
+- **Tests:**
+  - `test/unit/components/scroll-memory.test.ts`: the offset survives hiding, the reset scroll on showing and comes back; a list mounted hidden gets its offset once shown. `ResizeObserver` is a stub that the test triggers.
+  - `test/e2e/annotations.spec.ts`: scrolls the list to 1500 px, opens a row (full screen on desktop), closes it, and finds the same offset; again after Configurations and back. On desktop it failed before the change (0 instead of 1500). On a phone it passed before too, and stays as a guard.
+- **Results:** `npm test` 305 passed, `npm run lint` and `vue-tsc` clean, `npm run test:e2e` 79 passed and 3 skipped, the visual suite 40 of 40.
+
 ### Not done
 
 - **Unsaved editor drafts** are still guarded by `useUnsavedChanges`, not remembered.
