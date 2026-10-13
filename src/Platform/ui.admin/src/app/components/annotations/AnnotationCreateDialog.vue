@@ -3,6 +3,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { setAnnotation, type Annotation } from '@42for.net/2splatform.sdk'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
+import { useProjectSettingsStore } from '@/stores/project-settings'
 import {
   buildAnnotationKey,
   getAllAncestors,
@@ -21,12 +22,14 @@ import { errorMessage } from '@/utils/errors'
  * ancestors (CosmosAnnotationService.TryCheckAndCreate*), so the dialog only lists them; the body carries the
  * relation members the runtime type requires, derived from the key. A deleted key or ancestor is looked up first
  * (useDeletedKeyCheck): the user restores it, which keeps its configuration and history, or creates it new.
+ * The time zone starts as the project's default (project settings, 424-12); the API copies it to the new ancestors.
  */
 const open = defineModel<boolean>('open', { default: false })
 const emit = defineEmits<{ created: [key: string] }>()
 
 const catalog = useCatalogStore()
 const context = useContextStore()
+const projectSettings = useProjectSettingsStore()
 const actions = useAnnotationActions()
 const deletedCheck = useDeletedKeyCheck()
 const toast = useToast()
@@ -36,12 +39,14 @@ type Part = keyof AnnotationKeyParts
 const type = ref<AnnotationTypeCode>('exe')
 const parts = reactive<Record<Part, string>>({ subject: '', responsibility: '', context: '', unit: '', name: '' })
 const title = ref('')
+const timeZone = ref(projectSettings.defaultTimeZone)
 const saving = ref(false)
 const failure = ref<string>()
 
 watch(open, (value) => {
   if (value) {
     failure.value = undefined
+    timeZone.value = projectSettings.defaultTimeZone
   }
 })
 
@@ -144,6 +149,8 @@ async function create() {
         Name: key.value.split('.').at(-1)!,
         AnnotationType: meta.value.type,
         Title: title.value.trim() || restored?.Title || undefined,
+        // a restored annotation keeps its own zone
+        TimeZone: restored?.TimeZone || timeZone.value || undefined,
       }),
     )
     catalog.upsert(created)
@@ -199,6 +206,10 @@ async function create() {
 
         <UFormField label="Title">
           <UInput v-model="title" class="w-full" />
+        </UFormField>
+
+        <UFormField label="Time zone" help="Default from the project settings.">
+          <TimeZoneSelect v-model="timeZone" />
         </UFormField>
 
         <div class="rounded-md border border-default bg-muted p-3 text-sm">

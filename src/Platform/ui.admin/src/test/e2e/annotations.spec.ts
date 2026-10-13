@@ -103,3 +103,34 @@ test('opens the detail of a graph node', async ({ page }, testInfo) => {
   await expect(page).toHaveURL(/\/graph\/(rst|unt|sbt|usg|cnt|exe|uxe)\./)
   await expect(page.getByRole('link', { name: 'Annotation', exact: true })).toBeVisible()
 })
+
+test('new annotations start in the default time zone of the project', async ({ page }, testInfo) => {
+  const dialog = page.getByRole('dialog', { name: 'New annotation' })
+  const openNewAnnotation = () =>
+    page.getByRole('button', { name: isMobile(testInfo) ? 'New annotation' : 'New', exact: true }).click()
+
+  // Every project starts in UTC.
+  await openApp(page, '/acme/billing/default/annotations')
+  await openNewAnnotation()
+  await expect(dialog.getByRole('button', { name: 'Time zone', exact: true })).toContainText('UTC')
+  await page.keyboard.press('Escape')
+
+  // Not the browser's zone (Europe/Prague): an annotation without a zone shows that one as its placeholder.
+  await goto(page, '/acme/billing/settings')
+  await page.getByRole('button', { name: 'Default time zone' }).click()
+  await page.getByPlaceholder('Search time zones').fill('Tokyo')
+  await page.getByRole('option', { name: /Asia\/Tokyo/ }).click()
+  await expect(page.getByRole('button', { name: 'Default time zone' })).toContainText('Asia/Tokyo')
+
+  await goto(page, '/acme/billing/default/annotations')
+  await openNewAnnotation()
+  await expect(dialog.getByRole('button', { name: 'Time zone', exact: true })).toContainText('Asia/Tokyo')
+  await dialog.getByRole('combobox', { name: 'Type' }).click()
+  await page.getByRole('option', { name: 'Subject' }).click()
+  await dialog.getByRole('textbox', { name: 'Name' }).fill('cyberdyne')
+  await dialog.getByRole('button', { name: 'Create' }).click()
+  await expect(page.getByText('sbt.cyberdyne created', { exact: true })).toBeVisible()
+
+  await goto(page, '/acme/billing/default/annotations/sbt.cyberdyne')
+  await expect(page.getByRole('button', { name: 'Time zone', exact: true })).toContainText('Asia/Tokyo')
+})
