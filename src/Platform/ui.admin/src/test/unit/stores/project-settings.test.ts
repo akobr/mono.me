@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { useContextStore } from '@/stores/context'
 import { useProjectSettingsStore } from '@/stores/project-settings'
@@ -59,5 +59,24 @@ describe('project settings store', () => {
 
     expect(settings.settingsOf('acme.billing').defaultTimeZone).toBe('UTC')
     expect(settings.settingsOf('acme.shipping').defaultTimeZone).toBe('Europe/Prague')
+  })
+
+  it('keeps the defaults when localStorage is blocked', () => {
+    const blocked = vi.spyOn(window, 'localStorage', 'get').mockImplementation(() => {
+      throw new DOMException('Storage is disabled', 'SecurityError')
+    })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    try {
+      const settings = useProjectSettingsStore()
+      settings.update('acme.billing', { defaultTimeZone: 'Europe/Prague' })
+
+      expect(warn).toHaveBeenCalled()
+      expect(settings.settingsOf('acme.billing').defaultTimeZone).toBe('Europe/Prague')
+      expect(settings.settingsOf('acme.shipping').defaultTimeZone).toBe('UTC')
+    } finally {
+      // Before the shared afterEach clears localStorage; restoreMocks would only run after it.
+      blocked.mockRestore()
+    }
   })
 })
