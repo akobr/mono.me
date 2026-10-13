@@ -98,6 +98,8 @@ A configuration is edited:
 
 Values inherited from ancestors appear as placeholders; **Reset to inherited** removes your own value. A field can also hold a binding (`@sbt.northwind/baseUrl`) instead of a value. The form shows bindings as expressions and does not validate them, because the platform evaluates them first.
 
+**Lineage** in the header lists the ancestors in merge order, the order in which their configuration is inherited. Each ancestor opens its own configuration.
+
 Saving sends only your changes. Two situations stop a save:
 
 - **Schema violation:** the server rejected the document. The errors are listed at the fields, and an Owner or Contributor can still save with **Save anyway**.
