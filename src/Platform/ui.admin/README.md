@@ -22,6 +22,8 @@ npm run dev        # http://localhost:5173, real API (VITE_API_BASE_URL) and Aut
 
 After a change of the SDK, rebuild it and reinstall it here: `rm -rf node_modules/@42for.net && npm install`.
 
+The dev server pre-bundles every package imported in `app/` when it starts (`optimizeDeps.entries` in `vite.config.ts`), so moving to another page never re-optimizes the dependencies and reloads the app. A package that only a virtual module imports, like `vue-router/experimental` from the generated routes, goes into `optimizeDeps.include`. `test/unit/build/dependency-prebundling.test.ts` checks both.
+
 | Script | Command |
 | --- | --- |
 | `dev` | Vite dev server on port 5173 against the API in `.env.development` / `.env.local` |
