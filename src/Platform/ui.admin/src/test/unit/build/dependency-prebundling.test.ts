@@ -56,11 +56,10 @@ describe('dependency pre-bundling of the dev server', () => {
     const optimizer = server.environments.client.depsOptimizer!
     await optimizer.init()
     await optimizer.scanProcessing
-    // A dependency is still "discovered" while it is bundled and "optimized" once the bundle is written.
-    dependencies = new Set([
-      ...Object.keys(optimizer.metadata.optimized),
-      ...Object.keys(optimizer.metadata.discovered),
-    ])
+    // A dependency is still "discovered" while it is bundled and "optimized" once the bundle is written, so wait for
+    // the bundling to settle and count only what was pre-bundled.
+    await Promise.allSettled(Object.values(optimizer.metadata.discovered).map((dependency) => dependency.processing))
+    dependencies = new Set(Object.keys(optimizer.metadata.optimized))
   }, 60_000)
 
   afterAll(async () => {
