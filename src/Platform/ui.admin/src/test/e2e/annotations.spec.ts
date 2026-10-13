@@ -9,6 +9,12 @@ test('filters the grid, edits an annotation in the detail and saves it', async (
   await openFromList(page, 'sbt.northwind', testInfo)
   await expect(page).toHaveURL(/\/annotations\/sbt\.northwind/)
 
+  // Name, type and key are text: the type icon and the key with the name in bold, no disabled text boxes.
+  const identity = page.getByTestId('annotation-identity')
+  await expect(identity).toHaveText('sbt.northwind')
+  await expect(identity.getByRole('img', { name: 'Subject' })).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Name' })).toHaveCount(0)
+
   await page.getByRole('textbox', { name: 'Title' }).fill('Northwind Traders')
   await page.getByRole('button', { name: /^Save/ }).click()
   await expect(page.getByText('Annotation saved', { exact: true })).toBeVisible()

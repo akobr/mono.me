@@ -8,6 +8,8 @@ import {
   toAnnotationDraft,
 } from '@/forms/annotation.schema'
 import { chunk, runLimited } from '@/composables/useAnnotationActions'
+import AnnotationForm from '@/components/annotations/AnnotationForm.vue'
+import { mountScreen, settle } from '../../helpers'
 
 const annotation: Annotation = {
   ProjectName: 'billing',
@@ -124,6 +126,27 @@ describe('annotation form schema', () => {
       { path: 'ViewName', message: 'is part of the key and cannot change.' },
     ])
     expect(readOnlyIssues(annotation, [])).toHaveLength(1)
+  })
+})
+
+describe('AnnotationForm', () => {
+  it('shows the type, key and name as one line of text instead of inputs', async () => {
+    const screen = await mountScreen(AnnotationForm, { annotation, fresh: true })
+    await settle()
+
+    const inputs = screen.host.findAll('input').map((input) => input.element.value)
+    expect(inputs).not.toContain('prod')
+    expect(inputs).not.toContain('Execution')
+    expect(inputs).not.toContain('exe.northwind.invoicing.prod')
+
+    // the type is its icon in the type color, named for assistive technology; the name is the bold last segment
+    const identity = screen.host.find('[data-testid="annotation-identity"]')
+    expect(identity.find('[role="img"]').attributes('aria-label')).toBe('Execution')
+    expect(identity.find('[role="img"]').classes()).toContain('text-st-exe')
+    expect(identity.find('code').text()).toBe('exe.northwind.invoicing.prod')
+    expect(identity.find('code').classes()).toEqual(expect.arrayContaining(['text-sm', 'break-all']))
+    expect(identity.find('.font-semibold').text()).toBe('prod')
+    screen.host.unmount()
   })
 })
 
