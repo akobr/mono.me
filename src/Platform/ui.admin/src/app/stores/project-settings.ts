@@ -2,15 +2,19 @@ import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { isValidTimeZone } from '@/forms/annotation.schema'
+import { sanitizeTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 import { useContextStore } from './context'
 
 export interface ProjectSettings {
   /** IANA time zone that new annotations of the project start in. */
   defaultTimeZone: string
+  /** Names, colors and icons of the annotation types in this project; Preferences can override them (424-13). */
+  types: TypeAppearances
 }
 
 export const defaultProjectSettings: ProjectSettings = {
   defaultTimeZone: 'UTC',
+  types: {},
 }
 
 /**
@@ -31,18 +35,28 @@ export const useProjectSettingsStore = defineStore('project-settings', () => {
         stored?.defaultTimeZone && isValidTimeZone(stored.defaultTimeZone)
           ? stored.defaultTimeZone
           : defaultProjectSettings.defaultTimeZone,
+      types: sanitizeTypeAppearances(stored?.types),
     }
   }
 
   const current = computed(() => settingsOf(context.projectKey))
   const defaultTimeZone = computed(() => current.value.defaultTimeZone)
 
-  /** Merges the change into the project's entry; a change to a time zone Intl does not know is ignored. */
+  /**
+   * Merges the change into the project's entry; a change to a time zone Intl does not know is ignored. Types are
+   * stored sanitized, and empty types leave the entry, so it keeps only what was changed.
+   */
   function update(projectKey: string, patch: Partial<ProjectSettings>): void {
     if (patch.defaultTimeZone !== undefined && !isValidTimeZone(patch.defaultTimeZone)) {
       return
     }
-    state.value = { ...state.value, [projectKey]: { ...state.value[projectKey], ...patch } }
+
+    const { types, ...rest } = { ...state.value[projectKey], ...patch }
+    const cleanTypes = sanitizeTypeAppearances(types)
+    state.value = {
+      ...state.value,
+      [projectKey]: Object.keys(cleanTypes).length > 0 ? { ...rest, types: cleanTypes } : rest,
+    }
   }
 
   function reset(projectKey: string): void {

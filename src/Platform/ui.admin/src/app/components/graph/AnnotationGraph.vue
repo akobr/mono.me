@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { useElementSize, useMutationObserver, usePreferredReducedMotion } from '@vueuse/core'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore } from '@/stores/preferences'
+import { useTypeAppearanceStore } from '@/stores/type-appearance'
 import { typeCodes, typeMeta, type AnnotationTypeCode } from '@/utils/annotation-key'
 import {
   buildGraph,
@@ -37,6 +38,7 @@ const router = useRouter()
 const catalog = useCatalogStore()
 const context = useContextStore()
 const preferences = usePreferencesStore()
+const typeAppearance = useTypeAppearanceStore()
 const filter = useAnnotationFilter()
 const confirm = useConfirm()
 const toast = useToast()
@@ -186,6 +188,16 @@ useMutationObserver(
   typeof document === 'undefined' ? undefined : document.documentElement,
   () => (colors.value = readColors()),
   { attributes: true, attributeFilter: ['class'] },
+)
+
+// ... and with the type colors of the project settings and Preferences (424-13), once their style is written.
+watch(
+  () => typeAppearance.css,
+  async () => {
+    await nextTick()
+    colors.value = readColors()
+  },
+  { flush: 'post' },
 )
 
 // The simulation worker.

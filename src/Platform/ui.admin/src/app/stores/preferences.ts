@@ -2,6 +2,7 @@ import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { detailWidth } from '@/utils/detail-panel'
+import { sanitizeTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 import type { Scope } from './context'
 
 export type DocumentFormat = 'json' | 'yaml'
@@ -27,6 +28,8 @@ export interface Preferences {
   lastContext?: Scope
   recentKeys: string[]
   grids: Record<string, GridPreferences>
+  /** Personal names, colors and icons of the annotation types, in every project; they win over the project's. */
+  types: TypeAppearances
 }
 
 export const defaultPreferences: Preferences = {
@@ -39,6 +42,7 @@ export const defaultPreferences: Preferences = {
   density: 'compact',
   recentKeys: [],
   grids: {},
+  types: {},
 }
 
 /**
@@ -56,6 +60,12 @@ export const usePreferencesStore = defineStore('preferences', () => {
     set: (value: boolean) => (state.value.sidebarPinned = value),
   })
 
+  const types = computed(() => sanitizeTypeAppearances(state.value.types))
+
+  function setTypes(value: TypeAppearances): void {
+    state.value.types = sanitizeTypeAppearances(value)
+  }
+
   function rememberContext(scope: Scope): void {
     state.value.lastContext = scope
   }
@@ -72,5 +82,5 @@ export const usePreferencesStore = defineStore('preferences', () => {
     state.value = structuredClone(defaultPreferences)
   }
 
-  return { state, sidebarPinned, rememberContext, rememberKey, grid, reset }
+  return { state, sidebarPinned, types, setTypes, rememberContext, rememberKey, grid, reset }
 })

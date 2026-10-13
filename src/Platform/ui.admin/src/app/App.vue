@@ -3,8 +3,11 @@ import { computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import BareLayout from '@/layouts/BareLayout.vue'
 import DefaultLayout from '@/layouts/DefaultLayout.vue'
+import { useTypeAppearanceStore } from '@/stores/type-appearance'
 
 const route = useRoute()
+// Applies the type names, colors and icons of the project settings and Preferences on every page (424-13).
+useTypeAppearanceStore()
 
 // Nothing renders before the first navigation resolves, so the shell never flashes on the login page.
 const ready = computed(() => route.matched.length > 0)

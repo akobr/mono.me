@@ -50,16 +50,19 @@ watch(open, (value) => {
   }
 })
 
-const typeItems = typeCodes.map((code) => ({ label: typeMeta[code].label, value: code, icon: typeMeta[code].icon }))
+// Computed: the type names and icons follow the project settings and Preferences (424-13).
+const typeItems = computed(() =>
+  typeCodes.map((code) => ({ label: typeMeta[code].label, value: code, icon: typeMeta[code].icon })),
+)
 const meta = computed(() => typeMeta[type.value])
 
-const partLabels: Record<Part, string> = {
-  subject: 'Subject',
-  responsibility: 'Responsibility',
-  context: 'Context',
-  unit: 'Unit',
+const partLabels = computed<Record<Part, string>>(() => ({
+  subject: typeMeta.sbt.label,
+  responsibility: typeMeta.rst.label,
+  context: typeMeta.cnt.label,
+  unit: typeMeta.unt.label,
   name: 'Name',
-}
+}))
 
 /** Existing names per part, from the catalog (contexts and units only within the chosen subject/responsibility). */
 const suggestions = computed<Record<Part, string[]>>(() => {
