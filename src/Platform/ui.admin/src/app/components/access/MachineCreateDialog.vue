@@ -78,7 +78,7 @@ async function create() {
         <UAlert v-if="failure" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="failure" />
         <div class="flex justify-end gap-2">
           <UButton label="Cancel" color="neutral" variant="ghost" @click="open = false" />
-          <UButton label="Create" icon="i-lucide-cpu" :loading="saving" @click="create" />
+          <UButton label="Create" icon="i-lucide-computer" :loading="saving" @click="create" />
         </div>
       </div>
     </template>
