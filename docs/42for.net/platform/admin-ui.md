@@ -15,7 +15,7 @@ After that, the address bar always names the context, like GitHub:
 /{organization}/{project}/{view}/annotations
 ```
 
-The switcher at the top changes the organization, project or view and keeps the screen you are on. A link to an annotation or configuration opens the same screen for anyone with access to that project.
+The switcher at the top changes the organization, project or view and keeps the screen you are on. A link to an annotation or configuration opens the same screen for anyone with access to that project. The sidebar lists the screens of the view under **View · {view}**, so it always names the selected view, `default` included.
 
 ## The catalog
 
