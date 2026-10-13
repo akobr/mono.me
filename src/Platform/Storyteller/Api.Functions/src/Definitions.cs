@@ -71,6 +71,14 @@ public static class Definitions
             }
         }
 
+        public static class Bindings
+        {
+            public static class V1
+            {
+                public const string Bindings = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/bindings";
+            }
+        }
+
         public static class Views
         {
             public static class V1
@@ -212,6 +220,11 @@ public static class Definitions
             public const string RevokeSharedCertificate = nameof(RevokeSharedCertificate);
 
             public const string GetAuthConfiguration = nameof(GetAuthConfiguration);
+        }
+
+        public static class Bindings
+        {
+            public const string GetBindingCatalog = nameof(GetBindingCatalog);
         }
 
         public static class Views

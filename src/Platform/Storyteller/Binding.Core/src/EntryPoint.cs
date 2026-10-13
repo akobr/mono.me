@@ -46,6 +46,7 @@ public static class EntryPoint
         });
         @this.TryAddSingleton<IBindingRegistry>(provider => provider.GetRequiredService<BindingExecutor>());
         @this.TryAddSingleton<IBindingExecutor>(provider => provider.GetRequiredService<BindingExecutor>());
+        @this.TryAddSingleton<IBindingCatalog>(provider => provider.GetRequiredService<BindingExecutor>());
         @this.TryAddSingleton<IConfigurationBindingResolver>(provider =>
             new ConfigurationBindingResolver(
                 provider.GetRequiredService<BindingExecutor>(),
