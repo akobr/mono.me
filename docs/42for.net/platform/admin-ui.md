@@ -51,7 +51,7 @@ The **Type** column shows the full name of each type, with its icon and color, i
 Selecting a row opens its detail from the right, over the list. The list keeps its scroll position, selection and filter, and the part you can still see stays usable: selecting another row switches the detail. Two buttons in the detail header change how it opens:
 
 - **Pin** docks the detail beside the list. Drag the border between them to resize it, or focus the border and use `←` / `→`; a double-click restores the default width.
-- **Full screen** opens the detail as a page of its own, in place of the list.
+- **Full screen** opens the detail as a page of its own, in place of the list. Closing it brings the list back where you left it.
 
 The UI remembers your choice and the width, and opens the next detail the same way. Configurations, templates, schemas and machines open their detail the same way.
 
