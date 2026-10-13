@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { safeReturnTo } from '@/utils/return-to'
 import { groupMemberships, hasOrganization } from '@/utils/memberships'
 import { currentSection, projectTarget, viewTarget } from '@/utils/context-paths'
-import { buildNavigation } from '@/utils/navigation'
+import { accessibleContext, buildNavigation, mergeContext, navigationScope } from '@/utils/navigation'
 import { clampDetailWidth, detailMode } from '@/utils/detail-panel'
 import { describeError } from '@/utils/errors'
 import { StorytellerError } from '@42for.net/2splatform.sdk'
@@ -98,6 +98,64 @@ describe('navigation', () => {
 
   it('shows only the global entries outside an organization', () => {
     expect(buildNavigation({ projectRole: 'None', orgRole: 'None' }).map((section) => section.id)).toEqual(['global'])
+  })
+})
+
+describe('navigation context', () => {
+  const remembered = { org: 'acme', project: 'billing', view: 'staging' }
+  const accessMap = { 'acme.billing': 'Reader', 'acme.shipping': 'Contributor', globex: 'Owner' }
+
+  it.each([
+    ['a project page of the same project', { org: 'acme', project: 'billing' }, remembered],
+    ['an organization page of the same organization', { org: 'acme' }, remembered],
+    ['a page without an organization', {}, remembered],
+    ['another view', { org: 'acme', project: 'billing', view: 'default' }, { ...remembered, view: 'default' }],
+    ['another project', { org: 'acme', project: 'shipping' }, { org: 'acme', project: 'shipping' }],
+    ['another organization', { org: 'globex' }, { org: 'globex' }],
+  ])('merges the remembered context into %s', (_, current, expected) => {
+    expect(mergeContext(current, remembered)).toEqual(expected)
+  })
+
+  it('starts from the current context when nothing is remembered', () => {
+    expect(mergeContext({ org: 'acme', project: 'billing' }, undefined)).toEqual({ org: 'acme', project: 'billing' })
+    expect(mergeContext({}, undefined)).toEqual({})
+  })
+
+  it('drops the remembered organization or project the caller is no longer a member of', () => {
+    expect(accessibleContext(remembered, accessMap)).toEqual(remembered)
+    expect(accessibleContext(remembered, { 'acme.shipping': 'Reader' })).toEqual({ org: 'acme' })
+    expect(accessibleContext(remembered, { 'acme.billing': 'None', acme: 'Reader' })).toEqual({ org: 'acme' })
+    expect(accessibleContext(remembered, { globex: 'Owner' })).toBeUndefined()
+    expect(accessibleContext(undefined, accessMap)).toBeUndefined()
+  })
+
+  it('keeps the remembered view and project on pages of a less specific context', () => {
+    expect(navigationScope({ org: 'acme', project: 'billing' }, remembered, accessMap)).toEqual(remembered)
+    expect(navigationScope({ org: 'acme' }, remembered, accessMap)).toEqual(remembered)
+    expect(navigationScope({}, remembered, accessMap)).toEqual(remembered)
+    expect(navigationScope({}, remembered, { globex: 'Owner' })).toEqual({})
+  })
+
+  it('shows the default view of a project without a remembered view', () => {
+    expect(navigationScope({ org: 'acme', project: 'shipping' }, remembered, accessMap)).toEqual({
+      org: 'acme',
+      project: 'shipping',
+      view: 'default',
+    })
+    expect(navigationScope({}, { org: 'acme', project: 'billing' }, accessMap)).toEqual({
+      org: 'acme',
+      project: 'billing',
+      view: 'default',
+    })
+    expect(navigationScope({ org: 'globex' }, remembered, accessMap)).toEqual({ org: 'globex' })
+  })
+
+  it('always keeps the parts of the route, also without access', () => {
+    expect(navigationScope({ org: 'northwind', project: 'portal' }, remembered, accessMap)).toEqual({
+      org: 'northwind',
+      project: 'portal',
+      view: 'default',
+    })
   })
 })
 

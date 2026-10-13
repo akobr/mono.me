@@ -137,4 +137,42 @@ describe('context guard', () => {
 
     expect(useContextStore().org).toBeUndefined()
   })
+
+  it('keeps the remembered view on the pages of the same project and organization, and outside organizations', () => {
+    const preferences = usePreferencesStore()
+    contextGuard(
+      route('/acme/billing/staging/annotations', { params: { org: 'acme', project: 'billing', view: 'staging' } }),
+    )
+
+    contextGuard(route('/acme/billing/settings', { params: { org: 'acme', project: 'billing' } }))
+    expect(preferences.state.lastContext).toEqual({ org: 'acme', project: 'billing', view: 'staging' })
+
+    contextGuard(route('/acme', { params: { org: 'acme' } }))
+    contextGuard(route('/orgs'))
+    expect(preferences.state.lastContext).toEqual({ org: 'acme', project: 'billing', view: 'staging' })
+  })
+
+  it('remembers project and organization pages of another context without the view of the previous one', async () => {
+    server.use(account({ 'acme.billing': 'Reader', 'acme.shipping': 'Reader', globex: 'Reader' }))
+    await useSessionStore().loadAccount(true)
+    const preferences = usePreferencesStore()
+    contextGuard(
+      route('/acme/billing/staging/annotations', { params: { org: 'acme', project: 'billing', view: 'staging' } }),
+    )
+
+    contextGuard(route('/acme/shipping/members', { params: { org: 'acme', project: 'shipping' } }))
+    expect(preferences.state.lastContext).toEqual({ org: 'acme', project: 'shipping' })
+
+    contextGuard(route('/globex', { params: { org: 'globex' } }))
+    expect(preferences.state.lastContext).toEqual({ org: 'globex' })
+  })
+
+  it('does not remember a forbidden route', () => {
+    contextGuard(
+      route('/acme/billing/staging/annotations', { params: { org: 'acme', project: 'billing', view: 'staging' } }),
+    )
+    contextGuard(route('/northwind/portal', { params: { org: 'northwind', project: 'portal' } }))
+
+    expect(usePreferencesStore().state.lastContext).toEqual({ org: 'acme', project: 'billing', view: 'staging' })
+  })
 })
