@@ -20,6 +20,10 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
     public const string ReadRoleKey = "DefaultRead";
     public const string ReadWriteRoleKey = "DefaultReadWrite";
 
+    // Optional: machines that may receive key/value secrets. Without these roles such a machine cannot be created.
+    public const string SecretsReadRoleKey = "SecretsRead";
+    public const string SecretsReadWriteRoleKey = "SecretsReadWrite";
+
     private const int DefaultPasswordExpirationYears = 1000;
     private const string GeneratedSecretMarker = "42.sform.generated";
 
@@ -40,15 +44,30 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
         var clientId = _options.ClientId;
+        var isSecrets = model.Scope is MachineAccessScope.SecretsRead or MachineAccessScope.SecretsReadWrite;
         var isReadWrite = model.Scope is MachineAccessScope.DefaultReadWrite
             or MachineAccessScope.AnnotationReadWrite
-            or MachineAccessScope.ConfigurationReadWrite;
+            or MachineAccessScope.ConfigurationReadWrite
+            or MachineAccessScope.SecretsReadWrite;
 
         // TODO: [P2] Make support for all roles and make it configurable in easier way
-        var roleKey = isReadWrite ? ReadWriteRoleKey : ReadRoleKey;
-        var roleId = _options.AppRoles.TryGetValue(roleKey, out var configuredRoleId)
-            ? Guid.Parse(configuredRoleId)
-            : throw new InvalidOperationException($"Missing Auth:AppRoles:{roleKey}.");
+        var roleKey = model.Scope switch
+        {
+            MachineAccessScope.SecretsRead => SecretsReadRoleKey,
+            MachineAccessScope.SecretsReadWrite => SecretsReadWriteRoleKey,
+            _ => isReadWrite ? ReadWriteRoleKey : ReadRoleKey,
+        };
+
+        if (!_options.AppRoles.TryGetValue(roleKey, out var configuredRoleId))
+        {
+            throw isSecrets
+                ? new InvalidInputException(
+                    $"Machines with the scope {model.Scope:G} need the app role Auth:AppRoles:{roleKey}, which this deployment does not configure.",
+                    ErrorCodes.ProtectionNotConfigured)
+                : new InvalidOperationException($"Missing Auth:AppRoles:{roleKey}.");
+        }
+
+        var roleId = Guid.Parse(configuredRoleId);
 
         var application = new Application
         {
@@ -111,7 +130,7 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
             ObjectId = objectId,
             AccessKey = secret,
             AnnotationKey = model.AnnotationKey,
-            Scope = isReadWrite ? MachineAccessScope.DefaultReadWrite : MachineAccessScope.DefaultRead,
+            Scope = isSecrets ? model.Scope : isReadWrite ? MachineAccessScope.DefaultReadWrite : MachineAccessScope.DefaultRead,
             CredentialKind = MachineCredentialKind.ClientCredentials,
             TokenEndpoint = _machineOptions.GetTokenEndpoint(),
             TokenScope = $"api://{clientId}/.default",

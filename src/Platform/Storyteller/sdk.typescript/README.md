@@ -96,7 +96,7 @@ await patchConfiguration(org, project, view, key, [
 
 A new API version:
 
-1. Export the OpenAPI document from the running Functions host (`/api/openapi/v3.json`) into `open.api.v{version}.json` here and in `../Sdk.NSwag`.
+1. Export the OpenAPI document into `open.api.v{version}.json` here and in `../Sdk.NSwag`. The API test `OpenApiExportTests` renders it with the engine of the Functions host, so no host has to run: `STORYTELLER_OPENAPI_EXPORT=<path> dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTests"` (the running host serves the same document at `/api/openapi/v3.json`). Remove the superseded `open.api.v*.json` here; `../Sdk.NSwag` keeps its history.
 2. `npm run generate`, review the diff of `src/generated`, run the tests, commit.
 
 `dotnet build` builds `sdk.typescript.esproj` without Node. Pass `-p:BuildJavaScript=true` to also run `npm install` and `npm run build`.
@@ -106,3 +106,40 @@ Notes:
 - Node 22.18 or newer (Orval 8). Node 24 LTS is pinned in `src/.nvmrc`.
 - TypeScript is held at 6.0, because tsup's declaration build and typedoc (an Orval peer) do not support TypeScript 7 yet.
 - npm 10.9.2 can crash with `Cannot read properties of null (reading 'edgesOut')` when it resolves this dependency set without a lockfile. `npm ci` from the committed `package-lock.json` is not affected; newer npm versions are not affected either.
+
+## Key/value pairs
+
+The root entry has the generated functions of the `key-values` tag (`getKeyValues`, `getKeyValue`, `setKeyValue`, `deleteKeyValue`, `restoreKeyValues`, `purgeKeyValues`, `protectKeyValues`, the versions and diffs, `exportKeyValues`, `importKeyValues`, the policy, recipients, `getKeyValueAudit` and `getKeyValueUsage`), their Vue Query composables under `./vue-query`, Zod schemas under `./zod` and MSW handlers under `./msw`, plus the helpers of `lib/key-values.ts`:
+
+| Helper | Purpose |
+| --- | --- |
+| `isValidKeyValueKey`, `normalizeKeyValueKey`, `isSecretProtection` | The key rules of the API (dot-separated segments, 128 characters, case-insensitive) and the levels |
+| `parseDotEnv`, `serializeDotEnv`, `toEnvKey`, `fromEnvKey` | `.env` text with `#` comments, `export`, quoted values and escapes; `db.password` ↔ `DB__PASSWORD` |
+| `flattenJson`, `unflattenJson`, `toFlatJson`, `toKeyValueDocument` | Nested JSON ↔ dotted keys, and the `2s.key-values.v1` document of export and import |
+| `detectKeyValueFormat` | `document`, `flat-json`, `json`, `dotenv` or `unknown` for pasted text |
+| `isSecretReference`, `parseSecretReference`, `formatSecretReference` | References to secrets in the customer's Key Vault (`kv://vault/name`, the vault URI, App Configuration's `{ "uri": … }`) |
+
+```ts
+import { getKeyValues, importKeyValues, parseDotEnv, toKeyValueDocument } from '@42for.net/2splatform.sdk'
+
+const document = toKeyValueDocument(parseDotEnv(text))              // every item Public
+await importKeyValues('acme', 'billing', 'default', document, { mode: 'Merge', dryRun: true })
+const page = await getKeyValues('acme', 'billing', 'default', { keyPrefix: 'db.', includeValues: true })
+```
+
+### Client-side encryption (`./hyok`)
+
+Values of the `Hyok` level are encrypted before they reach the platform, for the RSA public keys registered as the project's recipients. `@42for.net/2splatform.sdk/hyok` does it on WebCrypto, in browsers and in Node 22 or later, with no runtime dependencies: JWE General JSON Serialization, `A256GCM` content, `RSA-OAEP-256` per recipient, and the place `{organization}/{project}/{view}/{key}` in the protected header. The C# library `KeyValues.ClientEncryption` and the CLI read and write the same documents; the tests check both directions against `jose`.
+
+```ts
+import { getRecipients, setKeyValue } from '@42for.net/2splatform.sdk'
+import { decryptClientSecret, encryptForRecipients, generateRecipientKeyPair, getHyokPlace } from '@42for.net/2splatform.sdk/hyok'
+
+const recipients = await getRecipients('acme', 'billing')                 // the API's ClientEncryptionRecipient[]
+const place = getHyokPlace('acme', 'billing', 'default', 'db.password')
+const value = await encryptForRecipients('s3cret', recipients, place)
+await setKeyValue('acme', 'billing', 'default', 'db.password', { Protection: 'Hyok', Value: value })
+
+const plain = await decryptClientSecret(value, privateKeyPem, 'api')       // the holder of a recipient's private key
+const { publicJwk, privateJwk } = await generateRecipientKeyPair()         // a new recipient: register publicJwk
+```

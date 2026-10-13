@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.1.3549
+ * OpenAPI spec version: 0.9.5.59171
  */
 import { faker } from "@faker-js/faker";
 
@@ -265,6 +265,8 @@ export const getGetMachineAccessesResponseMock = (): MachineAccess[] =>
       "AnnotationReadWrite",
       "ConfigurationReadWrite",
       "DefaultReadWrite",
+      "SecretsRead",
+      "SecretsReadWrite",
     ] as const),
     AnnotationKey: faker.helpers.arrayElement([
       faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -324,6 +326,8 @@ export const getCreateMachineAccessResponseMock = (
     "AnnotationReadWrite",
     "ConfigurationReadWrite",
     "DefaultReadWrite",
+    "SecretsRead",
+    "SecretsReadWrite",
   ] as const),
   AnnotationKey: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -384,6 +388,8 @@ export const getGetMachineAccessResponseMock = (
     "AnnotationReadWrite",
     "ConfigurationReadWrite",
     "DefaultReadWrite",
+    "SecretsRead",
+    "SecretsReadWrite",
   ] as const),
   AnnotationKey: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -444,6 +450,8 @@ export const getResetMachineAccessResponseMock = (
     "AnnotationReadWrite",
     "ConfigurationReadWrite",
     "DefaultReadWrite",
+    "SecretsRead",
+    "SecretsReadWrite",
   ] as const),
   AnnotationKey: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),

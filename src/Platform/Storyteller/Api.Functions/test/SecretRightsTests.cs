@@ -34,7 +34,7 @@ public class SecretRightsTests
         var (context, request) = FunctionTestDoubles.CreateRequest(services);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim> { new("sub", "user-1"), new("scp", "User.Impersonation") };
 
-        var rights = await request.GetSecretRightsAsync(new FakeAccess(role), new FakePolicies(requireMtls: true), Org, Project);
+        var rights = await request.GetSecretRightsAsync(new RoleAccess(role), new FixedKeyValuePolicies(requireMtls: true), Org, Project);
 
         rights.CanReadSecrets.ShouldBe(expected);
         rights.Caller.CanWriteSecrets.ShouldBe(expected);
@@ -52,7 +52,7 @@ public class SecretRightsTests
         var (context, request) = FunctionTestDoubles.CreateRequest(services);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim> { new("sub", "user-1"), new("scp", "User.Impersonation Configuration.Secrets") };
 
-        var rights = await request.GetSecretRightsAsync(new FakeAccess(AccountRole.Reader), new FakePolicies(requireMtls: true), Org, Project);
+        var rights = await request.GetSecretRightsAsync(new RoleAccess(AccountRole.Reader), new FixedKeyValuePolicies(requireMtls: true), Org, Project);
 
         rights.CanReadSecrets.ShouldBeTrue();
     }
@@ -74,7 +74,7 @@ public class SecretRightsTests
             context.Items[FunctionContextItemKeys.PresentingCertificateThumbprint] = "ABCD";
         }
 
-        var rights = await request.GetSecretRightsAsync(new FakeAccess(AccountRole.None), new FakePolicies(requireMtls), Org, Project);
+        var rights = await request.GetSecretRightsAsync(new RoleAccess(AccountRole.None), new FixedKeyValuePolicies(requireMtls), Org, Project);
 
         rights.CanReadSecrets.ShouldBe(expectedAllowed);
         rights.IsWithheldByMtls.ShouldBe(expectedWithheld);
@@ -95,60 +95,9 @@ public class SecretRightsTests
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim> { new("sub", "machine-1"), new("roles", "Configuration.Read") };
         context.Items[FunctionContextItemKeys.MachineIdentity] = "machine-1";
 
-        var rights = await request.GetSecretRightsAsync(new FakeAccess(AccountRole.None), new FakePolicies(requireMtls: true), Org, Project);
+        var rights = await request.GetSecretRightsAsync(new RoleAccess(AccountRole.None), new FixedKeyValuePolicies(requireMtls: true), Org, Project);
 
         rights.CanReadSecrets.ShouldBeFalse();
         rights.IsWithheldByMtls.ShouldBeFalse("there was nothing to withhold");
-    }
-
-    private sealed class FakePolicies(bool requireMtls) : IKeyValuePolicyStore
-    {
-        public Task<KeyValuePolicy> GetAsync(string organization, string project, CancellationToken cancellationToken = default)
-            => Task.FromResult(new KeyValuePolicy { RequireMtlsForSecretDelivery = requireMtls });
-
-        public Task<KeyValuePolicy> SetAsync(string organization, string project, KeyValuePolicy policy, CancellationToken cancellationToken = default)
-            => Task.FromResult(policy);
-
-        public Task<IReadOnlyList<(string Organization, string Project, KeyValuePolicy Policy)>> ListAsync(CancellationToken cancellationToken = default)
-            => Task.FromResult<IReadOnlyList<(string, string, KeyValuePolicy)>>([]);
-    }
-
-    private sealed class FakeAccess(AccountRole role) : IAccessService
-    {
-        public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey) => Task.FromResult(role);
-
-        public Task<Account?> GetAccountAsync(string id) => throw new NotSupportedException();
-
-        public Task<Account> CreateAccountAsync(AccountCreate model) => throw new NotSupportedException();
-
-        public Task<IEnumerable<AccessPoint>> GetAccessPointsAsync(string accountId) => throw new NotSupportedException();
-
-        public Task<AccessPoint?> GetAccessPointAsync(string key) => throw new NotSupportedException();
-
-        public Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model) => throw new NotSupportedException();
-
-        public Task<bool> GrantPermissionAsync(Permission model) => throw new NotSupportedException();
-
-        public Task<bool> RevokePermissionAsync(Permission model) => throw new NotSupportedException();
-
-        public Task<IReadOnlyList<AccessPointMember>> GetMembersAsync(string accessPointKey, string actorId) => throw new NotSupportedException();
-
-        public Task<AccessPointMember> SetMemberRoleAsync(string accessPointKey, string accountId, AccountRole newRole, string actorId) => throw new NotSupportedException();
-
-        public Task RemoveMemberAsync(string accessPointKey, string accountId, string actorId) => throw new NotSupportedException();
-
-        public Task<AccountRole> JoinAccessPointAsync(string accessPointKey, string accountId, AccountRole newRole) => throw new NotSupportedException();
-
-        public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project) => throw new NotSupportedException();
-
-        public Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id) => throw new NotSupportedException();
-
-        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotSupportedException();
-
-        public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId) => throw new NotSupportedException();
-
-        public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId) => throw new NotSupportedException();
-
-        public Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId) => throw new NotSupportedException();
     }
 }

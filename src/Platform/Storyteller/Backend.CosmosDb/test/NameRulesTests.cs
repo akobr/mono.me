@@ -62,6 +62,9 @@ public class NameRulesTests
     [InlineData("views")]
     [InlineData("members")]
     [InlineData("settings")]
+    [InlineData("key-values")]
+    [InlineData("audit")]
+    [InlineData("usage")]
     public void ReservedProjectAndViewNames_ThrowInvalidName(string name)
     {
         FluentActions.Invoking(() => NameRules.EnsureProjectName(name)).Should().Throw<InvalidInputException>();

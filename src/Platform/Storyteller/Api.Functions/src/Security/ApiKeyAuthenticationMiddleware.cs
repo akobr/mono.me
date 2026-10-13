@@ -92,16 +92,8 @@ public class ApiKeyAuthenticationMiddleware : IFunctionsWorkerMiddleware
 
     private static IEnumerable<string> GetRoleClaimsForScope(MachineAccessScope scope)
     {
-        return scope switch
-        {
-            MachineAccessScope.AnnotationRead => [Scopes.Annotation.Read],
-            MachineAccessScope.AnnotationReadWrite => [Scopes.Annotation.Read, Scopes.Annotation.Write],
-            MachineAccessScope.ConfigurationRead => [Scopes.Configuration.Read],
-            MachineAccessScope.ConfigurationReadWrite => [Scopes.Configuration.Read, Scopes.Configuration.Write],
-            MachineAccessScope.DefaultRead => [Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read],
-            MachineAccessScope.DefaultReadWrite => [Scopes.Default.Read, Scopes.Default.Write, Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Configuration.Read, Scopes.Configuration.Write],
-            _ => [],
-        };
+        // one mapping for every credential kind, so the secrets scopes reach API-key machines too
+        return MachineAccessScopes.Get(scope);
     }
 
     private static async Task RespondUnauthorizedAsync(FunctionContext context, HttpRequestData httpReqData)

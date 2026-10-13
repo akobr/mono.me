@@ -11,7 +11,7 @@ New organizations, projects, and views follow one rule: 2 to 63 characters from 
 | Kind | Reserved |
 | --- | --- |
 | Organization | `access`, `auth`, `login`, `callback`, `onboarding`, `invitations`, `account`, `orgs`, `unsupported` |
-| Project and view | `access`, `views`, `members`, `invitations`, `machines`, `certificates`, `settings` |
+| Project and view | `access`, `views`, `members`, `invitations`, `machines`, `certificates`, `settings`, `key-values`, `audit`, `usage` |
 
 A violation answers `400` with `ErrorCode` `InvalidName`. Only new names are checked: an organization created before the rule keeps working, and new projects can still be added to it, as long as the project name follows the rule. Existing documents are not migrated.
 

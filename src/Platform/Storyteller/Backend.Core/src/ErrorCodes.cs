@@ -56,4 +56,5 @@ public static class ErrorCodes
     public const string RecipientInvalid = "RecipientInvalid";
     public const string InvalidSecretReference = "InvalidSecretReference";
     public const string PolicyVersionMismatch = "PolicyVersionMismatch";
+    public const string InvalidQuery = "InvalidQuery";
 }

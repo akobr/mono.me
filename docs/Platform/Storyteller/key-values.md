@@ -2,7 +2,7 @@
 
 Storyteller stores named values that configurations and applications share: endpoints, switches, connection strings, API keys. Every pair belongs to one organization, project and view, like configurations, schemas and templates. Public pairs are plaintext; secrets are envelope-encrypted with keys that live in Azure Key Vault. One catalog lists both kinds, and a configuration binds any of them with `@key`.
 
-The spec is [Native Key-Value Storage](specs/2026-10-11%20Native%20Key-Value%20Storage.md). Phase 1a (storage, the Standard level, lifecycle, import and export, binding) is reviewed in [Phase 1a of Native Key-Value Storage](specs/reviews/2026-10-12%20Phase%201a%20of%20Native%20Key-Value%20Storage.md), Phase 1b (the project policy, the HSM, BYOK and client-side levels, references, rotation, secret delivery, audit and usage) in [Phase 1b of Native Key-Value Storage](specs/reviews/2026-10-13%20Phase%201b%20of%20Native%20Key-Value%20Storage.md). The API, the CLI and the admin UI follow in later phases.
+The spec is [Native Key-Value Storage](specs/2026-10-11%20Native%20Key-Value%20Storage.md). Phase 1a (storage, the Standard level, lifecycle, import and export, binding) is reviewed in [Phase 1a of Native Key-Value Storage](specs/reviews/2026-10-12%20Phase%201a%20of%20Native%20Key-Value%20Storage.md), Phase 1b (the project policy, the HSM, BYOK and client-side levels, references, rotation, secret delivery, audit and usage) in [Phase 1b of Native Key-Value Storage](specs/reviews/2026-10-13%20Phase%201b%20of%20Native%20Key-Value%20Storage.md), and Phase 2 (the API, the SDKs) in [Phase 2 of Native Key-Value Storage](specs/reviews/2026-10-13%20Phase%202%20of%20Native%20Key-Value%20Storage.md). The CLI and the admin UI follow in later phases.
 
 ## Identity
 
@@ -103,7 +103,7 @@ A secret value is delivered by a reveal, a secret version or diff, an export wit
 | Machine with an mTLS certificate (`PresentingCertificateThumbprint`) | The scope `Configuration.Secrets` |
 | Machine with an API key or a bearer token only | The scope, and the project policy has `RequireMtlsForSecretDelivery = false` |
 
-A withheld resolved configuration leaves the secrets unbound and carries the header `X-2S-Secrets-Withheld: mtls-required`. Explicit requests (reveal, export with secrets) answer `403 MtlsRequired` in Phase 2. Responses with a secret value are `Cache-Control: no-store`. The result is also the request's ambient caller (`KeyValueCallerContext`), which the audit trail and the usage meters use for binding reads.
+Machines get the scope through the machine access scopes `SecretsRead` (`Configuration.Read` and `Configuration.Secrets`) and `SecretsReadWrite` (plus `Configuration.ReadWrite`); see [authentication.md](authentication.md#the-machineaccess-object). A withheld resolved configuration leaves the secrets unbound and carries the header `X-2S-Secrets-Withheld: mtls-required`. Explicit requests (a reveal, a secret version or diff, an export with secrets, a write of a secret) answer `403 MtlsRequired`. Responses with a secret value are `Cache-Control: no-store`. The result is also the request's ambient caller (`KeyValueCallerContext`), which the audit trail and the usage meters use for binding reads.
 
 Machine certificates are in Cosmos now (`CosmosClientCertificateStore`, partition `{project}.access`, id `mcert.{thumbprint}`, expiring 30 days after the certificate), so a certificate issued on one instance authenticates on every other one and survives a restart; hits are cached for 5 minutes and misses for 30 seconds, which bounds the revocation latency. `TransportSecurityMiddleware` refuses plain HTTP outside Development (`400 HttpsRequired`, with `X-Forwarded-Proto` honoured behind the platform's proxy) and sends `Strict-Transport-Security`.
 
@@ -239,6 +239,103 @@ The integration tests of `KeyValues.Azure.KeyVault/testint` start Lowkey Vault w
 | `LookupAsync` | For the binding sources: the current value, or null when missing, deleted, or a secret without secrets included |
 
 Error codes of this area: `InvalidKey`, `ValueTooLarge`, `ProtectionRequired`, `ProtectionNotAllowed` (409), `ProtectionInUse` (409), `ProtectionNotConfigured` (501), `KeyValueNotFound`, `KeyValueBusy` (409), `KeyValueVersionMismatch` (412), `PolicyVersionMismatch` (409), `KeyEncryptionUnavailable` (503 with `Retry-After`), `CustomerKeyUnavailable` (424), `CustomerKeyInvalid`, `ByokNotConfigured` (409), `MtlsRequired` (403), `HttpsRequired` (400), `ImportInvalid` (400 with the failing items in `Details`), `SecretValueMissing`, `NotSupportedForProtection`, `ReprotectNotPossible`, `InvalidClientEncryptedValue`, `UnknownRecipient`, `RecipientExists`, `RecipientNotFound`, `RecipientInvalid`, `InvalidSecretReference`, and `AccessDenied` for missing secret rights.
+
+## API
+
+Every endpoint is under `v1/{organization}/{project}` and needs a bearer token (or a machine credential); the roles and scopes are in the table at the end. Bodies and responses are JSON with PascalCase names; the model types are the ones of the [service](#service). Values never travel in a URL: export and import are `POST`s, and the collection actions are `POST` only, so a key named `restore` or `export` is still reached with `GET`, `PUT` and `DELETE`.
+
+### Pairs of a view
+
+Base `K` = `v1/{organization}/{project}/{view}/key-values`.
+
+| Method | Route | Query | Body → response | Errors |
+| --- | --- | --- | --- | --- |
+| `GET` | `K` | `keyPrefix`, `protection` (repeatable or comma-separated), `state` (`Active`, `Deleted`, `All`), `includeValues`, `continuationToken` | → `KeyValuesResponse`, ordered by key, up to 1,000 per page | 400 |
+| `GET` | `K/{key}` | `reveal`, `includeDeleted` | → `KeyValue`; a secret's value only with `reveal=true` and secret rights | 403, 404, 424, 503 |
+| `PUT` | `K/{key}` | | `KeyValueWrite` → `KeyValue` without a secret value | 400, 403, 409, 412, 424, 501, 503 |
+| `DELETE` | `K/{key}` | `permanent` (Administrator), `expectedVersion` | → `204` | 403, 404, 409, 412 |
+| `POST` | `K/restore` | | `KeyValueBulkRequest` → `KeyValueBulkResult` | 400, 403 |
+| `POST` | `K/purge` | | `KeyValueBulkRequest` → `KeyValueBulkResult` (Administrator) | 400, 403 |
+| `POST` | `K/protect` | | `KeyValueBulkRequest` with `Protection` → `KeyValueBulkResult` | 400, 403, 409, 424, 501, 503 |
+| `GET` | `K/{key}/versions` | | → `KeyValueVersion[]`, oldest first | 404 |
+| `GET` | `K/{key}/versions/{version}` | `reveal` | → `KeyValue` | 403, 404, 424, 503 |
+| `GET` | `K/{key}/versions/{version}/diff`, `…/diff/{versionFrom}` | `format=unified` | → `DiffResult`, or `text/plain`; version 0 is the empty text | 400, 403, 404, 424 |
+| `POST` | `K/export` | | `KeyValueExportRequest` (`KeyPrefix`, `Protections`, `IncludeSecrets`) → `KeyValueDocument` | 403, 424, 503 |
+| `POST` | `K/import` | `mode` (`Merge`, `Replace`), `dryRun`, `keyPrefix` | `KeyValueDocument` → `KeyValueImportResult` | 400, 403, 409, 424, 501, 503 |
+
+### Policy, recipients, audit and usage of a project
+
+Base `P` = `v1/{organization}/{project}/key-values`.
+
+| Method | Route | Body → response | Who |
+| --- | --- | --- | --- |
+| `GET` | `P/policy` | → `KeyValuePolicy` | Reader, machines with a read scope |
+| `PUT` | `P/policy` | `KeyValuePolicyUpdate` (`AllowedProtections`, `DefaultSecretProtection`, `RequireMtlsForSecretDelivery`, `HsmRotationInterval`, `Byok.KeyUri`, `Byok.TenantId`, `ExpectedVersion`) → `KeyValuePolicy` | Administrator |
+| `GET` | `P/policy/byok/setup` | → `ByokSetupInfo` (`ClientId`, `ConsentUrl`, `RequiredRole`) | Administrator |
+| `POST` | `P/policy/byok/verify` | → `KeyValuePolicy` | Administrator |
+| `POST` | `P/policy/rotate` | `{ "Protection": "Standard" | "Hsm" }` → `KeyValuePolicy` | Administrator |
+| `GET` | `P/recipients` | → `ClientEncryptionRecipient[]` | Reader, machines with a read scope |
+| `POST` | `P/recipients` | `{ "Id"?, "Name", "PublicKey" }` (PEM or JWK) → `ClientEncryptionRecipient` | Administrator |
+| `PATCH` | `P/recipients/{id}` | `{ "Name"?, "IsEnabled"? }` → `ClientEncryptionRecipient` | Administrator |
+| `DELETE` | `P/recipients/{id}` | → `204` | Administrator |
+| `GET` | `P/audit` | query `view`, `key`, `operation`, `from`, `to`, `continuationToken` → `KeyValueAuditResponse`, newest first | Administrator |
+| `GET` | `v1/{organization}/{project}/usage/key-values` | query `from`, `to` (`yyyy-MM-dd`, the last 30 days by default, at most 400) → `KeyValueUsageReport` | Administrator |
+
+The Administrator operations are for users only; a machine gets `403` whatever its scopes.
+
+### Who may do what
+
+| Operation | User, project role | Machine, any of these scopes |
+| --- | --- | --- |
+| List, get without reveal, versions, a public version or diff, export without secrets, policy, recipients | `Reader` | `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read`, `Default.ReadWrite` |
+| Reveal, a secret version or diff, export with secrets | `ContributorWithSecrets` | a read scope and `Configuration.Secrets`, under the mTLS rule |
+| Set, delete or restore a public pair; import of public items | `Contributor` | `Configuration.ReadWrite`, `Default.ReadWrite` |
+| Set, delete, restore or protect a secret; a change to or from a secret level; import with secrets | `ContributorWithSecrets` | a write scope and `Configuration.Secrets`, under the mTLS rule |
+| Permanent delete, purge, policy changes, BYOK setup and verify, rotation, recipients, audit, usage | `Administrator` | never |
+
+A caller without the rights to a secret gets `403 AccessDenied`; a machine whose only missing piece is the mTLS certificate gets `403 MtlsRequired`. Responses that carry a secret value are `Cache-Control: no-store`. A query parameter that does not parse is `400 InvalidQuery`.
+
+### Examples
+
+```bash
+API=https://api.example.com/api/v1/acme/billing
+AUTH="Authorization: Bearer $TOKEN"
+
+# a public pair, then a Standard secret
+curl -X PUT "$API/default/key-values/db.host" -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{ "Protection": "Public", "Value": "sql.internal" }'
+curl -X PUT "$API/default/key-values/db.password" -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{ "Protection": "Standard", "Value": "s3cret", "ExpectedVersion": 0 }'
+
+# the listing never shows a secret value; a reveal does, with the rights
+curl "$API/default/key-values?keyPrefix=db.&includeValues=true" -H "$AUTH"
+curl "$API/default/key-values/db.password?reveal=true" -H "$AUTH"
+
+# soft delete, restore by prefix, history and a unified diff
+curl -X DELETE "$API/default/key-values/db.password?expectedVersion=1" -H "$AUTH"
+curl -X POST "$API/default/key-values/restore" -H "$AUTH" -H "Content-Type: application/json" -d '{ "KeyPrefix": "db." }'
+curl "$API/default/key-values/db.password/versions" -H "$AUTH"
+curl "$API/default/key-values/db.password/versions/2/diff?format=unified" -H "$AUTH"
+
+# export with secrets (ContributorWithSecrets), import as a dry run
+curl -X POST "$API/default/key-values/export" -H "$AUTH" -H "Content-Type: application/json" -d '{ "IncludeSecrets": true }' > kv.json
+curl -X POST "$API/rollout/key-values/import?mode=Merge&dryRun=true" -H "$AUTH" -H "Content-Type: application/json" -d @kv.json
+
+# the policy: allow HSM, move the secrets there, rotate
+curl -X PUT "$API/key-values/policy" -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{ "AllowedProtections": ["Public", "Standard", "Hsm"], "DefaultSecretProtection": "Hsm" }'
+curl -X POST "$API/default/key-values/protect" -H "$AUTH" -H "Content-Type: application/json" \
+  -d '{ "KeyPrefix": "", "Protection": "Hsm" }'
+curl -X POST "$API/key-values/policy/rotate" -H "$AUTH" -H "Content-Type: application/json" -d '{ "Protection": "Hsm" }'
+
+# the audit trail of the last day, and the usage of September
+curl "$API/key-values/audit?from=$(date -u -d yesterday +%Y-%m-%dT%H:%M:%SZ)" -H "$AUTH"
+curl "$API/usage/key-values?from=2026-09-01&to=2026-09-30" -H "$AUTH"
+```
+
+### SDKs
+
+The C# SDK (`Sdk.NSwag`, generated by NSwag) has `IKeyValuesApiClient` with one method per operation, registered by `AddStorytellerSdk`, and `KeyValueClientEncryption` (`ClientSideEncryption/`) to encrypt a value for the recipients of a project and to decrypt one with a recipient's private key, on top of `KeyValues.ClientEncryption`. The TypeScript SDK (`@42for.net/2splatform.sdk`) has the generated `key-values` functions, Vue Query composables, Zod schemas and MSW handlers, the helpers of `lib/key-values.ts` (key validation, `.env` and flat JSON conversion, format detection, secret references) in the root entry, and the subpath `./hyok` with `encryptForRecipients` and `decryptClientSecret` on WebCrypto; see [its README](../../../src/Platform/Storyteller/sdk.typescript/README.md).
 
 ## Import and export
 

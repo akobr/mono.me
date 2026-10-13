@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.1.3549
+ * OpenAPI spec version: 0.9.5.59171
  */
 import * as zod from "zod";
 
@@ -293,6 +293,8 @@ export const GetMachineAccessesResponseItem = zod.object({
       "AnnotationReadWrite",
       "ConfigurationReadWrite",
       "DefaultReadWrite",
+      "SecretsRead",
+      "SecretsReadWrite",
     ])
     .default(getMachineAccessesResponseScopeDefault),
   AnnotationKey: zod.string().optional(),
@@ -333,6 +335,8 @@ export const CreateMachineAccessBody = zod.object({
       "AnnotationReadWrite",
       "ConfigurationReadWrite",
       "DefaultReadWrite",
+      "SecretsRead",
+      "SecretsReadWrite",
     ])
     .default(createMachineAccessBodyScopeDefault),
   AnnotationKey: zod.string().optional(),
@@ -354,6 +358,8 @@ export const CreateMachineAccessResponse = zod.object({
       "AnnotationReadWrite",
       "ConfigurationReadWrite",
       "DefaultReadWrite",
+      "SecretsRead",
+      "SecretsReadWrite",
     ])
     .default(createMachineAccessResponseScopeDefault),
   AnnotationKey: zod.string().optional(),
@@ -394,6 +400,8 @@ export const GetMachineAccessResponse = zod.object({
       "AnnotationReadWrite",
       "ConfigurationReadWrite",
       "DefaultReadWrite",
+      "SecretsRead",
+      "SecretsReadWrite",
     ])
     .default(getMachineAccessResponseScopeDefault),
   AnnotationKey: zod.string().optional(),
@@ -434,6 +442,8 @@ export const ResetMachineAccessResponse = zod.object({
       "AnnotationReadWrite",
       "ConfigurationReadWrite",
       "DefaultReadWrite",
+      "SecretsRead",
+      "SecretsReadWrite",
     ])
     .default(resetMachineAccessResponseScopeDefault),
   AnnotationKey: zod.string().optional(),
