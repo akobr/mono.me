@@ -20,6 +20,7 @@ export function useScrollMemory(
 ): void {
   let restored = false
   let hidden = false
+  let current: HTMLElement | null | undefined
 
   async function restore(target: HTMLElement) {
     const top = offset.value
@@ -34,6 +35,12 @@ export function useScrollMemory(
   watch(
     [() => toValue(element), ready],
     async ([target, isReady]) => {
+      // Another element (the grid and the phone list swap at the breakpoint) starts at the top: restore it too.
+      if (target !== current) {
+        current = target
+        restored = false
+        hidden = false
+      }
       if (restored || !target || !isReady) {
         return
       }
