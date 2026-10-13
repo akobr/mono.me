@@ -39,6 +39,8 @@ public class OpenApiConfigurationOptions : DefaultOpenApiConfigurationOptions
         new MtlsSecuritySchemeDocumentFilter(),
         new OAuthSecuritySchemeDocumentFilter(),
         new DiffUnifiedResponseDocumentFilter(),
+        new NullableEnumDefaultDocumentFilter(),
+        new DateOnlySchemaDocumentFilter(),
         new ForbiddenResponseDocumentFilter(),
     ];
 }

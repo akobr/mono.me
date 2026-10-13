@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands.Configuration;
+using _42.Platform.Cli.Commands.KeyValues;
 using _42.Platform.Cli.Commands.Schemas;
 using _42.Platform.Cli.Commands.Templates;
 using _42.Platform.Storyteller.Sdk;
@@ -20,6 +21,7 @@ namespace _42.Platform.Cli.Commands.Storyteller;
     typeof(StorytellerDeletedCommand),
     typeof(StorytellerHistoryCommand),
     typeof(ConfigGetCommand),
+    typeof(KeyValueListCommand),
     typeof(TemplateGetCommand),
     typeof(SchemaCommand))]
 

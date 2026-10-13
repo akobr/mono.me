@@ -62,6 +62,24 @@ public static class CommandNames
     public const string AUTH = "auth";
     public const string MACHINE_AUTH = "machine-auth";
 
+    public const string KV = "kv";
+    public const string KEY_VALUES = "key-values";
+    public const string PURGE = "purge";
+    public const string PROTECT = "protect";
+    public const string EXPORT = "export";
+    public const string IMPORT = "import";
+    public const string REENCRYPT = "reencrypt";
+    public const string POLICY = "policy";
+    public const string RECIPIENTS = "recipients";
+    public const string AUDIT = "audit";
+    public const string USAGE = "usage";
+    public const string BYOK_SETUP = "byok-setup";
+    public const string BYOK_VERIFY = "byok-verify";
+    public const string ROTATE = "rotate";
+    public const string ADD = "add";
+    public const string ENABLE = "enable";
+    public const string DISABLE = "disable";
+
     public const string ASSIST = "assist";
     public const string ASSISTANCE = "assistance";
     public const string KEY = "key";
