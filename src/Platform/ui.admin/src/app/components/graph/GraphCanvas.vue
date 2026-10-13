@@ -47,6 +47,8 @@ const hovered = ref<number>()
 let behavior: ZoomBehavior<HTMLCanvasElement, unknown> | undefined
 let width = 0
 let height = 0
+/** A fit asked for while the canvas had no size (hidden); it runs once the canvas is shown. */
+let pendingFit: readonly number[] | undefined
 let scheduled = false
 let frames = 0
 
@@ -350,6 +352,10 @@ function fit(indexes?: readonly number[]) {
   if (!props.positions || props.graph.nodes.length === 0) {
     return
   }
+  if (!canvas.value?.clientWidth || !canvas.value.clientHeight) {
+    pendingFit = indexes ?? []
+    return
+  }
   const list = indexes?.length ? indexes : props.graph.nodes.map((_, index) => index)
   let minX = Infinity
   let minY = Infinity
@@ -404,7 +410,8 @@ async function toBlob(): Promise<Blob | null> {
 
 function resize() {
   const element = canvas.value
-  if (!element) {
+  // A hidden graph (a full-screen detail in its place) keeps its size and view until it is shown again.
+  if (!element || !element.clientWidth || !element.clientHeight) {
     return
   }
   const ratio = window.devicePixelRatio || 1
@@ -416,8 +423,12 @@ function resize() {
       target.height = Math.max(1, Math.round(height * ratio))
     }
   }
-  // The detail panel opening beside the graph must not hide the selected node.
-  if (props.selected !== undefined && props.positions) {
+  if (pendingFit) {
+    const indexes = pendingFit
+    pendingFit = undefined
+    fit(indexes)
+  } else if (props.selected !== undefined && props.positions) {
+    // The detail panel opening beside the graph must not hide the selected node.
     reveal(props.selected)
   }
   schedule()
