@@ -212,3 +212,49 @@ test('comes back to the filter, the detail and its tab after another section', a
     await expect(page.getByRole('textbox', { name: 'Filter annotations' })).toHaveValue('')
   }
 })
+
+test('keeps the scroll position of the list behind a covering detail', async ({ page }, testInfo) => {
+  // A full-screen detail, and every detail on a phone, hides the list; the browser drops its scroll position.
+  const phone = isMobile(testInfo)
+  const navigate = async (name: string) => {
+    if (phone) {
+      await page.getByRole('button', { name: 'Open navigation' }).click()
+      await page.getByRole('dialog').getByRole('link', { name, exact: true }).click()
+    } else {
+      await page.getByRole('link', { name, exact: true }).first().click()
+    }
+  }
+  // The scrolling element of the grid or of the phone list.
+  const scrollTop = () =>
+    page.evaluate(() => {
+      let element = document.querySelector<HTMLElement>('table, [role=list][aria-label=Annotations]')
+      while (element && !/(auto|scroll)/.test(getComputedStyle(element).overflowY)) {
+        element = element.parentElement
+      }
+      return element?.scrollTop ?? -1
+    })
+
+  await openApp(page, '/acme/billing/default/annotations')
+  const list = phone ? page.getByRole('list', { name: 'Annotations' }) : page.locator('table').first()
+  const box = (await list.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + 200)
+  await page.mouse.wheel(0, 1500)
+  await expect.poll(scrollTop).toBeGreaterThan(1000)
+  const left = await scrollTop()
+
+  // The list is virtualized: open the row in the middle of what is shown.
+  await page.mouse.click(box.x + box.width / 2, box.y + 200)
+  await expect(page).toHaveURL(/\/annotations\/[a-z]{3}\./)
+  if (!phone) {
+    await page.getByRole('button', { name: 'Open in full screen' }).click()
+    await expect(page.getByRole('textbox', { name: 'Filter annotations' })).toBeHidden()
+  }
+  await page.getByRole('button', { name: phone ? 'Back to the list' : 'Close the detail' }).click()
+  await expect.poll(scrollTop).toBeCloseTo(left, -1)
+
+  // The position is remembered too, not the one the hidden list was reset to.
+  await navigate('Configurations')
+  await expect(page).toHaveURL(/\/configurations$/)
+  await navigate('Annotations')
+  await expect.poll(scrollTop).toBeCloseTo(left, -1)
+})
