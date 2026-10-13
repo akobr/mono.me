@@ -6,7 +6,7 @@ namespace _42.Platform.Storyteller.Binding.Language;
 /// always evaluated against a snapshot of the configuration taken before the binding pass started, so the result
 /// never depends on the order in which properties are processed.
 /// </summary>
-public sealed class ConfigBindingFunction : IBindingFunction
+public sealed class ConfigBindingFunction : IBindingFunction, IDescribedBinding
 {
     private const string FunctionName = "config";
 
@@ -33,5 +33,35 @@ public sealed class ConfigBindingFunction : IBindingFunction
         var result = JsonQuery.Resolve(request.Document, expression);
 
         return new ValueTask<BindingValue?>(result is null ? null : new BindingValue(result));
+    }
+
+    public BindingDescription Describe(string name)
+    {
+        return new BindingDescription
+        {
+            Summary = "Reads a value of the configuration being resolved, from the snapshot taken before evaluation.",
+            Signature = $"{name}(\"<expr>\")",
+            Parameters =
+            [
+                new BindingParameterDescription
+                {
+                    Name = "expr",
+                    Description = "A quoted JSON Pointer (`/a/b`) or JSONPath (`$.a.b`) into the configuration.",
+                },
+            ],
+            Examples =
+            [
+                new BindingExample
+                {
+                    Expression = $"@{name}(\"/maxPrice\")",
+                    Description = "The value of `maxPrice` in the same configuration.",
+                },
+                new BindingExample
+                {
+                    Expression = $"@{name}(\"$.endpoints.db\")",
+                    Description = "The same lookup written as JSONPath.",
+                },
+            ],
+        };
     }
 }

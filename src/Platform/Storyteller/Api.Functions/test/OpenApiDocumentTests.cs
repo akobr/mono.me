@@ -44,4 +44,19 @@ public class OpenApiDocumentTests
         schemas.Keys.ShouldContain("AnnotationRestoreResult");
         schemas.Keys.ShouldContain("AnnotationDeletionResult");
     }
+
+    [Fact]
+    public void BindingCatalogSchema_PublishesFunctionsAndSources()
+    {
+        var helper = new DocumentHelper(new RouteConstraintFilter(), new OpenApiSchemaAcceptor());
+        var methods = typeof(BindingsHttp).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly).ToList();
+
+        var schemas = helper.GetOpenApiSchemas(methods, new DefaultNamingStrategy(), VisitorCollection.CreateInstance());
+
+        schemas["BindingCatalog"].Properties.Keys.ShouldBe(["Functions", "Sources"], ignoreOrder: true);
+        schemas["BindingFunctionDescriptor"].Properties.Keys.ShouldBe(["Name", "Summary", "Signature", "Parameters", "Examples"], ignoreOrder: true);
+        schemas["BindingSourceDescriptor"].Properties.Keys.ShouldBe(["Name", "Summary", "IsDefault", "IsSecret", "Examples"], ignoreOrder: true);
+        schemas["BindingParameterDescription"].Properties.Keys.ShouldBe(["Name", "Description", "IsOptional", "Values"], ignoreOrder: true);
+        schemas["BindingExample"].Properties.Keys.ShouldBe(["Expression", "Description"], ignoreOrder: true);
+    }
 }

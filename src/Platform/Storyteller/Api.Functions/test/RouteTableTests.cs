@@ -62,6 +62,7 @@ public partial class RouteTableTests
     [InlineData("DELETE v1/{}/{}/key-values/recipients/{}")]
     [InlineData("GET v1/{}/{}/key-values/audit")]
     [InlineData("GET v1/{}/{}/usage/key-values")]
+    [InlineData("GET v1/{}/{}/bindings")]
     public void Phase0cRoutes_AreRegistered(string expected)
     {
         var routes = typeof(AccessHttp).Assembly

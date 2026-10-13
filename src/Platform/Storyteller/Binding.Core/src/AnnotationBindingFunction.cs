@@ -13,7 +13,7 @@ namespace _42.Platform.Storyteller.Binding;
 /// resolved (see <see cref="ConfigurationBindingContext"/>, supplied via <see cref="BindingScope.Context"/>). With a
 /// second argument, the target is instead the ancestor annotation of the given <see cref="AnnotationType"/>.
 /// </summary>
-public sealed class AnnotationBindingFunction : IBindingFunction
+public sealed class AnnotationBindingFunction : IBindingFunction, IDescribedBinding
 {
     private const string FunctionName = "annotation";
 
@@ -22,6 +22,51 @@ public sealed class AnnotationBindingFunction : IBindingFunction
     public AnnotationBindingFunction(Lazy<IAnnotationService> annotationService)
     {
         _annotationService = annotationService ?? throw new ArgumentNullException(nameof(annotationService));
+    }
+
+    public BindingDescription Describe(string name)
+    {
+        return new BindingDescription
+        {
+            Summary = "Reads a field of the `Values` of the annotation being configured, or of one of its ancestors.",
+            Signature = $"{name}(\"<expr>\"[, \"<type>\"])",
+            Parameters =
+            [
+                new BindingParameterDescription
+                {
+                    Name = "expr",
+                    Description = "A quoted JSON Pointer (`/a/b`) or JSONPath (`$.a.b`) into the annotation's `Values`.",
+                },
+                new BindingParameterDescription
+                {
+                    Name = "type",
+                    Description = "A quoted annotation type name. Reads the ancestor of that type instead of the annotation itself.",
+                    IsOptional = true,
+                    Values =
+                    [
+                        nameof(AnnotationType.Responsibility),
+                        nameof(AnnotationType.Unit),
+                        nameof(AnnotationType.Subject),
+                        nameof(AnnotationType.Usage),
+                        nameof(AnnotationType.Context),
+                        nameof(AnnotationType.Execution),
+                    ],
+                },
+            ],
+            Examples =
+            [
+                new BindingExample
+                {
+                    Expression = $"@{name}(\"/owner\")",
+                    Description = "The `owner` value of the annotation being configured.",
+                },
+                new BindingExample
+                {
+                    Expression = $"@{name}(\"/currency\", \"Subject\")",
+                    Description = "The `currency` value of the subject the annotation belongs to.",
+                },
+            ],
+        };
     }
 
     public async ValueTask<BindingValue?> InvokeAsync(BindingFunctionRequest request)
