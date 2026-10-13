@@ -150,7 +150,7 @@ src/
 └── test/unit/                     # Vitest
 ```
 
-- **Server state** lives in TanStack Query through the SDK's generated composables. **Client state** lives in Pinia: `session` (user, account, AccessMap), `context` (org, project and view of the route), `preferences` (UI state only, in `localStorage`), `project-settings` (per project defaults such as the time zone of new annotations, in `localStorage` until the API stores project settings).
+- **Server state** lives in TanStack Query through the SDK's generated composables. **Client state** lives in Pinia: `session` (user, account, AccessMap), `context` (org, project and view of the route), `preferences` (UI state only, in `localStorage`, including personal names, colors and icons of the annotation types), `project-settings` (per project defaults such as the time zone of new annotations and the names, colors and icons of the types, in `localStorage` until the API stores project settings), `type-appearance` (resolves the type overrides, personal over project over built-in, and applies them to `typeMeta` and the `--st-*` color tokens).
 - **Errors:** the SDK throws `StorytellerError`. `5xx` and network failures show a global toast; screens handle `4xx` themselves. Server stack traces are never shown.
 - **Roles:** `useRole()` and `<RoleGate>` read the caller's role from `Account.AccessMap` (an organization role does not grant project access).
 - **Forms:** VeeValidate 4 with Zod 4 through `forms/typed-schema.ts` (`@vee-validate/zod` supports Zod 3 only).

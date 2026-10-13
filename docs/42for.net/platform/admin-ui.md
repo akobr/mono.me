@@ -121,9 +121,15 @@ Saving sends only your changes. Two situations stop a save:
 | Invitations | Administrator | Invite by email with a role and an expiry; resend, revoke or copy the link. |
 | Machines | Contributor | Credentials for services: scope, an optional annotation restriction, reset and delete. |
 | Certificates | Administrator | Shared client certificates: issue, revoke, expiry warnings. |
-| Settings | Everyone (policy: Administrator, time zone: Contributor) | The default time zone of new annotations, the machine authentication policy and the CA certificate download. |
+| Settings | Everyone (policy: Administrator, time zone and types: Contributor) | The default time zone of new annotations, the names, colors and icons of the annotation types, the machine authentication policy and the CA certificate download. |
 
 The **default time zone** is `UTC` until you change it. It is kept in your browser, so other people and other browsers keep their own until the API stores project settings.
+
+**Annotation types** on Settings gives each of the seven types a name (and its plural), a color and an icon for the whole project: chips, the legend of the graph, lists, filters and dialogs all use them. Your own **Annotation types** on the account page win over the project's, in every project, field by field. A field you leave empty uses the project's value, and then the built-in one.
+
+- Like the time zone, the project's values are kept in your browser until the API stores project settings.
+- The colors come from a palette that keeps WCAG AA contrast in both themes, and the icons from a fixed set.
+- Only the way a type is shown changes. Keys keep their codes (`exe`), and the API, the documents and the filter (`type:exe`, `type:execution`) keep the type names.
 
 New credentials (API keys, certificates with their password, client secrets) are shown **once**. The dialog stays open until you confirm that you stored them. Copies to the clipboard are announced, and the UI never keeps the credentials.
 
@@ -147,11 +153,11 @@ The UI adapts to the screen:
 - **Tablet:** the detail slides in from the right, or opens in full screen.
 - **Desktop:** the resizable sidebar sits beside the list; the detail opens over the list, pinned beside it and resizable, or in full screen.
 
-It follows the system light or dark theme unless you pick one on the account page.
+It follows the system light or dark theme unless you pick one on the account page. The account page also keeps your other preferences: row density, editor formats and your own names, colors and icons of the annotation types.
 
 Accessibility:
 - The screens are tested against WCAG 2.1 AA (axe).
-- Types and statuses always carry an icon and text, not only a color.
+- Types and statuses always carry an icon and text, not only a color. That holds for renamed and recolored types too.
 - Reduced motion turns off the graph animation and panel transitions.
 
 ## Running it
