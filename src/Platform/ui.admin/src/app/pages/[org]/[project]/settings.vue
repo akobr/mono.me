@@ -9,15 +9,19 @@ import {
 import { useGetAccessPoint } from '@42for.net/2splatform.sdk/vue-query'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
+import { usePreferencesStore } from '@/stores/preferences'
 import { useProjectSettingsStore } from '@/stores/project-settings'
 import { errorMessage } from '@/utils/errors'
 import { credentialKindDescriptions, issuesCertificates } from '@/utils/machines'
+import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 
 // Project settings (spec section 13): the machine authentication policy (Administrator), the CA certificate
 // download (PEM; the SDK fetcher returns non-JSON bodies as text) and project information. The default time zone of
-// new annotations (424-12) is kept in this browser, so it applies at once, like Preferences.
+// new annotations (424-12) and the names, colors and icons of the annotation types (424-13) are kept in this browser,
+// so they apply at once, like Preferences.
 const context = useContextStore()
 const projectSettings = useProjectSettingsStore()
+const preferences = usePreferencesStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const role = useRole()
@@ -32,6 +36,17 @@ const defaultTimeZone = computed({
     }
   },
 })
+
+const types = computed({
+  get: () => projectSettings.current.types,
+  set: (value: TypeAppearances) => {
+    if (context.projectKey) {
+      projectSettings.update(context.projectKey, { types: value })
+    }
+  },
+})
+const builtInTypes = resolveTypeAppearances()
+const hasPersonalTypes = computed(() => Object.keys(preferences.types).length > 0)
 
 const accessPoint = useGetAccessPoint(() => context.projectKey ?? '', {
   query: { enabled: () => !!context.projectKey && canAdmin.value, meta: { silent: true } },
@@ -112,6 +127,38 @@ async function downloadCa() {
               class="max-w-sm"
             />
           </UFormField>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <h2 class="font-semibold">Annotation types</h2>
+            <p class="mt-1 text-sm text-muted">
+              Names, colors and icons of the annotation types on every page, for everyone who opens this project in this
+              browser. Each person can override them in Preferences on the account page.
+            </p>
+          </template>
+          <UAlert
+            v-if="hasPersonalTypes"
+            class="mb-4"
+            color="neutral"
+            variant="subtle"
+            icon="i-lucide-user-cog"
+            description="Your own Preferences override some of these for you."
+            :actions="[{ label: 'Open Preferences', to: '/account', color: 'neutral', variant: 'outline' }]"
+          />
+          <TypeAppearanceEditor v-model="types" :inherited="builtInTypes" :disabled="!canEdit" />
+          <template v-if="canEdit" #footer>
+            <div class="flex justify-end">
+              <UButton
+                label="Reset to built-in"
+                color="neutral"
+                variant="ghost"
+                size="sm"
+                :disabled="Object.keys(types).length === 0"
+                @click="types = {}"
+              />
+            </div>
+          </template>
         </UCard>
 
         <UCard>
