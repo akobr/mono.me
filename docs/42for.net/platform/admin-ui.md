@@ -67,6 +67,8 @@ The configuration itself is edited on its own page (see Configuration). The head
 
 The breadcrumb and **Lineage** show its ancestors in merge order.
 
+**New** creates an annotation from its type and names. Its time zone (the zone of **Valid from** and **Expires**) starts as the project's default time zone from **Settings**, and the dialog lets you pick another one. Missing ancestors created with it get the same zone.
+
 ### Deleting and restoring
 
 **Delete** moves the annotation and everything below it in the graph to **Deleted**, with their configuration. The toast after a delete says until when they can be restored and offers **Undo**. The bulk bar deletes the same way.
@@ -119,7 +121,9 @@ Saving sends only your changes. Two situations stop a save:
 | Invitations | Administrator | Invite by email with a role and an expiry; resend, revoke or copy the link. |
 | Machines | Contributor | Credentials for services: scope, an optional annotation restriction, reset and delete. |
 | Certificates | Administrator | Shared client certificates: issue, revoke, expiry warnings. |
-| Settings | Everyone (policy: Administrator) | The machine authentication policy and the CA certificate download. |
+| Settings | Everyone (policy: Administrator, time zone: Contributor) | The default time zone of new annotations, the machine authentication policy and the CA certificate download. |
+
+The **default time zone** is `UTC` until you change it. It is kept in your browser, so other people and other browsers keep their own until the API stores project settings.
 
 New credentials (API keys, certificates with their password, client secrets) are shown **once**. The dialog stays open until you confirm that you stored them. Copies to the clipboard are announced, and the UI never keeps the credentials.
 
