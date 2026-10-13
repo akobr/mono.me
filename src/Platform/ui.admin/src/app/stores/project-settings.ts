@@ -19,7 +19,10 @@ export const defaultProjectSettings: ProjectSettings = {
  */
 export const useProjectSettingsStore = defineStore('project-settings', () => {
   const context = useContextStore()
-  const state = useStorage<Record<string, Partial<ProjectSettings>>>('2s-admin:project-settings', {}, localStorage)
+  // No storage argument: VueUse resolves localStorage itself and reports a blocked one to onError, keeping the defaults.
+  const state = useStorage<Record<string, Partial<ProjectSettings>>>('2s-admin:project-settings', {}, undefined, {
+    onError: (error) => console.warn('Project settings: localStorage access failed.', error),
+  })
 
   function settingsOf(projectKey: string | undefined): ProjectSettings {
     const stored = projectKey ? state.value[projectKey] : undefined
