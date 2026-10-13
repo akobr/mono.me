@@ -66,6 +66,9 @@ function close() {
             @click="closePanel"
           />
         </div>
+        <div class="flex">
+          <AnnotationLineage :annotation-key="key" section="configurations" :query="query" />
+        </div>
         <UNavigationMenu :items="tabs" highlight class="-mb-3" :ui="{ link: 'text-sm' }" />
       </div>
     </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { LocationQueryRaw } from 'vue-router'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { getDirectAncestors, metaOf } from '@/utils/annotation-key'
@@ -8,9 +9,15 @@ import { getDirectAncestors, metaOf } from '@/utils/annotation-key'
  * Every ancestor as a small layered DAG in merge order (spec section 11.1): the level closest to the annotation
  * first, each level in merge order. Configurations inherit in this order.
  */
-const props = withDefaults(defineProps<{ annotationKey: string; section?: 'annotations' | 'graph' }>(), {
-  section: 'annotations',
-})
+const props = withDefaults(
+  defineProps<{
+    annotationKey: string
+    /** The screen the links stay on: the configuration detail links to the ancestors' configurations. */
+    section?: 'annotations' | 'graph' | 'configurations'
+    query?: LocationQueryRaw
+  }>(),
+  { section: 'annotations', query: undefined },
+)
 
 const catalog = useCatalogStore()
 const context = useContextStore()
@@ -32,7 +39,10 @@ const levels = computed(() => {
   return result.toReversed()
 })
 
-const link = (key: string) => `/${context.org}/${context.project}/${context.view}/${props.section}/${key}`
+const link = (key: string) => ({
+  path: `/${context.org}/${context.project}/${context.view}/${props.section}/${key}`,
+  query: props.query,
+})
 </script>
 
 <template>
@@ -55,7 +65,7 @@ const link = (key: string) => `/${context.org}/${context.project}/${context.view
               :is="catalog.byKey.has(key) ? 'RouterLink' : 'span'"
               v-for="key in level"
               :key="key"
-              :to="link(key)"
+              :to="catalog.byKey.has(key) ? link(key) : undefined"
               class="inline-flex items-center gap-1 rounded border border-default px-1.5 py-0.5 font-mono"
               :class="catalog.byKey.has(key) ? 'hover:bg-elevated' : 'text-dimmed line-through'"
             >
