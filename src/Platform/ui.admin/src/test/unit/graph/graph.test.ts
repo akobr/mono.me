@@ -1,5 +1,6 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { markRaw } from 'vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import type { Annotation } from '@42for.net/2splatform.sdk'
@@ -18,6 +19,7 @@ import type { SimulationCommand, SimulationFrame } from '@/components/graph/simu
 import { useCatalogStore } from '@/stores/catalog'
 import { getAllAncestors } from '@/utils/annotation-key'
 import { buildNavigation } from '@/utils/navigation'
+import { usePageMemoryStore, type GraphFrameMemory } from '@/stores/page-memory'
 import { mountScreen, settle } from '../../helpers'
 
 const keys = [
@@ -314,6 +316,75 @@ describe('graph screen', () => {
     await settle()
     expect(host.text()).toContain('around sbt.big (depth 2)')
     host.unmount()
+  })
+
+  /** Stands in for the simulation worker: records the commands and sends frames back to the graph. */
+  function fakeWorker() {
+    const commands: SimulationCommand[] = []
+    let listener: ((event: MessageEvent<SimulationFrame>) => void) | undefined
+    vi.stubGlobal(
+      'Worker',
+      class {
+        addEventListener(_type: string, callback: typeof listener) {
+          listener = callback
+        }
+        postMessage(command: SimulationCommand) {
+          commands.push(command)
+        }
+        terminate() {}
+      },
+    )
+    const inits = () => commands.filter((command) => command.type === 'init')
+    const frame = (positions: Float32Array, alpha = 0.2) =>
+      listener?.({ data: { type: 'positions', generation: inits().at(-1)!.generation, positions, alpha } } as never)
+    return { inits, frame }
+  }
+
+  /** A remembered frame of `frameKeys`: node i of the frame sits at (100 + i, 200 + i). */
+  function rememberFrame(frameKeys: string[], pinned: string[] = []): GraphFrameMemory {
+    const positions = new Float32Array(frameKeys.length * 2)
+    frameKeys.forEach((_, index) => {
+      positions[index * 2] = 100 + index
+      positions[index * 2 + 1] = 200 + index
+    })
+    const frame = markRaw({ layout: 'layered' as const, keys: frameKeys, positions, alpha: 0.01, pinned })
+    usePageMemoryStore().page({ org: 'acme', project: 'billing', view: 'default' }, 'graph').frame = frame
+    return frame
+  }
+
+  it('resumes the remembered frame only for exactly its nodes', async () => {
+    const worker = fakeWorker()
+    rememberFrame(keys, ['sbt.contoso'])
+    const same = await mountGraph(keys)
+    expect(worker.inits().at(-1)!.resume).toEqual({ alpha: 0.01, pinned: expect.any(Uint32Array) })
+    same.host.unmount()
+
+    // Fewer nodes: every one is in the frame, but the frame's alpha and pins belong to a larger graph.
+    usePageMemoryStore().page({ org: 'acme', project: 'billing', view: 'default' }, 'graph').hidden = new Set(['rst'])
+    rememberFrame(keys, ['sbt.contoso'])
+    const subset = await mountGraph(keys)
+    expect(subset.host.text()).toContain('5 annotations')
+    expect(worker.inits().at(-1)!.resume).toBeUndefined()
+    subset.host.unmount()
+    vi.unstubAllGlobals()
+  })
+
+  it('seeds from the remembered frame of the view, not from live positions of another view', async () => {
+    const worker = fakeWorker()
+    const { host } = await mountGraph(keys)
+    // The graph draws live positions; the memory now holds another frame, as after the view switcher.
+    worker.frame(new Float32Array(keys.length * 2).fill(900))
+    const frame = rememberFrame(keys)
+
+    await host.find('button[title="Hide subjects"]').trigger('click')
+    await settle()
+    const init = worker.inits().at(-1)!
+    const seeds = [...init.seed!].filter((value) => !Number.isNaN(value))
+    expect(seeds).not.toContain(900)
+    expect(seeds.length).toBe((keys.length - 2) * 2)
+    expect(seeds.every((value) => [...frame.positions].includes(value))).toBe(true)
+    host.unmount()
+    vi.unstubAllGlobals()
   })
 
   it('keeps the hidden types for the next visit of the view', async () => {
