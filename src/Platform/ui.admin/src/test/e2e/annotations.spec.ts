@@ -24,6 +24,43 @@ test('filters the grid, edits an annotation in the detail and saves it', async (
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Northwind Traders')
 })
 
+test('opens the detail as an overlay, pins, resizes and shows it in full screen, and remembers it', async ({
+  page,
+}, testInfo) => {
+  test.skip(isMobile(testInfo), 'Below md the detail is always full screen.')
+  await openApp(page, '/acme/billing/default/annotations')
+  await openFromList(page, 'sbt.northwind', testInfo)
+
+  const detail = page.locator('[data-detail-mode]')
+  await expect(detail).toHaveAttribute('data-detail-mode', 'overlay')
+
+  await page.getByRole('button', { name: 'Pin the detail' }).click()
+  await expect(detail).toHaveAttribute('data-detail-mode', 'pinned')
+
+  // The border between the list and the detail is the resize handle.
+  const before = (await detail.boundingBox())!.width
+  const handle = (await page.getByRole('separator', { name: 'Resize the detail' }).boundingBox())!
+  await page.mouse.move(handle.x + handle.width / 2, handle.y + 200)
+  await page.mouse.down()
+  await page.mouse.move(handle.x - 150, handle.y + 200, { steps: 5 })
+  await page.mouse.up()
+  expect((await detail.boundingBox())!.width).toBeGreaterThan(before + 100)
+
+  await page.getByRole('button', { name: 'Open in full screen' }).click()
+  await expect(detail).toHaveAttribute('data-detail-mode', 'full')
+  await expect(page.getByRole('textbox', { name: 'Filter annotations' })).toBeHidden()
+
+  // The next visit opens the detail the same way.
+  await goto(page, '/acme/billing/default/annotations/sbt.northwind')
+  await expect(detail).toHaveAttribute('data-detail-mode', 'full')
+
+  await page.getByRole('button', { name: 'Exit full screen' }).click()
+  await expect(detail).toHaveAttribute('data-detail-mode', 'pinned')
+  await page.getByRole('button', { name: 'Close the detail' }).click()
+  await expect(detail).toHaveCount(0)
+  await expect(page.getByRole('textbox', { name: 'Filter annotations' })).toBeVisible()
+})
+
 test('filters with the bottom sheet on a phone', async ({ page }, testInfo) => {
   test.skip(!isMobile(testInfo), 'The bottom sheet replaces the filter tools below md.')
   await openApp(page, '/acme/billing/default/annotations')
