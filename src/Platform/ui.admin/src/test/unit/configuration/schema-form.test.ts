@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import SchemaForm from '@/components/configuration/SchemaForm.vue'
+import { applyDateFormat, defaultDateFormat } from '@/utils/dates'
 import { mountInApp, settle } from '../../helpers'
 
 const schema = {
@@ -45,6 +46,12 @@ function mountForm(props: Record<string, unknown>) {
 
 const field = (view: ReturnType<typeof mountInApp>, pointer: string) => view.host.find(`[data-path="${pointer}"]`)
 
+/** The date segments of a field in their order: year, month and day. */
+const segments = (view: ReturnType<typeof mountInApp>, pointer: string) =>
+  field(view, pointer)
+    .findAll('[data-reka-date-field-segment]:not([data-segment="literal"])')
+    .map((segment) => segment.attributes('data-segment'))
+
 describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
   it('renders a control for every kind of property', async () => {
     const { view } = mountForm({ modelValue: { retries: 1, tiers: [{ name: 'gold' }], headers: { 'X-A': '1' } } })
@@ -57,7 +64,7 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
     expect(field(view, '/homepage').find('input[type="url"]').exists()).toBe(true)
     expect(field(view, '/retries').text()).toContain('*')
     expect(field(view, '/enabled').find('[role="switch"]').exists()).toBe(true)
-    expect(field(view, '/start').find('input[type="date"]').exists()).toBe(true)
+    expect(field(view, '/start').find('[role="group"][aria-label="Start date"]').exists()).toBe(true)
     expect(field(view, '/tiers').text()).toContain('gold')
     expect(field(view, '/headers').find('input[aria-label="Key"]').element).toHaveProperty('value', 'X-A')
     expect(view.host.text()).toContain('Schedule')
@@ -145,7 +152,11 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
 
   it('treats a value as own, not inherited, when the saved own content has it', async () => {
     // The effective document contains the own content too; a cleared own value has nothing to fall back to.
-    const { view } = mountForm({ modelValue: {}, effective: { retries: 4, title: 'Own' }, own: { retries: 4, title: 'Own' } })
+    const { view } = mountForm({
+      modelValue: {},
+      effective: { retries: 4, title: 'Own' },
+      own: { retries: 4, title: 'Own' },
+    })
     await settle(6)
 
     expect(field(view, '/title').text()).not.toContain('inherited')
@@ -155,9 +166,11 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
     const saved = mountForm({ modelValue: { retries: 4 }, effective: { retries: 4 }, own: { retries: 4 } })
     await settle(6)
 
-    expect(field(saved.view, '/retries').findAll('button').some((button) => button.text() === 'Reset to inherited')).toBe(
-      false,
-    )
+    expect(
+      field(saved.view, '/retries')
+        .findAll('button')
+        .some((button) => button.text() === 'Reset to inherited'),
+    ).toBe(false)
     saved.view.host.unmount()
   })
 
@@ -170,6 +183,48 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
     expect(retries.find('input').element).toHaveProperty('value', '@rst.invoicing/retries')
     expect(retries.find('[role="alert"]').exists()).toBe(false)
     view.host.unmount()
+  })
+
+  describe('dates (424-23)', () => {
+    afterEach(() => applyDateFormat(defaultDateFormat))
+
+    it('edits a date in segments ordered by the date format', async () => {
+      const { view, updates } = mountForm({ modelValue: { retries: 1, start: '2026-10-03' } })
+      await settle(6)
+
+      expect(segments(view, '/start')).toEqual(['year', 'month', 'day'])
+      expect(field(view, '/start').find('input:not([aria-hidden])').exists()).toBe(false)
+
+      applyDateFormat('dd.mm.yyyy')
+      await settle()
+      expect(segments(view, '/start')).toEqual(['day', 'month', 'year'])
+
+      await field(view, '/start')
+        .findAll('button')
+        .find((button) => button.text() === 'Clear')!
+        .trigger('click')
+      await settle()
+
+      expect(updates.at(-1)).toEqual({ retries: 1 })
+      view.host.unmount()
+    })
+
+    it('shows an inherited date in the date format', async () => {
+      const { view } = mountForm({ modelValue: { retries: 1 }, effective: { retries: 1, start: '2026-10-03' } })
+      await settle(6)
+
+      expect(field(view, '/start').text()).toContain('Inherited: 2026-10-03')
+      view.host.unmount()
+    })
+
+    it('keeps a value the date field cannot read in a text input', async () => {
+      const { view } = mountForm({ modelValue: { retries: 1, start: 'next monday' } })
+      await settle(6)
+
+      expect(field(view, '/start').find('input[type="text"]').element).toHaveProperty('value', 'next monday')
+      expect(segments(view, '/start')).toEqual([])
+      view.host.unmount()
+    })
   })
 
   it('attaches client and server errors to the controls', async () => {
