@@ -10,14 +10,14 @@ import { metaOf } from '@/utils/annotation-key'
 import { groupMemberships } from '@/utils/memberships'
 import { buildNavigation } from '@/utils/navigation'
 
-// ⌘K / Ctrl+K (spec section 8): annotations of the catalog (Fuse.js, top 20), recently opened keys, pages of
-// the current context, projects and actions.
+// ⌘K / Ctrl+K (spec section 8): annotations of the catalog (Fuse.js, top 20), recently opened keys, the pages of
+// the navigation menu, projects and actions.
 const router = useRouter()
 const catalog = useCatalogStore()
 const context = useContextStore()
 const session = useSessionStore()
 const preferences = usePreferencesStore()
-const role = useRole()
+const navigation = useNavigationContext()
 const shortcuts = useShortcutsHelp()
 const sidebar = useSidebar()
 const create = useAnnotationCreate()
@@ -29,6 +29,11 @@ const searchTerm = ref('')
 const viewBase = computed(() =>
   context.org && context.project && context.view ? `/${context.org}/${context.project}/${context.view}` : undefined,
 )
+// The view of the navigation menu: the route's view, or the remembered one on the pages of a less specific context.
+const navigationBase = computed(() => {
+  const { org, project, view } = navigation.value
+  return org && project && view ? `/${org}/${project}/${view}` : undefined
+})
 const catalogInScope = computed(
   () =>
     !!viewBase.value &&
@@ -62,13 +67,7 @@ const recentItems = computed<CommandPaletteItem[]>(() =>
 )
 
 const pageItems = computed<CommandPaletteItem[]>(() =>
-  buildNavigation({
-    org: context.org,
-    project: context.project,
-    view: context.view,
-    projectRole: role.projectRole.value,
-    orgRole: role.orgRole.value,
-  }).flatMap((section) =>
+  buildNavigation(navigation.value).flatMap((section) =>
     section.items.map((item) => ({ label: item.label, suffix: section.label, icon: item.icon, to: item.to })),
   ),
 )
@@ -133,11 +132,11 @@ defineShortcuts({
   '?': () => shortcuts.show(),
   '[': () => sidebar.toggleFor(preferences.sidebarPinned),
   'g-o': () => go('/orgs'),
-  'g-a': () => go(viewBase.value && `${viewBase.value}/annotations`),
-  'g-c': () => go(viewBase.value && `${viewBase.value}/configurations`),
-  'g-g': () => go(viewBase.value && `${viewBase.value}/graph`),
-  'g-t': () => go(viewBase.value && `${viewBase.value}/templates`),
-  'g-s': () => go(viewBase.value && `${viewBase.value}/schemas`),
+  'g-a': () => go(navigationBase.value && `${navigationBase.value}/annotations`),
+  'g-c': () => go(navigationBase.value && `${navigationBase.value}/configurations`),
+  'g-g': () => go(navigationBase.value && `${navigationBase.value}/graph`),
+  'g-t': () => go(navigationBase.value && `${navigationBase.value}/templates`),
+  'g-s': () => go(navigationBase.value && `${navigationBase.value}/schemas`),
 })
 </script>
 
