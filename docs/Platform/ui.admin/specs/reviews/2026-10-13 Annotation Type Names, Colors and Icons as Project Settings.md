@@ -152,3 +152,14 @@ As planned:
   - The themes section names the personal type settings on the account page.
   - The accessibility list says that renamed and recolored types still carry an icon and text.
 - **`src/Platform/ui.admin/README.md`:** the client state list names the type overrides in `preferences` and `project-settings`, and the new `type-appearance` store.
+
+### 11. Follow-up: full names in the Type column
+
+Requested after review, and a deviation from section 8 ("codes in chips"):
+
+- **`grid/annotation-columns.ts`:** the Type column of the grid renders `AnnotationTypeBadge` with `variant: 'label'`, so it shows the full name (custom names included) in the type color, still in the monospace font. The column is 160 px wide instead of 96 px; in Tree mode it is 260 px instead of 220 px.
+- **`grid/TreeCell.vue`:** the tree row uses the same `label` variant, next to the child count.
+- **`AnnotationList.vue`** (phones) keeps `variant="icon"`, with the name as its title and accessible label, to save room.
+- The chips of the Deleted dialog keep the code; the detail header already showed the name.
+- **Tests:** `npm test` 225 passed, `npm run lint` clean, `npm run test:e2e` 64 passed and 2 skipped. The visual suite (`test:visual:docker`) changed only the six desktop screens with the grid (annotations, annotation detail and history, light and dark); their baselines were regenerated, and the suite then passed with 40 of 40.
+- **`docs/42for.net/platform/admin-ui.md`:** the catalog section says the Type column shows the full names, and only the icon on a phone.
