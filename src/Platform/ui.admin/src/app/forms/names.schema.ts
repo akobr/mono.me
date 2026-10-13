@@ -23,6 +23,9 @@ export const reservedProjectAndViewNames: ReadonlySet<string> = new Set([
   'machines',
   'certificates',
   'settings',
+  'key-values',
+  'audit',
+  'usage',
 ])
 
 const nameSchema = (kind: string, reserved: ReadonlySet<string>) =>

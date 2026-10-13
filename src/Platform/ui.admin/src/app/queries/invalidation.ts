@@ -63,3 +63,13 @@ export async function invalidateAccess(
     org && project ? invalidateByPath(client, `/v1/${org}/${project}/access`) : Promise.resolve(),
   ])
 }
+
+/** Every pair of the view, their versions and diffs. */
+export function invalidateKeyValues(client: QueryClient, scope: Scope): Promise<void> {
+  return invalidateByPath(client, `${base(scope)}/key-values`)
+}
+
+/** The project's key/value policy, its recipients, and the lists (a level change shows up there). */
+export async function invalidateKeyValuePolicy(client: QueryClient, org: string, project: string): Promise<void> {
+  await invalidateByPath(client, `/v1/${org}/${project}/key-values`)
+}

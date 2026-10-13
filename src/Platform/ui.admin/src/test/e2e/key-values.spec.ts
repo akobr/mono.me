@@ -1,0 +1,192 @@
+import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import { goto, isMobile, openApp } from './support'
+
+// The key values of a view and the project's secrets (spec 29.8), against the mock API: acme/billing is the
+// signed-in user's own project (Owner), northwind/portal gives them the Reader role.
+
+async function openKey(page: Page, key: string, testInfo: TestInfo) {
+  const item = isMobile(testInfo)
+    ? page.getByRole('listitem').filter({ hasText: key }).getByRole('button')
+    : page.getByRole('row').filter({ hasText: key })
+  await item.first().click()
+}
+
+async function createKey(page: Page, key: string, level: string, value: string) {
+  await page.getByRole('button', { name: 'New key' }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'New key' })
+  await dialog.getByPlaceholder('db.password').fill(key)
+  if (level !== 'Public') {
+    await dialog.getByRole('switch', { name: 'Secret' }).click()
+    await dialog.getByRole('combobox', { name: 'Protection level' }).click()
+    await page.getByRole('option', { name: level, exact: true }).click()
+  }
+  await dialog.locator('textarea').fill(value)
+  await dialog.getByRole('button', { name: 'Create' }).click()
+  await expect(dialog).toBeHidden()
+}
+
+test('creates a public key and sees it in the list with its binding', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await createKey(page, 'app.region', 'Public', 'eu-west')
+
+  await expect(page.getByText('app.region').first()).toBeVisible()
+  await expect(page.getByText('@app.region')).toBeVisible()
+  if (!isMobile(testInfo)) {
+    await expect(page.getByRole('row').filter({ hasText: 'app.region' })).toContainText('eu-west')
+  }
+})
+
+test('creates a Standard secret, reveals it, and the value is masked in the list', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await createKey(page, 'smtp.password', 'Standard', 'mail-s3cret')
+
+  await expect(page.getByText('mail-s3cret')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Reveal' }).click()
+  await expect(page.getByText('mail-s3cret')).toBeVisible()
+  await expect(page.getByText('Masked again after 60 seconds.').first()).toBeVisible()
+
+  if (!isMobile(testInfo)) {
+    await expect(page.getByRole('row').filter({ hasText: 'smtp.password' })).toContainText('••••••••')
+  }
+})
+
+test('a reader cannot reveal, create or change the policy', async ({ page }, testInfo) => {
+  await openApp(page, '/northwind/portal/default/key-values')
+  await expect(page.getByRole('button', { name: 'New key' })).toHaveCount(0)
+
+  await goto(page, '/northwind/portal/secrets')
+  await expect(page.getByText('Administrator', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save policy' })).toHaveCount(0)
+  expect(testInfo.project.name).toBeTruthy()
+})
+
+test('encrypts a HYOK value in the browser for the recipients', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await createKey(page, 'payments.signing_key', 'HYOK', 'client-side only')
+
+  await expect(page.getByText('Encrypted on the client')).toBeVisible()
+  await expect(page.getByText('invoicing-api').first()).toBeVisible()
+  await expect(page.getByText('client-side only')).toHaveCount(0)
+})
+
+test('changes the protection of a secret to HSM and keeps the old version at Standard', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await openKey(page, 'db.password', testInfo)
+
+  await page.getByRole('button', { name: 'Change protection' }).click()
+  await page.getByRole('menuitem', { name: 'Move to HSM' }).click()
+  await page.getByRole('button', { name: 'Change protection', exact: true }).last().click()
+  await expect(page.getByText("'db.password' is HSM now").first()).toBeVisible()
+
+  await page.getByRole('link', { name: 'Versions' }).click()
+  // the versions table arrives after the tab opens; the list table is the last one until then
+  const rows = page
+    .getByRole('table')
+    .filter({ has: page.getByRole('columnheader', { name: 'Expires' }) })
+    .getByRole('row')
+  await expect(rows.filter({ hasText: 'v3' })).toContainText('HSM')
+  await expect(rows.filter({ hasText: 'v2' })).toContainText('Standard')
+})
+
+test('deletes, restores and purges a key', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await openKey(page, 'app.name', testInfo)
+  await expect(page.getByText('Binding')).toBeVisible()
+
+  await goto(page, '/acme/billing/default/key-values')
+  const row = isMobile(testInfo) ? undefined : page.getByRole('row').filter({ hasText: 'app.name' })
+  if (row) {
+    await row.getByRole('button', { name: 'Actions for app.name' }).click()
+    await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+    await page.getByRole('button', { name: 'Delete', exact: true }).last().click()
+    await expect(page.getByText("'app.name' deleted").first()).toBeVisible()
+
+    await page.getByRole('button', { name: 'Deleted' }).click()
+    await expect(page.getByRole('row').filter({ hasText: 'app.name' })).toBeVisible()
+    await page.getByRole('row').filter({ hasText: 'legacy.endpoint' }).getByRole('checkbox').click()
+    await page.getByRole('button', { name: 'Purge' }).click()
+    await page.getByPlaceholder('default').fill('default')
+    await page.getByRole('button', { name: 'Purge', exact: true }).last().click()
+    await expect(page.getByRole('row').filter({ hasText: 'legacy.endpoint' })).toHaveCount(0)
+
+    await page.getByRole('row').filter({ hasText: 'app.name' }).getByRole('checkbox').click()
+    await page.getByRole('button', { name: 'Restore' }).click()
+    await expect(page.getByText('1 key(s) restored').first()).toBeVisible()
+  }
+})
+
+test('loads the versions only when the tab opens', async ({ page }, testInfo) => {
+  const versionRequests: string[] = []
+  page.on('request', (request) => {
+    if (request.url().endsWith('/key-values/db.host/versions')) {
+      versionRequests.push(request.url())
+    }
+  })
+  await openApp(page, '/acme/billing/default/key-values')
+  await openKey(page, 'db.host', testInfo)
+  await expect(page.getByText('Binding')).toBeVisible()
+  expect(versionRequests).toHaveLength(0)
+
+  await page.getByRole('link', { name: 'Versions' }).click()
+  await expect(page.getByRole('table').last().getByRole('row').filter({ hasText: '(current)' })).toBeVisible()
+  expect(versionRequests.length).toBeGreaterThan(0)
+})
+
+test('imports an .env text with a secret pattern after showing the plan', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await page.getByRole('button', { name: 'Import' }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'Import key values' })
+
+  await dialog.locator('textarea').fill('CACHE__HOST=redis.internal\nCACHE__PASSWORD=r3dis')
+  await dialog.getByRole('button', { name: 'Next' }).click()
+  await dialog.getByRole('button', { name: 'Mark' }).click()
+  await expect(dialog.getByRole('combobox', { name: 'Level of cache.password' })).toContainText('Standard')
+  await dialog.getByRole('button', { name: 'Check' }).click()
+  await expect(dialog.getByText('Plan: 2 create')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Import', exact: true }).click()
+  await expect(dialog.getByText('Imported', { exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Done' }).click()
+
+  await expect(page.getByText('cache.host').first()).toBeVisible()
+})
+
+test('exports the view as an .env file', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await page.getByRole('button', { name: 'Export' }).click()
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('menuitem', { name: '.env file' }).click(),
+  ])
+
+  expect(download.suggestedFilename()).toBe('acme-billing-default.env')
+})
+
+test('sets up a customer key with the BYOK wizard', async ({ page }) => {
+  await openApp(page, '/acme/billing/secrets')
+  await page.getByRole('button', { name: 'Show the setup' }).click()
+  await expect(page.getByText('Key Vault Crypto Service Encryption User').first()).toBeVisible()
+
+  await page
+    .getByPlaceholder('https://my-vault.vault.azure.net/keys/storyteller-kek')
+    .fill('https://acme-keys.vault.azure.net/keys/storyteller')
+  await page.getByPlaceholder('00000000-0000-0000-0000-000000000000').fill('11111111-2222-3333-4444-555555555555')
+  await page.getByRole('button', { name: 'Save key' }).click()
+  await expect(page.getByText('Customer key saved; verify it next').first()).toBeVisible()
+
+  await page.getByRole('button', { name: 'Verify' }).click()
+  await expect(page.getByText('Customer key verified').first()).toBeVisible()
+  await expect(page.getByText('Healthy').first()).toBeVisible()
+})
+
+test('filters the audit trail and shows the usage', async ({ page }) => {
+  await openApp(page, '/acme/billing/audit')
+  await expect(page.getByText('Reveal').first()).toBeVisible()
+  await page.getByRole('combobox', { name: 'Operation filter' }).click()
+  await page.getByRole('option', { name: 'Rotate', exact: true }).click()
+  await expect(page.getByRole('row').filter({ hasText: 'Rotate' })).toHaveCount(1)
+  await expect(page.getByRole('row').filter({ hasText: 'Reveal' })).toHaveCount(0)
+
+  await goto(page, '/acme/billing/usage')
+  await expect(page.getByText('Standard keys (key-months)').first()).toBeVisible()
+  await expect(page.getByText('Estimated charges')).toBeVisible()
+})

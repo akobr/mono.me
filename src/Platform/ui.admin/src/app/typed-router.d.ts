@@ -240,6 +240,37 @@ declare module 'vue-router/auto-routes' {
       { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
+    '/[org]/[project]/[view]/key-values': RouteRecordInfo<
+      '/[org]/[project]/[view]/key-values',
+      '/:org/:project/:view/key-values',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/key-values/[key]'
+      | '/[org]/[project]/[view]/key-values/[key]/'
+      | '/[org]/[project]/[view]/key-values/[key]/versions'
+    >,
+    '/[org]/[project]/[view]/key-values/[key]': RouteRecordInfo<
+      '/[org]/[project]/[view]/key-values/[key]',
+      '/:org/:project/:view/key-values/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/key-values/[key]/'
+      | '/[org]/[project]/[view]/key-values/[key]/versions'
+    >,
+    '/[org]/[project]/[view]/key-values/[key]/': RouteRecordInfo<
+      '/[org]/[project]/[view]/key-values/[key]/',
+      '/:org/:project/:view/key-values/:key',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/key-values/[key]/versions': RouteRecordInfo<
+      '/[org]/[project]/[view]/key-values/[key]/versions',
+      '/:org/:project/:view/key-values/:key/versions',
+      { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
     '/[org]/[project]/[view]/schemas': RouteRecordInfo<
       '/[org]/[project]/[view]/schemas',
       '/:org/:project/:view/schemas',
@@ -284,6 +315,13 @@ declare module 'vue-router/auto-routes' {
       { org: ParamValue<false>, project: ParamValue<false>, type: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
+    '/[org]/[project]/audit': RouteRecordInfo<
+      '/[org]/[project]/audit',
+      '/:org/:project/audit',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
     '/[org]/[project]/certificates': RouteRecordInfo<
       '/[org]/[project]/certificates',
       '/:org/:project/certificates',
@@ -319,9 +357,23 @@ declare module 'vue-router/auto-routes' {
       { org: ParamValue<false>, project: ParamValue<false> },
       | never
     >,
+    '/[org]/[project]/secrets': RouteRecordInfo<
+      '/[org]/[project]/secrets',
+      '/:org/:project/secrets',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
     '/[org]/[project]/settings': RouteRecordInfo<
       '/[org]/[project]/settings',
       '/:org/:project/settings',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/usage': RouteRecordInfo<
+      '/[org]/[project]/usage',
+      '/:org/:project/usage',
       { org: ParamValue<true>, project: ParamValue<true> },
       { org: ParamValue<false>, project: ParamValue<false> },
       | never
@@ -657,6 +709,43 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
+    'app/pages/[org]/[project]/[view]/key-values.vue': {
+      routes:
+        | '/[org]/[project]/[view]/key-values'
+        | '/[org]/[project]/[view]/key-values/[key]'
+        | '/[org]/[project]/[view]/key-values/[key]/'
+        | '/[org]/[project]/[view]/key-values/[key]/versions'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/key-values/[key].vue': {
+      routes:
+        | '/[org]/[project]/[view]/key-values/[key]'
+        | '/[org]/[project]/[view]/key-values/[key]/'
+        | '/[org]/[project]/[view]/key-values/[key]/versions'
+      views:
+        | 'default'
+      pathParamNames:
+        | 'key'
+    }
+    'app/pages/[org]/[project]/[view]/key-values/[key]/index.vue': {
+      routes:
+        | '/[org]/[project]/[view]/key-values/[key]/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/key-values/[key]/versions.vue': {
+      routes:
+        | '/[org]/[project]/[view]/key-values/[key]/versions'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
     'app/pages/[org]/[project]/[view]/schemas.vue': {
       routes:
         | '/[org]/[project]/[view]/schemas'
@@ -709,6 +798,14 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | 'type'
     }
+    'app/pages/[org]/[project]/audit.vue': {
+      routes:
+        | '/[org]/[project]/audit'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
     'app/pages/[org]/[project]/certificates.vue': {
       routes:
         | '/[org]/[project]/certificates'
@@ -750,9 +847,25 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
+    'app/pages/[org]/[project]/secrets.vue': {
+      routes:
+        | '/[org]/[project]/secrets'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
     'app/pages/[org]/[project]/settings.vue': {
       routes:
         | '/[org]/[project]/settings'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/usage.vue': {
+      routes:
+        | '/[org]/[project]/usage'
       views:
         | never
       pathParamNames:

@@ -33,6 +33,8 @@ const screens: {
   { name: 'schemas', path: '/acme/billing/default/schemas' },
   { name: 'members', path: '/acme/billing/members' },
   { name: 'machines', path: '/acme/billing/machines' },
+  { name: 'key-values', path: '/acme/billing/default/key-values' },
+  { name: 'secrets', path: '/acme/billing/secrets' },
   { name: 'onboarding', path: '/onboarding', scenario: 'new-user' },
 ]
 

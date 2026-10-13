@@ -9,6 +9,8 @@ export const scopeDescriptions: Record<MachineAccessCreateScope, string> = {
   AnnotationReadWrite: 'Reads and writes annotations.',
   ConfigurationReadWrite: 'Reads and writes configurations.',
   DefaultReadWrite: 'Reads and writes annotations and configurations.',
+  SecretsRead: 'Reads configurations and receives key/value secrets (over mTLS when the project requires it).',
+  SecretsReadWrite: 'Reads and writes configurations and key/value secrets (over mTLS when the project requires it).',
 }
 
 export const credentialKindDescriptions: Record<NonNullable<MachineAuthenticationPolicy['CredentialKind']>, string> = {

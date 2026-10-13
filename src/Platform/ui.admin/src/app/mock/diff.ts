@@ -36,10 +36,12 @@ function lineDiff(before: string[], after: string[]): Edit[] {
 }
 
 export function diffDocuments(before: unknown, after: unknown): DiffResult {
-  const edits = lineDiff(
-    JSON.stringify(before ?? {}, null, 2).split('\n'),
-    JSON.stringify(after ?? {}, null, 2).split('\n'),
-  )
+  return diffTexts(JSON.stringify(before ?? {}, null, 2), JSON.stringify(after ?? {}, null, 2))
+}
+
+/** The same hunks for two texts (key/value pairs: the value of a version, version 0 is the empty text). */
+export function diffTexts(before: string, after: string): DiffResult {
+  const edits = lineDiff(before.split('\n'), after.split('\n'))
   const changed = edits.map((edit, index) => (edit.type === 'Unchanged' ? -1 : index)).filter((index) => index >= 0)
 
   const ranges: [number, number][] = []

@@ -50,6 +50,7 @@ declare global {
   const usePreferencesStore: typeof import('./stores/preferences').usePreferencesStore
   const useProjectSettingsStore: typeof import('./stores/project-settings').useProjectSettingsStore
   const useResizable: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useResizable').useResizable
+  const useRevealedValue: typeof import('./composables/useRevealedValue').useRevealedValue
   const useRole: typeof import('./composables/useRole').useRole
   const useScope: typeof import('./composables/useAppContext').useScope
   const useScrollMemory: typeof import('./composables/useScrollMemory').useScrollMemory

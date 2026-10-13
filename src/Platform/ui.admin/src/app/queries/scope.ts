@@ -1,10 +1,19 @@
 import { computed, toValue, type MaybeRefOrGetter } from 'vue'
+import type { GetKeyValueAuditParams, GetKeyValuesParams, GetKeyValueUsageParams } from '@42for.net/2splatform.sdk'
 import {
   useGetAnnotation,
   useGetAnnotationHistory,
   useGetDeletedAnnotation,
+  useGetKeyValue,
+  useGetKeyValueAudit,
+  useGetKeyValuePolicy,
+  useGetKeyValues,
+  useGetKeyValueUsage,
+  useGetKeyValueVersions,
+  useGetRecipients,
   useGetTemplates,
 } from '@42for.net/2splatform.sdk/vue-query'
+import { useAppContext } from '@/composables/useAppContext'
 import { useScope } from '@/composables/useAppContext'
 import { metaOf, type AnnotationTypeCode } from '@/utils/annotation-key'
 
@@ -53,4 +62,57 @@ export function useTemplateTypes() {
         )
       : undefined,
   )
+}
+
+// --- key/value pairs (spec section 29.1) ---
+
+export function useKeyValues(params: MaybeRefOrGetter<GetKeyValuesParams>) {
+  const scope = useScope()
+  return useGetKeyValues(scope.org, scope.project, scope.view, () => toValue(params), {
+    query: { enabled: () => !!scope.view(), staleTime: 15_000, refetchOnWindowFocus: true },
+  })
+}
+
+/** One pair without its secret value; reveals go through useRevealedValue and are never cached. */
+export function useKeyValue(key: MaybeRefOrGetter<string | undefined>, includeDeleted = true) {
+  const scope = useScope()
+  return useGetKeyValue(scope.org, scope.project, scope.view, () => toValue(key) ?? '', { includeDeleted }, {
+    query: { enabled: () => !!toValue(key) && !!scope.view(), staleTime: 15_000, meta: { silent: true } },
+  })
+}
+
+/** The versions of a key, loaded only while the Versions tab is open (spec R6). */
+export function useKeyValueVersions(key: MaybeRefOrGetter<string | undefined>, enabled: MaybeRefOrGetter<boolean>) {
+  const scope = useScope()
+  return useGetKeyValueVersions(scope.org, scope.project, scope.view, () => toValue(key) ?? '', {
+    query: { enabled: () => toValue(enabled) && !!toValue(key) && !!scope.view(), staleTime: 15_000 },
+  })
+}
+
+export function useKeyValuePolicy() {
+  const { org, project } = useAppContext()
+  return useGetKeyValuePolicy(() => org.value ?? '', () => project.value ?? '', {
+    query: { enabled: () => !!project.value, staleTime: 60_000, meta: { silent: true } },
+  })
+}
+
+export function useRecipients() {
+  const { org, project } = useAppContext()
+  return useGetRecipients(() => org.value ?? '', () => project.value ?? '', {
+    query: { enabled: () => !!project.value, staleTime: 60_000, meta: { silent: true } },
+  })
+}
+
+export function useKeyValueAudit(params: MaybeRefOrGetter<GetKeyValueAuditParams>, enabled: MaybeRefOrGetter<boolean> = true) {
+  const { org, project } = useAppContext()
+  return useGetKeyValueAudit(() => org.value ?? '', () => project.value ?? '', () => toValue(params), {
+    query: { enabled: () => !!project.value && toValue(enabled), staleTime: 15_000, meta: { silent: true } },
+  })
+}
+
+export function useKeyValueUsage(params: MaybeRefOrGetter<GetKeyValueUsageParams>, enabled: MaybeRefOrGetter<boolean> = true) {
+  const { org, project } = useAppContext()
+  return useGetKeyValueUsage(() => org.value ?? '', () => project.value ?? '', () => toValue(params), {
+    query: { enabled: () => !!project.value && toValue(enabled), staleTime: 60_000, meta: { silent: true } },
+  })
 }
