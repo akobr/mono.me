@@ -23,6 +23,14 @@ export default defineConfig(({ command, mode }) => ({
     mode === 'e2e' && mockServiceWorker(),
   ],
   resolve: { alias: { '@': fileURLToPath(new URL('./app', import.meta.url)) } },
+  // The dev server pre-bundles the dependencies it finds by crawling from index.html. The pages sit behind the
+  // virtual vue-router/auto-routes module and the components are auto-imported, so the crawl would miss most of
+  // the app, and every page that imports a new package would re-optimize the dependencies and reload the app.
+  optimizeDeps: {
+    entries: ['index.html', 'app/**/*.{vue,ts}', '!app/**/*.d.ts'],
+    // Imported only by the generated routes.
+    include: ['vue-router/experimental'],
+  },
   worker: { format: 'es' },
   build: {
     target: 'es2022',
