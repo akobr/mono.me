@@ -4,24 +4,31 @@ import type { ColumnSizingState, RowSelectionState, SortingState, VisibilityStat
 import type { ConfigurationSummary } from '@42for.net/2splatform.sdk'
 import { useNow } from '@vueuse/core'
 import { usePreferencesStore } from '@/stores/preferences'
-import type { TreeNode } from '@/utils/tree-projection'
+import { keySelectionOf, rowSelectionOf, type TreeNode } from '@/utils/tree-projection'
 import { annotationColumns, defaultHiddenColumns } from './grid/annotation-columns'
 
 /**
  * Annotation grid and tree (spec section 8) on Nuxt UI UTable (TanStack Table) with virtual rows. In tree mode
- * the rows are the flattened visible tree; sorting applies to the grid mode only.
+ * the rows are the flattened visible tree, where an annotation can have a row per path; sorting applies to the
+ * grid mode only.
  */
 const props = defineProps<{
   rows: TreeNode[]
   tree: boolean
   selectedKey?: string
-  activeKey?: string
+  activeId?: string
   configurations: ReadonlyMap<string, ConfigurationSummary> | null
-  isExpanded: (key: string) => boolean
+  isExpanded: (id: string) => boolean
 }>()
 
-const emit = defineEmits<{ open: [key: string]; toggle: [key: string] }>()
+const emit = defineEmits<{ open: [key: string, id: string]; toggle: [id: string] }>()
 const rowSelection = defineModel<RowSelectionState>('rowSelection', { default: () => ({}) })
+
+// The model is keyed by annotation key and UTable by row id, so every copy of a selected annotation is selected.
+const tableSelection = computed<RowSelectionState>({
+  get: () => rowSelectionOf(props.rows, rowSelection.value),
+  set: (next) => (rowSelection.value = keySelectionOf(props.rows, rowSelection.value, tableSelection.value, next)),
+})
 
 const preferences = usePreferencesStore()
 const gridPreferences = preferences.grid('annotations')
@@ -46,7 +53,7 @@ const columns = computed(() =>
     now: now.value.getTime(),
     configurations: props.configurations,
     isExpanded: props.isExpanded,
-    toggle: (key) => emit('toggle', key),
+    toggle: (id) => emit('toggle', id),
   }),
 )
 
@@ -54,13 +61,13 @@ const rowClass = (row: { original: TreeNode }) =>
   [
     // Opaque, so pinned (sticky) cells do not show the scrolled content through the highlight.
     row.original.key === props.selectedKey ? '[&>td]:bg-[color-mix(in_oklab,var(--ui-primary)_12%,var(--ui-bg))]' : '',
-    row.original.key === props.activeKey ? 'outline outline-1 -outline-offset-1 outline-primary/60' : '',
+    row.original.id === props.activeId ? 'outline outline-1 -outline-offset-1 outline-primary/60' : '',
     row.original.matched || row.original.missing ? '' : 'opacity-50',
   ].join(' ')
 
 /** Scrolls a row into view (keyboard navigation, focus return). */
-function scrollToKey(key: string): void {
-  const index = props.rows.findIndex((row) => row.key === key)
+function scrollToId(id: string): void {
+  const index = props.rows.findIndex((row) => row.id === id)
   const element = table.value?.$el
   if (index < 0 || !element) {
     return
@@ -90,20 +97,20 @@ watchEffect(() => {
   }
 })
 
-defineExpose({ scrollToKey, columnVisibility, hideableColumns })
+defineExpose({ scrollToId, columnVisibility, hideableColumns })
 </script>
 
 <template>
   <UTable
     ref="table"
-    v-model:row-selection="rowSelection"
+    v-model:row-selection="tableSelection"
     v-model:sorting="sorting"
     v-model:column-visibility="columnVisibility"
     v-model:column-sizing="columnSizing"
     v-model:column-pinning="columnPinning"
     :data="rows"
     :columns="columns"
-    :get-row-id="(row: TreeNode) => row.key"
+    :get-row-id="(row: TreeNode) => row.id"
     :enable-row-selection="(row: { original: TreeNode }) => !row.original.missing"
     :enable-sorting="!tree"
     enable-column-resizing
@@ -118,7 +125,7 @@ defineExpose({ scrollToKey, columnVisibility, hideableColumns })
       td: preferences.state.density === 'compact' ? 'py-1.5 text-sm' : 'py-2.5 text-sm',
       tr: 'cursor-pointer',
     }"
-    :on-select="(_event: Event, row: { original: TreeNode }) => emit('open', row.original.key)"
+    :on-select="(_event: Event, row: { original: TreeNode }) => emit('open', row.original.key, row.original.id)"
     empty="No annotations match the filter."
   />
 </template>

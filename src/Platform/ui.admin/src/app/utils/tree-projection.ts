@@ -1,9 +1,18 @@
 import type { Annotation } from '@42for.net/2splatform.sdk'
-import { parseAnnotationKey, type AnnotationTypeCode, type ParsedAnnotationKey } from './annotation-key'
+import type { RowSelectionState } from '@tanstack/vue-table'
+import {
+  codeOfKey,
+  getDirectAncestors,
+  parseAnnotationKey,
+  type AnnotationTypeCode,
+  type ParsedAnnotationKey,
+} from './annotation-key'
 
 export type TreePerspective = 'subject' | 'responsibility'
 
 export interface TreeNode {
+  /** Unique per row: the keys of the path from the root, joined with '/'. The annotation key in grid mode. */
+  id: string
   key: string
   /** Undefined for a synthetic "(missing)" node of a parent that is not in the catalog. */
   annotation?: Annotation
@@ -14,16 +23,17 @@ export interface TreeNode {
   children: TreeNode[]
 }
 
-const rootOrder: Record<TreePerspective, AnnotationTypeCode[]> = {
-  subject: ['sbt', 'rst'],
-  responsibility: ['rst', 'sbt'],
+/** The only type at the root of a perspective; the types that do not descend from it are not shown. */
+export const rootCode: Record<TreePerspective, AnnotationTypeCode> = {
+  subject: 'sbt',
+  responsibility: 'rst',
 }
 
 /**
- * The parent of a key in a perspective (spec section 7). In each perspective every annotation has at most one
- * parent, so the DAG becomes a tree:
+ * The primary parent of a key in a perspective, for the breadcrumb, which shows one chain (spec section 11.1):
  * - by subject:        cnt → sbt, usg → sbt, exe → cnt, uxe → exe, unt → rst
  * - by responsibility: unt → rst, usg → rst, exe → usg, uxe → exe, cnt → sbt
+ * The tree itself shows every path (projectTree).
  */
 export function parentKey(parsed: ParsedAnnotationKey, perspective: TreePerspective): string | undefined {
   const { subject, responsibility, context } = parsed
@@ -45,105 +55,136 @@ export function parentKey(parsed: ParsedAnnotationKey, perspective: TreePerspect
   }
 }
 
-const compareNodes = (a: TreeNode, b: TreeNode) => a.key.localeCompare(b.key)
+const compareKeys = (a: string, b: string) => a.localeCompare(b)
 
 /**
- * Projects the annotations into a tree. A parent missing from the catalog becomes a synthetic "(missing)" node
- * (attached to its own parent the same way), so data problems stay visible. With `matches`, only matching
- * annotations and their ancestor chains are kept; kept ancestors that do not match are marked `matched: false`.
+ * Projects the inheritance graph into a tree with only subjects or only responsibilities at the root, following
+ * every path down (spec 2026-10-13): by subject, an execution appears under its context and its usage; by
+ * responsibility, a unit of execution appears under its unit and its execution. A parent missing from the catalog
+ * becomes a synthetic "(missing)" node on every path, so data problems stay visible. With `matches`, only matching
+ * annotations and their ancestor paths are kept; kept ancestors that do not match are marked `matched: false`.
  */
 export function projectTree(
   annotations: Iterable<Annotation>,
   perspective: TreePerspective,
   matches?: (annotation: Annotation) => boolean,
 ): TreeNode[] {
-  const nodes = new Map<string, TreeNode>()
-  const parsedByKey = new Map<string, ParsedAnnotationKey>()
-  const visible = new Set<string>()
-
-  const node = (key: string, annotation?: Annotation): TreeNode => {
-    let entry = nodes.get(key)
-    if (!entry) {
-      entry = { key, annotation, missing: !annotation, matched: false, depth: 0, children: [] }
-      nodes.set(key, entry)
-    } else if (annotation) {
-      entry.annotation = annotation
-      entry.missing = false
-    }
-    return entry
-  }
+  const byKey = new Map<string, Annotation>()
+  const matched = new Set<string>()
+  const children = new Map<string, Set<string>>()
 
   for (const annotation of annotations) {
-    const parsed = parseAnnotationKey(annotation.AnnotationKey)
-    if (parsed) {
-      parsedByKey.set(annotation.AnnotationKey, parsed)
-      node(annotation.AnnotationKey, annotation).matched = !matches || matches(annotation)
+    const key = annotation.AnnotationKey
+    if (parseAnnotationKey(key)) {
+      byKey.set(key, annotation)
+      if (!matches || matches(annotation)) {
+        matched.add(key)
+      }
     }
   }
 
-  // Link every node (and every synthetic parent) to its parent.
+  // Link every annotation, and every missing ancestor met on the way, to all of its direct ancestors.
   const linked = new Set<string>()
-  const roots: TreeNode[] = []
-  const link = (entry: TreeNode) => {
-    if (linked.has(entry.key)) {
+  const link = (key: string) => {
+    if (linked.has(key)) {
       return
     }
-    linked.add(entry.key)
+    linked.add(key)
 
-    const parsed = parsedByKey.get(entry.key) ?? parseAnnotationKey(entry.key)
-    const parent = parsed ? parentKey(parsed, perspective) : undefined
-
-    if (!parent) {
-      roots.push(entry)
-      return
+    for (const parent of getDirectAncestors(key)) {
+      let entry = children.get(parent)
+      if (!entry) {
+        entry = new Set()
+        children.set(parent, entry)
+      }
+      entry.add(key)
+      link(parent)
     }
-
-    const parentNode = node(parent)
-    parentNode.children.push(entry)
-    link(parentNode)
   }
+  byKey.forEach((_, key) => link(key))
 
-  // Map iteration also visits the synthetic parents added while linking.
-  for (const entry of nodes.values()) {
-    link(entry)
-  }
-
-  // Keep matching nodes and their ancestor chains.
-  const keep = (entry: TreeNode): boolean => {
-    const childrenKept = entry.children.filter(keep)
-    entry.children = childrenKept.toSorted(compareNodes)
-    const kept = entry.matched || childrenKept.length > 0 || (!matches && entry.missing)
-    if (kept) {
-      visible.add(entry.key)
+  // A node is kept when it matches or a child is kept. Memoized per key: a node can be reached on several paths.
+  const keptByKey = new Map<string, boolean>()
+  const kept = (key: string): boolean => {
+    let result = keptByKey.get(key)
+    if (result === undefined) {
+      result = matched.has(key)
+      for (const child of children.get(key) ?? []) {
+        result = kept(child) || result
+      }
+      keptByKey.set(key, result)
     }
-    return kept
+    return result
   }
 
-  const setDepth = (entry: TreeNode, depth: number) => {
-    entry.depth = depth
-    entry.children.forEach((child) => setDepth(child, depth + 1))
+  const keptChildren = (key: string) => [...(children.get(key) ?? [])].filter(kept).toSorted(compareKeys)
+
+  const build = (key: string, parentId: string | undefined, depth: number): TreeNode => {
+    const annotation = byKey.get(key)
+    const id = parentId === undefined ? key : `${parentId}/${key}`
+    return {
+      id,
+      key,
+      annotation,
+      missing: !annotation,
+      matched: matched.has(key),
+      depth,
+      children: keptChildren(key).map((child) => build(child, id, depth + 1)),
+    }
   }
 
-  const order = rootOrder[perspective]
-  return roots
-    .filter(keep)
-    .toSorted((a, b) => {
-      const byType =
-        order.indexOf(a.key.slice(0, 3) as AnnotationTypeCode) - order.indexOf(b.key.slice(0, 3) as AnnotationTypeCode)
-      return byType !== 0 ? byType : compareNodes(a, b)
-    })
-    .map((root) => (setDepth(root, 0), root))
+  const root = rootCode[perspective]
+  return [...linked]
+    .filter((key) => codeOfKey(key) === root && kept(key))
+    .toSorted(compareKeys)
+    .map((key) => build(key, undefined, 0))
 }
 
-/** Keys of every node that has children (for "expand all"). */
-export function expandableKeys(roots: TreeNode[]): string[] {
-  const keys: string[] = []
+/** Row ids of every node that has children (for "expand all"). */
+export function expandableIds(roots: TreeNode[]): string[] {
+  const ids: string[] = []
   const walk = (entry: TreeNode) => {
     if (entry.children.length > 0) {
-      keys.push(entry.key)
+      ids.push(entry.id)
       entry.children.forEach(walk)
     }
   }
   roots.forEach(walk)
-  return keys
+  return ids
+}
+
+/** The selection by row id: every row whose key is selected, so all copies of a selected annotation. */
+export function rowSelectionOf(rows: TreeNode[], byKey: RowSelectionState): RowSelectionState {
+  const result: RowSelectionState = {}
+  for (const row of rows) {
+    if (byKey[row.key]) {
+      result[row.id] = true
+    }
+  }
+  return result
+}
+
+/**
+ * The selection by key after a table change: rows turned on select their key, rows turned off clear it. Keys of
+ * rows that are not in `rows` (collapsed or filtered out) are kept, like TanStack keeps unknown row ids.
+ */
+export function keySelectionOf(
+  rows: TreeNode[],
+  byKey: RowSelectionState,
+  previous: RowSelectionState,
+  next: RowSelectionState,
+): RowSelectionState {
+  const result = { ...byKey }
+  for (const row of rows) {
+    const selected = !!next[row.id]
+    if (selected === !!previous[row.id]) {
+      continue
+    }
+    if (selected) {
+      result[row.key] = true
+    } else {
+      delete result[row.key]
+    }
+  }
+  return result
 }

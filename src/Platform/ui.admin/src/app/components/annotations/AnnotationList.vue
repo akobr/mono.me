@@ -29,7 +29,7 @@ const items = computed(() => virtualizer.value.getVirtualItems())
     <div :style="{ height: `${virtualizer.getTotalSize()}px` }" class="relative w-full">
       <div
         v-for="item in items"
-        :key="rows[item.index]!.key"
+        :key="rows[item.index]!.id"
         role="listitem"
         class="absolute inset-x-0 h-16 border-b border-default"
         :style="{ transform: `translateY(${item.start}px)` }"

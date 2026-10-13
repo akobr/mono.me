@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Annotation } from '@42for.net/2splatform.sdk'
 import { annotationStatus } from '@/utils/annotation-status'
-import { expandableKeys, projectTree, type TreeNode } from '@/utils/tree-projection'
+import { expandableIds, keySelectionOf, projectTree, rowSelectionOf, type TreeNode } from '@/utils/tree-projection'
 import { codeOfKey, deletedWith, metaOf } from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
 import { labelColor, normalizeLabels } from '@/utils/labels'
@@ -57,53 +57,106 @@ describe('projectTree', () => {
           : node.key,
     )
 
-  it('projects the DAG by subject, with missing parents as placeholders', () => {
+  const flatten = (roots: TreeNode[]): TreeNode[] => {
+    const flat: TreeNode[] = []
+    const walk = (node: TreeNode) => (flat.push(node), node.children.forEach(walk))
+    roots.forEach(walk)
+    return flat
+  }
+
+  it('shows only subjects at the root, with every path to the descendants and missing parents as placeholders', () => {
+    const northwindExecution = { 'exe.northwind.invoicing.prod': ['uxe.northwind.invoicing.prod.pdf'] }
+    const contosoExecution = { '(missing) exe.contoso.invoicing.eu': ['uxe.contoso.invoicing.eu.pdf'] }
+
     expect(shape(projectTree(data, 'subject'))).toEqual([
       {
         '(missing) sbt.contoso': [
-          { '(missing) cnt.contoso.eu': [{ '(missing) exe.contoso.invoicing.eu': ['uxe.contoso.invoicing.eu.pdf'] }] },
+          { '(missing) cnt.contoso.eu': [contosoExecution] },
+          { '(missing) usg.contoso.invoicing': [contosoExecution] },
         ],
       },
       {
         'sbt.northwind': [
-          { 'cnt.northwind.prod': [{ 'exe.northwind.invoicing.prod': ['uxe.northwind.invoicing.prod.pdf'] }] },
-          'usg.northwind.invoicing',
+          { 'cnt.northwind.prod': [northwindExecution] },
+          { 'usg.northwind.invoicing': [northwindExecution] },
         ],
       },
-      { 'rst.invoicing': ['unt.invoicing.pdf'] },
     ])
   })
 
-  it('projects by responsibility', () => {
-    const roots = projectTree(
-      data.filter((entry) => !entry.AnnotationKey.includes('contoso')),
-      'responsibility',
-    )
-
-    expect(shape(roots)).toEqual([
+  it('shows only responsibilities at the root, with units and usages and every path below them', () => {
+    expect(shape(projectTree(data, 'responsibility'))).toEqual([
       {
         'rst.invoicing': [
-          'unt.invoicing.pdf',
-          { 'usg.northwind.invoicing': [{ 'exe.northwind.invoicing.prod': ['uxe.northwind.invoicing.prod.pdf'] }] },
+          { 'unt.invoicing.pdf': ['uxe.contoso.invoicing.eu.pdf', 'uxe.northwind.invoicing.prod.pdf'] },
+          {
+            '(missing) usg.contoso.invoicing': [
+              { '(missing) exe.contoso.invoicing.eu': ['uxe.contoso.invoicing.eu.pdf'] },
+            ],
+          },
+          {
+            'usg.northwind.invoicing': [{ 'exe.northwind.invoicing.prod': ['uxe.northwind.invoicing.prod.pdf'] }],
+          },
         ],
       },
-      { 'sbt.northwind': ['cnt.northwind.prod'] },
     ])
   })
 
-  it('keeps the ancestor chain of matches and marks it as not matched', () => {
-    const roots = projectTree(data, 'subject', (entry) => entry.AnnotationKey === 'uxe.northwind.invoicing.prod.pdf')
-    const flat: TreeNode[] = []
-    const walk = (node: TreeNode) => (flat.push(node), node.children.forEach(walk))
-    roots.forEach(walk)
+  it('gives every row a unique id, the path of keys from the root', () => {
+    const flat = flatten(projectTree(data, 'subject'))
 
-    expect(flat.map((node) => [node.key, node.matched, node.depth])).toEqual([
+    expect(new Set(flat.map((node) => node.id)).size).toBe(flat.length)
+    expect(
+      flat.filter((node) => node.key === 'uxe.northwind.invoicing.prod.pdf').map((node) => [node.id, node.depth]),
+    ).toEqual([
+      ['sbt.northwind/cnt.northwind.prod/exe.northwind.invoicing.prod/uxe.northwind.invoicing.prod.pdf', 3],
+      ['sbt.northwind/usg.northwind.invoicing/exe.northwind.invoicing.prod/uxe.northwind.invoicing.prod.pdf', 3],
+    ])
+  })
+
+  it('keeps every path to a match and marks its ancestors as not matched', () => {
+    const roots = projectTree(data, 'subject', (entry) => entry.AnnotationKey === 'uxe.northwind.invoicing.prod.pdf')
+
+    expect(flatten(roots).map((node) => [node.key, node.matched, node.depth])).toEqual([
       ['sbt.northwind', false, 0],
       ['cnt.northwind.prod', false, 1],
       ['exe.northwind.invoicing.prod', false, 2],
       ['uxe.northwind.invoicing.prod.pdf', true, 3],
+      ['usg.northwind.invoicing', false, 1],
+      ['exe.northwind.invoicing.prod', false, 2],
+      ['uxe.northwind.invoicing.prod.pdf', true, 3],
     ])
-    expect(expandableKeys(roots)).toEqual(['sbt.northwind', 'cnt.northwind.prod', 'exe.northwind.invoicing.prod'])
+    expect(expandableIds(roots)).toEqual([
+      'sbt.northwind',
+      'sbt.northwind/cnt.northwind.prod',
+      'sbt.northwind/cnt.northwind.prod/exe.northwind.invoicing.prod',
+      'sbt.northwind/usg.northwind.invoicing',
+      'sbt.northwind/usg.northwind.invoicing/exe.northwind.invoicing.prod',
+    ])
+  })
+
+  it('leaves out the types that are not below the roots of the perspective', () => {
+    const byType = (code: string) => (entry: Annotation) => entry.AnnotationKey.startsWith(`${code}.`)
+
+    expect(projectTree(data, 'subject', byType('rst'))).toEqual([])
+    expect(projectTree(data, 'subject', byType('unt'))).toEqual([])
+    expect(projectTree(data, 'responsibility', byType('sbt'))).toEqual([])
+    expect(projectTree(data, 'responsibility', byType('cnt'))).toEqual([])
+  })
+
+  it('selects an annotation on every row that shows it', () => {
+    const rows = flatten(projectTree(data, 'subject'))
+    const contextCopy = 'sbt.northwind/cnt.northwind.prod/exe.northwind.invoicing.prod'
+    const usageCopy = 'sbt.northwind/usg.northwind.invoicing/exe.northwind.invoicing.prod'
+
+    const selected = keySelectionOf(rows, { 'rst.invoicing': true }, {}, { [contextCopy]: true })
+    expect(selected).toEqual({ 'rst.invoicing': true, 'exe.northwind.invoicing.prod': true })
+
+    const shown = rowSelectionOf(rows, selected)
+    expect(shown).toEqual({ [contextCopy]: true, [usageCopy]: true })
+
+    // Clearing one copy clears the annotation; the key of a row that is not shown stays selected.
+    expect(keySelectionOf(rows, selected, shown, { [contextCopy]: true })).toEqual({ 'rst.invoicing': true })
   })
 })
 
