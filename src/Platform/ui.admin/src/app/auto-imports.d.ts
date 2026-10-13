@@ -34,6 +34,7 @@ declare global {
   const useConfirm: typeof import('./composables/useConfirm').useConfirm
   const useContentSearch: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useContentSearch').useContentSearch
   const useContextStore: typeof import('./stores/context').useContextStore
+  const useDateFormatStore: typeof import('./stores/date-format').useDateFormatStore
   const useDeletedKeyCheck: typeof import('./composables/useDeletedKeyCheck').useDeletedKeyCheck
   const useDeletionToast: typeof import('./composables/useDeletionToast').useDeletionToast
   const useDetailPanel: typeof import('./composables/useDetailPanel').useDetailPanel

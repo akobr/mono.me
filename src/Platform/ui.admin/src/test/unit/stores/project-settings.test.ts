@@ -9,9 +9,11 @@ describe('project settings store', () => {
   it('starts every project in UTC', () => {
     const settings = useProjectSettingsStore()
 
-    expect(settings.settingsOf('acme.billing')).toEqual({ defaultTimeZone: 'UTC', types: {} })
-    expect(settings.settingsOf(undefined)).toEqual({ defaultTimeZone: 'UTC', types: {} })
+    const defaults = { defaultTimeZone: 'UTC', dateFormat: 'yyyy-mm-dd', types: {} }
+    expect(settings.settingsOf('acme.billing')).toEqual(defaults)
+    expect(settings.settingsOf(undefined)).toEqual(defaults)
     expect(settings.defaultTimeZone).toBe('UTC')
+    expect(settings.dateFormat).toBe('yyyy-mm-dd')
   })
 
   it('keeps the default time zone per project in localStorage', async () => {
@@ -48,6 +50,28 @@ describe('project settings store', () => {
     settings.update('acme.shipping', { defaultTimeZone: 'America/New_York' })
     settings.update('acme.shipping', { defaultTimeZone: 'Nowhere/City' })
     expect(settings.settingsOf('acme.shipping').defaultTimeZone).toBe('America/New_York')
+  })
+
+  it('keeps the date format per project and ignores unknown formats', async () => {
+    const context = useContextStore()
+    const settings = useProjectSettingsStore()
+
+    settings.update('acme.billing', { dateFormat: 'dd.mm.yyyy' })
+    settings.update('acme.billing', { dateFormat: 'yyyy/mm/dd' as never })
+    await nextTick()
+
+    expect(settings.settingsOf('acme.billing').dateFormat).toBe('dd.mm.yyyy')
+    expect(settings.settingsOf('acme.shipping').dateFormat).toBe('yyyy-mm-dd')
+    expect(JSON.parse(localStorage.getItem(storageKey)!)).toEqual({ 'acme.billing': { dateFormat: 'dd.mm.yyyy' } })
+
+    context.set({ org: 'acme', project: 'billing', view: 'default' })
+    expect(settings.dateFormat).toBe('dd.mm.yyyy')
+  })
+
+  it('falls back to yyyy-mm-dd for a stored format it does not know', () => {
+    localStorage.setItem(storageKey, JSON.stringify({ 'acme.billing': { dateFormat: 'dd-mm-yy' } }))
+
+    expect(useProjectSettingsStore().settingsOf('acme.billing').dateFormat).toBe('yyyy-mm-dd')
   })
 
   it('keeps the type names, colors and icons per project, sanitized', async () => {

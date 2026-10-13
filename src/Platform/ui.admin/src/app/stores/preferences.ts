@@ -2,6 +2,7 @@ import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
 import { detailWidth } from '@/utils/detail-panel'
+import { isDateFormat, type DateFormat } from '@/utils/dates'
 import { sanitizeTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 import type { Scope } from './context'
 
@@ -29,6 +30,8 @@ export interface Preferences {
   lastContext?: Partial<Scope>
   recentKeys: string[]
   grids: Record<string, GridPreferences>
+  /** Personal date format, in every project; unset follows the project's (424-23). */
+  dateFormat?: DateFormat
   /** Personal names, colors and icons of the annotation types, in every project; they win over the project's. */
   types: TypeAppearances
 }
@@ -61,6 +64,17 @@ export const usePreferencesStore = defineStore('preferences', () => {
     set: (value: boolean) => (state.value.sidebarPinned = value),
   })
 
+  const dateFormat = computed(() => (isDateFormat(state.value.dateFormat) ? state.value.dateFormat : undefined))
+
+  /** Undefined goes back to the project's format; an unknown format is ignored. */
+  function setDateFormat(value: DateFormat | undefined): void {
+    if (value === undefined) {
+      delete state.value.dateFormat
+    } else if (isDateFormat(value)) {
+      state.value.dateFormat = value
+    }
+  }
+
   const types = computed(() => sanitizeTypeAppearances(state.value.types))
 
   function setTypes(value: TypeAppearances): void {
@@ -83,5 +97,16 @@ export const usePreferencesStore = defineStore('preferences', () => {
     state.value = structuredClone(defaultPreferences)
   }
 
-  return { state, sidebarPinned, types, setTypes, rememberContext, rememberKey, grid, reset }
+  return {
+    state,
+    sidebarPinned,
+    dateFormat,
+    setDateFormat,
+    types,
+    setTypes,
+    rememberContext,
+    rememberKey,
+    grid,
+    reset,
+  }
 })

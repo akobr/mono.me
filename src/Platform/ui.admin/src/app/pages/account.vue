@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useColorMode } from '@vueuse/core'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSessionStore } from '@/stores/session'
+import { dateFormatItems, isDateFormat } from '@/utils/dates'
 import { groupMemberships } from '@/utils/memberships'
 import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 
@@ -31,6 +32,15 @@ const types = computed({
   set: (value: TypeAppearances) => preferences.setTypes(value),
 })
 const builtInTypes = resolveTypeAppearances()
+
+// Personal date format (424-23); "Project default" follows the Settings of each project. Select items cannot have an
+// empty value.
+const projectDefault = 'project'
+const dateFormat = computed({
+  get: () => preferences.dateFormat ?? projectDefault,
+  set: (value: string) => preferences.setDateFormat(isDateFormat(value) ? value : undefined),
+})
+const dateFormatOptions = [{ label: 'Project default', value: projectDefault }, ...dateFormatItems()]
 
 const colorModes = [
   { label: 'Light', value: 'light', icon: 'i-lucide-sun' },
@@ -123,6 +133,12 @@ const densities = [
             </UFormField>
             <UFormField label="Annotation editing" help="Default mode of the annotation detail.">
               <UTabs v-model="preferences.state.annotationMode" :items="annotationModes" :content="false" size="sm" />
+            </UFormField>
+            <UFormField
+              label="Date format"
+              help="How dates are shown. Project default follows the Settings of each project."
+            >
+              <USelect v-model="dateFormat" :items="dateFormatOptions" class="w-full" />
             </UFormField>
           </div>
           <template #footer>
