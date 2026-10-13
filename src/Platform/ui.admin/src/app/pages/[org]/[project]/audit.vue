@@ -18,14 +18,15 @@ const operations = [
 
 const view = ref('')
 const key = ref('')
-const operation = ref('')
+// 'all' stands for every operation: a Select item must not have an empty-string value.
+const operation = ref('all')
 const from = ref('')
 const to = ref('')
 
 const params = computed(() => ({
   view: view.value.trim() || undefined,
   key: key.value.trim() || undefined,
-  operation: operation.value || undefined,
+  operation: operation.value === 'all' ? undefined : operation.value,
   from: from.value ? new Date(from.value).toISOString() : undefined,
   to: to.value ? new Date(new Date(to.value).getTime() + 86_400_000).toISOString() : undefined,
 }))
@@ -61,7 +62,7 @@ async function loadMore() {
   }
 }
 
-const operationItems = [{ label: 'Every operation', value: '' }, ...operations.map((entry) => ({ label: entry, value: entry }))]
+const operationItems = [{ label: 'Every operation', value: 'all' }, ...operations.map((entry) => ({ label: entry, value: entry }))]
 </script>
 
 <template>

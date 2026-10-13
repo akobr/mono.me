@@ -80,6 +80,6 @@ const items = computed(() => [
 
 <template>
   <UDropdownMenu :items="items" :content="{ align: 'end' }">
-    <UButton label="Export" icon="i-lucide-download" color="neutral" variant="outline" :loading="busy" />
+    <UButton label="Export" aria-label="Export" icon="i-lucide-download" color="neutral" variant="outline" :loading="busy" :ui="{ label: 'hidden sm:inline' }" />
   </UDropdownMenu>
 </template>
