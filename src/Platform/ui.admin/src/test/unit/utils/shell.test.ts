@@ -89,11 +89,25 @@ describe('navigation', () => {
     })
 
     expect(sections.map((section) => section.id)).toEqual(['view', 'project', 'org', 'global'])
+    expect(sections.map((section) => section.label)).toEqual(['View · default', 'Project', 'Organization', undefined])
     expect(sections[0]!.items[0]).toMatchObject({
       label: 'Annotations',
       to: '/acme/billing/default/annotations',
       locked: true,
     })
+  })
+
+  it('names the selected view, the same for every view', () => {
+    const [section] = buildNavigation({
+      org: 'acme',
+      project: 'billing',
+      view: 'staging',
+      projectRole: 'Contributor',
+      orgRole: 'None',
+    })
+
+    expect(section).toMatchObject({ id: 'view', label: 'View · staging' })
+    expect(section!.items[0]).toMatchObject({ to: '/acme/billing/staging/annotations', locked: false })
   })
 
   it('shows only the global entries outside an organization', () => {
