@@ -12,6 +12,7 @@ beforeEach(() => {
 afterEach(async () => {
   // Let watchers (VueUse useStorage) flush their writes before the storage is cleared.
   await nextTick()
-  localStorage.clear()
-  sessionStorage.clear()
+  // Tests in the node environment (test/unit/build) have no Web Storage.
+  globalThis.localStorage?.clear()
+  globalThis.sessionStorage?.clear()
 })
