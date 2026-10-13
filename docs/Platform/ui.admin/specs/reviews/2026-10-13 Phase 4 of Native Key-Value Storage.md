@@ -62,3 +62,10 @@ The admin UI is green: `vue-tsc` (typecheck), `oxlint` and ESLint, Vitest 174 (1
 - The visual baselines of `key-values` and `secrets` are not generated: they are made in the Playwright Linux container (`npm run test:visual:docker -- --update`), which was not run here. Until then `test:visual` reports the two screens as missing.
 - The import dialog does not validate pasted references or JSON content types per row beyond the key rule; the server does on Check.
 - From the earlier phases: the manual smoke test against real Azure, `x-ms-client-request-id` on Key Vault calls, and the `hsm.keyVersions` snapshot.
+
+## Fixes after the review (14 Oct 2026)
+
+- **Empty Select values.** The "All levels" item of the level filter on the Key values screen and the "Every operation" item of the Audit screen had the value `''`. reka-ui reserves the empty string for "cleared" and throws in the item's setup, which left a half-mounted component tree that crashed on the next route change (`instance is null` on unmount). Both items use the sentinel `'all'` now; the query string and the API parameters are unchanged (no `level`/`operation` when it is selected). The tests did not catch it because none opened the level filter, and the audit test left the screen with a full page load.
+- **Phone header.** With Export, Import and New key as labelled buttons, the right side of the navbar took the whole width of a phone and the left side (menu button, context) collapsed to zero width. The three buttons are icon-only below `sm` (`aria-label` keeps their names).
+- `test/e2e/key-values.spec.ts` gained a test that filters by level, clears the filter and leaves the screen through the navigation menu on desktop and on the phone.
+

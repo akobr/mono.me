@@ -29,7 +29,10 @@ const canSecrets = useCan('secrets')
 const canAdmin = useCan('manageAccess')
 
 const state = computed<'Active' | 'Deleted'>(() => (route.query.state === 'Deleted' || route.query.state === 'All' ? 'Deleted' : 'Active'))
-const levelFilter = computed(() => (typeof route.query.level === 'string' && levels.includes(route.query.level as KeyValueProtection) ? route.query.level : ''))
+// 'all' stands for no level filter: a Select item must not have an empty-string value (reka-ui reserves it for "cleared").
+const levelFilter = computed<KeyValueProtection | 'all'>(() =>
+  typeof route.query.level === 'string' && levels.includes(route.query.level as KeyValueProtection) ? (route.query.level as KeyValueProtection) : 'all',
+)
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
 watch(
   () => route.query.q,
@@ -38,7 +41,7 @@ watch(
 
 const params = computed(() => ({
   state: state.value === 'Deleted' ? 'Deleted' : undefined,
-  protection: levelFilter.value || undefined,
+  protection: levelFilter.value === 'all' ? undefined : levelFilter.value,
   includeValues: true,
 }))
 const list = useKeyValues(params)
@@ -201,7 +204,7 @@ const resolveButton = () => resolveComponent('UButton') as Component
 const rowClass = (row: { original: KeyValueSummary }) =>
   row.original.Key === selectedKey.value ? '[&>td]:bg-[color-mix(in_oklab,var(--ui-primary)_12%,var(--ui-bg))]' : ''
 
-const levelItems = computed(() => [{ label: 'All levels', value: '' }, ...levels.map((level) => ({ label: levelMeta[level].label, value: level }))])
+const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...levels.map((level) => ({ label: levelMeta[level].label, value: level }))])
 </script>
 
 <template>
@@ -210,8 +213,9 @@ const levelItems = computed(() => [{ label: 'All levels', value: '' }, ...levels
       <AppNavbar title="Key values">
         <template #right>
           <KeyValueExportMenu />
-          <UButton v-if="canEdit" label="Import" icon="i-lucide-upload" color="neutral" variant="outline" @click="importing = true" />
-          <UButton v-if="canEdit" label="New key" icon="i-lucide-plus" @click="creating = true" />
+          <!-- icon-only below sm, or the left side of the navbar (menu button, context) collapses on a phone -->
+          <UButton v-if="canEdit" label="Import" aria-label="Import" icon="i-lucide-upload" color="neutral" variant="outline" :ui="{ label: 'hidden sm:inline' }" @click="importing = true" />
+          <UButton v-if="canEdit" label="New key" aria-label="New key" icon="i-lucide-plus" :ui="{ label: 'hidden sm:inline' }" @click="creating = true" />
         </template>
       </AppNavbar>
       <UDashboardToolbar class="py-2">
@@ -224,7 +228,7 @@ const levelItems = computed(() => [{ label: 'All levels', value: '' }, ...levels
             aria-label="Search"
             @update:model-value="(value) => ((search = String(value)), setQuery({ q: String(value) || undefined }))"
           />
-          <USelect :model-value="levelFilter" :items="levelItems" class="w-40" aria-label="Level filter" @update:model-value="(value) => setQuery({ level: value || undefined })" />
+          <USelect :model-value="levelFilter" :items="levelItems" class="w-40" aria-label="Level filter" @update:model-value="(value) => setQuery({ level: value === 'all' ? undefined : value })" />
           <UFieldGroup>
             <UButton label="Active" :color="state === 'Active' ? 'primary' : 'neutral'" :variant="state === 'Active' ? 'solid' : 'outline'" size="sm" @click="setQuery({ state: undefined })" />
             <UButton label="Deleted" :color="state === 'Deleted' ? 'primary' : 'neutral'" :variant="state === 'Deleted' ? 'solid' : 'outline'" size="sm" @click="setQuery({ state: 'Deleted' })" />

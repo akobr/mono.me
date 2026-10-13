@@ -1,8 +1,17 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { goto, isMobile, openApp } from './support'
 
 // The key values of a view and the project's secrets (spec 29.8), against the mock API: acme/billing is the
 // signed-in user's own project (Owner), northwind/portal gives them the Reader role.
+
+/** The navigation menu: the docked sidebar, or on a phone the slideover behind the menu button. */
+async function menu(page: Page, testInfo: TestInfo): Promise<Locator> {
+  if (isMobile(testInfo)) {
+    await page.getByRole('button', { name: 'Open navigation' }).click()
+    return page.getByRole('dialog')
+  }
+  return page.locator('nav').filter({ has: page.getByRole('link', { name: 'Organizations' }) })
+}
 
 async function openKey(page: Page, key: string, testInfo: TestInfo) {
   const item = isMobile(testInfo)
@@ -34,6 +43,30 @@ test('creates a public key and sees it in the list with its binding', async ({ p
   if (!isMobile(testInfo)) {
     await expect(page.getByRole('row').filter({ hasText: 'app.region' })).toContainText('eu-west')
   }
+})
+
+test('filters the list by level, clears the filter, and the app survives leaving the screen', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/key-values')
+  await expect(page.getByText('db.password').first()).toBeVisible()
+
+  // every item of the Select needs a non-empty value, so "All levels" is a sentinel; an empty string breaks the Select
+  await page.getByRole('combobox', { name: 'Level filter' }).click()
+  await page.getByRole('option', { name: 'Public', exact: true }).click()
+  await expect(page).toHaveURL(/level=Public/)
+  await expect(page.getByText('app.name').first()).toBeVisible()
+  await expect(page.getByText('db.password')).toHaveCount(0)
+
+  await page.getByRole('combobox', { name: 'Level filter' }).click()
+  await page.getByRole('option', { name: 'All levels', exact: true }).click()
+  await expect(page).not.toHaveURL(/level=/)
+  await expect(page.getByText('db.password').first()).toBeVisible()
+  await expect(page.getByRole('listbox')).toBeHidden()
+
+  await (await menu(page, testInfo)).getByRole('link', { name: 'Annotations', exact: true }).click()
+  await expect(page).toHaveURL(/\/annotations/)
+  await expect(page.getByText('rst.invoicing').first()).toBeVisible()
+  await (await menu(page, testInfo)).getByRole('link', { name: 'Key values', exact: true }).click()
+  await expect(page.getByText('db.password').first()).toBeVisible()
 })
 
 test('creates a Standard secret, reveals it, and the value is masked in the list', async ({ page }, testInfo) => {
