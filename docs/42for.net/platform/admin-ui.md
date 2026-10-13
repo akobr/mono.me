@@ -24,6 +24,8 @@ The switcher at the top changes the organization, project or view and keeps the 
 - **Grid:** sortable, resizable columns.
 - **Tree:** grouped by subject or by responsibility.
 
+The **Type** column shows the full name of each type, with its icon and color, including the names from **Settings** and your Preferences. On a phone the list shows only the icon, to keep room for the name and key.
+
 Selecting a row opens its detail from the right, over the list. The list keeps its scroll position, selection and filter, and the part you can still see stays usable: selecting another row switches the detail. Two buttons in the detail header change how it opens:
 
 - **Pin** docks the detail beside the list. Drag the border between them to resize it, or focus the border and use `←` / `→`; a double-click restores the default width.
