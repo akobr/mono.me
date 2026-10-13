@@ -54,3 +54,30 @@ test('type names, colors and icons come from the project settings and Preference
   await expect(page.getByTestId('type-preview-exe')).toHaveText('Execution')
   expect(await stExe(page)).toBe('#047857')
 })
+
+// The date format (424-23): yyyy-mm-dd until the project's Settings change it, overridden by Preferences.
+test('dates follow the date format of the project settings and Preferences', async ({ page }) => {
+  const certificates = '/acme/billing/certificates'
+  const expires = page.getByRole('row').filter({ hasText: 'ci-pipeline' }).getByRole('cell').nth(3)
+
+  async function pick(path: string, option: string | RegExp) {
+    await goto(page, path)
+    await page.getByRole('combobox', { name: 'Date format', exact: true }).click()
+    await page.getByRole('option', { name: option }).click()
+    await goto(page, certificates)
+  }
+
+  await openApp(page, certificates)
+  await expect(expires).toHaveText(/^\d{4}-\d{2}-\d{2}$/)
+  const [year, month, day] = (await expires.textContent())!.trim().split('-')
+
+  await pick('/acme/billing/settings', /\(dd\.mm\.yyyy\)$/)
+  await expect(expires).toHaveText(`${day}.${month}.${year}`)
+
+  // A personal format wins over the project's.
+  await pick('/account', /\(mm\/dd\/yyyy\)$/)
+  await expect(expires).toHaveText(`${month}/${day}/${year}`)
+
+  await pick('/account', 'Project default')
+  await expect(expires).toHaveText(`${day}.${month}.${year}`)
+})

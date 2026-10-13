@@ -209,6 +209,19 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
       view.host.unmount()
     })
 
+    it('edits a date-time in the browser zone with the date segments ordered by the date format', async () => {
+      applyDateFormat('mm/dd/yyyy')
+      const view = mountInApp(SchemaForm, {
+        schema: { type: 'object', properties: { due: { type: 'string', format: 'date-time' } } },
+        modelValue: { due: '2026-10-03T15:04:00Z' },
+      })
+      await settle(6)
+
+      expect(segments(view, '/due')).toEqual(['month', 'day', 'year'])
+      expect(field(view, '/due').find('[aria-label="Due time"]').exists()).toBe(true)
+      view.host.unmount()
+    })
+
     it('shows an inherited date in the date format', async () => {
       const { view } = mountForm({ modelValue: { retries: 1 }, effective: { retries: 1, start: '2026-10-03' } })
       await settle(6)
