@@ -9,7 +9,7 @@ The data binding system lets configuration values, stored as JSON, reference ext
 Resolution runs on the resolved read (`GetResolvedConfigurationAsync` and the with-secrets / without-secrets variants). Writes, `GetRawConfigurationAsync`, the hierarchy view, and version content keep the stored JSON, including any object-binding envelope.
 
 The system is split into five binding projects, plus built-in functions contributed by `Backend.Core`:
-- **Binding.Abstractions**: Core interfaces and data structures (`IBindingExecutor`, `IConfigurationBindingResolver`, `IBindingRegistry`, `IBindingSource`, `IBindingFunction`, `BindingScope`).
+- **Binding.Abstractions**: Core interfaces and data structures (`IBindingExecutor`, `IConfigurationBindingResolver`, `IBindingRegistry`, `IBindingCatalog`, `IBindingSource`, `IBindingFunction`, `IDescribedBinding`, `BindingScope`).
 - **Binding.Language**: The `@` string interpreter (tokenizer, parser, evaluator), the `IBindingExecutor` entry point, the `JsonQuery` structured-query helper, and the built-in `@config` function.
 - **Binding.Object**: The object-binding walker. An envelope whose `$binding` is `jlogic` or `jsone` is evaluated with JSON Logic or JSON-e.
 - **Binding.Core**: Dependency-injection registration and options for wiring up sources, functions, and the object-binding resolver, plus `KeyValueBindingSource`, the native key/value store as the `default`, `public` and `secret` sources.
@@ -140,6 +140,8 @@ Defines the fundamental building blocks:
 - `IBindingRegistry`: Registers named `IBindingSource`s and `IBindingFunction`s.
 - `IBindingSource`: Resolves a `BindingRequest` (a path, `IncludeSecrets`, and the `Context` of the resolution pass, e.g. the configuration being resolved) to a `BindingValue`.
 - `IBindingFunction`: Resolves a `BindingFunctionRequest` (a function name plus already-evaluated `BindingValue` arguments) to a `BindingValue`.
+- `IDescribedBinding`: Optional. A source or function describes itself (`BindingDescription`: summary, signature, parameters, examples, whether it holds secrets) for the catalog.
+- `IBindingCatalog`: Lists the registered functions and sources (`BindingCatalog` of `BindingFunctionDescriptor` and `BindingSourceDescriptor`) with their descriptions.
 - `BindingValue`: A thin wrapper around a `Newtonsoft.Json.Linq.JToken`.
 - `BindingException`: Base exception type for binding failures.
 - `BindingEvaluationException`: A binding's own content cannot be evaluated: a failed statement, a malformed envelope, or an engine error. Carries the JSON `Path` when known. The API returns it as 422.
@@ -151,7 +153,7 @@ Contains the interpreter pipeline:
 - `Tokenizer` / `Token` / `TokenType`: Lexes a binding string into tokens, tracking offsets for diagnostics.
 - `Parser` and the AST node types (`PathStatement`, `SourcedStatement`, `FunctionStatement`, `InterpolationExpression`, `MathExpression`, etc.): Build a `BindingNode` tree via recursive descent.
 - `BindingEvaluator`: Walks the AST, resolving statements against registered sources/functions and evaluating interpolation/math. Accepts an optional `BindingScope` (a `Document` and an opaque `Context`) which is forwarded onto every `BindingFunctionRequest` so functions can see ambient data beyond their own arguments.
-- `BindingExecutor`: Implements both `IBindingExecutor` and `IBindingRegistry`; it guards on the leading `@`, then tokenizes, parses, evaluates, and assigns the result back onto the JSON token. `TryBinding` accepts an optional `BindingScope`.
+- `BindingExecutor`: Implements `IBindingExecutor`, `IBindingRegistry` and `IBindingCatalog`; it guards on the leading `@`, then tokenizes, parses, evaluates, and assigns the result back onto the JSON token. `TryBinding` accepts an optional `BindingScope`.
 - `JsonQuery`: Resolves a JSONPath or JSON Pointer (RFC 6901) expression against a `JToken`, auto-detecting the dialect from the expression's leading character (`$` for JSONPath, `/` or empty for JSON Pointer).
 - `BindingFunctionArguments`: Shared helper that validates a function argument is a quoted string literal.
 - `ConfigBindingFunction`: The built-in `@config` function (see "Built-in Functions" below).
@@ -168,7 +170,7 @@ A source copy of `JsonE.Net` 3.0.1 (json-everything commit `8b8ab34`, MIT) with 
 ### Binding.Core
 
 Contains dependency-injection registration:
-- `EntryPoint.AddConfigurationBindings`: Registers `BindingExecutor` as `IBindingExecutor`/`IBindingRegistry`, registers `ConfigurationBindingResolver` as `IConfigurationBindingResolver` over that same executor, and applies `BindingsOptions`.
+- `EntryPoint.AddConfigurationBindings`: Registers `BindingExecutor` as `IBindingExecutor`/`IBindingRegistry`/`IBindingCatalog`, registers `ConfigurationBindingResolver` as `IConfigurationBindingResolver` over that same executor, and applies `BindingsOptions`.
 - `BindingsOptions` / `BindingsOptionsExtensions`: Fluent API for registering sources (keyed, defaulting to `"default"`) and functions (by name) during startup. `BindingsOptions.ObjectBindingLimits` sets the object-binding evaluation limits (defaults in "Evaluation limits" above).
 
 `EntryPoint.AddKeyValueBindings` registers `KeyValueBindingSource` three times: as `default` (public pairs and secrets), `public` and `secret`. Call it after the other source registrations, so the native store owns those names. The source reads the organization, project and view from the `ConfigurationBindingContext` in `BindingRequest.Context` and declines outside a configuration read. Each key is looked up at most once per resolved read; the memo lives with the read's context, so a changed pair takes effect on the next read. A key-encryption key that is unavailable fails the read (`503`) instead of declining, because a silently unbound secret would look like a configuration error.
@@ -220,6 +222,55 @@ services.AddSingleton<AnnotationBindingFunction>();
 services.AddConfigurationBindings(options => options
     .AddFunction<ConfigBindingFunction>("config")
     .AddFunction<AnnotationBindingFunction>("annotation"));
+```
+
+## Binding Catalog
+
+Clients such as the Administration UI offer completion and examples for the functions and sources a deployment registered. `GET v1/{organization}/{project}/bindings` (`GetBindingCatalog`, tag `Configurations`) returns them:
+
+```json
+{
+  "Functions": [
+    {
+      "Name": "config",
+      "Summary": "Reads a value of the configuration being resolved, from the snapshot taken before evaluation.",
+      "Signature": "config(\"<expr>\")",
+      "Parameters": [ { "Name": "expr", "Description": "A quoted JSON Pointer (`/a/b`) or JSONPath (`$.a.b`) into the configuration.", "IsOptional": false, "Values": [] } ],
+      "Examples": [ { "Expression": "@config(\"/maxPrice\")", "Description": "The value of `maxPrice` in the same configuration." } ]
+    }
+  ],
+  "Sources": [
+    {
+      "Name": "primaryVault",
+      "Summary": "A secret of the Azure Key Vault registered as `primaryVault`. …",
+      "IsDefault": false,
+      "IsSecret": true,
+      "Examples": [ { "Expression": "@(db.password, primaryVault)", "Description": "The secret `db--password`." } ]
+    }
+  ]
+}
+```
+
+- The endpoint needs one of the scopes `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read`, `Default.ReadWrite` and the Reader role on the project. Machines may call it. The registrations are global today; the route is project-scoped so it can list project sources later.
+- `BindingExecutor.GetCatalog()` sorts functions and sources by name (ordinal). It never resolves a value and never calls a source.
+- A binding that implements `IDescribedBinding` contributes its `BindingDescription`. `Describe` receives the registered name, so the examples use it (a Key Vault source does not know its key otherwise). Any other binding is listed by its name only, with an empty summary.
+- `IsDefault` is set for the source registered as `default`, which `@path.to.value` reads. `IsSecret` comes from the description.
+- `config`, `annotation` and `KeyVaultBindingSource` describe themselves. The `annotation` parameter `type` lists its allowed values (`Responsibility`, `Unit`, `Subject`, `Usage`, `Context`, `Execution`).
+
+A custom function describes itself next to `InvokeAsync`:
+
+```csharp
+public sealed class UpperBindingFunction : IBindingFunction, IDescribedBinding
+{
+    public BindingDescription Describe(string name) => new()
+    {
+        Summary = "The text in upper case.",
+        Signature = $"{name}(<value>)",
+        Examples = [new BindingExample { Expression = $"@{name}(@config(\"/name\"))", Description = "The name in upper case." }],
+    };
+
+    // InvokeAsync …
+}
 ```
 
 ## Usage
