@@ -8,6 +8,8 @@ import {
   getAuthConfiguration,
   getConfigurations,
   getConfigurationSchemas,
+  getKeyValuePolicy,
+  getKeyValues,
   getMembers,
   getTemplates,
   getViews,
@@ -21,6 +23,8 @@ import {
   GetAuthConfigurationResponse,
   GetConfigurationSchemasResponse,
   GetConfigurationsResponse,
+  GetKeyValuePolicyResponse,
+  GetKeyValuesResponse,
   GetMembersResponse,
   GetTemplatesResponse,
   GetViewsResponse,
@@ -47,6 +51,8 @@ describe('generated client against generated mocks', () => {
     ['getConfigurations', () => getConfigurations('acme', 'billing', 'default'), GetConfigurationsResponse],
     ['getConfigurationSchemas', () => getConfigurationSchemas('acme', 'billing', 'default'), GetConfigurationSchemasResponse],
     ['getTemplates', () => getTemplates('acme', 'billing', 'default'), GetTemplatesResponse],
+    ['getKeyValues', () => getKeyValues('acme', 'billing', 'default'), GetKeyValuesResponse],
+    ['getKeyValuePolicy', () => getKeyValuePolicy('acme', 'billing'), GetKeyValuePolicyResponse],
     ['acceptInvitation', () => acceptInvitation('0192f0aa'), AcceptInvitationResponse],
   ] as const)('%s returns data that passes its Zod schema', async (_name, call, schema) => {
     const response = await call()

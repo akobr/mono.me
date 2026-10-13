@@ -123,6 +123,38 @@ public static class Definitions
             }
         }
 
+        public static class KeyValues
+        {
+            public static class V1
+            {
+                // View-scoped: the pairs of a view. The collection actions are POST only, and a key is never addressed by POST,
+                // so a key named "restore" or "export" still reaches the key functions with GET, PUT and DELETE.
+                public const string KeyValues = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/key-values";
+                public const string KeyValue = $"{KeyValues}/{{{Parameters.Key}}}";
+                public const string Restore = $"{KeyValues}/restore";
+                public const string Purge = $"{KeyValues}/purge";
+                public const string Protect = $"{KeyValues}/protect";
+                public const string Export = $"{KeyValues}/export";
+                public const string Import = $"{KeyValues}/import";
+
+                public const string Versions = $"{KeyValue}/versions";
+                public const string Version = $"{Versions}/{{{Parameters.Version}}}";
+                public const string VersionDiff = $"{Version}/diff";
+                public const string VersionDiffCustom = $"{VersionDiff}/{{{Parameters.VersionFrom}}}";
+
+                // Project-scoped: the literal "key-values" takes the place of the view, so "key-values" is a reserved view name.
+                public const string ProjectKeyValues = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/key-values";
+                public const string Policy = $"{ProjectKeyValues}/policy";
+                public const string ByokSetup = $"{Policy}/byok/setup";
+                public const string ByokVerify = $"{Policy}/byok/verify";
+                public const string Rotate = $"{Policy}/rotate";
+                public const string Recipients = $"{ProjectKeyValues}/recipients";
+                public const string Recipient = $"{Recipients}/{{{Parameters.Id}}}";
+                public const string Audit = $"{ProjectKeyValues}/audit";
+                public const string Usage = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/usage/key-values";
+            }
+        }
+
         public static class Template
         {
             public static class V1
@@ -265,6 +297,39 @@ public static class Definitions
             public const string GetDescendantTypeSchemaVersionDiffCustom = nameof(GetDescendantTypeSchemaVersionDiffCustom);
         }
 
+        public static class KeyValues
+        {
+            public const string GetKeyValues = nameof(GetKeyValues);
+            public const string GetKeyValue = nameof(GetKeyValue);
+            public const string SetKeyValue = nameof(SetKeyValue);
+            public const string DeleteKeyValue = nameof(DeleteKeyValue);
+            public const string RestoreKeyValues = nameof(RestoreKeyValues);
+            public const string PurgeKeyValues = nameof(PurgeKeyValues);
+            public const string ProtectKeyValues = nameof(ProtectKeyValues);
+
+            public const string GetKeyValueVersions = nameof(GetKeyValueVersions);
+            public const string GetKeyValueVersion = nameof(GetKeyValueVersion);
+            public const string GetKeyValueVersionDiff = nameof(GetKeyValueVersionDiff);
+            public const string GetKeyValueVersionDiffCustom = nameof(GetKeyValueVersionDiffCustom);
+
+            public const string ExportKeyValues = nameof(ExportKeyValues);
+            public const string ImportKeyValues = nameof(ImportKeyValues);
+
+            public const string GetKeyValuePolicy = nameof(GetKeyValuePolicy);
+            public const string SetKeyValuePolicy = nameof(SetKeyValuePolicy);
+            public const string GetByokSetup = nameof(GetByokSetup);
+            public const string VerifyByok = nameof(VerifyByok);
+            public const string RotateKeyValueKey = nameof(RotateKeyValueKey);
+
+            public const string GetRecipients = nameof(GetRecipients);
+            public const string AddRecipient = nameof(AddRecipient);
+            public const string UpdateRecipient = nameof(UpdateRecipient);
+            public const string RemoveRecipient = nameof(RemoveRecipient);
+
+            public const string GetKeyValueAudit = nameof(GetKeyValueAudit);
+            public const string GetKeyValueUsage = nameof(GetKeyValueUsage);
+        }
+
         public static class Template
         {
             public const string GetTemplates = nameof(GetTemplates);
@@ -302,6 +367,18 @@ public static class Definitions
         public const string Force = "force";
         public const string Roots = "roots";
         public const string DeletionId = "deletionId";
+        public const string Protection = "protection";
+        public const string State = "state";
+        public const string IncludeValues = "includeValues";
+        public const string Reveal = "reveal";
+        public const string IncludeDeleted = "includeDeleted";
+        public const string Permanent = "permanent";
+        public const string ExpectedVersion = "expectedVersion";
+        public const string Mode = "mode";
+        public const string DryRun = "dryRun";
+        public const string Operation = "operation";
+        public const string From = "from";
+        public const string To = "to";
     }
 
     public static class Tags
@@ -311,6 +388,7 @@ public static class Definitions
         public const string Configurations = nameof(Configurations);
         public const string Schemas = nameof(Schemas);
         public const string Templates = nameof(Templates);
+        public const string KeyValues = nameof(KeyValues);
     }
 
     public static class Descriptions
@@ -337,6 +415,14 @@ public static class Definitions
         public const string Key = "The key of the requested annotation.";
         public const string AnnotationType = "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).";
         public const string DiffFormat = "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.";
+        public const string KeyValueKey = "The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.";
+        public const string KeyValueVersion = "The version number of the pair.";
+        public const string RecipientId = "The id of the recipient (the JWE kid).";
+        public const string ResponseFailedDependency = "The customer's key (Byok) is not available: disabled, deleted or the role was removed (ErrorCode CustomerKeyUnavailable).";
+        public const string ResponseNotImplemented = "The protection level is not configured in this deployment (ErrorCode ProtectionNotConfigured).";
+        public const string ResponseServiceUnavailable = "The key-encryption key is not reachable right now (ErrorCode KeyEncryptionUnavailable); Retry-After says when to try again.";
+        public const string ResponseMtlsRequired = "Secret rights are missing (ErrorCode AccessDenied), or the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired).";
+        public const string NoStore = "Responses with a secret value are Cache-Control: no-store.";
     }
 
     public static class Errors

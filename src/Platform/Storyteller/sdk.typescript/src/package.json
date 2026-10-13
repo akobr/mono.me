@@ -1,7 +1,7 @@
 {
   "name": "@42for.net/2splatform.sdk",
-  "version": "0.9.1",
-  "description": "TypeScript SDK for the 2S Platform Storyteller API: fetch functions, Vue Query composables, Zod schemas and MSW mocks.",
+  "version": "0.9.5",
+  "description": "TypeScript SDK for the 2S Platform Storyteller API: fetch functions, Vue Query composables, Zod schemas, MSW mocks, key/value helpers and client-side encryption.",
   "license": "MIT",
   "author": "Ales Kobr",
   "homepage": "https://42for.net/",
@@ -23,6 +23,10 @@
     "./msw": {
       "types": "./dist/msw.d.ts",
       "import": "./dist/msw.js"
+    },
+    "./hyok": {
+      "types": "./dist/hyok.d.ts",
+      "import": "./dist/hyok.js"
     }
   },
   "files": [
@@ -67,6 +71,7 @@
     "@faker-js/faker": "^10.6.0",
     "@tanstack/vue-query": "^5.104.1",
     "@types/node": "^24.0.0",
+    "jose": "^6.2.12",
     "msw": "^2.15.0",
     "orval": "^8.41.0",
     "oxlint": "^1.87.0",

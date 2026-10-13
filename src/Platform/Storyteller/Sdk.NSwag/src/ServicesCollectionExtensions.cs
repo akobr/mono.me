@@ -24,6 +24,7 @@ public static class ServicesCollectionExtensions
         ConfigureHttpClient<IAnnotationsApiClient, AnnotationsApiClient>(services);
         ConfigureHttpClient<IConfigurationsApiClient, ConfigurationsApiClient>(services);
         ConfigureHttpClient<ISchemasApiClient, SchemasApiClient>(services);
+        ConfigureHttpClient<IKeyValuesApiClient, KeyValuesApiClient>(services);
         ConfigureHttpClient<ITemplatesApiClient, TemplatesApiClient>(services);
 
         return services;

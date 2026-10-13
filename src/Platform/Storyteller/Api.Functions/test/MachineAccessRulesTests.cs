@@ -31,6 +31,8 @@ public class MachineAccessRulesTests
     [InlineData(MachineAccessScope.AnnotationRead, new[] { Scopes.Annotation.Read })]
     [InlineData(MachineAccessScope.ConfigurationReadWrite, new[] { Scopes.Configuration.Read, Scopes.Configuration.Write })]
     [InlineData(MachineAccessScope.DefaultReadWrite, new[] { Scopes.Default.Read, Scopes.Default.Write, Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Configuration.Read, Scopes.Configuration.Write })]
+    [InlineData(MachineAccessScope.SecretsRead, new[] { Scopes.Configuration.Read, Scopes.Configuration.Secrets })]
+    [InlineData(MachineAccessScope.SecretsReadWrite, new[] { Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Configuration.Secrets })]
     public void MachineScopeRoles_MatchTheApiScopeNames(MachineAccessScope scope, string[] expected)
     {
         MachineScopeClaims.GetRoleClaimsForScope(scope).ShouldBe(expected);

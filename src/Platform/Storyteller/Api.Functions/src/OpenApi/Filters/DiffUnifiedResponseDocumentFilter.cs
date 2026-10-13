@@ -19,6 +19,8 @@ public class DiffUnifiedResponseDocumentFilter : IDocumentFilter
         "GetAnnotationSchemaVersionDiffCustom",
         "GetDescendantTypeSchemaVersionDiff",
         "GetDescendantTypeSchemaVersionDiffCustom",
+        "GetKeyValueVersionDiff",
+        "GetKeyValueVersionDiffCustom",
     ];
 
     private const string UnifiedDiffExample =

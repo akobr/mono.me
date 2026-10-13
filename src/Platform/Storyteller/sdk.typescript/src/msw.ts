@@ -3,12 +3,14 @@
 import { getAccessMock } from './generated/vue-query/access/access.msw'
 import { getAnnotationsMock } from './generated/vue-query/annotations/annotations.msw'
 import { getConfigurationsMock } from './generated/vue-query/configurations/configurations.msw'
+import { getKeyValuesMock } from './generated/vue-query/key-values/key-values.msw'
 import { getSchemasMock } from './generated/vue-query/schemas/schemas.msw'
 import { getTemplatesMock } from './generated/vue-query/templates/templates.msw'
 
 export * from './generated/vue-query/access/access.msw'
 export * from './generated/vue-query/annotations/annotations.msw'
 export * from './generated/vue-query/configurations/configurations.msw'
+export * from './generated/vue-query/key-values/key-values.msw'
 export * from './generated/vue-query/schemas/schemas.msw'
 export * from './generated/vue-query/templates/templates.msw'
 
@@ -17,6 +19,7 @@ export const getStorytellerMock = () => [
   ...getAccessMock(),
   ...getAnnotationsMock(),
   ...getConfigurationsMock(),
+  ...getKeyValuesMock(),
   ...getSchemasMock(),
   ...getTemplatesMock(),
 ]

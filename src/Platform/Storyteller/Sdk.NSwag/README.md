@@ -17,6 +17,27 @@ dotnet tool install --global NSwag.ConsoleCore
 
 ```powershell
 cd src/Platform/Storyteller/Sdk.NSwag/
-nswag openapi2csclient /input:open.api.v0.9.1.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
+nswag openapi2csclient /input:open.api.v0.9.5.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
 ```
 
+The OpenAPI document comes from the API test `OpenApiExportTests`: it renders the document with the same engine the Functions host uses, so no running host is needed.
+
+```powershell
+$env:STORYTELLER_OPENAPI_EXPORT = "$PWD/open.api.v<version>.json"
+dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTests"
+```
+
+Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (`npm run generate`), then add the new `{controller}ApiClient` to `src/ApiSdk.partial.cs` and `src/ServicesCollectionExtensions.cs`.
+
+## Client-side encryption
+
+`src/ClientSideEncryption/KeyValueClientEncryption.cs` encrypts a key/value secret for the recipients of a project (`GET …/key-values/recipients`) and decrypts a returned document with a recipient's private key, on top of the `KeyValues.ClientEncryption` library (JWE General JSON Serialization, A256GCM, RSA-OAEP-256). The TypeScript SDK (`./hyok`) and the CLI produce and read the same format.
+
+```csharp
+var recipients = await keyValues.GetRecipientsAsync("acme", "billing");
+var write = KeyValueClientEncryption.CreateWrite("s3cret", recipients, "acme", "billing", "default", "db.password");
+await keyValues.SetKeyValueAsync("acme", "billing", "default", "db.password", write);
+
+var revealed = await keyValues.GetKeyValueAsync("acme", "billing", "default", "db.password", reveal: true, includeDeleted: null);
+var plain = KeyValueClientEncryption.Decrypt(revealed.Value, "api", privateKey);
+```

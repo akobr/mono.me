@@ -21,6 +21,57 @@ public class ClientEncryptionAndReferenceTests(Startup startup)
 
     private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets("account: admin");
 
+    // A test-only key pair generated for this fixture; it protects nothing.
+    private const string TypeScriptSdkPrivateKeyPem = """
+        -----BEGIN PRIVATE KEY-----
+        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
+        q4TVFlYP7StiXA21pT6PiA==
+        -----END PRIVATE KEY-----
+        """;
+
+    // encryptForRecipients("from the TypeScript SDK", [{ id: "api", publicKey }], "acme/billing/default/db.password")
+    private const string TypeScriptSdkDocument = """
+        {"protected":"eyJlbmMiOiJBMjU2R0NNIiwiY3R5IjoidGV4dC9wbGFpbiIsIjJzIjoiYWNtZS9iaWxsaW5nL2RlZmF1bHQvZGIucGFzc3dvcmQifQ","recipients":[{"header":{"alg":"RSA-OAEP-256","kid":"api"},"encrypted_key":"c1UttwnIgsH3IF6A0YU9yUTXnJpX4Cznvm6mejIZoARpqVquuRWpm-2sL3mU-g2IqKT1xjjm0F6AjtWmgjMIqayvTggsenKEu_BR8ICEMQZfwGSoexZv26D51Y5GC_hjF0Vp10IXkh1aYNzFtcgDpOV_sXN9N6rc3jYo2ycLHfDTKspoFeAVI1lhIw_bFnREI6NojYSV7Ot8Yy8IsW8yEzAO8i65GslkdquGHNtLbGr-Oqbs9zS_I-Bk8YReOLxFDWcwfS6S8moOkGBrDQmYP2x4WYWN_jnKzhinRXYfgPcM9xOZzbXrK57I6q5z_1-0LsXx0SX3Ol8yoZCVgfOdWZp0pNTqDsY2g-Y-8-9kjeZ_s2byiUXmqdhHsNBMlDiaqlODHjku2uXpEDhAsOJFsvmFE6qXR8mKiXcqnXh-_DcmT4b86z089kFlJ62di--IKjvWoJ67cRJv_YnmLBNosOoRP_ruzsSbnL3bTSmsyuGN1BH79Oe9pBc91L3-U800"}],"iv":"ts7bQV3DTvJWA2MP","ciphertext":"SDocrvrdpghIymI_4krr_tilyOqgO4E","tag":"Pprjyt0WB1y4xFrbMl20Wg"}
+        """;
+
+    private static RsaJsonWebKey ToModel(RsaPublicJwk jwk) => new() { N = jwk.N, E = jwk.E };
+
     [Fact]
     public void Encrypt_ForSeveralRecipients_EachDecrypts_AndTamperingIsDetected()
     {
@@ -59,6 +110,25 @@ public class ClientEncryptionAndReferenceTests(Startup startup)
         jwk.ModulusBits.Should().Be(3072);
         var garbage = () => RsaPublicJwk.Parse("not a key");
         garbage.Should().Throw<FormatException>();
+    }
+
+    // A document written by the TypeScript SDK (@42for.net/2splatform.sdk/hyok, WebCrypto) for a 3072-bit test key:
+    // the server validates it and the C# library decrypts it, so the two implementations stay interoperable.
+    [Fact]
+    public void Document_FromTheTypeScriptSdk_ValidatesAndDecrypts()
+    {
+        using var rsa = RSA.Create();
+        rsa.ImportFromPem(TypeScriptSdkPrivateKeyPem);
+        var identity = new KeyValueIdentity("acme", "billing", "default", "db.password", 1);
+        var recipients = new[] { new ClientEncryptionRecipient { Id = "api", Name = "api", PublicKey = ToModel(RsaPublicJwk.FromRsa(rsa)), CreatedAt = DateTimeOffset.UnixEpoch, CreatedBy = "test" } };
+
+        var document = JweDocument.Parse(TypeScriptSdkDocument);
+        var validated = ClientEncryptedValueValidator.Validate(TypeScriptSdkDocument, identity, recipients);
+
+        document.Place.Should().Be("acme/billing/default/db.password");
+        document.ContentType.Should().Be("text/plain");
+        validated.Should().Equal("api");
+        ClientSecretDecryptor.Decrypt(TypeScriptSdkDocument, "api", rsa).Should().Be("from the TypeScript SDK");
     }
 
     [Fact]

@@ -12,4 +12,8 @@ public enum MachineAccessScope
     AnnotationReadWrite,
     ConfigurationReadWrite,
     DefaultReadWrite,
+
+    // Configuration reads plus key/value secrets; delivered to machines under the project's mTLS rule.
+    SecretsRead = 6,
+    SecretsReadWrite = 7,
 }

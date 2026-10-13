@@ -13,6 +13,8 @@ public static class MachineAccessScopes
             MachineAccessScope.ConfigurationReadWrite => ["Configuration.Read", "Configuration.ReadWrite"],
             MachineAccessScope.DefaultRead => ["Default.Read", "Annotation.Read", "Configuration.Read"],
             MachineAccessScope.DefaultReadWrite => ["Default.Read", "Default.ReadWrite", "Annotation.Read", "Annotation.ReadWrite", "Configuration.Read", "Configuration.ReadWrite"],
+            MachineAccessScope.SecretsRead => ["Configuration.Read", "Configuration.Secrets"],
+            MachineAccessScope.SecretsReadWrite => ["Configuration.Read", "Configuration.ReadWrite", "Configuration.Secrets"],
             _ => [],
         };
     }

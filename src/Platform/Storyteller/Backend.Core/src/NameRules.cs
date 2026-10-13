@@ -17,6 +17,7 @@ public static partial class NameRules
     public static readonly IReadOnlySet<string> ReservedProjectAndViewNames = new HashSet<string>(StringComparer.Ordinal)
     {
         "access", "views", "members", "invitations", "machines", "certificates", "settings",
+        "key-values", "audit", "usage",
     };
 
     public static bool IsValidName(string? name)

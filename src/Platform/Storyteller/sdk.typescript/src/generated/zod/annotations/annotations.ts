@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.1.3549
+ * OpenAPI spec version: 0.9.5.59171
  */
 import * as zod from "zod";
 
@@ -2389,8 +2389,6 @@ export const getAnnotationHistoryResponseEntriesItemActionDefault = `Created`;
 export const getAnnotationHistoryResponseEntriesItemActorKindDefault = `Account`;
 export const getAnnotationHistoryResponseEntriesItemCauseKindDefault = `Cascade`;
 export const getAnnotationHistoryResponseEntriesItemValuesItemChangeDefault = `Added`;
-export const getAnnotationHistoryResponseEntriesItemValuesItemPreviousKindDefault = `Null`;
-export const getAnnotationHistoryResponseEntriesItemValuesItemValueKindDefault = `Null`;
 
 export const GetAnnotationHistoryResponse = zod.object({
   AnnotationKey: zod.string().optional(),
@@ -2468,10 +2466,7 @@ export const GetAnnotationHistoryResponse = zod.object({
                   zod.literal("Array"),
                   zod.literal(null),
                 ])
-                .nullish()
-                .default(
-                  getAnnotationHistoryResponseEntriesItemValuesItemPreviousKindDefault,
-                ),
+                .nullish(),
               Previous: zod.looseObject({}).optional(),
               IsPreviousTruncated: zod.boolean().optional(),
               ValueKind: zod
@@ -2484,10 +2479,7 @@ export const GetAnnotationHistoryResponse = zod.object({
                   zod.literal("Array"),
                   zod.literal(null),
                 ])
-                .nullish()
-                .default(
-                  getAnnotationHistoryResponseEntriesItemValuesItemValueKindDefault,
-                ),
+                .nullish(),
               Value: zod.looseObject({}).optional(),
               IsValueTruncated: zod.boolean().optional(),
             }),

@@ -15,4 +15,8 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\KeyValues.ClientEncryption\src\KeyValues.ClientEncryption.csproj" />
+  </ItemGroup>
+
 </Project>
