@@ -26,7 +26,16 @@ The browser remembers this context, and the address `/` opens it again.
 **Annotations** lists the catalog of the view in two modes:
 
 - **Grid:** sortable, resizable columns.
-- **Tree:** grouped by subject or by responsibility.
+- **Tree:** by subject or by responsibility.
+
+The tree shows only subjects, or only responsibilities, at the root, with every path down to their descendants:
+
+| Perspective | Paths |
+| --- | --- |
+| By subject | subject › context › execution › unit of execution<br>subject › usage › execution › unit of execution |
+| By responsibility | responsibility › unit › unit of execution<br>responsibility › usage › execution › unit of execution |
+
+So an annotation with two parents appears under both of them, for example an execution under its context and under its usage. Checking the box of one of its rows selects the annotation for the bulk actions, so all its rows are checked. A parent missing from the catalog is shown as a "(missing)" row. With a filter, the tree keeps the matching annotations and the rows above them, dimmed.
 
 The **Type** column shows the full name of each type, with its icon and color, including the names from **Settings** and your Preferences. On a phone the list shows only the icon, to keep room for the name and key.
 
