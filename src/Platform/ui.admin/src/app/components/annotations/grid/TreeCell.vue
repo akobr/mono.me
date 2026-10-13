@@ -21,7 +21,7 @@ const emit = defineEmits<{ toggle: [] }>()
       @click.stop="emit('toggle')"
     />
     <span v-else class="inline-block w-6" />
-    <AnnotationTypeBadge :type="node.key.slice(0, 3)" :class="node.missing ? 'opacity-60' : ''" />
+    <AnnotationTypeBadge :type="node.key.slice(0, 3)" variant="label" :class="node.missing ? 'opacity-60' : ''" />
     <span v-if="node.children.length" class="text-xs text-dimmed">{{ node.children.length }}</span>
   </div>
 </template>
