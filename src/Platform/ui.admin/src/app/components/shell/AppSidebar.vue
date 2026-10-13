@@ -4,27 +4,20 @@ import { useRoute } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
 import type { NavigationMenuItem } from '@nuxt/ui'
 import { usePreferencesStore } from '@/stores/preferences'
-import { useContextStore } from '@/stores/context'
 import { useBootState } from '@/boot/state'
 import { buildNavigation } from '@/utils/navigation'
 
 const route = useRoute()
 const preferences = usePreferencesStore()
-const context = useContextStore()
-const role = useRole()
+const navigation = useNavigationContext()
 const { open, collapsed: sidebarCollapsed, close } = useSidebar()
 const boot = useBootState()
 
 const environment = computed(() => boot.value.config?.environmentName)
 
+// The sections of the remembered view and project stay on the pages of a less specific context (424-17).
 const items = computed<NavigationMenuItem[][]>(() =>
-  buildNavigation({
-    org: context.org,
-    project: context.project,
-    view: context.view,
-    projectRole: role.projectRole.value,
-    orgRole: role.orgRole.value,
-  }).map((section) => [
+  buildNavigation(navigation.value).map((section) => [
     ...(section.label ? [{ label: section.label, type: 'label' as const }] : []),
     ...section.items.map((item) => ({
       label: item.label,

@@ -40,6 +40,7 @@ declare global {
   const useFileUpload: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFileUpload').useFileUpload
   const useFormField: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFormField').useFormField
   const useKbd: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useKbd').useKbd
+  const useNavigationContext: typeof import('./composables/useNavigationContext').useNavigationContext
   const useOverlay: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useOverlay').useOverlay
   const usePreferencesStore: typeof import('./stores/preferences').usePreferencesStore
   const useProjectSettingsStore: typeof import('./stores/project-settings').useProjectSettingsStore
