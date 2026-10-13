@@ -1,6 +1,7 @@
 import { computed } from 'vue'
 import { defineStore } from 'pinia'
 import { useStorage } from '@vueuse/core'
+import { detailWidth } from '@/utils/detail-panel'
 import type { Scope } from './context'
 
 export type DocumentFormat = 'json' | 'yaml'
@@ -15,6 +16,11 @@ export interface GridPreferences {
 
 export interface Preferences {
   sidebarPinned: boolean
+  /** The detail is docked beside the list; otherwise it opens as an overlay over the list. */
+  detailPinned: boolean
+  detailFullscreen: boolean
+  /** Width of the overlay or pinned detail, in percent of the window. */
+  detailWidth: number
   editorFormat: DocumentFormat
   annotationMode: EditorMode
   density: Density
@@ -25,6 +31,9 @@ export interface Preferences {
 
 export const defaultPreferences: Preferences = {
   sidebarPinned: true,
+  detailPinned: false,
+  detailFullscreen: false,
+  detailWidth: detailWidth.default,
   editorFormat: 'json',
   annotationMode: 'form',
   density: 'compact',
@@ -32,7 +41,10 @@ export const defaultPreferences: Preferences = {
   grids: {},
 }
 
-/** UI state only; nothing secret is ever stored here. Panel sizes are persisted by UDashboardGroup itself. */
+/**
+ * UI state only; nothing secret is ever stored here. The sidebar size is persisted by UDashboardGroup itself; the
+ * detail panel keeps its mode and width here.
+ */
 export const usePreferencesStore = defineStore('preferences', () => {
   // A copy: useStorage would otherwise mutate the shared defaults when nothing is stored yet.
   const state = useStorage<Preferences>('2s-admin:preferences', structuredClone(defaultPreferences), localStorage, {

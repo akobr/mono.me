@@ -14,6 +14,7 @@ const context = useContextStore()
 const catalog = useCatalogStore()
 const scope = useScope()
 const canEdit = useCan('edit')
+const detail = useDetailPanel()
 const creating = ref(false)
 
 watch(
@@ -68,7 +69,7 @@ const current = computed(() => route.path)
 </script>
 
 <template>
-  <UDashboardPanel id="schemas">
+  <UDashboardPanel id="schemas" :class="{ hidden: detail.covers.value }">
     <template #header>
       <AppNavbar title="Schemas">
         <template #right>

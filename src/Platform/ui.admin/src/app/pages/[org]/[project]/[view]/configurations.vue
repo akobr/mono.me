@@ -25,6 +25,7 @@ const catalog = useCatalogStore()
 const context = useContextStore()
 const filter = useAnnotationFilter()
 const desktop = useMediaQuery('(min-width: 768px)')
+const detail = useDetailPanel()
 
 watch(
   () => context.scope,
@@ -92,7 +93,11 @@ const rowClass = (row: { original: Row }) =>
 </script>
 
 <template>
-  <UDashboardPanel id="configurations" :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
+  <UDashboardPanel
+    id="configurations"
+    :class="{ hidden: detail.covers.value }"
+    :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }"
+  >
     <template #header>
       <AppNavbar title="Configurations" />
       <UDashboardToolbar class="py-2">

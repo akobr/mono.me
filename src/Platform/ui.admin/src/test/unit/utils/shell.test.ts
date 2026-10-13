@@ -3,6 +3,7 @@ import { safeReturnTo } from '@/utils/return-to'
 import { groupMemberships, hasOrganization } from '@/utils/memberships'
 import { currentSection, projectTarget, viewTarget } from '@/utils/context-paths'
 import { buildNavigation } from '@/utils/navigation'
+import { clampDetailWidth, detailMode } from '@/utils/detail-panel'
 import { describeError } from '@/utils/errors'
 import { StorytellerError } from '@42for.net/2splatform.sdk'
 
@@ -116,5 +117,32 @@ describe('describeError', () => {
       status: 403,
     })
     expect(describeError(new Error('boom'), 'Failed')).toEqual({ title: 'Failed', message: 'boom' })
+  })
+})
+
+describe('detail panel', () => {
+  const phone = { medium: false, large: false }
+  const tablet = { medium: true, large: false }
+  const desktop = { medium: true, large: true }
+
+  it.each([
+    [phone, false, false, 'full'],
+    [phone, true, false, 'full'],
+    [tablet, false, false, 'overlay'],
+    [tablet, true, false, 'overlay'],
+    [tablet, true, true, 'full'],
+    [desktop, false, false, 'overlay'],
+    [desktop, true, false, 'pinned'],
+    [desktop, false, true, 'full'],
+    [desktop, true, true, 'full'],
+  ] as const)('opens on %o with pinned %s and full screen %s as %s', (screen, pinned, fullscreen, mode) => {
+    expect(detailMode({ ...screen, pinned, fullscreen })).toBe(mode)
+  })
+
+  it('keeps the width within 25-70 %', () => {
+    expect(clampDetailWidth(10)).toBe(25)
+    expect(clampDetailWidth(42.5)).toBe(42.5)
+    expect(clampDetailWidth(90)).toBe(70)
+    expect(clampDetailWidth(Number.NaN)).toBe(40)
   })
 })

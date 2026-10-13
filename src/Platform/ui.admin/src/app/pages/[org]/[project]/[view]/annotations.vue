@@ -18,6 +18,7 @@ const context = useContextStore()
 const filter = useAnnotationFilter()
 const canEdit = useCan('edit')
 const desktop = useMediaQuery('(min-width: 768px)')
+const detail = useDetailPanel()
 
 const grid = useTemplateRef<{
   scrollToKey: (key: string) => void
@@ -138,14 +139,19 @@ useEventListener(window, 'keydown', (event: KeyboardEvent) => {
   }
 })
 
-// Focus returns to the originating row when the detail closes.
-watch(selectedKey, (key, previous) => {
-  if (key) {
-    activeKey.value = key
-  } else if (previous) {
-    grid.value?.scrollToKey(previous)
-  }
-})
+// Focus returns to the originating row when the detail closes; after the render, so a grid hidden by a full-screen
+// detail is visible again.
+watch(
+  selectedKey,
+  (key, previous) => {
+    if (key) {
+      activeKey.value = key
+    } else if (previous) {
+      grid.value?.scrollToKey(previous)
+    }
+  },
+  { flush: 'post' },
+)
 
 const columnItems = computed<DropdownMenuItem[]>(() =>
   (grid.value?.hideableColumns() ?? [])
@@ -173,7 +179,11 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
 </script>
 
 <template>
-  <UDashboardPanel id="annotations" :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
+  <UDashboardPanel
+    id="annotations"
+    :class="{ hidden: detail.covers.value }"
+    :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }"
+  >
     <template #header>
       <AppNavbar title="Annotations">
         <template #right>

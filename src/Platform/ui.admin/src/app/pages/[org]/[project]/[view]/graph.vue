@@ -10,6 +10,7 @@ const route = useRoute()
 const router = useRouter()
 const catalog = useCatalogStore()
 const context = useContextStore()
+const detail = useDetailPanel()
 
 watch(
   () => context.scope,
@@ -33,7 +34,11 @@ function close() {
 </script>
 
 <template>
-  <UDashboardPanel id="graph" :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
+  <UDashboardPanel
+    id="graph"
+    :class="{ hidden: detail.covers.value }"
+    :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }"
+  >
     <template #header>
       <AppNavbar title="Graph">
         <template #right>

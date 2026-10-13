@@ -34,6 +34,7 @@ declare global {
   const useContextStore: typeof import('./stores/context').useContextStore
   const useDeletedKeyCheck: typeof import('./composables/useDeletedKeyCheck').useDeletedKeyCheck
   const useDeletionToast: typeof import('./composables/useDeletionToast').useDeletionToast
+  const useDetailPanel: typeof import('./composables/useDetailPanel').useDetailPanel
   const useFileUpload: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFileUpload').useFileUpload
   const useFormField: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFormField').useFormField
   const useKbd: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useKbd').useKbd

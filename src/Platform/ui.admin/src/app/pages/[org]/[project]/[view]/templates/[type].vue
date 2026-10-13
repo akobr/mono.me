@@ -32,6 +32,7 @@ function close() {
         />
         <AnnotationTypeBadge v-if="type" :type="type" variant="label" />
         <h2 class="flex-1 truncate text-base font-semibold text-highlighted">Template</h2>
+        <DetailPanelActions />
         <UButton
           icon="i-lucide-x"
           color="neutral"
