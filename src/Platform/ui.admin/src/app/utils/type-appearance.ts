@@ -182,7 +182,11 @@ export function sanitizeTypeAppearances(value: unknown): TypeAppearances {
     const appearance: TypeAppearance = {
       label,
       plural: label ? cleanName(entry.plural) : undefined,
-      color: typeof entry.color === 'string' && entry.color in typeColors ? (entry.color as TypeColor) : undefined,
+      // Own keys only: `in` would also accept inherited names such as "toString".
+      color:
+        typeof entry.color === 'string' && Object.hasOwn(typeColors, entry.color)
+          ? (entry.color as TypeColor)
+          : undefined,
       icon: typeof entry.icon === 'string' && iconNames.has(entry.icon) ? entry.icon : undefined,
     }
     const defined = Object.fromEntries(Object.entries(appearance).filter(([, field]) => field !== undefined))

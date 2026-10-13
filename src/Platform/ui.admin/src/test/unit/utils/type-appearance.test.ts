@@ -26,6 +26,12 @@ describe('sanitizeTypeAppearances', () => {
     expect(sanitizeTypeAppearances(['exe'])).toEqual({})
   })
 
+  it('rejects color names inherited from Object', () => {
+    expect(sanitizeTypeAppearances({ exe: { label: 'Job', color: 'toString' }, sbt: { color: '__proto__' } })).toEqual({
+      exe: { label: 'Job' },
+    })
+  })
+
   it('trims names, cuts them to 40 characters and drops empty ones', () => {
     expect(sanitizeTypeAppearances({ exe: { label: '  Batch job  ', plural: ' Batch jobs ' } })).toEqual({
       exe: { label: 'Batch job', plural: 'Batch jobs' },
