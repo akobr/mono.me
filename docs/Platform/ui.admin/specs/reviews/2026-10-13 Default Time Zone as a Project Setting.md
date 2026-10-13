@@ -20,7 +20,7 @@ The Settings page and the user documentation both say that the value is kept in 
 
 - `useProjectSettingsStore`, a Pinia setup store, is auto-imported like `preferences`. `app/auto-imports.d.ts` was regenerated with `useProjectSettingsStore`, `defaultProjectSettings` and the `ProjectSettings` type.
 - `ProjectSettings { defaultTimeZone: string }` and `defaultProjectSettings = { defaultTimeZone: 'UTC' }`.
-- **Storage:** `useStorage<Record<string, Partial<ProjectSettings>>>('2s-admin:project-settings', {}, localStorage)`. An entry only holds what was changed.
+- **Storage:** `useStorage<Record<string, Partial<ProjectSettings>>>('2s-admin:project-settings', {}, undefined, { onError })`. An entry only holds what was changed. No storage argument is passed, so VueUse resolves `localStorage` itself: when the browser blocks it, `onError` logs a warning and the store keeps working in memory with the defaults instead of throwing.
 - **`settingsOf(projectKey)`** returns the defaults merged with the stored entry. A missing project key, a missing entry, or a stored zone that `isValidTimeZone` rejects all give `UTC`.
 - **`current`** (`settingsOf(context.projectKey)`) and **`defaultTimeZone`** follow the project of the route.
 - **`update(projectKey, patch)`:**
