@@ -21,12 +21,18 @@ function fakeResizeObserver() {
   return { resize: () => notify?.() }
 }
 
-function mountList(offset: Ref<number>, ready: () => boolean, style = 'height: 100px; overflow: auto') {
+function mountList(
+  offset: Ref<number>,
+  ready: () => boolean,
+  style = 'height: 100px; overflow: auto',
+  variant = ref(0),
+) {
   const List = defineComponent({
     setup() {
       const element = ref<HTMLElement>()
       useScrollMemory(element, offset, ready)
-      return () => h('div', { ref: element, style }, [h('div')])
+      // A new key renders another element, as the grid and the phone list swap at the breakpoint.
+      return () => h('div', { key: variant.value, ref: element, style }, [h('div')])
     },
   })
   return mount(List, { attachTo: document.body })
@@ -104,6 +110,22 @@ describe('scroll memory', () => {
     observer.resize()
     await settle()
     expect(element.scrollTop).toBe(200)
+    wrapper.unmount()
+  })
+
+  it('restores the offset into another element that replaces the list', async () => {
+    const offset = ref(0)
+    const variant = ref(0)
+    const wrapper = mountList(offset, () => true, undefined, variant)
+    await settle()
+    scrollTo(wrapper.element as HTMLElement, 300)
+    expect(offset.value).toBe(300)
+
+    variant.value = 1
+    await settle()
+    const replacement = wrapper.element as HTMLElement
+    expect(replacement.scrollTop).toBe(300)
+    expect(offset.value).toBe(300)
     wrapper.unmount()
   })
 })
