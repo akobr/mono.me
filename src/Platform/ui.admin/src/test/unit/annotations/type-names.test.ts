@@ -1,4 +1,5 @@
 import { glob, readFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Annotation } from '@42for.net/2splatform.sdk'
 import AnnotationTypeBadge from '@/components/annotations/AnnotationTypeBadge.vue'
@@ -8,6 +9,9 @@ import { applyTypeAppearance } from '@/utils/type-appearance'
 import { mountInApp, settle } from '../../helpers'
 
 // The type chips show the names of the settings, not the codes (424-34); only Schemas keeps the codes.
+
+// The package root: the source scan must not depend on the directory Vitest starts from.
+const root = resolve(import.meta.dirname, '../../..')
 
 // A chip without a variant shows the code: the tags in templates and the props of render functions.
 const badgeRE = /<AnnotationTypeBadge\b[^>]*>|h\(AnnotationTypeBadge,\s*\{[^}]*\}/g
@@ -63,8 +67,8 @@ describe('type names instead of codes', () => {
 
   it('shows the codes only on Schemas', async () => {
     const chips: string[] = []
-    for await (const file of glob('app/**/*.{vue,ts}', { exclude: (name) => name.endsWith('.d.ts') })) {
-      const source = await readFile(file, 'utf8')
+    for await (const file of glob('app/**/*.{vue,ts}', { cwd: root, exclude: (name) => name.endsWith('.d.ts') })) {
+      const source = await readFile(resolve(root, file), 'utf8')
       for (const match of source.matchAll(badgeRE)) {
         if (!match[0].includes('variant')) {
           chips.push(file.replaceAll('\\', '/'))
