@@ -105,7 +105,7 @@ function edit(view: View) {
           <UBadge v-if="view.IsDefault" label="default" color="primary" variant="subtle" size="sm" />
           <UBadge v-if="!view.IsRegistered" label="discovered" color="warning" variant="subtle" size="sm" />
           <span class="min-w-0 flex-1 truncate text-sm text-muted">{{ view.Description }}</span>
-          <RelativeTime v-if="view.CreatedAt" :value="view.CreatedAt" class="text-xs text-dimmed" />
+          <RelativeTime v-if="view.Created" :value="view.Created.At" class="text-xs text-dimmed" />
           <span class="flex gap-1">
             <UButton
               :to="`/${context.org}/${context.project}/${context.view ?? 'default'}/compare?to=${view.Name}`"

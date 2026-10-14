@@ -6,6 +6,7 @@ import type {
   SchemaValidationErrorDetail,
 } from '@42for.net/2splatform.sdk'
 import { metaOf, typeCodes, type AnnotationTypeCode } from '@/utils/annotation-key'
+import { stamp } from './audit'
 import type { MockDb } from './db'
 import { combinedSchema, ownContent, schemaErrors } from './configuration-handlers'
 import {
@@ -16,6 +17,7 @@ import {
   putVersion,
   type DocumentId,
   type ScopeRef,
+  type StoredVersion,
 } from './documents'
 import { diffDocuments } from './diff'
 import { errorResponse, requireRole, withDb } from './handlers'
@@ -37,7 +39,7 @@ function versionedHandlers(
   idOf: (params: Params) => DocumentId | undefined,
   wrap: (
     params: Params,
-    version: { Version: number; Author: string; Content?: Record<string, unknown> },
+    version: Pick<StoredVersion, 'Version' | 'Modified' | 'Content'>,
   ) => Record<string, unknown>,
   options: {
     patch?: boolean
@@ -142,12 +144,7 @@ function versionedHandlers(
         return (
           denied ??
           HttpResponse.json(
-            (read(db, params)?.versions ?? []).map(({ Version, Author, CreationTime, ExpirationTime }) => ({
-              Version,
-              Author,
-              CreationTime,
-              ExpirationTime,
-            })),
+            (read(db, params)?.versions ?? []).map(({ Version, Modified, ExpirationTime }) => ({ Version, Modified, ExpirationTime })),
           )
         )
       }),
@@ -201,7 +198,7 @@ function nonCompliant(
       unknown
     >
     const previous = store[id]
-    store[id] = { versions: [{ Version: 0, Author: '', CreationTime: '', Content: content }] }
+    store[id] = { versions: [{ Version: 0, Modified: stamp(db), Content: content }] }
     const combined = combinedSchema(db, scope, key)
     if (previous === undefined) {
       delete store[id]
@@ -218,11 +215,11 @@ function nonCompliant(
 
 const schemaWrap =
   (identity: (params: Params) => Record<string, unknown>) =>
-  (params: Params, version: { Version: number; Author: string; Content?: Record<string, unknown> }) => ({
+  (params: Params, version: Pick<StoredVersion, 'Version' | 'Modified' | 'Content'>) => ({
     View: params.view,
     ...identity(params),
     Version: version.Version,
-    Author: version.Author,
+    Modified: version.Modified,
     Content: version.Content,
   })
 
@@ -239,8 +236,7 @@ export const templateSchemaHandlers: HttpHandler[] = [
               {
                 AnnotationType: type,
                 Version: version.Version,
-                Author: version.Author,
-                UpdatedAt: version.CreationTime,
+                Modified: version.Modified,
               },
             ]
           : []
@@ -261,7 +257,7 @@ export const templateSchemaHandlers: HttpHandler[] = [
             return []
           }
           const [, kind, first, second] = id.split(':')
-          const base = { Version: version.Version, Author: version.Author, UpdatedAt: version.CreationTime }
+          const base = { Version: version.Version, Modified: version.Modified }
           return kind === 'type'
             ? [{ Kind: 'Type' as const, AnnotationType: first, ...base }]
             : kind === 'annotation'
@@ -279,7 +275,7 @@ export const templateSchemaHandlers: HttpHandler[] = [
     (params, version) => ({
       AnnotationType: code(params.type),
       Version: version.Version,
-      Author: version.Author,
+      Modified: version.Modified,
       Content: version.Content,
     }),
     { patch: true },

@@ -108,10 +108,10 @@ const current = computed(() => route.path)
               </RouterLink>
               <span v-if="row.summary" class="font-mono text-xs">v{{ row.summary.Version }}</span>
               <UBadge v-else label="No schema" color="neutral" variant="outline" size="sm" />
-              <span v-if="row.summary?.Author" class="text-xs text-muted">{{ row.summary.Author }}</span>
+              <AuditActorLink v-if="row.summary?.Modified" :actor="row.summary.Modified.By" subtle class="text-xs" />
               <RelativeTime
-                v-if="row.summary?.UpdatedAt"
-                :value="row.summary.UpdatedAt"
+                v-if="row.summary?.Modified"
+                :value="row.summary.Modified.At"
                 class="ms-auto text-xs text-dimmed"
               />
             </li>

@@ -141,7 +141,7 @@ const canAdd = computed(() => name.value.trim().length > 0 && publicKey.value.tr
               <td class="px-3 py-2 font-medium">{{ recipient.Name }}</td>
               <td class="px-3 py-2 font-mono text-xs">{{ recipient.Id }}</td>
               <td class="px-3 py-2 text-xs text-muted">RSA {{ bits(recipient) }} bits</td>
-              <td class="px-3 py-2 text-xs text-muted">{{ recipient.CreatedAt ? formatDateTime(new Date(recipient.CreatedAt)) : '' }}</td>
+              <td class="px-3 py-2 text-xs text-muted">{{ recipient.Created?.At ? formatDateTime(new Date(recipient.Created.At)) : '' }}</td>
               <td class="px-3 py-2">
                 <UBadge :label="recipient.IsEnabled === false ? 'disabled' : 'enabled'" :color="recipient.IsEnabled === false ? 'neutral' : 'success'" variant="subtle" size="sm" />
               </td>

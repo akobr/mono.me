@@ -214,6 +214,8 @@ test('sets up a customer key with the BYOK wizard', async ({ page }) => {
 test('filters the audit trail and shows the usage', async ({ page }) => {
   await openApp(page, '/acme/billing/audit')
   await expect(page.getByText('Reveal').first()).toBeVisible()
+  await expect(page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Reveal', exact: true }) })).toContainText('Grace Hopper')
+  await expect(page.getByRole('row').filter({ hasText: 'BindingRead' })).toContainText('machine:mach-billing-sync')
   await page.getByRole('combobox', { name: 'Operation filter' }).click()
   await page.getByRole('option', { name: 'Rotate', exact: true }).click()
   await expect(page.getByRole('row').filter({ hasText: 'Rotate' })).toHaveCount(1)

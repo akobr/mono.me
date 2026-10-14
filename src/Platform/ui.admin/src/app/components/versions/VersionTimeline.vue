@@ -27,8 +27,8 @@ const expired = (entry: ConfigurationVersion) =>
       <span class="w-10 font-mono font-semibold text-highlighted">v{{ entry.Version }}</span>
       <UBadge v-if="entry.Version === current" label="current" color="primary" variant="subtle" size="sm" />
       <UBadge v-if="expired(entry)" label="expired" color="warning" variant="subtle" size="sm" />
-      <span class="min-w-0 truncate text-muted">{{ entry.Author ?? 'unknown' }}</span>
-      <RelativeTime :value="entry.CreationTime" class="text-xs text-dimmed" />
+      <span class="min-w-0 truncate"><AuditActorLink :actor="entry.Modified?.By" subtle /></span>
+      <RelativeTime :value="entry.Modified?.At" class="text-xs text-dimmed" />
       <span class="ms-auto flex gap-1">
         <UButton label="View" size="xs" color="neutral" variant="ghost" @click="emit('view', entry.Version!)" />
         <UButton

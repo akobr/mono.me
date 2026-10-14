@@ -31,7 +31,7 @@ declare module 'vue' {
     AppNavbar: typeof import('./components/shell/AppNavbar.vue')['default']
     AppSidebar: typeof import('./components/shell/AppSidebar.vue')['default']
     ArrayLayout: typeof import('./components/configuration/renderers/ArrayLayout.vue')['default']
-    AuditActorLink: typeof import('./components/annotations/AuditActorLink.vue')['default']
+    AuditActorLink: typeof import('./components/common/AuditActorLink.vue')['default']
     BindingExpressionInput: typeof import('./components/configuration/BindingExpressionInput.vue')['default']
     BindingReference: typeof import('./components/configuration/BindingReference.vue')['default']
     BooleanControl: typeof import('./components/configuration/renderers/BooleanControl.vue')['default']

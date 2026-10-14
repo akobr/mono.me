@@ -11,6 +11,7 @@ import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
 import { bindingFor, daysUntil, isSecretLevel, levelMeta, levels, maskedValue, valuePreview } from '@/utils/key-values'
 import KeyValueLevelBadge from '@/components/key-values/KeyValueLevelBadge.vue'
+import AuditActorLink from '@/components/common/AuditActorLink.vue'
 import RelativeTime from '@/components/common/RelativeTime.vue'
 
 /**
@@ -176,14 +177,14 @@ const columns = computed<TableColumn<KeyValueSummary>[]>(() => [
       h('span', { class: 'font-mono text-xs text-muted' }, isSecretLevel(row.original.Protection) ? maskedValue : valuePreview(row.original.Value)),
   },
   { id: 'version', header: 'Version', cell: ({ row }) => h('span', { class: 'font-mono text-xs' }, `v${row.original.Version ?? '?'}`) },
-  { id: 'author', header: 'Author', cell: ({ row }) => h('span', { class: 'text-muted' }, row.original.Author ?? '') },
+  { id: 'author', header: 'Author', cell: ({ row }) => h(AuditActorLink, { actor: row.original.Modified?.By, subtle: true }) },
   {
     id: 'updated',
     header: state.value === 'Deleted' ? 'Expires' : 'Updated',
     cell: ({ row }) =>
       state.value === 'Deleted'
         ? h('span', { class: 'text-muted' }, `in ${daysUntil(row.original.ExpiresAt) ?? '?'} days`)
-        : h(RelativeTime, { value: row.original.UpdatedAt }),
+        : h(RelativeTime, { value: row.original.Modified?.At }),
   },
   {
     id: 'actions',

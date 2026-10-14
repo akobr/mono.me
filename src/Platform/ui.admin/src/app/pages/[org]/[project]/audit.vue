@@ -112,7 +112,7 @@ const operationItems = [{ label: 'Every operation', value: 'all' }, ...operation
               <td class="px-3 py-2 font-mono text-xs">{{ event.Key ?? '' }}</td>
               <td class="px-3 py-2 font-mono text-xs">{{ event.Version ? `v${event.Version}` : '' }}</td>
               <td class="px-3 py-2"><KeyValueLevelBadge v-if="event.Protection" :level="event.Protection" /></td>
-              <td class="px-3 py-2 text-xs">{{ event.Actor }}</td>
+              <td class="px-3 py-2 text-xs"><AuditActorLink :actor="event.Actor" /></td>
               <td class="px-3 py-2 text-xs text-muted">{{ event.Channel }}</td>
               <td class="px-3 py-2 text-end font-mono text-xs">{{ event.Count ?? 1 }}</td>
               <td class="px-3 py-2">

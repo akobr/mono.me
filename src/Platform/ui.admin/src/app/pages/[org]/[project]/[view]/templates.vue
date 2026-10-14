@@ -57,8 +57,8 @@ const selected = computed(() => (route.params as { type?: string }).type)
             <AnnotationTypeBadge :type="row.code" variant="label" />
             <span v-if="row.summary" class="font-mono text-xs">v{{ row.summary.Version }}</span>
             <UBadge v-else label="No template" color="neutral" variant="outline" size="sm" />
-            <span v-if="row.summary?.Author" class="text-sm text-muted">{{ row.summary.Author }}</span>
-            <RelativeTime v-if="row.summary?.UpdatedAt" :value="row.summary.UpdatedAt" class="text-xs text-dimmed" />
+            <AuditActorLink v-if="row.summary?.Modified" :actor="row.summary.Modified.By" subtle class="text-sm" />
+            <RelativeTime v-if="row.summary?.Modified" :value="row.summary.Modified.At" class="text-xs text-dimmed" />
             <span class="ms-auto text-xs text-muted"
               >{{ row.configurations }} configuration{{ row.configurations === 1 ? '' : 's' }}</span
             >

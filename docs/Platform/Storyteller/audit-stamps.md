@@ -44,6 +44,10 @@ Audit-log entries have their own time and carry only `Actor`.
 
 A configuration version keeps the time of its write. The configuration item is also rewritten by the platform when the effective document is cached or invalidated, but that changes neither `Modified` nor the listed time. A configuration that was never written (version 0, calculated on read) is stamped as the calculation by `System`.
 
+## Clients
+
+Both SDKs carry the two types (`AuditActor`, `AuditStamp` in `Sdk.NSwag` and `@42for.net/2splatform.sdk`). `sform` prints an actor as its name, `machine:{id}` or `system` (`AuditConsoleExtensions.FormatActor`), in the version lists of configurations, templates and schemas, the key/value listing, versions, recipients and audit. The admin UI renders every actor with `AuditActorLink`: an account links to its row on the members page for Administrators, a machine to its page, and the subtle variant keeps table cells and version lists muted.
+
 ## Storage and request units
 
 The stamps are stored as they are returned. Organization containers keep them out of the index (`ContainerFactory.AuditStampPaths`): `/Created/*`, `/Modified/*`, `/Deleted/By/*`, `/Deletion/DeletedBy/*` and `/Actor/*`, next to the audit entries (`/Entries/*`). Nothing filters or sorts on them; listings only project them. The deletion times stay indexed, because the deleted listings filter on `IS_DEFINED(c.Deleted.At)` and sort on `c.Deletion.DeletedAt`. `ContainerFactory.EnsureContainerSettingsAsync` adds the exclusions to existing containers.

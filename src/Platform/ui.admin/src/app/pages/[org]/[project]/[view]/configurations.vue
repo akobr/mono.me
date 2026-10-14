@@ -7,6 +7,7 @@ import type { ConfigurationSummary } from '@42for.net/2splatform.sdk'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import AnnotationTypeBadge from '@/components/annotations/AnnotationTypeBadge.vue'
+import AuditActorLink from '@/components/common/AuditActorLink.vue'
 import KeyText from '@/components/common/KeyText.vue'
 import RelativeTime from '@/components/common/RelativeTime.vue'
 
@@ -96,9 +97,10 @@ const columns: TableColumn<Row>[] = [
   {
     id: 'author',
     header: 'Author',
-    cell: ({ row }) => h('span', { class: 'text-muted' }, row.original.summary.Author ?? ''),
+    cell: ({ row }) =>
+      row.original.summary.Modified ? h(AuditActorLink, { actor: row.original.summary.Modified.By, subtle: true }) : '',
   },
-  { id: 'updated', header: 'Updated', cell: ({ row }) => h(RelativeTime, { value: row.original.summary.UpdatedAt }) },
+  { id: 'updated', header: 'Updated', cell: ({ row }) => h(RelativeTime, { value: row.original.summary.Modified?.At }) },
 ]
 
 const rowClass = (row: { original: Row }) =>

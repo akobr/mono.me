@@ -13,6 +13,7 @@ import type {
   KeyValueRotateRequest,
   KeyValueWrite,
 } from '@42for.net/2splatform.sdk'
+import { mockActor, stamp } from './audit'
 import type { MockDb } from './db'
 import { diffTexts } from './diff'
 import { errorResponse, requireRole, withDb } from './handlers'
@@ -47,7 +48,6 @@ type KeyParams = ScopeParams & { key: string }
 
 const projectKeyOf = (params: ProjectParams) => `${params.org}.${params.project}`
 const scopeOf = (params: ScopeParams): ScopeRef => ({ org: params.org, project: params.project, view: params.view })
-const author = (db: MockDb) => db.user.name
 
 const referencePattern =
   /^(kv:\/\/[a-z0-9-]+\/[A-Za-z0-9-]+(\/[a-f0-9]{32})?|https:\/\/[a-z0-9-]+\.vault\.azure\.net\/secrets\/[A-Za-z0-9-]+(\/[a-f0-9]{32})?)\/?$/i
@@ -59,7 +59,7 @@ const hasSecretRights = (db: MockDb, projectKey: string) => !requireRole(db, pro
 function listPairs(db: MockDb, scope: ScopeRef, state: string | null, prefix: string | null, levels: string[] | null): StoredKeyValue[] {
   const store = storeOf(db, scope)
   return Object.values(store.pairs)
-    .filter((stored) => (state === 'All' ? true : state === 'Deleted' ? !!stored.DeletedAt : !stored.DeletedAt))
+    .filter((stored) => (state === 'All' ? true : state === 'Deleted' ? !!stored.Deleted : !stored.Deleted))
     .filter((stored) => !prefix || stored.Key.toLowerCase().startsWith(prefix.toLowerCase()))
     .filter((stored) => !levels?.length || levels.includes(latest(stored).Protection))
     .toSorted((a, b) => a.Key.localeCompare(b.Key))
@@ -232,8 +232,7 @@ const projectHandlers: HttpHandler[] = [
         }
       }
       policy.Version = (policy.Version ?? 0) + 1
-      policy.Author = author(db)
-      policy.UpdatedAt = new Date().toISOString()
+      policy.Modified = stamp(db)
       recordAudit(db, projectKey, { Operation: 'PolicyChange', Detail: `Allowed: ${(policy.AllowedProtections ?? []).join(', ')}` })
       return HttpResponse.json(policy)
     }),
@@ -348,7 +347,7 @@ const projectHandlers: HttpHandler[] = [
       } else {
         return errorResponse(400, 'The public key is neither PEM nor a JWK object.', 'RecipientInvalid')
       }
-      const recipient: ClientEncryptionRecipient = { Id: id, Name: body.Name, PublicKey: publicKey, IsEnabled: true, CreatedAt: new Date().toISOString(), CreatedBy: db.user.id }
+      const recipient: ClientEncryptionRecipient = { Id: id, Name: body.Name, PublicKey: publicKey, IsEnabled: true, Created: stamp(db) }
       recipients.push(recipient)
       policy.Version = (policy.Version ?? 0) + 1
       recordAudit(db, projectKey, { Operation: 'RecipientAdded', Detail: id })
@@ -493,7 +492,7 @@ const viewHandlers: HttpHandler[] = [
       const reveal = url.searchParams.get('reveal') === 'true'
       const includeDeleted = url.searchParams.get('includeDeleted') === 'true'
       const stored = storeOf(db, scopeOf(params)).pairs[normalizeKey(params.key)]
-      if (!stored || (stored.DeletedAt && !includeDeleted)) {
+      if (!stored || (stored.Deleted && !includeDeleted)) {
         return notFound(params.view, params.key)
       }
       const current = latest(stored)
@@ -519,7 +518,7 @@ const viewHandlers: HttpHandler[] = [
       const scope = scopeOf(params)
       const store = storeOf(db, scope)
       const existing = store.pairs[normalizeKey(params.key)]
-      const active = existing && !existing.DeletedAt ? existing : undefined
+      const active = existing && !existing.Deleted ? existing : undefined
       const protection = (write.Protection ?? active?.Versions.at(-1)?.Protection) as KeyValueProtection | undefined
 
       if (!protection) {
@@ -538,7 +537,7 @@ const viewHandlers: HttpHandler[] = [
       if (checked.error) {
         return checked.error
       }
-      const stored = writeVersion(store, params.key, { Protection: protection, Value: write.Value ?? '', ContentType: write.ContentType ?? undefined, Recipients: checked.recipients }, author(db))
+      const stored = writeVersion(store, params.key, { Protection: protection, Value: write.Value ?? '', ContentType: write.ContentType ?? undefined, Recipients: checked.recipients }, mockActor(db))
       auditedWrite(db, scope, stored, !active)
       return HttpResponse.json(toKeyValue(stored, latest(stored), false))
     }),
@@ -557,7 +556,7 @@ const viewHandlers: HttpHandler[] = [
       const store = storeOf(db, scopeOf(params))
       const id = normalizeKey(params.key)
       const stored = store.pairs[id]
-      if (!stored || (stored.DeletedAt && !permanent)) {
+      if (!stored || (stored.Deleted && !permanent)) {
         return notFound(params.view, params.key)
       }
       const current = latest(stored)
@@ -571,7 +570,7 @@ const viewHandlers: HttpHandler[] = [
       if (permanent) {
         delete store.pairs[id]
       } else {
-        softDelete(stored, author(db))
+        softDelete(stored, mockActor(db))
       }
       if (isSecret(current.Protection)) {
         recordAudit(db, projectKey, { Operation: permanent ? 'PermanentDelete' : 'Delete', View: params.view, Key: stored.Key, Version: current.Version, Protection: current.Protection })
@@ -592,7 +591,7 @@ const viewHandlers: HttpHandler[] = [
       const store = storeOf(db, scopeOf(params))
       const items = bulkKeys(store.pairs, body).map((key): KeyValueBulkItemResult => {
         const stored = store.pairs[normalizeKey(key)]
-        if (!stored || !stored.DeletedAt) {
+        if (!stored || !stored.Deleted) {
           return { Key: key, Outcome: stored ? 'Unchanged' : 'NotFound' }
         }
         if (isSecret(latest(stored).Protection) && !hasSecretRights(db, projectKey)) {
@@ -621,7 +620,7 @@ const viewHandlers: HttpHandler[] = [
       const items = bulkKeys(store.pairs, body).map((key): KeyValueBulkItemResult => {
         const id = normalizeKey(key)
         const stored = store.pairs[id]
-        if (!stored?.DeletedAt) {
+        if (!stored?.Deleted) {
           return { Key: key, Outcome: 'NotFound', Message: stored ? 'Not deleted.' : undefined }
         }
         delete store.pairs[id]
@@ -654,7 +653,7 @@ const viewHandlers: HttpHandler[] = [
       const store = storeOf(db, scopeOf(params))
       const items = bulkKeys(store.pairs, body).map((key): KeyValueBulkItemResult => {
         const stored = store.pairs[normalizeKey(key)]
-        if (!stored || stored.DeletedAt) {
+        if (!stored || stored.Deleted) {
           return { Key: key, Outcome: 'NotFound' }
         }
         const current = latest(stored)
@@ -667,7 +666,7 @@ const viewHandlers: HttpHandler[] = [
         if (current.Protection === target) {
           return { Key: stored.Key, Outcome: 'Unchanged', Version: current.Version }
         }
-        writeVersion(store, stored.Key, { Protection: target, Value: current.Value, ContentType: current.ContentType }, author(db))
+        writeVersion(store, stored.Key, { Protection: target, Value: current.Value, ContentType: current.ContentType }, mockActor(db))
         recordAudit(db, projectKey, { Operation: 'Reprotect', View: params.view, Key: stored.Key, Version: latest(stored).Version, Protection: target, Detail: `${current.Protection} -> ${target}` })
         return { Key: stored.Key, Outcome: 'Done', Version: latest(stored).Version }
       })
@@ -819,7 +818,7 @@ const viewHandlers: HttpHandler[] = [
         if (item.Value == null) {
           if (!isSecret(level)) {
             fail('SecretValueMissing', 'A public item needs a value.')
-          } else if (!existing || existing.DeletedAt) {
+          } else if (!existing || existing.Deleted) {
             fail('SecretValueMissing', 'The secret does not exist, so it needs a value.')
           } else {
             plan.push({ Key: existing.Key, Protection: current!.Protection, Action: 'Unchanged', Version: current!.Version })
@@ -832,11 +831,11 @@ const viewHandlers: HttpHandler[] = [
           fail(body.ErrorCode ?? 'ImportInvalid', body.Message)
           continue
         }
-        const unchanged = current && !existing?.DeletedAt && current.Protection === level && current.Value === item.Value && (current.ContentType ?? undefined) === (item.ContentType ?? undefined)
+        const unchanged = current && !existing?.Deleted && current.Protection === level && current.Value === item.Value && (current.ContentType ?? undefined) === (item.ContentType ?? undefined)
         plan.push({
           Key: existing?.Key ?? key.trim(),
           Protection: level,
-          Action: unchanged ? 'Unchanged' : existing && !existing.DeletedAt ? 'Update' : 'Create',
+          Action: unchanged ? 'Unchanged' : existing && !existing.Deleted ? 'Update' : 'Create',
           Version: unchanged ? current?.Version : undefined,
           value: item.Value,
           contentType: item.ContentType ?? undefined,
@@ -845,7 +844,7 @@ const viewHandlers: HttpHandler[] = [
       }
       if (mode === 'Replace') {
         for (const stored of Object.values(store.pairs)) {
-          if (!stored.DeletedAt && stored.Key.toLowerCase().startsWith(prefix) && !seen.has(stored.Key.toLowerCase())) {
+          if (!stored.Deleted && stored.Key.toLowerCase().startsWith(prefix) && !seen.has(stored.Key.toLowerCase())) {
             if (isSecret(latest(stored).Protection) && !hasSecretRights(db, projectKey)) {
               invalid.push({ Key: stored.Key, Protection: latest(stored).Protection, Action: 'Delete', ErrorCode: 'AccessDenied', Message: 'A secret would be deleted; no secret rights.' })
             } else {
@@ -863,10 +862,10 @@ const viewHandlers: HttpHandler[] = [
         }
         if (result.Action === 'Delete') {
           const stored = store.pairs[normalizeKey(result.Key ?? '')]!
-          softDelete(stored, author(db))
+          softDelete(stored, mockActor(db))
           return result
         }
-        const stored = writeVersion(store, result.Key ?? '', { Protection: (result.Protection ?? 'Public') as KeyValueProtection, Value: value ?? '', ContentType: contentType, Recipients: recipients }, author(db))
+        const stored = writeVersion(store, result.Key ?? '', { Protection: (result.Protection ?? 'Public') as KeyValueProtection, Value: value ?? '', ContentType: contentType, Recipients: recipients }, mockActor(db))
         return { ...result, Version: latest(stored).Version }
       })
       if (!dryRun) {

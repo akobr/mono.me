@@ -131,9 +131,8 @@ async function save(force = false): Promise<void> {
     catalog.setConfiguration(props.annotationKey, {
       AnnotationKey: props.annotationKey,
       Version: saved.Version,
-      Author: saved.Author,
+      Modified: saved.Modified,
       HasContent: true,
-      UpdatedAt: new Date().toISOString(),
     })
     await invalidateConfiguration(queryClient, context.scope, props.annotationKey)
     toast.add({ title: `Configuration saved (v${saved.Version ?? '?'})`, color: 'success', icon: 'i-lucide-check' })
