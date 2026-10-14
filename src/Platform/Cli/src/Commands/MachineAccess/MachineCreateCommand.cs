@@ -47,6 +47,9 @@ public class MachineCreateCommand : BaseContextCommand
     [Option("-o|--output", CommandOptionType.SingleValue, Description = "Output file path for the PKCS#12 certificate (.pfx).")]
     public string? OutputPath { get; set; }
 
+    [Option("-s|--shared-certificate", CommandOptionType.NoValue, Description = "A certificate-and-api-key machine without a certificate of its own: it signs in with a shared certificate of the project and its API key.")]
+    public bool UseSharedCertificate { get; set; }
+
     protected override async Task<int> ExecuteAsync()
     {
         if (!string.IsNullOrWhiteSpace(AnnotationKey))
@@ -67,6 +70,23 @@ public class MachineCreateCommand : BaseContextCommand
             credentialKind = kind;
         }
 
+        if (UseSharedCertificate)
+        {
+            // A shared certificate is the certificate half of a CertificateAndApiKey login.
+            if (credentialKind is not null and not MachineAccessCreateCredentialKind.CertificateAndApiKey)
+            {
+                Console.WriteImportant($"A shared certificate is used only by certificate-and-api-key machines, not {credentialKind}.");
+                return ExitCodes.ERROR_INPUT_PARSING;
+            }
+
+            credentialKind = MachineAccessCreateCredentialKind.CertificateAndApiKey;
+
+            if (LifetimeDays is not null || OutputPath is not null)
+            {
+                Console.WriteLine("The machine gets no certificate of its own, so --lifetime-days and --output are ignored.");
+            }
+        }
+
         var machine = await _accessApi.CreateMachineAccessAsync(
             Context.OrganizationName,
             Context.ProjectName,
@@ -81,7 +101,8 @@ public class MachineCreateCommand : BaseContextCommand
 
                 // Null: the project's default kind and lifetime.
                 CredentialKind = credentialKind,
-                CertificateLifetimeDays = LifetimeDays,
+                CertificateLifetimeDays = UseSharedCertificate ? null : LifetimeDays,
+                UseSharedCertificate = UseSharedCertificate ? true : null,
             });
 
         Console.WriteJson(new
@@ -96,6 +117,7 @@ public class MachineCreateCommand : BaseContextCommand
             machine.CertificateLifetimeDays,
             machine.CertificateNotAfter,
             machine.LastRenewalAt,
+            machine.UsesSharedCertificate,
             Certificate = string.IsNullOrEmpty(machine.Certificate) ? null : "[written to file]",
             CertificatePassword = string.IsNullOrEmpty(machine.CertificatePassword) ? null : "[see below]",
         });
@@ -122,6 +144,11 @@ public class MachineCreateCommand : BaseContextCommand
         else
         {
             Console.WriteImportant("Make sure to copy the access key (secret), it is not stored anywhere.");
+        }
+
+        if (machine.UsesSharedCertificate)
+        {
+            Console.WriteLine("The machine has no certificate of its own: it presents a shared certificate of the project with its API key (sform account shared-cert).");
         }
 
         return ExitCodes.SUCCESS;
