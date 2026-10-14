@@ -12,7 +12,7 @@ const executionSchema = {
     endpoint: {
       type: 'string',
       format: 'uri',
-      description: 'Usually a binding to the subject, for example `@sbt.northwind/baseUrl`.',
+      description: 'Usually a binding, for example `@config("/baseUrl")`: the base URL the context configures.',
     },
     mode: { type: 'string', enum: ['batch', 'stream', 'manual'] },
     region: {

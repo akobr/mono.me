@@ -32,6 +32,7 @@ declare module 'vue' {
     ArrayLayout: typeof import('./components/configuration/renderers/ArrayLayout.vue')['default']
     AuditActorLink: typeof import('./components/annotations/AuditActorLink.vue')['default']
     BindingExpressionInput: typeof import('./components/configuration/BindingExpressionInput.vue')['default']
+    BindingReference: typeof import('./components/configuration/BindingReference.vue')['default']
     BooleanControl: typeof import('./components/configuration/renderers/BooleanControl.vue')['default']
     ByokBanner: typeof import('./components/key-values/ByokBanner.vue')['default']
     ByokCard: typeof import('./components/secrets/ByokCard.vue')['default']

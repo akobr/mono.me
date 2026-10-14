@@ -22,6 +22,7 @@ import { buildPatch, changeCount } from '@/utils/json-patch'
 import { parseServerErrors, type ValidationIssue } from '@/utils/schema-validation'
 import { bindingDecorations } from '@/components/editor/setup/bindings'
 import { schemaLinter } from '@/components/editor/setup/schema-lint'
+import { provideBindingAssist, useBindingAssist } from '@/composables/useBindingAssist'
 
 // The schema form (JSON Forms) loads on demand.
 const SchemaForm = defineAsyncComponent(() => import('./SchemaForm.vue'))
@@ -90,10 +91,16 @@ const mode = computed<EditorMode>({
   },
 })
 
+// Completion, hover and the binding reference read the catalog, the paths of this configuration and the annotation.
+const assist = useBindingAssist({
+  annotationKey: () => props.annotationKey,
+  documents: () => [effective.data.value?.Content, draft.value],
+})
+provideBindingAssist(assist)
+const bindings = bindingDecorations(assist)
+
 const extensions = computed(() =>
-  schema.value && mode.value !== 'form'
-    ? [schemaLinter(schema.value, mode.value), bindingDecorations()]
-    : [bindingDecorations()],
+  schema.value && mode.value !== 'form' ? [schemaLinter(schema.value, mode.value), bindings] : [bindings],
 )
 
 async function refreshOwn(): Promise<unknown> {
@@ -275,16 +282,18 @@ defineShortcuts({
         <UTooltip v-if="!schema" text="No schema applies to this annotation, so there is no form.">
           <UIcon name="i-lucide-info" class="size-4 text-dimmed" />
         </UTooltip>
-        <UButton
-          v-if="canEdit"
-          class="ms-auto"
-          label="Delete own"
-          icon="i-lucide-trash-2"
-          size="xs"
-          color="neutral"
-          variant="ghost"
-          @click="confirmDelete = true"
-        />
+        <div class="ms-auto flex items-center gap-1">
+          <BindingReference />
+          <UButton
+            v-if="canEdit"
+            label="Delete own"
+            icon="i-lucide-trash-2"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            @click="confirmDelete = true"
+          />
+        </div>
       </div>
 
       <div class="flex-1 space-y-3 p-4">

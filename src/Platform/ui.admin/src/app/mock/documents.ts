@@ -82,7 +82,8 @@ function configurationContent(annotation: Annotation, version: number): Record<s
       return {
         retries: version % 6,
         timeout: 10 + version * 5,
-        endpoint: `@sbt.${parts[1]}/baseUrl`,
+        // The context configures baseUrl; the execution inherits it, so @config reads it from the snapshot.
+        endpoint: '@config("/baseUrl")',
         notify: [`ops@${parts[1]}.example`],
         tiers: [
           { name: 'gold', limit: 100 * version },

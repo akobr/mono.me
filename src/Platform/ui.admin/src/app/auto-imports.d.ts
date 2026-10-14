@@ -17,11 +17,14 @@ declare global {
   const extendLocale: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineLocale').extendLocale
   const extractShortcuts: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts').extractShortcuts
   const hasUnsavedChanges: typeof import('./composables/useUnsavedChanges').hasUnsavedChanges
+  const injectBindingAssist: typeof import('./composables/useBindingAssist').injectBindingAssist
   const isRememberedSection: typeof import('./stores/page-memory').isRememberedSection
   const onSignOut: typeof import('./stores/session').onSignOut
+  const provideBindingAssist: typeof import('./composables/useBindingAssist').provideBindingAssist
   const rememberedSections: typeof import('./stores/page-memory').rememberedSections
   const runLimited: typeof import('./composables/useAnnotationActions').runLimited
   const shortcutGroups: typeof import('./composables/useShortcutsHelp').shortcutGroups
+  const staticBindingAssist: typeof import('./composables/useBindingAssist').staticBindingAssist
   const typeColorsStyleId: typeof import('./stores/type-appearance').typeColorsStyleId
   const undoKeys: typeof import('./composables/useAnnotationActions').undoKeys
   const useAnnotationActions: typeof import('./composables/useAnnotationActions').useAnnotationActions
@@ -30,6 +33,7 @@ declare global {
   const useAppConfig: typeof import('../node_modules/@nuxt/ui/dist/runtime/vue/composables/useAppConfig.js').useAppConfig
   const useAppContext: typeof import('./composables/useAppContext').useAppContext
   const useAuth: typeof import('./composables/useAuth').useAuth
+  const useBindingAssist: typeof import('./composables/useBindingAssist').useBindingAssist
   const useCan: typeof import('./composables/useRole').useCan
   const useCatalogStore: typeof import('./stores/catalog').useCatalogStore
   const useConfiguration: typeof import('./composables/useConfiguration').useConfiguration
@@ -72,6 +76,9 @@ declare global {
   // @ts-ignore
   export type { ListMode } from './composables/useAnnotationFilter'
   import('./composables/useAnnotationFilter')
+  // @ts-ignore
+  export type { BindingAssist, BindingAssistOptions } from './composables/useBindingAssist'
+  import('./composables/useBindingAssist')
   // @ts-ignore
   export type { ConfirmOptions } from './composables/useConfirm'
   import('./composables/useConfirm')
