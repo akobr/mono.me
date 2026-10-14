@@ -43,6 +43,15 @@ sform story config import <zip-or-folder> [--dry-run] [--force] [--timeout <minu
 
 The commands are `Cli/src/Commands/Configuration/ConfigExportCommand.cs` and `ConfigImportCommand.cs`, with `Services/ConfigurationArchives.cs` (packing and unpacking through `IFileSystem`) and `Services/TransferPolling.cs`.
 
+## Administration UI
+
+The Configurations page has **Export** (every role) and **Import** (Contributor) in its header (`ui.admin/src/app/pages/[org]/[project]/[view]/configurations.vue`).
+
+- `stores/transfers.ts` starts and polls the jobs (every second, then every 2 and 3 seconds, at most 15 minutes) independently of the page. A succeeded export is fetched with the bearer token and saved under its `FileName` (`utils/download.ts`). Running exports are kept in `sessionStorage` and resumed after a reload.
+- `TransferToaster` (in the default layout) reports the end of an export, and of an import whose dialog is closed, and refreshes the configuration queries and the catalog after an import that wrote documents.
+- `ConfigurationExportDialog` picks the format and closes when the download starts. `ConfigurationImportDialog` takes a zip (`UFileUpload`), the dry run and force options, shows the progress and the result (`ConfigurationImportResult`), and offers **Import now** after a dry run. Opened again, it shows the view's latest import.
+- The mock API (`mock/transfer-handlers.ts`, `mock/zip.ts`) runs both jobs over the mock database. Its git export is the folder layout plus `.git/HEAD`; it writes no repository.
+
 ## What travels
 
 Only the annotations' **own documents**: the `Content` of the configuration item `{view}.cnf.{key}` and of its versions `{view}.cfv.{key}.{version}` ([inheritance.md](inheritance.md)).

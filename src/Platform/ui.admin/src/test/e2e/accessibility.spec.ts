@@ -50,3 +50,15 @@ test('sign-in has no serious accessibility violations', async ({ page }) => {
   await openApp(page, '/login')
   await expectAccessible(page)
 })
+
+for (const [name, button] of [
+  ['export', 'Export configurations'],
+  ['import', 'Import configurations'],
+] as const) {
+  test(`the ${name} dialog has no serious accessibility violations`, async ({ page }) => {
+    await openApp(page, '/acme/billing/default/configurations')
+    await page.getByRole('button', { name: button }).click()
+    await page.getByRole('dialog').waitFor()
+    await expectAccessible(page)
+  })
+}
