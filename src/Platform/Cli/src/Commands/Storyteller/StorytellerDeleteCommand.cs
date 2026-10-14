@@ -170,6 +170,8 @@ public class StorytellerDeleteCommand : BaseContextCommand
             Context.ViewName,
             annotationKey,
             "all",
+            null,
+            null,
             null);
 
         var count = response.Annotations?.Count ?? 0;

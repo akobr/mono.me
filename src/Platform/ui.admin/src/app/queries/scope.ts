@@ -22,7 +22,7 @@ import { metaOf, type AnnotationTypeCode } from '@/utils/annotation-key'
 
 export function useAnnotation(key: MaybeRefOrGetter<string | undefined>) {
   const scope = useScope()
-  return useGetAnnotation(scope.org, scope.project, scope.view, () => toValue(key) ?? '', {
+  return useGetAnnotation(scope.org, scope.project, scope.view, () => toValue(key) ?? '', undefined, {
     query: { enabled: () => !!toValue(key) && !!scope.view(), staleTime: 30_000, refetchOnWindowFocus: true },
   })
 }
