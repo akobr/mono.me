@@ -11,6 +11,7 @@ using _42.Platform.Storyteller.KeyValues.Audit;
 using _42.Platform.Storyteller.KeyValues.Policy;
 using _42.Platform.Storyteller.KeyValues.Protection;
 using _42.Platform.Storyteller.KeyValues.Usage;
+using _42.Platform.Storyteller.Transferring;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -137,6 +138,9 @@ public static class EntryPoint
 
         // Machine certificates in Cosmos, so every instance recognizes them (AddCertificateMachineAccess keeps this one).
         services.AddSingleton<IClientCertificateStore, CosmosClientCertificateStore>();
+        // Export and import jobs. The service is added by AddConfigurationTransfers, the archives and the queue
+        // by Backend.AzureStorage.
+        services.AddSingleton<IConfigurationTransferStore, CosmosConfigurationTransferStore>();
 
         // Invitations: the identity provider may replace the sender (AuthKit sends the email through WorkOS).
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));

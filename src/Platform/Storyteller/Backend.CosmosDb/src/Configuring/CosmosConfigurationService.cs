@@ -3,12 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Json;
+using _42.Platform.Storyteller.Transferring;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Logging;
@@ -328,7 +330,13 @@ public class CosmosConfigurationService : IConfigurationService
             $"Unknown configuration for {sourceKey.Annotation} in view {toView}.");
     }
 
-    public async Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force = false)
+    public Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force = false)
+    {
+        return WriteConfigurationAsync(key, value, actor, force, merge: true);
+    }
+
+    // Merges the value into the stored document, or replaces the document with it (an import).
+    private async Task<Configuration> WriteConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force, bool merge)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
@@ -355,11 +363,7 @@ public class CosmosConfigurationService : IConfigurationService
                 await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, value);
             }
 
-            var maxVersionResponse = await repository.Container.GetItemLinqQueryable<ConfigurationHistoryEntity>(
-                requestOptions: new QueryRequestOptions { PartitionKey = partitionKey })
-                .Where(history => history.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.ConfigurationVersion}.{annotationKey}."))
-                .Select(history => history.Version)
-                .MaxAsync();
+            var highestArchivedVersion = await GetHighestArchivedVersionAsync(key, repository);
 
             var configuration = new ConfigurationEntity
             {
@@ -371,7 +375,7 @@ public class CosmosConfigurationService : IConfigurationService
                 ProjectName = key.ProjectName,
                 ViewName = key.ViewName,
                 Content = value,
-                Version = maxVersionResponse.Resource + 1,
+                Version = highestArchivedVersion + 1,
                 Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
             };
 
@@ -383,7 +387,7 @@ public class CosmosConfigurationService : IConfigurationService
         var newContent = value;
 
         // merge into stored content when there is some; an empty document is replaced
-        if (existingConfiguration.Content.HasValues)
+        if (merge && existingConfiguration.Content.HasValues)
         {
             newContent = (JObject)existingConfiguration.Content.DeepClone();
             newContent.MergeInto(value);
@@ -400,6 +404,14 @@ public class CosmosConfigurationService : IConfigurationService
         {
             newContent = newContent.RemoveRequested();
             newContent = await newContent.ApplyPatchRequested();
+
+            if (!merge
+                && existingConfiguration.Content.HasValues
+                && JToken.DeepEquals(existingConfiguration.Content, newContent))
+            {
+                // a replacement by an equal document writes nothing
+                return existingConfiguration.ToConfigurationFromContent();
+            }
         }
 
         // validate before any write, so a rejection cannot leave a history item
@@ -429,13 +441,19 @@ public class CosmosConfigurationService : IConfigurationService
             await repository.Container.CreateItemAsync(history, partitionKey);
         }
 
+        // an item that only cached the effective document (version 0) continues after the archived versions,
+        // which a clear left behind, so the next archive cannot collide with them
+        var previousVersion = existingConfiguration.Content.HasValues
+            ? existingConfiguration.Version
+            : Math.Max(existingConfiguration.Version, await GetHighestArchivedVersionAsync(key, repository));
+
         // invalidate all ancestor configurations
         await InvalidateConfigurationsAsync(key, repository);
 
         // save a new version of the configuration
         var newConfiguration = existingConfiguration with
         {
-            Version = existingConfiguration.Version + 1,
+            Version = previousVersion + 1,
             Content = newContent,
             Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
             CalculatedContent = null,
@@ -602,6 +620,186 @@ public class CosmosConfigurationService : IConfigurationService
         if (existingConfiguration?.Content.HasValues == true)
         {
             await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationDeleted, existingConfiguration.Version);
+        }
+    }
+
+    public async Task<IReadOnlyList<ConfigurationHistory>> GetConfigurationHistoriesAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default)
+    {
+        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var deletedKeys = await ReadDeletedAnnotationKeysAsync(container, project, view, cancellationToken);
+        var currentPrefix = $"{view}.{EntityIdPrefixTypes.Configuration}.";
+        var query = new QueryDefinition(
+                "SELECT c.id, c.AnnotationKey, c.Version, c.Content, c.Modified, c.AnnotationDeletionId FROM c "
+                + "WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND (STARTSWITH(c.id, @currentPrefix) OR STARTSWITH(c.id, @historyPrefix))")
+            .WithParameter("@projectPrefix", $"{project}.")
+            .WithParameter("@currentPrefix", currentPrefix)
+            .WithParameter("@historyPrefix", $"{view}.{EntityIdPrefixTypes.ConfigurationVersion}.");
+
+        var documents = new Dictionary<string, (List<ConfigurationDocument> History, ConfigurationDocument? Current)>(StringComparer.Ordinal);
+        using var iterator = container.GetItemQueryStreamIterator(query);
+
+        while (iterator.HasMoreResults)
+        {
+            using var response = await iterator.ReadNextAsync(cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var page = response.Content.DeserializeNewtonsoft<QueryPage<ConfigurationArchiveRow>>(_serializerOptions);
+
+            foreach (var row in page?.Documents ?? [])
+            {
+                if (row.Id is null
+                    || row.AnnotationKey is null
+                    || row.Content is null
+                    || !row.Content.HasValues
+                    || deletedKeys.Contains(row.AnnotationKey)
+                    || !AnnotationKey.TryParse(row.AnnotationKey, out _))
+                {
+                    // an empty document only caches the effective one; a deleted annotation hides its versions
+                    continue;
+                }
+
+                var isCurrent = row.Id.StartsWith(currentPrefix, StringComparison.Ordinal);
+
+                if (isCurrent && row.AnnotationDeletionId is not null)
+                {
+                    continue;
+                }
+
+                var document = new ConfigurationDocument
+                {
+                    Version = row.Version,
+                    Author = row.Modified.By.Name ?? row.Modified.By.Id,
+                    CreatedAt = row.Modified.At,
+                    Content = row.Content,
+                };
+
+                if (!documents.TryGetValue(row.AnnotationKey, out var entry))
+                {
+                    entry = ([], null);
+                }
+
+                if (isCurrent)
+                {
+                    entry.Current = document;
+                }
+                else
+                {
+                    entry.History.Add(document);
+                }
+
+                documents[row.AnnotationKey] = entry;
+            }
+        }
+
+        return documents
+            .OrderBy(item => item.Key, StringComparer.Ordinal)
+            .Select(item =>
+            {
+                var (history, current) = item.Value;
+                var versions = history
+                    .Where(version => current is null || version.Version < current.Version)
+                    .OrderBy(version => version.Version)
+                    .ToList();
+
+                if (current is not null)
+                {
+                    versions.Add(current);
+                }
+
+                return new ConfigurationHistory { AnnotationKey = item.Key, Versions = versions, Current = current };
+            })
+            .ToList();
+    }
+
+    public async Task<ConfigurationImportResult> ImportConfigurationAsync(
+        FullKey key,
+        JObject content,
+        AuditActor actor,
+        bool force = false,
+        bool dryRun = false)
+    {
+        var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
+        var annotationKey = key.Annotation.ToString();
+
+        switch (await AnnotationItemStore.ReadStateAsync(repository.Container, key))
+        {
+            case AnnotationItemState.Missing:
+                return new ConfigurationImportResult(
+                    ConfigurationImportOutcome.Skipped,
+                    ErrorCode: ErrorCodes.AnnotationNotFound,
+                    Message: $"The view {key.ViewName} has no annotation {annotationKey}.");
+
+            case AnnotationItemState.Deleted:
+                return DeletedImport(annotationKey);
+        }
+
+        JObject document;
+
+        try
+        {
+            // the directives apply to the document alone, as on a create
+            document = await content.RemoveRequested().ApplyPatchRequested();
+        }
+        catch (JsonPatchException exception)
+        {
+            return new ConfigurationImportResult(ConfigurationImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
+        }
+
+        if (!document.HasValues)
+        {
+            return new ConfigurationImportResult(
+                ConfigurationImportOutcome.Skipped,
+                ErrorCode: ErrorCodes.EmptyDocument,
+                Message: "An empty document is not imported; delete the configuration to clear it.");
+        }
+
+        var existing = await repository.Container.TryReadItemAsync(
+            $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKey}",
+            key.GetCosmosPartitionKey(),
+            stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
+        var hasContent = existing?.Content.HasValues == true;
+
+        if (hasContent && JToken.DeepEquals(existing!.Content, document))
+        {
+            return new ConfigurationImportResult(ConfigurationImportOutcome.Unchanged, existing.Version);
+        }
+
+        if (!force && _schemaService is not null)
+        {
+            try
+            {
+                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, document);
+            }
+            catch (SchemaValidationException exception)
+            {
+                var errors = exception.ValidationErrors.SelectMany(error => error.Errors);
+                return new ConfigurationImportResult(
+                    ConfigurationImportOutcome.Failed,
+                    ErrorCode: ErrorCodes.SchemaViolation,
+                    Message: $"The document violates its schema: {string.Join("; ", errors)}");
+            }
+        }
+
+        var outcome = hasContent ? ConfigurationImportOutcome.Updated : ConfigurationImportOutcome.Created;
+
+        if (dryRun)
+        {
+            return new ConfigurationImportResult(outcome);
+        }
+
+        try
+        {
+            // validated above, so the write skips the schema
+            var written = await WriteConfigurationAsync(key, document, actor, force: true, merge: false);
+            return new ConfigurationImportResult(outcome, written.Version);
+        }
+        catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.AnnotationDeleted)
+        {
+            // deleted between the check and the write
+            return DeletedImport(annotationKey);
         }
     }
 
@@ -974,6 +1172,53 @@ public class CosmosConfigurationService : IConfigurationService
         transaction.CreateItem(history);
         transaction.DeleteItem(id);
         await transaction.ExecuteAsync();
+    }
+
+    // The highest version in the history of the configuration, 0 without one.
+    private static async Task<ulong> GetHighestArchivedVersionAsync(FullKey key, IContainerRepository repository)
+    {
+        var maxVersionResponse = await repository.Container.GetItemLinqQueryable<ConfigurationHistoryEntity>(
+                requestOptions: new QueryRequestOptions { PartitionKey = key.GetCosmosPartitionKey() })
+            .Where(history => history.Id.StartsWith($"{key.ViewName}.{EntityIdPrefixTypes.ConfigurationVersion}.{key.Annotation}."))
+            .Select(history => history.Version)
+            .MaxAsync();
+
+        return maxVersionResponse.Resource;
+    }
+
+    // Keys of the soft-deleted annotations of a view, whose configuration versions are hidden.
+    private static async Task<HashSet<string>> ReadDeletedAnnotationKeysAsync(Container container, string project, string view, CancellationToken cancellationToken)
+    {
+        var query = new QueryDefinition(
+                "SELECT VALUE c.AnnotationKey FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND c.ProjectName = @project "
+                + "AND c.ViewName = @view AND IS_DEFINED(c.AnnotationType) AND IS_DEFINED(c.Deletion)")
+            .WithParameter("@projectPrefix", $"{project}.")
+            .WithParameter("@project", project)
+            .WithParameter("@view", view);
+
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        using var iterator = container.GetItemQueryIterator<string>(query);
+
+        while (iterator.HasMoreResults)
+        {
+            foreach (var key in await iterator.ReadNextAsync(cancellationToken))
+            {
+                if (!string.IsNullOrEmpty(key))
+                {
+                    keys.Add(key);
+                }
+            }
+        }
+
+        return keys;
+    }
+
+    private static ConfigurationImportResult DeletedImport(string annotationKey)
+    {
+        return new ConfigurationImportResult(
+            ConfigurationImportOutcome.Skipped,
+            ErrorCode: ErrorCodes.AnnotationDeleted,
+            Message: $"The annotation {annotationKey} is deleted; restore it before importing its configuration.");
     }
 
     // A soft-deleted annotation's configuration cannot change until a restore.
