@@ -7,9 +7,11 @@ using _42.Platform.Cli.Commands.Configuration;
 using _42.Platform.Cli.Commands.KeyValues;
 using _42.Platform.Cli.Commands.Schemas;
 using _42.Platform.Cli.Commands.Templates;
-using _42.Platform.Storyteller.Sdk;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
+using SdkAnnotation = _42.Platform.Storyteller.Sdk.Annotation;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
@@ -66,8 +68,26 @@ public class StorytellerListCommand : BaseContextCommand
     [Option("-k|--continuation-token", CommandOptionType.SingleValue, Description = "The continuation token for next results page.")]
     public string? ContinuationToken { get; set; }
 
+    [Option("-i|--inactive", CommandOptionType.NoValue, Description = "Include disabled, scheduled and expired annotations.")]
+    public bool IncludeInactive { get; set; }
+
+    [Option("--deleted", CommandOptionType.NoValue, Description = "Include deleted annotations.")]
+    public bool IncludeDeleted { get; set; }
+
+    [Option("-a|--all", CommandOptionType.NoValue, Description = "Include every annotation: disabled, scheduled, expired and deleted ones.")]
+    public bool IncludeAll { get; set; }
+
+    // null keeps the API default: only active annotations
+    private bool? InactiveFlag => IncludeInactive || IncludeAll ? true : null;
+
+    private bool? DeletedFlag => IncludeDeleted || IncludeAll ? true : null;
+
+    private DateTimeOffset Now { get; set; }
+
     protected override async Task<int> ExecuteAsync()
     {
+        Now = DateTimeOffset.UtcNow;
+
         if (ShowAsTree)
         {
             await RenderTreeAsync();
@@ -121,6 +141,26 @@ public class StorytellerListCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 
+    // The key, and the status of an annotation that is not active.
+    private void WriteAnnotation(SdkAnnotation annotation)
+    {
+        var marker = AnnotationConsoleExtensions.FormatStatusMarker(annotation, Now);
+
+        if (marker.Length < 1)
+        {
+            Console.WriteLine($"- {annotation.AnnotationKey}");
+            return;
+        }
+
+        Console.WriteLine($"- {annotation.AnnotationKey} ", marker.ThemedLowlight(Console.Theme));
+    }
+
+    private string StatusSuffix(SdkAnnotation annotation)
+    {
+        var marker = AnnotationConsoleExtensions.FormatStatusMarker(annotation, Now);
+        return marker.Length < 1 ? string.Empty : $" {marker}";
+    }
+
     private async Task RenderSubjectsAsync()
     {
         var response = await _annotationsApi.GetSubjectsAsync(
@@ -129,8 +169,8 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ViewName,
             nameQuery: QuerySubjects,
             continuationToken: ContinuationToken,
-            includeInactive: null,
-            includeDeleted: null);
+            includeInactive: InactiveFlag,
+            includeDeleted: DeletedFlag);
 
         Console.WriteHeader("Subjects");
 
@@ -141,7 +181,7 @@ public class StorytellerListCommand : BaseContextCommand
 
         foreach (var annotation in response.Annotations)
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            WriteAnnotation(annotation);
         }
 
         if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
@@ -162,8 +202,8 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ViewName,
             nameQuery: QueryResponsibilities,
             continuationToken: ContinuationToken,
-            includeInactive: null,
-            includeDeleted: null);
+            includeInactive: InactiveFlag,
+            includeDeleted: DeletedFlag);
 
         Console.WriteHeader("Responsibilities");
 
@@ -174,7 +214,7 @@ public class StorytellerListCommand : BaseContextCommand
 
         foreach (var annotation in response.Annotations)
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            WriteAnnotation(annotation);
         }
 
         if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
@@ -196,8 +236,8 @@ public class StorytellerListCommand : BaseContextCommand
             responsibilityNameQuery: QueryResponsibilities,
             subjectNameQuery: QuerySubjects,
             continuationToken: ContinuationToken,
-            includeInactive: null,
-            includeDeleted: null);
+            includeInactive: InactiveFlag,
+            includeDeleted: DeletedFlag);
 
         Console.WriteHeader("Usages");
 
@@ -208,7 +248,7 @@ public class StorytellerListCommand : BaseContextCommand
 
         foreach (var annotation in response.Annotations)
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            WriteAnnotation(annotation);
         }
 
         if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
@@ -230,8 +270,8 @@ public class StorytellerListCommand : BaseContextCommand
             subjectNameQuery: QuerySubjects,
             nameQuery: QueryContexts,
             continuationToken: ContinuationToken,
-            includeInactive: null,
-            includeDeleted: null);
+            includeInactive: InactiveFlag,
+            includeDeleted: DeletedFlag);
 
         Console.WriteHeader("Contexts");
 
@@ -242,7 +282,7 @@ public class StorytellerListCommand : BaseContextCommand
 
         foreach (var annotation in response.Annotations)
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            WriteAnnotation(annotation);
         }
 
         if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
@@ -265,8 +305,8 @@ public class StorytellerListCommand : BaseContextCommand
             responsibilityNameQuery: QueryResponsibilities,
             contextNameQuery: QueryContexts,
             continuationToken: ContinuationToken,
-            includeInactive: null,
-            includeDeleted: null);
+            includeInactive: InactiveFlag,
+            includeDeleted: DeletedFlag);
 
         Console.WriteHeader("Executions");
 
@@ -277,7 +317,7 @@ public class StorytellerListCommand : BaseContextCommand
 
         foreach (var annotation in response.Annotations)
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            WriteAnnotation(annotation);
         }
 
         if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
@@ -299,8 +339,8 @@ public class StorytellerListCommand : BaseContextCommand
             annotationKey,
             "all",
             ContinuationToken,
-            null,
-            null);
+            InactiveFlag,
+            DeletedFlag);
 
         Console.WriteHeader("All descendants");
 
@@ -311,7 +351,7 @@ public class StorytellerListCommand : BaseContextCommand
 
         foreach (var annotation in response.Annotations)
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            WriteAnnotation(annotation);
         }
 
         if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
@@ -324,7 +364,7 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderAnnotationsAsync()
     {
-        var response = await _annotationsApi.GetAnnotationsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, null, null, null);
+        var response = await _annotationsApi.GetAnnotationsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, ContinuationToken, InactiveFlag, DeletedFlag);
         Console.WriteHeader("Annotations");
 
         if (response.Annotations.Count < 1)
@@ -334,7 +374,7 @@ public class StorytellerListCommand : BaseContextCommand
 
         foreach (var annotation in response.Annotations)
         {
-            Console.WriteLine($"- {annotation.AnnotationKey}");
+            WriteAnnotation(annotation);
         }
 
         if (!string.IsNullOrWhiteSpace(response.ContinuationToken))
@@ -367,8 +407,8 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ViewName,
             nameQuery: QueryResponsibilities,
             continuationToken: ContinuationToken,
-            includeInactive: null,
-            includeDeleted: null);
+            includeInactive: InactiveFlag,
+            includeDeleted: DeletedFlag);
 
         var root = new Composition("Tree of responsibilities");
 
@@ -385,7 +425,7 @@ public class StorytellerListCommand : BaseContextCommand
 
             var responsibilityNode = new Composition(new ConsoleOutputComposition(
                 new ConsoleOutput(responsibility.Name),
-                new ConsoleOutputThemedText(" [responsibility]", t => t.LowlightColor)));
+                new ConsoleOutputThemedText($" [responsibility]{StatusSuffix(responsibility)}", t => t.LowlightColor)));
             root.Children.Add(responsibilityNode);
 
             var executionsResponse = await _annotationsApi.GetExecutionsAsync(
@@ -396,8 +436,8 @@ public class StorytellerListCommand : BaseContextCommand
                 responsibilityNameQuery: responsibility.Name,
                 contextNameQuery: QueryContexts,
                 continuationToken: null,
-                includeInactive: null,
-                includeDeleted: null);
+                includeInactive: InactiveFlag,
+                includeDeleted: DeletedFlag);
 
             foreach (var execution in executionsResponse.Annotations)
             {
@@ -415,7 +455,7 @@ public class StorytellerListCommand : BaseContextCommand
 
                 subjectNode.Children.Add(new Composition(new ConsoleOutputComposition(
                     new ConsoleOutput(key.ContextName),
-                    new ConsoleOutputThemedText(" [context]", t => t.LowlightColor))));
+                    new ConsoleOutputThemedText($" [context]{StatusSuffix(execution)}", t => t.LowlightColor))));
             }
 
             foreach (var childNode in responsibilityNode.Children
@@ -443,8 +483,8 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ViewName,
             nameQuery: QuerySubjects,
             continuationToken: ContinuationToken,
-            includeInactive: null,
-            includeDeleted: null);
+            includeInactive: InactiveFlag,
+            includeDeleted: DeletedFlag);
 
         var root = new Composition("Tree of subjects");
 
@@ -460,7 +500,7 @@ public class StorytellerListCommand : BaseContextCommand
             var mapOfContexts = new Dictionary<string, Composition>();
             var subjectNode = new Composition(new ConsoleOutputComposition(
                 new ConsoleOutput(subject.Name),
-                new ConsoleOutputThemedText(" [subject]", t => t.LowlightColor)));
+                new ConsoleOutputThemedText($" [subject]{StatusSuffix(subject)}", t => t.LowlightColor)));
             root.Children.Add(subjectNode);
 
             var executionsResponse = await _annotationsApi.GetExecutionsAsync(
@@ -471,8 +511,8 @@ public class StorytellerListCommand : BaseContextCommand
                 responsibilityNameQuery: QueryResponsibilities,
                 contextNameQuery: QueryContexts,
                 continuationToken: null,
-                includeInactive: null,
-                includeDeleted: null);
+                includeInactive: InactiveFlag,
+                includeDeleted: DeletedFlag);
 
             foreach (var execution in executionsResponse.Annotations)
             {
@@ -490,7 +530,7 @@ public class StorytellerListCommand : BaseContextCommand
 
                 contextNode.Children.Add(new Composition(new ConsoleOutputComposition(
                     new ConsoleOutput(key.ResponsibilityName),
-                    new ConsoleOutputThemedText(" [responsibility]", t => t.LowlightColor))));
+                    new ConsoleOutputThemedText($" [responsibility]{StatusSuffix(execution)}", t => t.LowlightColor))));
             }
         }
 
@@ -504,4 +544,3 @@ public class StorytellerListCommand : BaseContextCommand
         }
     }
 }
-

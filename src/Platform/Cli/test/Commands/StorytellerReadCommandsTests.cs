@@ -23,7 +23,7 @@ public class StorytellerReadCommandsTests
         const string key = "sbt.northwind";
         var deletion = AnnotationCommandFixture.Deletion(key);
         _fixture.Api
-            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", key, null, null))
+            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", key, true, null))
             .ThrowsAsync(AnnotationCommandFixture.Error(404));
         _fixture.Api
             .Setup(api => api.GetDeletedAnnotationAsync("org1", "proj1", "default", key))

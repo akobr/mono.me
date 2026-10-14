@@ -138,7 +138,7 @@ public class StorytellerDeleteCommandTests
     public async Task Permanent_OfAnUnknownKey_AnswersNotFound()
     {
         _fixture.Api
-            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, null, null))
+            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, true, null))
             .ThrowsAsync(AnnotationCommandFixture.Error(404));
         _fixture.Api
             .Setup(api => api.GetDeletedAnnotationAsync("org1", "proj1", "default", Key))
@@ -153,7 +153,7 @@ public class StorytellerDeleteCommandTests
     private void ActiveKey(int descendants)
     {
         _fixture.Api
-            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, null, null))
+            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, true, null))
             .ReturnsAsync(new Annotation { AnnotationKey = Key });
 
         var children = new List<Annotation>();
@@ -164,14 +164,14 @@ public class StorytellerDeleteCommandTests
         }
 
         _fixture.Api
-            .Setup(api => api.GetDescendantsAsync("org1", "proj1", "default", Key, "all", null, null, null))
+            .Setup(api => api.GetDescendantsAsync("org1", "proj1", "default", Key, "all", null, true, null))
             .ReturnsAsync(new AnnotationsResponse { Annotations = children, Count = children.Count });
     }
 
     private void DeletedKey(AnnotationDeletion deletion)
     {
         _fixture.Api
-            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, null, null))
+            .Setup(api => api.GetAnnotationAsync("org1", "proj1", "default", Key, true, null))
             .ThrowsAsync(AnnotationCommandFixture.Error(404));
         _fixture.Api
             .Setup(api => api.GetDeletedAnnotationAsync("org1", "proj1", "default", Key))
