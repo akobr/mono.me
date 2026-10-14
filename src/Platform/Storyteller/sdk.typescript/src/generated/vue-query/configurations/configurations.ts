@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.6.55325
+ * OpenAPI spec version: 0.9.7.38817
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -22,6 +22,7 @@ import { computed, toValue, unref } from "vue";
 import type { MaybeRefOrGetter } from "vue";
 
 import type {
+  BindingCatalog,
   Configuration,
   ConfigurationVersion,
   ConfigurationsResponse,
@@ -42,6 +43,129 @@ import { storytellerFetch } from "../../../lib/fetcher";
 import type { ErrorType, BodyType } from "../../../lib/fetcher";
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
+
+export const getGetBindingCatalogUrl = (
+  organization: string,
+  project: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/bindings`;
+};
+
+/**
+ * The binding functions and sources registered on the server, with descriptions and examples. Values are never resolved.
+ */
+export const getBindingCatalog = async (
+  organization: string,
+  project: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<BindingCatalog> => {
+  return storytellerFetch<BindingCatalog>(
+    getGetBindingCatalogUrl(organization, project),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetBindingCatalogQueryKey = (
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+) => {
+  return ["v1", organization, project, "bindings"] as const;
+};
+
+export const getGetBindingCatalogQueryOptions = <
+  TData = Awaited<ReturnType<typeof getBindingCatalog>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getBindingCatalog>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetBindingCatalogQueryKey(organization, project);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getBindingCatalog>>
+  > = ({ signal }) =>
+    getBindingCatalog(toValue(organization), toValue(project), {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(organization) !== null &&
+        toValue(organization) !== undefined &&
+        toValue(project) !== null &&
+        toValue(project) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getBindingCatalog>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetBindingCatalogQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getBindingCatalog>>
+>;
+export type GetBindingCatalogQueryError = ErrorType<void | ErrorResponse>;
+
+export function useGetBindingCatalog<
+  TData = Awaited<ReturnType<typeof getBindingCatalog>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getBindingCatalog>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetBindingCatalogQueryOptions(
+    organization,
+    project,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
 
 export const getGetConfigurationsUrl = (
   organization: string,
