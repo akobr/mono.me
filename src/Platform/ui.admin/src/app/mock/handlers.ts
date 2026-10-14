@@ -17,6 +17,7 @@ import type {
 } from '@42for.net/2splatform.sdk'
 import { roleRank } from '@42for.net/2splatform.sdk'
 import { fallbackFunctions } from '@/utils/binding-language'
+import { stamp } from './audit'
 import { loadDb, saveDb, type MockDb } from './db'
 
 // Hand-written handlers for the operations the mock scenarios need to be coherent (accounts, access points,
@@ -177,8 +178,7 @@ export const viewHandlers: HttpHandler[] = [
         Description: body.Description,
         IsDefault: false,
         IsRegistered: true,
-        CreatedAt: new Date().toISOString(),
-        CreatedBy: db.user.id,
+        Created: stamp(db),
       }
       db.views[key] = [...viewsOf(db, key).filter((existing) => existing.Name !== body.Name), view]
       return HttpResponse.json(view, { status: 201 })
@@ -202,8 +202,7 @@ export const viewHandlers: HttpHandler[] = [
         Description: body.Description,
         IsDefault: params.view === 'default',
         IsRegistered: true,
-        CreatedAt: existing?.CreatedAt ?? new Date().toISOString(),
-        CreatedBy: existing?.CreatedBy ?? db.user.id,
+        Created: existing?.Created ?? stamp(db),
       }
       db.views[key] = [...viewsOf(db, key).filter((other) => other.Name !== params.view), view]
       return HttpResponse.json(view)

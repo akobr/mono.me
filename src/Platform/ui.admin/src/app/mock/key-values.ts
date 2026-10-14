@@ -1,4 +1,6 @@
 import type {
+  AuditActor,
+  AuditStamp,
   ClientEncryptionRecipient,
   KeyValue,
   KeyValueAuditEvent,
@@ -10,6 +12,7 @@ import type {
   KeyValueUsageReport,
   KeyValueVersion,
 } from '@42for.net/2splatform.sdk'
+import { accountActor, mockActor } from './audit'
 import type { MockDb } from './db'
 
 // The key/value pairs of the mock API (spec 29.8): a stateful store per scope with levels, versions with their
@@ -20,19 +23,16 @@ export interface StoredKeyValueVersion {
   Protection: KeyValueProtection
   Value: string
   ContentType?: string
-  Author: string
-  CreationTime: string
+  Modified: AuditStamp
   ExpirationTime?: string
   Recipients?: string[]
 }
 
 export interface StoredKeyValue {
   Key: string
-  CreatedBy: string
-  CreatedAt: string
+  Created: AuditStamp
   Versions: StoredKeyValueVersion[]
-  DeletedAt?: string
-  DeletedBy?: string
+  Deleted?: AuditStamp
   ExpiresAt?: string
 }
 
@@ -68,8 +68,7 @@ export const mockRecipient: ClientEncryptionRecipient = {
     E: 'AQAB',
   },
   IsEnabled: true,
-  CreatedAt: at(-40),
-  CreatedBy: 'user_01MOCKADA',
+  Created: { At: at(-40), By: accountActor('user_01MOCKADA') },
 }
 
 const base64Url = (text: string) => btoa(text).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')
@@ -89,9 +88,10 @@ function pair(
   key: string,
   protection: KeyValueProtection,
   values: string[],
-  options: { contentType?: string; author?: string; deletedDaysAgo?: number; recipients?: string[] } = {},
+  options: { contentType?: string; deletedDaysAgo?: number; recipients?: string[] } = {},
 ): StoredKeyValue {
-  const author = options.author ?? 'Ada Lovelace'
+  const author = accountActor('user_01MOCKADA')
+  const grace = accountActor('user_01MOCKGRACE')
   const created = Date.now() - values.length * 9 * day
   const versions = values.map((value, index): StoredKeyValueVersion => {
     const version = index + 1
@@ -101,19 +101,17 @@ function pair(
       Protection: protection,
       Value: value,
       ContentType: options.contentType,
-      Author: version % 2 ? author : 'Grace Hopper',
-      CreationTime: time,
+      Modified: { At: time, By: version % 2 ? author : grace },
       ExpirationTime: version === values.length ? undefined : new Date(created + index * 9 * day + versionRetentionDays * day).toISOString(),
       Recipients: options.recipients,
     }
   })
   return {
     Key: key,
-    CreatedBy: author,
-    CreatedAt: new Date(created).toISOString(),
+    Created: { At: new Date(created).toISOString(), By: author },
     Versions: versions,
     ...(options.deletedDaysAgo !== undefined
-      ? { DeletedAt: at(-options.deletedDaysAgo), DeletedBy: 'Grace Hopper', ExpiresAt: at(deletedRetentionDays - options.deletedDaysAgo) }
+      ? { Deleted: { At: at(-options.deletedDaysAgo), By: grace }, ExpiresAt: at(deletedRetentionDays - options.deletedDaysAgo) }
       : {}),
   }
 }
@@ -170,9 +168,8 @@ export function toSummary(stored: StoredKeyValue, includeValues: boolean): KeyVa
     ContentType: current.ContentType,
     IsReference: current.ContentType === secretReferenceContentType,
     Version: current.Version,
-    Author: current.Author,
-    UpdatedAt: current.CreationTime,
-    IsDeleted: !!stored.DeletedAt,
+    Modified: current.Modified,
+    IsDeleted: !!stored.Deleted,
     ExpiresAt: stored.ExpiresAt ?? null,
   }
 }
@@ -188,13 +185,10 @@ export function toKeyValue(stored: StoredKeyValue, version: StoredKeyValueVersio
     IsReference: version.ContentType === secretReferenceContentType,
     Recipients: version.Recipients,
     Version: version.Version,
-    Author: version.Author,
-    UpdatedAt: version.CreationTime,
-    CreatedBy: stored.CreatedBy,
-    CreatedAt: stored.CreatedAt,
-    IsDeleted: !!stored.DeletedAt,
-    DeletedAt: stored.DeletedAt ?? null,
-    DeletedBy: stored.DeletedBy,
+    Created: stored.Created,
+    Modified: version.Modified,
+    IsDeleted: !!stored.Deleted,
+    Deleted: stored.Deleted,
     ExpiresAt: stored.ExpiresAt ?? null,
   }
 }
@@ -204,9 +198,8 @@ export function toVersion(stored: StoredKeyValue, version: StoredKeyValueVersion
   return {
     Version: version.Version,
     Protection: version.Protection,
-    Author: version.Author,
-    CreationTime: version.CreationTime,
-    ExpirationTime: version === current && !stored.DeletedAt ? undefined : version.ExpirationTime ?? stored.ExpiresAt,
+    Modified: version.Modified,
+    ExpirationTime: version === current && !stored.Deleted ? undefined : version.ExpirationTime ?? stored.ExpiresAt,
     IsCurrent: version === current,
   }
 }
@@ -216,7 +209,7 @@ export function writeVersion(
   store: KeyValueScopeStore,
   key: string,
   write: { Protection: KeyValueProtection; Value: string; ContentType?: string; Recipients?: string[] },
-  author: string,
+  author: AuditActor,
 ): StoredKeyValue {
   const id = normalizeKey(key)
   const existing = store.pairs[id]
@@ -226,33 +219,29 @@ export function writeVersion(
     Protection: write.Protection,
     Value: write.Value,
     ContentType: write.ContentType,
-    Author: author,
-    CreationTime: time,
+    Modified: { At: time, By: author },
     Recipients: write.Recipients,
   }
   if (existing) {
     const previous = latest(existing)
     previous.ExpirationTime = at(versionRetentionDays)
     existing.Versions.push(version)
-    delete existing.DeletedAt
-    delete existing.DeletedBy
+    delete existing.Deleted
     delete existing.ExpiresAt
     return existing
   }
-  const created: StoredKeyValue = { Key: key.trim(), CreatedBy: author, CreatedAt: time, Versions: [version] }
+  const created: StoredKeyValue = { Key: key.trim(), Created: { At: time, By: author }, Versions: [version] }
   store.pairs[id] = created
   return created
 }
 
-export function softDelete(stored: StoredKeyValue, author: string): void {
-  stored.DeletedAt = now()
-  stored.DeletedBy = author
+export function softDelete(stored: StoredKeyValue, author: AuditActor): void {
+  stored.Deleted = { At: now(), By: author }
   stored.ExpiresAt = at(deletedRetentionDays)
 }
 
 export function restore(stored: StoredKeyValue): void {
-  delete stored.DeletedAt
-  delete stored.DeletedBy
+  delete stored.Deleted
   delete stored.ExpiresAt
 }
 
@@ -295,8 +284,7 @@ export function policyOf(db: MockDb, projectKey: string): KeyValuePolicy {
         : undefined,
       Recipients: billing ? [mockRecipient] : [],
       Version: billing ? 3 : 1,
-      Author: 'Ada Lovelace',
-      UpdatedAt: at(-30),
+      Modified: { At: at(-30), By: accountActor('user_01MOCKADA') },
     }
     policies[projectKey] = policy
   }
@@ -325,7 +313,7 @@ export function recordAudit(
   auditOf(db, projectKey).push({
     Id: `kva.${Date.now()}.${(counter++).toString(16)}`,
     Time: now(),
-    Actor: `account: ${db.user.id}`,
+    Actor: mockActor(db),
     Channel: 'User',
     Count: 1,
     CorrelationId: crypto.randomUUID(),
@@ -337,7 +325,7 @@ function seedAudit(): KeyValueAuditEvent[] {
   const entry = (daysAgo: number, event: Partial<KeyValueAuditEvent> & { Operation: KeyValueAuditEventOperation }): KeyValueAuditEvent => ({
     Id: `kva.seed.${daysAgo}.${event.Operation}`,
     Time: at(-daysAgo),
-    Actor: 'account: user_01MOCKADA',
+    Actor: accountActor('user_01MOCKADA'),
     Channel: 'User',
     Count: 1,
     CorrelationId: `00000000-0000-4000-8000-${String(daysAgo).padStart(12, '0')}`,
@@ -348,11 +336,11 @@ function seedAudit(): KeyValueAuditEvent[] {
     entry(20, { Operation: 'PolicyChange', Detail: 'AllowedProtections: Public, Standard, Hsm, Hyok' }),
     entry(18, { Operation: 'Create', View: 'default', Key: 'api.token', Version: 1, Protection: 'Hsm' }),
     entry(12, { Operation: 'Update', View: 'default', Key: 'db.password', Version: 2, Protection: 'Standard' }),
-    entry(9, { Operation: 'Reveal', View: 'default', Key: 'db.password', Version: 2, Protection: 'Standard', Actor: 'account: user_01MOCKGRACE' }),
-    entry(6, { Operation: 'BindingRead', View: 'default', Key: 'db.password', Protection: 'Standard', Actor: 'application: mach-billing-sync', Channel: 'MachineMtls', Count: 143 }),
+    entry(9, { Operation: 'Reveal', View: 'default', Key: 'db.password', Version: 2, Protection: 'Standard', Actor: accountActor('user_01MOCKGRACE') }),
+    entry(6, { Operation: 'BindingRead', View: 'default', Key: 'db.password', Protection: 'Standard', Actor: { Kind: 'Machine', Id: 'mach-billing-sync' }, Channel: 'MachineMtls', Count: 143 }),
     entry(3, { Operation: 'Rotate', Protection: 'Standard', Detail: 'Key version b7c1e0a9', Channel: 'User' }),
-    entry(3, { Operation: 'Rewrap', Protection: 'Standard', Detail: '4 envelopes', Actor: 'system', Channel: 'System' }),
-    entry(1, { Operation: 'Export', View: 'default', Detail: '2 secrets revealed', Actor: 'account: user_01MOCKGRACE' }),
+    entry(3, { Operation: 'Rewrap', Protection: 'Standard', Detail: '4 envelopes', Actor: { Kind: 'System', Id: 'system' }, Channel: 'System' }),
+    entry(1, { Operation: 'Export', View: 'default', Detail: '2 secrets revealed', Actor: accountActor('user_01MOCKGRACE') }),
   ]
 }
 
@@ -369,7 +357,7 @@ const dayHash = (projectKey: string, date: string) => {
 export function usageReport(db: MockDb, projectKey: string, from: string, to: string): KeyValueUsageReport {
   const [org, project] = projectKey.split('.') as [string, string]
   const store = storeOf(db, { org, project, view: 'default' })
-  const active = Object.values(store.pairs).filter((stored) => !stored.DeletedAt)
+  const active = Object.values(store.pairs).filter((stored) => !stored.Deleted)
   const count = (level: KeyValueProtection) => active.filter((stored) => latest(stored).Protection === level && latest(stored).ContentType !== secretReferenceContentType).length
   const references = active.filter((stored) => latest(stored).ContentType === secretReferenceContentType).length
   const versions = Object.values(store.pairs).reduce((sum, stored) => sum + stored.Versions.length, 0)

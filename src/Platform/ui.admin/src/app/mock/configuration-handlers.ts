@@ -83,7 +83,7 @@ export function combinedSchema(db: MockDb, scope: ScopeRef, key: string) {
         View: scope.view,
         ...identity,
         Version: version.Version,
-        Author: version.Author,
+        Modified: version.Modified,
         Content: version.Content,
       })
       merged = deepMerge(merged ?? {}, version.Content) as Record<string, unknown>
@@ -138,8 +138,7 @@ function summary(db: MockDb, scope: ScopeRef, key: string): ConfigurationSummary
         AnnotationKey: key,
         AnnotationType: metaOf(key.slice(0, 3))?.type,
         Version: version.Version,
-        Author: version.Author,
-        UpdatedAt: version.CreationTime,
+        Modified: version.Modified,
         HasContent: true,
       }
     : undefined
@@ -150,7 +149,7 @@ function configurationResponse(db: MockDb, scope: ScopeRef, key: string, content
   return {
     AnnotationKey: key,
     Version: version?.Version ?? 0,
-    Author: version?.Author ?? 'system',
+    Modified: version?.Modified ?? { At: new Date().toISOString(), By: { Kind: 'System' as const, Id: 'system' } },
     Content: content,
     Hash: ((JSON.stringify(content).length * 2654435761) >>> 0).toString(16),
   }
@@ -321,12 +320,7 @@ export const configurationHandlers: HttpHandler[] = [
       return (
         denied ??
         HttpResponse.json(
-          (document?.versions ?? []).map(({ Version, Author, CreationTime, ExpirationTime }) => ({
-            Version,
-            Author,
-            CreationTime,
-            ExpirationTime,
-          })),
+          (document?.versions ?? []).map(({ Version, Modified, ExpirationTime }) => ({ Version, Modified, ExpirationTime })),
         )
       )
     }),
@@ -346,7 +340,7 @@ export const configurationHandlers: HttpHandler[] = [
         ? HttpResponse.json({
             AnnotationKey: params.key,
             Version: version.Version,
-            Author: version.Author,
+            Modified: version.Modified,
             Content: version.Content,
           })
         : errorResponse(404, `Version ${params.version} of ${params.key} is not available.`, 'NotFound')

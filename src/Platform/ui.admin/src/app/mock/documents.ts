@@ -1,5 +1,6 @@
-import type { Annotation } from '@42for.net/2splatform.sdk'
+import type { Annotation, AuditActor, AuditStamp } from '@42for.net/2splatform.sdk'
 import { codeOfKey, typeCodes, type AnnotationTypeCode } from '@/utils/annotation-key'
+import { accountActor, stamp } from './audit'
 import { annotationsOf, type MockDb } from './db'
 import { templates, typeSchemas } from './schemas'
 
@@ -8,8 +9,8 @@ import { templates, typeSchemas } from './schemas'
 
 export interface StoredVersion {
   Version: number
-  Author: string
-  CreationTime: string
+  /** Who wrote the version and when, as ConfigurationVersion.Modified of the API. */
+  Modified: AuditStamp
   ExpirationTime?: string
   /** undefined: the version's document has expired. */
   Content?: Record<string, unknown>
@@ -33,7 +34,7 @@ export interface ScopeRef {
 }
 
 const day = 86_400_000
-const authors = ['Ada Lovelace', 'Grace Hopper', 'Alan Turing']
+const authors: AuditActor[] = ['user_01MOCKADA', 'user_01MOCKGRACE', 'user_01MOCKALAN'].map(accountActor)
 
 const hash = (text: string) => {
   let value = 0
@@ -55,8 +56,7 @@ function history(count: number, content: (version: number) => Record<string, unk
       const expired = now - created > 30 * day
       return {
         Version: version,
-        Author: authors[version % authors.length]!,
-        CreationTime: new Date(created).toISOString(),
+        Modified: { At: new Date(created).toISOString(), By: authors[version % authors.length]! },
         ExpirationTime: new Date(created + 30 * day).toISOString(),
         Content: expired ? undefined : content(version),
       }
@@ -181,8 +181,7 @@ export function putVersion(
   const now = new Date()
   const version: StoredVersion = {
     Version: (latest(document)?.Version ?? 0) + 1,
-    Author: db.user.name,
-    CreationTime: now.toISOString(),
+    Modified: stamp(db, now),
     ExpirationTime: new Date(now.getTime() + 30 * day).toISOString(),
     Content: content,
   }

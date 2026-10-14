@@ -15,6 +15,7 @@ import { useRevealedValue } from '@/composables/useRevealedValue'
 import { invalidateKeyValues } from '@/queries/invalidation'
 import { useKeyValue, useKeyValuePolicy, useRecipients } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
+import { actorName } from '@/utils/audit'
 import { formatDateTime } from '@/utils/dates'
 import { errorMessage } from '@/utils/errors'
 import {
@@ -150,7 +151,7 @@ async function save(options: { overwrite?: boolean } = {}) {
   } catch (error) {
     if (isPreconditionFailed(error) || hasErrorCode(error, 'KeyValueVersionMismatch')) {
       const fresh = await pair.refetch()
-      conflict.value = { version: fresh.data?.Version, author: fresh.data?.Author }
+      conflict.value = { version: fresh.data?.Version, author: fresh.data?.Modified ? actorName(fresh.data.Modified.By) : undefined }
     } else if (hasErrorCode(error, 'ProtectionNotAllowed')) {
       saveError.value = `${error.message} An Administrator allows levels in the Secrets settings.`
     } else if (hasErrorCode(error, 'CustomerKeyUnavailable')) {
@@ -251,11 +252,14 @@ const protectTargets = computed(() =>
         <dt class="text-muted">Version</dt>
         <dd class="font-mono text-xs">v{{ pair.data.value.Version }}</dd>
         <dt class="text-muted">Author</dt>
-        <dd>{{ pair.data.value.Author }}</dd>
+        <dd><AuditActorLink :actor="pair.data.value.Modified?.By" /></dd>
         <dt class="text-muted">Updated</dt>
-        <dd>{{ pair.data.value.UpdatedAt ? formatDateTime(new Date(pair.data.value.UpdatedAt)) : '' }}</dd>
+        <dd>{{ pair.data.value.Modified?.At ? formatDateTime(new Date(pair.data.value.Modified.At)) : '' }}</dd>
         <dt class="text-muted">Created</dt>
-        <dd>{{ pair.data.value.CreatedBy }}, {{ pair.data.value.CreatedAt ? formatDateTime(new Date(pair.data.value.CreatedAt)) : '' }}</dd>
+        <dd>
+          <AuditActorLink :actor="pair.data.value.Created?.By" />,
+          {{ pair.data.value.Created?.At ? formatDateTime(new Date(pair.data.value.Created.At)) : '' }}
+        </dd>
         <dt class="text-muted">Content type</dt>
         <dd class="font-mono text-xs">{{ pair.data.value.ContentType ?? 'text/plain' }}</dd>
         <dt class="text-muted">Binding</dt>

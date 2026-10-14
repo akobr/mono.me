@@ -98,8 +98,8 @@ const expiry = (entry: KeyValueVersion) =>
             <tr v-for="entry in rows" :key="entry.Version" :class="entry.IsCurrent ? 'bg-primary/5' : ''">
               <td class="px-3 py-2 font-mono text-xs">v{{ entry.Version }}<span v-if="entry.IsCurrent" class="ms-1 text-muted">(current)</span></td>
               <td class="px-3 py-2"><KeyValueLevelBadge :level="entry.Protection" /></td>
-              <td class="px-3 py-2 text-muted">{{ entry.Author }}</td>
-              <td class="px-3 py-2">{{ entry.CreationTime ? formatDateTime(new Date(entry.CreationTime)) : '' }}</td>
+              <td class="px-3 py-2"><AuditActorLink :actor="entry.Modified?.By" subtle /></td>
+              <td class="px-3 py-2">{{ entry.Modified?.At ? formatDateTime(new Date(entry.Modified.At)) : '' }}</td>
               <td class="px-3 py-2 text-muted">{{ expiry(entry) }}</td>
               <td class="px-3 py-2 text-end">
                 <template v-if="!clientEncrypted && (!isSecretLevel(entry.Protection) || canSecrets)">

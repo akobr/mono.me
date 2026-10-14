@@ -1,5 +1,6 @@
 import { setupWorker } from 'msw/browser'
 import { getStorytellerMock } from '@42for.net/2splatform.sdk/msw'
+import { accountActor } from './audit'
 import { applyScenarioFromUrl, loadDb, resetDb, saveDb, type MockScenario } from './db'
 import { getDocument, latest, putVersion, type ScopeRef } from './documents'
 import { mockHandlers } from './all-handlers'
@@ -29,7 +30,7 @@ export async function startMockApi(): Promise<void> {
       const db = loadDb()
       const id = `configuration:${key}` as const
       const content = { ...latest(getDocument(db, scope, id))?.Content, ...changes }
-      putVersion(db, scope, id, content).Author = 'Grace Hopper'
+      putVersion(db, scope, id, content).Modified.By = accountActor('user_01MOCKGRACE')
       saveDb(db)
     },
   }

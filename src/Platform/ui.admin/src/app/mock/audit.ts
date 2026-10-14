@@ -8,7 +8,7 @@ import type {
   AuditActor,
   AuditStamp,
 } from '@42for.net/2splatform.sdk'
-import { overridesOf, type MockDb } from './db'
+import { mockDirectory, overridesOf, type MockDb } from './db'
 
 // The change history of the mock API, in the shapes of the API (annotation-lifecycle.md, "Audit"): one list of
 // entries per key, written by every annotation write, delete, restore and configuration save.
@@ -26,6 +26,9 @@ const maxValueLength = 256
 let sequence = 0
 
 export const mockActor = (db: MockDb): AuditActor => ({ Kind: 'Account', Id: db.user.id, Name: db.user.name })
+
+/** An account of the mock directory, named as the API names the author of a change. */
+export const accountActor = (id: string): AuditActor => ({ Kind: 'Account', Id: id, Name: mockDirectory[id]?.name })
 
 export const stamp = (db: MockDb, at = new Date()): AuditStamp => ({ At: at.toISOString(), By: mockActor(db) })
 
