@@ -9,7 +9,7 @@ const preferences = usePreferencesStore()
 <template>
   <div class="flex w-full items-center gap-2">
     <RouterLink to="/" class="flex min-w-0 items-center gap-2 font-semibold" aria-label="2S Admin home">
-      <img src="/favicon.svg" alt="" class="size-6 shrink-0" />
+      <img src="@/assets/images/42logo-128.png" alt="" class="size-6 shrink-0" />
       <span v-if="!collapsed" class="truncate">2S Admin</span>
     </RouterLink>
     <UTooltip v-if="!collapsed" :text="preferences.sidebarPinned ? 'Unpin sidebar' : 'Pin sidebar'">
