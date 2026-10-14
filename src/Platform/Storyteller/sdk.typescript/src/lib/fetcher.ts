@@ -43,7 +43,7 @@ export function getStorytellerConfig(): StorytellerConfig {
  * The Orval mutator: every generated request goes through this function.
  * - prefixes the base URL to the generated "/v1/..." path (absolute URLs are kept),
  * - adds the bearer token, retries once after a 401 with a fresh token,
- * - parses JSON bodies by content type and returns any other content type as text,
+ * - parses JSON bodies by content type, returns zip and octet-stream bodies as a Blob and any other content type as text,
  * - throws StorytellerError for non-2xx responses and network failures.
  */
 export async function storytellerFetch<T>(url: string, init: RequestInit = {}): Promise<T> {
@@ -106,6 +106,11 @@ async function readBody(response: Response): Promise<unknown> {
     return undefined
   }
 
+  // Archives (configuration exports) stay binary; reading them as text would corrupt them.
+  if (response.ok && isBinary(response.headers.get('content-type') ?? '')) {
+    return await response.blob()
+  }
+
   const text = await response.text()
 
   if (text.length === 0) {
@@ -125,4 +130,8 @@ async function readBody(response: Response): Promise<unknown> {
   } catch {
     return text
   }
+}
+
+function isBinary(contentType: string): boolean {
+  return /^application\/(?:zip|octet-stream)\b/i.test(contentType)
 }

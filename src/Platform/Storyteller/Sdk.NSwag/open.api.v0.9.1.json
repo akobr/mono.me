@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.1.3549"
+    "version": "0.9.1.33866"
   },
   "servers": [
     {
@@ -8111,6 +8111,625 @@
         ]
       }
     },
+    "/v1/{organization}/{project}/{view}/configurations/exports": {
+      "post": {
+        "tags": [
+          "Configurations"
+        ],
+        "description": "Starts an export of the own documents of every configuration in the view, with their versions, as a zip: a folder of JSON files or a git repository. Poll the export until it has succeeded, then download its archive.",
+        "operationId": "StartConfigurationExport",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The format of the archive: Folder (default) or Git.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationExportCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The queued export; Location points to it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationExport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project already has the maximum of exports and imports in progress (TransferLimit).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configurations/exports/{id}": {
+      "get": {
+        "tags": [
+          "Configurations"
+        ],
+        "description": "The state of an export of the view.",
+        "operationId": "GetConfigurationExport",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The id of the export.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The export.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationExport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The export doesn't exist in this view, or has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configurations/exports/{id}/archive": {
+      "get": {
+        "tags": [
+          "Configurations"
+        ],
+        "description": "The zip of a succeeded export, named by Content-Disposition (the export's FileName).",
+        "operationId": "GetConfigurationExportArchive",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The id of the export.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The archive.",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The export doesn't exist in this view, or it or its archive has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The export is queued, running or failed (TransferNotReady).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configurations/imports": {
+      "post": {
+        "tags": [
+          "Configurations"
+        ],
+        "description": "Starts an import of a zip into the view: every <annotation-key>.json file, in any folder, replaces the annotation's own document as a new version unless it is equal. Version files, export.json and .git are ignored. Poll the import for the outcome of each file.",
+        "operationId": "StartConfigurationImport",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "description": "When true, store documents even if they violate their schema.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "dryRun",
+            "in": "query",
+            "description": "When true, validate and compare only; nothing is written.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "query",
+            "description": "The name of the uploaded file, for display.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The zip archive.",
+          "content": {
+            "application/zip": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "The queued import; Location points to it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationImport"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The body is not a zip, or breaks a limit of the archive (InvalidArchive).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The project already has the maximum of exports and imports in progress (TransferLimit).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The archive is larger than allowed (ArchiveTooLarge).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configurations/imports/{id}": {
+      "get": {
+        "tags": [
+          "Configurations"
+        ],
+        "description": "The state of an import into the view, with the outcome of its files.",
+        "operationId": "GetConfigurationImport",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The id of the import.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The import.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationImport"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The import doesn't exist in this view, or has expired.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Annotation.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Configuration.Secrets",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.Read",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/Default.ReadWrite",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/User.Impersonation",
+              "api://303a7632-ecfd-4eb7-af9b-be2043eaf25d/.default"
+            ]
+          }
+        ]
+      }
+    },
     "/v1/access/points/{key}/invitations": {
       "get": {
         "tags": [
@@ -11294,6 +11913,222 @@
             "additionalProperties": {
               "type": "object"
             }
+          }
+        }
+      },
+      "ConfigurationExport": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Status": {
+            "enum": [
+              "Queued",
+              "Running",
+              "Succeeded",
+              "Failed"
+            ],
+            "type": "string",
+            "default": "Queued"
+          },
+          "Format": {
+            "enum": [
+              "Folder",
+              "Git"
+            ],
+            "type": "string",
+            "default": "Folder"
+          },
+          "FileName": {
+            "type": "string"
+          },
+          "CreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "CreatedBy": {
+            "$ref": "#/components/schemas/AuditActor"
+          },
+          "StartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "CompletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ConfigurationCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "VersionCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "Size": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "Error": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfigurationExportCreate": {
+        "type": "object",
+        "properties": {
+          "Format": {
+            "enum": [
+              "Folder",
+              "Git"
+            ],
+            "type": "string",
+            "default": "Folder"
+          }
+        }
+      },
+      "ConfigurationImport": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Status": {
+            "enum": [
+              "Queued",
+              "Running",
+              "Succeeded",
+              "Failed"
+            ],
+            "type": "string",
+            "default": "Queued"
+          },
+          "FileName": {
+            "type": "string"
+          },
+          "IsDryRun": {
+            "type": "boolean"
+          },
+          "IsForced": {
+            "type": "boolean"
+          },
+          "CreatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "CreatedBy": {
+            "$ref": "#/components/schemas/AuditActor"
+          },
+          "StartedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "CompletedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "ExpiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "TotalCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "ProcessedCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "Summary": {
+            "$ref": "#/components/schemas/ConfigurationImportSummary"
+          },
+          "Items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigurationImportItem"
+            }
+          },
+          "AreItemsTruncated": {
+            "type": "boolean"
+          },
+          "Error": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfigurationImportItem": {
+        "type": "object",
+        "properties": {
+          "Path": {
+            "type": "string"
+          },
+          "AnnotationKey": {
+            "type": "string"
+          },
+          "Outcome": {
+            "enum": [
+              "Created",
+              "Updated",
+              "Unchanged",
+              "Skipped",
+              "Failed"
+            ],
+            "type": "string",
+            "default": "Created"
+          },
+          "Version": {
+            "type": "integer",
+            "format": "int64",
+            "nullable": true
+          },
+          "ErrorCode": {
+            "type": "string"
+          },
+          "Message": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfigurationImportSummary": {
+        "type": "object",
+        "properties": {
+          "Created": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Updated": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Unchanged": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Skipped": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "Failed": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "IgnoredFiles": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

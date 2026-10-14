@@ -35,7 +35,7 @@ The fetcher (`lib/fetcher.ts`, the Orval mutator):
 
 - prefixes `baseUrl` to the generated `/v1/...` paths,
 - adds `Authorization: Bearer …` when `getAccessToken` returns a token, and asks for a token once more after a `401` (with `forceRefresh: true`),
-- parses `application/json` and `application/*+json` bodies and returns every other content type as text (PEM certificates, unified diffs),
+- parses `application/json` and `application/*+json` bodies, returns `application/zip` and `application/octet-stream` bodies as a `Blob` (configuration export archives), and every other content type as text (PEM certificates, unified diffs),
 - throws `StorytellerError` (`status`, `message`, `hint`, `errorCode`, `schemaErrors`) for non-2xx responses, and with `status: 0` for network failures and aborts (`aborted: true`, `isAborted(error)`).
 
 With Vue Query, query keys are the path segments of the request, so cache invalidation can use paths:

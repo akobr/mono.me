@@ -4,6 +4,30 @@ The configurations of a view can be exported as a zip, either as a folder of JSO
 
 The code is in `src/Platform/Storyteller/Backend.Core/src/Transferring/` (jobs, archive formats, the git writer), `Backend.CosmosDb/src/Transferring/` and `Configuring/CosmosConfigurationService.cs` (jobs and documents in Cosmos DB), and `Backend.AzureStorage/src/` (archives and the queue). The design and its decisions are in [the spec](specs/2026-10-14%20Export%20and%20Import%20of%20Configurations.md).
 
+## API
+
+All routes are below `v1/{organization}/{project}/{view}/configurations`, with the tag `Configurations` (`Api.Functions/src/V1/ConfigurationTransferHttp.cs`).
+
+| Method | Route | Answer |
+| --- | --- | --- |
+| `POST` | `…/exports` with `{ "Format": "Folder" \| "Git" }` | `202` `ConfigurationExport`, `Location` of the job; `409 TransferLimit` |
+| `GET` | `…/exports/{id}` | `200` `ConfigurationExport`; `404` for an unknown, expired or other view's export |
+| `GET` | `…/exports/{id}/archive` | `200` `application/zip`, `Content-Disposition` with the export's `FileName`; `409 TransferNotReady` while it is queued, running or failed; `404` |
+| `POST` | `…/imports?force=&dryRun=&fileName=` with the zip as the body (`application/zip`) | `202` `ConfigurationImport`, `Location` of the job; `400 InvalidArchive`; `413 ArchiveTooLarge`; `409 TransferLimit` |
+| `GET` | `…/imports/{id}` | `200` `ConfigurationImport` with the summary and the items; `404` |
+
+- **Export** needs the scope `Configuration.Read`, `Configuration.Write`, `Default.Read` or `Default.Write` and any role on the project, like reading one configuration. The archive holds only own documents, which every reader can read.
+- **Import**, and reading an import, needs `Configuration.Write` or `Default.Write` and `Contributor`, like writing a configuration.
+- Machines are allowed with the same scopes. The caller's author string becomes the `Author` of imported versions, and its audit actor the job's `CreatedBy` and the actor of each audit entry.
+- The upload is copied into memory up to `MaxArchiveBytes` (a larger `Content-Length` is refused before reading) and must start with a zip signature; then the central directory is checked (see [Limits](#limits)).
+
+The background half is `Api.Functions/src/Transfers/ConfigurationTransferFunctions.cs`:
+
+- `ProcessConfigurationTransfer` is triggered by the queue `configuration-transfers` on `AzureWebJobsStorage`. `host.json` sets `batchSize` 4 and `maxDequeueCount` 3. A message that is not a valid job is logged and dropped. Any other failure fails the invocation (`ExceptionHandlingMiddleware` rethrows for invocations without an HTTP request), so the runtime delivers the message again.
+- `PurgeConfigurationTransfers` runs every hour at minute 17 and deletes archives older than the retention plus one hour.
+
+Locally, the Aspire host (`Aspire.Host/src/AppHost.cs`) runs Azurite on the default ports, so `UseDevelopmentStorage=true` of `local.settings.json` works unchanged. Without Aspire, start Azurite (`npx azurite`) before the Functions host.
+
 ## What travels
 
 Only the annotations' **own documents**: the `Content` of the configuration item `{view}.cnf.{key}` and of its versions `{view}.cfv.{key}.{version}` ([inheritance.md](inheritance.md)).

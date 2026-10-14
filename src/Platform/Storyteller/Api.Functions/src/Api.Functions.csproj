@@ -31,6 +31,7 @@
     <PackageReference Include="Microsoft.Azure.Functions.Worker.ApplicationInsights" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.OpenApi" />
+    <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Storage.Queues" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Timer" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.OpenApi.Core" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" />
@@ -45,6 +46,7 @@
     <ProjectReference Include="..\..\Access.Certificates.Azure.KeyVault\src\Access.Certificates.Azure.KeyVault.csproj" />
     <ProjectReference Include="..\..\Access.AzureAd\src\Access.AzureAd.csproj" />
     <ProjectReference Include="..\..\Access.Keycloak\src\Access.Keycloak.csproj" />
+    <ProjectReference Include="..\..\Backend.AzureStorage\src\Backend.AzureStorage.csproj" />
     <ProjectReference Include="..\..\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
     <ProjectReference Include="..\..\Binding.Azure.KeyVault\src\Binding.Azure.KeyVault.csproj" />
     <ProjectReference Include="..\..\KeyValues.Azure.KeyVault\src\KeyValues.Azure.KeyVault.csproj" />
