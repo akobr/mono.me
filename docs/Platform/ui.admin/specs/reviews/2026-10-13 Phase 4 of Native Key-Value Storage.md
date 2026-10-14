@@ -69,3 +69,22 @@ The admin UI is green: `vue-tsc` (typecheck), `oxlint` and ESLint, Vitest 174 (1
 - **Phone header.** With Export, Import and New key as labelled buttons, the right side of the navbar took the whole width of a phone and the left side (menu button, context) collapsed to zero width. The three buttons are icon-only below `sm` (`aria-label` keeps their names).
 - `test/e2e/key-values.spec.ts` gained a test that filters by level, clears the filter and leaves the screen through the navigation menu on desktop and on the phone.
 
+## Review findings of PR #69 (14 Oct 2026)
+
+Fixed, across the phases:
+
+- `KeyValueRules`: a missing value answers `ValueRequired` and a too long content type `InvalidContentType` (new error codes; the create dialog maps them to their fields).
+- `EnvelopeValueProtector`: the plaintext cache key carries a fingerprint of the envelope, so a plaintext is reused only for the same ciphertext at an identity.
+- `ContainerFactory`: a positive `DefaultTimeToLive` of an existing container is set to `-1` too; a positive default would expire active records.
+- `AddAzureKeyVaultBindings`: a vault named `default`, `public` or `secret` is a source again; `AddKeyValueBindings`, registered later, takes the names over.
+- `KeyVaultKeyProvider`: the shared key creation runs without a caller's token; a cancelled caller only stops waiting (`WaitAsync`).
+- Bulk requests: an empty `KeyPrefix` selects every key, as documented; only a missing one is refused.
+- `sform kv set` on an existing key keeps the stored level and acts on it (hidden prompt for a secret, local encryption for HYOK).
+- `kv restore|purge|protect` summaries ("protected", not "protectd"), the escaped pipe in the policy route table, the policy cache dropped on a version conflict, string checks of JWK members, the PEM recipient key size check in the TypeScript SDK, the dirty check of the policy card, the client-side encryption inside the submit's error handling, and the blob URL revoked after the download started.
+
+Skipped:
+
+- "Keep the `All` state of the list": the screen offers Active and Deleted on purpose (spec 29.2); a hand-typed `state=All` falls back to Deleted.
+- "Reject a default secret level that is no longer allowed": the default is left alone when its level is disabled, by design and covered by `KeyValuePolicyTests`; a write at that level fails with `ProtectionNotAllowed`.
+- "Format the audit `from`/`to` with the round-trip format": the generated client is left alone (NSwag's default template drops the offset). Instead `sform kv audit` converts the times to UTC before the call, which is what the API assumes for a time without an offset.
+

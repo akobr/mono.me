@@ -177,7 +177,7 @@ Contains dependency-injection registration:
 
 Provides integration with Azure Key Vault:
 - `KeyVaultBindingSource`: Implements `IBindingSource`. Declines (`null`) unless `IncludeSecrets` is set, and transforms configuration paths (using dots) to Key Vault secret names (using double dashes, e.g., `db.password` becomes `db--password`).
-- `EntryPoint`: Provides the `AddAzureKeyVaultBindings` extension method to configure multiple Key Vaults and register a `KeyVaultBindingSource` per vault. A vault entry named `default`, `public` or `secret` gets a `SecretClient` but no binding source, because the native store owns those names; give such a vault another entry name to read it as `@(db.password, shared)`.
+- `EntryPoint`: Provides the `AddAzureKeyVaultBindings` extension method to configure multiple Key Vaults and register a `KeyVaultBindingSource` per vault. A vault entry named `default`, `public` or `secret` is a source of that name until `AddKeyValueBindings` is registered after it (as the API does), when the native store takes the name over; give such a vault another entry name to read it as `@(db.password, shared)` next to the store.
 
 ## Built-in Functions
 

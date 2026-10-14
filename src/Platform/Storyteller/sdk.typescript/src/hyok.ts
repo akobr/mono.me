@@ -244,7 +244,14 @@ async function importRecipientKey(publicKey: RsaPublicJwk | string): Promise<Cry
 
   if (typeof publicKey === 'string') {
     const der = pemToDer(publicKey, 'PUBLIC KEY')
-    return crypto.subtle.importKey('spki', der, algorithm, false, ['encrypt'])
+    const key = await crypto.subtle.importKey('spki', der, algorithm, false, ['encrypt'])
+    const { modulusLength } = key.algorithm as RsaHashedKeyAlgorithm
+
+    if (modulusLength < minimumRecipientModulusBits) {
+      throw new Error(`The recipient key has ${modulusLength} bits; at least ${minimumRecipientModulusBits} are required.`)
+    }
+
+    return key
   }
 
   const modulusBits = base64UrlDecode(publicKey.n).length * 8

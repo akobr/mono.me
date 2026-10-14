@@ -204,7 +204,9 @@ public class ContainerFactory : IContainerFactory
     {
         var changed = false;
 
-        if (properties.DefaultTimeToLive is null)
+        // null: TTL off, so the ttl of versions and deleted items is ignored; positive: every item without its own ttl
+        // expires, which active records never may. -1 keeps TTL on with no default expiry.
+        if (properties.DefaultTimeToLive is null or > 0)
         {
             properties.DefaultTimeToLive = -1;
             changed = true;

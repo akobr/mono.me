@@ -55,18 +55,18 @@ public class KeyValueSetCommand : KeyValueCommandBase
     protected override async Task<int> ExecuteKeyValuesAsync()
     {
         var key = RequireKey(Key);
-        var level = await ResolveLevelAsync(key);
+        var (level, effectiveLevel) = await ResolveLevelAsync(key);
         var contentType = Reference ? SecretReferenceContentType : ContentType;
 
-        if (Reference && level is not null && level != KeyValueProtection.Public)
+        if (Reference && effectiveLevel != KeyValueProtection.Public)
         {
             Console.WriteImportant("A reference is a public pair; the platform never resolves it. Drop --protection or --secret.");
             throw new WrongInputException();
         }
 
-        var value = await ReadValueAsync(level);
+        var value = await ReadValueAsync(effectiveLevel);
 
-        if (level == KeyValueProtection.Hyok)
+        if (effectiveLevel == KeyValueProtection.Hyok)
         {
             var recipients = await KeyValues.GetRecipientsAsync(Context.OrganizationName, Context.ProjectName);
             value = KeyValueClientEncryption.Encrypt(value, recipients, Context.OrganizationName, Context.ProjectName, Context.ViewName, key, contentType ?? "text/plain");
@@ -90,34 +90,39 @@ public class KeyValueSetCommand : KeyValueCommandBase
         return ExitCodes.SUCCESS;
     }
 
-    // The level: given, the project's default secret level with --secret, Public for a new key without any, or kept on an update.
-    private async Task<KeyValueProtection?> ResolveLevelAsync(string key)
+    // The level to write (null keeps the stored one on an update) and the level the value ends up at: given, the
+    // project's default secret level with --secret, Public for a new key without any, or the stored level of an existing key.
+    private async Task<(KeyValueProtection? Write, KeyValueProtection Effective)> ResolveLevelAsync(string key)
     {
         if (Protection is not null)
         {
-            return KeyValueLevels.Parse(Console, Protection);
+            var given = KeyValueLevels.Parse(Console, Protection);
+            return (given, given);
         }
 
         if (Secret)
         {
             var policy = await KeyValues.GetKeyValuePolicyAsync(Context.OrganizationName, Context.ProjectName);
-            return KeyValueLevels.Parse(Console, policy.DefaultSecretProtection.ToString());
+            var fallback = KeyValueLevels.Parse(Console, policy.DefaultSecretProtection.ToString());
+            return (fallback, fallback);
         }
 
         if (Reference)
         {
-            return KeyValueProtection.Public;
+            return (KeyValueProtection.Public, KeyValueProtection.Public);
         }
 
         try
         {
-            await KeyValues.GetKeyValueAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, null, null);
-            return null;
+            var existing = await KeyValues.GetKeyValueAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, key, null, null);
+
+            // the write keeps the stored level; the value is still read and encrypted for that level
+            return (null, Enum.Parse<KeyValueProtection>(existing.Protection.ToString()));
         }
         catch (ApiException exception) when (exception.StatusCode == (int)HttpStatusCode.NotFound)
         {
             Console.WriteLine("New key, stored as Public; use --secret or --protection for a secret.".ThemedLowlight(Console.Theme));
-            return KeyValueProtection.Public;
+            return (KeyValueProtection.Public, KeyValueProtection.Public);
         }
     }
 

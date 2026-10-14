@@ -38,7 +38,7 @@ watch(
 const dirty = computed(
   () =>
     [...allowed.value].toSorted().join() !== [...((props.policy.AllowedProtections ?? []) as string[])].toSorted().join() ||
-    defaultLevel.value !== props.policy.DefaultSecretProtection ||
+    defaultLevel.value !== (props.policy.DefaultSecretProtection ?? 'Standard') ||
     requireMtls.value !== (props.policy.RequireMtlsForSecretDelivery ?? true),
 )
 

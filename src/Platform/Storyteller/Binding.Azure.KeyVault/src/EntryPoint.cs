@@ -43,12 +43,8 @@ public static class EntryPoint
         {
             foreach (var vault in vaults.GetChildren())
             {
-                // the native key/value store owns "default", "public" and "secret"; such a vault is still a vault, not a source
-                if (KeyValueBindingSources.ReservedKeys.Contains(vault.Key))
-                {
-                    continue;
-                }
-
+                // a vault named "default", "public" or "secret" is a source too, until AddKeyValueBindings (registered
+                // later) takes the name over for the native key/value store
                 options.AddSource(
                     provider => new KeyVaultBindingSource(
                         provider.GetRequiredService<IAzureClientFactory<SecretClient>>(), vault.Key),

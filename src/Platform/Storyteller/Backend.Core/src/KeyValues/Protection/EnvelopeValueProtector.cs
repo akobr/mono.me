@@ -125,9 +125,12 @@ public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
         _cache.Dispose();
     }
 
-    private static string GetCacheKey(KeyValueIdentity identity)
+    // The identity and a fingerprint of the envelope: a plaintext is reused only for the same ciphertext at that identity
+    // (a key purged and written again starts at version 1 within the cache window).
+    private static string GetCacheKey(KeyValueIdentity identity, EncryptedValue encrypted)
     {
-        return $"{identity.Organization}/{identity.Project}/{identity.View}/{identity.Key}/{identity.Version}";
+        var fingerprint = SHA256.HashData(Encoding.UTF8.GetBytes($"{encrypted.KeyId}|{encrypted.WrappedKey}|{encrypted.Nonce}|{encrypted.Ciphertext}"));
+        return $"{identity.Organization}/{identity.Project}/{identity.View}/{identity.Key}/{identity.Version}/{Convert.ToHexStringLower(fingerprint)[..32]}";
     }
 
     private IKeyEncryptionProvider GetProvider(KeyValueProtection protection)
@@ -200,15 +203,14 @@ public sealed class EnvelopeValueProtector : IValueProtector, IDisposable
 
     private async Task<string> DecryptAsync(KeyValueIdentity identity, StoredValue value, CancellationToken cancellationToken)
     {
-        var cacheKey = GetCacheKey(identity);
+        var encrypted = value.Encrypted
+            ?? throw new KeyValueIntegrityException($"The '{value.Protection}' value of '{identity.Key}' version {identity.Version} has no ciphertext.");
+        var cacheKey = GetCacheKey(identity, encrypted);
 
         if (_cache.TryGetValue(cacheKey, out string? cached) && cached is not null)
         {
             return cached;
         }
-
-        var encrypted = value.Encrypted
-            ?? throw new KeyValueIntegrityException($"The '{value.Protection}' value of '{identity.Key}' version {identity.Version} has no ciphertext.");
 
         var provider = GetProvider(value.Protection);
         var policy = await _policies.GetAsync(identity.Organization, identity.Project, cancellationToken);

@@ -31,7 +31,7 @@ public static class KeyValueBindingSources
         [SecretKey] = KeyValueSourceKind.Secret,
     };
 
-    // Source names the native store owns; other registrations (a vault named "default") skip them.
+    // Source names the native store takes over when AddKeyValueBindings is registered after the other sources.
     public static readonly IReadOnlySet<string> ReservedKeys = Kinds.Keys.ToHashSet(StringComparer.Ordinal);
 }
 

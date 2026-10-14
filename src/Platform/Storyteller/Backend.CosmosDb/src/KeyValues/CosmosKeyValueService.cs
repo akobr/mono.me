@@ -1053,7 +1053,8 @@ public class CosmosKeyValueService : IKeyValueService
                 .ToList();
         }
 
-        if (string.IsNullOrWhiteSpace(request.KeyPrefix))
+        // an empty prefix selects every key of the view; only a missing one is an error
+        if (request.KeyPrefix is null)
         {
             throw new InvalidInputException("Keys or a key prefix is required.", ErrorCodes.InvalidKey);
         }

@@ -69,17 +69,18 @@ const onSubmit = handleSubmit(async (form) => {
     return
   }
 
-  let sent = form.value
-  if (isClientEncrypted(form.protection)) {
-    if (hyokRecipients.value.length === 0) {
-      setFieldError('protection', 'The project has no enabled recipient; add one in the Secrets settings.')
-      return
-    }
-    const { org, project, view } = context.scope
-    sent = await encryptForRecipients(form.value, hyokRecipients.value, getHyokPlace(org, project, view, form.key), form.contentType || 'text/plain')
+  if (isClientEncrypted(form.protection) && hyokRecipients.value.length === 0) {
+    setFieldError('protection', 'The project has no enabled recipient; add one in the Secrets settings.')
+    return
   }
 
   try {
+    let sent = form.value
+    if (isClientEncrypted(form.protection)) {
+      const { org, project, view } = context.scope
+      sent = await encryptForRecipients(form.value, hyokRecipients.value, getHyokPlace(org, project, view, form.key), form.contentType || 'text/plain')
+    }
+
     const pair = await setKeyValue(context.scope.org, context.scope.project, context.scope.view, form.key, {
       Protection: form.protection as KeyValueProtection,
       Value: sent,
@@ -93,7 +94,9 @@ const onSubmit = handleSubmit(async (form) => {
       setFieldError('key', 'This key exists already; open it to change its value.')
     } else if (hasErrorCode(error, 'ProtectionNotAllowed')) {
       setFieldError('protection', `${error.message} Allow it in the Secrets settings.`)
-    } else if (hasErrorCode(error, 'InvalidSecretReference') || hasErrorCode(error, 'InvalidKey') || hasErrorCode(error, 'ValueTooLarge')) {
+    } else if (hasErrorCode(error, 'InvalidContentType')) {
+      setFieldError('contentType', error.message)
+    } else if (hasErrorCode(error, 'InvalidSecretReference') || hasErrorCode(error, 'InvalidKey') || hasErrorCode(error, 'ValueRequired') || hasErrorCode(error, 'ValueTooLarge')) {
       setFieldError(hasErrorCode(error, 'InvalidKey') ? 'key' : 'value', error.message)
     } else if (isConflict(error)) {
       formError.value = errorMessage(error)
