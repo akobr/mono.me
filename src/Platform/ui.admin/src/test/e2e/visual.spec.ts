@@ -28,6 +28,7 @@ const screens: {
     name: 'annotation-history',
     path: '/acme/billing/default/annotations/exe.northwind.invoicing.prod/history',
   },
+  { name: 'configurations', path: '/acme/billing/default/configurations' },
   { name: 'deleted', path: '/acme/billing/default/deleted', prepare: deleted('sbt.contoso') },
   { name: 'template', path: '/acme/billing/default/templates/exe' },
   { name: 'schemas', path: '/acme/billing/default/schemas' },
