@@ -12,7 +12,8 @@ public enum AuditActorKind
     System,
 }
 
-// Who made a change. Id is the account's subject (sub) or the machine id; Name is a display snapshot from the token.
+// Who did something. Kind and Id are the reference: the account's subject (sub, the account id), the machine id,
+// or "system". Name is a display snapshot taken when the change was made; it is never looked up and may be stale.
 public record class AuditActor
 {
     public required AuditActorKind Kind { get; init; }
@@ -22,11 +23,19 @@ public record class AuditActor
     public string? Name { get; init; }
 
     public static AuditActor System { get; } = new() { Kind = AuditActorKind.System, Id = "system" };
+
+    public static AuditActor Account(string id, string? name = null) => new() { Kind = AuditActorKind.Account, Id = id, Name = name };
+
+    public static AuditActor Machine(string id, string? name = null) => new() { Kind = AuditActorKind.Machine, Id = id, Name = name };
 }
 
+// Who made a change and when. Created: the write that created the object; Modified: the write that produced the
+// current state (or the listed version); Deleted: the soft delete, only while deleted.
 public record class AuditStamp
 {
     public required DateTimeOffset At { get; init; }
 
     public required AuditActor By { get; init; }
+
+    public static AuditStamp Of(AuditActor by, DateTimeOffset at) => new() { At = at, By = by };
 }

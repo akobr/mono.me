@@ -143,8 +143,7 @@ public class TemplateHttp
 
         try
         {
-            var author = request.GetAuthor();
-            var outputModel = await _templates.CreateOrUpdateTemplateAsync(organization, project, view, annotationType, inputModel, author);
+            var outputModel = await _templates.CreateOrUpdateTemplateAsync(organization, project, view, annotationType, inputModel, request.GetAuditActor());
             return new OkObjectResult(outputModel);
         }
         catch (TemplateConcurrencyException ex)
@@ -211,8 +210,7 @@ public class TemplateHttp
 
         try
         {
-            var author = request.GetAuthor();
-            var outputModel = await _templates.PatchTemplateAsync(organization, project, view, annotationType, patchOperations, author);
+            var outputModel = await _templates.PatchTemplateAsync(organization, project, view, annotationType, patchOperations, request.GetAuditActor());
             return new OkObjectResult(outputModel);
         }
         catch (TemplateNotFoundException ex)

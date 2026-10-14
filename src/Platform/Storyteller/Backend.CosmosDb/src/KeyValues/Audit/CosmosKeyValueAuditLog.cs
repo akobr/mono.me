@@ -57,7 +57,7 @@ public class CosmosKeyValueAuditLog : IKeyValueAuditLog
     {
         ArgumentNullException.ThrowIfNull(caller);
         var hour = _timeProvider.GetUtcNow().UtcDateTime.Date.AddHours(_timeProvider.GetUtcNow().UtcDateTime.Hour);
-        var bucket = new BindingReadKey(organization, project, view, KeyValueRules.Normalize(key), protection, caller.Author, caller.Channel, hour);
+        var bucket = new BindingReadKey(organization, project, view, KeyValueRules.Normalize(key), protection, caller.Actor, caller.Channel, hour);
         _bindingReads.AddOrUpdate(bucket, 1, (_, count) => count + 1);
     }
 
@@ -207,7 +207,7 @@ public class CosmosKeyValueAuditLog : IKeyValueAuditLog
         string View,
         string Key,
         KeyValueProtection Protection,
-        string Actor,
+        AuditActor Actor,
         KeyValueChannel Channel,
         DateTime Hour);
 }

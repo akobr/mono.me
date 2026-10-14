@@ -1,4 +1,3 @@
-using System;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller.KeyValues.Protection;
 using Newtonsoft.Json;
@@ -37,7 +36,6 @@ public record class KeyValueVersionEntity
 
     public required StoredValue Content { get; init; }
 
-    public required string Author { get; init; }
-
-    public required DateTimeOffset CreationTime { get; init; }
+    // The write that produced this version.
+    public required AuditStamp Modified { get; init; }
 }

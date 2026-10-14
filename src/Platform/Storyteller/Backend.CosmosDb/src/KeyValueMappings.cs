@@ -16,13 +16,10 @@ internal static class KeyValueMappings
         IsReference = KeyValueContentTypes.IsReference(e.Content.ContentType),
         Recipients = e.Content.Recipients,
         Version = e.Version,
-        Author = e.Author,
-        UpdatedAt = e.UpdatedAt,
-        CreatedBy = e.CreatedBy,
-        CreatedAt = e.CreatedAt,
+        Created = e.Created,
+        Modified = e.Modified,
         IsDeleted = e.IsDeleted,
-        DeletedAt = e.DeletedAt,
-        DeletedBy = e.DeletedBy,
+        Deleted = e.Deleted,
         ExpiresAt = GetExpiration(e.LastUpdatedEpochTimestamp, e.TimeToLiveInSeconds, now),
     };
 
@@ -35,13 +32,10 @@ internal static class KeyValueMappings
         IsReference = KeyValueContentTypes.IsReference(e.Content.ContentType),
         Recipients = e.Content.Recipients,
         Version = e.Version,
-        Author = e.Author,
-        UpdatedAt = e.CreationTime,
-        CreatedBy = catalog?.CreatedBy ?? e.Author,
-        CreatedAt = catalog?.CreatedAt ?? e.CreationTime,
+        Created = catalog?.Created ?? e.Modified,
+        Modified = e.Modified,
         IsDeleted = catalog?.IsDeleted ?? false,
-        DeletedAt = catalog?.DeletedAt,
-        DeletedBy = catalog?.DeletedBy,
+        Deleted = catalog?.Deleted,
     };
 
     public static KeyValueVersionEntity ToVersion(this KeyValueEntity e, int timeToLiveInSeconds) => new()
@@ -55,16 +49,14 @@ internal static class KeyValueMappings
         NormalizedKey = KeyValueRules.Normalize(e.Key),
         Version = e.Version,
         Content = e.Content,
-        Author = e.Author,
-        CreationTime = e.UpdatedAt,
+        Modified = e.Modified,
     };
 
     public static KeyValueVersion ToCurrentVersion(this KeyValueEntity e, DateTimeOffset now) => new()
     {
         Version = e.Version,
         Protection = e.Content.Protection,
-        Author = e.Author,
-        CreationTime = e.UpdatedAt,
+        Modified = e.Modified,
         ExpirationTime = GetExpiration(e.LastUpdatedEpochTimestamp, e.TimeToLiveInSeconds, now),
         IsCurrent = true,
     };
@@ -73,8 +65,7 @@ internal static class KeyValueMappings
     {
         Version = row.Version,
         Protection = row.Protection,
-        Author = row.Author ?? string.Empty,
-        CreationTime = row.CreationTime,
+        Modified = row.Modified,
         ExpirationTime = GetExpiration(row.Timestamp, row.TimeToLive, now),
     };
 
@@ -86,9 +77,8 @@ internal static class KeyValueMappings
         ContentType = row.ContentType,
         IsReference = KeyValueContentTypes.IsReference(row.ContentType),
         Version = row.Version,
-        Author = row.Author ?? string.Empty,
-        UpdatedAt = row.UpdatedAt,
-        IsDeleted = row.DeletedAt is not null,
+        Modified = row.Modified,
+        IsDeleted = row.Deleted is not null,
         ExpiresAt = GetExpiration(row.Timestamp, row.TimeToLive, now),
     };
 

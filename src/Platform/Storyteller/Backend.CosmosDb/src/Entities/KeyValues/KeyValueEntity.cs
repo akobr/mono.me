@@ -1,4 +1,3 @@
-using System;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller.KeyValues.Protection;
 using Newtonsoft.Json;
@@ -41,19 +40,15 @@ public record class KeyValueEntity
 
     public required StoredValue Content { get; init; }
 
-    public required string Author { get; init; }
+    public required AuditStamp Created { get; init; }
 
-    public required DateTimeOffset UpdatedAt { get; init; }
+    // The write that produced the current version.
+    public required AuditStamp Modified { get; init; }
 
-    public required string CreatedBy { get; init; }
-
-    public required DateTimeOffset CreatedAt { get; init; }
-
-    public DateTimeOffset? DeletedAt { get; init; }
-
-    public string? DeletedBy { get; init; }
+    // Set only while the key is soft-deleted.
+    public AuditStamp? Deleted { get; init; }
 
     [System.Text.Json.Serialization.JsonIgnore]
     [Newtonsoft.Json.JsonIgnore]
-    public bool IsDeleted => DeletedAt is not null;
+    public bool IsDeleted => Deleted is not null;
 }

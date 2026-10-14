@@ -260,8 +260,7 @@ public partial class CosmosAnnotationService : IAnnotationService
             ProjectName = configuration.ProjectName,
             ViewName = configuration.ViewName,
             Content = configuration.Content,
-            CreationTime = configuration.GetLastUpdatedTime(),
-            Author = configuration.Author,
+            Modified = configuration.GetModified(),
         };
     }
 

@@ -16,7 +16,7 @@ Each annotation may have one configuration item in the organization container.
 | `CalculatedContent` | The effective document: ancestors, this annotation's type template, and `Content`, merged. |
 | `CalculatedContentHash` | Identity of `CalculatedContent`. Eight lowercase hex digits, MurmurHash3 32-bit, seed `42`, of the calculated JSON serialized with `JsonSettingNames.Unique`. |
 
-`GetRawConfigurationAsync` returns a `Configuration` whose `Content` property is the effective document. `Version` and `Author` come from the target annotation's configuration item. `Hash` is `CalculatedContentHash`.
+`GetRawConfigurationAsync` returns a `Configuration` whose `Content` property is the effective document. `Version` and `Modified` come from the target annotation's configuration item. `Hash` is `CalculatedContentHash`.
 
 The item id is `{viewName}.cnf.{annotationKey}`. Subject and context items use the subject partition `{project}.sbt.{subject}`. Every other annotation type uses the responsibility partition `{project}.rst.{responsibility}`. Ancestor keys are read from their own partitions. The walk crosses partitions.
 
@@ -72,7 +72,7 @@ Two nodes are shared:
 3. When the item already has `CalculatedContent`, return it. Ancestors and templates are left unread.
 4. Otherwise build the graph and run `CalculateAndCacheConfigurationAsync` on the requested node.
 5. Reload the configuration item so the response carries the hash just written.
-6. Return that item with the calculated object as `Content`. When no item exists after calculation, return the calculated object with version `0` and author `system`.
+6. Return that item with the calculated object as `Content`. When no item exists after calculation, return the calculated object with version `0`, stamped as the calculation by `System`.
 
 `CalculateAndCacheConfigurationAsync` runs for the requested node and, recursively, for every ancestor:
 
@@ -82,7 +82,7 @@ Two nodes are shared:
 4. For each direct ancestor in `AnnotationType` order, calculate that ancestor and `MergeInto` its calculated document.
 5. `MergeInto` the view template of this node's type (`{view}.gen.{typeCode}` in partition `{project}.template`), when that item exists. See [templating.md](templating.md).
 6. `MergeInto` this node's stored `Content`, when the configuration item exists.
-7. When the merged object has at least one property, persist it. An existing item is upserted with `CalculatedContent` and `CalculatedContentHash`; stored `Content`, `Version`, and `Author` stay as they were. A missing item is created with empty `Content`, author `system`, and the merge in `CalculatedContent`. An empty merge is returned and left unstored, so the next read calculates it again.
+7. When the merged object has at least one property, persist it. An existing item is upserted with `CalculatedContent` and `CalculatedContentHash`; stored `Content`, `Version`, and `Modified` stay as they were. A missing item is created with empty `Content`, `Modified` stamped by `System`, and the merge in `CalculatedContent`. An empty merge is returned and left unstored, so the next read calculates it again.
 
 The value merged from an ancestor is that ancestor's full calculated document. It already contains the ancestor's own ancestors, the ancestor's template, and the ancestor's stored content. A node that has no configuration item contributes an empty object, plus anything its ancestors and its template produced.
 

@@ -10,5 +10,5 @@ public record class ConfigurationTemplate
 
     public required JObject Content { get; init; }
 
-    public required string Author { get; init; }
+    public required AuditStamp Modified { get; init; }
 }

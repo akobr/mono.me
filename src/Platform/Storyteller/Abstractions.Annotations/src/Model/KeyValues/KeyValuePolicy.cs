@@ -29,9 +29,8 @@ public record class KeyValuePolicy
 
     public ulong Version { get; init; }
 
-    public string? Author { get; init; }
-
-    public DateTimeOffset? UpdatedAt { get; init; }
+    // Null for the defaults.
+    public AuditStamp? Modified { get; init; }
 }
 
 public record class ProtectionKeyInfo
@@ -112,9 +111,7 @@ public record class ClientEncryptionRecipient
 
     public bool IsEnabled { get; init; } = true;
 
-    public required DateTimeOffset CreatedAt { get; init; }
-
-    public required string CreatedBy { get; init; }
+    public required AuditStamp Created { get; init; }
 }
 
 public record class RewrapStatus

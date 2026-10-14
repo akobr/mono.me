@@ -125,20 +125,22 @@ public class CosmosAnnotationAuditTests(Startup startup)
     }
 
     [Fact]
-    public async Task ConfigurationChange_WithAnActor_IsInTheHistory()
+    public async Task ConfigurationChange_IsInTheHistory()
     {
         var configurations = Context.Services.GetRequiredService<IConfigurationService>();
         await Annotations.CreateAnnotationAsync(TestConstants.Organization, Model("sbt.cc-s"));
 
-        await configurations.CreateOrUpdateConfigurationAsync(Key("sbt.cc-s"), JObject.Parse("""{ "a": 1 }"""), "account: user_editor", actor: Editor);
-        await configurations.CreateOrUpdateConfigurationAsync(Key("sbt.cc-s"), JObject.Parse("""{ "a": 2 }"""), "account: user_editor");
+        await configurations.CreateOrUpdateConfigurationAsync(Key("sbt.cc-s"), JObject.Parse("""{ "a": 1 }"""), Editor);
+        await configurations.CreateOrUpdateConfigurationAsync(Key("sbt.cc-s"), JObject.Parse("""{ "a": 2 }"""), AuditActor.System);
 
         var history = await Annotations.GetAnnotationHistoryAsync(Key("sbt.cc-s"));
-        var change = history!.Entries[0];
-        change.Action.Should().Be(AnnotationAuditAction.ConfigurationChanged);
-        change.ConfigurationVersion.Should().Be(1);
-        change.Actor.Id.Should().Be(Editor.Id);
-        history.Entries.Should().HaveCount(2, "a change without an actor is not recorded");
+        history!.Entries.Should().HaveCount(3);
+        history.Entries[0].Action.Should().Be(AnnotationAuditAction.ConfigurationChanged);
+        history.Entries[0].ConfigurationVersion.Should().Be(2);
+        history.Entries[0].Actor.Should().Be(AuditActor.System);
+        history.Entries[1].Action.Should().Be(AnnotationAuditAction.ConfigurationChanged);
+        history.Entries[1].ConfigurationVersion.Should().Be(1);
+        history.Entries[1].Actor.Id.Should().Be(Editor.Id);
     }
 
     [Fact]

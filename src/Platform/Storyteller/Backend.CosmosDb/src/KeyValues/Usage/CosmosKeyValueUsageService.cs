@@ -213,7 +213,7 @@ public class CosmosKeyValueUsageService : IKeyValueUsageService
     {
         var query = new QueryDefinition(
                 "SELECT c.ProjectName AS Project, c.Content.Protection AS Protection, COUNT(1) AS Count, SUM(c.Content.Length) AS Bytes FROM c "
-                + "WHERE CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) AND NOT IS_DEFINED(c.DeletedAt) "
+                + "WHERE CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) AND NOT IS_DEFINED(c.Deleted.At) "
                 + "GROUP BY c.ProjectName, c.Content.Protection")
             .WithParameter("@infix", $".{PartitionKeys.KeyValuesPartitionInfix}.")
             .WithParameter("@prefix", $"{EntityIdPrefixTypes.KeyValue}.");
@@ -225,7 +225,7 @@ public class CosmosKeyValueUsageService : IKeyValueUsageService
     {
         var query = new QueryDefinition(
                 "SELECT c.ProjectName AS Project, COUNT(1) AS Count, SUM(c.Content.Length) AS Bytes FROM c "
-                + "WHERE CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) AND NOT IS_DEFINED(c.DeletedAt) "
+                + "WHERE CONTAINS(c.PartitionKey, @infix) AND STARTSWITH(c.id, @prefix) AND NOT IS_DEFINED(c.Deleted.At) "
                 + "AND (c.Content.ContentType = @reference OR c.Content.ContentType = @appConfiguration) GROUP BY c.ProjectName")
             .WithParameter("@infix", $".{PartitionKeys.KeyValuesPartitionInfix}.")
             .WithParameter("@prefix", $"{EntityIdPrefixTypes.KeyValue}.")

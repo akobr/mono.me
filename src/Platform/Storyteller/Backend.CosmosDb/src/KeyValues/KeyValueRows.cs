@@ -1,4 +1,3 @@
-using System;
 using Newtonsoft.Json;
 
 namespace _42.Platform.Storyteller.KeyValues;
@@ -13,11 +12,9 @@ internal sealed record KeyValueListingRow
 
     public ulong Version { get; init; }
 
-    public string? Author { get; init; }
+    public required AuditStamp Modified { get; init; }
 
-    public DateTimeOffset UpdatedAt { get; init; }
-
-    public DateTimeOffset? DeletedAt { get; init; }
+    public AuditStamp? Deleted { get; init; }
 
     [JsonProperty("ttl")]
     public int? TimeToLive { get; init; }
@@ -46,9 +43,7 @@ internal sealed record KeyValueVersionRow
 {
     public ulong Version { get; init; }
 
-    public string? Author { get; init; }
-
-    public DateTimeOffset CreationTime { get; init; }
+    public required AuditStamp Modified { get; init; }
 
     public KeyValueProtection Protection { get; init; }
 

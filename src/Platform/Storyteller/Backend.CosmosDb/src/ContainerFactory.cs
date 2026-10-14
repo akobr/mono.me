@@ -17,6 +17,18 @@ public class ContainerFactory : IContainerFactory
     // items of soft-deleted annotations), and the audit entries left out of the index.
     public const string AuditEntriesPath = "/Entries/*";
 
+    // The audit stamps and actors are read with their items but never filtered or sorted on, so they stay out of the
+    // index, where they would cost index terms on every write (on the emulator, an annotation write drops from about
+    // 15 to 10 RU). Only the deletion times stay indexed: the deleted listings filter and sort on them.
+    public static readonly IReadOnlyList<string> AuditStampPaths =
+    [
+        "/Created/*",
+        "/Modified/*",
+        "/Deleted/By/*",
+        "/Deletion/DeletedBy/*",
+        "/Actor/*",
+    ];
+
     private readonly ICosmosClientProvider _cosmosClientProvider;
     private readonly CosmosDbOptions _options;
     private readonly AsyncLazy<Database> _database;
@@ -220,10 +232,13 @@ public class ContainerFactory : IContainerFactory
             changed = true;
         }
 
-        if (!policy.ExcludedPaths.Any(path => string.Equals(path.Path, AuditEntriesPath, StringComparison.Ordinal)))
+        foreach (var excludedPath in AuditStampPaths.Prepend(AuditEntriesPath))
         {
-            policy.ExcludedPaths.Add(new ExcludedPath { Path = AuditEntriesPath });
-            changed = true;
+            if (!policy.ExcludedPaths.Any(path => string.Equals(path.Path, excludedPath, StringComparison.Ordinal)))
+            {
+                policy.ExcludedPaths.Add(new ExcludedPath { Path = excludedPath });
+                changed = true;
+            }
         }
 
         return changed;

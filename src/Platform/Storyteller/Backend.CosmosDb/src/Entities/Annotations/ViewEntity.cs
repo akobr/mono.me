@@ -20,18 +20,26 @@ public record class ViewEntity
 
     public string? Description { get; init; }
 
-    public required DateTimeOffset CreatedAt { get; init; }
+    // Null on views registered before the stamps (see GetCreated).
+    public AuditStamp? Created { get; init; }
 
-    public required string CreatedBy { get; init; }
+    // Legacy creation of views registered before the stamps; never written again.
+    public DateTimeOffset? CreatedAt { get; init; }
+
+    public string? CreatedBy { get; init; }
 
     public static string GetPartitionKey(string project) => $"{project}.meta";
+
+    public AuditStamp? GetCreated()
+    {
+        return Created ?? (CreatedAt is { } at ? LegacyAuthors.ToStamp(CreatedBy, at) : null);
+    }
 
     public View ToView() => new()
     {
         Name = Name,
         Description = Description,
-        CreatedAt = CreatedAt,
-        CreatedBy = CreatedBy,
+        Created = GetCreated(),
         IsDefault = Name == Constants.DefaultViewName,
         IsRegistered = true,
     };

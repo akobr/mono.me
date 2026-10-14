@@ -19,7 +19,7 @@ public class ClientEncryptionAndReferenceTests(Startup startup)
     private const string Org = TestConstants.Organization;
     private const string View = Constants.DefaultViewName;
 
-    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets("account: admin");
+    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets(AuditActor.Account("admin"));
 
     // A test-only key pair generated for this fixture; it protects nothing.
     private const string TypeScriptSdkPrivateKeyPem = """
@@ -120,7 +120,7 @@ public class ClientEncryptionAndReferenceTests(Startup startup)
         using var rsa = RSA.Create();
         rsa.ImportFromPem(TypeScriptSdkPrivateKeyPem);
         var identity = new KeyValueIdentity("acme", "billing", "default", "db.password", 1);
-        var recipients = new[] { new ClientEncryptionRecipient { Id = "api", Name = "api", PublicKey = ToModel(RsaPublicJwk.FromRsa(rsa)), CreatedAt = DateTimeOffset.UnixEpoch, CreatedBy = "test" } };
+        var recipients = new[] { new ClientEncryptionRecipient { Id = "api", Name = "api", PublicKey = ToModel(RsaPublicJwk.FromRsa(rsa)), Created = AuditStamp.Of(AuditActor.Account("test"), DateTimeOffset.UnixEpoch) } };
 
         var document = JweDocument.Parse(TypeScriptSdkDocument);
         var validated = ClientEncryptedValueValidator.Validate(TypeScriptSdkDocument, identity, recipients);
@@ -138,8 +138,8 @@ public class ClientEncryptionAndReferenceTests(Startup startup)
         var identity = new KeyValueIdentity("acme", "billing", "default", "db.password", 1);
         var recipients = new[]
         {
-            new ClientEncryptionRecipient { Id = "app", Name = "App", PublicKey = new RsaJsonWebKey { N = "x", E = "AQAB" }, IsEnabled = true, CreatedAt = DateTimeOffset.UtcNow, CreatedBy = "t" },
-            new ClientEncryptionRecipient { Id = "old", Name = "Old", PublicKey = new RsaJsonWebKey { N = "x", E = "AQAB" }, IsEnabled = false, CreatedAt = DateTimeOffset.UtcNow, CreatedBy = "t" },
+            new ClientEncryptionRecipient { Id = "app", Name = "App", PublicKey = new RsaJsonWebKey { N = "x", E = "AQAB" }, IsEnabled = true, Created = AuditStamp.Of(AuditActor.Account("t"), DateTimeOffset.UtcNow) },
+            new ClientEncryptionRecipient { Id = "old", Name = "Old", PublicKey = new RsaJsonWebKey { N = "x", E = "AQAB" }, IsEnabled = false, Created = AuditStamp.Of(AuditActor.Account("t"), DateTimeOffset.UtcNow) },
         };
         var key = new ClientEncryptionRecipientKey("app", RsaPublicJwk.FromRsa(rsa));
         var place = ClientEncryptedValueValidator.GetPlace(identity);

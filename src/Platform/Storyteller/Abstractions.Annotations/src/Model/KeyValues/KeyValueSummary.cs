@@ -18,9 +18,7 @@ public record class KeyValueSummary
 
     public required ulong Version { get; init; }
 
-    public required string Author { get; init; }
-
-    public required DateTimeOffset UpdatedAt { get; init; }
+    public required AuditStamp Modified { get; init; }
 
     public bool IsDeleted { get; init; }
 

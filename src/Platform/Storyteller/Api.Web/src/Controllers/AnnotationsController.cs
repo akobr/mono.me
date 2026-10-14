@@ -659,6 +659,6 @@ public class AnnotationsController : ControllerBase
 
         return id is null
             ? AuditActor.System
-            : new AuditActor { Kind = AuditActorKind.Account, Id = id, Name = User.FindFirst("name")?.Value };
+            : AuditActor.Account(id, User.FindFirst("name")?.Value);
     }
 }

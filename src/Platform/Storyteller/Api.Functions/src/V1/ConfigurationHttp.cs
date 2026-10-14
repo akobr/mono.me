@@ -221,8 +221,7 @@ public class ConfigurationHttp
 
         try
         {
-            var author = request.GetAuthor();
-            var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, author, IsForce(request), request.GetAuditActor());
+            var outputModel = await _configuration.CreateOrUpdateConfigurationAsync(fullKey, inputModel, request.GetAuditActor(), IsForce(request));
             return new OkObjectResult(outputModel);
         }
         catch (StorytellerException ex)
@@ -304,8 +303,7 @@ public class ConfigurationHttp
 
         try
         {
-            var author = request.GetAuthor();
-            var outputModel = await _configuration.PatchConfigurationAsync(fullKey, patchOperations, author, IsForce(request), request.GetAuditActor());
+            var outputModel = await _configuration.PatchConfigurationAsync(fullKey, patchOperations, request.GetAuditActor(), IsForce(request));
             return new OkObjectResult(outputModel);
         }
         catch (StorytellerException ex)

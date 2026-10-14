@@ -18,7 +18,7 @@ public class KeyValueAuditAndUsageTests(Startup startup)
     private const string Org = TestConstants.Organization;
     private const string View = Constants.DefaultViewName;
 
-    private static readonly KeyValueCaller Admin = new("account: admin", true, true, KeyValueChannel.User) { CorrelationId = "corr-1" };
+    private static readonly KeyValueCaller Admin = new(AuditActor.Account("admin"), true, true, KeyValueChannel.User) { CorrelationId = "corr-1" };
 
     private IKeyValueService KeyValues => Context.Services.GetRequiredService<IKeyValueService>();
 
@@ -55,7 +55,7 @@ public class KeyValueAuditAndUsageTests(Startup startup)
             KeyValueAuditOperation.Update,
         ]);
         all.Items.Should().BeInDescendingOrder(entry => entry.Time);
-        all.Items.Should().OnlyContain(entry => entry.Actor == "account: admin" && entry.CorrelationId == "corr-1" && entry.Channel == KeyValueChannel.User);
+        all.Items.Should().OnlyContain(entry => entry.Actor == AuditActor.Account("admin") && entry.CorrelationId == "corr-1" && entry.Channel == KeyValueChannel.User);
         all.Items.Single(entry => entry.Operation == KeyValueAuditOperation.Update && entry.Key == "pub").Detail.Should().Be("Public -> Standard");
         all.Items.Single(entry => entry.Operation == KeyValueAuditOperation.Export).Detail.Should().Be("1 secret value(s)");
 
@@ -74,7 +74,7 @@ public class KeyValueAuditAndUsageTests(Startup startup)
         var project = $"kv-bind-audit-{Guid.NewGuid().ToString("N")[..8]}";
         await KeyValues.SetAsync(Org, project, View, "s", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "v" }, Admin);
         await KeyValues.SetAsync(Org, project, View, "p", new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "v" }, Admin);
-        var machine = new KeyValueCaller("application: m1", true, true, KeyValueChannel.MachineMtls);
+        var machine = new KeyValueCaller(AuditActor.Machine("m1"), true, true, KeyValueChannel.MachineMtls);
 
         KeyValueCallerContext.Current = machine;
 
@@ -97,7 +97,7 @@ public class KeyValueAuditAndUsageTests(Startup startup)
         reads.Items.Should().ContainSingle("three reads of one secret by one actor make one event; public reads are not audited");
         reads.Items[0].Count.Should().Be(3);
         reads.Items[0].Key.Should().Be("s");
-        reads.Items[0].Actor.Should().Be("application: m1");
+        reads.Items[0].Actor.Should().Be(AuditActor.Machine("m1"));
         reads.Items[0].Channel.Should().Be(KeyValueChannel.MachineMtls);
     }
 

@@ -109,7 +109,7 @@ Machine certificates are in Cosmos now (`CosmosClientCertificateStore`, partitio
 
 ## Audit trail
 
-Every secret-related operation writes a `KeyValueAuditEvent` into the organization container, partition `{project}.audit`, id `kva.{time}.{guid}`, with `ttl` = `KeyValues:AuditRetention` (400 days): the operation, time, view, key, version, level, actor, channel, correlation id (the Functions invocation id, also sent to Key Vault as `x-ms-client-request-id`) and a detail, never a value. Operations: `Create`, `Update`, `Delete`, `Restore`, `PermanentDelete`, `Purge`, `Reprotect`, `Reveal`, `Export`, `Import`, `PolicyChange`, `Rotate`, `Rewrap`, `ByokVerify`, `ByokUnavailable`, `RecipientAdded`, `RecipientChanged`, `RecipientRemoved`. Public writes are not audited. Binding reads of secrets are counted per actor, key and hour in memory and written as one `BindingRead` event with `Count` by the usage flush. `IKeyValueAuditLog.QueryAsync` pages through the events, newest first, filtered by view, key, operation and time.
+Every secret-related operation writes a `KeyValueAuditEvent` into the organization container, partition `{project}.audit`, id `kva.{time}.{guid}`, with `ttl` = `KeyValues:AuditRetention` (400 days): the operation, time, view, key, version, level, actor (an [`AuditActor`](audit-stamps.md#the-actor)), channel, correlation id (the Functions invocation id, also sent to Key Vault as `x-ms-client-request-id`) and a detail, never a value. Operations: `Create`, `Update`, `Delete`, `Restore`, `PermanentDelete`, `Purge`, `Reprotect`, `Reveal`, `Export`, `Import`, `PolicyChange`, `Rotate`, `Rewrap`, `ByokVerify`, `ByokUnavailable`, `RecipientAdded`, `RecipientChanged`, `RecipientRemoved`. Public writes are not audited. Binding reads of secrets are counted per actor, key and hour in memory and written as one `BindingRead` event with `Count` by the usage flush. `IKeyValueAuditLog.QueryAsync` pages through the events, newest first, filtered by view, key, operation and time.
 
 ## Usage meters
 
@@ -123,7 +123,7 @@ Pairs live in the organization container (`org.{organization}`), in the partitio
 
 | Item | id | Content |
 | --- | --- | --- |
-| Catalog item | `kv.{lower-cased key}` | The current version: key, protection, value or envelope, author, timestamps, the deleted state |
+| Catalog item | `kv.{lower-cased key}` | The current version: key, protection, value or envelope, the `Created` and `Modified` [audit stamps](audit-stamps.md), `Deleted` while deleted |
 | Version | `kvv.{lower-cased key}.{version}` | A version that is no longer current, with its own `ttl` |
 
 Versions are separate items on purpose. A read of the current value costs about 1 RU whatever the history is, a listing loads catalog items only, and a new version costs one create and one replace in one batch. Embedding the history in the catalog item would make every read and every listing pay for it, and could not expire versions one by one.
@@ -136,7 +136,7 @@ The version items of one key are queried by the id prefix `kvv.{key}.` and carry
 | --- | --- |
 | Create | Version 1, or one more than the highest version still stored, so numbering continues after an expired deleted key |
 | Update | The current version becomes a version item with the rest of its lifetime as `ttl`; the catalog item gets `Version + 1`. The same value, content type and level is not written again |
-| Delete | Soft. The current version is written to history, and the catalog item gets `DeletedAt`, `DeletedBy` and a `ttl` of 90 days (`KeyValues:DeletedRetention`). The key is not found by reads and listings unless they ask for deleted keys |
+| Delete | Soft. The current version is written to history, and the catalog item gets the `Deleted` stamp and a `ttl` of 90 days (`KeyValues:DeletedRetention`). The key is not found by reads and listings unless they ask for deleted keys |
 | Restore | The catalog item loses its deleted state and `ttl`, and the history item of the current version is removed again. **No new version** |
 | Write to a deleted key | Continues the numbering; the old versions are still there |
 | Permanent delete, purge | Every version item, then the catalog item. Nothing is left, and a new create starts at version 1 |
@@ -224,16 +224,16 @@ The integration tests of `KeyValues.Azure.KeyVault/testint` start Lowkey Vault w
 
 ## Service
 
-`IKeyValueService` (`Backend.Core/src/KeyValues/`) is implemented by `CosmosKeyValueService`. Every call takes the organization, project and view, and the writes take a `KeyValueCaller`: the author, `CanReadSecrets`, `CanWriteSecrets`, the channel and the correlation id. The API decides the rights; the service enforces them, because only the service knows whether a key is a secret. The service also checks the project policy, validates references and client-encrypted values, writes the audit events and counts the usage.
+`IKeyValueService` (`Backend.Core/src/KeyValues/`) is implemented by `CosmosKeyValueService`. Every call takes the organization, project and view, and the writes take a `KeyValueCaller`: the actor (an [`AuditActor`](audit-stamps.md#the-actor)), `CanReadSecrets`, `CanWriteSecrets`, the channel and the correlation id. The API decides the rights; the service enforces them, because only the service knows whether a key is a secret. The service also checks the project policy, validates references and client-encrypted values, writes the audit events and counts the usage.
 
 | Method | Behaviour |
 | --- | --- |
-| `ListAsync` | One page of catalog items as `KeyValueSummary` (key, level, content type, version, author, updated, deleted state, expiry), filtered by key prefix, levels and state (`Active`, `Deleted`, `All`), ordered by key, with a continuation token. Values of public pairs only with `IncludeValues`; values of secrets never |
+| `ListAsync` | One page of catalog items as `KeyValueSummary` (key, level, content type, version, `Modified`, deleted state, expiry), filtered by key prefix, levels and state (`Active`, `Deleted`, `All`), ordered by key, with a continuation token. Values of public pairs only with `IncludeValues`; values of secrets never |
 | `GetAsync` | The current version. A secret's value only with `Reveal` and `CanReadSecrets` (`403` otherwise); a deleted key only with `IncludeDeleted` |
 | `SetAsync` | Create or update, see the lifecycle |
 | `DeleteAsync` | Soft, or permanent with `Permanent`. False when the key does not exist |
 | `RestoreAsync`, `PurgeAsync`, `ProtectAsync` | Bulk, by a list of at most 100 keys or by a prefix of at most 1,000 keys. Each key gets its own outcome: `Done`, `Unchanged`, `NotFound`, `Forbidden`, `NotAllowed` or `Failed`. Protect changes the level between the server-side levels and writes a new version; public and client-encrypted pairs need a new value from the client |
-| `GetVersionsAsync` | Every stored version with its level, author, creation time, expiry and `IsCurrent` |
+| `GetVersionsAsync` | Every stored version with its level, `Modified` (who wrote it and when), expiry and `IsCurrent` |
 | `GetVersionAsync`, `GetVersionChangesAsync` | One version, and the text diff of two versions (version 0 is the empty text). Secrets need `CanReadSecrets` |
 | `ExportAsync`, `ImportAsync` | The document format below |
 | `LookupAsync` | For the binding sources: the current value, or null when missing, deleted, or a secret without secrets included |

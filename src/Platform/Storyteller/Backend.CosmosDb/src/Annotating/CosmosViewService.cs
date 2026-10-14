@@ -48,7 +48,7 @@ public class CosmosViewService : IViewService
             .ToList();
     }
 
-    public async Task<View> CreateViewAsync(string organization, string project, ViewCreate model, string author)
+    public async Task<View> CreateViewAsync(string organization, string project, ViewCreate model, AuditActor actor)
     {
         var name = model.Name?.Trim();
         NameRules.EnsureViewName(name);
@@ -63,8 +63,7 @@ public class CosmosViewService : IViewService
             PartitionKey = ViewEntity.GetPartitionKey(project),
             Name = name!,
             Description = NormalizeDescription(model.Description),
-            CreatedAt = _timeProvider.GetUtcNow(),
-            CreatedBy = author,
+            Created = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
         };
 
         try
@@ -80,7 +79,7 @@ public class CosmosViewService : IViewService
         return entity.ToView();
     }
 
-    public async Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate model, string author)
+    public async Task<View> UpdateViewAsync(string organization, string project, string view, ViewUpdate model, AuditActor actor)
     {
         // The name is kept as given: legacy names that break the rules are rejected, never registered under another id.
         var name = view.Trim();
@@ -102,12 +101,14 @@ public class CosmosViewService : IViewService
         {
             PartitionKey = partitionKey,
             Name = name,
-            CreatedAt = _timeProvider.GetUtcNow(),
-            CreatedBy = author,
+            Created = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
         }) with
         {
             Description = NormalizeDescription(model.Description),
         };
+
+        // a view registered before the stamps stores the stamp built from its legacy fields instead
+        entity = entity with { Created = entity.GetCreated(), CreatedAt = null, CreatedBy = null };
 
         await container.UpsertItemAsync(entity, new PartitionKey(partitionKey));
         return entity.ToView();

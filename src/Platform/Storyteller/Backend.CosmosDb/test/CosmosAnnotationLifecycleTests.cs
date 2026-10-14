@@ -136,7 +136,7 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
     public async Task Delete_SetsTtlAndRestore_RemovesIt()
     {
         await CreateAsync("sbt.tt-s");
-        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.tt-s"), JObject.Parse("""{ "a": 1 }"""), "tester");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.tt-s"), JObject.Parse("""{ "a": 1 }"""), AuditActor.Account("tester"));
 
         await Annotations.DeleteAnnotationAsync(Key("sbt.tt-s"));
 
@@ -183,7 +183,7 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
     public async Task Restore_WithoutTheDeletionSnapshot_StillRestoresTheConfiguration()
     {
         await CreateAsync("sbt.ms-s");
-        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.ms-s"), JObject.Parse("""{ "a": 1 }"""), "tester");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.ms-s"), JObject.Parse("""{ "a": 1 }"""), AuditActor.Account("tester"));
         await Annotations.DeleteAnnotationAsync(Key("sbt.ms-s"));
 
         var partitionKey = $"{Project}.sbt.ms-s";
@@ -202,7 +202,7 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
     public async Task Restore_WithDescendants_BringsBackTheTreeAndItsConfiguration()
     {
         await CreateAsync("exe.rd-s.rd-r.rd-c");
-        await Configurations.CreateOrUpdateConfigurationAsync(Key("exe.rd-s.rd-r.rd-c"), JObject.Parse("""{ "x": 1 }"""), "tester");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("exe.rd-s.rd-r.rd-c"), JObject.Parse("""{ "x": 1 }"""), AuditActor.Account("tester"));
         await Annotations.DeleteAnnotationAsync(Key("sbt.rd-s"));
 
         var result = await RestoreAsync(includeDescendants: true, "sbt.rd-s");
@@ -319,8 +319,8 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
     public async Task Create_DeletedKey_StartsANewLifetimeWithoutConfiguration()
     {
         await CreateAsync("usg.rc-s.rc-r");
-        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.rc-s"), JObject.Parse("""{ "a": 1 }"""), "tester");
-        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.rc-s"), JObject.Parse("""{ "a": 2 }"""), "tester");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.rc-s"), JObject.Parse("""{ "a": 1 }"""), AuditActor.Account("tester"));
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.rc-s"), JObject.Parse("""{ "a": 2 }"""), AuditActor.Account("tester"));
         await Annotations.DeleteAnnotationAsync(Key("sbt.rc-s"));
 
         await Annotations.CreateAnnotationAsync(TestConstants.Organization, Model("sbt.rc-s") with { Title = "New lifetime" });
@@ -335,10 +335,15 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
         usage!.Deletion!.IsRoot.Should().BeTrue();
 
         var history = await Annotations.GetAnnotationHistoryAsync(Key("sbt.rc-s"));
-        history!.Entries.Select(e => e.Action).Should().Equal(AnnotationAuditAction.Recreated, AnnotationAuditAction.Deleted, AnnotationAuditAction.Created);
+        history!.Entries.Select(e => e.Action).Should().Equal(
+            AnnotationAuditAction.Recreated,
+            AnnotationAuditAction.Deleted,
+            AnnotationAuditAction.ConfigurationChanged,
+            AnnotationAuditAction.ConfigurationChanged,
+            AnnotationAuditAction.Created);
         history.Entries[0].DeletionId.Should().Be(history.Entries[1].DeletionId);
 
-        var next = await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.rc-s"), JObject.Parse("""{ "b": 3 }"""), "tester");
+        var next = await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.rc-s"), JObject.Parse("""{ "b": 3 }"""), AuditActor.Account("tester"));
         next.Version.Should().Be(3, "the versions of the previous lifetime stay");
         (await Configurations.GetConfigurationVersionsAsync(Key("sbt.rc-s"))).Select(v => v.Version).Should().Equal(1u, 2u, 3u);
     }
@@ -371,7 +376,7 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
     public async Task Purge_RemovesTheTreeAndItsAuditsButKeepsTheVersions()
     {
         await CreateAsync("exe.pg-s.pg-r.pg-c");
-        await Configurations.CreateOrUpdateConfigurationAsync(Key("exe.pg-s.pg-r.pg-c"), JObject.Parse("""{ "p": 1 }"""), "tester");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("exe.pg-s.pg-r.pg-c"), JObject.Parse("""{ "p": 1 }"""), AuditActor.Account("tester"));
 
         var active = async () => await Annotations.PurgeAnnotationAsync(Key("sbt.pg-s"), AnnotationServiceTestExtensions.TestActor);
         (await active.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.AnnotationNotDeleted);
@@ -447,7 +452,7 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
     public async Task DeletedAnnotation_HidesItsConfigurationAndRejectsChanges()
     {
         await CreateAsync("sbt.cf-s");
-        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.cf-s"), JObject.Parse("""{ "c": 1 }"""), "tester");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.cf-s"), JObject.Parse("""{ "c": 1 }"""), AuditActor.Account("tester"));
         await Annotations.DeleteAnnotationAsync(Key("sbt.cf-s"));
 
         (await Configurations.GetRawConfigurationAsync(Key("sbt.cf-s"))).Should().BeNull();
@@ -457,10 +462,10 @@ public class CosmosAnnotationLifecycleTests(Startup startup)
         var listing = await Configurations.ListConfigurationsAsync(TestConstants.Organization, Project, Constants.DefaultViewName, keyPrefix: "sbt.cf-s");
         listing.Configurations.Should().BeEmpty();
 
-        var set = async () => await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.cf-s"), JObject.Parse("""{ "c": 2 }"""), "tester");
+        var set = async () => await Configurations.CreateOrUpdateConfigurationAsync(Key("sbt.cf-s"), JObject.Parse("""{ "c": 2 }"""), AuditActor.Account("tester"));
         (await set.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.AnnotationDeleted);
 
-        var patch = async () => await Configurations.PatchConfigurationAsync(Key("sbt.cf-s"), JArray.Parse("""[{ "op": "replace", "path": "/c", "value": 3 }]"""), "tester");
+        var patch = async () => await Configurations.PatchConfigurationAsync(Key("sbt.cf-s"), JArray.Parse("""[{ "op": "replace", "path": "/c", "value": 3 }]"""), AuditActor.Account("tester"));
         (await patch.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.AnnotationDeleted);
 
         var delete = async () => await Configurations.DeleteAsync(Key("sbt.cf-s"));

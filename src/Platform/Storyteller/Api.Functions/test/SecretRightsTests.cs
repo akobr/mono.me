@@ -39,7 +39,8 @@ public class SecretRightsTests
         rights.CanReadSecrets.ShouldBe(expected);
         rights.Caller.CanWriteSecrets.ShouldBe(expected);
         rights.Caller.Channel.ShouldBe(KeyValueChannel.User);
-        rights.Caller.Author.ShouldBe("account: user-1");
+        rights.Caller.Actor.Kind.ShouldBe(AuditActorKind.Account);
+        rights.Caller.Actor.Id.ShouldBe("user-1");
         rights.IsWithheldByMtls.ShouldBeFalse();
         rights.AsAmbient().ShouldBeSameAs(rights);
         KeyValueCallerContext.Current.ShouldBe(rights.Caller);
@@ -79,7 +80,7 @@ public class SecretRightsTests
         rights.CanReadSecrets.ShouldBe(expectedAllowed);
         rights.IsWithheldByMtls.ShouldBe(expectedWithheld);
         rights.Caller.Channel.ShouldBe(presentsCertificate ? KeyValueChannel.MachineMtls : KeyValueChannel.MachineToken);
-        rights.Caller.Author.ShouldBe("application: machine-1");
+        rights.Caller.Actor.ShouldBe(AuditActor.Machine("machine-1"));
     }
 
     [Fact]

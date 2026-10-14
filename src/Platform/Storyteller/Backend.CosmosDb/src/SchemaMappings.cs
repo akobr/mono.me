@@ -1,5 +1,4 @@
 using System;
-using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
 
 namespace _42.Platform.Storyteller;
@@ -13,7 +12,7 @@ internal static class SchemaMappings
         AnnotationKey = annotationKey,
         Version = entity.Version,
         Content = entity.Content,
-        Author = entity.Author,
+        Modified = entity.GetModified(),
     };
 
     public static ConfigurationSchema ToConfigurationSchema(this ConfigurationSchemaHistoryEntity entity, string? annotationType, string? annotationKey) => new()
@@ -23,22 +22,20 @@ internal static class SchemaMappings
         AnnotationKey = annotationKey,
         Version = entity.Version,
         Content = entity.Content,
-        Author = entity.Author,
+        Modified = entity.GetModified(),
     };
 
     public static ConfigurationVersion ToConfigurationVersion(this ConfigurationSchemaEntity entity) => new()
     {
         Version = (uint)entity.Version,
-        Author = entity.Author,
-        CreationTime = entity.GetLastUpdatedTime(),
+        Modified = entity.GetModified(),
         ExpirationTime = DateTimeOffset.MaxValue,
     };
 
     public static ConfigurationVersion ToConfigurationVersion(this ConfigurationSchemaHistoryEntity entity) => new()
     {
         Version = (uint)entity.Version,
-        Author = entity.Author,
-        CreationTime = entity.CreationTime,
+        Modified = entity.GetModified(),
         ExpirationTime = entity.GetExpirationTime(),
     };
 
@@ -52,7 +49,6 @@ internal static class SchemaMappings
         ViewName = entity.ViewName,
         Version = entity.Version,
         Content = entity.Content,
-        Author = entity.Author,
-        CreationTime = entity.GetLastUpdatedTime(),
+        Modified = entity.GetModified(),
     };
 }

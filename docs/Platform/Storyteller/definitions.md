@@ -83,7 +83,7 @@ Each document stores:
 | Field | Role |
 | --- | --- |
 | `Content` | The JSON Schema object. |
-| `Author` | Author of the current version, taken from the caller. |
+| `Modified` | The [audit stamp](audit-stamps.md) of the current version: who wrote it (the caller) and when. |
 | `Version` | Current version number, starting at `1`. |
 | `ViewName` | The view this document belongs to. |
 
@@ -101,7 +101,7 @@ Those items are ignored. A read looks only at the view-scoped id. When that id i
 
 ## Writing a schema
 
-Send the JSON Schema object itself. The service assigns `Author` from the caller and assigns `Version`. A schema write replaces the stored schema document. It does not merge into the previous schema the way a configuration write merges into stored content. The merge described above happens only when layers are combined for a check or for a combined read.
+Send the JSON Schema object itself. The service stamps `Modified` with the caller and the time and assigns `Version`. A schema write replaces the stored schema document. It does not merge into the previous schema the way a configuration write merges into stored content. The merge described above happens only when layers are combined for a check or for a combined read.
 
 The body has to be an object that NJsonSchema can parse. A document it cannot parse is rejected with `400`, including when the caller passes force. Force covers compliance of configuration content. It does not accept a body that is not a schema.
 
@@ -140,7 +140,7 @@ Routes include the view, like configuration and template routes. The caller send
 
 | Method | Route | Operation |
 | --- | --- | --- |
-| GET | `v1/{organization}/{project}/{view}/configuration-schemas` | Every schema of the view without its content: `Kind` (`Type`, `Annotation`, `DescendantType`), `AnnotationType`, `AnnotationKey`, `Version`, `Author`, `UpdatedAt` |
+| GET | `v1/{organization}/{project}/{view}/configuration-schemas` | Every schema of the view without its content: `Kind` (`Type`, `Annotation`, `DescendantType`), `AnnotationType`, `AnnotationKey`, `Version`, `Modified` |
 | GET, PUT, DELETE | `v1/{organization}/{project}/{view}/configuration-schema/type/{annotationType}` | Type schema |
 | GET, PUT, DELETE | `v1/{organization}/{project}/{view}/configuration-schema/{key}` | Annotation schema |
 | GET, PUT, DELETE | `v1/{organization}/{project}/{view}/configuration-schema/{key}/type/{annotationType}` | Descendant-type schema on annotation `{key}` for descendant type `{annotationType}` |
@@ -244,7 +244,7 @@ Deleting a schema does not take force. A delete removes that view's document. Th
 
 Versioning follows configuration and template versioning.
 
-- A new schema starts at version `1`. Each write that changes the schema document increments `Version` and records the caller as `Author`.
+- A new schema starts at version `1`. Each write that changes the schema document increments `Version` and stamps the caller as `Modified`.
 - An equal document does not produce a new version.
 - Before a change, the current document is copied to a history item in the same `{project}.schema` partition. History ids:
 
@@ -256,7 +256,7 @@ Versioning follows configuration and template versioning.
 
 - A delete writes the history item of the deleted version. A schema created again later continues after the highest version ever allocated for that id, including after history has expired. The counter is kept on a state item (`{view}.css.…` in the same partition) that survives deletion.
 - History items expire after 365 days. The current version does not expire. The expiry is enforced since the containers got item-level TTL with the [key/value pairs](key-values.md#lifecycle) (`DefaultTimeToLive = -1`, set by `ContainerFactory` on new organization containers and by `2sInitDb` on existing ones); before that, the `ttl` was stored but ignored.
-- `ConfigurationVersion` describes a version: `Version`, `Author`, `CreationTime`, `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
+- `ConfigurationVersion` describes a version: `Version`, `Modified` (who wrote the version and when, see [audit stamps](audit-stamps.md)), `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
 - Diffs compare stored schema documents. Version `0` is an empty object. The diff of version `N` is `N-1 → N`. Any pair can be requested.
 
 The kind segment (`t`, `a`, `d`) keeps a type-schema history prefix from matching an annotation key that starts with the same characters.

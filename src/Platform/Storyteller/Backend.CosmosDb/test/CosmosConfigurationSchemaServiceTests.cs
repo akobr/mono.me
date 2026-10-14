@@ -34,7 +34,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             }
             """);
 
-        var result = await schemas.SetSchemaAsync(TestConstants.Organization, Project, View, AnnotationTypeCodes.Responsibility, schema, "test", false);
+        var result = await schemas.SetSchemaAsync(TestConstants.Organization, Project, View, AnnotationTypeCodes.Responsibility, schema, AuditActor.Account("test"), false);
         result.View.Should().Be(View);
         result.AnnotationType.Should().Be(AnnotationTypeCodes.Responsibility);
         result.Version.Should().Be(1);
@@ -60,7 +60,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             }
             """);
 
-        var result = await schemas.SetAnnotationSchemaAsync(TestConstants.Organization, Project, View, annotationKey, schema, "test", false);
+        var result = await schemas.SetAnnotationSchemaAsync(TestConstants.Organization, Project, View, annotationKey, schema, AuditActor.Account("test"), false);
         result.View.Should().Be(View);
         result.AnnotationKey.Should().Be(annotationKey);
         result.Version.Should().Be(1);
@@ -92,7 +92,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             """);
 
         var result = await schemas.SetDescendantTypeSchemaAsync(
-            TestConstants.Organization, Project, View, annotationKey, AnnotationTypeCodes.Execution, schema, "test", false);
+            TestConstants.Organization, Project, View, annotationKey, AnnotationTypeCodes.Execution, schema, AuditActor.Account("test"), false);
         result.View.Should().Be(View);
         result.AnnotationType.Should().Be(AnnotationTypeCodes.Execution);
         result.AnnotationKey.Should().Be(annotationKey);
@@ -141,8 +141,8 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             }
             """);
 
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, typeSchema, "test", false);
-        await schemas.SetAnnotationSchemaAsync(TestConstants.Organization, project, View, "rst.combined-target", annotationSchema, "test", false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, typeSchema, AuditActor.Account("test"), false);
+        await schemas.SetAnnotationSchemaAsync(TestConstants.Organization, project, View, "rst.combined-target", annotationSchema, AuditActor.Account("test"), false);
 
         var combined = await schemas.GetCombinedSchemaAsync(TestConstants.Organization, project, View, "rst.combined-target");
 
@@ -189,8 +189,8 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             }
             """);
 
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Execution, typeSchema, "test", false);
-        await schemas.SetDescendantTypeSchemaAsync(TestConstants.Organization, project, View, "rst.dt-parent", AnnotationTypeCodes.Execution, dtSchema, "test", false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Execution, typeSchema, AuditActor.Account("test"), false);
+        await schemas.SetDescendantTypeSchemaAsync(TestConstants.Organization, project, View, "rst.dt-parent", AnnotationTypeCodes.Execution, dtSchema, AuditActor.Account("test"), false);
 
         var combined = await schemas.GetCombinedSchemaAsync(TestConstants.Organization, project, View, "exe.dt-subject.dt-parent.dt-ctx");
 
@@ -233,7 +233,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             }
             """);
 
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, "test", false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, AuditActor.Account("test"), false);
 
         var content = JObject.Parse("""{ "name": "valid" }""");
 
@@ -257,7 +257,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             }
             """);
 
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, "test", false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, AuditActor.Account("test"), false);
 
         var content = JObject.Parse("""{ "other": 42 }""");
 
@@ -287,10 +287,10 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
         var project = "save-blocked-test";
 
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), "test", false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), AuditActor.Account("test"), false);
         var key = await CreateResponsibilityAsync(annotations, project, "save-blocked", View);
 
-        var act = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 123 }"""), "test");
+        var act = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 123 }"""), AuditActor.Account("test"));
         await act.Should().ThrowAsync<SchemaValidationException>();
     }
 
@@ -312,10 +312,10 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
             }
             """);
 
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, "test", false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, AuditActor.Account("test"), false);
         var key = await CreateResponsibilityAsync(annotations, project, "save-allowed", View);
 
-        var act = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "valid-value" }"""), "test");
+        var act = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "valid-value" }"""), AuditActor.Account("test"));
         await act.Should().NotThrowAsync();
     }
 
@@ -327,15 +327,15 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
         var project = "view-isolation-test";
 
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), "test", false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), AuditActor.Account("test"), false);
         var defaultKey = await CreateResponsibilityAsync(annotations, project, "isolated", View);
         var otherKey = await CreateResponsibilityAsync(annotations, project, "isolated", OtherView);
         var invalid = JObject.Parse("""{ "badField": 1 }""");
 
-        var otherView = () => configs.CreateOrUpdateConfigurationAsync(otherKey, invalid, "test");
+        var otherView = () => configs.CreateOrUpdateConfigurationAsync(otherKey, invalid, AuditActor.Account("test"));
         await otherView.Should().NotThrowAsync();
 
-        var sameView = () => configs.CreateOrUpdateConfigurationAsync(defaultKey, invalid, "test");
+        var sameView = () => configs.CreateOrUpdateConfigurationAsync(defaultKey, invalid, AuditActor.Account("test"));
         await sameView.Should().ThrowAsync<SchemaValidationException>();
     }
 
@@ -350,10 +350,10 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
 
         var defaultKey = await CreateResponsibilityAsync(annotations, project, "comply-default", View);
         var otherKey = await CreateResponsibilityAsync(annotations, project, "comply-other", OtherView);
-        await configs.CreateOrUpdateConfigurationAsync(defaultKey, invalid, "test");
-        await configs.CreateOrUpdateConfigurationAsync(otherKey, invalid, "test");
+        await configs.CreateOrUpdateConfigurationAsync(defaultKey, invalid, AuditActor.Account("test"));
+        await configs.CreateOrUpdateConfigurationAsync(otherKey, invalid, AuditActor.Account("test"));
 
-        var act = () => schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), "test", false);
+        var act = () => schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), AuditActor.Account("test"), false);
         var exception = await act.Should().ThrowAsync<SchemaValidationException>();
         exception.Which.ValidationErrors.Should().ContainSingle();
         exception.Which.ValidationErrors[0].ViewName.Should().Be(View);
@@ -371,13 +371,13 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         var project = "force-schema-test";
 
         var key = await CreateResponsibilityAsync(annotations, project, "forced", View);
-        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 1 }"""), "test");
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 1 }"""), AuditActor.Account("test"));
 
-        var stored = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), "test", true);
+        var stored = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), AuditActor.Account("test"), true);
         stored.Version.Should().Be(1);
 
         var invalid = JObject.Parse("""{ "type": "object", "properties": [] }""");
-        var act = () => schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, invalid, "test", true);
+        var act = () => schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, invalid, AuditActor.Account("test"), true);
         await act.Should().ThrowAsync<ArgumentException>();
         (await schemas.GetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility))!.Version.Should().Be(1);
     }
@@ -389,12 +389,12 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         var project = "equal-schema-test";
         var schema = JObject.Parse("""{ "type": "object", "properties": { "name": { "type": "string" } } }""");
 
-        var first = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, "ada", false);
-        var second = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, "grace", false);
+        var first = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, AuditActor.Account("ada"), false);
+        var second = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, schema, AuditActor.Account("grace"), false);
 
         first.Version.Should().Be(1);
         second.Version.Should().Be(1);
-        second.Author.Should().Be("ada");
+        second.Modified.By.Id.Should().Be("ada");
     }
 
     [Fact]
@@ -405,12 +405,12 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         var firstBody = JObject.Parse("""{ "type": "object", "properties": { "name": { "type": "string" } } }""");
         var secondBody = JObject.Parse("""{ "type": "object", "properties": { "count": { "type": "integer" } } }""");
 
-        (await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, firstBody, "test", false)).Version.Should().Be(1);
-        (await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, secondBody, "test", false)).Version.Should().Be(2);
+        (await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, firstBody, AuditActor.Account("test"), false)).Version.Should().Be(1);
+        (await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, secondBody, AuditActor.Account("test"), false)).Version.Should().Be(2);
         (await schemas.DeleteSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility)).Should().BeTrue();
         (await schemas.GetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility)).Should().BeNull();
 
-        var recreated = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, firstBody, "test", false);
+        var recreated = await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, firstBody, AuditActor.Account("test"), false);
         recreated.Version.Should().Be(3);
     }
 
@@ -422,8 +422,8 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         var firstBody = JObject.Parse("""{ "type": "object", "properties": { "name": { "type": "string" } } }""");
         var secondBody = JObject.Parse("""{ "type": "object", "properties": { "name": { "type": "string" }, "count": { "type": "integer" } } }""");
 
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, firstBody, "test", false);
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, secondBody, "test", false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, firstBody, AuditActor.Account("test"), false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, secondBody, AuditActor.Account("test"), false);
 
         var versions = await schemas.GetSchemaVersionsAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility);
         versions.Select(version => version.Version).Should().Equal(1u, 2u);
@@ -489,7 +489,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         await validate.Should().NotThrowAsync();
 
         var key = await CreateResponsibilityAsync(annotations, project, "legacy-target", View);
-        var create = () => configs.CreateOrUpdateConfigurationAsync(key, content, "test");
+        var create = () => configs.CreateOrUpdateConfigurationAsync(key, content, AuditActor.Account("test"));
         await create.Should().NotThrowAsync();
     }
 
@@ -501,28 +501,28 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
         var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
         var project = "config-force-test";
 
-        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), "test", false);
+        await schemas.SetSchemaAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Responsibility, StrictNameSchema(), AuditActor.Account("test"), false);
         var key = await CreateResponsibilityAsync(annotations, project, "patched", View);
 
-        var create = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 1 }"""), "test");
+        var create = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 1 }"""), AuditActor.Account("test"));
         await create.Should().ThrowAsync<SchemaValidationException>();
 
-        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "ok" }"""), "test");
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "ok" }"""), AuditActor.Account("test"));
 
-        var rejectedUpdate = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 1 }"""), "test");
+        var rejectedUpdate = () => configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 1 }"""), AuditActor.Account("test"));
         await rejectedUpdate.Should().ThrowAsync<SchemaValidationException>();
         var versionsAfterRejection = await configs.GetConfigurationVersionsAsync(key);
         versionsAfterRejection.Should().ContainSingle();
         versionsAfterRejection.Single().Version.Should().Be(1u);
 
         var patch = JArray.Parse("""[{ "op": "add", "path": "/badField", "value": 1 }]""");
-        var rejected = () => configs.PatchConfigurationAsync(key, patch, "test");
+        var rejected = () => configs.PatchConfigurationAsync(key, patch, AuditActor.Account("test"));
         await rejected.Should().ThrowAsync<SchemaValidationException>();
 
-        var forced = await configs.PatchConfigurationAsync(key, patch, "test", true);
+        var forced = await configs.PatchConfigurationAsync(key, patch, AuditActor.Account("test"), true);
         forced.Content["badField"]!.Value<int>().Should().Be(1);
 
-        var forcedCreate = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 2 }"""), "test", true);
+        var forcedCreate = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "badField": 2 }"""), AuditActor.Account("test"), true);
         forcedCreate.Content["badField"]!.Value<int>().Should().Be(2);
     }
 

@@ -22,12 +22,15 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerSettings _serializerOptions;
     private readonly JsonContentDiffer _differ;
+    private readonly TimeProvider _timeProvider;
 
     public CosmosConfigurationTemplateService(
         IContainerRepositoryProvider repositoryProvider,
         IJsonSerializationSettingsProvider jsonSettingsProvider,
-        IOptions<JsonSerializerSettings> serializerOptions)
+        IOptions<JsonSerializerSettings> serializerOptions,
+        TimeProvider? timeProvider = null)
     {
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _repositoryProvider = repositoryProvider;
         _serializerOptions = serializerOptions.Value;
         _differ = new JsonContentDiffer(jsonSettingsProvider);
@@ -37,7 +40,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
     {
         // Current templates only: "{view}.gen." excludes the state ("gns") and history ("gnv") items.
         var prefix = $"{view}.{EntityIdPrefixTypes.GenerateTemplate}.";
-        var query = new QueryDefinition("SELECT c.id, c.Version, c.Author, c._ts FROM c WHERE STARTSWITH(c.id, @prefix)")
+        var query = new QueryDefinition("SELECT c.id, c.Version, c.Modified, c.Author, c._ts FROM c WHERE STARTSWITH(c.id, @prefix)")
             .WithParameter("@prefix", prefix);
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
@@ -53,8 +56,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
             {
                 AnnotationType = row.Id[prefix.Length..],
                 Version = row.Version,
-                Author = row.Author,
-                UpdatedAt = ListingTimestamps.ToUpdatedAt(row.Timestamp),
+                Modified = row.GetModified(),
             }));
         }
 
@@ -79,7 +81,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         string view,
         string annotationType,
         JObject value,
-        string author)
+        AuditActor actor)
     {
         annotationType = NormalizeAnnotationType(annotationType);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
@@ -112,7 +114,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                     ProjectName = project,
                     ViewName = view,
                     Content = input,
-                    Author = author,
+                    Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
                     Version = lastVersion + 1,
                 };
 
@@ -142,7 +144,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                 return existing.ToConfigurationTemplate();
             }
 
-            var updated = await TryWriteNextVersionAsync(repository, partitionKey, project, existing, etag!, state, stateEtag, newContent, author);
+            var updated = await TryWriteNextVersionAsync(repository, partitionKey, project, existing, etag!, state, stateEtag, newContent, AuditStamp.Of(actor, _timeProvider.GetUtcNow()));
             if (updated is null)
             {
                 continue;
@@ -160,7 +162,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         string view,
         string annotationType,
         JArray patchOperations,
-        string author)
+        AuditActor actor)
     {
         annotationType = NormalizeAnnotationType(annotationType);
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
@@ -186,7 +188,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
                 return existing.ToConfigurationTemplate();
             }
 
-            var updated = await TryWriteNextVersionAsync(repository, partitionKey, project, existing, etag!, state, stateEtag, newContent, author);
+            var updated = await TryWriteNextVersionAsync(repository, partitionKey, project, existing, etag!, state, stateEtag, newContent, AuditStamp.Of(actor, _timeProvider.GetUtcNow()));
             if (updated is null)
             {
                 continue;
@@ -363,13 +365,14 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         GenerateTemplateStateEntity? state,
         string? stateEtag,
         JObject newContent,
-        string author)
+        AuditStamp modified)
     {
         var updated = existing with
         {
             Version = Math.Max(existing.Version, state?.LastVersion ?? 0) + 1,
             Content = newContent,
-            Author = author,
+            Modified = modified,
+            Author = null,
         };
 
         // save history of the previous version together with the next version atomically
