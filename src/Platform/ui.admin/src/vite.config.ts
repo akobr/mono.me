@@ -5,6 +5,7 @@ import VueRouter from 'vue-router/vite'
 import ui from '@nuxt/ui/vite'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import { mockServiceWorker } from './build/mock-service-worker.ts'
+import { sdkFreshness } from './build/sdk-freshness.ts'
 
 export default defineConfig(({ command, mode }) => ({
   plugins: [
@@ -21,6 +22,7 @@ export default defineConfig(({ command, mode }) => ({
     }),
     command === 'serve' && mode === 'development' && vueDevTools(),
     mode === 'e2e' && mockServiceWorker(),
+    sdkFreshness(),
   ],
   resolve: { alias: { '@': fileURLToPath(new URL('./app', import.meta.url)) } },
   // The dev server pre-bundles the dependencies it finds by crawling from index.html. The pages sit behind the
