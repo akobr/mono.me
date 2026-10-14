@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { goto, openApp } from './support'
+import { goto, isMobile, openApp } from './support'
 
 // Names, colors and icons of the annotation types (424-13): the project's Settings, overridden by Preferences.
 const templates = '/acme/billing/default/templates'
@@ -53,6 +53,23 @@ test('type names, colors and icons come from the project settings and Preference
   await page.getByRole('button', { name: 'Reset to built-in' }).click()
   await expect(page.getByTestId('type-preview-exe')).toHaveText('Execution')
   expect(await stExe(page)).toBe('#047857')
+})
+
+// The Type column of the configurations grid shows the type names of the settings, as the annotations grid does
+// (424-34); only Schemas keeps the codes. On a phone the list shows the icon, named after the type.
+test('the configurations grid shows the type names of the settings', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/settings')
+  await setName(page, 'Execution name', 'Job')
+  await goto(page, '/acme/billing/default/configurations?q=type:exe')
+
+  if (isMobile(testInfo)) {
+    await expect(page.getByRole('img', { name: 'Job' }).first()).toBeVisible()
+    return
+  }
+  const firstRow = page.getByRole('row').filter({ has: page.getByRole('cell') }).first()
+  await expect(firstRow.getByRole('cell').first()).toHaveText('Job')
+  await expect(firstRow.getByRole('cell').nth(2)).toHaveText(/^exe\./)
+  await expect(page.getByRole('cell', { name: 'exe', exact: true })).toHaveCount(0)
 })
 
 // The date format (424-23): yyyy-mm-dd until the project's Settings change it, overridden by Preferences.
