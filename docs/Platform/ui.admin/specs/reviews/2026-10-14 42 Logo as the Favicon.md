@@ -25,7 +25,7 @@ The SVG link is replaced by the two PNG links of the docs site, 32 px first:
 
 ### 3. Remove `public/favicon.svg`
 
-The file is deleted, and nothing in `src/Platform/ui.admin` references `favicon.svg` any more. `vite preview` answers a request for it with `index.html`, its SPA fallback. Azure Static Web Apps answers `404`, because `navigationFallback.exclude` covers `*.svg`.
+The file is deleted. In `src/Platform/ui.admin`, `favicon.svg` appears only in the test that checks it stays gone. `vite preview` answers a request for it with `index.html`, its SPA fallback. Azure Static Web Apps answers `404`, because `navigationFallback.exclude` covers `*.svg`.
 
 ### 4. Tests
 
