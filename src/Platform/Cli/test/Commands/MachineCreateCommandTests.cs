@@ -113,6 +113,50 @@ public class MachineCreateCommandTests
         _authentication.VerifyNoOtherCalls();
     }
 
+    [Fact]
+    public async Task WithoutAKind_SendsNoKindSoTheProjectDefaultApplies()
+    {
+        MachineAccessCreate? sent = null;
+        _accessApi
+            .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
+            .Callback((string _, string _, MachineAccessCreate body) => sent = body)
+            .ReturnsAsync(new MachineAccess { Id = "m1", AccessKey = "api-key" });
+
+        await Execute();
+
+        sent!.CredentialKind.ShouldBeNull();
+        sent.CertificateLifetimeDays.ShouldBeNull();
+        Newtonsoft.Json.JsonConvert.SerializeObject(sent).ShouldNotContain("CredentialKind");
+    }
+
+    [Theory]
+    [InlineData("certificate", MachineAccessCreateCredentialKind.Certificate)]
+    [InlineData("certificate-and-api-key", MachineAccessCreateCredentialKind.CertificateAndApiKey)]
+    [InlineData("ClientCredentials", MachineAccessCreateCredentialKind.ClientCredentials)]
+    public async Task AKind_IsSentWithTheRequest(string value, MachineAccessCreateCredentialKind expected)
+    {
+        MachineAccessCreate? sent = null;
+        _accessApi
+            .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
+            .Callback((string _, string _, MachineAccessCreate body) => sent = body)
+            .ReturnsAsync(new MachineAccess { Id = "m1", AccessKey = string.Empty });
+
+        var exitCode = await Execute(value, lifetimeDays: 30);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        sent!.CredentialKind.ShouldBe(expected);
+        sent.CertificateLifetimeDays.ShouldBe(30);
+    }
+
+    [Fact]
+    public async Task UnknownKind_FailsWithoutCallingTheServer()
+    {
+        var exitCode = await Execute("42");
+
+        exitCode.ShouldBe(ExitCodes.ERROR_INPUT_PARSING);
+        _accessApi.VerifyNoOtherCalls();
+    }
+
     private void Returns(MachineAccess machine)
     {
         _accessApi
@@ -125,14 +169,18 @@ public class MachineCreateCommandTests
         return _console.Lines.Single(line => line.TrimStart().StartsWith(start));
     }
 
-    private Task<int> Execute()
+    private Task<int> Execute(string? credentialKind = null, int? lifetimeDays = null)
     {
         var command = new MachineCreateCommand(
             _console.Object,
             _context.Object,
             _accessApi.Object,
             Mock.Of<IFileSystem>(),
-            _authentication.Object);
+            _authentication.Object)
+        {
+            CredentialKind = credentialKind,
+            LifetimeDays = lifetimeDays,
+        };
 
         return command.OnExecuteAsync();
     }
