@@ -129,7 +129,7 @@ async function create() {
           <UCheckbox v-model="useSharedCertificate" label="Use a shared certificate of the project" />
         </UFormField>
         <UFormField v-if="ownCertificate" label="Certificate lifetime (days)">
-          <UInputNumber v-model="lifetime" :min="1" :max="825" class="w-40" />
+          <UInputNumber v-model="lifetime" :min="1" :max="3650" class="w-40" />
         </UFormField>
         <UAlert v-if="failure" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="failure" />
         <div class="flex justify-end gap-2">

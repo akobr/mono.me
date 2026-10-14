@@ -177,7 +177,7 @@ async function revoke() {
               <UInput v-model="label" class="w-full" placeholder="ci-pipeline" autofocus />
             </UFormField>
             <UFormField label="Lifetime (days)">
-              <UInputNumber v-model="lifetime" :min="1" :max="825" class="w-40" />
+              <UInputNumber v-model="lifetime" :min="1" :max="3650" class="w-40" />
             </UFormField>
             <div class="flex justify-end gap-2">
               <UButton label="Cancel" color="neutral" variant="ghost" @click="issuing = false" />
