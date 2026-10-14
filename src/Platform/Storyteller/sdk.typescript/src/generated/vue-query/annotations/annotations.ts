@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.7.38817
+ * OpenAPI spec version: 0.9.8.2631
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -38,6 +38,7 @@ import type {
   AnnotationsResponseUnitOfExecution,
   AnnotationsResponseUsage,
   ErrorResponse,
+  GetAnnotationParams,
   GetAnnotationsParams,
   GetContextsParams,
   GetDeletedAnnotationsParams,
@@ -341,8 +342,21 @@ export const getGetAnnotationUrl = (
   project: string,
   view: string,
   key: string,
+  params?: GetAnnotationParams,
 ) => {
-  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
 };
 
 export const getAnnotation = async (
@@ -350,10 +364,11 @@ export const getAnnotation = async (
   project: string,
   view: string,
   key: string,
+  params?: GetAnnotationParams,
   options?: Parameters<typeof storytellerFetch>[1],
 ): Promise<Annotation> => {
   return storytellerFetch<Annotation>(
-    getGetAnnotationUrl(organization, project, view, key),
+    getGetAnnotationUrl(organization, project, view, key, params),
     {
       ...options,
       method: "GET",
@@ -366,8 +381,17 @@ export const getGetAnnotationQueryKey = (
   project: MaybeRefOrGetter<string>,
   view: MaybeRefOrGetter<string>,
   key: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetAnnotationParams>,
 ) => {
-  return ["v1", organization, project, view, "annotations", key] as const;
+  return [
+    "v1",
+    organization,
+    project,
+    view,
+    "annotations",
+    key,
+    ...(params ? [params] : []),
+  ] as const;
 };
 
 export const getGetAnnotationQueryOptions = <
@@ -378,6 +402,7 @@ export const getGetAnnotationQueryOptions = <
   project: MaybeRefOrGetter<string>,
   view: MaybeRefOrGetter<string>,
   key: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetAnnotationParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getAnnotation>>, TError, TData>
@@ -387,7 +412,13 @@ export const getGetAnnotationQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = getGetAnnotationQueryKey(organization, project, view, key);
+  const queryKey = getGetAnnotationQueryKey(
+    organization,
+    project,
+    view,
+    key,
+    params,
+  );
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getAnnotation>>> = ({
     signal,
@@ -397,6 +428,7 @@ export const getGetAnnotationQueryOptions = <
       toValue(project),
       toValue(view),
       toValue(key),
+      toValue(params),
       { signal, ...requestOptions },
     );
 
@@ -435,6 +467,7 @@ export function useGetAnnotation<
   project: MaybeRefOrGetter<string>,
   view: MaybeRefOrGetter<string>,
   key: MaybeRefOrGetter<string>,
+  params?: MaybeRefOrGetter<GetAnnotationParams>,
   options?: {
     query?: Partial<
       UseQueryOptions<Awaited<ReturnType<typeof getAnnotation>>, TError, TData>
@@ -450,6 +483,7 @@ export function useGetAnnotation<
     project,
     view,
     key,
+    params,
     options,
   );
 

@@ -4152,18 +4152,22 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -4186,18 +4190,22 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The requested annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key);
+        System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The requested annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <remarks>
         /// Creates the annotation (with its missing ancestors), updates it when it is active, or re-creates it when it is deleted (a deleted ancestor is re-created too). The body must carry the type-specific members (SubjectKey, ResponsibilityKey, UnitType, ...); the server-owned members (Created, Modified, Deletion, the relation arrays) are ignored.
@@ -4253,9 +4261,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="descendants">The type of descendants to retrieve, possible value is: usages, contexts, executions, units, units-of-execution, or all.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of descendant annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4264,9 +4274,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="descendants">The type of descendants to retrieve, possible value is: usages, contexts, executions, units, units-of-execution, or all.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of descendant annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -4290,9 +4302,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="nameQuery">The name query to filter the responsibilities.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of responsibilities.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4300,18 +4314,22 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="nameQuery">The name query to filter the responsibilities.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of responsibilities.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="nameQuery">The name query to filter the subjects.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of subjects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4319,9 +4337,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="nameQuery">The name query to filter the subjects.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of subjects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -4329,9 +4349,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="responsibilityNameQuery">The name query to filter the usages by responsibility.</param>
         /// <param name="subjectNameQuery">The name query to filter the usages by subject.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of usages.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4340,9 +4362,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="responsibilityNameQuery">The name query to filter the usages by responsibility.</param>
         /// <param name="subjectNameQuery">The name query to filter the usages by subject.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of usages.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -4350,9 +4374,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The name query to filter the contexts by subject.</param>
         /// <param name="nameQuery">The name query to filter the contexts.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of contexts.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4361,9 +4387,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The name query to filter the contexts by subject.</param>
         /// <param name="nameQuery">The name query to filter the contexts.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of contexts.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -4372,9 +4400,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The name query to filter the executions by subject.</param>
         /// <param name="contextNameQuery">The name query to filter the executions by context.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of executions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4384,18 +4414,22 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The name query to filter the executions by subject.</param>
         /// <param name="contextNameQuery">The name query to filter the executions by context.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of executions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="responsibilityNameQuery">The responsibility name query to filter the units.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4403,9 +4437,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="responsibilityNameQuery">The responsibility name query to filter the units.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <param name="organization">Target organization name.</param>
         /// <param name="project">Target project name.</param>
@@ -4415,9 +4451,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The subject name query to filter the units of execution.</param>
         /// <param name="contextNameQuery">The context name query to filter the units of execution.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units of execution.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="organization">Target organization name.</param>
@@ -4428,9 +4466,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The subject name query to filter the units of execution.</param>
         /// <param name="contextNameQuery">The context name query to filter the units of execution.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units of execution.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken);
 
         /// <remarks>
         /// The deleted annotations of the view, newest deletion first, each with its Deletion (who, when, the root, and when it is purged automatically).
@@ -4693,11 +4733,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken)
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, bool? includeInactive, bool? includeDeleted)
         {
-            return GetAnnotationsAsync(organization, project, view, continuationToken, System.Threading.CancellationToken.None);
+            return GetAnnotationsAsync(organization, project, view, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -4705,9 +4747,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetAnnotationsAsync(string organization, string project, string view, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -4741,6 +4785,14 @@ namespace _42.Platform.Storyteller.Sdk
                     if (continuationToken != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 
@@ -4977,11 +5029,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The requested annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key)
+        public virtual System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive, bool? includeDeleted)
         {
-            return GetAnnotationAsync(organization, project, view, key, System.Threading.CancellationToken.None);
+            return GetAnnotationAsync(organization, project, view, key, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -4989,9 +5043,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="project">Target project name.</param>
         /// <param name="view">The target view inside the project.</param>
         /// <param name="key">The key of the requested annotation.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The requested annotation.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<Annotation> GetAnnotationAsync(string organization, string project, string view, string key, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -5025,6 +5081,16 @@ namespace _42.Platform.Storyteller.Sdk
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(view, System.Globalization.CultureInfo.InvariantCulture)));
                     urlBuilder_.Append("/annotations/");
                     urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append('?');
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    urlBuilder_.Length--;
 
                     PrepareRequest(client_, request_, urlBuilder_);
 
@@ -5087,8 +5153,12 @@ namespace _42.Platform.Storyteller.Sdk
                         else
                         if (status_ == 404)
                         {
-                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
-                            throw new ApiException("The requested annotation doesn\'t exist.", status_, responseText_, headers_, null);
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The requested annotation doesn\'t exist or is deleted, or it is not active and includeInactive is not set (ErrorCode AnnotationInactive).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 500)
@@ -5452,11 +5522,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="descendants">The type of descendants to retrieve, possible value is: usages, contexts, executions, units, units-of-execution, or all.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of descendant annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken)
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, bool? includeInactive, bool? includeDeleted)
         {
-            return GetDescendantsAsync(organization, project, view, key, descendants, continuationToken, System.Threading.CancellationToken.None);
+            return GetDescendantsAsync(organization, project, view, key, descendants, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -5466,9 +5538,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="key">The key of the requested annotation.</param>
         /// <param name="descendants">The type of descendants to retrieve, possible value is: usages, contexts, executions, units, units-of-execution, or all.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of descendant annotations.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse> GetDescendantsAsync(string organization, string project, string view, string key, string descendants, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -5511,6 +5585,14 @@ namespace _42.Platform.Storyteller.Sdk
                     if (continuationToken != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 
@@ -5748,11 +5830,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="nameQuery">The name query to filter the responsibilities.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of responsibilities.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken)
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
         {
-            return GetResponsibilitiesAsync(organization, project, view, nameQuery, continuationToken, System.Threading.CancellationToken.None);
+            return GetResponsibilitiesAsync(organization, project, view, nameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -5761,9 +5845,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="nameQuery">The name query to filter the responsibilities.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of responsibilities.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Responsibility> GetResponsibilitiesAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -5801,6 +5887,14 @@ namespace _42.Platform.Storyteller.Sdk
                     if (continuationToken != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 
@@ -5897,11 +5991,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="nameQuery">The name query to filter the subjects.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of subjects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken)
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
         {
-            return GetSubjectsAsync(organization, project, view, nameQuery, continuationToken, System.Threading.CancellationToken.None);
+            return GetSubjectsAsync(organization, project, view, nameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -5910,9 +6006,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="nameQuery">The name query to filter the subjects.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of subjects.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Subject> GetSubjectsAsync(string organization, string project, string view, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -5950,6 +6048,14 @@ namespace _42.Platform.Storyteller.Sdk
                     if (continuationToken != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 
@@ -6047,11 +6153,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="responsibilityNameQuery">The name query to filter the usages by responsibility.</param>
         /// <param name="subjectNameQuery">The name query to filter the usages by subject.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of usages.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken)
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
         {
-            return GetUsagesAsync(organization, project, view, responsibilityNameQuery, subjectNameQuery, continuationToken, System.Threading.CancellationToken.None);
+            return GetUsagesAsync(organization, project, view, responsibilityNameQuery, subjectNameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -6061,9 +6169,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="responsibilityNameQuery">The name query to filter the usages by responsibility.</param>
         /// <param name="subjectNameQuery">The name query to filter the usages by subject.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of usages.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Usage> GetUsagesAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6105,6 +6215,14 @@ namespace _42.Platform.Storyteller.Sdk
                     if (continuationToken != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 
@@ -6202,11 +6320,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The name query to filter the contexts by subject.</param>
         /// <param name="nameQuery">The name query to filter the contexts.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of contexts.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken)
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
         {
-            return GetContextsAsync(organization, project, view, subjectNameQuery, nameQuery, continuationToken, System.Threading.CancellationToken.None);
+            return GetContextsAsync(organization, project, view, subjectNameQuery, nameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -6216,9 +6336,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The name query to filter the contexts by subject.</param>
         /// <param name="nameQuery">The name query to filter the contexts.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of contexts.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Context> GetContextsAsync(string organization, string project, string view, string subjectNameQuery, string nameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6260,6 +6382,14 @@ namespace _42.Platform.Storyteller.Sdk
                     if (continuationToken != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 
@@ -6358,11 +6488,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The name query to filter the executions by subject.</param>
         /// <param name="contextNameQuery">The name query to filter the executions by context.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of executions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken)
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
         {
-            return GetExecutionsAsync(organization, project, view, responsibilityNameQuery, subjectNameQuery, contextNameQuery, continuationToken, System.Threading.CancellationToken.None);
+            return GetExecutionsAsync(organization, project, view, responsibilityNameQuery, subjectNameQuery, contextNameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -6373,9 +6505,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The name query to filter the executions by subject.</param>
         /// <param name="contextNameQuery">The name query to filter the executions by context.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of executions.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Execution> GetExecutionsAsync(string organization, string project, string view, string responsibilityNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6421,6 +6555,14 @@ namespace _42.Platform.Storyteller.Sdk
                     if (continuationToken != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 
@@ -6517,11 +6659,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="responsibilityNameQuery">The responsibility name query to filter the units.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken)
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
         {
-            return GetUnitsAsync(organization, project, view, responsibilityNameQuery, continuationToken, System.Threading.CancellationToken.None);
+            return GetUnitsAsync(organization, project, view, responsibilityNameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -6530,9 +6674,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="view">The target view inside the project.</param>
         /// <param name="responsibilityNameQuery">The responsibility name query to filter the units.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_Unit> GetUnitsAsync(string organization, string project, string view, string responsibilityNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6570,6 +6716,14 @@ namespace _42.Platform.Storyteller.Sdk
                     if (continuationToken != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 
@@ -6669,11 +6823,13 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The subject name query to filter the units of execution.</param>
         /// <param name="contextNameQuery">The context name query to filter the units of execution.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units of execution.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken)
+        public virtual System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted)
         {
-            return GetUnitsOfExecutionAsync(organization, project, view, responsibilityNameQuery, unitNameQuery, subjectNameQuery, contextNameQuery, continuationToken, System.Threading.CancellationToken.None);
+            return GetUnitsOfExecutionAsync(organization, project, view, responsibilityNameQuery, unitNameQuery, subjectNameQuery, contextNameQuery, continuationToken, includeInactive, includeDeleted, System.Threading.CancellationToken.None);
         }
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
@@ -6685,9 +6841,11 @@ namespace _42.Platform.Storyteller.Sdk
         /// <param name="subjectNameQuery">The subject name query to filter the units of execution.</param>
         /// <param name="contextNameQuery">The context name query to filter the units of execution.</param>
         /// <param name="continuationToken">The continuation token for multi-page queries.</param>
+        /// <param name="includeInactive">Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.</param>
+        /// <param name="includeDeleted">Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.</param>
         /// <returns>The list of units of execution.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
-        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, System.Threading.CancellationToken cancellationToken)
+        public virtual async System.Threading.Tasks.Task<AnnotationsResponse_UnitOfExecution> GetUnitsOfExecutionAsync(string organization, string project, string view, string responsibilityNameQuery, string unitNameQuery, string subjectNameQuery, string contextNameQuery, string continuationToken, bool? includeInactive, bool? includeDeleted, System.Threading.CancellationToken cancellationToken)
         {
             if (organization == null)
                 throw new System.ArgumentNullException("organization");
@@ -6737,6 +6895,14 @@ namespace _42.Platform.Storyteller.Sdk
                     if (continuationToken != null)
                     {
                         urlBuilder_.Append(System.Uri.EscapeDataString("continuationToken")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(continuationToken, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeInactive != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeInactive")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeInactive, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
+                    }
+                    if (includeDeleted != null)
+                    {
+                        urlBuilder_.Append(System.Uri.EscapeDataString("includeDeleted")).Append('=').Append(System.Uri.EscapeDataString(ConvertToString(includeDeleted, System.Globalization.CultureInfo.InvariantCulture))).Append('&');
                     }
                     urlBuilder_.Length--;
 

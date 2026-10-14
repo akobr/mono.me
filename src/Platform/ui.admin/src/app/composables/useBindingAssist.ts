@@ -57,8 +57,8 @@ export function useBindingAssist(options: BindingAssistOptions = {}): BindingAss
       // The annotation detail already holds the own annotation; an ancestor is fetched once and cached.
       const annotation = await queryClient
         .fetchQuery({
-          queryKey: getGetAnnotationQueryKey(org, project, view, target),
-          queryFn: ({ signal }) => getAnnotation(org, project, view, target, { signal }),
+          queryKey: getGetAnnotationQueryKey(org, project, view, target, { includeInactive: true }),
+          queryFn: ({ signal }) => getAnnotation(org, project, view, target, { includeInactive: true }, { signal }),
           staleTime: 30_000,
           meta: { silent: true },
         })
