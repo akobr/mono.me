@@ -24,6 +24,10 @@ public interface IMachineAccess
 
     DateTimeOffset? LastRenewalAt { get; }
 
+    int? CertificateLifetimeDays { get; }
+
+    DateTimeOffset? CertificateNotAfter { get; }
+
     string? TokenEndpoint { get; }
 
     string? TokenScope { get; }

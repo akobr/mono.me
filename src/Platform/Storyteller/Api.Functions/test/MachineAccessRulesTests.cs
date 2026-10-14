@@ -70,12 +70,36 @@ public class MachineAccessRulesTests
         exception.Message.ShouldContain("org1.proj1");
     }
 
+    [Fact]
+    public async Task Policy_ProjectEnablingClientCredentialsAmongOtherKinds_AcceptsTheBearerMachine()
+    {
+        var policy = new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.ClientCredentials],
+            CredentialKind = MachineCredentialKind.ApiKey,
+        };
+        var context = CreateContext(new FixedPolicyStore(policy), MachineCredentialKind.ClientCredentials);
+
+        await MachineCredentialPolicy.EnsureAllowedAsync(context, "org1", "proj1");
+    }
+
+    [Fact]
+    public async Task Policy_ProjectWithSeveralKindsWithoutClientCredentials_RejectsTheBearerMachine()
+    {
+        var policy = new MachineAuthenticationPolicy { EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate] };
+        var context = CreateContext(new FixedPolicyStore(policy), MachineCredentialKind.ClientCredentials);
+
+        var exception = await Should.ThrowAsync<SecurityTokenException>(() => MachineCredentialPolicy.EnsureAllowedAsync(context, "org1", "proj1"));
+
+        exception.Message.ShouldBe("The project org1.proj1 does not enable client credentials for machines (ApiKey, Certificate).");
+    }
+
     [Theory]
     [InlineData(MachineCredentialKind.ClientCredentials, false)]
     [InlineData(MachineCredentialKind.ApiKey, true)]
     public async Task Policy_WithoutAProjectPolicy_UsesTheDefaultKind(MachineCredentialKind defaultKind, bool rejected)
     {
-        var context = CreateContext(new FixedPolicyStore(null), MachineCredentialKind.ClientCredentials, defaultKind);
+        var context = CreateContext(new FixedPolicyStore((MachineAuthenticationPolicy?)null), MachineCredentialKind.ClientCredentials, defaultKind);
 
         var check = () => MachineCredentialPolicy.EnsureAllowedAsync(context, "org1", "proj1");
 
@@ -110,11 +134,16 @@ public class MachineAccessRulesTests
 
     private sealed class FixedPolicyStore : IMachineAuthenticationPolicyStore
     {
-        private readonly MachineCredentialKind? _kind;
+        private readonly MachineAuthenticationPolicy? _policy;
 
         public FixedPolicyStore(MachineCredentialKind? kind)
+            : this(kind is null ? null : new MachineAuthenticationPolicy { CredentialKind = kind.Value })
         {
-            _kind = kind;
+        }
+
+        public FixedPolicyStore(MachineAuthenticationPolicy? policy)
+        {
+            _policy = policy;
         }
 
         public int Reads { get; private set; }
@@ -122,7 +151,7 @@ public class MachineAccessRulesTests
         public Task<MachineAuthenticationPolicy?> GetAsync(string organization, string project)
         {
             Reads++;
-            return Task.FromResult(_kind is null ? null : new MachineAuthenticationPolicy { CredentialKind = _kind.Value });
+            return Task.FromResult(_policy);
         }
 
         public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy)

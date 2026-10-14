@@ -44,5 +44,7 @@ internal static class AccessMappings
         CredentialKind = e.CredentialKind,
         CertificateThumbprint = e.CertificateThumbprint,
         LastRenewalAt = e.LastRenewalAt,
+        CertificateLifetimeDays = e.CertificateLifetimeDays,
+        CertificateNotAfter = e.NotAfter,
     };
 }

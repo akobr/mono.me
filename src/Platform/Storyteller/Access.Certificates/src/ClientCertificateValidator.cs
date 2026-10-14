@@ -141,6 +141,7 @@ public class ClientCertificateValidator : IClientCertificateValidator
             record.Scope,
             thumbprint,
             ClientCertificateKind.Machine,
-            record.AnnotationKey);
+            record.AnnotationKey,
+            record.CredentialKind);
     }
 }

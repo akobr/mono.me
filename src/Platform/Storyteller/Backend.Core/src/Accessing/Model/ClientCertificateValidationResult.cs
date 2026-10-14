@@ -7,4 +7,5 @@ public record ClientCertificateValidationResult(
     MachineAccessScope Scope,
     string Thumbprint,
     ClientCertificateKind Kind,
-    string? AnnotationKey);
+    string? AnnotationKey,
+    MachineCredentialKind? CredentialKind = null);

@@ -12,6 +12,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
 using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
@@ -24,6 +25,7 @@ public class AccessHttp
     private readonly ICertificateAuthorityProvider? _caProvider;
     private readonly IMachineAuthenticationPolicyStore? _policyStore;
     private readonly IUserProfileResolver? _profileResolver;
+    private readonly MachineAuthenticationOptions _machineOptions;
     private readonly ILogger<AccessHttp> _logger;
 
     public AccessHttp(
@@ -31,13 +33,15 @@ public class AccessHttp
         ILogger<AccessHttp> logger,
         ICertificateAuthorityProvider? caProvider = null,
         IMachineAuthenticationPolicyStore? policyStore = null,
-        IUserProfileResolver? profileResolver = null)
+        IUserProfileResolver? profileResolver = null,
+        IOptions<MachineAuthenticationOptions>? machineOptions = null)
     {
         _accessService = accessService;
         _logger = logger;
         _caProvider = caProvider;
         _policyStore = policyStore;
         _profileResolver = profileResolver;
+        _machineOptions = machineOptions?.Value ?? new MachineAuthenticationOptions();
     }
 
     [Function(nameof(GetAccount))]
@@ -403,13 +407,43 @@ public class AccessHttp
         return new ContentResult { Content = pem, ContentType = "application/x-pem-file", StatusCode = 200 };
     }
 
+    [Function(nameof(GetMachineAuthentication))]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetMachineAuthentication, Definitions.Tags.Access, Description = "The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The key of the access point (organization.project).")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The machine authentication policy of the project.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key is not organization.project.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> GetMachineAuthentication(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.MachineAuthentication)]
+        HttpRequestData request,
+        string key)
+    {
+        request.CheckScope(Scopes.User.Impersonation);
+        var pointKey = key.Trim().ToLowerInvariant();
+
+        // Contributors create machines, so they read the kinds and the default lifetime too.
+        await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Contributor);
+
+        if (!TrySplitProjectKey(pointKey, out var organization, out var project, out var badRequestResult))
+        {
+            return badRequestResult;
+        }
+
+        var stored = _policyStore is null ? null : await _policyStore.GetAsync(organization, project);
+        return new OkObjectResult(MachineAuthenticationPolicies.Resolve(stored, _machineOptions));
+    }
+
     [Function(nameof(PutMachineAuthentication))]
     [OpenApiOperation(Definitions.RouteIds.Access.SetMachineAuthentication, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The key of the access point (organization.project).")]
-    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The machine authentication policy to set.")]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The updated machine authentication policy.")]
+    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The updated machine authentication policy, with every property filled.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No kind is enabled, a kind doesn't exist, the default kind is not enabled, or the certificate lifetime is out of the deployment's bounds.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutMachineAuthentication(
@@ -427,15 +461,40 @@ public class AccessHttp
             return new StatusCodeResult((int)HttpStatusCode.NotImplemented);
         }
 
+        if (!TrySplitProjectKey(pointKey, out var organization, out var project, out var badRequestResult))
+        {
+            return badRequestResult;
+        }
+
+        if (MachineAuthenticationPolicies.Validate(policy, _machineOptions) is { } invalid)
+        {
+            return new BadRequestObjectResult(new ErrorResponse(invalid));
+        }
+
+        var normalized = MachineAuthenticationPolicies.Normalize(policy);
+        await _policyStore.SetAsync(organization, project, normalized);
+        return new OkObjectResult(MachineAuthenticationPolicies.Resolve(normalized, _machineOptions));
+    }
+
+    private static bool TrySplitProjectKey(
+        string pointKey,
+        out string organization,
+        out string project,
+        [NotNullWhen(false)] out IActionResult? badRequestResult)
+    {
         var segments = pointKey.Split('.', 2);
 
         if (segments.Length < 2)
         {
-            return new BadRequestObjectResult(new ErrorResponse { Message = "Access point key must be in organization.project format." });
+            organization = project = string.Empty;
+            badRequestResult = new BadRequestObjectResult(new ErrorResponse { Message = "Access point key must be in organization.project format." });
+            return false;
         }
 
-        await _policyStore.SetAsync(segments[0], segments[1], policy);
-        return new OkObjectResult(policy);
+        organization = segments[0];
+        project = segments[1];
+        badRequestResult = null;
+        return true;
     }
 
     private static bool TryValidatePermission(Permission? model, [NotNullWhen(false)] out IActionResult? badRequestResult)

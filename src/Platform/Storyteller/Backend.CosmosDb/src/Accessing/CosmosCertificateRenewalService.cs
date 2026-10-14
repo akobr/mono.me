@@ -119,8 +119,11 @@ public class CosmosCertificateRenewalService : ICertificateRenewalService
             };
         }
 
-        // Issue new certificate.
-        var lifetimeDays = Math.Clamp(opts.CertificateLifetimeDays, opts.MinCertificateLifetimeDays, opts.MaxCertificateLifetimeDays);
+        // Issue new certificate with the lifetime the machine was created with.
+        var lifetimeDays = Math.Clamp(
+            entity.CertificateLifetimeDays ?? opts.CertificateLifetimeDays,
+            opts.MinCertificateLifetimeDays,
+            opts.MaxCertificateLifetimeDays);
         var issued = await _authority.IssueCertificateAsync(
             organization,
             project,

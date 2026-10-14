@@ -68,7 +68,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
 
         if (machineAccess?.HashedSecret is not null)
         {
-            return new ApiKeyHashEntry(machineAccess.HashedSecret, machineAccess.Scope);
+            return new ApiKeyHashEntry(machineAccess.HashedSecret, machineAccess.Scope, machineAccess.CredentialKind);
         }
 
         return null;

@@ -95,6 +95,21 @@ public partial class RouteTableTests
         routes.ShouldContain(expected);
     }
 
+    [Theory]
+    [InlineData("GET v1/access/points/{}/machine-authentication")]
+    [InlineData("PUT v1/access/points/{}/machine-authentication")]
+    public void MachineAuthenticationRoutes_AreRegistered(string expected)
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"));
+
+        routes.ShouldContain(expected);
+    }
+
     // The literal segments of the new routes can never be an annotation key, so they never shadow a key route.
     [Theory]
     [InlineData("deleted")]

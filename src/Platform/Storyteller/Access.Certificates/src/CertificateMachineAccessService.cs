@@ -44,7 +44,8 @@ public class CertificateMachineAccessService
             IsRevoked: false,
             Scope: model.Scope,
             AnnotationKey: model.AnnotationKey,
-            LastRenewalAt: null);
+            LastRenewalAt: null,
+            CredentialKind: MachineCredentialKind.Certificate);
 
         await _store.StoreAsync(model.Organization, model.Project, record);
 
@@ -59,6 +60,8 @@ public class CertificateMachineAccessService
             Certificate = Convert.ToBase64String(issued.Pkcs12),
             CertificatePassword = issued.Password,
             CertificateThumbprint = issued.Thumbprint,
+            CertificateLifetimeDays = lifetimeDays,
+            CertificateNotAfter = issued.NotAfter,
         };
     }
 
@@ -81,7 +84,8 @@ public class CertificateMachineAccessService
             IsRevoked: false,
             Scope: model.Scope,
             AnnotationKey: model.AnnotationKey,
-            LastRenewalAt: null);
+            LastRenewalAt: null,
+            CredentialKind: MachineCredentialKind.CertificateAndApiKey);
 
         await _store.StoreAsync(model.Organization, model.Project, record);
 
@@ -91,6 +95,8 @@ public class CertificateMachineAccessService
             Certificate = Convert.ToBase64String(issued.Pkcs12),
             CertificatePassword = issued.Password,
             CertificateThumbprint = issued.Thumbprint,
+            CertificateLifetimeDays = lifetimeDays,
+            CertificateNotAfter = issued.NotAfter,
         };
     }
 

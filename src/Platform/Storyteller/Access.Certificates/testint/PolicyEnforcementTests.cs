@@ -1,6 +1,9 @@
+using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller.Access.Certificates.IntegrationTests;
 
@@ -65,6 +68,32 @@ public class PolicyEnforcementTests(CosmosFixture fixture)
         retrieved.ShouldNotBeNull();
         retrieved!.CredentialKind.ShouldBe(MachineCredentialKind.Certificate);
         retrieved.CertificateLifetimeDays.ShouldBe(90);
+    }
+
+    [Fact]
+    public async Task SetPolicy_WithEnabledKinds_IsReadBackFromCosmos()
+    {
+        var policyStore = fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>();
+        await EnsureAccessPointAsync();
+
+        await policyStore.SetAsync(Organization, Project, new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.CertificateAndApiKey],
+            CredentialKind = MachineCredentialKind.CertificateAndApiKey,
+            CertificateLifetimeDays = 60,
+        });
+
+        // A store with an empty cache reads the document itself.
+        var uncached = new CosmosMachineAuthenticationPolicyStore(
+            fixture.Services.GetRequiredService<IContainerRepositoryProvider>(),
+            fixture.Services.GetRequiredService<IOptions<JsonSerializerOptions>>(),
+            new MemoryCache(new MemoryCacheOptions()));
+        var retrieved = await uncached.GetAsync(Organization, Project);
+
+        retrieved.ShouldNotBeNull();
+        retrieved.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.ApiKey, MachineCredentialKind.CertificateAndApiKey]);
+        retrieved.CredentialKind.ShouldBe(MachineCredentialKind.CertificateAndApiKey);
+        retrieved.CertificateLifetimeDays.ShouldBe(60);
     }
 
     private async Task EnsureAccessPointAsync()

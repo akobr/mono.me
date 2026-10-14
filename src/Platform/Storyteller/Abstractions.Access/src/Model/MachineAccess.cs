@@ -24,6 +24,11 @@ public record class MachineAccess : IMachineAccess
 
     public DateTimeOffset? LastRenewalAt { get; init; }
 
+    // Kinds with a certificate only: the lifetime chosen at creation, kept for renewals, and when the current certificate expires.
+    public int? CertificateLifetimeDays { get; init; }
+
+    public DateTimeOffset? CertificateNotAfter { get; init; }
+
     // ClientCredentials only, returned on create and not stored. Get, list, and reset omit them.
     // TokenEndpoint is where the machine exchanges Id and AccessKey for a token. TokenScope is
     // the scope parameter that exchange needs.

@@ -36,6 +36,9 @@ public record class MachineAccessEntity
 
     public DateTimeOffset? NotAfter { get; init; }
 
+    // The lifetime chosen at creation; renewals keep it. Null for machines created before it was stored.
+    public int? CertificateLifetimeDays { get; init; }
+
     public bool IsRevoked { get; init; }
 
     public DateTimeOffset? LastRenewalAt { get; init; }

@@ -452,6 +452,8 @@ public class CosmosAccessService : IAccessService
             AnnotationKey = machineAccess.AnnotationKey,
             CredentialKind = machineAccess.CredentialKind,
             CertificateThumbprint = machineAccess.CertificateThumbprint,
+            CertificateLifetimeDays = machineAccess.CertificateLifetimeDays,
+            NotAfter = machineAccess.CertificateNotAfter,
             HashedSecret = existing?.HashedSecret,
         };
 
