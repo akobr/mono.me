@@ -77,7 +77,7 @@ public class CosmosConfigurationService : IConfigurationService
         string? continuationToken = null)
     {
         var idPrefix = $"{view}.{EntityIdPrefixTypes.Configuration}.";
-        var text = "SELECT c.AnnotationKey, c.Version, c.Modified, c.Author, c.CalculatedContentHash, c._ts, "
+        var text = "SELECT c.AnnotationKey, c.Version, c.Modified, c.CalculatedContentHash, "
             + "(IS_OBJECT(c.Content) AND ARRAY_LENGTH(ObjectToArray(c.Content)) > 0) AS HasContent "
             + "FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND STARTSWITH(c.id, @idPrefix) "
             + "AND NOT IS_DEFINED(c.AnnotationDeletionId)";
@@ -119,7 +119,7 @@ public class CosmosConfigurationService : IConfigurationService
                 AnnotationKey = item.Row.AnnotationKey!,
                 AnnotationType = AnnotationTypeCodes.ValidCodes[item.Code],
                 Version = item.Row.Version,
-                Modified = item.Row.GetModified(),
+                Modified = item.Row.Modified,
                 Hash = item.Row.CalculatedContentHash,
                 HasContent = item.Row.HasContent,
             })
@@ -423,7 +423,7 @@ public class CosmosConfigurationService : IConfigurationService
                 ProjectName = existingConfiguration.ProjectName,
                 ViewName = existingConfiguration.ViewName,
                 Content = existingConfiguration.Content,
-                Modified = existingConfiguration.GetModified(),
+                Modified = existingConfiguration.Modified,
             };
 
             await repository.Container.CreateItemAsync(history, partitionKey);
@@ -438,7 +438,6 @@ public class CosmosConfigurationService : IConfigurationService
             Version = existingConfiguration.Version + 1,
             Content = newContent,
             Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
-            Author = null,
             CalculatedContent = null,
             CalculatedContentHash = null,
         };
@@ -498,7 +497,7 @@ public class CosmosConfigurationService : IConfigurationService
             ProjectName = existingConfiguration.ProjectName,
             ViewName = existingConfiguration.ViewName,
             Content = existingConfiguration.Content,
-            Modified = existingConfiguration.GetModified(),
+            Modified = existingConfiguration.Modified,
         };
 
         var newConfiguration = existingConfiguration with
@@ -506,7 +505,6 @@ public class CosmosConfigurationService : IConfigurationService
             Version = existingConfiguration.Version + 1,
             Content = newContent,
             Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
-            Author = null,
             CalculatedContent = null,
             CalculatedContentHash = null,
         };
@@ -578,7 +576,7 @@ public class CosmosConfigurationService : IConfigurationService
             ProjectName = existingConfiguration.ProjectName,
             ViewName = existingConfiguration.ViewName,
             Content = existingConfiguration.Content,
-            Modified = existingConfiguration.GetModified(),
+            Modified = existingConfiguration.Modified,
         };
 
         var transaction = repository.Container.CreateTransactionalBatch(partitionKey);
@@ -971,7 +969,7 @@ public class CosmosConfigurationService : IConfigurationService
             ProjectName = existingConfiguration.ProjectName,
             ViewName = existingConfiguration.ViewName,
             Content = existingConfiguration.Content,
-            Modified = existingConfiguration.GetModified(),
+            Modified = existingConfiguration.Modified,
         };
         transaction.CreateItem(history);
         transaction.DeleteItem(id);

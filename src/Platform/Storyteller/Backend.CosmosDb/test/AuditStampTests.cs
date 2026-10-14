@@ -5,8 +5,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
-using _42.Platform.Storyteller.Entities.Annotations;
-using _42.Platform.Storyteller.Entities.Configurations;
 using FluentAssertions;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,14 +13,12 @@ using Xunit;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
-// The audit stamps of configurations and views, also for items stored before the stamps; every test works in its own project.
+// The audit stamps of configurations and views; every test works in its own project.
 public class AuditStampTests(Startup startup)
     : BaseTestsClass(startup)
 {
     private const string Organization = TestConstants.Organization;
     private const string View = Constants.DefaultViewName;
-
-    private static readonly DateTimeOffset LegacyTime = new(2026, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
     private IAnnotationService Annotations => Context.Services.GetRequiredService<IAnnotationService>();
 
@@ -36,53 +32,19 @@ public class AuditStampTests(Startup startup)
         .Container;
 
     [Fact]
-    public async Task LegacyConfiguration_IsReadWithItsAuthorAndConvertedOnTheNextWrite()
+    public async Task ConfigurationVersions_KeepTheStampOfTheirWrite()
     {
         var project = NewProject();
-        var annotationKey = AnnotationKey.CreateResponsibility("legacy");
-        var key = await CreateAnnotationAsync(project, annotationKey);
-        var partitionKey = key.GetPartitionKey();
-        var current = Create.Configuration(annotationKey, JObject.Parse("""{ "a": 2 }"""), viewName: View, projectName: project) with
-        {
-            Version = 2,
-            Modified = null,
-            Author = "account: user-legacy",
-        };
-        var history = new ConfigurationHistoryEntity
-        {
-            PartitionKey = partitionKey,
-            Id = $"{View}.cfv.{annotationKey}.1",
-            AnnotationKey = annotationKey,
-            Name = annotationKey.Name,
-            ProjectName = project,
-            ViewName = View,
-            Version = 1,
-            Content = JObject.Parse("""{ "a": 1 }"""),
-            Author = "application: machine-legacy",
-            CreationTime = LegacyTime,
-        };
-        await Container.UpsertItemAsync(current, new PartitionKey(partitionKey));
-        await Container.UpsertItemAsync(history, new PartitionKey(partitionKey));
+        var key = await CreateAnnotationAsync(project, AnnotationKey.CreateResponsibility("versions"));
+
+        var first = await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "a": 1 }"""), AuditActor.Machine("machine-1"));
+        var second = await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "a": 2 }"""), AuditActor.Account("user-1", "User One"));
 
         var versions = (await Configs.GetConfigurationVersionsAsync(key)).ToList();
-        var summary = (await Configs.ListConfigurationsAsync(Organization, project, View)).Configurations.Single();
-
         versions.Select(version => version.Version).Should().Equal(1u, 2u);
-        versions[0].Modified.Should().Be(AuditStamp.Of(AuditActor.Machine("machine-legacy"), LegacyTime));
-        versions[1].Modified.By.Should().Be(AuditActor.Account("user-legacy"));
-        versions[1].Modified.At.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(5), "a legacy item without a time has its last write");
-        summary.Modified.Should().Be(versions[1].Modified);
-
-        var written = await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "a": 3 }"""), AuditActor.Account("user-new", "New User"));
-
-        written.Modified.By.Should().Be(AuditActor.Account("user-new", "New User"));
-        var stored = await ReadRawAsync($"{View}.cnf.{annotationKey}", partitionKey);
-        stored.ContainsKey("Author").Should().BeFalse("the legacy author is not written again");
-        stored["Modified"]!["By"]!["Id"]!.Value<string>().Should().Be("user-new");
-        var archived = await ReadRawAsync($"{View}.cfv.{annotationKey}.2", partitionKey);
-        archived.ContainsKey("Author").Should().BeFalse();
-        archived["Modified"]!["By"]!["Id"]!.Value<string>().Should().Be("user-legacy");
-        archived["Modified"]!["By"]!["Kind"]!.Value<string>().Should().Be("Account");
+        versions[0].Modified.Should().Be(first.Modified, "the archived version keeps the stamp of its write");
+        versions[1].Modified.Should().Be(second.Modified);
+        (await Configs.ListConfigurationsAsync(Organization, project, View)).Configurations.Single().Modified.Should().Be(second.Modified);
     }
 
     [Fact]
@@ -118,23 +80,15 @@ public class AuditStampTests(Startup startup)
     }
 
     [Fact]
-    public async Task LegacyView_IsReadWithItsAuthorAndConvertedOnUpdate()
+    public async Task ViewUpdate_KeepsWhoCreatedTheView()
     {
         var project = NewProject();
-        var partitionKey = ViewEntity.GetPartitionKey(project);
-        await Container.UpsertItemAsync(
-            new ViewEntity { PartitionKey = partitionKey, Name = "legacy", CreatedAt = LegacyTime, CreatedBy = "system" },
-            new PartitionKey(partitionKey));
+        var created = await Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "rollout" }, AuditActor.Account("creator"));
 
-        var listed = (await Views.GetViewsAsync(Organization, project, discover: false)).Single(view => view.Name == "legacy");
-        var updated = await Views.UpdateViewAsync(Organization, project, "legacy", new ViewUpdate { Description = "Kept" }, AuditActor.Account("user-1"));
+        var updated = await Views.UpdateViewAsync(Organization, project, "rollout", new ViewUpdate { Description = "Kept" }, AuditActor.Account("editor"));
 
-        listed.Created.Should().Be(AuditStamp.Of(AuditActor.System, LegacyTime));
-        updated.Created.Should().Be(listed.Created, "an update does not change who created the view");
-        var stored = await ReadRawAsync($"{ViewEntity.IdPrefix}legacy", partitionKey);
-        stored.ContainsKey("CreatedBy").Should().BeFalse();
-        stored.ContainsKey("CreatedAt").Should().BeFalse();
-        stored["Created"]!["By"]!["Kind"]!.Value<string>().Should().Be("System");
+        created.Created!.By.Should().Be(AuditActor.Account("creator"));
+        updated.Created.Should().Be(created.Created);
     }
 
     [Fact]

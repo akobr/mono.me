@@ -12,7 +12,7 @@ public static class Mapping
         {
             AnnotationKey = @this.AnnotationKey,
             Version = @this.Version,
-            Modified = @this.GetModified(),
+            Modified = @this.Modified,
             Content = content is null ? @this.CalculatedContent : content,
             Hash = @this.CalculatedContentHash,
             Labels = @this.Labels,
@@ -26,7 +26,7 @@ public static class Mapping
         {
             AnnotationKey = @this.AnnotationKey,
             Version = @this.Version,
-            Modified = @this.GetModified(),
+            Modified = @this.Modified,
             Content = @this.Content,
             Hash = null,
             Labels = @this.Labels,
@@ -40,7 +40,7 @@ public static class Mapping
         {
             AnnotationKey = @this.AnnotationKey,
             Version = @this.Version,
-            Modified = @this.GetModified(),
+            Modified = @this.Modified,
             Content = @this.Content,
             Hash = null,
         };

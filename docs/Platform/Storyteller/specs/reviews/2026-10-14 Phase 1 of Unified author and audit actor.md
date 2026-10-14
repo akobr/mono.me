@@ -58,3 +58,8 @@ Nothing filters or sorts on the stamps, so `ContainerFactory.AuditStampPaths` ex
 
 - New `Backend.CosmosDb/test/AuditStampTests.cs`: a legacy configuration and history item are read with their parsed actors and times and converted by the next write (the archived version keeps the converted stamp); the version time does not move when the calculation cache rewrites the item; an unwritten configuration is stamped by `System`; a legacy view is read and converted on update; the organization container excludes `AuditStampPaths`.
 - The existing tests pass `AuditActor`s and assert the stamps; `SecretRightsTests` asserts the account and the machine actor of the caller.
+
+
+### Follow-up: no legacy reads
+
+After the review of the pull request (decided 2026-10-14), the databases are recreated and no stored data has to be kept, so the legacy reads of D3 are removed again: `LegacyAuthors`, `ConfigurationStampExtensions`, the legacy `Author`, `CreationTime`, `CreatedAt` and `CreatedBy` properties of the entities, `ViewEntity.GetCreated()` and the `c.Author`/`c._ts` fallback of the listings. Every entity declares its stamp `required`, the summaries return `Modified` as required, and the mappings and history items copy the stored stamp directly. The two legacy tests of `AuditStampTests` are replaced by `ConfigurationVersions_KeepTheStampOfTheirWrite` and `ViewUpdate_KeepsWhoCreatedTheView`; `Backend.CosmosDb.UnitTests` 333 and `Api.Functions.UnitTests` 267 pass, and the exported OpenAPI document is unchanged apart from its build number.

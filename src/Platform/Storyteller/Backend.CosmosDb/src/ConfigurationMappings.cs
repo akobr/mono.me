@@ -8,14 +8,14 @@ internal static class ConfigurationMappings
     public static ConfigurationVersion ToConfigurationVersion(this ConfigurationEntity e) => new()
     {
         Version = (uint)e.Version,
-        Modified = e.GetModified(),
+        Modified = e.Modified,
         ExpirationTime = DateTimeOffset.MaxValue,
     };
 
     public static ConfigurationVersion ToConfigurationVersion(this ConfigurationHistoryEntity e) => new()
     {
         Version = (uint)e.Version,
-        Modified = e.GetModified(),
+        Modified = e.Modified,
         ExpirationTime = e.GetExpirationTime(),
     };
 }

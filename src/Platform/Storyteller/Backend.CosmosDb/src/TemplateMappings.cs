@@ -11,7 +11,7 @@ internal static class TemplateMappings
         AnnotationType = e.Name,
         Version = e.Version,
         Content = e.Content,
-        Modified = e.GetModified(),
+        Modified = e.Modified,
     };
 
     public static ConfigurationTemplate ToConfigurationTemplate(this GenerateTemplateHistoryEntity e) => new()
@@ -19,20 +19,20 @@ internal static class TemplateMappings
         AnnotationType = e.Name,
         Version = e.Version,
         Content = e.Content,
-        Modified = e.GetModified(),
+        Modified = e.Modified,
     };
 
     public static ConfigurationVersion ToConfigurationVersion(this GenerateTemplateEntity e) => new()
     {
         Version = (uint)e.Version,
-        Modified = e.GetModified(),
+        Modified = e.Modified,
         ExpirationTime = DateTimeOffset.MaxValue,
     };
 
     public static ConfigurationVersion ToConfigurationVersion(this GenerateTemplateHistoryEntity e) => new()
     {
         Version = (uint)e.Version,
-        Modified = e.GetModified(),
+        Modified = e.Modified,
         ExpirationTime = e.GetExpirationTime(),
     };
 
@@ -46,6 +46,6 @@ internal static class TemplateMappings
         ViewName = e.ViewName,
         Version = e.Version,
         Content = e.Content,
-        Modified = e.GetModified(),
+        Modified = e.Modified,
     };
 }

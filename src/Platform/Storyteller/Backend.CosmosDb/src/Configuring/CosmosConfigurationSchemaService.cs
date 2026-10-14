@@ -53,7 +53,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
     {
         // Current schema documents only: "{view}.cfs." excludes the state ("css") and history ("csv") items.
         var prefix = $"{view}.{EntityIdPrefixTypes.ConfigurationSchema}.";
-        var query = new QueryDefinition("SELECT c.id, c.Version, c.Modified, c.Author, c._ts FROM c WHERE STARTSWITH(c.id, @prefix)")
+        var query = new QueryDefinition("SELECT c.id, c.Version, c.Modified FROM c WHERE STARTSWITH(c.id, @prefix)")
             .WithParameter("@prefix", prefix);
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
@@ -918,7 +918,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
                 AnnotationType = value.Type,
                 AnnotationKey = value.Key,
                 Version = row.Version,
-                Modified = row.GetModified(),
+                Modified = row.Modified,
             }
             : null;
     }
