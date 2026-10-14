@@ -1,5 +1,5 @@
-import { test } from '@playwright/test'
-import { expectAccessible, openApp, signedOut } from './support'
+import { expect, test } from '@playwright/test'
+import { expectAccessible, openApp, openBulkCreate, signedOut } from './support'
 
 // Accessibility of the main screens (spec section 15): no serious or critical axe violations (WCAG 2.1 AA).
 const screens: [string, string][] = [
@@ -27,6 +27,18 @@ for (const [name, path] of screens) {
     await expectAccessible(page)
   })
 }
+
+test('the bulk create dialog has no serious accessibility violations', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/annotations')
+  const dialog = await openBulkCreate(page, testInfo)
+  // New, Exists and Duplicate rows, and an invalid line with its message
+  await dialog
+    .getByRole('textbox', { name: 'Keys' })
+    .fill('northwind.billing\nexe.cyberdyne.invoicing.prod\nrst.invoicing\nusg.northwind.billing\nexe.a.b')
+  await expect(dialog.getByRole('button', { name: 'Remove invalid lines' })).toBeVisible()
+  await expect(dialog.getByRole('region', { name: 'Review' }).getByRole('row')).toHaveCount(6)
+  await expectAccessible(page)
+})
 
 test('onboarding has no serious accessibility violations', async ({ page }) => {
   await openApp(page, '/onboarding', 'new-user')

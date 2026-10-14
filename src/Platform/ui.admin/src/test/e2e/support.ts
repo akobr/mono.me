@@ -1,4 +1,4 @@
-import { expect, type Page, type TestInfo } from '@playwright/test'
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { AxeBuilder } from '@axe-core/playwright'
 
 export type MockScenario = 'default' | 'new-user' | 'invited' | 'large'
@@ -36,6 +36,20 @@ export async function openFromList(page: Page, key: string, testInfo: TestInfo):
     ? page.getByRole('listitem').filter({ hasText: key }).getByRole('button')
     : page.getByRole('row').filter({ hasText: key })
   await item.first().click()
+}
+
+/** Opens Bulk create from the navbar (desktop) or the command palette (mobile, where the navbar has no room for it). */
+export async function openBulkCreate(page: Page, testInfo: TestInfo): Promise<Locator> {
+  if (isMobile(testInfo)) {
+    await page.getByRole('button', { name: 'Search…' }).click()
+    await page.getByPlaceholder('Search annotations, pages, projects and actions…').fill('Bulk create')
+    await page.getByRole('option', { name: 'Bulk create annotations' }).click()
+  } else {
+    await page.getByRole('button', { name: 'Bulk create', exact: true }).click()
+  }
+  const dialog = page.getByRole('dialog', { name: 'Bulk create annotations' })
+  await expect(dialog).toBeVisible()
+  return dialog
 }
 
 /** Replaces the text of the visible CodeMirror editor. */
