@@ -24,6 +24,10 @@ test('the sign-in page offers AuthKit after signing out', async ({ page }) => {
 
   await expect(page).toHaveURL(/\/login/)
   await expect(page.getByRole('heading', { name: 'Sign in to 2S Admin' })).toBeVisible()
+  // The bare layout loads the 128 px 42 logo above the card (424-32).
+  const logo = page.locator('img[src*="42logo-128"]')
+  await expect(logo).toBeVisible()
+  await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(128)
   await page.getByRole('button', { name: 'Continue with AuthKit' }).click()
   await expect(page).toHaveURL(/\/orgs|\/acme/)
 })
