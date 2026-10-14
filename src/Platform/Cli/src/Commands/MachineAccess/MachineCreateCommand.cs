@@ -38,7 +38,10 @@ public class MachineCreateCommand : BaseContextCommand
     [Option("-w|--write", CommandOptionType.NoValue, Description = "Scope will be read and write.")]
     public bool IsScopeReadWrite { get; set; }
 
-    [Option("-l|--lifetime-days", CommandOptionType.SingleValue, Description = "Certificate lifetime in days (when credential kind includes certificate).")]
+    [Option("-k|--credential-kind", CommandOptionType.SingleValue, Description = "One of the kinds the project enables: " + CredentialKinds.Names + ". Default: the project's default kind.")]
+    public string? CredentialKind { get; set; }
+
+    [Option("-l|--lifetime-days", CommandOptionType.SingleValue, Description = "Certificate lifetime in days (when credential kind includes certificate). Default: the project's default lifetime.")]
     public int? LifetimeDays { get; set; }
 
     [Option("-o|--output", CommandOptionType.SingleValue, Description = "Output file path for the PKCS#12 certificate (.pfx).")]
@@ -49,6 +52,19 @@ public class MachineCreateCommand : BaseContextCommand
         if (!string.IsNullOrWhiteSpace(AnnotationKey))
         {
             Console.ValidateAnnotationKey(AnnotationKey);
+        }
+
+        MachineAccessCreateCredentialKind? credentialKind = null;
+
+        if (CredentialKind is not null)
+        {
+            if (!CredentialKinds.TryParse<MachineAccessCreateCredentialKind>(CredentialKind, out var kind))
+            {
+                Console.WriteImportant($"Unknown credential kind '{CredentialKind}'. Use {CredentialKinds.Names}.");
+                return ExitCodes.ERROR_INPUT_PARSING;
+            }
+
+            credentialKind = kind;
         }
 
         var machine = await _accessApi.CreateMachineAccessAsync(
@@ -62,6 +78,9 @@ public class MachineCreateCommand : BaseContextCommand
                 Scope = IsScopeReadWrite
                     ? MachineAccessCreateScope.DefaultReadWrite
                     : MachineAccessCreateScope.DefaultRead,
+
+                // Null: the project's default kind and lifetime.
+                CredentialKind = credentialKind,
                 CertificateLifetimeDays = LifetimeDays,
             });
 
@@ -74,6 +93,8 @@ public class MachineCreateCommand : BaseContextCommand
             machine.AnnotationKey,
             machine.CredentialKind,
             machine.CertificateThumbprint,
+            machine.CertificateLifetimeDays,
+            machine.CertificateNotAfter,
             machine.LastRenewalAt,
             Certificate = string.IsNullOrEmpty(machine.Certificate) ? null : "[written to file]",
             CertificatePassword = string.IsNullOrEmpty(machine.CertificatePassword) ? null : "[see below]",
