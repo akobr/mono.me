@@ -16,7 +16,7 @@ Keys keep their casing but are unique case-insensitively. `DB.Password` and `db.
 
 ### Values
 
-A value is a string of at most 24,576 bytes in UTF-8 (`400 ValueTooLarge` otherwise). The empty string is allowed. An optional content type of up to 255 characters, such as `text/plain` or `application/json`, tells clients how to render the value; it is not validated.
+A value is a string of at most 24,576 bytes in UTF-8 (`400 ValueTooLarge` otherwise; `400 ValueRequired` when it is missing). The empty string is allowed. An optional content type of up to 255 characters (`400 InvalidContentType` otherwise), such as `text/plain` or `application/json`, tells clients how to render the value; it is not validated.
 
 Two content types mark a **reference**: `application/vnd.2s.secret-reference` and the Azure App Configuration format `application/vnd.microsoft.appconfig.keyvaultref+json;charset=utf-8`. A reference is a public pair whose value points to a secret in the customer's own vault. The platform never resolves it; the consuming application does, with its own identity.
 
@@ -238,7 +238,7 @@ The integration tests of `KeyValues.Azure.KeyVault/testint` start Lowkey Vault w
 | `ExportAsync`, `ImportAsync` | The document format below |
 | `LookupAsync` | For the binding sources: the current value, or null when missing, deleted, or a secret without secrets included |
 
-Error codes of this area: `InvalidKey`, `ValueTooLarge`, `ProtectionRequired`, `ProtectionNotAllowed` (409), `ProtectionInUse` (409), `ProtectionNotConfigured` (501), `KeyValueNotFound`, `KeyValueBusy` (409), `KeyValueVersionMismatch` (412), `PolicyVersionMismatch` (409), `KeyEncryptionUnavailable` (503 with `Retry-After`), `CustomerKeyUnavailable` (424), `CustomerKeyInvalid`, `ByokNotConfigured` (409), `MtlsRequired` (403), `HttpsRequired` (400), `ImportInvalid` (400 with the failing items in `Details`), `SecretValueMissing`, `NotSupportedForProtection`, `ReprotectNotPossible`, `InvalidClientEncryptedValue`, `UnknownRecipient`, `RecipientExists`, `RecipientNotFound`, `RecipientInvalid`, `InvalidSecretReference`, and `AccessDenied` for missing secret rights.
+Error codes of this area: `InvalidKey`, `ValueRequired`, `ValueTooLarge`, `InvalidContentType`, `ProtectionRequired`, `ProtectionNotAllowed` (409), `ProtectionInUse` (409), `ProtectionNotConfigured` (501), `KeyValueNotFound`, `KeyValueBusy` (409), `KeyValueVersionMismatch` (412), `PolicyVersionMismatch` (409), `KeyEncryptionUnavailable` (503 with `Retry-After`), `CustomerKeyUnavailable` (424), `CustomerKeyInvalid`, `ByokNotConfigured` (409), `MtlsRequired` (403), `HttpsRequired` (400), `ImportInvalid` (400 with the failing items in `Details`), `SecretValueMissing`, `NotSupportedForProtection`, `ReprotectNotPossible`, `InvalidClientEncryptedValue`, `UnknownRecipient`, `RecipientExists`, `RecipientNotFound`, `RecipientInvalid`, `InvalidSecretReference`, and `AccessDenied` for missing secret rights.
 
 ## API
 
@@ -273,7 +273,7 @@ Base `P` = `v1/{organization}/{project}/key-values`.
 | `PUT` | `P/policy` | `KeyValuePolicyUpdate` (`AllowedProtections`, `DefaultSecretProtection`, `RequireMtlsForSecretDelivery`, `HsmRotationInterval`, `Byok.KeyUri`, `Byok.TenantId`, `ExpectedVersion`) → `KeyValuePolicy` | Administrator |
 | `GET` | `P/policy/byok/setup` | → `ByokSetupInfo` (`ClientId`, `ConsentUrl`, `RequiredRole`) | Administrator |
 | `POST` | `P/policy/byok/verify` | → `KeyValuePolicy` | Administrator |
-| `POST` | `P/policy/rotate` | `{ "Protection": "Standard" | "Hsm" }` → `KeyValuePolicy` | Administrator |
+| `POST` | `P/policy/rotate` | `{ "Protection": "Standard" \| "Hsm" }` → `KeyValuePolicy` | Administrator |
 | `GET` | `P/recipients` | → `ClientEncryptionRecipient[]` | Reader, machines with a read scope |
 | `POST` | `P/recipients` | `{ "Id"?, "Name", "PublicKey" }` (PEM or JWK) → `ClientEncryptionRecipient` | Administrator |
 | `PATCH` | `P/recipients/{id}` | `{ "Name"?, "IsEnabled"? }` → `ClientEncryptionRecipient` | Administrator |

@@ -82,6 +82,8 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
                 changes.Add($"-{level}");
             }
 
+            // the default secret level is left alone when its level is disabled (a write at that level fails with
+            // ProtectionNotAllowed until the default is changed), see KeyValuePolicyTests.EnableHsm_CreatesTheKeyAndRecordsTheBackend
             policy = policy with { AllowedProtections = allowed };
         }
 

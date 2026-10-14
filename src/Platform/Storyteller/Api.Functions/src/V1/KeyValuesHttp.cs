@@ -140,7 +140,7 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.KeyValueKey)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueWrite), Required = true, Description = "The value, the content type, the protection level (required on create) and an optional expected version (0 = the key must not exist).")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValue), Description = "The new version, without a secret value.")]
-    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "InvalidKey, ValueTooLarge, ProtectionRequired, InvalidSecretReference, InvalidClientEncryptedValue or UnknownRecipient.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "InvalidKey, ValueRequired, ValueTooLarge, InvalidContentType, ProtectionRequired, InvalidSecretReference, InvalidClientEncryptedValue or UnknownRecipient.")]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The level is not allowed in the project (ProtectionNotAllowed), or the key changed concurrently too often (KeyValueBusy).")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The expected version does not match (KeyValueVersionMismatch).")]
@@ -563,7 +563,7 @@ public class KeyValuesHttp
 
     private static bool TryValidateBulk([System.Diagnostics.CodeAnalysis.NotNullWhen(true)] KeyValueBulkRequest? bulk, [System.Diagnostics.CodeAnalysis.NotNullWhen(false)] out IActionResult? badRequest)
     {
-        if (bulk is null || ((bulk.Keys is null || bulk.Keys.Count == 0) && string.IsNullOrEmpty(bulk.KeyPrefix)))
+        if (bulk is null || ((bulk.Keys is null || bulk.Keys.Count == 0) && bulk.KeyPrefix is null))
         {
             badRequest = new BadRequestObjectResult(new ErrorResponse("A body with Keys or a KeyPrefix is required."));
             return false;

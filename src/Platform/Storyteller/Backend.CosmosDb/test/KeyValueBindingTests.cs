@@ -156,7 +156,7 @@ public class KeyValueBindingTests(Startup startup)
     }
 
     [Fact]
-    public void Registration_AVaultNamedDefaultIsNotABindingSource()
+    public void Registration_TheNativeStoreTakesOverAVaultNamedDefault()
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -170,11 +170,12 @@ public class KeyValueBindingTests(Startup startup)
         services.AddAzureKeyVaultBindings(configuration);
         using var withoutStore = services.BuildServiceProvider();
         var vaultOnly = withoutStore.GetRequiredService<IOptions<BindingsOptions>>().Value;
-        vaultOnly.SourceKeys.Should().BeEquivalentTo(["shared"]);
+        vaultOnly.SourceKeys.Should().BeEquivalentTo(["default", "public", "shared"], "without the native store the vaults keep their names");
 
         services.AddKeyValueBindings();
         using var withStore = services.BuildServiceProvider();
         var all = withStore.GetRequiredService<IOptions<BindingsOptions>>().Value;
+        // AddSource keeps the last registration of a name, so the store registered later owns "default" and "public"
         all.SourceKeys.Should().BeEquivalentTo(["shared", "default", "public", "secret"]);
     }
 

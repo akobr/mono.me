@@ -45,7 +45,7 @@ public static partial class KeyValueRules
     {
         if (value is null)
         {
-            throw new InvalidInputException("The value is required.", ErrorCodes.ValueTooLarge);
+            throw new InvalidInputException("The value is required.", ErrorCodes.ValueRequired);
         }
 
         if (protection == KeyValueProtection.Hyok)
@@ -74,7 +74,7 @@ public static partial class KeyValueRules
         {
             throw new InvalidInputException(
                 $"A content type may have at most {MaxContentTypeLength} characters.",
-                ErrorCodes.InvalidKey);
+                ErrorCodes.InvalidContentType);
         }
     }
 

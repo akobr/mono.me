@@ -104,15 +104,16 @@ public static class KeyValueConsoleExtensions
             new[] { "Key", "Outcome", "Version", "Note" });
 
         var done = items.Count(item => item.Outcome is KeyValueBulkItemResultOutcome.Done or KeyValueBulkItemResultOutcome.Unchanged);
+        var past = operation.EndsWith('e') ? $"{operation}d" : $"{operation}ed";
         @this.WriteLine();
 
         if (done == items.Count)
         {
-            @this.WriteImportant($"{done} of {items.Count} keys {operation}d.");
+            @this.WriteImportant($"{done} of {items.Count} keys {past}.");
             return ExitCodes.SUCCESS;
         }
 
-        @this.WriteImportant($"{done} of {items.Count} keys {operation}d; the others were not found, not allowed or failed.");
+        @this.WriteImportant($"{done} of {items.Count} keys {past}; the others were not found, not allowed or failed.");
         return ExitCodes.WARNING_PARTIAL_RESULT;
     }
 

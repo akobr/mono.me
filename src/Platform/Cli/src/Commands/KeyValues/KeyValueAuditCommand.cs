@@ -70,7 +70,8 @@ public class KeyValueAuditCommand : KeyValueCommandBase
 
         if (DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var time))
         {
-            return time;
+            // the generated client sends the time without its offset ("s" format) and the API assumes UTC, so send UTC
+            return time.ToUniversalTime();
         }
 
         Console.WriteImportant($"{option} '{text}' is not a date or time.");

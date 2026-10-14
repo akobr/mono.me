@@ -30,7 +30,9 @@ public static class ErrorCodes
     public const string AnnotationDeleted = "AnnotationDeleted";
     public const string AnnotationNotDeleted = "AnnotationNotDeleted";
 
+    public const string ValueRequired = "ValueRequired";
     public const string ValueTooLarge = "ValueTooLarge";
+    public const string InvalidContentType = "InvalidContentType";
     public const string ProtectionRequired = "ProtectionRequired";
     public const string ImportInvalid = "ImportInvalid";
     public const string SecretValueMissing = "SecretValueMissing";

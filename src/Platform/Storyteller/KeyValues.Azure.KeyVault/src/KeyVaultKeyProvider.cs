@@ -100,7 +100,8 @@ public sealed class KeyVaultKeyProvider : IKeyEncryptionProvider, IHsmBackendPro
         var client = GetClient(scope);
         var name = GetKeyName(_keyOptions.KeyNamePrefix, scope);
         var cacheKey = $"{client.VaultUri}|{name}";
-        var lazy = _ensuredKeys.GetOrAdd(cacheKey, _ => new Lazy<Task<ProtectionKeyInfo>>(() => CreateIfMissingAsync(client, name, cancellationToken)));
+        // the creation is shared by every caller, so it runs without a caller's token; a cancelled caller only stops waiting
+        var lazy = _ensuredKeys.GetOrAdd(cacheKey, _ => new Lazy<Task<ProtectionKeyInfo>>(() => CreateIfMissingAsync(client, name, CancellationToken.None)));
 
         return Awaited(lazy, cacheKey);
 
@@ -108,7 +109,12 @@ public sealed class KeyVaultKeyProvider : IKeyEncryptionProvider, IHsmBackendPro
         {
             try
             {
-                return await pending.Value;
+                return await pending.Value.WaitAsync(cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // this caller gave up; the shared creation goes on for the others
+                throw;
             }
             catch
             {

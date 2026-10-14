@@ -40,9 +40,9 @@ public sealed record RsaPublicJwk(string N, string E)
                 throw new FormatException("The public key is neither PEM nor a JWK object.", exception);
             }
 
-            var kty = json?["kty"]?.GetValue<string>();
-            var n = json?["n"]?.GetValue<string>();
-            var e = json?["e"]?.GetValue<string>();
+            var kty = AsString(json?["kty"]);
+            var n = AsString(json?["n"]);
+            var e = AsString(json?["e"]);
 
             if (!string.Equals(kty, "RSA", StringComparison.Ordinal) || string.IsNullOrEmpty(n) || string.IsNullOrEmpty(e))
             {
@@ -80,6 +80,11 @@ public sealed record RsaPublicJwk(string N, string E)
     public string ToJson()
     {
         return new JsonObject { ["kty"] = Kty, ["n"] = N, ["e"] = E }.ToJsonString();
+    }
+
+    private static string? AsString(JsonNode? node)
+    {
+        return node is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
     }
 }
 

@@ -47,7 +47,8 @@ async function download(format: 'json' | 'env' | 'flat') {
     link.href = url
     link.download = name
     link.click()
-    URL.revokeObjectURL(url)
+    // revoked after the click has been handled; an immediate revoke can cancel the download in some browsers
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
 
     if (format !== 'json' && withoutValue > 0) {
       toast.add({

@@ -62,6 +62,7 @@ public class CosmosKeyValuePolicyStore : IKeyValuePolicyStore
 
         if (policy.Version != storedVersion + 1)
         {
+            _cache.Remove(GetCacheKey(organization, project));
             throw new ConflictException(
                 $"The key/value policy of '{organization}.{project}' is at version {storedVersion}; reload and retry.",
                 ErrorCodes.PolicyVersionMismatch);
@@ -80,6 +81,7 @@ public class CosmosKeyValuePolicyStore : IKeyValuePolicyStore
         }
         catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.PreconditionFailed)
         {
+            _cache.Remove(GetCacheKey(organization, project));
             throw new ConflictException(
                 $"The access point '{organization}.{project}' was changed concurrently; reload and retry.",
                 ErrorCodes.PolicyVersionMismatch);
