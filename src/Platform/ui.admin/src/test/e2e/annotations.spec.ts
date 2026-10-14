@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { goto, isMobile, openApp, openFromList } from './support'
+import { goto, isMobile, openApp, openBulkCreate, openFromList } from './support'
 
 test('filters the grid, edits an annotation in the detail and saves it', async ({ page }, testInfo) => {
   await openApp(page, '/acme/billing/default/annotations')
@@ -174,6 +174,52 @@ test('new annotations start in the default time zone of the project', async ({ p
 
   await goto(page, '/acme/billing/default/annotations/sbt.cyberdyne')
   await expect(page.getByRole('button', { name: 'Time zone', exact: true })).toContainText('Asia/Tokyo')
+})
+
+test('creates annotations in bulk from a list of keys, with their missing ancestors', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/annotations')
+  // The review checks the keys against the catalog, so it has to be loaded.
+  await expect(page.getByRole('button', { name: 'Reload the catalog' })).toBeEnabled()
+  const dialog = await openBulkCreate(page, testInfo)
+
+  await dialog
+    .getByRole('textbox', { name: 'Keys' })
+    .fill('northwind.billing\nexe.cyberdyne.invoicing.prod\nrst.invoicing')
+  // missing: rst.billing, sbt.cyberdyne, usg.cyberdyne.invoicing and cnt.cyberdyne.prod
+  await expect(dialog.getByText('2 new · 1 already exists · 4 missing ancestors', { exact: true })).toBeVisible()
+  const review = dialog.getByRole('region', { name: 'Review' })
+  await expect(review.getByRole('row').filter({ hasText: 'usg.northwind.billing' })).toContainText('New')
+  await expect(review.getByRole('row').filter({ hasText: 'rst.invoicing' })).toContainText('Exists')
+
+  await dialog.getByRole('button', { name: 'Create 2 annotations' }).click()
+  await expect(
+    dialog.getByText('Created 6 annotations: 2 from the list and 4 missing ancestors.', { exact: true }),
+  ).toBeVisible()
+  await expect(dialog.getByText('1 key already existed and was skipped.', { exact: true })).toBeVisible()
+  await expect(dialog.getByRole('region', { name: 'Created annotations' }).getByRole('row')).toHaveCount(7)
+  const done = dialog.getByRole('button', { name: 'Done' })
+  await expect(done).toBeFocused()
+  await done.click()
+  await expect(dialog).toBeHidden()
+
+  // The list is virtualized: the filter brings the new key into view.
+  await page.getByRole('textbox', { name: 'Filter annotations' }).fill('key:exe.cyberdyne.invoicing.prod')
+  await openFromList(page, 'exe.cyberdyne.invoicing.prod', testInfo)
+  await expect(page).toHaveURL(/\/annotations\/exe\.cyberdyne\.invoicing\.prod/)
+  await expect(page.getByTestId('annotation-identity')).toHaveText('exe.cyberdyne.invoicing.prod')
+  // a new annotation has only its key and name
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('')
+})
+
+test('a Reader does not see Bulk create', async ({ page }) => {
+  // northwind.portal: the mock user is a Reader
+  await openApp(page, '/northwind/portal/default/annotations')
+  await expect(page.getByRole('button', { name: 'Reload the catalog' })).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Bulk create' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Search…' }).click()
+  await expect(page.getByRole('option', { name: 'Switch project' })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'Bulk create annotations' })).toHaveCount(0)
 })
 
 test('comes back to the filter, the detail and its tab after another section', async ({ page }, testInfo) => {
