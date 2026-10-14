@@ -115,6 +115,76 @@ public class MachineAuthenticationMiddlewareTests
         (await InvokeAsync(sendApiKey: true, sendCertificate: false)).Called.ShouldBeTrue();
     }
 
+    [Fact]
+    public async Task SharedCertificate_WithTheKeyOfACertificateAndApiKeyMachine_IsAuthenticated()
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
+        GiveMachineWithSharedCertificate(MachineCredentialKind.CertificateAndApiKey);
+
+        var (called, context) = await InvokeAsync(sendApiKey: true, sendCertificate: true);
+
+        called.ShouldBeTrue();
+        context.Items[FunctionContextItemKeys.MachineIdentity].ShouldBe(MachineId);
+        context.Items[FunctionContextItemKeys.PresentingCertificateThumbprint].ShouldBe("SHARED");
+    }
+
+    [Fact]
+    public async Task SharedCertificate_WithTheKeyOfAnApiKeyMachine_IsUnauthorized()
+    {
+        // ApiKey is enabled, but a shared certificate belongs to CertificateAndApiKey: it must not ride along.
+        _policyStore.Policy = Enable(MachineCredentialKind.ApiKey, MachineCredentialKind.CertificateAndApiKey);
+        GiveMachineWithSharedCertificate(MachineCredentialKind.ApiKey);
+
+        var (called, context) = await InvokeAsync(sendApiKey: true, sendCertificate: true);
+
+        called.ShouldBeFalse();
+        _middleware.Response!.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        context.Items.ContainsKey(FunctionContextItemKeys.PresentingCertificateThumbprint).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task SharedCertificate_OfAProjectThatNoLongerEnablesCertificateAndApiKey_IsUnauthorized()
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate);
+        GiveMachineWithSharedCertificate(MachineCredentialKind.CertificateAndApiKey);
+
+        (await InvokeAsync(sendApiKey: true, sendCertificate: true)).Called.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task SharedCertificate_WithoutAnApiKey_IsUnauthorized()
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
+        GiveMachineWithSharedCertificate(MachineCredentialKind.CertificateAndApiKey);
+
+        (await InvokeAsync(sendApiKey: false, sendCertificate: true)).Called.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task SharedCertificate_WithTheKeyOfAMachineOfUnknownKind_FollowsCertificateAndApiKey()
+    {
+        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, MachineAccessScope.DefaultRead);
+        _certificateValidator.Result = SharedCertificateResult();
+
+        _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
+        (await InvokeAsync(sendApiKey: true, sendCertificate: true)).Called.ShouldBeTrue();
+
+        _policyStore.Policy = Enable(MachineCredentialKind.ApiKey);
+        (await InvokeAsync(sendApiKey: true, sendCertificate: true)).Called.ShouldBeFalse();
+    }
+
+    private static ClientCertificateValidationResult SharedCertificateResult()
+    {
+        return new ClientCertificateValidationResult(
+            "org1",
+            "proj1",
+            null,
+            default,
+            "SHARED",
+            ClientCertificateKind.Shared,
+            null);
+    }
+
     private static MachineAuthenticationPolicy Enable(params MachineCredentialKind[] kinds)
     {
         return new MachineAuthenticationPolicy { EnabledCredentialKinds = kinds };
@@ -140,6 +210,12 @@ public class MachineAuthenticationMiddlewareTests
             ClientCertificateKind.Machine,
             null,
             kind);
+    }
+
+    private void GiveMachineWithSharedCertificate(MachineCredentialKind kind)
+    {
+        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, MachineAccessScope.DefaultRead, kind);
+        _certificateValidator.Result = SharedCertificateResult();
     }
 
     private async Task<(bool Called, TestFunctionContext Context)> InvokeAsync(bool sendApiKey, bool sendCertificate)

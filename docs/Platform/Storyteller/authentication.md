@@ -195,6 +195,12 @@ A project enables one or more **machine credential kinds**, and each machine use
 | `CertificateAndApiKey` | A certificate (its own, or a shared certificate of the project) and its API key. |
 | `ClientCredentials` | `Authorization: Bearer` with a token of the identity provider, see [Machine access with client credentials](#machine-access-with-client-credentials). |
 
+**Shared certificates follow `CertificateAndApiKey`.** A shared certificate is the certificate half of a `CertificateAndApiKey` login, so the policy needs no setting of its own for it:
+
+* A project issues shared certificates (`POST …/access/certificates`) only while it enables `CertificateAndApiKey`; otherwise the call returns `400`. Listing and revoking work under every policy, so they can be cleaned up after the kind is disabled.
+* A shared certificate is accepted only together with the API key of a `CertificateAndApiKey` machine of the same project, and only while the project enables that kind. A machine of another kind that sends a shared certificate is rejected, even if its API key alone would pass. So a shared certificate never makes an `ApiKey` machine look like an mTLS one, for example for [secret delivery](key-values.md#secret-delivery).
+* Disabling `CertificateAndApiKey` stops every shared certificate of the project at once, without revoking them; enabling it again lets them work again.
+
 The policy (`MachineAuthenticationPolicy`) is stored on the project's access point:
 
 | Property | Description |
@@ -225,7 +231,7 @@ sform machine machine-auth                 # prints the policy
 sform machine create -k api-key            # without -k: the project default
 ```
 
-**Creating a machine.** `MachineAccessCreate.CredentialKind` picks the kind; without it the project default is used. A kind the project does not enable fails with `400`. A machine with a certificate gets `MachineAccessCreate.CertificateLifetimeDays`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. The machine keeps its kind and its lifetime: reset and delete follow the kind, and a certificate renewal issues the new certificate with the same lifetime. Machines created before the lifetime was stored renew with `MachineAuth:CertificateLifetimeDays`.
+**Creating a machine.** `MachineAccessCreate.CredentialKind` picks the kind; without it the project default is used. A kind the project does not enable fails with `400`. `MachineAccessCreate.UseSharedCertificate` creates a `CertificateAndApiKey` machine with no certificate of its own: it gets only its API key, `UsesSharedCertificate` is set, and it signs in with one of the project's shared certificates and that key. Any other kind with `UseSharedCertificate` fails with `400`. A machine with a certificate of its own gets `MachineAccessCreate.CertificateLifetimeDays`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. The machine keeps its kind and its lifetime: reset and delete follow the kind, and a certificate renewal issues the new certificate with the same lifetime. Machines created before the lifetime was stored renew with `MachineAuth:CertificateLifetimeDays`.
 
 **Every machine call** is accepted only when the machine presents what its own kind requires, and the project still enables that kind. A `CertificateAndApiKey` machine that sends only its API key is rejected, even if the project also enables `ApiKey`. Disabling a kind stops every machine of that kind at once (up to the 60-second cache of the policy); enable it again and they work again. To move a machine to another kind, create a new machine and delete the old one.
 
@@ -269,12 +275,13 @@ Create returns the secret once. Get and list read the stored record: the secret 
 | `Scope` | `MachineAccessScope` | What the machine may call. `AnnotationRead` grants `Annotation.Read`. `AnnotationReadWrite` grants `Annotation.Read` and `Annotation.ReadWrite`. `ConfigurationRead` grants `Configuration.Read`. `ConfigurationReadWrite` grants `Configuration.Read` and `Configuration.ReadWrite`. `DefaultRead` grants `Default.Read`, `Annotation.Read` and `Configuration.Read`. `DefaultReadWrite` grants those three plus `Default.ReadWrite`, `Annotation.ReadWrite` and `Configuration.ReadWrite`. `SecretsRead` grants `Configuration.Read` and `Configuration.Secrets`, `SecretsReadWrite` adds `Configuration.ReadWrite`; such a machine receives [key/value secrets](key-values.md#secret-delivery) under the project's mTLS rule. Entra ID stores `DefaultReadWrite` for any `…ReadWrite` request and `DefaultRead` otherwise, and keeps the two secrets scopes as they are. |
 | `AnnotationKey` | string | Annotation key supplied at creation, stored and returned with the machine. A machine certificate also copies it onto the `annotationKey` claim. |
 | `CredentialKind` | `MachineCredentialKind` | `ApiKey`, `Certificate`, `CertificateAndApiKey` or `ClientCredentials`. Chosen at creation from the kinds the project enables (the project default when the request names none) and kept when the policy later changes. |
-| `CertificateThumbprint` | string | Thumbprint of the machine's current certificate. Present for `Certificate` and `CertificateAndApiKey`, and updated when the certificate is renewed. |
+| `CertificateThumbprint` | string | Thumbprint of the machine's current certificate. Present for `Certificate` and `CertificateAndApiKey`, except a machine that uses a shared certificate, and updated when the certificate is renewed. |
 | `Certificate` | string | Base64 PKCS#12 of a newly issued machine certificate. Returned on create. Cosmos keeps no copy, so get, list and reset omit it. |
 | `CertificatePassword` | string | Password for that PKCS#12. Returned on create. Cosmos keeps no copy, so get, list and reset omit it. |
 | `LastRenewalAt` | date-time | UTC time of the last certificate renewal. Present after the first renewal. |
 | `CertificateLifetimeDays` | integer | Lifetime of the machine's certificates in days, chosen at creation. Renewals keep it. Present for `Certificate` and `CertificateAndApiKey` machines created since it is stored. |
 | `CertificateNotAfter` | date-time | When the current certificate expires. Present for machines created since it is stored, and updated by renewal. |
+| `UsesSharedCertificate` | boolean | `true` for a `CertificateAndApiKey` machine created with `UseSharedCertificate`: it has no certificate, thumbprint, lifetime or expiry of its own, and presents a shared certificate of the project with its API key. Reset renews the API key; there is nothing to renew for the certificate. |
 | `TokenEndpoint` | string | Token URL for client credentials, returned on create. AuthKit uses `{AuthKitDomain}/oauth2/token`. Entra ID uses `https://login.microsoftonline.com/{MachineAuth:AzureAd:TenantId}/oauth2/v2.0/token`. Keycloak uses `{ServerUrl}/realms/{Realm}/protocol/openid-connect/token`. Cosmos keeps no copy, so get, list and reset omit it. |
 | `TokenScope` | string | `scope` form field for the token request. Entra ID sets `api://{Auth:ClientId}/.default` on create. AuthKit and Keycloak leave it empty; their tokens carry the machine's scopes without this parameter. Cosmos keeps no copy, so get, list and reset omit it. |
 
@@ -346,7 +353,7 @@ A machine call that names a project goes through `CheckAccessToAsync`. That read
 |---|---|---|
 | `ApiKey` | `Authorization: ApiKey` and the structured `2s.` key | The key carries the organization, project and machine id. Storyteller point-reads the same entity and compares a SHA-256 hash. |
 | `Certificate` | The client certificate | The chain is built against the configured CA. Revocation checking is off. The thumbprint is then checked in `IClientCertificateStore`. |
-| `CertificateAndApiKey` | The certificate and the API key | Both checks have to succeed, and the organization, project and machine id have to match. |
+| `CertificateAndApiKey` | The certificate and the API key | Both checks have to succeed, and the organization, project and machine id have to match. With a shared certificate, the certificate has to be a stored, unrevoked shared certificate of the same organization and project, and the machine id comes from the API key. |
 | `ClientCredentials` | `Authorization: Bearer` and a JWT | RS256 against the provider's JWKS, which is cached. AuthKit also requires `sub` equal to `client_id`, `aud` equal to `Auth:AuthKit:ClientId`, and `org_id` equal to `MachineOrganizationId`. Scopes come only from `PermissionMap`. |
 
 The membership read stays a point read as the catalogue grows, as long as the machines are spread across projects. Every machine of one project shares the logical partition `{project}.access`. Cosmos serves a logical partition from one physical partition, and a physical partition is capped at 10,000 RU/s. A point read of this small document is about 1 RU, so one project cannot carry tens of thousands of machine calls per second. The container read in front of it adds a second round trip to every such call, for every kind.

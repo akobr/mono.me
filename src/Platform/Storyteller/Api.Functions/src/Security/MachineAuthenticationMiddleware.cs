@@ -174,6 +174,18 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         var hasApiKey = apiKeyResult is not null;
         var machineKind = ResolveMachineKind(certResult, apiKeyResult);
 
+        // A shared certificate is the certificate half of a CertificateAndApiKey login. Any other machine that
+        // presents one is refused, so the certificate can't satisfy the policy or the mTLS secret delivery for it.
+        if (certResult?.Kind == Accessing.Model.ClientCertificateKind.Shared
+            && machineKind != MachineCredentialKind.CertificateAndApiKey)
+        {
+            _logger.LogWarning(
+                "Shared certificate presented by a {MachineKind} machine for {Url}",
+                machineKind, httpReqData.Url.AbsolutePath);
+            await RespondUnauthorizedAsync(context, httpReqData);
+            return;
+        }
+
         var policyStore = context.InstanceServices.GetRequiredService<IMachineAuthenticationPolicyStore>();
         var policy = await policyStore.GetEffectiveAsync(organization, project, options);
 

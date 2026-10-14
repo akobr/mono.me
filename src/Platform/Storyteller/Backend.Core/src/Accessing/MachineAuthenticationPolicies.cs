@@ -95,6 +95,13 @@ public static class MachineAuthenticationPolicies
         return GetRequestedKinds(policy).Contains(kind);
     }
 
+    // A shared certificate is the certificate half of a CertificateAndApiKey login, so it follows that kind:
+    // a project issues and accepts shared certificates only while it enables CertificateAndApiKey.
+    public static bool AllowsSharedCertificates(this MachineAuthenticationPolicy policy)
+    {
+        return policy.IsEnabled(MachineCredentialKind.CertificateAndApiKey);
+    }
+
     public static bool IssuesCertificate(this MachineCredentialKind kind)
     {
         return kind is MachineCredentialKind.Certificate or MachineCredentialKind.CertificateAndApiKey;

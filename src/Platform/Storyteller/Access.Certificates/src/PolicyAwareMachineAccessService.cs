@@ -31,7 +31,8 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
     }
 
     // The machine picks one of the kinds its project enables (the project default when it names none).
-    // A certificate gets the requested lifetime, else the project default.
+    // A certificate gets the requested lifetime, else the project default. A CertificateAndApiKey machine
+    // that uses a shared certificate gets no certificate of its own, so no lifetime either.
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
         var policy = await _policyStore.GetEffectiveAsync(model.Organization, model.Project, _options.Value);
@@ -43,12 +44,21 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
                 $"The credential kind {credentialKind} is not enabled in the project {model.Organization}.{model.Project}.");
         }
 
+        var usesSharedCertificate = model.UseSharedCertificate == true;
+
+        if (usesSharedCertificate && credentialKind != MachineCredentialKind.CertificateAndApiKey)
+        {
+            throw new MachineAccessNotSupportedException(
+                $"Only {MachineCredentialKind.CertificateAndApiKey} machines can use a shared certificate, not {credentialKind}.");
+        }
+
         model = model with
         {
             CredentialKind = credentialKind,
-            CertificateLifetimeDays = credentialKind.IssuesCertificate()
+            CertificateLifetimeDays = credentialKind.IssuesCertificate() && !usesSharedCertificate
                 ? model.CertificateLifetimeDays ?? policy.CertificateLifetimeDays
                 : null,
+            UseSharedCertificate = usesSharedCertificate,
         };
 
         return credentialKind switch
@@ -131,6 +141,16 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
     {
         // Phase 1: Create API key machine access.
         var apiKeyAccess = await _apiKeyService.CreateMachineAccessAsync(model);
+
+        if (model.UseSharedCertificate == true)
+        {
+            // The certificate half is a shared certificate of the project, so none is issued for the machine.
+            return apiKeyAccess with
+            {
+                CredentialKind = MachineCredentialKind.CertificateAndApiKey,
+                UsesSharedCertificate = true,
+            };
+        }
 
         try
         {

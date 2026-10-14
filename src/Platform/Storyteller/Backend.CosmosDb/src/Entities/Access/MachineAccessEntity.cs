@@ -41,6 +41,8 @@ public record class MachineAccessEntity
 
     public bool IsRevoked { get; init; }
 
+    public bool UsesSharedCertificate { get; init; }
+
     public DateTimeOffset? LastRenewalAt { get; init; }
 
     [JsonProperty("_etag")]
