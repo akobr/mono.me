@@ -136,7 +136,7 @@ The CSP allows no `eval`. Keep these in mind when adding code:
 src/
 ├── index.html, vite.config.ts, vitest.config.ts, eslint.config.ts, .oxlintrc.json, tsconfig*.json
 ├── build/mock-service-worker.ts   # serves msw's worker script in the e2e mode only
-├── public/                        # app-config.json, theme-init.js (color mode before first paint), favicon
+├── public/                        # app-config.json, theme-init.js (color mode before first paint), 16 and 32 px favicons
 ├── app/
 │   ├── main.ts                    # boot: app-config → SDK fetcher → AuthKit → Pinia, Vue Query, router, Nuxt UI
 │   ├── App.vue                    # <UApp>, layout switch on route.meta.layout
