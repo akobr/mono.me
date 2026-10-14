@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Configuring;
@@ -44,4 +45,21 @@ public interface IConfigurationService
     Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion);
 
     Task<DiffResult> GetConfigurationViewChangesAsync(FullKey sourceKey, string toView);
+
+    // The own documents of every configuration in a view and their versions still in the history, for an export.
+    // Configurations of soft-deleted annotations are left out; an empty document is not a version.
+    Task<IReadOnlyList<ConfigurationHistory>> GetConfigurationHistoriesAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default);
+
+    // Replaces the annotation's own document with the given one as a new version, unless it is equal (an import).
+    // A missing or deleted annotation and an empty document are skipped; a schema violation fails unless forced.
+    Task<ConfigurationImportResult> ImportConfigurationAsync(
+        FullKey key,
+        JObject content,
+        AuditActor actor,
+        bool force = false,
+        bool dryRun = false);
 }

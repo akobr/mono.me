@@ -33,10 +33,13 @@ public class Startup : IAsyncLifetime, ITestContext
 
     public async Task InitializeAsync()
     {
-        DbContainer = new CosmosDbBuilder()
-            .WithImage("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
-            .WithReuse(true)
-            .Build();
+        // Built only when used: building it needs a running Docker, the local emulator does not.
+        DbContainer = UseContainer
+            ? new CosmosDbBuilder()
+                .WithImage("mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest")
+                .WithReuse(true)
+                .Build()
+            : null!;
 
         var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(5));
         var containerTask = UseContainer ? DbContainer.StartAsync(cancellation.Token) : Task.CompletedTask;

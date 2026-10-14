@@ -7,6 +7,7 @@ public static class PartitionKeys
 {
     public const string TemplatePartitionSuffix = "template";
     public const string KeyValuesPartitionInfix = "kv";
+    public const string TransferPartitionSuffix = "transfer";
 
     public static string GetResponsibility(string projectName, string responsibilityName)
     {
@@ -27,6 +28,12 @@ public static class PartitionKeys
     public static string GetKeyValues(string projectName, string viewName)
     {
         return $"{projectName}.{KeyValuesPartitionInfix}.{viewName}";
+    }
+
+    // Export and import jobs of all views of a project.
+    public static string GetTransfer(string projectName)
+    {
+        return $"{projectName}.{TransferPartitionSuffix}";
     }
 
     public static string GetKey(IAnnotation annotation)
@@ -77,5 +84,10 @@ public static class PartitionKeys
     public static PartitionKey GetCosmosKeyValues(string projectName, string viewName)
     {
         return new PartitionKey(GetKeyValues(projectName, viewName));
+    }
+
+    public static PartitionKey GetCosmosTransfer(string projectName)
+    {
+        return new PartitionKey(GetTransfer(projectName));
     }
 }

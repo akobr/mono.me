@@ -104,6 +104,7 @@
     <Project Path="src/Platform/Storyteller/Api.Functions/src/Api.Functions.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Functions/test/Api.Functions.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Api.Web/src/Api.Web.csproj" />
+    <Project Path="src/Platform/Storyteller/Backend.AzureStorage/src/Backend.AzureStorage.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.Core/src/Backend.Core.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.Core/test/Backend.Core.UnitTests.csproj" />
     <Project Path="src/Platform/Storyteller/Backend.CosmosDb/src/Backend.CosmosDb.csproj" />
