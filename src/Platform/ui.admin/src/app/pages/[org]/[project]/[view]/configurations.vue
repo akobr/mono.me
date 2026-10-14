@@ -75,11 +75,12 @@ function open(key: string) {
 }
 
 const columns: TableColumn<Row>[] = [
+  // The name of the type, as in the annotations grid (424-34); a custom name can be long, so the cell cannot grow.
   {
     id: 'type',
     header: 'Type',
-    cell: ({ row }) => h(AnnotationTypeBadge, { type: row.original.key.slice(0, 3) }),
-    meta: { style: { th: 'width: 96px', td: 'width: 96px' } },
+    cell: ({ row }) => h(AnnotationTypeBadge, { type: row.original.key.slice(0, 3), variant: 'label' }),
+    meta: { style: { th: 'width: 160px', td: 'width: 160px; max-width: 160px' } },
   },
   {
     id: 'name',
