@@ -3,8 +3,11 @@ using System.Reflection;
 using _42.Platform.Storyteller.Api.V1;
 
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core;
+using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Configurations;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Visitors;
+
+using Microsoft.OpenApi.Models;
 
 using Newtonsoft.Json.Serialization;
 
@@ -58,5 +61,31 @@ public class OpenApiDocumentTests
         schemas["BindingSourceDescriptor"].Properties.Keys.ShouldBe(["Name", "Summary", "IsDefault", "IsSecret", "Examples"], ignoreOrder: true);
         schemas["BindingParameterDescription"].Properties.Keys.ShouldBe(["Name", "Description", "IsOptional", "Values"], ignoreOrder: true);
         schemas["BindingExample"].Properties.Keys.ShouldBe(["Expression", "Description"], ignoreOrder: true);
+    }
+
+    [Theory]
+    [InlineData(nameof(AnnotationsHttp.GetAnnotations))]
+    [InlineData(nameof(AnnotationsHttp.GetAnnotation))]
+    [InlineData(nameof(AnnotationsHttp.GetDescendants))]
+    [InlineData(nameof(AnnotationsHttp.GetResponsibilities))]
+    [InlineData(nameof(AnnotationsHttp.GetSubjects))]
+    [InlineData(nameof(AnnotationsHttp.GetUsages))]
+    [InlineData(nameof(AnnotationsHttp.GetContexts))]
+    [InlineData(nameof(AnnotationsHttp.GetExecutions))]
+    [InlineData(nameof(AnnotationsHttp.GetUnits))]
+    [InlineData(nameof(AnnotationsHttp.GetUnitsOfExecution))]
+    public void AnnotationReads_PublishTheIncludeFlags(string operation)
+    {
+        var method = typeof(AnnotationsHttp).GetMethod(operation).ShouldNotBeNull();
+        var published = method.GetCustomAttributes<OpenApiParameterAttribute>().ToDictionary(parameter => parameter.Name);
+
+        foreach (var name in new[] { "includeInactive", "includeDeleted" })
+        {
+            var parameter = published[name];
+            parameter.In.ShouldBe(ParameterLocation.Query);
+            parameter.Type.ShouldBe(typeof(bool));
+            parameter.Required.ShouldBeFalse();
+            method.GetParameters().Single(argument => argument.Name == name).DefaultValue.ShouldBe(false);
+        }
     }
 }

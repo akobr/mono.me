@@ -32,15 +32,18 @@ public partial class AnnotationsHttp
 
     private readonly IAnnotationService _annotations;
     private readonly IAccessService _access;
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger<AnnotationsHttp> _logger;
 
     public AnnotationsHttp(
         IAnnotationService annotations,
         IAccessService access,
+        TimeProvider timeProvider,
         ILogger<AnnotationsHttp> logger)
     {
         _annotations = annotations;
         _access = access;
+        _timeProvider = timeProvider;
         _logger = logger;
     }
 
@@ -52,6 +55,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of annotations.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -62,7 +67,9 @@ public partial class AnnotationsHttp
         string organization,
         string project,
         string view,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -80,6 +87,8 @@ public partial class AnnotationsHttp
                 AnnotationType.UnitOfExecution,
             },
             ContinuationToken = continuationToken,
+            IncludeInactive = includeInactive,
+            Deleted = DeletedFilter(includeDeleted),
             Organization = organization,
             Project = project,
             View = view,
@@ -98,9 +107,11 @@ public partial class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), Description = "The requested annotation.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The requested annotation doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The requested annotation doesn't exist or is deleted, or it is not active and includeInactive is not set (ErrorCode AnnotationInactive).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetAnnotation(
@@ -109,7 +120,9 @@ public partial class AnnotationsHttp
         string organization,
         string project,
         string view,
-        string key)
+        string key,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -122,9 +135,26 @@ public partial class AnnotationsHttp
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
         var annotation = await _annotations.GetAnnotationAsync(fullKey);
 
+        if (annotation is null && includeDeleted)
+        {
+            annotation = await _annotations.GetDeletedAnnotationAsync(fullKey);
+        }
+
         if (annotation is null)
         {
             return new NotFoundResult();
+        }
+
+        // the same rule as the lists: an inactive annotation is read only on request, and the error code tells it
+        // from a missing one
+        var status = annotation.GetStatus(_timeProvider.GetUtcNow());
+
+        if (!includeInactive && status != AnnotationStatus.Active)
+        {
+            return new NotFoundObjectResult(new ErrorResponse($"The annotation '{key}' is {status.ToString().ToLowerInvariant()}; read it with includeInactive=true.")
+            {
+                ErrorCode = ErrorCodes.AnnotationInactive,
+            });
         }
 
         return new OkObjectResult(annotation);
@@ -140,6 +170,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
     [OpenApiParameter(Definitions.Parameters.Descendants, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The type of descendants to retrieve, possible value is: usages, contexts, executions, units, units-of-execution, or all.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "The list of descendant annotations.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -152,7 +184,9 @@ public partial class AnnotationsHttp
         string view,
         string key,
         string descendants = "all",
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -242,6 +276,8 @@ public partial class AnnotationsHttp
         var dataRequest = new AnnotationsRequest
         {
             ContinuationToken = continuationToken,
+            IncludeInactive = includeInactive,
+            Deleted = DeletedFilter(includeDeleted),
             Organization = organization,
             Project = project,
             View = view,
@@ -460,6 +496,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.NameQuery, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the responsibilities.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse<Responsibility>), Description = "The list of responsibilities.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -471,7 +509,9 @@ public partial class AnnotationsHttp
         string project,
         string view,
         [FromQuery] string? nameQuery = null,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -485,6 +525,8 @@ public partial class AnnotationsHttp
             ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
+            IncludeInactive = includeInactive,
+            Deleted = DeletedFilter(includeDeleted),
             Organization = organization,
             Project = project,
             View = view,
@@ -532,6 +574,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.NameQuery, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the subjects.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse<Subject>), Description = "The list of subjects.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -543,7 +587,9 @@ public partial class AnnotationsHttp
         string project,
         string view,
         [FromQuery] string? nameQuery = null,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -557,6 +603,8 @@ public partial class AnnotationsHttp
             ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
+            IncludeInactive = includeInactive,
+            Deleted = DeletedFilter(includeDeleted),
             Organization = organization,
             Project = project,
             View = view,
@@ -605,6 +653,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter("responsibilityNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the usages by responsibility.")]
     [OpenApiParameter("subjectNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the usages by subject.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse<Usage>), Description = "The list of usages.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -617,7 +667,9 @@ public partial class AnnotationsHttp
         string view,
         [FromQuery] string? responsibilityNameQuery = null,
         [FromQuery] string? subjectNameQuery = null,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -631,6 +683,8 @@ public partial class AnnotationsHttp
             ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
+            IncludeInactive = includeInactive,
+            Deleted = DeletedFilter(includeDeleted),
             Organization = organization,
             Project = project,
             View = view,
@@ -708,6 +762,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter("subjectNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the contexts by subject.")]
     [OpenApiParameter(Definitions.Parameters.NameQuery, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the contexts.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse<Context>), Description = "The list of contexts.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -720,7 +776,9 @@ public partial class AnnotationsHttp
         string view,
         [FromQuery] string? subjectNameQuery = null,
         [FromQuery] string? nameQuery = null,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -734,6 +792,8 @@ public partial class AnnotationsHttp
             ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
+            IncludeInactive = includeInactive,
+            Deleted = DeletedFilter(includeDeleted),
             Organization = organization,
             Project = project,
             View = view,
@@ -811,6 +871,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter("subjectNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the executions by subject.")]
     [OpenApiParameter("contextNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name query to filter the executions by context.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse<Execution>), Description = "The list of executions.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -824,7 +886,9 @@ public partial class AnnotationsHttp
         [FromQuery] string? responsibilityNameQuery = null,
         [FromQuery] string? subjectNameQuery = null,
         [FromQuery] string? contextNameQuery = null,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -838,6 +902,8 @@ public partial class AnnotationsHttp
             ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
+            IncludeInactive = includeInactive,
+            Deleted = DeletedFilter(includeDeleted),
             Organization = organization,
             Project = project,
             View = view,
@@ -941,6 +1007,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter("responsibilityNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The responsibility name query to filter the units.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse<Unit>), Description = "The list of units.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -952,7 +1020,9 @@ public partial class AnnotationsHttp
         string project,
         string view,
         [FromQuery] string? responsibilityNameQuery = null,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -966,6 +1036,8 @@ public partial class AnnotationsHttp
             ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
+            IncludeInactive = includeInactive,
+            Deleted = DeletedFilter(includeDeleted),
             Organization = organization,
             Project = project,
             View = view,
@@ -1016,6 +1088,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter("subjectNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The subject name query to filter the units of execution.")]
     [OpenApiParameter("contextNameQuery", In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The context name query to filter the units of execution.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
+    [OpenApiParameter(Definitions.Parameters.IncludeInactive, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeInactive)]
+    [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = Definitions.Descriptions.IncludeDeleted)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse<UnitOfExecution>), Description = "The list of units of execution.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -1030,7 +1104,9 @@ public partial class AnnotationsHttp
         [FromQuery] string? unitNameQuery = null,
         [FromQuery] string? subjectNameQuery = null,
         [FromQuery] string? contextNameQuery = null,
-        [FromQuery] string? continuationToken = null)
+        [FromQuery] string? continuationToken = null,
+        [FromQuery] bool includeInactive = false,
+        [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
@@ -1044,6 +1120,8 @@ public partial class AnnotationsHttp
             ],
             Conditions = conditions,
             ContinuationToken = continuationToken,
+            IncludeInactive = includeInactive,
+            Deleted = DeletedFilter(includeDeleted),
             Organization = organization,
             Project = project,
             View = view,
@@ -1164,5 +1242,10 @@ public partial class AnnotationsHttp
 
         var response = await _annotations.GetAnnotationsAsync(dataRequest);
         return new OkObjectResult(response.AsTyped<UnitOfExecution>());
+    }
+
+    private static AnnotationDeletedFilter DeletedFilter(bool includeDeleted)
+    {
+        return includeDeleted ? AnnotationDeletedFilter.Include : AnnotationDeletedFilter.Exclude;
     }
 }

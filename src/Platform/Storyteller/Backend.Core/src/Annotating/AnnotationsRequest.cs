@@ -20,6 +20,10 @@ public class AnnotationsRequest
 
     public AnnotationDeletedFilter Deleted { get; set; } = AnnotationDeletedFilter.Exclude;
 
+    // Also the disabled, scheduled and expired annotations; without it only the active ones (AnnotationStatus).
+    // Independent of Deleted: a deleted annotation that is disabled needs both.
+    public bool IncludeInactive { get; set; }
+
     // With Deleted = Only: just the roots of deletions.
     public bool DeletionRootsOnly { get; set; }
 

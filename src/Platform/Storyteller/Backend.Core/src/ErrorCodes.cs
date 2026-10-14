@@ -59,4 +59,5 @@ public static class ErrorCodes
     public const string InvalidSecretReference = "InvalidSecretReference";
     public const string PolicyVersionMismatch = "PolicyVersionMismatch";
     public const string InvalidQuery = "InvalidQuery";
+    public const string AnnotationInactive = "AnnotationInactive";
 }

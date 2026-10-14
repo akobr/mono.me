@@ -21,6 +21,8 @@ public class AnnotationsHttpTests
          "Title":"Invoices of Northwind"}
         """;
 
+    private static readonly DateTimeOffset Now = new(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
+
     [Theory]
     [InlineData("POST")]
     [InlineData("PUT")]
@@ -129,6 +131,113 @@ public class AnnotationsHttpTests
     }
 
     [Fact]
+    public async Task Lists_ByDefault_AskOnlyForActiveAnnotations()
+    {
+        var annotations = new RecordingAnnotations();
+        var http = Http(annotations);
+
+        foreach (var list in Lists(http))
+        {
+            await list(false, false);
+
+            var request = annotations.LastRequest.ShouldNotBeNull();
+            request.IncludeInactive.ShouldBeFalse();
+            request.Deleted.ShouldBe(AnnotationDeletedFilter.Exclude);
+        }
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Lists_PassTheIncludeFlags(bool includeInactive, bool includeDeleted)
+    {
+        var annotations = new RecordingAnnotations();
+        var http = Http(annotations);
+
+        foreach (var list in Lists(http))
+        {
+            await list(includeInactive, includeDeleted);
+
+            var request = annotations.LastRequest.ShouldNotBeNull();
+            request.IncludeInactive.ShouldBe(includeInactive);
+            request.Deleted.ShouldBe(includeDeleted ? AnnotationDeletedFilter.Include : AnnotationDeletedFilter.Exclude);
+        }
+    }
+
+    [Fact]
+    public async Task Get_ActiveAnnotation_IsReturned()
+    {
+        var annotations = new RecordingAnnotations { Stored = Subject("sbt.northwind") };
+
+        var result = await Http(annotations).GetAnnotation(Request("GET"), "acme", "billing", "default", "sbt.northwind");
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<Subject>().AnnotationKey.ShouldBe("sbt.northwind");
+    }
+
+    [Theory]
+    [InlineData("disabled")]
+    [InlineData("scheduled")]
+    [InlineData("expired")]
+    public async Task Get_InactiveAnnotation_Answers404AnnotationInactive(string status)
+    {
+        var annotations = new RecordingAnnotations { Stored = Inactive(Subject("sbt.northwind"), status) };
+
+        var result = await Http(annotations).GetAnnotation(Request("GET"), "acme", "billing", "default", "sbt.northwind");
+
+        var error = result.ShouldBeOfType<NotFoundObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.ErrorCode.ShouldBe(ErrorCodes.AnnotationInactive);
+        error.Message.ShouldContain(status);
+    }
+
+    [Theory]
+    [InlineData("disabled")]
+    [InlineData("scheduled")]
+    [InlineData("expired")]
+    public async Task Get_InactiveAnnotationWithIncludeInactive_IsReturned(string status)
+    {
+        var annotations = new RecordingAnnotations { Stored = Inactive(Subject("sbt.northwind"), status) };
+
+        var result = await Http(annotations).GetAnnotation(Request("GET"), "acme", "billing", "default", "sbt.northwind", includeInactive: true);
+
+        result.ShouldBeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task Get_DeletedAnnotation_Answers404UnlessIncluded()
+    {
+        var annotations = new RecordingAnnotations { StoredDeleted = Deleted(Subject("sbt.northwind")) };
+        var http = Http(annotations);
+
+        var hidden = await http.GetAnnotation(Request("GET"), "acme", "billing", "default", "sbt.northwind");
+        var included = await http.GetAnnotation(Request("GET"), "acme", "billing", "default", "sbt.northwind", includeDeleted: true);
+
+        hidden.ShouldBeOfType<NotFoundResult>();
+        included.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<Subject>().Deletion.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task Get_DeletedAndDisabledAnnotation_NeedsBothFlags()
+    {
+        var annotations = new RecordingAnnotations { StoredDeleted = Deleted(Inactive(Subject("sbt.northwind"), "disabled")) };
+        var http = Http(annotations);
+
+        var deletedOnly = await http.GetAnnotation(Request("GET"), "acme", "billing", "default", "sbt.northwind", includeDeleted: true);
+        var both = await http.GetAnnotation(Request("GET"), "acme", "billing", "default", "sbt.northwind", includeInactive: true, includeDeleted: true);
+
+        deletedOnly.ShouldBeOfType<NotFoundObjectResult>().Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.AnnotationInactive);
+        both.ShouldBeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task Get_UnknownKey_Answers404()
+    {
+        var result = await Http(new RecordingAnnotations()).GetAnnotation(Request("GET"), "acme", "billing", "default", "sbt.northwind", includeInactive: true, includeDeleted: true);
+
+        result.ShouldBeOfType<NotFoundResult>();
+    }
+
+    [Fact]
     public async Task DeletedList_PassesTheFilters()
     {
         var annotations = new RecordingAnnotations();
@@ -232,7 +341,52 @@ public class AnnotationsHttpTests
 
     private static AnnotationsHttp Http(RecordingAnnotations annotations)
     {
-        return new AnnotationsHttp(annotations, new ContributorAccess(), NullLogger<AnnotationsHttp>.Instance);
+        return new AnnotationsHttp(annotations, new ContributorAccess(), new FixedTime(Now), NullLogger<AnnotationsHttp>.Instance);
+    }
+
+    // Every list endpoint and the descendants, called with the two include flags.
+    private static IEnumerable<Func<bool, bool, Task>> Lists(AnnotationsHttp http)
+    {
+        yield return (inactive, deleted) => http.GetAnnotations(Request("GET"), "acme", "billing", "default", null, inactive, deleted);
+        yield return (inactive, deleted) => http.GetResponsibilities(Request("GET"), "acme", "billing", "default", null, null, inactive, deleted);
+        yield return (inactive, deleted) => http.GetSubjects(Request("GET"), "acme", "billing", "default", null, null, inactive, deleted);
+        yield return (inactive, deleted) => http.GetUsages(Request("GET"), "acme", "billing", "default", null, null, null, inactive, deleted);
+        yield return (inactive, deleted) => http.GetContexts(Request("GET"), "acme", "billing", "default", null, null, null, inactive, deleted);
+        yield return (inactive, deleted) => http.GetExecutions(Request("GET"), "acme", "billing", "default", null, null, null, null, inactive, deleted);
+        yield return (inactive, deleted) => http.GetUnits(Request("GET"), "acme", "billing", "default", null, null, inactive, deleted);
+        yield return (inactive, deleted) => http.GetUnitsOfExecution(Request("GET"), "acme", "billing", "default", null, null, null, null, null, inactive, deleted);
+        yield return (inactive, deleted) => http.GetDescendants(Request("GET"), "acme", "billing", "default", "sbt.northwind", "all", null, inactive, deleted);
+    }
+
+    private static Subject Subject(string key)
+    {
+        return new Subject
+        {
+            ProjectName = "billing",
+            ViewName = "default",
+            AnnotationKey = key,
+            Name = AnnotationKey.Parse(key).Name,
+            AnnotationType = AnnotationType.Subject,
+        };
+    }
+
+    private static Subject Inactive(Subject subject, string status)
+    {
+        return status switch
+        {
+            "disabled" => subject with { IsDisabled = true },
+            "scheduled" => subject with { ValidFrom = Now.AddDays(1) },
+            "expired" => subject with { ExpiresAt = Now },
+            _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+        };
+    }
+
+    private static Subject Deleted(Subject subject)
+    {
+        return subject with
+        {
+            Deletion = new AnnotationDeletion { DeletionId = "d1", RootKey = subject.AnnotationKey, DeletedAt = DateTimeOffset.UnixEpoch, DeletedBy = AuditActor.System, IsRoot = true },
+        };
     }
 
     private static TestHttpRequestData Request(string method, string body = "")
@@ -258,6 +412,11 @@ public class AnnotationsHttpTests
         public AnnotationsRequest? LastRequest { get; private set; }
 
         public AuditActor? LastActor { get; private set; }
+
+        // What GetAnnotationAsync and GetDeletedAnnotationAsync find.
+        public Annotation? Stored { get; init; }
+
+        public Annotation? StoredDeleted { get; init; }
 
         public Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor)
         {
@@ -314,13 +473,13 @@ public class AnnotationsHttpTests
             return Task.FromResult(new AnnotationPurgeResult { PurgedKeys = [fullKey.Annotation] });
         }
 
-        public Task<Annotation?> GetDeletedAnnotationAsync(FullKey fullKey) => Task.FromResult<Annotation?>(null);
+        public Task<Annotation?> GetDeletedAnnotationAsync(FullKey fullKey) => Task.FromResult(StoredDeleted);
 
         public Task<AnnotationHistory?> GetAnnotationHistoryAsync(FullKey fullKey) => Task.FromResult<AnnotationHistory?>(null);
 
         public Task<bool> ExistAnnotationAsync(FullKey fullKey) => throw new NotImplementedException();
 
-        public Task<Annotation?> GetAnnotationAsync(FullKey fullKey) => throw new NotImplementedException();
+        public Task<Annotation?> GetAnnotationAsync(FullKey fullKey) => Task.FromResult(Stored);
 
         public Task<IEnumerable<Annotation>> CreateAnnotationAsync(string organization, Annotation annotation, AuditActor actor) => throw new NotImplementedException();
 
@@ -333,6 +492,11 @@ public class AnnotationsHttpTests
             Calls.Add($"simple:{organization}:{project}:{view}:{string.Join(",", annotations)}");
             return Task.FromResult<IEnumerable<Annotation>>([]);
         }
+    }
+
+    private sealed class FixedTime(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
     }
 
     // The signed-in user is a Contributor of every project.

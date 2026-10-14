@@ -1,6 +1,6 @@
 # Annotation Lifecycle and Audit
 
-Deleting an annotation is a soft delete. A deleted annotation can be restored, it can be deleted permanently, and it expires after a retention period. Every change of an annotation is recorded in its audit document, with the actor who made it.
+Deleting an annotation is a soft delete. A deleted annotation can be restored, it can be deleted permanently, and it expires after a retention period. Every change of an annotation is recorded in its audit document, with the actor who made it. An annotation that is not deleted can still be out of effect: disabled, scheduled or expired ([Active annotations](#active-annotations)).
 
 The code is in `src/Platform/Storyteller/Backend.CosmosDb/src/Annotating/` (`CosmosAnnotationService`, `CosmosAnnotationService.Deletion.cs`, `AnnotationAuditStore`) and `Backend.Core/src/Annotating/` (rules, audit differences, options). The design and its decisions are in [the spec](specs/2026-10-11%20Soft-delete%20and%20audit%20of%20annotations.md).
 
@@ -19,9 +19,36 @@ stateDiagram-v2
 ```
 
 - **I1.** Every descendant of a deleted annotation is deleted. A delete cascades to the whole tree of the inheritance graph ([inheritance.md](inheritance.md)). A restore restores the ancestors first, and a create creates or re-creates them.
-- **I2.** Reads see only active annotations: `GetAnnotation`, `ExistAnnotation`, the list endpoints, `GetDescendants`, the `@annotation` binding and every configuration read treat a deleted annotation as missing. Only the reads of deleted annotations show it.
+- **I2.** Reads see only annotations that are not deleted: `GetAnnotation`, `ExistAnnotation`, the list endpoints, `GetDescendants`, the `@annotation` binding and every configuration read treat a deleted annotation as missing. Only the reads of deleted annotations show it, and the list endpoints, `GetDescendants` and `GetAnnotation` when asked with `includeDeleted=true`.
 - **I3.** The audit lives as long as the key is known. It is created with the annotation, survives soft delete and re-create, and is removed by a permanent delete or the expiry.
 - **I4.** A deleted annotation is a **root** of the deleted list (`Deletion.IsRoot`) when it was the key a delete was requested for, or when its deleted parent became active again (restored alone, or re-created).
+
+## Active annotations
+
+An annotation that is not deleted has a **status** (`AnnotationStatus`, `Abstractions.Annotations/src/AnnotationStatusExtensions.cs`), evaluated at the time of the read in UTC:
+
+| Status | When | Order |
+| --- | --- | --- |
+| `Disabled` | `IsDisabled` is `true` | wins |
+| `Scheduled` | `ValidFrom` is after now | then |
+| `Expired` | `ExpiresAt` is at or before now | then |
+| `Active` | otherwise | |
+
+`ValidFrom` and `ExpiresAt` are compared as instants: their offset and the annotation's `TimeZone` (which only says how to show and enter them) don't matter. The admin UI computes the same status (`annotation-status.ts`).
+
+**The reads of annotations return only active annotations by default.** Two query flags, `false` by default, add the others:
+
+| Flag | Adds |
+| --- | --- |
+| `includeInactive` | disabled, scheduled and expired annotations |
+| `includeDeleted` | soft-deleted annotations, each with its `Deletion` |
+
+Each flag removes one condition, so a deleted annotation that is also disabled needs both. They apply to `GET …/annotations`, the per-type lists (`…/responsibilities`, `…/subjects`, `…/usages`, `…/contexts`, `…/executions`, `…/units`, `…/units-of-execution`), `GET …/annotations/{key}/{descendants}` and `GET …/annotations/{key}`.
+
+- **Lists.** Without `includeInactive`, Cosmos drops the disabled annotations (an undefined, `null` or `false` `IsDisabled` is enabled), and each page is filtered in memory by the validity window, because the dates are stored with the offset the client sent and can't be compared as strings. A page can therefore hold fewer items than the page size, or none, and still have a continuation token: follow it until it is absent. `Count` is the number of returned items.
+- **One key.** Without `includeInactive`, an annotation that is not active answers `404` with `ErrorCode` `AnnotationInactive` and a message naming the status, so clients can tell it from a missing one (plain `404`). With `includeDeleted`, a deleted key is returned with its `Deletion` instead of `404`.
+
+**Not filtered by status:** `ExistAnnotation`, every write (an update, delete, restore or purge acts on an inactive annotation as on an active one, and a delete cascades to inactive descendants), the reads of deleted annotations (`…/deleted…`), the history, the `@annotation` binding, and the configuration reads and listings. A configuration of a disabled or expired annotation still resolves.
 
 ## Items
 
@@ -117,6 +144,9 @@ All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Func
 | PUT, POST | `…/{key}` | Contributor | Creates, updates, or re-creates; `200` with the stored annotation, so the client receives the stamps. `400 InvalidAnnotation` or `InvalidKey`; `409` after three concurrent changes. |
 | POST | `…` and `…/simple` | Contributor | Bulk create (at most 100); deleted keys and deleted ancestors are re-created. |
 | DELETE | `…/{key}` | Contributor | Soft delete with the descendants; `200 AnnotationDeletionResult`. A repeated delete returns the existing deletion. `404` when missing. |
+| GET | `…` and the per-type lists | Reader | `AnnotationsResponse` of active annotations; `?includeInactive=true` and `?includeDeleted=true` add the others ([Active annotations](#active-annotations)); `?continuationToken=`. |
+| GET | `…/{key}` | Reader | The annotation; `404` when missing or deleted, `404 AnnotationInactive` when it is not active. `?includeInactive=true` and `?includeDeleted=true` return those too. |
+| GET | `…/{key}/{descendants}` | Reader | The descendants of the key that are active; the same two flags. |
 | GET | `…/deleted` | Reader | `AnnotationsResponse` with `Deletion` on each item, newest deletion first. `?roots=true` (default) lists only the roots, `?roots=false` everything; `?deletionId=` what one delete removed; `?continuationToken=`. |
 | GET | `…/deleted/{key}` | Reader | The deleted annotation with `Deletion`; `404` when it is not deleted. |
 | POST | `…/deleted/lookup` | Reader | `AnnotationKeysRequest` (at most 100 keys) → the deleted annotations among them; active and unknown keys are left out. `400 InvalidKey` for an invalid key, no keys, or too many. |
@@ -166,5 +196,6 @@ A violation answers `InvalidInputException` with `ErrorCode` `InvalidAnnotation`
 | `InvalidKey` | A key in the route or the body can't be parsed, or a lookup or restore has no keys or more than 100. |
 | `AnnotationDeleted` | A configuration write for a deleted annotation. |
 | `AnnotationNotDeleted` | A permanent delete of an active annotation. |
+| `AnnotationInactive` | `GET …/annotations/{key}` of a disabled, scheduled or expired annotation without `includeInactive=true` (`404`). |
 | `NotFound` | A restore of a key that does not exist or was purged. |
 | `Conflict` | The annotations changed concurrently three times in a row, or a descendant was restored during a permanent delete. |
