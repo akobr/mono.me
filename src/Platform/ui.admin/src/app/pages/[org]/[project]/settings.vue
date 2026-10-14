@@ -265,7 +265,7 @@ async function downloadCa() {
               label="Default certificate lifetime (days)"
               help="Preselected when a machine with a certificate is created; renewals keep the machine's lifetime."
             >
-              <UInputNumber v-model="lifetime" :min="1" :max="825" class="w-40" />
+              <UInputNumber v-model="lifetime" :min="1" :max="3650" class="w-40" />
             </UFormField>
             <p class="text-xs text-muted">
               Machines keep the kind they were created with. Disabling a kind stops every machine that uses it until the
