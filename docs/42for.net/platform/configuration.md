@@ -166,6 +166,8 @@ Expressions that the Storyteller API evaluates:
 
 The customer keeps `currency` in the subject's `values`. The execution refers to it. The secret never has to be copied into the catalog; a resolved read with the secret scope materializes it for the service that is allowed to hold it, and everyone else still sees the expression.
 
+The functions and sources depend on the deployment: each Azure Key Vault is a source under its own name. The administration UI lists the ones the server registered, with examples, and completes them as you type.
+
 ## What you gain
 
 - **A place for every difference.** Customer, environment, version, and one-off each have a document. Shared behavior is written once.

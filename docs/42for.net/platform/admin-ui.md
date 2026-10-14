@@ -114,7 +114,15 @@ A configuration is edited:
 - as a **form**, generated from the JSON Schema that applies to the annotation (a property's `description` is the field's help, in Markdown);
 - or as **JSON** or **YAML**, with schema hints and validation as you type.
 
-Values inherited from ancestors appear as placeholders; **Reset to inherited** removes your own value. A field can also hold a binding (`@sbt.northwind/baseUrl`) instead of a value. The form shows bindings as expressions and does not validate them, because the platform evaluates them first.
+Values inherited from ancestors appear as placeholders; **Reset to inherited** removes your own value. A field can also hold a binding (`@config("/baseUrl")`) instead of a value: **fx** next to the field turns the value into an expression. The form shows bindings as expressions and does not validate them, because the platform evaluates them first. Under the expression, a line says what it reads, for example "Function config: Reads a value of the configuration being resolved", or points at a likely mistake, such as a `/` inside a path or an unquoted argument.
+
+**fx** inside a binding field, and **fx Bindings** above the JSON and YAML editors, open the binding reference: the expression forms (paths, sources, function calls, text with expressions, math), the functions and sources this server has registered (secret sources are marked), and the JSON Logic and JSON-e object bindings. Every entry has examples to copy; in a field, **Use** puts the example into the value.
+
+The JSON and YAML editors help with bindings too:
+
+- Typing `@` in a string value lists the functions, the sources, and the text and math forms. Picking a function such as `config` writes the call with its quotes.
+- Inside `@config("…")` the list offers the paths of this configuration; inside `@annotation("…")` the fields of the annotation's values, or of the ancestor named by the second argument; the second argument offers the ancestor types.
+- Hovering a binding explains it, the same way as the line under a form field.
 
 **Lineage** in the header lists the ancestors in merge order, the order in which their configuration is inherited. Each ancestor opens its own configuration.
 
