@@ -174,10 +174,10 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         var hasApiKey = apiKeyResult is not null;
         var machineKind = ResolveMachineKind(certResult, apiKeyResult);
 
-        // A machine certificate whose kind is unknown can't show what its machine has to present.
+        // A certificate whose machine kind is unknown can't show what its machine has to present.
         if (machineKind is not { } kind)
         {
-            _logger.LogWarning("Machine certificate without a credential kind for {Url}", httpReqData.Url.AbsolutePath);
+            _logger.LogWarning("Certificate of a machine without a credential kind for {Url}", httpReqData.Url.AbsolutePath);
             await RespondUnauthorizedAsync(context, httpReqData);
             return;
         }
@@ -242,10 +242,11 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         await next(context);
     }
 
-    // The kind the machine was created with. A machine certificate carries it, and null there stays null: the
-    // presented credentials can't stand in for it (a CertificateAndApiKey machine sending only its certificate
-    // would pass as Certificate). Otherwise it comes from the API key; a store that does not record it there
-    // leaves the kind the presented credentials form.
+    // The kind the machine was created with. A machine certificate carries it, and with a shared certificate it
+    // comes from the API key; null there stays null: the presented credentials can't stand in for it (a
+    // CertificateAndApiKey machine sending only its certificate would pass as Certificate, an ApiKey machine
+    // sending a shared certificate as CertificateAndApiKey). With an API key alone, a store that does not record
+    // the kind leaves the kind the presented credentials form.
     private static MachineCredentialKind? ResolveMachineKind(
         Accessing.Model.ClientCertificateValidationResult? certResult,
         ApiKeyValidationResult? apiKeyResult)
@@ -253,6 +254,11 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         if (certResult?.Kind == Accessing.Model.ClientCertificateKind.Machine)
         {
             return certResult.CredentialKind;
+        }
+
+        if (certResult?.Kind == Accessing.Model.ClientCertificateKind.Shared)
+        {
+            return apiKeyResult?.CredentialKind;
         }
 
         return apiKeyResult?.CredentialKind
