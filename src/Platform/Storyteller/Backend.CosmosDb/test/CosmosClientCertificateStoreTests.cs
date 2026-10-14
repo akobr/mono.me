@@ -23,6 +23,7 @@ public class CosmosClientCertificateStoreTests(Startup startup)
         return new CosmosClientCertificateStore(
             Context.Services.GetRequiredService<IContainerRepositoryProvider>(),
             Context.Services.GetRequiredService<IOptions<JsonSerializerSettings>>(),
+            Context.Services.GetRequiredService<IOptions<System.Text.Json.JsonSerializerOptions>>(),
             new MemoryCache(new MemoryCacheOptions()));
     }
 
@@ -72,6 +73,40 @@ public class CosmosClientCertificateStoreTests(Startup startup)
         (await CreateStore().GetByThumbprintAsync(Org, project, thumbprint))!.IsRevoked.Should().BeTrue("every certificate of the machine is revoked");
 
         (await CreateStore().GetByMachineAccessIdAsync(Org, "other-project", machine)).Should().BeNull("projects are isolated");
+    }
+
+    [Fact]
+    public async Task CredentialKind_IsStored_AndAnOlderRecordTakesItFromTheMachine()
+    {
+        var project = $"certk-{Guid.NewGuid():N}"[..20];
+        var store = CreateStore();
+        var machine = Guid.NewGuid().ToString("D");
+        var thumbprint = Guid.NewGuid().ToString("N").ToUpperInvariant();
+
+        await store.StoreAsync(Org, project, NewRecord(machine, thumbprint) with { CredentialKind = MachineCredentialKind.CertificateAndApiKey });
+        (await CreateStore().GetByThumbprintAsync(Org, project, thumbprint))!.CredentialKind.Should().Be(MachineCredentialKind.CertificateAndApiKey);
+
+        // a record without the kind, as stored before it was kept: the kind comes from the machine access document
+        var older = Guid.NewGuid().ToString("D");
+        var olderThumbprint = Guid.NewGuid().ToString("N").ToUpperInvariant();
+        await store.StoreAsync(Org, project, NewRecord(older, olderThumbprint));
+        (await CreateStore().GetByMachineAccessIdAsync(Org, project, older))!.CredentialKind.Should().BeNull("the machine has no document");
+
+        var container = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetOrganizationContainer(Org).Container;
+        await container.UpsertItemAsync(
+            new Entities.Access.MachineAccessEntity
+            {
+                PartitionKey = CosmosClientCertificateStore.GetPartitionKey(project),
+                Id = older,
+                ObjectId = older,
+                AccessKey = "***",
+                Scope = MachineAccessScope.DefaultRead,
+                CredentialKind = MachineCredentialKind.CertificateAndApiKey,
+            },
+            new Microsoft.Azure.Cosmos.PartitionKey(CosmosClientCertificateStore.GetPartitionKey(project)));
+
+        (await CreateStore().GetByMachineAccessIdAsync(Org, project, older))!.CredentialKind.Should().Be(MachineCredentialKind.CertificateAndApiKey);
+        (await CreateStore().GetByThumbprintAsync(Org, project, olderThumbprint))!.CredentialKind.Should().Be(MachineCredentialKind.CertificateAndApiKey);
     }
 
     [Fact]

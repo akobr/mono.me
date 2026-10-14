@@ -174,14 +174,22 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         var hasApiKey = apiKeyResult is not null;
         var machineKind = ResolveMachineKind(certResult, apiKeyResult);
 
+        // A machine certificate whose kind is unknown can't show what its machine has to present.
+        if (machineKind is not { } kind)
+        {
+            _logger.LogWarning("Machine certificate without a credential kind for {Url}", httpReqData.Url.AbsolutePath);
+            await RespondUnauthorizedAsync(context, httpReqData);
+            return;
+        }
+
         // A shared certificate is the certificate half of a CertificateAndApiKey login. Any other machine that
         // presents one is refused, so the certificate can't satisfy the policy or the mTLS secret delivery for it.
         if (certResult?.Kind == Accessing.Model.ClientCertificateKind.Shared
-            && machineKind != MachineCredentialKind.CertificateAndApiKey)
+            && kind != MachineCredentialKind.CertificateAndApiKey)
         {
             _logger.LogWarning(
                 "Shared certificate presented by a {MachineKind} machine for {Url}",
-                machineKind, httpReqData.Url.AbsolutePath);
+                kind, httpReqData.Url.AbsolutePath);
             await RespondUnauthorizedAsync(context, httpReqData);
             return;
         }
@@ -189,11 +197,11 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         var policyStore = context.InstanceServices.GetRequiredService<IMachineAuthenticationPolicyStore>();
         var policy = await policyStore.GetEffectiveAsync(organization, project, options);
 
-        if (!policy.IsEnabled(machineKind) || !machineKind.IsSatisfiedBy(hasCert, hasApiKey))
+        if (!policy.IsEnabled(kind) || !kind.IsSatisfiedBy(hasCert, hasApiKey))
         {
             _logger.LogWarning(
                 "Machine kind {MachineKind} not satisfied or not enabled (hasCert={HasCert}, hasApiKey={HasApiKey}) for {Url}",
-                machineKind, hasCert, hasApiKey, httpReqData.Url.AbsolutePath);
+                kind, hasCert, hasApiKey, httpReqData.Url.AbsolutePath);
             await RespondUnauthorizedAsync(context, httpReqData);
             return;
         }
@@ -234,18 +242,20 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         await next(context);
     }
 
-    // The kind the machine was created with, from its certificate or its API key. A store that does not
-    // record it leaves the kind the presented credentials form.
-    private static MachineCredentialKind ResolveMachineKind(
+    // The kind the machine was created with. A machine certificate carries it, and null there stays null: the
+    // presented credentials can't stand in for it (a CertificateAndApiKey machine sending only its certificate
+    // would pass as Certificate). Otherwise it comes from the API key; a store that does not record it there
+    // leaves the kind the presented credentials form.
+    private static MachineCredentialKind? ResolveMachineKind(
         Accessing.Model.ClientCertificateValidationResult? certResult,
         ApiKeyValidationResult? apiKeyResult)
     {
-        var machineCertificateKind = certResult?.Kind == Accessing.Model.ClientCertificateKind.Machine
-            ? certResult.CredentialKind
-            : null;
+        if (certResult?.Kind == Accessing.Model.ClientCertificateKind.Machine)
+        {
+            return certResult.CredentialKind;
+        }
 
-        return machineCertificateKind
-            ?? apiKeyResult?.CredentialKind
+        return apiKeyResult?.CredentialKind
             ?? (certResult, apiKeyResult) switch
             {
                 (not null, not null) => MachineCredentialKind.CertificateAndApiKey,

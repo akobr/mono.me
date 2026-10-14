@@ -103,6 +103,22 @@ public class MachineAuthenticationMiddlewareTests
         called.ShouldBe(accepted);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MachineCertificateWithoutAKind_IsUnauthorized(bool sendApiKey)
+    {
+        // Certificate is enabled, but the presented credentials don't tell the machine's own kind.
+        _policyStore.Policy = Enable(MachineCredentialKind.Certificate, MachineCredentialKind.CertificateAndApiKey);
+        GiveMachine(MachineCredentialKind.CertificateAndApiKey);
+        _certificateValidator.Result = _certificateValidator.Result! with { CredentialKind = null };
+
+        var (called, _) = await InvokeAsync(sendApiKey, sendCertificate: true);
+
+        called.ShouldBeFalse();
+        _middleware.Response!.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
     [Fact]
     public async Task WithoutAProjectPolicy_TheDeploymentDefaultKindIsEnabled()
     {
