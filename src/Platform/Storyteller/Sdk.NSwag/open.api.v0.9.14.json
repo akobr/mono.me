@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.11.55139"
+    "version": "0.9.14.2684"
   },
   "servers": [
     {
@@ -14901,12 +14901,8 @@
           "IsEnabled": {
             "type": "boolean"
           },
-          "CreatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "CreatedBy": {
-            "type": "string"
+          "Created": {
+            "$ref": "#/components/schemas/AuditStamp"
           }
         }
       },
@@ -14969,8 +14965,8 @@
           "Content": {
             "type": "object"
           },
-          "Author": {
-            "type": "string"
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           },
           "Hash": {
             "type": "string"
@@ -15008,8 +15004,8 @@
           "Content": {
             "type": "object"
           },
-          "Author": {
-            "type": "string"
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           }
         }
       },
@@ -15035,13 +15031,8 @@
             "type": "integer",
             "format": "int64"
           },
-          "Author": {
-            "type": "string"
-          },
-          "UpdatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           }
         }
       },
@@ -15086,16 +15077,11 @@
             "type": "integer",
             "format": "int64"
           },
-          "Author": {
-            "type": "string"
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           },
           "Hash": {
             "type": "string"
-          },
-          "UpdatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
           },
           "HasContent": {
             "type": "boolean"
@@ -15115,8 +15101,8 @@
           "Content": {
             "type": "object"
           },
-          "Author": {
-            "type": "string"
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           }
         }
       },
@@ -15130,13 +15116,8 @@
             "type": "integer",
             "format": "int64"
           },
-          "Author": {
-            "type": "string"
-          },
-          "UpdatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           }
         }
       },
@@ -15147,12 +15128,8 @@
             "type": "integer",
             "format": "int32"
           },
-          "Author": {
-            "type": "string"
-          },
-          "CreationTime": {
-            "type": "string",
-            "format": "date-time"
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           },
           "ExpirationTime": {
             "type": "string",
@@ -15540,30 +15517,17 @@
             "type": "integer",
             "format": "int64"
           },
-          "Author": {
-            "type": "string"
+          "Created": {
+            "$ref": "#/components/schemas/AuditStamp"
           },
-          "UpdatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "CreatedBy": {
-            "type": "string"
-          },
-          "CreatedAt": {
-            "type": "string",
-            "format": "date-time"
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           },
           "IsDeleted": {
             "type": "boolean"
           },
-          "DeletedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "DeletedBy": {
-            "type": "string"
+          "Deleted": {
+            "$ref": "#/components/schemas/AuditStamp"
           },
           "ExpiresAt": {
             "type": "string",
@@ -15630,7 +15594,7 @@
             "default": "Reveal"
           },
           "Actor": {
-            "type": "string"
+            "$ref": "#/components/schemas/AuditActor"
           },
           "Channel": {
             "enum": [
@@ -15913,13 +15877,8 @@
             "type": "integer",
             "format": "int64"
           },
-          "Author": {
-            "type": "string"
-          },
-          "UpdatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           }
         }
       },
@@ -16034,12 +15993,8 @@
             "type": "integer",
             "format": "int64"
           },
-          "Author": {
-            "type": "string"
-          },
-          "UpdatedAt": {
-            "type": "string",
-            "format": "date-time"
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           },
           "IsDeleted": {
             "type": "boolean"
@@ -16115,12 +16070,8 @@
             "type": "string",
             "default": "Public"
           },
-          "Author": {
-            "type": "string"
-          },
-          "CreationTime": {
-            "type": "string",
-            "format": "date-time"
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
           },
           "ExpirationTime": {
             "type": "string",
@@ -16691,13 +16642,8 @@
           "Description": {
             "type": "string"
           },
-          "CreatedAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "CreatedBy": {
-            "type": "string"
+          "Created": {
+            "$ref": "#/components/schemas/AuditStamp"
           },
           "IsDefault": {
             "type": "boolean"

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
 import * as zod from "zod";
 
@@ -18,13 +18,28 @@ export const GetConfigurationSchemaParams = zod.object({
     ),
 });
 
+export const getConfigurationSchemaResponseModifiedByKindDefault = `Account`;
+
 export const GetConfigurationSchemaResponse = zod.object({
   View: zod.string().optional(),
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getConfigurationSchemaResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const SetConfigurationSchemaParams = zod.object({
@@ -49,13 +64,28 @@ export const SetConfigurationSchemaQueryParams = zod.object({
 
 export const SetConfigurationSchemaBody = zod.looseObject({});
 
+export const setConfigurationSchemaResponseModifiedByKindDefault = `Account`;
+
 export const SetConfigurationSchemaResponse = zod.object({
   View: zod.string().optional(),
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setConfigurationSchemaResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const DeleteConfigurationSchemaParams = zod.object({
@@ -78,13 +108,28 @@ export const GetAnnotationSchemaParams = zod.object({
   key: zod.string().describe("The key of the requested annotation."),
 });
 
+export const getAnnotationSchemaResponseModifiedByKindDefault = `Account`;
+
 export const GetAnnotationSchemaResponse = zod.object({
   View: zod.string().optional(),
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getAnnotationSchemaResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const SetAnnotationSchemaParams = zod.object({
@@ -105,13 +150,28 @@ export const SetAnnotationSchemaQueryParams = zod.object({
 
 export const SetAnnotationSchemaBody = zod.looseObject({});
 
+export const setAnnotationSchemaResponseModifiedByKindDefault = `Account`;
+
 export const SetAnnotationSchemaResponse = zod.object({
   View: zod.string().optional(),
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setAnnotationSchemaResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const DeleteAnnotationSchemaParams = zod.object({
@@ -131,13 +191,28 @@ export const GetDescendantTypeSchemaParams = zod.object({
   annotationType: zod.string().describe("The descendant annotation type code."),
 });
 
+export const getDescendantTypeSchemaResponseModifiedByKindDefault = `Account`;
+
 export const GetDescendantTypeSchemaResponse = zod.object({
   View: zod.string().optional(),
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getDescendantTypeSchemaResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const SetDescendantTypeSchemaParams = zod.object({
@@ -159,13 +234,28 @@ export const SetDescendantTypeSchemaQueryParams = zod.object({
 
 export const SetDescendantTypeSchemaBody = zod.looseObject({});
 
+export const setDescendantTypeSchemaResponseModifiedByKindDefault = `Account`;
+
 export const SetDescendantTypeSchemaResponse = zod.object({
   View: zod.string().optional(),
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setDescendantTypeSchemaResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const DeleteDescendantTypeSchemaParams = zod.object({
@@ -185,6 +275,8 @@ export const GetCombinedConfigurationSchemaParams = zod.object({
   key: zod.string().describe("The key of the requested annotation."),
 });
 
+export const getCombinedConfigurationSchemaResponseAppliedSchemasItemModifiedByKindDefault = `Account`;
+
 export const GetCombinedConfigurationSchemaResponse = zod.object({
   View: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
@@ -197,7 +289,22 @@ export const GetCombinedConfigurationSchemaResponse = zod.object({
         AnnotationKey: zod.string().optional(),
         Version: zod.int().optional(),
         Content: zod.looseObject({}).optional(),
-        Author: zod.string().optional(),
+        Modified: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getCombinedConfigurationSchemaResponseAppliedSchemasItemModifiedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
       }),
     )
     .optional(),
@@ -213,6 +320,7 @@ export const GetConfigurationSchemasParams = zod.object({
 });
 
 export const getConfigurationSchemasResponseKindDefault = `Type`;
+export const getConfigurationSchemasResponseModifiedByKindDefault = `Account`;
 
 export const GetConfigurationSchemasResponseItem = zod.object({
   Kind: zod
@@ -221,8 +329,20 @@ export const GetConfigurationSchemasResponseItem = zod.object({
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  UpdatedAt: zod.iso.datetime({ offset: true }).nullish(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getConfigurationSchemasResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 export const GetConfigurationSchemasResponse = zod.array(
   GetConfigurationSchemasResponseItem,
@@ -239,10 +359,24 @@ export const GetSchemaVersionsParams = zod.object({
     ),
 });
 
+export const getSchemaVersionsResponseModifiedByKindDefault = `Account`;
+
 export const GetSchemaVersionsResponseItem = zod.object({
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  CreationTime: zod.iso.datetime({ offset: true }).optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getSchemaVersionsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).optional(),
 });
 export const GetSchemaVersionsResponse = zod.array(
@@ -261,13 +395,28 @@ export const GetSchemaVersionParams = zod.object({
   version: zod.int().describe("The version number."),
 });
 
+export const getSchemaVersionResponseModifiedByKindDefault = `Account`;
+
 export const GetSchemaVersionResponse = zod.object({
   View: zod.string().optional(),
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getSchemaVersionResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const GetSchemaVersionDiffParams = zod.object({
@@ -408,10 +557,24 @@ export const GetAnnotationSchemaVersionsParams = zod.object({
   key: zod.string().describe("The key of the requested annotation."),
 });
 
+export const getAnnotationSchemaVersionsResponseModifiedByKindDefault = `Account`;
+
 export const GetAnnotationSchemaVersionsResponseItem = zod.object({
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  CreationTime: zod.iso.datetime({ offset: true }).optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getAnnotationSchemaVersionsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).optional(),
 });
 export const GetAnnotationSchemaVersionsResponse = zod.array(
@@ -426,13 +589,28 @@ export const GetAnnotationSchemaVersionParams = zod.object({
   version: zod.int().describe("The version number."),
 });
 
+export const getAnnotationSchemaVersionResponseModifiedByKindDefault = `Account`;
+
 export const GetAnnotationSchemaVersionResponse = zod.object({
   View: zod.string().optional(),
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getAnnotationSchemaVersionResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const GetAnnotationSchemaVersionDiffParams = zod.object({
@@ -566,10 +744,26 @@ export const GetDescendantTypeSchemaVersionsParams = zod.object({
   annotationType: zod.string().describe("The descendant annotation type code."),
 });
 
+export const getDescendantTypeSchemaVersionsResponseModifiedByKindDefault = `Account`;
+
 export const GetDescendantTypeSchemaVersionsResponseItem = zod.object({
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  CreationTime: zod.iso.datetime({ offset: true }).optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(
+              getDescendantTypeSchemaVersionsResponseModifiedByKindDefault,
+            ),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).optional(),
 });
 export const GetDescendantTypeSchemaVersionsResponse = zod.array(
@@ -585,13 +779,30 @@ export const GetDescendantTypeSchemaVersionParams = zod.object({
   version: zod.int().describe("The version number."),
 });
 
+export const getDescendantTypeSchemaVersionResponseModifiedByKindDefault = `Account`;
+
 export const GetDescendantTypeSchemaVersionResponse = zod.object({
   View: zod.string().optional(),
   AnnotationType: zod.string().optional(),
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(
+              getDescendantTypeSchemaVersionResponseModifiedByKindDefault,
+            ),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const GetDescendantTypeSchemaVersionDiffParams = zod.object({

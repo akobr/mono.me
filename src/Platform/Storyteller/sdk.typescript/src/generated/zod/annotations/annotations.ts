@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
 import * as zod from "zod";
 
@@ -2632,11 +2632,25 @@ export const GetViewsQueryParams = zod.object({
     ),
 });
 
+export const getViewsResponseCreatedByKindDefault = `Account`;
+
 export const GetViewsResponseItem = zod.object({
   Name: zod.string().optional(),
   Description: zod.string().optional(),
-  CreatedAt: zod.iso.datetime({ offset: true }).nullish(),
-  CreatedBy: zod.string().optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getViewsResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   IsDefault: zod.boolean().optional(),
   IsRegistered: zod.boolean().optional(),
 });
@@ -2655,11 +2669,25 @@ export const CreateViewBody = zod.object({
   Description: zod.string().optional(),
 });
 
+export const createViewResponseCreatedByKindDefault = `Account`;
+
 export const CreateViewResponse = zod.object({
   Name: zod.string().optional(),
   Description: zod.string().optional(),
-  CreatedAt: zod.iso.datetime({ offset: true }).nullish(),
-  CreatedBy: zod.string().optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(createViewResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   IsDefault: zod.boolean().optional(),
   IsRegistered: zod.boolean().optional(),
 });
@@ -2677,11 +2705,25 @@ export const UpdateViewBody = zod.object({
   Description: zod.string().optional(),
 });
 
+export const updateViewResponseCreatedByKindDefault = `Account`;
+
 export const UpdateViewResponse = zod.object({
   Name: zod.string().optional(),
   Description: zod.string().optional(),
-  CreatedAt: zod.iso.datetime({ offset: true }).nullish(),
-  CreatedBy: zod.string().optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(updateViewResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   IsDefault: zod.boolean().optional(),
   IsRegistered: zod.boolean().optional(),
 });

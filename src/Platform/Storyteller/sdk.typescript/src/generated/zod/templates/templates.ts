@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
 import * as zod from "zod";
 
@@ -16,11 +16,25 @@ export const GetTemplatesParams = zod.object({
   view: zod.string().describe("The target view inside the project."),
 });
 
+export const getTemplatesResponseModifiedByKindDefault = `Account`;
+
 export const GetTemplatesResponseItem = zod.object({
   AnnotationType: zod.string().optional(),
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  UpdatedAt: zod.iso.datetime({ offset: true }).nullish(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getTemplatesResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 export const GetTemplatesResponse = zod.array(GetTemplatesResponseItem);
 
@@ -35,11 +49,26 @@ export const GetTemplateParams = zod.object({
     ),
 });
 
+export const getTemplateResponseModifiedByKindDefault = `Account`;
+
 export const GetTemplateResponse = zod.object({
   AnnotationType: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getTemplateResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const SetTemplateParams = zod.object({
@@ -55,11 +84,26 @@ export const SetTemplateParams = zod.object({
 
 export const SetTemplateBody = zod.looseObject({});
 
+export const setTemplateResponseModifiedByKindDefault = `Account`;
+
 export const SetTemplateResponse = zod.object({
   AnnotationType: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setTemplateResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const PatchTemplateParams = zod.object({
@@ -93,11 +137,26 @@ export const PatchTemplateBodyItem = zod
   .describe("One RFC 6902 JSON Patch operation.");
 export const PatchTemplateBody = zod.array(PatchTemplateBodyItem);
 
+export const patchTemplateResponseModifiedByKindDefault = `Account`;
+
 export const PatchTemplateResponse = zod.object({
   AnnotationType: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(patchTemplateResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const DeleteTemplateParams = zod.object({
@@ -124,10 +183,24 @@ export const GetTemplateVersionsParams = zod.object({
     ),
 });
 
+export const getTemplateVersionsResponseModifiedByKindDefault = `Account`;
+
 export const GetTemplateVersionsResponseItem = zod.object({
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  CreationTime: zod.iso.datetime({ offset: true }).optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getTemplateVersionsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).optional(),
 });
 export const GetTemplateVersionsResponse = zod.array(
@@ -146,11 +219,26 @@ export const GetTemplateVersionParams = zod.object({
   version: zod.int().describe("The version number."),
 });
 
+export const getTemplateVersionResponseModifiedByKindDefault = `Account`;
+
 export const GetTemplateVersionResponse = zod.object({
   AnnotationType: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getTemplateVersionResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export const GetTemplateVersionDiffParams = zod.object({

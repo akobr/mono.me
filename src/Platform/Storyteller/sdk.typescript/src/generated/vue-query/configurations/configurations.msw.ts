@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
 import { faker } from "@faker-js/faker";
 
@@ -149,17 +149,36 @@ export const getGetConfigurationsResponseMock = (
         "UnitOfExecution",
       ] as const),
       Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Author: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
         undefined,
       ]),
       Hash: faker.helpers.arrayElement([
         faker.string.alpha({ length: { min: 10, max: 20 } }),
         undefined,
-      ]),
-      UpdatedAt: faker.helpers.arrayElement([
-        faker.date.past().toISOString().slice(0, 19) + "Z",
-        null,
       ]),
       HasContent: faker.helpers.arrayElement([
         faker.datatype.boolean(),
@@ -185,8 +204,31 @@ export const getGetConfigurationResponseMock = (
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
   Content: faker.helpers.arrayElement([{}, undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   Hash: faker.helpers.arrayElement([
@@ -218,8 +260,31 @@ export const getSetConfigurationResponseMock = (
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
   Content: faker.helpers.arrayElement([{}, undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   Hash: faker.helpers.arrayElement([
@@ -251,8 +316,31 @@ export const getPatchConfigurationResponseMock = (
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
   Content: faker.helpers.arrayElement([{}, undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   Hash: faker.helpers.arrayElement([
@@ -284,8 +372,31 @@ export const getGetResolvedConfigurationResponseMock = (
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
   Content: faker.helpers.arrayElement([{}, undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   Hash: faker.helpers.arrayElement([
@@ -315,12 +426,31 @@ export const getGetConfigurationVersionsResponseMock =
       (_, i) => i + 1,
     ).map(() => ({
       Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Author: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
-        undefined,
-      ]),
-      CreationTime: faker.helpers.arrayElement([
-        faker.date.past().toISOString().slice(0, 19) + "Z",
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
         undefined,
       ]),
       ExpirationTime: faker.helpers.arrayElement([
@@ -338,8 +468,31 @@ export const getGetConfigurationVersionResponseMock = (
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
   Content: faker.helpers.arrayElement([{}, undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   Hash: faker.helpers.arrayElement([

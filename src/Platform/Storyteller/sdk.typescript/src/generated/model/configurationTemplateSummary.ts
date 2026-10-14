@@ -3,13 +3,12 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
+import type { AuditStamp } from "./auditStamp";
 
 export interface ConfigurationTemplateSummary {
   AnnotationType?: string;
   Version?: number;
-  Author?: string;
-  /** @nullable */
-  UpdatedAt?: string | null;
+  Modified?: AuditStamp;
 }
