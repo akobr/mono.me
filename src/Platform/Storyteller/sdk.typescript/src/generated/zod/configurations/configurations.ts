@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
 import * as zod from "zod";
 
@@ -90,6 +90,7 @@ export const GetConfigurationsQueryParams = zod.object({
 });
 
 export const getConfigurationsResponseConfigurationsItemAnnotationTypeDefault = `Responsibility`;
+export const getConfigurationsResponseConfigurationsItemModifiedByKindDefault = `Account`;
 
 export const GetConfigurationsResponse = zod.object({
   Configurations: zod
@@ -110,9 +111,23 @@ export const GetConfigurationsResponse = zod.object({
             getConfigurationsResponseConfigurationsItemAnnotationTypeDefault,
           ),
         Version: zod.int().optional(),
-        Author: zod.string().optional(),
+        Modified: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getConfigurationsResponseConfigurationsItemModifiedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
         Hash: zod.string().optional(),
-        UpdatedAt: zod.iso.datetime({ offset: true }).nullish(),
         HasContent: zod.boolean().optional(),
       }),
     )
@@ -128,11 +143,26 @@ export const GetConfigurationParams = zod.object({
   key: zod.string().describe("The key of the requested annotation."),
 });
 
+export const getConfigurationResponseModifiedByKindDefault = `Account`;
+
 export const GetConfigurationResponse = zod.object({
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getConfigurationResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
@@ -156,11 +186,26 @@ export const SetConfigurationQueryParams = zod.object({
 
 export const SetConfigurationBody = zod.looseObject({});
 
+export const setConfigurationResponseModifiedByKindDefault = `Account`;
+
 export const SetConfigurationResponse = zod.object({
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setConfigurationResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
@@ -202,11 +247,26 @@ export const PatchConfigurationBodyItem = zod
   .describe("One RFC 6902 JSON Patch operation.");
 export const PatchConfigurationBody = zod.array(PatchConfigurationBodyItem);
 
+export const patchConfigurationResponseModifiedByKindDefault = `Account`;
+
 export const PatchConfigurationResponse = zod.object({
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(patchConfigurationResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
@@ -228,11 +288,26 @@ export const GetResolvedConfigurationParams = zod.object({
   key: zod.string().describe("The key of the requested annotation."),
 });
 
+export const getResolvedConfigurationResponseModifiedByKindDefault = `Account`;
+
 export const GetResolvedConfigurationResponse = zod.object({
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getResolvedConfigurationResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),
@@ -245,10 +320,24 @@ export const GetConfigurationVersionsParams = zod.object({
   key: zod.string().describe("The key of the requested annotation."),
 });
 
+export const getConfigurationVersionsResponseModifiedByKindDefault = `Account`;
+
 export const GetConfigurationVersionsResponseItem = zod.object({
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  CreationTime: zod.iso.datetime({ offset: true }).optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getConfigurationVersionsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).optional(),
 });
 export const GetConfigurationVersionsResponse = zod.array(
@@ -263,11 +352,26 @@ export const GetConfigurationVersionParams = zod.object({
   version: zod.int().describe("The version number."),
 });
 
+export const getConfigurationVersionResponseModifiedByKindDefault = `Account`;
+
 export const GetConfigurationVersionResponse = zod.object({
   AnnotationKey: zod.string().optional(),
   Version: zod.int().optional(),
   Content: zod.looseObject({}).optional(),
-  Author: zod.string().optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getConfigurationVersionResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   Hash: zod.string().optional(),
   Labels: zod.array(zod.string()).optional(),
   Values: zod.record(zod.string(), zod.unknown()).optional(),

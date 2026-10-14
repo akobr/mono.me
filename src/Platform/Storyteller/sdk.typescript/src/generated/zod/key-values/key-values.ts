@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
 import * as zod from "zod";
 
@@ -19,7 +19,9 @@ export const getKeyValuePolicyResponseAllowedProtectionsItemDefault = `Public`;
 export const getKeyValuePolicyResponseDefaultSecretProtectionDefault = `Public`;
 export const getKeyValuePolicyResponseHsmBackendDefault = `KeyVaultPremium`;
 export const getKeyValuePolicyResponseByokHealthDefault = `Unknown`;
+export const getKeyValuePolicyResponseRecipientsItemCreatedByKindDefault = `Account`;
 export const getKeyValuePolicyResponseRewrapProtectionDefault = `Public`;
+export const getKeyValuePolicyResponseModifiedByKindDefault = `Account`;
 
 export const GetKeyValuePolicyResponse = zod.object({
   AllowedProtections: zod
@@ -83,8 +85,22 @@ export const GetKeyValuePolicyResponse = zod.object({
           })
           .optional(),
         IsEnabled: zod.boolean().optional(),
-        CreatedAt: zod.iso.datetime({ offset: true }).optional(),
-        CreatedBy: zod.string().optional(),
+        Created: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getKeyValuePolicyResponseRecipientsItemCreatedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
       }),
     )
     .optional(),
@@ -102,8 +118,20 @@ export const GetKeyValuePolicyResponse = zod.object({
     })
     .optional(),
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  UpdatedAt: zod.iso.datetime({ offset: true }).nullish(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getKeyValuePolicyResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -149,7 +177,9 @@ export const setKeyValuePolicyResponseAllowedProtectionsItemDefault = `Public`;
 export const setKeyValuePolicyResponseDefaultSecretProtectionDefault = `Public`;
 export const setKeyValuePolicyResponseHsmBackendDefault = `KeyVaultPremium`;
 export const setKeyValuePolicyResponseByokHealthDefault = `Unknown`;
+export const setKeyValuePolicyResponseRecipientsItemCreatedByKindDefault = `Account`;
 export const setKeyValuePolicyResponseRewrapProtectionDefault = `Public`;
+export const setKeyValuePolicyResponseModifiedByKindDefault = `Account`;
 
 export const SetKeyValuePolicyResponse = zod.object({
   AllowedProtections: zod
@@ -213,8 +243,22 @@ export const SetKeyValuePolicyResponse = zod.object({
           })
           .optional(),
         IsEnabled: zod.boolean().optional(),
-        CreatedAt: zod.iso.datetime({ offset: true }).optional(),
-        CreatedBy: zod.string().optional(),
+        Created: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    setKeyValuePolicyResponseRecipientsItemCreatedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
       }),
     )
     .optional(),
@@ -232,8 +276,20 @@ export const SetKeyValuePolicyResponse = zod.object({
     })
     .optional(),
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  UpdatedAt: zod.iso.datetime({ offset: true }).nullish(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setKeyValuePolicyResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -262,7 +318,9 @@ export const verifyByokResponseAllowedProtectionsItemDefault = `Public`;
 export const verifyByokResponseDefaultSecretProtectionDefault = `Public`;
 export const verifyByokResponseHsmBackendDefault = `KeyVaultPremium`;
 export const verifyByokResponseByokHealthDefault = `Unknown`;
+export const verifyByokResponseRecipientsItemCreatedByKindDefault = `Account`;
 export const verifyByokResponseRewrapProtectionDefault = `Public`;
+export const verifyByokResponseModifiedByKindDefault = `Account`;
 
 export const VerifyByokResponse = zod.object({
   AllowedProtections: zod
@@ -326,8 +384,22 @@ export const VerifyByokResponse = zod.object({
           })
           .optional(),
         IsEnabled: zod.boolean().optional(),
-        CreatedAt: zod.iso.datetime({ offset: true }).optional(),
-        CreatedBy: zod.string().optional(),
+        Created: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    verifyByokResponseRecipientsItemCreatedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
       }),
     )
     .optional(),
@@ -345,8 +417,20 @@ export const VerifyByokResponse = zod.object({
     })
     .optional(),
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  UpdatedAt: zod.iso.datetime({ offset: true }).nullish(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(verifyByokResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -369,7 +453,9 @@ export const rotateKeyValueKeyResponseAllowedProtectionsItemDefault = `Public`;
 export const rotateKeyValueKeyResponseDefaultSecretProtectionDefault = `Public`;
 export const rotateKeyValueKeyResponseHsmBackendDefault = `KeyVaultPremium`;
 export const rotateKeyValueKeyResponseByokHealthDefault = `Unknown`;
+export const rotateKeyValueKeyResponseRecipientsItemCreatedByKindDefault = `Account`;
 export const rotateKeyValueKeyResponseRewrapProtectionDefault = `Public`;
+export const rotateKeyValueKeyResponseModifiedByKindDefault = `Account`;
 
 export const RotateKeyValueKeyResponse = zod.object({
   AllowedProtections: zod
@@ -433,8 +519,22 @@ export const RotateKeyValueKeyResponse = zod.object({
           })
           .optional(),
         IsEnabled: zod.boolean().optional(),
-        CreatedAt: zod.iso.datetime({ offset: true }).optional(),
-        CreatedBy: zod.string().optional(),
+        Created: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    rotateKeyValueKeyResponseRecipientsItemCreatedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
       }),
     )
     .optional(),
@@ -452,8 +552,20 @@ export const RotateKeyValueKeyResponse = zod.object({
     })
     .optional(),
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  UpdatedAt: zod.iso.datetime({ offset: true }).nullish(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(rotateKeyValueKeyResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -463,6 +575,8 @@ export const GetRecipientsParams = zod.object({
   organization: zod.string().describe("Target organization name."),
   project: zod.string().describe("Target project name."),
 });
+
+export const getRecipientsResponseCreatedByKindDefault = `Account`;
 
 export const GetRecipientsResponseItem = zod.object({
   Id: zod.string().optional(),
@@ -475,8 +589,20 @@ export const GetRecipientsResponseItem = zod.object({
     })
     .optional(),
   IsEnabled: zod.boolean().optional(),
-  CreatedAt: zod.iso.datetime({ offset: true }).optional(),
-  CreatedBy: zod.string().optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getRecipientsResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 export const GetRecipientsResponse = zod.array(GetRecipientsResponseItem);
 
@@ -494,6 +620,8 @@ export const AddRecipientBody = zod.object({
   PublicKey: zod.string().optional(),
 });
 
+export const addRecipientResponseCreatedByKindDefault = `Account`;
+
 export const AddRecipientResponse = zod.object({
   Id: zod.string().optional(),
   Name: zod.string().optional(),
@@ -505,8 +633,20 @@ export const AddRecipientResponse = zod.object({
     })
     .optional(),
   IsEnabled: zod.boolean().optional(),
-  CreatedAt: zod.iso.datetime({ offset: true }).optional(),
-  CreatedBy: zod.string().optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(addRecipientResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -523,6 +663,8 @@ export const UpdateRecipientBody = zod.object({
   IsEnabled: zod.boolean().nullish(),
 });
 
+export const updateRecipientResponseCreatedByKindDefault = `Account`;
+
 export const UpdateRecipientResponse = zod.object({
   Id: zod.string().optional(),
   Name: zod.string().optional(),
@@ -534,8 +676,20 @@ export const UpdateRecipientResponse = zod.object({
     })
     .optional(),
   IsEnabled: zod.boolean().optional(),
-  CreatedAt: zod.iso.datetime({ offset: true }).optional(),
-  CreatedBy: zod.string().optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(updateRecipientResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /**
@@ -581,6 +735,7 @@ export const GetKeyValuesQueryParams = zod.object({
 });
 
 export const getKeyValuesResponseItemsItemProtectionDefault = `Public`;
+export const getKeyValuesResponseItemsItemModifiedByKindDefault = `Account`;
 
 export const GetKeyValuesResponse = zod.object({
   Items: zod
@@ -594,8 +749,20 @@ export const GetKeyValuesResponse = zod.object({
         ContentType: zod.string().optional(),
         IsReference: zod.boolean().optional(),
         Version: zod.int().optional(),
-        Author: zod.string().optional(),
-        UpdatedAt: zod.iso.datetime({ offset: true }).optional(),
+        Modified: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(getKeyValuesResponseItemsItemModifiedByKindDefault),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
         IsDeleted: zod.boolean().optional(),
         ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
       }),
@@ -633,6 +800,9 @@ export const GetKeyValueQueryParams = zod.object({
 });
 
 export const getKeyValueResponseProtectionDefault = `Public`;
+export const getKeyValueResponseCreatedByKindDefault = `Account`;
+export const getKeyValueResponseModifiedByKindDefault = `Account`;
+export const getKeyValueResponseDeletedByKindDefault = `Account`;
 
 export const GetKeyValueResponse = zod.object({
   Key: zod.string().optional(),
@@ -645,13 +815,49 @@ export const GetKeyValueResponse = zod.object({
   IsReference: zod.boolean().optional(),
   Recipients: zod.array(zod.string()).optional(),
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  UpdatedAt: zod.iso.datetime({ offset: true }).optional(),
-  CreatedBy: zod.string().optional(),
-  CreatedAt: zod.iso.datetime({ offset: true }).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getKeyValueResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getKeyValueResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   IsDeleted: zod.boolean().optional(),
-  DeletedAt: zod.iso.datetime({ offset: true }).nullish(),
-  DeletedBy: zod.string().optional(),
+  Deleted: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getKeyValueResponseDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
 });
 
@@ -686,6 +892,9 @@ export const SetKeyValueBody = zod.object({
 });
 
 export const setKeyValueResponseProtectionDefault = `Public`;
+export const setKeyValueResponseCreatedByKindDefault = `Account`;
+export const setKeyValueResponseModifiedByKindDefault = `Account`;
+export const setKeyValueResponseDeletedByKindDefault = `Account`;
 
 export const SetKeyValueResponse = zod.object({
   Key: zod.string().optional(),
@@ -698,13 +907,49 @@ export const SetKeyValueResponse = zod.object({
   IsReference: zod.boolean().optional(),
   Recipients: zod.array(zod.string()).optional(),
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  UpdatedAt: zod.iso.datetime({ offset: true }).optional(),
-  CreatedBy: zod.string().optional(),
-  CreatedAt: zod.iso.datetime({ offset: true }).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setKeyValueResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setKeyValueResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   IsDeleted: zod.boolean().optional(),
-  DeletedAt: zod.iso.datetime({ offset: true }).nullish(),
-  DeletedBy: zod.string().optional(),
+  Deleted: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(setKeyValueResponseDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
 });
 
@@ -897,14 +1142,27 @@ export const GetKeyValueVersionsParams = zod.object({
 });
 
 export const getKeyValueVersionsResponseProtectionDefault = `Public`;
+export const getKeyValueVersionsResponseModifiedByKindDefault = `Account`;
 
 export const GetKeyValueVersionsResponseItem = zod.object({
   Version: zod.int().optional(),
   Protection: zod
     .enum(["Public", "Standard", "Hsm", "Byok", "Hyok"])
     .default(getKeyValueVersionsResponseProtectionDefault),
-  Author: zod.string().optional(),
-  CreationTime: zod.iso.datetime({ offset: true }).optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getKeyValueVersionsResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   ExpirationTime: zod.iso.datetime({ offset: true }).nullish(),
   IsCurrent: zod.boolean().optional(),
 });
@@ -935,6 +1193,9 @@ export const GetKeyValueVersionQueryParams = zod.object({
 });
 
 export const getKeyValueVersionResponseProtectionDefault = `Public`;
+export const getKeyValueVersionResponseCreatedByKindDefault = `Account`;
+export const getKeyValueVersionResponseModifiedByKindDefault = `Account`;
+export const getKeyValueVersionResponseDeletedByKindDefault = `Account`;
 
 export const GetKeyValueVersionResponse = zod.object({
   Key: zod.string().optional(),
@@ -947,13 +1208,49 @@ export const GetKeyValueVersionResponse = zod.object({
   IsReference: zod.boolean().optional(),
   Recipients: zod.array(zod.string()).optional(),
   Version: zod.int().optional(),
-  Author: zod.string().optional(),
-  UpdatedAt: zod.iso.datetime({ offset: true }).optional(),
-  CreatedBy: zod.string().optional(),
-  CreatedAt: zod.iso.datetime({ offset: true }).optional(),
+  Created: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getKeyValueVersionResponseCreatedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  Modified: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getKeyValueVersionResponseModifiedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   IsDeleted: zod.boolean().optional(),
-  DeletedAt: zod.iso.datetime({ offset: true }).nullish(),
-  DeletedBy: zod.string().optional(),
+  Deleted: zod
+    .object({
+      At: zod.iso.datetime({ offset: true }).optional(),
+      By: zod
+        .object({
+          Kind: zod
+            .enum(["Account", "Machine", "System"])
+            .default(getKeyValueVersionResponseDeletedByKindDefault),
+          Id: zod.string().optional(),
+          Name: zod.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
   ExpiresAt: zod.iso.datetime({ offset: true }).nullish(),
 });
 
@@ -1230,6 +1527,7 @@ export const GetKeyValueAuditQueryParams = zod.object({
 });
 
 export const getKeyValueAuditResponseItemsItemOperationDefault = `Reveal`;
+export const getKeyValueAuditResponseItemsItemActorKindDefault = `Account`;
 export const getKeyValueAuditResponseItemsItemChannelDefault = `User`;
 
 export const GetKeyValueAuditResponse = zod.object({
@@ -1274,7 +1572,15 @@ export const GetKeyValueAuditResponse = zod.object({
             "RecipientRemoved",
           ])
           .default(getKeyValueAuditResponseItemsItemOperationDefault),
-        Actor: zod.string().optional(),
+        Actor: zod
+          .object({
+            Kind: zod
+              .enum(["Account", "Machine", "System"])
+              .default(getKeyValueAuditResponseItemsItemActorKindDefault),
+            Id: zod.string().optional(),
+            Name: zod.string().optional(),
+          })
+          .optional(),
         Channel: zod
           .enum(["User", "MachineMtls", "MachineToken", "System"])
           .default(getKeyValueAuditResponseItemsItemChannelDefault),

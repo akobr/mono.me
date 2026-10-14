@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
 import { faker } from "@faker-js/faker";
 
@@ -3239,12 +3239,31 @@ export const getGetViewsResponseMock = (): View[] =>
       faker.string.alpha({ length: { min: 10, max: 20 } }),
       undefined,
     ]),
-    CreatedAt: faker.helpers.arrayElement([
-      faker.date.past().toISOString().slice(0, 19) + "Z",
-      null,
-    ]),
-    CreatedBy: faker.helpers.arrayElement([
-      faker.string.alpha({ length: { min: 10, max: 20 } }),
+    Created: faker.helpers.arrayElement([
+      {
+        At: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        By: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
       undefined,
     ]),
     IsDefault: faker.helpers.arrayElement([
@@ -3268,12 +3287,31 @@ export const getCreateViewResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
-  CreatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    null,
-  ]),
-  CreatedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   IsDefault: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
@@ -3295,12 +3333,31 @@ export const getUpdateViewResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
-  CreatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    null,
-  ]),
-  CreatedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   IsDefault: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),

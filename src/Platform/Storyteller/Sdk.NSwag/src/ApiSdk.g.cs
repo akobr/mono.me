@@ -22870,11 +22870,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("IsEnabled", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public bool IsEnabled { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("CreatedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset CreatedAt { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("CreatedBy", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string CreatedBy { get; set; }
+        [Newtonsoft.Json.JsonProperty("Created", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Created { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -22972,8 +22969,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Content", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public object Content { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         [Newtonsoft.Json.JsonProperty("Hash", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Hash { get; set; }
@@ -23014,8 +23011,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Content", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public object Content { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -23045,11 +23042,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long Version { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("UpdatedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset? UpdatedAt { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -23100,14 +23094,11 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long Version { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         [Newtonsoft.Json.JsonProperty("Hash", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Hash { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("UpdatedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset? UpdatedAt { get; set; }
 
         [Newtonsoft.Json.JsonProperty("HasContent", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public bool HasContent { get; set; }
@@ -23136,8 +23127,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Content", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public object Content { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -23160,11 +23151,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long Version { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("UpdatedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset? UpdatedAt { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -23184,11 +23172,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public int Version { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("CreationTime", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset CreationTime { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         [Newtonsoft.Json.JsonProperty("ExpirationTime", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.DateTimeOffset ExpirationTime { get; set; }
@@ -23574,26 +23559,17 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long Version { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
+        [Newtonsoft.Json.JsonProperty("Created", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Created { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("UpdatedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset UpdatedAt { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("CreatedBy", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string CreatedBy { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("CreatedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset CreatedAt { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         [Newtonsoft.Json.JsonProperty("IsDeleted", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public bool IsDeleted { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("DeletedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset? DeletedAt { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("DeletedBy", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string DeletedBy { get; set; }
+        [Newtonsoft.Json.JsonProperty("Deleted", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Deleted { get; set; }
 
         [Newtonsoft.Json.JsonProperty("ExpiresAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.DateTimeOffset? ExpiresAt { get; set; }
@@ -23637,7 +23613,7 @@ namespace _42.Platform.Storyteller.Sdk
         public KeyValueAuditEventOperation Operation { get; set; } = _42.Platform.Storyteller.Sdk.KeyValueAuditEventOperation.Reveal;
 
         [Newtonsoft.Json.JsonProperty("Actor", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Actor { get; set; }
+        public AuditActor Actor { get; set; }
 
         [Newtonsoft.Json.JsonProperty("Channel", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
@@ -23925,11 +23901,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long Version { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("UpdatedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset? UpdatedAt { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         private System.Collections.Generic.IDictionary<string, object> _additionalProperties;
 
@@ -24042,11 +24015,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Version", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public long Version { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("UpdatedAt", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset UpdatedAt { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         [Newtonsoft.Json.JsonProperty("IsDeleted", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public bool IsDeleted { get; set; }
@@ -24130,11 +24100,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
         public KeyValueVersionProtection Protection { get; set; } = _42.Platform.Storyteller.Sdk.KeyValueVersionProtection.Public;
 
-        [Newtonsoft.Json.JsonProperty("Author", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string Author { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("CreationTime", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset CreationTime { get; set; }
+        [Newtonsoft.Json.JsonProperty("Modified", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Modified { get; set; }
 
         [Newtonsoft.Json.JsonProperty("ExpirationTime", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.DateTimeOffset? ExpirationTime { get; set; }
@@ -24661,11 +24628,8 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("Description", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string Description { get; set; }
 
-        [Newtonsoft.Json.JsonProperty("CreatedAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public System.DateTimeOffset? CreatedAt { get; set; }
-
-        [Newtonsoft.Json.JsonProperty("CreatedBy", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
-        public string CreatedBy { get; set; }
+        [Newtonsoft.Json.JsonProperty("Created", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public AuditStamp Created { get; set; }
 
         [Newtonsoft.Json.JsonProperty("IsDefault", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public bool IsDefault { get; set; }

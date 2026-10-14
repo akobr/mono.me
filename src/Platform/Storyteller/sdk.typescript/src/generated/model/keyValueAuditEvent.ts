@@ -3,8 +3,9 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
+import type { AuditActor } from "./auditActor";
 import type { KeyValueAuditEventChannel } from "./keyValueAuditEventChannel";
 import type { KeyValueAuditEventOperation } from "./keyValueAuditEventOperation";
 import type { KeyValueAuditEventProtection } from "./keyValueAuditEventProtection";
@@ -19,7 +20,7 @@ export interface KeyValueAuditEvent {
   /** @nullable */
   Protection?: KeyValueAuditEventProtection;
   Operation?: KeyValueAuditEventOperation;
-  Actor?: string;
+  Actor?: AuditActor;
   Channel?: KeyValueAuditEventChannel;
   Count?: number;
   CorrelationId?: string;

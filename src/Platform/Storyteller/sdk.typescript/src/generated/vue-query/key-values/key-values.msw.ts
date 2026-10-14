@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
 import { faker } from "@faker-js/faker";
 
@@ -172,12 +172,31 @@ export const getGetKeyValuePolicyResponseMock = (
         faker.datatype.boolean(),
         undefined,
       ]),
-      CreatedAt: faker.helpers.arrayElement([
-        faker.date.past().toISOString().slice(0, 19) + "Z",
-        undefined,
-      ]),
-      CreatedBy: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+      Created: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
         undefined,
       ]),
     })),
@@ -214,13 +233,32 @@ export const getGetKeyValuePolicyResponseMock = (
     undefined,
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
-  ]),
-  UpdatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    null,
   ]),
   ...overrideResponse,
 });
@@ -372,12 +410,31 @@ export const getSetKeyValuePolicyResponseMock = (
         faker.datatype.boolean(),
         undefined,
       ]),
-      CreatedAt: faker.helpers.arrayElement([
-        faker.date.past().toISOString().slice(0, 19) + "Z",
-        undefined,
-      ]),
-      CreatedBy: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+      Created: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
         undefined,
       ]),
     })),
@@ -414,13 +471,32 @@ export const getSetKeyValuePolicyResponseMock = (
     undefined,
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
-  ]),
-  UpdatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    null,
   ]),
   ...overrideResponse,
 });
@@ -590,12 +666,31 @@ export const getVerifyByokResponseMock = (
         faker.datatype.boolean(),
         undefined,
       ]),
-      CreatedAt: faker.helpers.arrayElement([
-        faker.date.past().toISOString().slice(0, 19) + "Z",
-        undefined,
-      ]),
-      CreatedBy: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+      Created: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
         undefined,
       ]),
     })),
@@ -632,13 +727,32 @@ export const getVerifyByokResponseMock = (
     undefined,
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
-  ]),
-  UpdatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    null,
   ]),
   ...overrideResponse,
 });
@@ -790,12 +904,31 @@ export const getRotateKeyValueKeyResponseMock = (
         faker.datatype.boolean(),
         undefined,
       ]),
-      CreatedAt: faker.helpers.arrayElement([
-        faker.date.past().toISOString().slice(0, 19) + "Z",
-        undefined,
-      ]),
-      CreatedBy: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+      Created: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
         undefined,
       ]),
     })),
@@ -832,13 +965,32 @@ export const getRotateKeyValueKeyResponseMock = (
     undefined,
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
-  ]),
-  UpdatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    null,
   ]),
   ...overrideResponse,
 });
@@ -877,12 +1029,31 @@ export const getGetRecipientsResponseMock = (): ClientEncryptionRecipient[] =>
       faker.datatype.boolean(),
       undefined,
     ]),
-    CreatedAt: faker.helpers.arrayElement([
-      faker.date.past().toISOString().slice(0, 19) + "Z",
-      undefined,
-    ]),
-    CreatedBy: faker.helpers.arrayElement([
-      faker.string.alpha({ length: { min: 10, max: 20 } }),
+    Created: faker.helpers.arrayElement([
+      {
+        At: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        By: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
       undefined,
     ]),
   }));
@@ -916,12 +1087,31 @@ export const getAddRecipientResponseMock = (
     undefined,
   ]),
   IsEnabled: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
-  CreatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    undefined,
-  ]),
-  CreatedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   ...overrideResponse,
@@ -956,12 +1146,31 @@ export const getUpdateRecipientResponseMock = (
     undefined,
   ]),
   IsEnabled: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
-  CreatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    undefined,
-  ]),
-  CreatedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   ...overrideResponse,
@@ -999,12 +1208,31 @@ export const getGetKeyValuesResponseMock = (
         undefined,
       ]),
       Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-      Author: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
-        undefined,
-      ]),
-      UpdatedAt: faker.helpers.arrayElement([
-        faker.date.past().toISOString().slice(0, 19) + "Z",
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
         undefined,
       ]),
       IsDeleted: faker.helpers.arrayElement([
@@ -1061,29 +1289,86 @@ export const getGetKeyValueResponseMock = (
     undefined,
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
-  UpdatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    undefined,
-  ]),
-  CreatedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
-    undefined,
-  ]),
-  CreatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   IsDeleted: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
-  DeletedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    null,
-  ]),
-  DeletedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Deleted: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   ExpiresAt: faker.helpers.arrayElement([
@@ -1128,29 +1413,86 @@ export const getSetKeyValueResponseMock = (
     undefined,
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
-  UpdatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    undefined,
-  ]),
-  CreatedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
-    undefined,
-  ]),
-  CreatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   IsDeleted: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
-  DeletedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    null,
-  ]),
-  DeletedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Deleted: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   ExpiresAt: faker.helpers.arrayElement([
@@ -1278,12 +1620,31 @@ export const getGetKeyValueVersionsResponseMock = (): KeyValueVersion[] =>
       "Byok",
       "Hyok",
     ] as const),
-    Author: faker.helpers.arrayElement([
-      faker.string.alpha({ length: { min: 10, max: 20 } }),
-      undefined,
-    ]),
-    CreationTime: faker.helpers.arrayElement([
-      faker.date.past().toISOString().slice(0, 19) + "Z",
+    Modified: faker.helpers.arrayElement([
+      {
+        At: faker.helpers.arrayElement([
+          faker.date.past().toISOString().slice(0, 19) + "Z",
+          undefined,
+        ]),
+        By: faker.helpers.arrayElement([
+          {
+            Kind: faker.helpers.arrayElement([
+              "Account",
+              "Machine",
+              "System",
+            ] as const),
+            Id: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+            Name: faker.helpers.arrayElement([
+              faker.string.alpha({ length: { min: 10, max: 20 } }),
+              undefined,
+            ]),
+          },
+          undefined,
+        ]),
+      },
       undefined,
     ]),
     ExpirationTime: faker.helpers.arrayElement([
@@ -1331,29 +1692,86 @@ export const getGetKeyValueVersionResponseMock = (
     undefined,
   ]),
   Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
-  Author: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Created: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
-  UpdatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    undefined,
-  ]),
-  CreatedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
-    undefined,
-  ]),
-  CreatedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
+  Modified: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   IsDeleted: faker.helpers.arrayElement([faker.datatype.boolean(), undefined]),
-  DeletedAt: faker.helpers.arrayElement([
-    faker.date.past().toISOString().slice(0, 19) + "Z",
-    null,
-  ]),
-  DeletedBy: faker.helpers.arrayElement([
-    faker.string.alpha({ length: { min: 10, max: 20 } }),
+  Deleted: faker.helpers.arrayElement([
+    {
+      At: faker.helpers.arrayElement([
+        faker.date.past().toISOString().slice(0, 19) + "Z",
+        undefined,
+      ]),
+      By: faker.helpers.arrayElement([
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+    },
     undefined,
   ]),
   ExpiresAt: faker.helpers.arrayElement([
@@ -1659,7 +2077,21 @@ export const getGetKeyValueAuditResponseMock = (
         "RecipientRemoved",
       ] as const),
       Actor: faker.helpers.arrayElement([
-        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        {
+          Kind: faker.helpers.arrayElement([
+            "Account",
+            "Machine",
+            "System",
+          ] as const),
+          Id: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        },
         undefined,
       ]),
       Channel: faker.helpers.arrayElement([

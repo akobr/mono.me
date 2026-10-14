@@ -3,8 +3,9 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.11.55139
+ * OpenAPI spec version: 0.9.14.2684
  */
+import type { AuditStamp } from "./auditStamp";
 import type { ConfigurationSchemaContent } from "./configurationSchemaContent";
 
 export interface ConfigurationSchema {
@@ -13,5 +14,5 @@ export interface ConfigurationSchema {
   AnnotationKey?: string;
   Version?: number;
   Content?: ConfigurationSchemaContent;
-  Author?: string;
+  Modified?: AuditStamp;
 }
