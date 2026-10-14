@@ -11,7 +11,8 @@ public record class Configuration
 
     public required JObject Content { get; init; }
 
-    public required string Author { get; init; }
+    // The write that produced this version; version 0, calculated and never written, is the calculation by System.
+    public required AuditStamp Modified { get; init; }
 
     public string? Hash { get; init; }
 

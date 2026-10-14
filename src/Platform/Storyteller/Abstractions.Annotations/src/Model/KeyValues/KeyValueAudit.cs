@@ -46,7 +46,7 @@ public record class KeyValueAuditEvent
 
     public required KeyValueAuditOperation Operation { get; init; }
 
-    public required string Actor { get; init; }
+    public required AuditActor Actor { get; init; }
 
     public required KeyValueChannel Channel { get; init; }
 

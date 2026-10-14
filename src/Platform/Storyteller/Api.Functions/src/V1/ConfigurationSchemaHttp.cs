@@ -117,8 +117,7 @@ public partial class ConfigurationSchemaHttp
 
         try
         {
-            var author = request.GetAuthor();
-            var schema = await _schemaService.SetSchemaAsync(organization, project, view, annotationType, inputModel, author, IsForce(request));
+            var schema = await _schemaService.SetSchemaAsync(organization, project, view, annotationType, inputModel, request.GetAuditActor(), IsForce(request));
             return new OkObjectResult(schema);
         }
         catch (ArgumentException ex)
@@ -261,8 +260,7 @@ public partial class ConfigurationSchemaHttp
 
         try
         {
-            var author = request.GetAuthor();
-            var schema = await _schemaService.SetAnnotationSchemaAsync(organization, project, view, key, inputModel, author, IsForce(request));
+            var schema = await _schemaService.SetAnnotationSchemaAsync(organization, project, view, key, inputModel, request.GetAuditActor(), IsForce(request));
             return new OkObjectResult(schema);
         }
         catch (ArgumentException ex)
@@ -419,8 +417,7 @@ public partial class ConfigurationSchemaHttp
 
         try
         {
-            var author = request.GetAuthor();
-            var schema = await _schemaService.SetDescendantTypeSchemaAsync(organization, project, view, key, annotationType, inputModel, author, IsForce(request));
+            var schema = await _schemaService.SetDescendantTypeSchemaAsync(organization, project, view, key, annotationType, inputModel, request.GetAuditActor(), IsForce(request));
             return new OkObjectResult(schema);
         }
         catch (ArgumentException ex)

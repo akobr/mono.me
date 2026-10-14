@@ -178,7 +178,7 @@ public static class Create
         };
     }
 
-    public static ConfigurationEntity Configuration(AnnotationKey annotationKey, JObject content, string author = "system", string viewName = Constants.DefaultViewName, string projectName = Constants.DefaultProjectName)
+    public static ConfigurationEntity Configuration(AnnotationKey annotationKey, JObject content, AuditActor? author = null, string viewName = Constants.DefaultViewName, string projectName = Constants.DefaultProjectName)
     {
         return new ConfigurationEntity
         {
@@ -188,7 +188,7 @@ public static class Create
             Name = annotationKey.Name,
             Content = content,
             Version = 1,
-            Author = author,
+            Modified = AuditStamp.Of(author ?? AuditActor.System, DateTimeOffset.UtcNow),
             ViewName = viewName,
             ProjectName = projectName,
         };

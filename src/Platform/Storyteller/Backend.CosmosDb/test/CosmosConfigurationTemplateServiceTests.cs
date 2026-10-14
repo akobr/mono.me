@@ -57,7 +57,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
                                         "decimal": 42.2
                                     }
                                     """);
-        var version1 = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, content, "author-1");
+        var version1 = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, content, AuditActor.Account("author-1"));
 
         content.Add("array", JArray.Parse("""
                                           [
@@ -66,7 +66,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
                                               { "isObject" : true }
                                           ]
                                           """));
-        var version2 = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, content, "author-2");
+        var version2 = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, content, AuditActor.Account("author-2"));
 
         var version3 = await Templates.CreateOrUpdateTemplateAsync(
             org,
@@ -74,7 +74,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
             View,
             type,
             JObject.Parse("""{ "$remove": [ "$.*" ] }"""),
-            "author-3");
+            AuditActor.Account("author-3"));
 
         version1.Version.Should().Be(1);
         version2.Version.Should().Be(2);
@@ -83,7 +83,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
 
         var versions = await Templates.GetTemplateVersionsAsync(org, project, View, type);
         versions.Select(v => v.Version).Should().Equal(1u, 2u, 3u);
-        versions.Select(v => v.Author).Should().Equal("author-1", "author-2", "author-3");
+        versions.Select(v => v.Modified.By.Id).Should().Equal("author-1", "author-2", "author-3");
         versions.Last().ExpirationTime.Should().Be(DateTimeOffset.MaxValue);
         versions.First().ExpirationTime.Should().BeAfter(DateTimeOffset.UtcNow.AddDays(300));
 
@@ -125,11 +125,11 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var org = TestConstants.Organization;
         var content = JObject.Parse("""{ "retries": 3 }""");
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Usage, content, "system");
-        var second = await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Usage, content, "someone-else");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Usage, content, AuditActor.System);
+        var second = await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Usage, content, AuditActor.Account("someone-else"));
 
         second.Version.Should().Be(1);
-        second.Author.Should().Be("system");
+        second.Modified.By.Should().Be(AuditActor.System);
         (await Templates.GetTemplateVersionsAsync(org, project, View, AnnotationTypeCodes.Usage)).Should().HaveCount(1);
     }
 
@@ -139,7 +139,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var project = $"{ProjectPrefix}-case";
         var org = TestConstants.Organization;
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, "EXE", JObject.Parse("""{ "retries": 3 }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, "EXE", JObject.Parse("""{ "retries": 3 }"""), AuditActor.System);
         var template = await Templates.GetTemplateAsync(org, project, View, AnnotationTypeCodes.Execution);
 
         template.Should().NotBeNull();
@@ -160,17 +160,17 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var org = TestConstants.Organization;
         const string type = AnnotationTypeCodes.Context;
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "retries": 3, "owner": "platform" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "retries": 3, "owner": "platform" }"""), AuditActor.System);
         var patched = await Templates.PatchTemplateAsync(
             org,
             project,
             View,
             type,
             JArray.Parse("""[ { "op": "replace", "path": "/retries", "value": 5 }, { "op": "remove", "path": "/owner" } ]"""),
-            "patcher");
+            AuditActor.Account("patcher"));
 
         patched.Version.Should().Be(2);
-        patched.Author.Should().Be("patcher");
+        patched.Modified.By.Id.Should().Be("patcher");
         patched.Content.Should().HaveCount(1);
         patched.Content["retries"]!.Value<int>().Should().Be(5);
 
@@ -187,7 +187,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
             View,
             AnnotationTypeCodes.Execution,
             JArray.Parse("""[ { "op": "add", "path": "/retries", "value": 5 } ]"""),
-            "patcher");
+            AuditActor.Account("patcher"));
 
         await act.Should().ThrowAsync<TemplateNotFoundException>();
     }
@@ -199,11 +199,11 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var org = TestConstants.Organization;
         const string type = AnnotationTypeCodes.Unit;
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "a": 1 }"""), "system");
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "b": 2 }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "b": 2 }"""), AuditActor.System);
         var deleted = await Templates.DeleteTemplateAsync(org, project, View, type);
         var afterDelete = await Templates.GetTemplateAsync(org, project, View, type);
-        var recreated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "c": 3 }"""), "system");
+        var recreated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "c": 3 }"""), AuditActor.System);
 
         deleted.Should().BeTrue();
         afterDelete.Should().BeNull();
@@ -223,7 +223,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         const string type = AnnotationTypeCodes.Responsibility;
 
         var writes = Enumerable.Range(1, 3)
-            .Select(i => Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse($$"""{ "writer{{i}}": {{i}} }"""), $"writer-{i}"));
+            .Select(i => Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse($$"""{ "writer{{i}}": {{i}} }"""), AuditActor.Account($"writer-{i}")));
         await Task.WhenAll(writes);
 
         var versions = await Templates.GetTemplateVersionsAsync(org, project, View, type);
@@ -242,7 +242,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var first = await CreateExecutionAsync(project, View, "customer", "billing", "prod");
         var second = await CreateExecutionAsync(project, View, "customer", "shipping", "prod");
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "owner": "platform" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "owner": "platform" }"""), AuditActor.System);
 
         foreach (var key in new[] { first, second })
         {
@@ -260,17 +260,17 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
 
         var defaultExecution = await CreateExecutionAsync(project, View, "customer", "billing", "prod");
         var otherExecution = await CreateExecutionAsync(project, OtherView, "customer", "billing", "prod");
-        await Configs.CreateOrUpdateConfigurationAsync(otherExecution, JObject.Parse("""{ "retries": 5 }"""), "system");
+        await Configs.CreateOrUpdateConfigurationAsync(otherExecution, JObject.Parse("""{ "retries": 5 }"""), AuditActor.System);
 
         // a template only in the default view is not merged in the other view
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "platform" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "platform" }"""), AuditActor.System);
         (await Configs.GetRawConfigurationAsync(defaultExecution))!.Content["owner"]!.Value<string>().Should().Be("platform");
         (await Configs.GetRawConfigurationAsync(otherExecution))!.Content.Should().NotContainKey("owner");
         (await Templates.GetTemplateAsync(org, project, OtherView, type)).Should().BeNull();
 
         // each view has its own content and its own version sequence
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "tier": "gold" }"""), "system");
-        var other = await Templates.CreateOrUpdateTemplateAsync(org, project, OtherView, type, JObject.Parse("""{ "owner": "team" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "tier": "gold" }"""), AuditActor.System);
+        var other = await Templates.CreateOrUpdateTemplateAsync(org, project, OtherView, type, JObject.Parse("""{ "owner": "team" }"""), AuditActor.System);
 
         other.Version.Should().Be(1);
         (await Templates.GetTemplateVersionsAsync(org, project, View, type)).Should().HaveCount(2);
@@ -280,7 +280,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         // a template write in one view leaves the cached calculations of the other view intact
         await Configs.GetRawConfigurationAsync(defaultExecution);
         (await HasCachedCalculationAsync(defaultExecution)).Should().BeTrue();
-        await Templates.CreateOrUpdateTemplateAsync(org, project, OtherView, type, JObject.Parse("""{ "owner": "ops" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, OtherView, type, JObject.Parse("""{ "owner": "ops" }"""), AuditActor.System);
         (await HasCachedCalculationAsync(defaultExecution)).Should().BeTrue();
         (await HasCachedCalculationAsync(otherExecution)).Should().BeFalse();
 
@@ -297,9 +297,9 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var execution = await CreateExecutionAsync(project, Constants.DefaultViewName, "northwind", "invoicing", "production");
         var responsibility = FullKey.Create(execution.Annotation.GetResponsibilityKey(), execution);
 
-        await Configs.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "currency": "EUR", "retries": 1, "features": ["vat"] }"""), "system");
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "retries": 3, "features": ["audit"], "owner": "platform" }"""), "system");
-        await Configs.CreateOrUpdateConfigurationAsync(execution, JObject.Parse("""{ "retries": 5, "features": ["vip"] }"""), "system");
+        await Configs.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "currency": "EUR", "retries": 1, "features": ["vat"] }"""), AuditActor.System);
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "retries": 3, "features": ["audit"], "owner": "platform" }"""), AuditActor.System);
+        await Configs.CreateOrUpdateConfigurationAsync(execution, JObject.Parse("""{ "retries": 5, "features": ["vip"] }"""), AuditActor.System);
 
         var configuration = await Configs.GetRawConfigurationAsync(execution);
 
@@ -315,13 +315,13 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var project = $"{ProjectPrefix}-invalidate";
         var org = TestConstants.Organization;
         var execution = await CreateExecutionAsync(project, Constants.DefaultViewName, "customer", "billing", "prod");
-        await Configs.CreateOrUpdateConfigurationAsync(execution, JObject.Parse("""{ "retries": 5 }"""), "system");
+        await Configs.CreateOrUpdateConfigurationAsync(execution, JObject.Parse("""{ "retries": 5 }"""), AuditActor.System);
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "owner": "platform" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "owner": "platform" }"""), AuditActor.System);
         var first = await Configs.GetRawConfigurationAsync(execution);
         (await HasCachedCalculationAsync(execution)).Should().BeTrue();
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "owner": "team" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "owner": "team" }"""), AuditActor.System);
         (await HasCachedCalculationAsync(execution)).Should().BeFalse();
         var second = await Configs.GetRawConfigurationAsync(execution);
 
@@ -344,13 +344,13 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var usage = FullKey.Create(unitOfExecution.Annotation.GetUsageKey(), unitOfExecution);
         var execution = FullKey.Create(unitOfExecution.Annotation.GetExecutionKey(), unitOfExecution);
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Subject, JObject.Parse("""{ "tier": "gold" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Subject, JObject.Parse("""{ "tier": "gold" }"""), AuditActor.System);
         foreach (var key in new[] { usage, execution, unitOfExecution })
         {
             (await Configs.GetRawConfigurationAsync(key))!.Content["tier"]!.Value<string>().Should().Be("gold");
         }
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Subject, JObject.Parse("""{ "tier": "silver" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Subject, JObject.Parse("""{ "tier": "silver" }"""), AuditActor.System);
         foreach (var key in new[] { usage, execution, unitOfExecution })
         {
             (await Configs.GetRawConfigurationAsync(key))!.Content["tier"]!.Value<string>().Should().Be("silver");
@@ -366,13 +366,13 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var responsibility = FullKey.Create(execution.Annotation.GetResponsibilityKey(), execution);
         var subject = FullKey.Create(execution.Annotation.GetSubjectKey(), execution);
 
-        await Configs.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "level": "responsibility" }"""), "system");
-        await Configs.CreateOrUpdateConfigurationAsync(subject, JObject.Parse("""{ "level": "subject" }"""), "system");
+        await Configs.CreateOrUpdateConfigurationAsync(responsibility, JObject.Parse("""{ "level": "responsibility" }"""), AuditActor.System);
+        await Configs.CreateOrUpdateConfigurationAsync(subject, JObject.Parse("""{ "level": "subject" }"""), AuditActor.System);
         await Configs.GetRawConfigurationAsync(responsibility);
         await Configs.GetRawConfigurationAsync(subject);
         await Configs.GetRawConfigurationAsync(execution);
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "owner": "platform" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "owner": "platform" }"""), AuditActor.System);
 
         (await HasCachedCalculationAsync(responsibility)).Should().BeTrue();
         (await HasCachedCalculationAsync(subject)).Should().BeTrue();
@@ -406,13 +406,13 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
             });
         }
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Unit, JObject.Parse("""{ "size": "s" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Unit, JObject.Parse("""{ "size": "s" }"""), AuditActor.System);
         foreach (var unit in units)
         {
             await Configs.GetRawConfigurationAsync(unit);
         }
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Unit, JObject.Parse("""{ "size": "xl" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, AnnotationTypeCodes.Unit, JObject.Parse("""{ "size": "xl" }"""), AuditActor.System);
 
         foreach (var unit in units)
         {
@@ -425,7 +425,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
     {
         var project = $"{ProjectPrefix}-legacy";
         var execution = await CreateExecutionAsync(project, Constants.DefaultViewName, "customer", "billing", "prod");
-        await Configs.CreateOrUpdateConfigurationAsync(execution, JObject.Parse("""{ "retries": 5 }"""), "system");
+        await Configs.CreateOrUpdateConfigurationAsync(execution, JObject.Parse("""{ "retries": 5 }"""), AuditActor.System);
 
         var partitionKey = PartitionKeys.GetResponsibility(project, "billing");
         await GetContainer().CreateItemAsync(
@@ -455,7 +455,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         const string type = AnnotationTypeCodes.Execution;
         var execution = await CreateExecutionAsync(project, View, "customer", "billing", "prod");
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "platform" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "platform" }"""), AuditActor.System);
         await Configs.GetRawConfigurationAsync(execution);
 
         // simulate a committed template change whose invalidation failed afterwards
@@ -464,7 +464,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         (await Configs.GetRawConfigurationAsync(execution))!.Content["owner"]!.Value<string>().Should().Be("platform");
 
         // the repeated request has no change to write, but completes the invalidation
-        var repeated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "team" }"""), "system");
+        var repeated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "team" }"""), AuditActor.System);
 
         repeated.Version.Should().Be(1);
         (await HasCachedCalculationAsync(execution)).Should().BeFalse();
@@ -479,9 +479,9 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var org = TestConstants.Organization;
         const string type = AnnotationTypeCodes.Execution;
         var execution = await CreateExecutionAsync(project, View, "customer", "billing", "prod");
-        await Configs.CreateOrUpdateConfigurationAsync(execution, JObject.Parse("""{ "retries": 5 }"""), "system");
+        await Configs.CreateOrUpdateConfigurationAsync(execution, JObject.Parse("""{ "retries": 5 }"""), AuditActor.System);
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "platform" }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "owner": "platform" }"""), AuditActor.System);
         await Configs.GetRawConfigurationAsync(execution);
 
         // simulate a committed deletion whose invalidation failed afterwards
@@ -505,8 +505,8 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
         var org = TestConstants.Organization;
         const string type = AnnotationTypeCodes.Unit;
 
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "a": 1 }"""), "system");
-        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "b": 2 }"""), "system");
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
+        await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "b": 2 }"""), AuditActor.System);
         await Templates.DeleteTemplateAsync(org, project, View, type);
 
         // simulate the expiration (ttl) of the whole history
@@ -515,8 +515,8 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
             await GetContainer().DeleteItemAsync<JObject>($"{View}.gnv.{type}.{version}", PartitionKeys.GetCosmosTemplate(project));
         }
 
-        var recreated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "c": 3 }"""), "system");
-        var updated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "d": 4 }"""), "system");
+        var recreated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "c": 3 }"""), AuditActor.System);
+        var updated = await Templates.CreateOrUpdateTemplateAsync(org, project, View, type, JObject.Parse("""{ "d": 4 }"""), AuditActor.System);
 
         recreated.Version.Should().Be(3);
         updated.Version.Should().Be(4);

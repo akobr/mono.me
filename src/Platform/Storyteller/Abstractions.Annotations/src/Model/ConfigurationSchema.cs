@@ -14,5 +14,5 @@ public record class ConfigurationSchema
 
     public required JObject Content { get; init; }
 
-    public required string Author { get; init; }
+    public required AuditStamp Modified { get; init; }
 }

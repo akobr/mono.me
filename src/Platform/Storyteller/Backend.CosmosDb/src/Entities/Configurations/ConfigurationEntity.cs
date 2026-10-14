@@ -16,7 +16,11 @@ public record class ConfigurationEntity : ExtendableEntity
 
     public required JObject Content { get; init; }
 
-    public required string Author { get; init; }
+    // The write that produced the current version; null on items stored before the stamps (see GetModified).
+    public AuditStamp? Modified { get; init; }
+
+    // Legacy author string of items stored before the stamps; never written again.
+    public string? Author { get; init; }
 
     public JObject? CalculatedContent { get; init; }
 

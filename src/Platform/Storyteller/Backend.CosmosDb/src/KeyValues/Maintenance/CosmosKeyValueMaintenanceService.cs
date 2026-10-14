@@ -282,8 +282,7 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
                 return await _policies.SetAsync(organization, project, policy with
                 {
                     Version = policy.Version + 1,
-                    Author = "system",
-                    UpdatedAt = _timeProvider.GetUtcNow(),
+                    Modified = AuditStamp.Of(AuditActor.System, _timeProvider.GetUtcNow()),
                 }, cancellationToken);
             }
             catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.PolicyVersionMismatch && attempt < 2)
@@ -310,7 +309,7 @@ public class CosmosKeyValueMaintenanceService : IKeyValueMaintenanceService
             Id = CosmosKeyValueAuditLog.NewId(now),
             Time = now,
             Operation = operation,
-            Actor = "system",
+            Actor = AuditActor.System,
             Channel = KeyValueChannel.System,
             Detail = detail,
         }, cancellationToken);

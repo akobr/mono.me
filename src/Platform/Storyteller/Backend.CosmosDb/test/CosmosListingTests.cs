@@ -35,7 +35,7 @@ public class CosmosListingTests(Startup startup)
         var alpha = await CreateConfigurationAsync(project, View, AnnotationKey.CreateResponsibility("alpha"), """{ "retries": 3 }""");
         await CreateConfigurationAsync(project, View, AnnotationKey.CreateSubject("beta"), """{ "tier": "gold" }""");
         var emptied = await CreateConfigurationAsync(project, View, AnnotationKey.CreateResponsibility("emptied"), """{ "a": 1 }""");
-        await Configs.PatchConfigurationAsync(emptied, JArray.Parse("""[{ "op": "remove", "path": "/a" }]"""), "author-2");
+        await Configs.PatchConfigurationAsync(emptied, JArray.Parse("""[{ "op": "remove", "path": "/a" }]"""), AuditActor.Account("author-2"));
         await CreateConfigurationAsync(project, OtherView, AnnotationKey.CreateResponsibility("alpha"), """{ "retries": 9 }""");
         var calculated = await Configs.GetRawConfigurationAsync(alpha);
 
@@ -48,10 +48,10 @@ public class CosmosListingTests(Startup startup)
         var alphaSummary = response.Configurations.Single(item => item.AnnotationKey == "rst.alpha");
         alphaSummary.AnnotationType.Should().Be(AnnotationType.Responsibility);
         alphaSummary.Version.Should().Be(1);
-        alphaSummary.Author.Should().Be("author-1");
+        alphaSummary.Modified!.By.Id.Should().Be("author-1");
         alphaSummary.HasContent.Should().BeTrue();
         alphaSummary.Hash.Should().Be(calculated!.Hash);
-        alphaSummary.UpdatedAt.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(5));
+        alphaSummary.Modified.At.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(5));
 
         var emptiedSummary = response.Configurations.Single(item => item.AnnotationKey == "rst.emptied");
         emptiedSummary.HasContent.Should().BeFalse();
@@ -85,11 +85,11 @@ public class CosmosListingTests(Startup startup)
         var project = NewProject();
         var schema = JObject.Parse("""{ "type": "object" }""");
         var stricter = JObject.Parse("""{ "type": "object", "properties": { "retries": { "type": "integer" } } }""");
-        await Schemas.SetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility, schema, "author-1", force: false);
-        await Schemas.SetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility, stricter, "author-2", force: false);
-        await Schemas.SetAnnotationSchemaAsync(Organization, project, View, "rst.alpha", schema, "author-1", force: false);
-        await Schemas.SetDescendantTypeSchemaAsync(Organization, project, View, "rst.alpha", AnnotationTypeCodes.Unit, schema, "author-1", force: false);
-        await Schemas.SetSchemaAsync(Organization, project, OtherView, AnnotationTypeCodes.Subject, schema, "author-1", force: false);
+        await Schemas.SetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility, schema, AuditActor.Account("author-1"), force: false);
+        await Schemas.SetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility, stricter, AuditActor.Account("author-2"), force: false);
+        await Schemas.SetAnnotationSchemaAsync(Organization, project, View, "rst.alpha", schema, AuditActor.Account("author-1"), force: false);
+        await Schemas.SetDescendantTypeSchemaAsync(Organization, project, View, "rst.alpha", AnnotationTypeCodes.Unit, schema, AuditActor.Account("author-1"), force: false);
+        await Schemas.SetSchemaAsync(Organization, project, OtherView, AnnotationTypeCodes.Subject, schema, AuditActor.Account("author-1"), force: false);
 
         var summaries = await Schemas.ListSchemasAsync(Organization, project, View);
 
@@ -97,22 +97,22 @@ public class CosmosListingTests(Startup startup)
             (ConfigurationSchemaKind.Type, AnnotationTypeCodes.Responsibility, (string?)null, 2UL),
             (ConfigurationSchemaKind.Annotation, (string?)null, "rst.alpha", 1UL),
             (ConfigurationSchemaKind.DescendantType, AnnotationTypeCodes.Unit, "rst.alpha", 1UL));
-        summaries[0].Author.Should().Be("author-2");
-        summaries.Should().OnlyContain(item => item.UpdatedAt != null);
+        summaries[0].Modified!.By.Id.Should().Be("author-2");
+        summaries.Should().OnlyContain(item => item.Modified != null);
     }
 
     [Fact]
     public async Task ListTemplates_ReturnsTheCurrentTemplatesOfTheView()
     {
         var project = NewProject();
-        await Templates.CreateOrUpdateTemplateAsync(Organization, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "a": 1 }"""), "author-1");
-        await Templates.CreateOrUpdateTemplateAsync(Organization, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "a": 2 }"""), "author-2");
-        await Templates.CreateOrUpdateTemplateAsync(Organization, project, View, AnnotationTypeCodes.Responsibility, JObject.Parse("""{ "b": 1 }"""), "author-1");
-        await Templates.CreateOrUpdateTemplateAsync(Organization, project, OtherView, AnnotationTypeCodes.Subject, JObject.Parse("""{ "c": 1 }"""), "author-1");
+        await Templates.CreateOrUpdateTemplateAsync(Organization, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "a": 1 }"""), AuditActor.Account("author-1"));
+        await Templates.CreateOrUpdateTemplateAsync(Organization, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{ "a": 2 }"""), AuditActor.Account("author-2"));
+        await Templates.CreateOrUpdateTemplateAsync(Organization, project, View, AnnotationTypeCodes.Responsibility, JObject.Parse("""{ "b": 1 }"""), AuditActor.Account("author-1"));
+        await Templates.CreateOrUpdateTemplateAsync(Organization, project, OtherView, AnnotationTypeCodes.Subject, JObject.Parse("""{ "c": 1 }"""), AuditActor.Account("author-1"));
 
         var summaries = await Templates.ListTemplatesAsync(Organization, project, View);
 
-        summaries.Select(item => (item.AnnotationType, item.Version, item.Author)).Should().Equal(
+        summaries.Select(item => (item.AnnotationType, item.Version, item.Modified!.By.Id)).Should().Equal(
             (AnnotationTypeCodes.Execution, 2UL, "author-2"),
             (AnnotationTypeCodes.Responsibility, 1UL, "author-1"));
     }
@@ -128,7 +128,7 @@ public class CosmosListingTests(Startup startup)
         await Annotations.CreateAnnotationAsync(Organization, annotation);
 
         var key = FullKey.Create(annotationKey, Organization, project, view);
-        await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse(content), "author-1");
+        await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse(content), AuditActor.Account("author-1"));
         return key;
     }
 }

@@ -26,10 +26,10 @@ public interface IConfigurationService
 
     Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key);
 
-    // With an actor, the change is also recorded in the annotation's audit (best effort, after the write).
-    Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author, bool force = false, AuditActor? actor = null);
+    // The actor stamps the new version and is recorded in the annotation's audit (best effort, after the write).
+    Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force = false);
 
-    Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author, bool force = false, AuditActor? actor = null);
+    Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, AuditActor actor, bool force = false);
 
     Task ClearConfigurationAsync(FullKey key, AuditActor? actor = null);
 

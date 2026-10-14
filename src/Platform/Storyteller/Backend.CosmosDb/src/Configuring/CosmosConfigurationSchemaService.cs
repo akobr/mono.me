@@ -26,13 +26,16 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
     private readonly JsonSerializerSettings _serializerOptions;
     private readonly JsonContentDiffer _differ;
     private readonly ILogger<CosmosConfigurationSchemaService> _logger;
+    private readonly TimeProvider _timeProvider;
 
     public CosmosConfigurationSchemaService(
         IContainerRepositoryProvider repositoryProvider,
         IJsonSerializationSettingsProvider jsonSettingsProvider,
         IOptions<JsonSerializerSettings> serializerOptions,
-        ILogger<CosmosConfigurationSchemaService> logger)
+        ILogger<CosmosConfigurationSchemaService> logger,
+        TimeProvider? timeProvider = null)
     {
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _repositoryProvider = repositoryProvider;
         _serializerOptions = serializerOptions.Value;
         _differ = new JsonContentDiffer(jsonSettingsProvider);
@@ -50,7 +53,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
     {
         // Current schema documents only: "{view}.cfs." excludes the state ("css") and history ("csv") items.
         var prefix = $"{view}.{EntityIdPrefixTypes.ConfigurationSchema}.";
-        var query = new QueryDefinition("SELECT c.id, c.Version, c.Author, c._ts FROM c WHERE STARTSWITH(c.id, @prefix)")
+        var query = new QueryDefinition("SELECT c.id, c.Version, c.Modified, c.Author, c._ts FROM c WHERE STARTSWITH(c.id, @prefix)")
             .WithParameter("@prefix", prefix);
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
@@ -92,11 +95,11 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         string view,
         string annotationType,
         JObject schemaContent,
-        string author,
+        AuditActor actor,
         bool force)
     {
         var identity = SchemaIdentity.ForType(view, NormalizeAnnotationType(annotationType));
-        return SaveAsync(organization, project, view, identity, schemaContent, author, force);
+        return SaveAsync(organization, project, view, identity, schemaContent, actor, force);
     }
 
     public Task<bool> DeleteSchemaAsync(string organization, string project, string view, string annotationType)
@@ -117,11 +120,11 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         string view,
         string annotationKey,
         JObject schemaContent,
-        string author,
+        AuditActor actor,
         bool force)
     {
         var identity = SchemaIdentity.ForAnnotation(view, AnnotationKey.Parse(annotationKey).ToString());
-        return SaveAsync(organization, project, view, identity, schemaContent, author, force);
+        return SaveAsync(organization, project, view, identity, schemaContent, actor, force);
     }
 
     public Task<bool> DeleteAnnotationSchemaAsync(string organization, string project, string view, string annotationKey)
@@ -148,11 +151,11 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         string annotationKey,
         string descendantTypeCode,
         JObject schemaContent,
-        string author,
+        AuditActor actor,
         bool force)
     {
         var identity = SchemaIdentity.ForDescendant(view, AnnotationKey.Parse(annotationKey).ToString(), NormalizeAnnotationType(descendantTypeCode));
-        return SaveAsync(organization, project, view, identity, schemaContent, author, force);
+        return SaveAsync(organization, project, view, identity, schemaContent, actor, force);
     }
 
     public Task<bool> DeleteDescendantTypeSchemaAsync(
@@ -349,10 +352,11 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         string view,
         SchemaIdentity identity,
         JObject schemaContent,
-        string author,
+        AuditActor actor,
         bool force)
     {
         await EnsureValidSchemaAsync(schemaContent);
+        var modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow());
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = GetSchemaPartitionKey(project);
@@ -368,7 +372,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
                 return existing.ToConfigurationSchema(identity.ModelType, identity.ModelKey);
             }
 
-            var errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, schemaContent, author);
+            var errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, schemaContent, modified);
 
             if (errors.Count > 0 && !force)
             {
@@ -403,7 +407,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
                 ProjectName = project,
                 ViewName = view,
                 Content = schemaContent,
-                Author = author,
+                Modified = modified,
                 Version = version,
             };
 
@@ -539,9 +543,9 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         string view,
         SchemaIdentity identity,
         JObject schemaContent,
-        string author)
+        AuditStamp modified)
     {
-        var schemaOverride = new SchemaOverride(identity.Kind, identity.ModelType, identity.Kind == SchemaKind.Type ? null : identity.ModelKey, schemaContent, author);
+        var schemaOverride = new SchemaOverride(identity.Kind, identity.ModelType, identity.Kind == SchemaKind.Type ? null : identity.ModelKey, schemaContent, modified);
         var errors = new List<SchemaValidationError>();
         var layerCache = new Dictionary<string, ConfigurationSchemaEntity?>();
         var feed = QueryAffectedConfigurations(repository.Container, project, view, identity);
@@ -838,7 +842,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
             AnnotationKey = annotationKey,
             Version = 0,
             Content = schemaOverride.Content,
-            Author = schemaOverride.Author,
+            Modified = schemaOverride.Modified,
         };
     }
 
@@ -914,8 +918,7 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
                 AnnotationType = value.Type,
                 AnnotationKey = value.Key,
                 Version = row.Version,
-                Author = row.Author,
-                UpdatedAt = ListingTimestamps.ToUpdatedAt(row.Timestamp),
+                Modified = row.GetModified(),
             }
             : null;
     }
@@ -960,5 +963,5 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         }
     }
 
-    private sealed record SchemaOverride(SchemaKind Kind, string? TypeCode, string? AnnotationKey, JObject Content, string Author);
+    private sealed record SchemaOverride(SchemaKind Kind, string? TypeCode, string? AnnotationKey, JObject Content, AuditStamp Modified);
 }

@@ -31,7 +31,7 @@ The design behind the change is in [the spec](specs/2026-10-11%20Soft-delete%20a
 
 ## Cost model
 
-The RU figures are estimates for one item of about 1 KB with the container's default indexing (every path except `/Entries/*`) and Session consistency. Strong or Bounded Staleness consistency doubles read costs. Measure a real workload with `RequestCharge` in the Cosmos diagnostics.
+The RU figures are estimates for one item of about 1 KB with the container's default indexing at the time (every path except `/Entries/*`) and Session consistency. Since the [audit stamps](audit-stamps.md#storage-and-request-units) are also kept out of the index, an annotation write costs about 4.5 RU less than the figures below. Strong or Bounded Staleness consistency doubles read costs. Measure a real workload with `RequestCharge` in the Cosmos diagnostics.
 
 | Operation | RU | Basis |
 | --- | --- | --- |

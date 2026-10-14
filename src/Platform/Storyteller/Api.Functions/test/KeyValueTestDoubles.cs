@@ -236,10 +236,8 @@ internal sealed class RecordingKeyValueService : IKeyValueService
         Protection = protection,
         Value = value,
         Version = 1,
-        Author = "account: ada",
-        UpdatedAt = DateTimeOffset.UnixEpoch,
-        CreatedBy = "account: ada",
-        CreatedAt = DateTimeOffset.UnixEpoch,
+        Created = AuditStamp.Of(AuditActor.Account("ada"), DateTimeOffset.UnixEpoch),
+        Modified = AuditStamp.Of(AuditActor.Account("ada"), DateTimeOffset.UnixEpoch),
     };
 
     private Task<KeyValueBulkResult> Bulk(string operation, KeyValueBulkRequest request, KeyValueCaller caller)
@@ -317,8 +315,7 @@ internal sealed class RecordingPolicyService : IKeyValuePolicyService
         Id = id,
         Name = name,
         PublicKey = new RsaJsonWebKey { N = "AQ", E = "AQAB" },
-        CreatedAt = DateTimeOffset.UnixEpoch,
-        CreatedBy = "account: ada",
+        Created = AuditStamp.Of(AuditActor.Account("ada"), DateTimeOffset.UnixEpoch),
     };
 }
 

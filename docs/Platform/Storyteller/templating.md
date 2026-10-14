@@ -26,7 +26,7 @@ Templates are created, changed, and deleted through `IConfigurationTemplateServi
 | Property | Role |
 | --- | --- |
 | `Content` | JSON object merged into the calculation. |
-| `Author` | Author of the current version. |
+| `Modified` | The [audit stamp](audit-stamps.md) of the current version: who wrote it and when. |
 | `Version` | Current version number, starting at `1`. |
 
 The base `Entity` fields are `id`, `PartitionKey`, `ProjectName`, `ViewName`, `AnnotationKey`, `Name`, and `_ts`. Calculation addresses the item by `id` and partition key. It reads `Content` and leaves the other fields unused.
@@ -64,7 +64,7 @@ A template is identified by organization, project, view, and type code. It does 
   "ViewName": "default",
   "AnnotationKey": "exe",
   "Name": "exe",
-  "Author": "platform",
+  "Modified": { "At": "2026-10-14T08:00:47.576+00:00", "By": { "Kind": "Account", "Id": "user_01J9ZK3M4N5P6Q7R8S9T0V1W2X", "Name": "Ada Lovelace" } },
   "Version": 2,
   "Content": {
     "retries": 3,
@@ -109,7 +109,7 @@ The routes include the view, like configuration routes:
 
 | Method | Route | Operation |
 | --- | --- | --- |
-| GET | `v1/{organization}/{project}/{view}/templates` | `GetTemplates`: every template of the view without its content (`AnnotationType`, `Version`, `Author`, `UpdatedAt`) |
+| GET | `v1/{organization}/{project}/{view}/templates` | `GetTemplates`: every template of the view without its content (`AnnotationType`, `Version`, `Modified`) |
 | GET | `v1/{organization}/{project}/{view}/template/{annotationType}` | `GetTemplate` |
 | POST, PUT | same | `SetTemplate` |
 | PATCH (`application/json-patch+json`) | same | `PatchTemplate` |
@@ -132,7 +132,7 @@ Versioning follows configuration versioning:
 - Before a change, the current item is copied into a `GenerateTemplateHistoryEntity` with id `{viewName}.gnv.{typeCode}.{version}`, in the same `{project}.template` partition. Every view has its own version sequence. The copy and the change are written in one transactional batch.
 - A delete also writes the history item of the deleted version. A template created again later continues the numbering after `LastVersion` of the state record, even when the history has already expired. Templates written before the state record existed fall back to the highest history version.
 - History items expire after 365 days (`ttl`). The current version never expires. The expiry is enforced since the containers got item-level TTL with the [key/value pairs](key-values.md#lifecycle) (`DefaultTimeToLive = -1`, set by `ContainerFactory` on new organization containers and by `2sInitDb` on existing ones); before that, the `ttl` was stored but ignored.
-- `ConfigurationVersion` describes a version: `Version`, `Author`, `CreationTime`, `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
+- `ConfigurationVersion` describes a version: `Version`, `Modified` (who wrote the version and when, see [audit stamps](audit-stamps.md)), `ExpirationTime` (`DateTimeOffset.MaxValue` for the current version).
 
 ## Merge
 
@@ -213,8 +213,8 @@ Calculation of that execution, with no other stored documents and no other templ
 
 When the merged object has at least one property, calculation persists it:
 
-- An existing configuration item is replaced with `CalculatedContent` and `CalculatedContentHash`, conditionally on the ETag read at the start of the calculation. Stored `Content`, `Version`, and `Author` stay as they were. When the item changed in the meantime (for example, an invalidation after a template write), the result is returned but not cached, because it may be stale.
-- A missing configuration item is created with empty `Content`, `Author` set to `"system"`, `CalculatedContent` set to the merge, and `Name` set to the annotation name. The id is the normal configuration id, `{viewName}.cnf.{annotationKey}`. An invalidation cannot reach an item that did not exist yet, so after the creation the templates used by the calculation are read again. If any of their ETags changed, `CalculatedContent` of the new item is cleared. If the item was created concurrently by someone else, theirs is kept.
+- An existing configuration item is replaced with `CalculatedContent` and `CalculatedContentHash`, conditionally on the ETag read at the start of the calculation. Stored `Content`, `Version`, and `Modified` stay as they were. When the item changed in the meantime (for example, an invalidation after a template write), the result is returned but not cached, because it may be stale.
+- A missing configuration item is created with empty `Content`, `Modified` stamped by `System`, `CalculatedContent` set to the merge, and `Name` set to the annotation name. The id is the normal configuration id, `{viewName}.cnf.{annotationKey}`. An invalidation cannot reach an item that did not exist yet, so after the creation the templates used by the calculation are read again. If any of their ETags changed, `CalculatedContent` of the new item is cleared. If the item was created concurrently by someone else, theirs is kept.
 
 `CalculatedContentHash` is eight lowercase hex digits. It is MurmurHash3 32-bit, seed `42`, of the calculated JSON serialized with `JsonSettingNames.Unique` (properties ordered by name).
 

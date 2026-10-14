@@ -24,7 +24,7 @@ public class KeyValueBindingTests(Startup startup)
     private const string Org = TestConstants.Organization;
     private const string View = Constants.DefaultViewName;
 
-    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets("account: admin");
+    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets(AuditActor.Account("admin"));
 
     private IKeyValueService KeyValues => Context.Services.GetRequiredService<IKeyValueService>();
 
@@ -192,7 +192,7 @@ public class KeyValueBindingTests(Startup startup)
         });
 
         var key = FullKey.Create(annotationKey, Org, project, View);
-        await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse(content), "system");
+        await Configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse(content), AuditActor.System);
         return key;
     }
 

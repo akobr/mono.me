@@ -79,7 +79,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  """);
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, configuration, AuditActor.System);
         var hasContent = await configs.HasConfigurationContentAsync(key);
         var retrieveConfig = await configs.GetRawConfigurationAsync(key);
         var content = retrieveConfig?.Content;
@@ -117,7 +117,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  """);
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, configuration, AuditActor.System);
         var hasContentBefore = await configs.HasConfigurationContentAsync(key);
         await configs.ClearConfigurationAsync(key);
         var hasContentAfter = await configs.HasConfigurationContentAsync(key);
@@ -153,7 +153,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  """);
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, configuration, AuditActor.System);
         var hasContentBefore = await configs.HasConfigurationContentAsync(key);
         await configs.DeleteAsync(key);
         await annotations.DeleteAnnotationAsync(key);
@@ -292,7 +292,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  """);
 
         var subjectKey = FullKey.Create(subjectAnnotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(subjectKey, configuration, "system");
+        await configs.CreateOrUpdateConfigurationAsync(subjectKey, configuration, AuditActor.System);
         var executionConfigBeforeDelete = await configs.GetRawConfigurationAsync(executionKey);
 
         // TODO: [P3] replace it with just calling config service
@@ -329,7 +329,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                  """);
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system"); // version 1
+        await configs.CreateOrUpdateConfigurationAsync(key, configuration, AuditActor.System); // version 1
 
         configuration.Add("array", JArray.Parse("""
                                                 [
@@ -339,13 +339,13 @@ public class CosmosConfigurationServiceTests(Startup startup)
                                                 ]
                                                 """));
 
-        await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system"); // version 2
+        await configs.CreateOrUpdateConfigurationAsync(key, configuration, AuditActor.System); // version 2
         configuration = JObject.Parse("""
                                       {
                                         "$remove": [ "$.*" ]
                                       }
                                       """);
-        await configs.CreateOrUpdateConfigurationAsync(key, configuration, "system"); // version 3 (current)
+        await configs.CreateOrUpdateConfigurationAsync(key, configuration, AuditActor.System); // version 3 (current)
 
         var versions = await configs.GetConfigurationVersionsAsync(key);
         var version1 = await configs.GetConfigurationVersionContentAsync(key, 1);
@@ -358,7 +358,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var changes3 = await configs.GetConfigurationVersionChangesAsync(key, 3);
 
         versions.Should().HaveCount(3);
-        versions.First().CreationTime.Should().BeAfter(DateTimeOffset.UtcNow.AddDays(-1));
+        versions.First().Modified.At.Should().BeAfter(DateTimeOffset.UtcNow.AddDays(-1));
         versions.First().ExpirationTime.Should().BeAfter(DateTimeOffset.UtcNow.AddDays(300));
         version1?.Content.Should().HaveCount(3);
         version2?.Content.Should().HaveCount(4);
@@ -464,13 +464,13 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var executionKey = FullKey.Create(executionAnnotationKey, org, project, view);
         var unitKey = FullKey.Create(unitAnnotationKey, org, project, view);
 
-        await configs.CreateOrUpdateConfigurationAsync(responsibilityKey, JObject.Parse("""{ "level": "responsibility" }"""), "system");
-        await configs.CreateOrUpdateConfigurationAsync(subjectKey, JObject.Parse("""{ "level": "subject" }"""), "system");
-        await configs.CreateOrUpdateConfigurationAsync(usageKey, JObject.Parse("""{ "level": "usage" }"""), "system");
-        await configs.CreateOrUpdateConfigurationAsync(contextKey, JObject.Parse("""{ "level": "context" }"""), "system");
-        await configs.CreateOrUpdateConfigurationAsync(executionKey, JObject.Parse("""{ "level": "execution" }"""), "system");
-        await configs.CreateOrUpdateConfigurationAsync(unitKey, JObject.Parse("""{ "level": "unit" }"""), "system");
-        await configs.CreateOrUpdateConfigurationAsync(uoeKey, JObject.Parse("""{ "level": "unit-of-execution" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(responsibilityKey, JObject.Parse("""{ "level": "responsibility" }"""), AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(subjectKey, JObject.Parse("""{ "level": "subject" }"""), AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(usageKey, JObject.Parse("""{ "level": "usage" }"""), AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(contextKey, JObject.Parse("""{ "level": "context" }"""), AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(executionKey, JObject.Parse("""{ "level": "execution" }"""), AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(unitKey, JObject.Parse("""{ "level": "unit" }"""), AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(uoeKey, JObject.Parse("""{ "level": "unit-of-execution" }"""), AuditActor.System);
 
         var hierarchyResult = await configs.GetConfigurationHierarchyViewAsync(uoeKey);
         var hierarchy = hierarchyResult?.Content;
@@ -558,9 +558,9 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var responsibilityKey = FullKey.Create(responsibilityAnnotationKey, org, project, view);
 
         // Only configure 3 of the 7 levels
-        await configs.CreateOrUpdateConfigurationAsync(responsibilityKey, JObject.Parse("""{ "from": "responsibility" }"""), "system");
-        await configs.CreateOrUpdateConfigurationAsync(subjectKey, JObject.Parse("""{ "from": "subject" }"""), "system");
-        await configs.CreateOrUpdateConfigurationAsync(uoeKey, JObject.Parse("""{ "from": "unit-of-execution" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(responsibilityKey, JObject.Parse("""{ "from": "responsibility" }"""), AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(subjectKey, JObject.Parse("""{ "from": "subject" }"""), AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(uoeKey, JObject.Parse("""{ "from": "unit-of-execution" }"""), AuditActor.System);
 
         var hierarchyResult = await configs.GetConfigurationHierarchyViewAsync(uoeKey);
         var hierarchy = hierarchyResult?.Content;
@@ -622,8 +622,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
         var fullKeyA = FullKey.Create(annotationKey, TestConstants.Organization, Project, viewA);
         var fullKeyB = FullKey.Create(annotationKey, TestConstants.Organization, Project, viewB);
 
-        await configs.CreateOrUpdateConfigurationAsync(fullKeyA, configA, "system");
-        await configs.CreateOrUpdateConfigurationAsync(fullKeyB, configB, "system");
+        await configs.CreateOrUpdateConfigurationAsync(fullKeyA, configA, AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(fullKeyB, configB, AuditActor.System);
 
         var diff = await configs.GetConfigurationViewChangesAsync(fullKeyA, viewB);
 
@@ -661,7 +661,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                 "name": "original",
                 "value": 10
             }
-            """), "system");
+            """), AuditActor.System);
 
         // Update with $patch operations
         var update = JObject.Parse("""
@@ -673,7 +673,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             }
             """);
 
-        var result = await configs.CreateOrUpdateConfigurationAsync(key, update, "system");
+        var result = await configs.CreateOrUpdateConfigurationAsync(key, update, AuditActor.System);
         var content = result.Content;
 
         content["name"]!.Value<string>().Should().Be("patched");
@@ -705,7 +705,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                 "removeMe": "bye",
                 "replace": "old"
             }
-            """), "system");
+            """), AuditActor.System);
 
         // Merge new property + $remove + $patch
         var update = JObject.Parse("""
@@ -718,7 +718,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             }
             """);
 
-        var result = await configs.CreateOrUpdateConfigurationAsync(key, update, "system");
+        var result = await configs.CreateOrUpdateConfigurationAsync(key, update, AuditActor.System);
         var content = result.Content;
 
         content["keep"]!.Value<string>().Should().Be("yes");
@@ -752,7 +752,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                 "count": 1,
                 "nested": { "a": 1, "b": 2 }
             }
-            """), "system");
+            """), AuditActor.System);
 
         var patchOps = JArray.Parse("""
             [
@@ -762,7 +762,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             ]
             """);
 
-        var result = await configs.PatchConfigurationAsync(key, patchOps, "system");
+        var result = await configs.PatchConfigurationAsync(key, patchOps, AuditActor.System);
         var content = result.Content;
 
         content["name"]!.Value<string>().Should().Be("after");
@@ -790,10 +790,10 @@ public class CosmosConfigurationServiceTests(Startup startup)
         });
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "v": 1 }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "v": 1 }"""), AuditActor.System);
 
         var patchOps = JArray.Parse("""[{ "op": "replace", "path": "/v", "value": 2 }]""");
-        await configs.PatchConfigurationAsync(key, patchOps, "system");
+        await configs.PatchConfigurationAsync(key, patchOps, AuditActor.System);
 
         var versions = await configs.GetConfigurationVersionsAsync(key);
         versions.Should().HaveCount(2);
@@ -816,12 +816,12 @@ public class CosmosConfigurationServiceTests(Startup startup)
         });
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "a": 1 }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "a": 1 }"""), AuditActor.System);
 
         // replace on non-existing path should fail
         var patchOps = JArray.Parse("""[{ "op": "replace", "path": "/nonexistent/deep/path", "value": 99 }]""");
 
-        var act = () => configs.PatchConfigurationAsync(key, patchOps, "system");
+        var act = () => configs.PatchConfigurationAsync(key, patchOps, AuditActor.System);
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*JSON Patch*failed*");
     }
@@ -843,7 +843,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
         });
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        var stored = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "retries": 3 }"""), "system");
+        var stored = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "retries": 3 }"""), AuditActor.System);
 
         // a client that still sees retries = 2 must not overwrite the newer value
         var patchOps = JArray.Parse("""
@@ -853,7 +853,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             ]
             """);
 
-        var act = () => configs.PatchConfigurationAsync(key, patchOps, "system");
+        var act = () => configs.PatchConfigurationAsync(key, patchOps, AuditActor.System);
         (await act.Should().ThrowAsync<JsonPatchException>()).Which.Kind.Should().Be(JsonPatchFailureKind.TestFailed);
 
         var current = await configs.GetRawConfigurationAsync(key);
@@ -883,7 +883,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                 "maxPrice": 10,
                 "limit": "@config(\"/maxPrice\")"
             }
-            """), "system");
+            """), AuditActor.System);
 
         var resolved = await configs.GetResolvedConfigurationAsync(key);
 
@@ -915,7 +915,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                 "base": "@{1 + 1}",
                 "snapshot": "@config(\"/base\")"
             }
-            """), "system");
+            """), AuditActor.System);
 
         var resolved = await configs.GetResolvedConfigurationAsync(key);
 
@@ -945,7 +945,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
             {
                 "owner": "@annotation(\"/owner\")"
             }
-            """), "system");
+            """), AuditActor.System);
 
         var resolved = await configs.GetResolvedConfigurationAsync(key);
 
@@ -969,7 +969,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
         });
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "value": 1 }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "value": 1 }"""), AuditActor.System);
 
         var changes = await configs.GetConfigurationVersionChangesAsync(key, 1);
 
@@ -997,8 +997,8 @@ public class CosmosConfigurationServiceTests(Startup startup)
         });
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "value": 1 }"""), "system");
-        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "$remove": [ "$.*" ] }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "value": 1 }"""), AuditActor.System);
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "$remove": [ "$.*" ] }"""), AuditActor.System);
 
         var changes = await configs.GetConfigurationVersionChangesAsync(key, 2);
 
@@ -1040,7 +1040,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                     }
                 ]
             }
-            """), "system");
+            """), AuditActor.System);
 
         var resolved = await configs.GetResolvedConfigurationAsync(key);
 
@@ -1079,10 +1079,10 @@ public class CosmosConfigurationServiceTests(Startup startup)
                     }
                 }
                 """),
-            "system");
+            AuditActor.System);
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "stored" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "stored" }"""), AuditActor.System);
 
         var calculated = await configs.GetRawConfigurationAsync(key);
         calculated!.Content["name"]!.Value<string>().Should().Be("stored");
@@ -1110,7 +1110,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
         });
 
         var key = FullKey.Create(annotationKey, TestConstants.Organization, Project, Constants.DefaultViewName);
-        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "stored" }"""), "system");
+        await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{ "name": "stored" }"""), AuditActor.System);
         var written = await configs.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""
             {
                 "item": {
@@ -1118,7 +1118,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                     "$definition": { "ok": true }
                 }
             }
-            """), "system");
+            """), AuditActor.System);
 
         written.Content["name"]!.Value<string>().Should().Be("stored");
         written.Content["item"]!["$binding"]!.Value<string>().Should().Be("jsone");
@@ -1155,7 +1155,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
                     "$context": { "secret": "{{expression}}" }
                 }
             }
-            """), "system");
+            """), AuditActor.System);
 
         var hidden = await configs.GetResolvedConfigurationAsync(key, includeSecrets: false);
         hidden!.Content["label"]!.Type.Should().Be(JTokenType.String);

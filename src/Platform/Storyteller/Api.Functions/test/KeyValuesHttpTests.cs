@@ -303,7 +303,7 @@ public class KeyValuesHttpTests
         var (http, service) = Create(AccountRole.Reader);
 
         var missing = await http.GetKeyValueVersions(KeyValueRequests.User(), Org, Project, View, "k");
-        service.Versions = [new KeyValueVersion { Version = 1, Protection = KeyValueProtection.Public, Author = "a", CreationTime = DateTimeOffset.UnixEpoch, IsCurrent = true }];
+        service.Versions = [new KeyValueVersion { Version = 1, Protection = KeyValueProtection.Public, Modified = AuditStamp.Of(AuditActor.Account("a"), DateTimeOffset.UnixEpoch), IsCurrent = true }];
         var found = await http.GetKeyValueVersions(KeyValueRequests.User(), Org, Project, View, "k");
         await http.GetKeyValueVersionDiff(KeyValueRequests.User(), Org, Project, View, "k", 3);
         var first = service.LastDiff;
@@ -363,7 +363,7 @@ public class KeyValuesHttpTests
         setup.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<ByokSetupInfo>().ConsentUrl.ShouldContain("adminconsent");
         await act.ShouldThrowAsync<AccessDeniedException>();
         policies.Calls.ShouldBe(["get", "get", "update", "byok-setup"]);
-        policies.LastCaller!.Author.ShouldBe("account: user-1");
+        policies.LastCaller!.Actor.Id.ShouldBe("user-1");
     }
 
     [Fact]

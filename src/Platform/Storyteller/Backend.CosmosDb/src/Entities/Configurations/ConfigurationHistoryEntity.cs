@@ -11,9 +11,13 @@ public record class ConfigurationHistoryEntity : Entity
 
     public required JObject Content { get; init; }
 
-    public required string Author { get; init; }
+    // The write that produced this version; null on items stored before the stamps (see GetModified).
+    public AuditStamp? Modified { get; init; }
 
-    public DateTimeOffset CreationTime { get; init; }
+    // Legacy author and time of items stored before the stamps; never written again.
+    public string? Author { get; init; }
+
+    public DateTimeOffset? CreationTime { get; init; }
 
     [JsonProperty("ttl")]
     [JsonPropertyName("ttl")]

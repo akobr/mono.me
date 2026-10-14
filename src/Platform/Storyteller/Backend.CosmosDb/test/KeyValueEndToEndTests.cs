@@ -69,7 +69,7 @@ public class KeyValueEndToEndTests(Startup startup)
             services.GetRequiredService<IOptions<JsonSerializerSettings>>());
 
         var project = $"kv-e2e-{Guid.NewGuid():N}"[..30];
-        var admin = KeyValueCaller.WithSecrets("account: admin");
+        var admin = KeyValueCaller.WithSecrets(AuditActor.Account("admin"));
 
         var written = await keyValues.SetAsync(Org, project, View, "db.password", new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "hunter2" }, admin);
         await keyValues.SetAsync(Org, project, View, "db.password", new KeyValueWrite { Value = "hunter3" }, admin);

@@ -1,4 +1,5 @@
-﻿using _42.Platform.Storyteller.Entities.Configurations;
+﻿using System;
+using _42.Platform.Storyteller.Entities.Configurations;
 using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller;
@@ -11,7 +12,7 @@ public static class Mapping
         {
             AnnotationKey = @this.AnnotationKey,
             Version = @this.Version,
-            Author = @this.Author,
+            Modified = @this.GetModified(),
             Content = content is null ? @this.CalculatedContent : content,
             Hash = @this.CalculatedContentHash,
             Labels = @this.Labels,
@@ -25,7 +26,7 @@ public static class Mapping
         {
             AnnotationKey = @this.AnnotationKey,
             Version = @this.Version,
-            Author = @this.Author,
+            Modified = @this.GetModified(),
             Content = @this.Content,
             Hash = null,
             Labels = @this.Labels,
@@ -39,19 +40,20 @@ public static class Mapping
         {
             AnnotationKey = @this.AnnotationKey,
             Version = @this.Version,
-            Author = @this.Author,
+            Modified = @this.GetModified(),
             Content = @this.Content,
             Hash = null,
         };
     }
 
-    public static Configuration ToConfiguration(this JObject @this, string annotationKey)
+    // Version 0: calculated and never written, so the calculation by System.
+    public static Configuration ToConfiguration(this JObject @this, string annotationKey, DateTimeOffset calculatedAt)
     {
         return new Configuration
         {
             AnnotationKey = annotationKey,
             Version = 0,
-            Author = "system",
+            Modified = AuditStamp.Of(AuditActor.System, calculatedAt),
             Hash = null,
             Content = @this,
         };

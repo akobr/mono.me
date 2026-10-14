@@ -167,10 +167,8 @@ public class CosmosKeyValueService : IKeyValueService
                     Key = key,
                     Version = version,
                     Content = content,
-                    Author = caller.Author,
-                    UpdatedAt = now,
-                    CreatedBy = caller.Author,
-                    CreatedAt = now,
+                    Created = AuditStamp.Of(caller.Actor, now),
+                    Modified = AuditStamp.Of(caller.Actor, now),
                 };
 
                 try
@@ -203,7 +201,7 @@ public class CosmosKeyValueService : IKeyValueService
             }
 
             var newContent = await _protector.ProtectAsync(place.Identity(normalizedKey, existing.Version + 1), targetProtection, write.Value, write.ContentType);
-            var updated = await TryWriteNextVersionAsync(place, existing, etag!, newContent, caller.Author, now);
+            var updated = await TryWriteNextVersionAsync(place, existing, etag!, newContent, caller.Actor, now);
 
             if (updated is not null)
             {
@@ -242,7 +240,7 @@ public class CosmosKeyValueService : IKeyValueService
                 return true;
             }
 
-            if (await TrySoftDeleteAsync(place, existing, etag!, caller.Author))
+            if (await TrySoftDeleteAsync(place, existing, etag!, caller.Actor))
             {
                 await RecordWriteAsync(place, caller, existing, KeyValueAuditOperation.Delete, previous: null);
                 return true;
@@ -281,7 +279,7 @@ public class CosmosKeyValueService : IKeyValueService
         var now = _timeProvider.GetUtcNow();
 
         var query = new QueryDefinition(
-                "SELECT c.Version, c.Author, c.CreationTime, c.Content.Protection AS Protection, c.ttl, c._ts "
+                "SELECT c.Version, c.Modified, c.Content.Protection AS Protection, c.ttl, c._ts "
                 + "FROM c WHERE STARTSWITH(c.id, @prefix) ORDER BY c.Version")
             .WithParameter("@prefix", GetVersionIdPrefix(normalizedKey));
 
@@ -645,7 +643,7 @@ public class CosmosKeyValueService : IKeyValueService
     private QueryDefinition BuildListingQuery(KeyValueListRequest request)
     {
         var idPrefix = $"{EntityIdPrefixTypes.KeyValue}.";
-        var text = "SELECT c.id, c.Key, c.Version, c.Author, c.UpdatedAt, c.DeletedAt, c.ttl, c._ts, "
+        var text = "SELECT c.id, c.Key, c.Version, c.Modified, c.Deleted, c.ttl, c._ts, "
             + "c.Content.Protection AS Protection, c.Content.ContentType AS ContentType";
 
         if (request.IncludeValues)
@@ -659,11 +657,11 @@ public class CosmosKeyValueService : IKeyValueService
         switch (request.State)
         {
             case KeyValueState.Active:
-                text += " AND NOT IS_DEFINED(c.DeletedAt)";
+                text += " AND NOT IS_DEFINED(c.Deleted.At)";
                 break;
 
             case KeyValueState.Deleted:
-                text += " AND IS_DEFINED(c.DeletedAt)";
+                text += " AND IS_DEFINED(c.Deleted.At)";
                 break;
         }
 
@@ -797,7 +795,7 @@ public class CosmosKeyValueService : IKeyValueService
             return;
         }
 
-        var remaining = GetRemainingLifetime(existing.UpdatedAt, now);
+        var remaining = GetRemainingLifetime(existing.Modified.At, now);
 
         if (remaining <= 0)
         {
@@ -814,16 +812,14 @@ public class CosmosKeyValueService : IKeyValueService
         batch.CreateItem(existing.ToVersion(remaining));
     }
 
-    private async Task<KeyValueEntity?> TryWriteNextVersionAsync(Place place, KeyValueEntity existing, string etag, StoredValue content, string author, DateTimeOffset now)
+    private async Task<KeyValueEntity?> TryWriteNextVersionAsync(Place place, KeyValueEntity existing, string etag, StoredValue content, AuditActor actor, DateTimeOffset now)
     {
         var updated = existing with
         {
             Version = existing.Version + 1,
             Content = content,
-            Author = author,
-            UpdatedAt = now,
-            DeletedAt = null,
-            DeletedBy = null,
+            Modified = AuditStamp.Of(actor, now),
+            Deleted = null,
             TimeToLiveInSeconds = null,
         };
 
@@ -834,13 +830,12 @@ public class CosmosKeyValueService : IKeyValueService
         return await TryExecuteWriteAsync(place, batch, "update", existing.Id) ? updated : null;
     }
 
-    private async Task<bool> TrySoftDeleteAsync(Place place, KeyValueEntity existing, string etag, string author)
+    private async Task<bool> TrySoftDeleteAsync(Place place, KeyValueEntity existing, string etag, AuditActor actor)
     {
         var now = _timeProvider.GetUtcNow();
         var deleted = existing with
         {
-            DeletedAt = now,
-            DeletedBy = author,
+            Deleted = AuditStamp.Of(actor, now),
             TimeToLiveInSeconds = (int)Math.Max(1, _options.DeletedRetention.TotalSeconds),
         };
 
@@ -855,8 +850,7 @@ public class CosmosKeyValueService : IKeyValueService
     {
         var restored = existing with
         {
-            DeletedAt = null,
-            DeletedBy = null,
+            Deleted = null,
             TimeToLiveInSeconds = null,
         };
 
@@ -966,11 +960,11 @@ public class CosmosKeyValueService : IKeyValueService
         switch (state)
         {
             case KeyValueState.Active:
-                text += " AND NOT IS_DEFINED(c.DeletedAt)";
+                text += " AND NOT IS_DEFINED(c.Deleted.At)";
                 break;
 
             case KeyValueState.Deleted:
-                text += " AND IS_DEFINED(c.DeletedAt)";
+                text += " AND IS_DEFINED(c.Deleted.At)";
                 break;
         }
 
@@ -1108,7 +1102,7 @@ public class CosmosKeyValueService : IKeyValueService
 
             if (await TryRestoreAsync(place, existing, etag!))
             {
-                await RecordWriteAsync(place, caller, existing with { DeletedAt = null, DeletedBy = null }, KeyValueAuditOperation.Restore, previous: null);
+                await RecordWriteAsync(place, caller, existing with { Deleted = null }, KeyValueAuditOperation.Restore, previous: null);
                 return new KeyValueBulkItemResult { Key = key, Outcome = KeyValueBulkOutcome.Done, Version = existing.Version };
             }
         }
@@ -1171,7 +1165,7 @@ public class CosmosKeyValueService : IKeyValueService
 
             var plaintext = await _protector.UnprotectAsync(place.Identity(existing), existing.Content);
             var content = await _protector.ProtectAsync(place.Identity(KeyValueRules.Normalize(existing.Key), existing.Version + 1), target, plaintext, existing.Content.ContentType);
-            var updated = await TryWriteNextVersionAsync(place, existing, etag!, content, caller.Author, now);
+            var updated = await TryWriteNextVersionAsync(place, existing, etag!, content, caller.Actor, now);
 
             if (updated is not null)
             {
@@ -1412,19 +1406,15 @@ public class CosmosKeyValueService : IKeyValueService
                         Key = item.Item.Key,
                         Version = version,
                         Content = content,
-                        Author = caller.Author,
-                        UpdatedAt = now,
-                        CreatedBy = caller.Author,
-                        CreatedAt = now,
+                        Created = AuditStamp.Of(caller.Actor, now),
+                        Modified = AuditStamp.Of(caller.Actor, now),
                     }
                     : item.Existing with
                     {
                         Version = version,
                         Content = content,
-                        Author = caller.Author,
-                        UpdatedAt = now,
-                        DeletedAt = null,
-                        DeletedBy = null,
+                        Modified = AuditStamp.Of(caller.Actor, now),
+                        Deleted = null,
                         TimeToLiveInSeconds = null,
                     };
 
@@ -1482,7 +1472,7 @@ public class CosmosKeyValueService : IKeyValueService
                     return item.ToResult(existing?.Version);
                 }
 
-                if (await TrySoftDeleteAsync(place, existing, etag!, caller.Author))
+                if (await TrySoftDeleteAsync(place, existing, etag!, caller.Actor))
                 {
                     return item.ToResult(existing.Version);
                 }
@@ -1540,7 +1530,7 @@ public class CosmosKeyValueService : IKeyValueService
             Version = version,
             Protection = protection,
             Operation = operation,
-            Actor = caller.Author,
+            Actor = caller.Actor,
             Channel = caller.Channel,
             CorrelationId = caller.CorrelationId,
             Detail = detail,

@@ -24,8 +24,8 @@ public class CosmosKeyValueServiceTests(Startup startup)
     private const string Org = TestConstants.Organization;
     private const string View = Constants.DefaultViewName;
 
-    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets("account: admin");
-    private static readonly KeyValueCaller Reader = KeyValueCaller.WithoutSecrets("account: reader");
+    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets(AuditActor.Account("admin"));
+    private static readonly KeyValueCaller Reader = KeyValueCaller.WithoutSecrets(AuditActor.Account("reader"));
 
     private IKeyValueService KeyValues => Context.Services.GetRequiredService<IKeyValueService>();
 
@@ -66,7 +66,7 @@ public class CosmosKeyValueServiceTests(Startup startup)
         v3.Key.Should().Be("db.host", "the casing of the first write is kept");
         v3.Protection.Should().Be(KeyValueProtection.Public, "an update without a level keeps the level");
         v3.ContentType.Should().BeNull("the content type is not carried over implicitly");
-        v3.CreatedBy.Should().Be("account: admin");
+        v3.Created.By.Should().Be(AuditActor.Account("admin"));
 
         var current = await KeyValues.GetAsync(Org, project, View, "db.host", new KeyValueReadOptions(), Reader);
         current!.Value.Should().Be("sql-3");
@@ -112,7 +112,7 @@ public class CosmosKeyValueServiceTests(Startup startup)
         (await KeyValues.GetAsync(Org, project, View, "a.one", new KeyValueReadOptions(), Reader)).Should().BeNull();
         var deleted = await KeyValues.GetAsync(Org, project, View, "a.one", new KeyValueReadOptions { IncludeDeleted = true }, Reader);
         deleted!.IsDeleted.Should().BeTrue();
-        deleted.DeletedBy.Should().Be("account: admin");
+        deleted.Deleted!.By.Should().Be(AuditActor.Account("admin"));
         deleted.ExpiresAt.Should().BeAfter(DateTimeOffset.UtcNow.AddDays(80));
         deleted.Version.Should().Be(2);
 
@@ -172,7 +172,7 @@ public class CosmosKeyValueServiceTests(Startup startup)
 
         var recreated = await shortLived.SetAsync(Org, project, View, "temp.key", Public("3"), Admin);
         recreated.Version.Should().Be(3);
-        recreated.CreatedBy.Should().Be("account: admin");
+        recreated.Created.By.Should().Be(AuditActor.Account("admin"));
     }
 
     [Fact]
@@ -367,7 +367,7 @@ public class CosmosKeyValueServiceTests(Startup startup)
         await KeyValues.SetAsync(Org, project, View, "race", Public("0"), Admin);
 
         await Task.WhenAll(Enumerable.Range(1, 8).Select(i =>
-            KeyValues.SetAsync(Org, project, View, "race", Public($"v{i}"), KeyValueCaller.WithSecrets($"account: writer-{i}"))));
+            KeyValues.SetAsync(Org, project, View, "race", Public($"v{i}"), KeyValueCaller.WithSecrets(AuditActor.Account($"writer-{i}")))));
 
         var versions = await KeyValues.GetVersionsAsync(Org, project, View, "race");
         versions.Select(version => version.Version).Should().Equal(Enumerable.Range(1, 9).Select(i => (ulong)i));

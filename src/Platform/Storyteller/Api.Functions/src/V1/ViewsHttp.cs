@@ -85,7 +85,7 @@ public class ViewsHttp
             return new BadRequestObjectResult(new ErrorResponse("The view is missing."));
         }
 
-        var view = await _views.CreateViewAsync(organization, project, model, request.GetAuthor());
+        var view = await _views.CreateViewAsync(organization, project, model, request.GetAuditActor());
         return new OkObjectResult(view);
     }
 
@@ -113,7 +113,7 @@ public class ViewsHttp
         EnsureNotMachine(request);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
 
-        var updated = await _views.UpdateViewAsync(organization, project, view, model ?? new ViewUpdate(), request.GetAuthor());
+        var updated = await _views.UpdateViewAsync(organization, project, view, model ?? new ViewUpdate(), request.GetAuditActor());
         return new OkObjectResult(updated);
     }
 

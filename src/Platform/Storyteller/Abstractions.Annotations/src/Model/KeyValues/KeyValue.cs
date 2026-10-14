@@ -24,19 +24,14 @@ public record class KeyValue
 
     public required ulong Version { get; init; }
 
-    public required string Author { get; init; }
+    public required AuditStamp Created { get; init; }
 
-    public required DateTimeOffset UpdatedAt { get; init; }
-
-    public required string CreatedBy { get; init; }
-
-    public required DateTimeOffset CreatedAt { get; init; }
+    // The write that produced this version.
+    public required AuditStamp Modified { get; init; }
 
     public bool IsDeleted { get; init; }
 
-    public DateTimeOffset? DeletedAt { get; init; }
-
-    public string? DeletedBy { get; init; }
+    public AuditStamp? Deleted { get; init; }
 
     // A deleted key: when it is removed for good.
     public DateTimeOffset? ExpiresAt { get; init; }

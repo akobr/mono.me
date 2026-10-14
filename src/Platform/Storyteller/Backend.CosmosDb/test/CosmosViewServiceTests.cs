@@ -36,24 +36,24 @@ public class CosmosViewServiceTests(Startup startup)
     {
         var project = NewProject();
 
-        var created = await Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "rollout", Description = "  Canary rollout  " }, "account: user-1");
+        var created = await Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "rollout", Description = "  Canary rollout  " }, AuditActor.Account("user-1"));
         var views = await Views.GetViewsAsync(Organization, project, discover: false);
 
         created.IsRegistered.Should().BeTrue();
         created.Description.Should().Be("Canary rollout");
         views.Select(view => (view.Name, view.IsRegistered)).Should().Equal((Constants.DefaultViewName, false), ("rollout", true));
-        views[1].CreatedBy.Should().Be("account: user-1");
-        views[1].CreatedAt.Should().NotBeNull();
+        views[1].Created!.By.Should().Be(AuditActor.Account("user-1"));
+        views[1].Created.At.Should().BeCloseTo(DateTimeOffset.UtcNow, TimeSpan.FromMinutes(5));
     }
 
     [Fact]
     public async Task CreateView_Twice_ThrowsViewExists()
     {
         var project = NewProject();
-        await Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "rollout" }, "author");
+        await Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "rollout" }, AuditActor.Account("author"));
 
-        var again = () => Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "rollout" }, "author");
-        var defaultView = () => Views.CreateViewAsync(Organization, project, new ViewCreate { Name = Constants.DefaultViewName }, "author");
+        var again = () => Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "rollout" }, AuditActor.Account("author"));
+        var defaultView = () => Views.CreateViewAsync(Organization, project, new ViewCreate { Name = Constants.DefaultViewName }, AuditActor.Account("author"));
 
         (await again.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.ViewExists);
         (await defaultView.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.ViewExists);
@@ -65,7 +65,7 @@ public class CosmosViewServiceTests(Startup startup)
     [InlineData("members")]
     public async Task CreateView_InvalidOrReservedName_ThrowsInvalidName(string name)
     {
-        var act = () => Views.CreateViewAsync(Organization, NewProject(), new ViewCreate { Name = name }, "author");
+        var act = () => Views.CreateViewAsync(Organization, NewProject(), new ViewCreate { Name = name }, AuditActor.Account("author"));
 
         (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidName);
     }
@@ -75,7 +75,7 @@ public class CosmosViewServiceTests(Startup startup)
     {
         var project = NewProject();
 
-        var act = () => Views.UpdateViewAsync(Organization, project, "Prod", new ViewUpdate(), "author");
+        var act = () => Views.UpdateViewAsync(Organization, project, "Prod", new ViewUpdate(), AuditActor.Account("author"));
 
         (await act.Should().ThrowAsync<InvalidInputException>()).Which.ErrorCode.Should().Be(ErrorCodes.InvalidName);
         (await Views.GetViewsAsync(Organization, project, discover: false)).Select(view => view.Name).Should().NotContain("prod");
@@ -86,16 +86,16 @@ public class CosmosViewServiceTests(Startup startup)
     {
         var project = NewProject();
 
-        var defaultView = await Views.UpdateViewAsync(Organization, project, Constants.DefaultViewName, new ViewUpdate { Description = "Production" }, "author");
-        var beta = await Views.UpdateViewAsync(Organization, project, "beta", new ViewUpdate { Description = "Beta testers" }, "author");
-        var cleared = await Views.UpdateViewAsync(Organization, project, "beta", new ViewUpdate { Description = " " }, "other");
+        var defaultView = await Views.UpdateViewAsync(Organization, project, Constants.DefaultViewName, new ViewUpdate { Description = "Production" }, AuditActor.Account("author"));
+        var beta = await Views.UpdateViewAsync(Organization, project, "beta", new ViewUpdate { Description = "Beta testers" }, AuditActor.Account("author"));
+        var cleared = await Views.UpdateViewAsync(Organization, project, "beta", new ViewUpdate { Description = " " }, AuditActor.Account("other"));
         var views = await Views.GetViewsAsync(Organization, project, discover: false);
 
         defaultView.IsDefault.Should().BeTrue();
         defaultView.IsRegistered.Should().BeTrue();
         beta.Description.Should().Be("Beta testers");
         cleared.Description.Should().BeNull();
-        cleared.CreatedBy.Should().Be("author");
+        cleared.Created!.By.Id.Should().Be("author");
         views.Select(view => (view.Name, view.Description)).Should().Equal((Constants.DefaultViewName, "Production"), ("beta", (string?)null));
     }
 
@@ -103,7 +103,7 @@ public class CosmosViewServiceTests(Startup startup)
     public async Task GetViews_Discover_AddsViewsThatOnlyExistInTheData()
     {
         var project = NewProject();
-        await Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "registered" }, "author");
+        await Views.CreateViewAsync(Organization, project, new ViewCreate { Name = "registered" }, AuditActor.Account("author"));
         await CreateResponsibilityAsync(project, "hidden");
         await CreateResponsibilityAsync(project, "registered");
 

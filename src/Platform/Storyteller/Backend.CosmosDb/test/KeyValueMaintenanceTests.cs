@@ -19,7 +19,7 @@ public class KeyValueMaintenanceTests(Startup startup)
     private const string Org = TestConstants.Organization;
     private const string View = Constants.DefaultViewName;
 
-    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets("account: admin");
+    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets(AuditActor.Account("admin"));
 
     private IKeyValueService KeyValues => Context.Services.GetRequiredService<IKeyValueService>();
 
@@ -127,7 +127,7 @@ public class KeyValueMaintenanceTests(Startup startup)
         var notAllowed = () => KeyValues.ProtectAsync(Org, project, View, new KeyValueBulkRequest { Keys = ["s"], Protection = KeyValueProtection.Byok }, Admin);
         (await notAllowed.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.ProtectionNotAllowed);
 
-        var reader = await KeyValues.ProtectAsync(Org, project, View, new KeyValueBulkRequest { Keys = ["s"], Protection = KeyValueProtection.Hsm }, KeyValueCaller.WithoutSecrets("account: reader"));
+        var reader = await KeyValues.ProtectAsync(Org, project, View, new KeyValueBulkRequest { Keys = ["s"], Protection = KeyValueProtection.Hsm }, KeyValueCaller.WithoutSecrets(AuditActor.Account("reader")));
         reader.Items.Single().Outcome.Should().Be(KeyValueBulkOutcome.Forbidden);
     }
 }

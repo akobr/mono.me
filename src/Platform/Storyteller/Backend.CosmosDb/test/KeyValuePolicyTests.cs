@@ -21,7 +21,7 @@ public class KeyValuePolicyTests(Startup startup)
     private const string Org = TestConstants.Organization;
     private const string View = Constants.DefaultViewName;
 
-    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets("account: admin");
+    private static readonly KeyValueCaller Admin = KeyValueCaller.WithSecrets(AuditActor.Account("admin"));
 
     private IKeyValuePolicyService Policies => Context.Services.GetRequiredService<IKeyValuePolicyService>();
 
@@ -63,7 +63,7 @@ public class KeyValuePolicyTests(Startup startup)
         }, Admin);
 
         policy.Version.Should().Be(1);
-        policy.Author.Should().Be("account: admin");
+        policy.Modified!.By.Should().Be(AuditActor.Account("admin"));
         policy.Hsm.Should().NotBeNull();
         policy.Hsm!.Backend.Should().Be(HsmBackend.KeyVaultPremium);
         policy.Hsm.Key!.KeyId.Should().Contain("kek-hsm");

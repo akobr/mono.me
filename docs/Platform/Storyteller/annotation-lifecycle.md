@@ -63,7 +63,7 @@ All items of an annotation live in the annotation's partition of the organizatio
 
 `Deletion` holds `DeletionId` (shared by everything one delete removed), `RootKey`, `DeletedAt`, `DeletedBy`, `IsRoot`, and `DescendantCount` on the requested root. `PurgeAt` is computed on read as `_ts + ttl`, which is when Cosmos removes the item.
 
-Every stored annotation also carries the server-owned stamps `Created` and `Modified` (`{ At, By }`); the annotations DbCreator seeds are stamped by the `System` actor. A write ignores them in its body, and so it ignores `Deletion` and the relation arrays (`UnitNames`, `ResponsibilityNames`, `ContextNames`): the server keeps those.
+Every stored annotation also carries the server-owned [audit stamps](audit-stamps.md) `Created` and `Modified` (`{ At, By }`); the annotations DbCreator seeds are stamped by the `System` actor. A write ignores them in its body, and so it ignores `Deletion` and the relation arrays (`UnitNames`, `ResponsibilityNames`, `ContextNames`): the server keeps those.
 
 ## Delete
 
@@ -111,13 +111,13 @@ The audit document of an annotation holds its entries, oldest first:
 | `Updated` | an update that changes something | `Fields`, `Labels`, `Values` |
 | `Deleted` | delete | `DeletionId`; cause `Cascade` on descendants; `DescendantCount` on the root |
 | `Restored` | restore | `DeletionId`; cause `Cascade` or `Ancestor`; `DescendantCount` on a restore with descendants |
-| `ConfigurationChanged`, `ConfigurationDeleted` | a configuration write with an actor | `ConfigurationVersion`; best effort, after the write |
+| `ConfigurationChanged`, `ConfigurationDeleted` | a configuration write or clear | `ConfigurationVersion`; best effort, after the write |
 
 - **Fields** keep the previous and the new value of `Title`, `DocumentationLink`, `IsDisabled`, `ValidFrom`, `ExpiresAt`, `TimeZone` and, for units, `UnitType`. `Description` and `UnitDefinition` record only that they changed.
 - **Labels** list the added and the removed labels.
 - **Values** list the changed keys with the kind of both sides; primitive values are stored, objects and arrays only by their kind.
 - Strings are cut at `Audit:MaxValueLength` (256) with `IsPreviousTruncated` or `IsValueTruncated`.
-- Each entry has the actor (`Account`, `Machine` or `System`, with an id and a display name) and the time.
+- Each entry has the [actor](audit-stamps.md#the-actor) (`Account`, `Machine` or `System`, with an id and a display name) and the time.
 
 An annotation write and its audit entry go to one transactional batch. An update that changes nothing writes nothing.
 
@@ -137,7 +137,7 @@ Organization containers have TTL on without a default expiry (`DefaultTimeToLive
 
 ## API
 
-All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Functions/src/V1/AnnotationsHttp.cs` and `AnnotationsHttp.Deleted.cs`). Writes record the caller as the actor: an account with its id and name from the token, a machine with its id, or `System` in `DEV_AUTH` builds.
+All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Functions/src/V1/AnnotationsHttp.cs` and `AnnotationsHttp.Deleted.cs`). Writes record the caller as the actor (`GetAuditActor()`): an account with its id and name from the token, a machine with its id, or `System` for a request without an identity in `DEV_AUTH` builds.
 
 | Method | Route | Role | Result |
 | --- | --- | --- | --- |

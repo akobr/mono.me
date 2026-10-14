@@ -10,6 +10,9 @@ internal sealed record ConfigurationListingRow
 
     public ulong Version { get; init; }
 
+    public AuditStamp? Modified { get; init; }
+
+    // Legacy author of items stored before the stamps.
     public string? Author { get; init; }
 
     public string? CalculatedContentHash { get; init; }
@@ -18,6 +21,8 @@ internal sealed record ConfigurationListingRow
 
     [JsonProperty("_ts")]
     public long Timestamp { get; init; }
+
+    public AuditStamp? GetModified() => ListingStamps.ToModified(Modified, Author, Timestamp);
 }
 
 internal sealed record DocumentListingRow
@@ -27,17 +32,28 @@ internal sealed record DocumentListingRow
 
     public ulong Version { get; init; }
 
+    public AuditStamp? Modified { get; init; }
+
+    // Legacy author of items stored before the stamps.
     public string? Author { get; init; }
 
     [JsonProperty("_ts")]
     public long Timestamp { get; init; }
+
+    public AuditStamp? GetModified() => ListingStamps.ToModified(Modified, Author, Timestamp);
 }
 
-internal static class ListingTimestamps
+internal static class ListingStamps
 {
-    // Cosmos _ts is the last write in Unix seconds; 0 means the projection had none.
-    public static DateTimeOffset? ToUpdatedAt(long timestamp)
+    // An item stored before the stamps gets its author string and its last write (Cosmos _ts, in Unix seconds;
+    // 0 means the projection had none).
+    public static AuditStamp? ToModified(AuditStamp? modified, string? author, long timestamp)
     {
-        return timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(timestamp) : null;
+        if (modified is not null)
+        {
+            return modified;
+        }
+
+        return timestamp > 0 ? LegacyAuthors.ToStamp(author, DateTimeOffset.FromUnixTimeSeconds(timestamp)) : null;
     }
 }

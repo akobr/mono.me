@@ -242,8 +242,7 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
             Name = create.Name.Trim(),
             PublicKey = new RsaJsonWebKey { N = key.N, E = key.E },
             IsEnabled = true,
-            CreatedAt = _timeProvider.GetUtcNow(),
-            CreatedBy = caller.Author,
+            Created = AuditStamp.Of(caller.Actor, _timeProvider.GetUtcNow()),
         };
 
         await SaveAsync(organization, project, current with { Recipients = [.. current.Recipients, recipient] }, caller, cancellationToken);
@@ -455,8 +454,7 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
         return await _store.SetAsync(organization, project, policy with
         {
             Version = policy.Version + 1,
-            Author = caller.Author,
-            UpdatedAt = _timeProvider.GetUtcNow(),
+            Modified = AuditStamp.Of(caller.Actor, _timeProvider.GetUtcNow()),
         }, cancellationToken);
     }
 
@@ -473,7 +471,7 @@ public partial class CosmosKeyValuePolicyService : IKeyValuePolicyService
             Id = CosmosKeyValueAuditLog.NewId(now),
             Time = now,
             Operation = operation,
-            Actor = caller.Author,
+            Actor = caller.Actor,
             Channel = caller.Channel,
             CorrelationId = caller.CorrelationId,
             Detail = detail,

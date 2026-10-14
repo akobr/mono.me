@@ -9,9 +9,9 @@ public interface IConfigurationTemplateService
     // The templates of the view without their content.
     Task<IReadOnlyList<ConfigurationTemplateSummary>> ListTemplatesAsync(string organization, string project, string view);
 
-    Task<ConfigurationTemplate> CreateOrUpdateTemplateAsync(string organization, string project, string view, string annotationType, JObject value, string author);
+    Task<ConfigurationTemplate> CreateOrUpdateTemplateAsync(string organization, string project, string view, string annotationType, JObject value, AuditActor actor);
 
-    Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, JArray patchOperations, string author);
+    Task<ConfigurationTemplate> PatchTemplateAsync(string organization, string project, string view, string annotationType, JArray patchOperations, AuditActor actor);
 
     Task<bool> DeleteTemplateAsync(string organization, string project, string view, string annotationType);
 

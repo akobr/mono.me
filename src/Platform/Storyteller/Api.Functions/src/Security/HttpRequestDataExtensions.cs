@@ -104,39 +104,28 @@ public static class HttpRequestDataExtensions
         return allScopes.Contains(scope);
     }
 
-    public static string GetAuthor(this HttpRequestData @this)
-    {
-        if (@this.TryGetApplicationIdentity(out var appId))
-        {
-            return $"application: {appId}";
-        }
-
-        var accountId = @this.GetIdentityUniqueId();
-        return $"account: {accountId}";
-    }
-
-    // Who makes the request, for the audit: the machine, or the account with a display name from the token.
-    // The profile resolver is not called, so recording the actor adds no latency.
+    // Who makes the request, for every audit stamp: the machine, or the account (its sub) with a display name from
+    // the token. The profile resolver is not called, so recording the actor adds no latency. Debug builds (DEV_AUTH)
+    // also serve requests without an identity; those are System.
     public static AuditActor GetAuditActor(this HttpRequestData @this)
     {
-#if DEV_AUTH
-        return AuditActor.System;
-#else
         if (@this.TryGetApplicationIdentity(out var appId))
         {
-            return new AuditActor { Kind = AuditActorKind.Machine, Id = appId };
+            return AuditActor.Machine(appId);
         }
+
+#if DEV_AUTH
+        if (string.IsNullOrWhiteSpace(@this.GetClaim("sub", ClaimTypes.NameIdentifier)))
+        {
+            return AuditActor.System;
+        }
+#endif
 
         var name = @this.GetClaim(NameClaimType)?.Trim();
         var userName = @this.GetClaim(UniqueNameClaimTypes)?.Trim();
-
-        return new AuditActor
-        {
-            Kind = AuditActorKind.Account,
-            Id = @this.GetIdentityUniqueId(),
-            Name = string.IsNullOrEmpty(name) ? (string.IsNullOrEmpty(userName) ? null : userName) : name,
-        };
-#endif
+        return AuditActor.Account(
+            @this.GetIdentityUniqueId(),
+            string.IsNullOrEmpty(name) ? (string.IsNullOrEmpty(userName) ? null : userName) : name);
     }
 
     // Who the caller is for key/value secrets, and whether it may receive secret values: a user needs
@@ -149,7 +138,7 @@ public static class HttpRequestDataExtensions
         string organization,
         string project)
     {
-        var author = @this.GetAuthor();
+        var actor = @this.GetAuditActor();
         var correlationId = @this.FunctionContext.InvocationId;
         var hasSecretScope = @this.TryCheckScope(Scopes.Configuration.Secrets);
 
@@ -161,7 +150,7 @@ public static class HttpRequestDataExtensions
             var policy = await policies.GetAsync(organization, project);
             var withheld = hasSecretScope && policy.RequireMtlsForSecretDelivery && channel != KeyValueChannel.MachineMtls;
             var allowed = hasSecretScope && !withheld;
-            var machine = new KeyValueCaller(author, allowed, allowed, channel) { CorrelationId = correlationId };
+            var machine = new KeyValueCaller(actor, allowed, allowed, channel) { CorrelationId = correlationId };
             return new SecretRights(machine, withheld);
         }
 
@@ -174,7 +163,7 @@ public static class HttpRequestDataExtensions
             canUseSecrets = accessRole >= AccountRole.ContributorWithSecrets;
         }
 
-        var user = new KeyValueCaller(author, canUseSecrets, canUseSecrets, KeyValueChannel.User) { CorrelationId = correlationId };
+        var user = new KeyValueCaller(actor, canUseSecrets, canUseSecrets, KeyValueChannel.User) { CorrelationId = correlationId };
         return new SecretRights(user, IsWithheldByMtls: false);
     }
 

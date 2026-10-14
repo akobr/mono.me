@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -14,12 +13,11 @@ public record class ConfigurationSummary
 
     public required ulong Version { get; init; }
 
-    public string? Author { get; init; }
+    // The write that produced the current version.
+    public AuditStamp? Modified { get; init; }
 
     // Hash of the calculated (effective) document; null until it is calculated.
     public string? Hash { get; init; }
-
-    public DateTimeOffset? UpdatedAt { get; init; }
 
     // The annotation's own stored document is a non-empty object.
     public bool HasContent { get; init; }
@@ -55,9 +53,7 @@ public record class ConfigurationSchemaSummary
 
     public required ulong Version { get; init; }
 
-    public string? Author { get; init; }
-
-    public DateTimeOffset? UpdatedAt { get; init; }
+    public AuditStamp? Modified { get; init; }
 }
 
 // A template of a view without its content, for listings.
@@ -68,7 +64,5 @@ public record class ConfigurationTemplateSummary
 
     public required ulong Version { get; init; }
 
-    public string? Author { get; init; }
-
-    public DateTimeOffset? UpdatedAt { get; init; }
+    public AuditStamp? Modified { get; init; }
 }
