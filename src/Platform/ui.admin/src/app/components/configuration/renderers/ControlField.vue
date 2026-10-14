@@ -85,7 +85,7 @@ const canReset = computed(() => hasOwn.value && inherited.value !== undefined)
           variant="ghost"
           @click="form?.reset(pointer)"
         />
-        <UTooltip v-if="!readonly && !binding" text="Use a binding expression (@…)">
+        <UTooltip v-if="!readonly && !binding" text="Use a binding expression (@…): a function, a source, text or math">
           <UButton
             label="fx"
             size="xs"

@@ -10,11 +10,13 @@ import type {
   AccessPointCreate,
   AccountCreate,
   AccountRole,
+  BindingCatalog,
   View,
   ViewCreate,
   ViewUpdate,
 } from '@42for.net/2splatform.sdk'
 import { roleRank } from '@42for.net/2splatform.sdk'
+import { fallbackFunctions } from '@/utils/binding-language'
 import { loadDb, saveDb, type MockDb } from './db'
 
 // Hand-written handlers for the operations the mock scenarios need to be coherent (accounts, access points,
@@ -206,5 +208,30 @@ export const viewHandlers: HttpHandler[] = [
       db.views[key] = [...viewsOf(db, key).filter((other) => other.Name !== params.view), view]
       return HttpResponse.json(view)
     }),
+  ),
+]
+
+// The catalog of a deployment with one Azure Key Vault, as GetBindingCatalog describes it (424-10).
+export const mockBindingCatalog: BindingCatalog = {
+  Functions: [...fallbackFunctions],
+  Sources: [
+    {
+      Name: 'primaryVault',
+      Summary:
+        'A secret of the Azure Key Vault registered as `primaryVault`. The path becomes the secret name joined by `--`. Resolved only for callers that may read secrets.',
+      IsDefault: false,
+      IsSecret: true,
+      Examples: [{ Expression: '@(db.password, primaryVault)', Description: 'The secret `db--password`.' }],
+    },
+  ],
+}
+
+export const bindingHandlers: HttpHandler[] = [
+  http.get(
+    `${api}/:org/:project/bindings`,
+    withDb(
+      (db, { params }) =>
+        requireRole(db, `${params.org}.${params.project}`, 'Reader') ?? HttpResponse.json(mockBindingCatalog),
+    ),
   ),
 ]

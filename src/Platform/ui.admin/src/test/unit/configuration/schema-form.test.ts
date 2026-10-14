@@ -185,6 +185,37 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
     view.host.unmount()
   })
 
+  it('explains a binding value and points at a likely mistake (424-10)', async () => {
+    const { view } = mountForm({
+      modelValue: { retries: 1, title: '@config("/name")', homepage: '@sbt.northwind/baseUrl' },
+    })
+    await settle(6)
+
+    const title = field(view, '/title').find('[data-binding-explanation]')
+    expect(title.text().replace(/\s+/g, ' ')).toContain(
+      'Function config: Reads a value of the configuration being resolved',
+    )
+    expect(title.find('[role="status"]').exists()).toBe(false)
+
+    const homepage = field(view, '/homepage').find('[data-binding-explanation] [role="status"]')
+    expect(homepage.text()).toContain('/ cannot follow sbt.northwind')
+    view.host.unmount()
+  })
+
+  it('replaces a binding with an example of the binding reference (424-10)', async () => {
+    const { view, updates } = mountForm({ modelValue: { retries: '@rst.invoicing/retries' } })
+    await settle(6)
+
+    await field(view, '/retries').get('button[aria-label="Binding reference"]').trigger('click')
+    await settle()
+    const config = document.body.querySelector('[data-binding="function-config"]')!
+    ;[...config.querySelectorAll('button')].find((button) => button.textContent === 'Use')!.click()
+    await settle()
+
+    expect(updates.at(-1)).toEqual({ retries: '@config("/maxPrice")' })
+    view.host.unmount()
+  })
+
   describe('dates (424-23)', () => {
     afterEach(() => applyDateFormat(defaultDateFormat))
 

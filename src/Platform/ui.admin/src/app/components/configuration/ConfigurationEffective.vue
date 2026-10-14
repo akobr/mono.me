@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { usePreferencesStore, type DocumentFormat } from '@/stores/preferences'
 import { bindingDecorations } from '@/components/editor/setup/bindings'
+import { provideBindingAssist, useBindingAssist } from '@/composables/useBindingAssist'
 
 /** The Effective tab: the merged document (ancestors, template, own), read-only (spec section 11.2). */
 const props = defineProps<{ annotationKey: string }>()
@@ -9,7 +10,10 @@ const props = defineProps<{ annotationKey: string }>()
 const preferences = usePreferencesStore()
 const { effective, missing } = useConfiguration(() => props.annotationKey)
 const format = ref<DocumentFormat>(preferences.state.editorFormat)
-const extensions = [bindingDecorations()]
+// Read-only: hovering a binding explains it; the reference lists the functions and sources.
+const assist = useBindingAssist({ annotationKey: () => props.annotationKey })
+provideBindingAssist(assist)
+const extensions = [bindingDecorations(assist)]
 </script>
 
 <template>
@@ -36,6 +40,7 @@ const extensions = [bindingDecorations()]
         @update:format="(value) => (format = value)"
       >
         <template #actions>
+          <BindingReference />
           <span
             v-if="effective.data.value?.Hash"
             class="font-mono text-xs text-dimmed"

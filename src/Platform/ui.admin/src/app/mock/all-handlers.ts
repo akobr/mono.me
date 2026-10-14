@@ -2,8 +2,8 @@ import type { HttpHandler } from 'msw'
 import { accessManagementHandlers } from './access-handlers'
 import { annotationHandlers } from './annotation-handlers'
 import { configurationHandlers } from './configuration-handlers'
-import { accessHandlers, viewHandlers } from './handlers'
 import { keyValueHandlers } from './key-value-handlers'
+import { accessHandlers, bindingHandlers, viewHandlers } from './handlers'
 import { templateSchemaHandlers } from './template-schema-handlers'
 
 /** Every hand-written mock handler, in matching order (before the generated Faker handlers). */
@@ -11,6 +11,7 @@ export const mockHandlers: HttpHandler[] = [
   ...accessHandlers,
   ...accessManagementHandlers,
   ...viewHandlers,
+  ...bindingHandlers,
   ...annotationHandlers,
   // The definition route (configuration-schema/{key}/definition) must win over configuration-schema/{key}/…
   ...configurationHandlers,

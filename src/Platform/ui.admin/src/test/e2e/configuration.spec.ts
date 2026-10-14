@@ -38,6 +38,49 @@ test('Lineage opens the configuration of an ancestor and keeps the filter', asyn
   await expect(page.getByRole('button', { name: 'Lineage' })).toBeDisabled()
 })
 
+test('the JSON editor completes a binding and explains it on hover', async ({ page }) => {
+  await openFromTemplate(page)
+  await page.getByRole('radio', { name: 'JSON' }).click()
+  await expect(page.locator('.cm-content').first()).toContainText('"retries"')
+
+  await replaceEditorText(page, '{\n  "endpoint": "')
+  await page.keyboard.type('@con')
+  const completion = page.locator('.cm-tooltip-autocomplete')
+  // Clicked, not Enter: a key right after the list opens is ignored (interactionDelay).
+  await completion.getByRole('option', { name: /^config/ }).click()
+
+  // The argument lists the paths of the configuration.
+  await completion.getByRole('option', { name: '/retries' }).click()
+  await page.keyboard.press('End')
+  await page.keyboard.insertText('"\n}')
+  await expect(page.locator('.cm-content').first()).toContainText('"endpoint": "@config(\\"/retries\\")"')
+
+  // The hover opens after the pointer rests on the binding; under load a single move can be missed, so move again.
+  const hover = page.locator('.cm-tooltip-hover')
+  await expect(async () => {
+    await page.mouse.move(0, 0)
+    await page.locator('.cm-binding').first().hover()
+    await expect(hover).toContainText('Function config', { timeout: 2_000 })
+  }).toPass()
+  await expect(hover).toContainText('Reads a value of the configuration being resolved')
+})
+
+test('the fx reference of a form field lists the sources of the server and fills the value', async ({ page }) => {
+  await openFromTemplate(page)
+  const endpoint = page.locator('[data-path="/endpoint"]')
+  await endpoint.getByRole('button', { name: 'fx' }).click()
+
+  await endpoint.getByRole('button', { name: 'Binding reference' }).click()
+  const reference = page.getByRole('region', { name: 'Binding reference' })
+  await expect(reference.locator('[data-binding="source-primaryVault"]')).toContainText('secret')
+  await reference.locator('[data-binding="function-config"]').getByRole('button', { name: 'Use' }).first().click()
+
+  await expect(endpoint.getByRole('textbox')).toHaveValue('@config("/maxPrice")')
+  await expect(endpoint.locator('[data-binding-explanation]')).toContainText(
+    'Function config: Reads a value of the configuration being resolved',
+  )
+})
+
 test('a schema violation is reported and can be saved anyway', async ({ page }) => {
   await openFromTemplate(page)
   await editJson(page, (content) => (content.retries = 42))

@@ -24,6 +24,7 @@ import { cloneJson } from '@/utils/clone'
 import { errorMessage } from '@/utils/errors'
 import { buildPatch, changeCount } from '@/utils/json-patch'
 import { bindingDecorations } from '@/components/editor/setup/bindings'
+import { provideBindingAssist, useBindingAssist } from '@/composables/useBindingAssist'
 import type { VersionSource } from '@/components/versions/version-source'
 
 /**
@@ -71,6 +72,11 @@ watch(
   },
   { immediate: true },
 )
+
+// A template has no annotation: completion offers the paths of the template and the types of its ancestors.
+const assist = useBindingAssist({ annotationType: () => props.type, documents: () => [draft.value] })
+provideBindingAssist(assist)
+const extensions = [bindingDecorations(assist)]
 
 const dirty = computed(() => JSON.stringify(draft.value ?? null) !== JSON.stringify(original.value ?? null))
 const patch = computed(() => (dirty.value && !missing.value ? buildPatch(original.value, draft.value) : []))
@@ -215,7 +221,7 @@ defineShortcuts({
             :model-value="draft ?? {}"
             :format="format"
             :readonly="!canEdit"
-            :extensions="[bindingDecorations()]"
+            :extensions="extensions"
             aria-label="Template"
             @update:model-value="(value) => (draft = value)"
             @update:format="(value) => (format = value)"
@@ -223,6 +229,7 @@ defineShortcuts({
             @save="canEdit && dirty && save()"
           >
             <template #actions>
+              <BindingReference />
               <UBadge
                 v-if="template.data.value?.Version"
                 :label="`v${template.data.value.Version}`"
