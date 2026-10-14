@@ -143,6 +143,15 @@ Saving sends only your changes. Two situations stop a save:
 
 **Versions** lists the history of a configuration, a template or a schema. Any two versions can be compared side by side, or in one column on small screens. **Compare views** shows the same key in two views. When the project has only one other view, it is already selected.
 
+### Export and import
+
+The **Configurations** page exports and imports every configuration of the view at once.
+
+- **Export** builds a zip on the server. Choose **Folder** (each current document as `<key>.json`, earlier versions as `<key>.<version>.json`, and `export.json`) or **Git repository** (the current documents checked out, every version a commit by its author). The browser downloads the zip when it is ready, named with the date and the time in UTC. You can close the dialog in the meantime, even leave the page; the download still starts.
+- **Import** (Contributor or a higher role) takes a zip of `<key>.json` files, for example an edited export or a zipped clone of the repository. Each file replaces the annotation's own document as a new version, unless it is equal. Files for missing or deleted annotations are skipped, and documents that break their schema fail unless you choose to store them anyway. **Only check, write nothing** shows the outcome of every file first; **Import now** then imports the same file. The dialog lists every file that was not unchanged, with a link to the configurations that changed.
+
+Only your own documents travel: templates, schemas and resolved secrets stay out.
+
 **Templates** hold the defaults per annotation type. **Schemas** define the form and the validation, for a type, for an annotation, or for the descendants of an annotation. A schema shows a form preview, and before you save a change it lists the configurations that the change would break.
 
 ## Graph

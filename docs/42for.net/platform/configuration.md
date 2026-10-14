@@ -168,6 +168,15 @@ The customer keeps `currency` in the subject's `values`. The execution refers to
 
 The functions and sources depend on the deployment: each Azure Key Vault is a source under its own name. The administration UI lists the ones the server registered, with examples, and completes them as you type.
 
+## Export and import
+
+The own documents of a view can leave the platform as one zip and come back the same way, from the Administration UI or with `sform story config export` and `sform story config import`.
+
+- As a **folder**, each current document is `<annotation-key>.json` and each earlier version `<annotation-key>.<version>.json`.
+- As a **git repository**, every version is a commit by its author at its time, in the order the versions were written. `git log`, `git blame` and `git diff` then work on the history of a whole view.
+
+An import writes each changed document as a new version and leaves equal ones alone, so importing an export changes nothing, and editing a clone of the repository and importing it is a review-friendly way to change many documents. Templates, schemas and secrets are not part of an archive.
+
 ## What you gain
 
 - **A place for every difference.** Customer, environment, version, and one-off each have a document. Shared behavior is written once.

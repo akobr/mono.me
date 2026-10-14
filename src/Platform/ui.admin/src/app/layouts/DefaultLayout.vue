@@ -42,5 +42,6 @@ const session = useSessionStore()
     <slot v-else />
 
     <CommandPalette />
+    <TransferToaster />
   </UDashboardGroup>
 </template>

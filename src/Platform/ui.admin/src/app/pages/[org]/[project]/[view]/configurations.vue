@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, useTemplateRef, watch } from 'vue'
+import { computed, h, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
@@ -68,6 +68,11 @@ useScrollMemory(
   () => rows.value.length > 0,
 )
 
+// Export for every role, import for Contributors (spec 4.1).
+const canEdit = useCan('edit')
+const exportOpen = ref(false)
+const importOpen = ref(false)
+
 const selectedKey = computed(() => (route.params as { key?: string }).key)
 const base = computed(() => `/${context.org}/${context.project}/${context.view}/configurations`)
 
@@ -114,7 +119,30 @@ const rowClass = (row: { original: Row }) =>
     :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }"
   >
     <template #header>
-      <AppNavbar title="Configurations" />
+      <AppNavbar title="Configurations">
+        <template #right>
+          <UTooltip text="Export the configurations of the view">
+            <UButton
+              icon="i-lucide-download"
+              color="neutral"
+              variant="ghost"
+              :label="desktop ? 'Export' : undefined"
+              aria-label="Export configurations"
+              @click="exportOpen = true"
+            />
+          </UTooltip>
+          <UTooltip v-if="canEdit" text="Import configuration documents into the view">
+            <UButton
+              icon="i-lucide-upload"
+              color="neutral"
+              variant="ghost"
+              :label="desktop ? 'Import' : undefined"
+              aria-label="Import configurations"
+              @click="importOpen = true"
+            />
+          </UTooltip>
+        </template>
+      </AppNavbar>
       <UDashboardToolbar class="py-2">
         <AnnotationFilterBar
           :query="filter.query.value"
@@ -169,6 +197,9 @@ const rowClass = (row: { original: Row }) =>
       </ul>
     </template>
   </UDashboardPanel>
+
+  <ConfigurationExportDialog v-if="context.scope" v-model:open="exportOpen" :scope="context.scope" />
+  <ConfigurationImportDialog v-if="context.scope && canEdit" v-model:open="importOpen" :scope="context.scope" />
 
   <RouterView />
 </template>
