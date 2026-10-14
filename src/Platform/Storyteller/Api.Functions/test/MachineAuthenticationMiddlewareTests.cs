@@ -177,16 +177,18 @@ public class MachineAuthenticationMiddlewareTests
     }
 
     [Fact]
-    public async Task SharedCertificate_WithTheKeyOfAMachineOfUnknownKind_FollowsCertificateAndApiKey()
+    public async Task SharedCertificate_WithTheKeyOfAMachineOfUnknownKind_IsUnauthorized()
     {
+        // The machine may be an ApiKey one: the shared certificate must not make it pass as CertificateAndApiKey.
         _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, MachineAccessScope.DefaultRead);
         _certificateValidator.Result = SharedCertificateResult();
+        _policyStore.Policy = Enable(MachineCredentialKind.ApiKey, MachineCredentialKind.CertificateAndApiKey);
 
-        _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
-        (await InvokeAsync(sendApiKey: true, sendCertificate: true)).Called.ShouldBeTrue();
+        var (called, context) = await InvokeAsync(sendApiKey: true, sendCertificate: true);
 
-        _policyStore.Policy = Enable(MachineCredentialKind.ApiKey);
-        (await InvokeAsync(sendApiKey: true, sendCertificate: true)).Called.ShouldBeFalse();
+        called.ShouldBeFalse();
+        _middleware.Response!.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        context.Items.ContainsKey(FunctionContextItemKeys.PresentingCertificateThumbprint).ShouldBeFalse();
     }
 
     private static ClientCertificateValidationResult SharedCertificateResult()
