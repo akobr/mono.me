@@ -36,7 +36,7 @@ const style = computed(() => {
     role="tooltip"
   >
     <div class="flex items-center gap-2">
-      <AnnotationTypeBadge :type="annotationKey.slice(0, 3)" />
+      <AnnotationTypeBadge :type="annotationKey.slice(0, 3)" variant="label" />
       <span class="truncate font-semibold text-highlighted">{{
         annotation?.Name ?? annotationKey.split('.').at(-1)
       }}</span>

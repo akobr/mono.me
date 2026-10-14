@@ -2,7 +2,10 @@
 import { computed } from 'vue'
 import { metaOf } from '@/utils/annotation-key'
 
-/** Type chip: icon and code in the type color (color is never the only signal). */
+/**
+ * Type chip: icon and code in the type color (color is never the only signal). `label` shows the name instead of the
+ * code and `icon` only the icon; the code itself is shown only on Schemas (424-34).
+ */
 const props = withDefaults(defineProps<{ type?: string | null; variant?: 'chip' | 'icon' | 'label' }>(), {
   type: undefined,
   variant: 'chip',

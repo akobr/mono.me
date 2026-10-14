@@ -305,7 +305,7 @@ const selectedRows = computed(() => rows.value.filter((row) => selected.value.ha
               </td>
               <td class="px-3 py-2">
                 <span class="flex min-w-0 items-center gap-2">
-                  <AnnotationTypeBadge :type="annotation.AnnotationKey.slice(0, 3)" />
+                  <AnnotationTypeBadge :type="annotation.AnnotationKey.slice(0, 3)" variant="label" />
                   <button
                     type="button"
                     class="min-w-0 text-start hover:underline"
