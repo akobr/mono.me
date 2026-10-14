@@ -43,6 +43,9 @@ public record class MachineCertificateEntity
 
     public DateTimeOffset? LastRenewalAt { get; init; }
 
+    // The kind of the machine. Null on records stored before it was kept here.
+    public MachineCredentialKind? CredentialKind { get; init; }
+
     public static string GetId(string thumbprint) => $"{IdPrefix}{thumbprint.ToUpperInvariant()}";
 
     public CertificateRecord ToRecord() => new(
@@ -56,7 +59,8 @@ public record class MachineCertificateEntity
         IsRevoked,
         Scope,
         AnnotationKey,
-        LastRenewalAt);
+        LastRenewalAt,
+        CredentialKind);
 
     public static MachineCertificateEntity FromRecord(string partitionKey, CertificateRecord record, DateTimeOffset now) => new()
     {
@@ -74,5 +78,6 @@ public record class MachineCertificateEntity
         Scope = record.Scope,
         AnnotationKey = record.AnnotationKey,
         LastRenewalAt = record.LastRenewalAt,
+        CredentialKind = record.CredentialKind,
     };
 }

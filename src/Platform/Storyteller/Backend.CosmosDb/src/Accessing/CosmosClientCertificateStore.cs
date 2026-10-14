@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Entities.Access;
@@ -13,7 +14,8 @@ namespace _42.Platform.Storyteller;
 
 // Machine certificates in Cosmos, so a certificate issued on one instance authenticates on every other one and
 // survives a restart. Hits are cached for 5 minutes, misses for 30 seconds; a revocation is seen by other
-// instances within the hit time.
+// instances within the hit time. A record stored before the machine kind was kept on it takes the kind from the
+// machine access document, so a certificate never authenticates under a kind its machine doesn't have.
 public class CosmosClientCertificateStore : IClientCertificateStore
 {
     private static readonly TimeSpan HitExpiration = TimeSpan.FromMinutes(5);
@@ -21,17 +23,20 @@ public class CosmosClientCertificateStore : IClientCertificateStore
 
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerSettings _serializerOptions;
+    private readonly JsonSerializerOptions _entityOptions;
     private readonly IMemoryCache _cache;
     private readonly TimeProvider _timeProvider;
 
     public CosmosClientCertificateStore(
         IContainerRepositoryProvider repositoryProvider,
         IOptions<JsonSerializerSettings> serializerOptions,
+        IOptions<JsonSerializerOptions> entityOptions,
         IMemoryCache cache,
         TimeProvider? timeProvider = null)
     {
         _repositoryProvider = repositoryProvider;
         _serializerOptions = serializerOptions.Value;
+        _entityOptions = entityOptions.Value;
         _cache = cache;
         _timeProvider = timeProvider ?? TimeProvider.System;
     }
@@ -67,7 +72,7 @@ public class CosmosClientCertificateStore : IClientCertificateStore
             newest = (await iterator.ReadNextAsync()).FirstOrDefault();
         }
 
-        var record = newest?.ToRecord();
+        var record = await ToRecordAsync(organization, project, newest);
         _cache.Set(cacheKey, new CachedRecord(record), record is null ? MissExpiration : HitExpiration);
         return record;
     }
@@ -87,7 +92,7 @@ public class CosmosClientCertificateStore : IClientCertificateStore
             new PartitionKey(GetPartitionKey(project)),
             stream => stream.DeserializeNewtonsoft<MachineCertificateEntity>(_serializerOptions));
 
-        var record = entity?.ToRecord();
+        var record = await ToRecordAsync(organization, project, entity);
         _cache.Set(cacheKey, new CachedRecord(record), record is null ? MissExpiration : HitExpiration);
         return record;
     }
@@ -128,6 +133,24 @@ public class CosmosClientCertificateStore : IClientCertificateStore
         {
             Evict(organization, project, machineAccessId, entity.Thumbprint);
         }
+    }
+
+    private async Task<CertificateRecord?> ToRecordAsync(string organization, string project, MachineCertificateEntity? entity)
+    {
+        var record = entity?.ToRecord();
+
+        if (record is null || record.CredentialKind is not null)
+        {
+            return record;
+        }
+
+        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var machine = await container.TryReadItemAsync(
+            record.MachineAccessId,
+            new PartitionKey(GetPartitionKey(project)),
+            stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_entityOptions));
+
+        return record with { CredentialKind = machine?.CredentialKind };
     }
 
     private void Evict(string organization, string project, string machineAccessId, string thumbprint)
