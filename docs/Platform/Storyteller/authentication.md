@@ -217,6 +217,14 @@ PUT v1/access/points/acme.billing/machine-authentication
 { "EnabledCredentialKinds": [ "ApiKey", "Certificate" ], "CredentialKind": "Certificate", "CertificateLifetimeDays": 90 }
 ```
 
+The same with `sform`, which sets the whole policy (`-k` is required, the first `-k` is the default unless `-d` names another, and without `-l` the project follows the deployment default):
+
+```
+sform machine machine-auth -k api-key -k certificate -d certificate -l 90
+sform machine machine-auth                 # prints the policy
+sform machine create -k api-key            # without -k: the project default
+```
+
 **Creating a machine.** `MachineAccessCreate.CredentialKind` picks the kind; without it the project default is used. A kind the project does not enable fails with `400`. A machine with a certificate gets `MachineAccessCreate.CertificateLifetimeDays`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. The machine keeps its kind and its lifetime: reset and delete follow the kind, and a certificate renewal issues the new certificate with the same lifetime. Machines created before the lifetime was stored renew with `MachineAuth:CertificateLifetimeDays`.
 
 **Every machine call** is accepted only when the machine presents what its own kind requires, and the project still enables that kind. A `CertificateAndApiKey` machine that sends only its API key is rejected, even if the project also enables `ApiKey`. Disabling a kind stops every machine of that kind at once (up to the 60-second cache of the policy); enable it again and they work again. To move a machine to another kind, create a new machine and delete the old one.
