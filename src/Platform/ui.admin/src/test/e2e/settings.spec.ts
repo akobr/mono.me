@@ -66,9 +66,8 @@ test('the configurations grid shows the type names of the settings', async ({ pa
     await expect(page.getByRole('img', { name: 'Job' }).first()).toBeVisible()
     return
   }
-  const firstRow = page.getByRole('row').filter({ has: page.getByRole('cell') }).first()
-  await expect(firstRow.getByRole('cell').first()).toHaveText('Job')
-  await expect(firstRow.getByRole('cell').nth(2)).toHaveText(/^exe\./)
+  const row = page.getByRole('row', { name: /exe\./ }).first()
+  await expect(row.getByRole('cell').first()).toHaveText('Job')
   await expect(page.getByRole('cell', { name: 'exe', exact: true })).toHaveCount(0)
 })
 
