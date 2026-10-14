@@ -13,6 +13,7 @@ declare module 'vue' {
   export interface GlobalComponents {
     AnnotationBreadcrumb: typeof import('./components/annotations/AnnotationBreadcrumb.vue')['default']
     AnnotationBulkBar: typeof import('./components/annotations/AnnotationBulkBar.vue')['default']
+    AnnotationBulkCreateDialog: typeof import('./components/annotations/AnnotationBulkCreateDialog.vue')['default']
     AnnotationCreateDialog: typeof import('./components/annotations/AnnotationCreateDialog.vue')['default']
     AnnotationDetail: typeof import('./components/annotations/AnnotationDetail.vue')['default']
     AnnotationDetailPanel: typeof import('./components/annotations/AnnotationDetailPanel.vue')['default']

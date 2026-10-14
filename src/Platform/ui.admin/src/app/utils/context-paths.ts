@@ -15,6 +15,9 @@ export type CurrentSection =
   | { kind: 'org'; name?: string }
   | { kind: 'none' }
 
+/** Whether two scopes are the same view of the same project. */
+export const sameView = (a: Scope, b: Scope) => a.org === b.org && a.project === b.project && a.view === b.view
+
 const isViewSection = (value: string | undefined): value is ViewSection =>
   (viewSections as readonly string[]).includes(value ?? '')
 const isProjectSection = (value: string | undefined): value is ProjectSection =>

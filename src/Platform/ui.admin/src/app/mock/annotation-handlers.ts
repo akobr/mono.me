@@ -10,6 +10,7 @@ import type {
 import {
   codeOfKey,
   getAllAncestors,
+  getAnnotationTypeInfo,
   getDirectAncestors,
   isValidAnnotationKey,
   parseAnnotationKey,
@@ -31,6 +32,7 @@ import {
 import { annotationsOf, overridesOf, type AnnotationOverrides, type MockDb } from './db'
 import { deleteDocument } from './documents'
 import { errorResponse, requireRole, withDb } from './handlers'
+import { keyOfSimpleLine } from './simple-lines'
 
 const api = '*/api/v1/:org/:project/:view'
 const pageSize = 1000
@@ -104,6 +106,13 @@ const typeNames: Record<AnnotationTypeCode, Annotation['AnnotationType']> = {
 /** The longest path to a root of the graph (AnnotationKeyExtensions.GetDepth). */
 const depths: Record<AnnotationTypeCode, number> = { rst: 0, sbt: 0, unt: 1, usg: 1, cnt: 1, exe: 2, uxe: 3 }
 const depthOf = (key: string) => depths[codeOfKey(key) ?? 'rst']
+
+/** The AnnotationType enum value (rst, unt, sbt, usg, cnt, exe, uxe): the order CreateAnnotationsAsync writes in. */
+const mergeOrderOf = (key: string) => getAnnotationTypeInfo(key.slice(0, key.indexOf('.')))?.mergeOrder ?? 0
+
+/** The order of GetAllAncestorKeys: by depth, then type, then an ordinal comparison of the key (roots first). */
+const byDepthTypeKey = (a: string, b: string) =>
+  depthOf(a) - depthOf(b) || mergeOrderOf(a) - mergeOrderOf(b) || (a < b ? -1 : a > b ? 1 : 0)
 
 const isDescendant = (candidate: string, key: string) => candidate !== key && getAllAncestors(candidate).includes(key)
 
@@ -521,6 +530,62 @@ export const annotationHandlers: HttpHandler[] = [
       const created = body
         .filter((annotation) => !existing.has(annotation.AnnotationKey))
         .map((annotation) => store(db, params, annotation))
+      return HttpResponse.json(created)
+    }),
+  ),
+
+  // SetAnnotationsSimple, like CreateAnnotationsFromStringAsync: each entry is read into a key (keyOfSimpleLine),
+  // the keys are created in type order with their missing ancestors, and existing or repeated keys are skipped.
+  // The response lists, per key, the ancestors created for it (roots first) and then the key. The literal segment
+  // "simple" wins over {key}, like the API's route table.
+  http.post<ScopeParams>(
+    `${api}/annotations/simple`,
+    withDb(async (db, { params, request }) => {
+      const denied = requireRole(db, projectKey(params), 'Contributor')
+      if (denied) {
+        return denied
+      }
+
+      const body: unknown = await request.json().catch(() => null)
+      if (!Array.isArray(body)) {
+        // the server dereferences the null list
+        return errorResponse(500, 'Object reference not set to an instance of an object.')
+      }
+      if (body.length > maxKeys) {
+        return errorResponse(400, `The number of annotations to create is too large, maximum allowed is ${maxKeys}.`)
+      }
+
+      const keys = body
+        .map((entry) => (typeof entry === 'string' ? keyOfSimpleLine(entry) : undefined))
+        .filter((key): key is string => !!key)
+        .toSorted((a, b) => mergeOrderOf(a) - mergeOrderOf(b))
+      const created: Annotation[] = []
+      const handled = new Set<string>()
+
+      for (const key of keys) {
+        // annotationsOf is rebuilt after every write, so an ancestor created for an earlier key counts as active
+        const active = annotationsOf(db, params.org, params.project, params.view)
+        if (handled.has(key) || active.has(key)) {
+          continue
+        }
+
+        const missing = getAllAncestors(key).filter((ancestor) => !active.has(ancestor))
+        // only what the key gives; store() adds the relations
+        const parsed = parseAnnotationKey(key)!
+        const stored = store(db, params, {
+          ProjectName: params.project,
+          ViewName: params.view,
+          AnnotationKey: key,
+          Name: parsed.name,
+          AnnotationType: typeNames[parsed.code],
+        })
+        const after = annotationsOf(db, params.org, params.project, params.view)
+        created.push(...missing.toSorted(byDepthTypeKey).map((ancestor) => after.get(ancestor)!), stored)
+        for (const written of [...missing, key]) {
+          handled.add(written)
+        }
+      }
+
       return HttpResponse.json(created)
     }),
   ),
