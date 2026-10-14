@@ -19,7 +19,7 @@ async function mountBrand(collapsed: boolean) {
   return view
 }
 
-// The navigation bar and the bare pages show the 42 logo, not the "2S" placeholder in public/favicon.svg (424-32).
+// The navigation bar and the bare pages show the 42 logo instead of the former "2S" placeholder (424-32).
 describe('brand', () => {
   it('shows the 42 logo and the name in the navigation bar', async () => {
     const view = await mountBrand(false)
