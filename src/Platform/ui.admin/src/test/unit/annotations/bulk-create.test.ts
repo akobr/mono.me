@@ -306,10 +306,10 @@ describe('AnnotationBulkCreateDialog', () => {
     expect(dialog().querySelector('p[aria-live="polite"]')).toBe(live)
     expect(textOf(live)).toBe('2 new · 1 already exists · 1 duplicate · 4 missing ancestors')
     expect(rows('Review')).toEqual([
-      ['1', 'usg usg.northwind.billing northwind.billing', 'New'],
-      ['2', 'exe exe.cyberdyne.invoicing.prod EXE.cyberdyne.invoicing.prod', 'New'],
-      ['4', 'rst rst.invoicing', 'Exists'],
-      ['5', 'usg usg.northwind.billing', 'Duplicate'],
+      ['1', 'Usage usg.northwind.billing northwind.billing', 'New'],
+      ['2', 'Execution exe.cyberdyne.invoicing.prod EXE.cyberdyne.invoicing.prod', 'New'],
+      ['4', 'Responsibility rst.invoicing', 'Exists'],
+      ['5', 'Usage usg.northwind.billing', 'Duplicate'],
     ])
     expect(text()).not.toContain('The catalog is still loading')
     expect(button('Create 2 annotations')!.disabled).toBe(false)
@@ -333,7 +333,7 @@ describe('AnnotationBulkCreateDialog', () => {
     expect(document.activeElement).toBe(textarea())
     await new Promise((resolve) => setTimeout(resolve, 200))
     await settle()
-    expect(rows('Review')).toEqual([['1', 'usg usg.northwind.billing northwind.billing', 'New']])
+    expect(rows('Review')).toEqual([['1', 'Usage usg.northwind.billing northwind.billing', 'New']])
     expect(button('Create 1 annotation')!.disabled).toBe(false)
   })
 
@@ -347,12 +347,12 @@ describe('AnnotationBulkCreateDialog', () => {
     expect(text()).toContain('Created 6 annotations: 2 from the list and 4 missing ancestors.')
     expect(text()).toContain('1 key already existed and was skipped.')
     expect(rows('Created annotations')).toEqual([
-      ['rst rst.billing', 'Missing ancestor'],
-      ['usg usg.northwind.billing', 'From the list'],
-      ['sbt sbt.cyberdyne', 'Missing ancestor'],
-      ['usg usg.cyberdyne.invoicing', 'Missing ancestor'],
-      ['cnt cnt.cyberdyne.prod', 'Missing ancestor'],
-      ['exe exe.cyberdyne.invoicing.prod', 'From the list'],
+      ['Responsibility rst.billing', 'Missing ancestor'],
+      ['Usage usg.northwind.billing', 'From the list'],
+      ['Subject sbt.cyberdyne', 'Missing ancestor'],
+      ['Usage usg.cyberdyne.invoicing', 'Missing ancestor'],
+      ['Context cnt.cyberdyne.prod', 'Missing ancestor'],
+      ['Execution exe.cyberdyne.invoicing.prod', 'From the list'],
     ])
     for (const key of ['exe.cyberdyne.invoicing.prod', 'usg.northwind.billing', 'rst.billing', 'cnt.cyberdyne.prod']) {
       expect(active().has(key), key).toBe(true)
@@ -371,7 +371,7 @@ describe('AnnotationBulkCreateDialog', () => {
 
     // the keys exist now
     await type('exe.cyberdyne.invoicing.prod')
-    expect(rows('Review')).toEqual([['1', 'exe exe.cyberdyne.invoicing.prod', 'Exists']])
+    expect(rows('Review')).toEqual([['1', 'Execution exe.cyberdyne.invoicing.prod', 'Exists']])
     expect(button('Create 0 annotations')!.disabled).toBe(true)
 
     await click('Cancel')
@@ -388,10 +388,10 @@ describe('AnnotationBulkCreateDialog', () => {
 
     expect(text()).toContain('Created 4 annotations: 2 from the list and 2 missing ancestors.')
     expect(rows('Created annotations')).toEqual([
-      ['sbt sbt.cyberdyne', 'From the list'],
-      ['usg usg.cyberdyne.invoicing', 'Missing ancestor'],
-      ['cnt cnt.cyberdyne.prod', 'Missing ancestor'],
-      ['exe exe.cyberdyne.invoicing.prod', 'From the list'],
+      ['Subject sbt.cyberdyne', 'From the list'],
+      ['Usage usg.cyberdyne.invoicing', 'Missing ancestor'],
+      ['Context cnt.cyberdyne.prod', 'Missing ancestor'],
+      ['Execution exe.cyberdyne.invoicing.prod', 'From the list'],
     ])
   })
 
@@ -412,7 +412,7 @@ describe('AnnotationBulkCreateDialog', () => {
     await openDialog()
     await type('SBT.legacy')
 
-    expect(rows('Review')).toEqual([['1', 'sbt sbt.legacy SBT.legacy', 'Exists']])
+    expect(rows('Review')).toEqual([['1', 'Subject sbt.legacy SBT.legacy', 'Exists']])
     expect(text()).toContain('1 already exists')
     expect(button('Create 0 annotations')!.disabled).toBe(true)
   })

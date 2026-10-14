@@ -396,7 +396,7 @@ async function run(current: Review, target: Scope) {
                 <tr v-for="annotation in result.created" :key="annotation.AnnotationKey">
                   <td class="px-3 py-1.5">
                     <div class="flex min-w-0 items-center gap-2">
-                      <AnnotationTypeBadge :type="annotation.AnnotationType" />
+                      <AnnotationTypeBadge :type="annotation.AnnotationType" variant="label" />
                       <KeyText :value="annotation.AnnotationKey" :truncate="false" />
                     </div>
                   </td>
@@ -498,7 +498,7 @@ async function run(current: Review, target: Scope) {
                         row.line.text
                       }}</span>
                       <div v-else class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <AnnotationTypeBadge :type="row.line.key.slice(0, 3)" />
+                        <AnnotationTypeBadge :type="row.line.key.slice(0, 3)" variant="label" />
                         <KeyText :value="row.line.key" :truncate="false" />
                         <span v-if="row.line.text !== row.line.key" class="font-mono text-xs break-all text-muted">
                           {{ row.line.text }}
