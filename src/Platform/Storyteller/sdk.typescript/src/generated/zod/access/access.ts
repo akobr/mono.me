@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.8.2631
+ * OpenAPI spec version: 0.9.9.10198
  */
 import * as zod from "zod";
 
@@ -50,8 +50,6 @@ export const CreateAccountResponse = zod.object({
     .optional(),
 });
 
-export const getAccessPointsResponseMachineAuthenticationCredentialKindDefault = `ApiKey`;
-
 export const GetAccessPointsResponseItem = zod.object({
   Key: zod.string().optional(),
   AccessMap: zod
@@ -69,16 +67,25 @@ export const GetAccessPointsResponseItem = zod.object({
     .optional(),
   MachineAuthentication: zod
     .object({
+      EnabledCredentialKinds: zod
+        .array(
+          zod.enum([
+            "ApiKey",
+            "Certificate",
+            "CertificateAndApiKey",
+            "ClientCredentials",
+          ]),
+        )
+        .optional(),
       CredentialKind: zod
-        .enum([
-          "ApiKey",
-          "Certificate",
-          "CertificateAndApiKey",
-          "ClientCredentials",
+        .union([
+          zod.literal("ApiKey"),
+          zod.literal("Certificate"),
+          zod.literal("CertificateAndApiKey"),
+          zod.literal("ClientCredentials"),
+          zod.literal(null),
         ])
-        .default(
-          getAccessPointsResponseMachineAuthenticationCredentialKindDefault,
-        ),
+        .nullish(),
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
@@ -90,8 +97,6 @@ export const CreateAccessPointBody = zod.object({
   Project: zod.string().optional(),
   OwnerId: zod.string().optional(),
 });
-
-export const createAccessPointResponseMachineAuthenticationCredentialKindDefault = `ApiKey`;
 
 export const CreateAccessPointResponse = zod.object({
   Key: zod.string().optional(),
@@ -110,16 +115,25 @@ export const CreateAccessPointResponse = zod.object({
     .optional(),
   MachineAuthentication: zod
     .object({
+      EnabledCredentialKinds: zod
+        .array(
+          zod.enum([
+            "ApiKey",
+            "Certificate",
+            "CertificateAndApiKey",
+            "ClientCredentials",
+          ]),
+        )
+        .optional(),
       CredentialKind: zod
-        .enum([
-          "ApiKey",
-          "Certificate",
-          "CertificateAndApiKey",
-          "ClientCredentials",
+        .union([
+          zod.literal("ApiKey"),
+          zod.literal("Certificate"),
+          zod.literal("CertificateAndApiKey"),
+          zod.literal("ClientCredentials"),
+          zod.literal(null),
         ])
-        .default(
-          createAccessPointResponseMachineAuthenticationCredentialKindDefault,
-        ),
+        .nullish(),
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
@@ -128,8 +142,6 @@ export const CreateAccessPointResponse = zod.object({
 export const GetAccessPointParams = zod.object({
   key: zod.string().describe("The key of requested access point."),
 });
-
-export const getAccessPointResponseMachineAuthenticationCredentialKindDefault = `ApiKey`;
 
 export const GetAccessPointResponse = zod.object({
   Key: zod.string().optional(),
@@ -148,16 +160,25 @@ export const GetAccessPointResponse = zod.object({
     .optional(),
   MachineAuthentication: zod
     .object({
+      EnabledCredentialKinds: zod
+        .array(
+          zod.enum([
+            "ApiKey",
+            "Certificate",
+            "CertificateAndApiKey",
+            "ClientCredentials",
+          ]),
+        )
+        .optional(),
       CredentialKind: zod
-        .enum([
-          "ApiKey",
-          "Certificate",
-          "CertificateAndApiKey",
-          "ClientCredentials",
+        .union([
+          zod.literal("ApiKey"),
+          zod.literal("Certificate"),
+          zod.literal("CertificateAndApiKey"),
+          zod.literal("ClientCredentials"),
+          zod.literal(null),
         ])
-        .default(
-          getAccessPointResponseMachineAuthenticationCredentialKindDefault,
-        ),
+        .nullish(),
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
@@ -184,8 +205,6 @@ export const GrantUserAccessBody = zod.object({
     .default(grantUserAccessBodyRoleDefault),
 });
 
-export const grantUserAccessResponseMachineAuthenticationCredentialKindDefault = `ApiKey`;
-
 export const GrantUserAccessResponse = zod.object({
   Key: zod.string().optional(),
   AccessMap: zod
@@ -203,16 +222,25 @@ export const GrantUserAccessResponse = zod.object({
     .optional(),
   MachineAuthentication: zod
     .object({
+      EnabledCredentialKinds: zod
+        .array(
+          zod.enum([
+            "ApiKey",
+            "Certificate",
+            "CertificateAndApiKey",
+            "ClientCredentials",
+          ]),
+        )
+        .optional(),
       CredentialKind: zod
-        .enum([
-          "ApiKey",
-          "Certificate",
-          "CertificateAndApiKey",
-          "ClientCredentials",
+        .union([
+          zod.literal("ApiKey"),
+          zod.literal("Certificate"),
+          zod.literal("CertificateAndApiKey"),
+          zod.literal("ClientCredentials"),
+          zod.literal(null),
         ])
-        .default(
-          grantUserAccessResponseMachineAuthenticationCredentialKindDefault,
-        ),
+        .nullish(),
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
@@ -239,8 +267,6 @@ export const RevokeUserAccessBody = zod.object({
     .default(revokeUserAccessBodyRoleDefault),
 });
 
-export const revokeUserAccessResponseMachineAuthenticationCredentialKindDefault = `ApiKey`;
-
 export const RevokeUserAccessResponse = zod.object({
   Key: zod.string().optional(),
   AccessMap: zod
@@ -258,16 +284,25 @@ export const RevokeUserAccessResponse = zod.object({
     .optional(),
   MachineAuthentication: zod
     .object({
+      EnabledCredentialKinds: zod
+        .array(
+          zod.enum([
+            "ApiKey",
+            "Certificate",
+            "CertificateAndApiKey",
+            "ClientCredentials",
+          ]),
+        )
+        .optional(),
       CredentialKind: zod
-        .enum([
-          "ApiKey",
-          "Certificate",
-          "CertificateAndApiKey",
-          "ClientCredentials",
+        .union([
+          zod.literal("ApiKey"),
+          zod.literal("Certificate"),
+          zod.literal("CertificateAndApiKey"),
+          zod.literal("ClientCredentials"),
+          zod.literal(null),
         ])
-        .default(
-          revokeUserAccessResponseMachineAuthenticationCredentialKindDefault,
-        ),
+        .nullish(),
       CertificateLifetimeDays: zod.int().nullish(),
     })
     .optional(),
@@ -310,6 +345,8 @@ export const GetMachineAccessesResponseItem = zod.object({
   Certificate: zod.string().optional(),
   CertificatePassword: zod.string().optional(),
   LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),
+  CertificateLifetimeDays: zod.int().nullish(),
+  CertificateNotAfter: zod.iso.datetime({ offset: true }).nullish(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
 });
@@ -340,6 +377,15 @@ export const CreateMachineAccessBody = zod.object({
     ])
     .default(createMachineAccessBodyScopeDefault),
   AnnotationKey: zod.string().optional(),
+  CredentialKind: zod
+    .union([
+      zod.literal("ApiKey"),
+      zod.literal("Certificate"),
+      zod.literal("CertificateAndApiKey"),
+      zod.literal("ClientCredentials"),
+      zod.literal(null),
+    ])
+    .nullish(),
   CertificateLifetimeDays: zod.int().nullish(),
 });
 
@@ -375,6 +421,8 @@ export const CreateMachineAccessResponse = zod.object({
   Certificate: zod.string().optional(),
   CertificatePassword: zod.string().optional(),
   LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),
+  CertificateLifetimeDays: zod.int().nullish(),
+  CertificateNotAfter: zod.iso.datetime({ offset: true }).nullish(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
 });
@@ -417,6 +465,8 @@ export const GetMachineAccessResponse = zod.object({
   Certificate: zod.string().optional(),
   CertificatePassword: zod.string().optional(),
   LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),
+  CertificateLifetimeDays: zod.int().nullish(),
+  CertificateNotAfter: zod.iso.datetime({ offset: true }).nullish(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
 });
@@ -459,6 +509,8 @@ export const ResetMachineAccessResponse = zod.object({
   Certificate: zod.string().optional(),
   CertificatePassword: zod.string().optional(),
   LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),
+  CertificateLifetimeDays: zod.int().nullish(),
+  CertificateNotAfter: zod.iso.datetime({ offset: true }).nullish(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
 });
@@ -473,37 +525,87 @@ export const DeleteMachineAccessResponse = zod.unknown();
 
 export const GetCertificateAuthorityResponse = zod.unknown();
 
+/**
+ * The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
+ */
+export const GetMachineAuthenticationParams = zod.object({
+  key: zod
+    .string()
+    .describe("The key of the access point (organization.project)."),
+});
+
+export const GetMachineAuthenticationResponse = zod.object({
+  EnabledCredentialKinds: zod
+    .array(
+      zod.enum([
+        "ApiKey",
+        "Certificate",
+        "CertificateAndApiKey",
+        "ClientCredentials",
+      ]),
+    )
+    .optional(),
+  CredentialKind: zod
+    .union([
+      zod.literal("ApiKey"),
+      zod.literal("Certificate"),
+      zod.literal("CertificateAndApiKey"),
+      zod.literal("ClientCredentials"),
+      zod.literal(null),
+    ])
+    .nullish(),
+  CertificateLifetimeDays: zod.int().nullish(),
+});
+
 export const SetMachineAuthenticationParams = zod.object({
   key: zod
     .string()
     .describe("The key of the access point (organization.project)."),
 });
 
-export const setMachineAuthenticationBodyCredentialKindDefault = `ApiKey`;
-
 export const SetMachineAuthenticationBody = zod.object({
+  EnabledCredentialKinds: zod
+    .array(
+      zod.enum([
+        "ApiKey",
+        "Certificate",
+        "CertificateAndApiKey",
+        "ClientCredentials",
+      ]),
+    )
+    .optional(),
   CredentialKind: zod
-    .enum([
-      "ApiKey",
-      "Certificate",
-      "CertificateAndApiKey",
-      "ClientCredentials",
+    .union([
+      zod.literal("ApiKey"),
+      zod.literal("Certificate"),
+      zod.literal("CertificateAndApiKey"),
+      zod.literal("ClientCredentials"),
+      zod.literal(null),
     ])
-    .default(setMachineAuthenticationBodyCredentialKindDefault),
+    .nullish(),
   CertificateLifetimeDays: zod.int().nullish(),
 });
 
-export const setMachineAuthenticationResponseCredentialKindDefault = `ApiKey`;
-
 export const SetMachineAuthenticationResponse = zod.object({
+  EnabledCredentialKinds: zod
+    .array(
+      zod.enum([
+        "ApiKey",
+        "Certificate",
+        "CertificateAndApiKey",
+        "ClientCredentials",
+      ]),
+    )
+    .optional(),
   CredentialKind: zod
-    .enum([
-      "ApiKey",
-      "Certificate",
-      "CertificateAndApiKey",
-      "ClientCredentials",
+    .union([
+      zod.literal("ApiKey"),
+      zod.literal("Certificate"),
+      zod.literal("CertificateAndApiKey"),
+      zod.literal("ClientCredentials"),
+      zod.literal(null),
     ])
-    .default(setMachineAuthenticationResponseCredentialKindDefault),
+    .nullish(),
   CertificateLifetimeDays: zod.int().nullish(),
 });
 

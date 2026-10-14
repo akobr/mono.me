@@ -3,14 +3,14 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.8.2631
+ * OpenAPI spec version: 0.9.9.10198
  */
 import { faker } from "@faker-js/faker";
 
 import { HttpResponse, http } from "msw";
 import type { RequestHandlerOptions } from "msw";
 
-import { AccountRole } from "../../model";
+import { AccountRole, MachineCredentialKind } from "../../model";
 import type {
   AccessPoint,
   AccessPointMember,
@@ -94,12 +94,19 @@ export const getGetAccessPointsResponseMock = (): AccessPoint[] =>
     ]),
     MachineAuthentication: faker.helpers.arrayElement([
       {
+        EnabledCredentialKinds: faker.helpers.arrayElement([
+          faker.helpers.arrayElements(Object.values(MachineCredentialKind)),
+          undefined,
+        ]),
         CredentialKind: faker.helpers.arrayElement([
-          "ApiKey",
-          "Certificate",
-          "CertificateAndApiKey",
-          "ClientCredentials",
-        ] as const),
+          faker.helpers.arrayElement([
+            "ApiKey",
+            "Certificate",
+            "CertificateAndApiKey",
+            "ClientCredentials",
+          ] as const),
+          null,
+        ]),
         CertificateLifetimeDays: faker.helpers.arrayElement([
           faker.number.int(),
           null,
@@ -126,12 +133,19 @@ export const getCreateAccessPointResponseMock = (
   ]),
   MachineAuthentication: faker.helpers.arrayElement([
     {
+      EnabledCredentialKinds: faker.helpers.arrayElement([
+        faker.helpers.arrayElements(Object.values(MachineCredentialKind)),
+        undefined,
+      ]),
       CredentialKind: faker.helpers.arrayElement([
-        "ApiKey",
-        "Certificate",
-        "CertificateAndApiKey",
-        "ClientCredentials",
-      ] as const),
+        faker.helpers.arrayElement([
+          "ApiKey",
+          "Certificate",
+          "CertificateAndApiKey",
+          "ClientCredentials",
+        ] as const),
+        null,
+      ]),
       CertificateLifetimeDays: faker.helpers.arrayElement([
         faker.number.int(),
         null,
@@ -159,12 +173,19 @@ export const getGetAccessPointResponseMock = (
   ]),
   MachineAuthentication: faker.helpers.arrayElement([
     {
+      EnabledCredentialKinds: faker.helpers.arrayElement([
+        faker.helpers.arrayElements(Object.values(MachineCredentialKind)),
+        undefined,
+      ]),
       CredentialKind: faker.helpers.arrayElement([
-        "ApiKey",
-        "Certificate",
-        "CertificateAndApiKey",
-        "ClientCredentials",
-      ] as const),
+        faker.helpers.arrayElement([
+          "ApiKey",
+          "Certificate",
+          "CertificateAndApiKey",
+          "ClientCredentials",
+        ] as const),
+        null,
+      ]),
       CertificateLifetimeDays: faker.helpers.arrayElement([
         faker.number.int(),
         null,
@@ -192,12 +213,19 @@ export const getGrantUserAccessResponseMock = (
   ]),
   MachineAuthentication: faker.helpers.arrayElement([
     {
+      EnabledCredentialKinds: faker.helpers.arrayElement([
+        faker.helpers.arrayElements(Object.values(MachineCredentialKind)),
+        undefined,
+      ]),
       CredentialKind: faker.helpers.arrayElement([
-        "ApiKey",
-        "Certificate",
-        "CertificateAndApiKey",
-        "ClientCredentials",
-      ] as const),
+        faker.helpers.arrayElement([
+          "ApiKey",
+          "Certificate",
+          "CertificateAndApiKey",
+          "ClientCredentials",
+        ] as const),
+        null,
+      ]),
       CertificateLifetimeDays: faker.helpers.arrayElement([
         faker.number.int(),
         null,
@@ -225,12 +253,19 @@ export const getRevokeUserAccessResponseMock = (
   ]),
   MachineAuthentication: faker.helpers.arrayElement([
     {
+      EnabledCredentialKinds: faker.helpers.arrayElement([
+        faker.helpers.arrayElements(Object.values(MachineCredentialKind)),
+        undefined,
+      ]),
       CredentialKind: faker.helpers.arrayElement([
-        "ApiKey",
-        "Certificate",
-        "CertificateAndApiKey",
-        "ClientCredentials",
-      ] as const),
+        faker.helpers.arrayElement([
+          "ApiKey",
+          "Certificate",
+          "CertificateAndApiKey",
+          "ClientCredentials",
+        ] as const),
+        null,
+      ]),
       CertificateLifetimeDays: faker.helpers.arrayElement([
         faker.number.int(),
         null,
@@ -294,6 +329,14 @@ export const getGetMachineAccessesResponseMock = (): MachineAccess[] =>
       faker.date.past().toISOString().slice(0, 19) + "Z",
       null,
     ]),
+    CertificateLifetimeDays: faker.helpers.arrayElement([
+      faker.number.int(),
+      null,
+    ]),
+    CertificateNotAfter: faker.helpers.arrayElement([
+      faker.date.past().toISOString().slice(0, 19) + "Z",
+      null,
+    ]),
     TokenEndpoint: faker.helpers.arrayElement([
       faker.string.alpha({ length: { min: 10, max: 20 } }),
       undefined,
@@ -352,6 +395,14 @@ export const getCreateMachineAccessResponseMock = (
     undefined,
   ]),
   LastRenewalAt: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
+  CertificateLifetimeDays: faker.helpers.arrayElement([
+    faker.number.int(),
+    null,
+  ]),
+  CertificateNotAfter: faker.helpers.arrayElement([
     faker.date.past().toISOString().slice(0, 19) + "Z",
     null,
   ]),
@@ -417,6 +468,14 @@ export const getGetMachineAccessResponseMock = (
     faker.date.past().toISOString().slice(0, 19) + "Z",
     null,
   ]),
+  CertificateLifetimeDays: faker.helpers.arrayElement([
+    faker.number.int(),
+    null,
+  ]),
+  CertificateNotAfter: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
   TokenEndpoint: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
@@ -479,6 +538,14 @@ export const getResetMachineAccessResponseMock = (
     faker.date.past().toISOString().slice(0, 19) + "Z",
     null,
   ]),
+  CertificateLifetimeDays: faker.helpers.arrayElement([
+    faker.number.int(),
+    null,
+  ]),
+  CertificateNotAfter: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
   TokenEndpoint: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
@@ -493,15 +560,45 @@ export const getResetMachineAccessResponseMock = (
 export const getGetCertificateAuthorityResponseMock = (): string =>
   faker.word.sample();
 
+export const getGetMachineAuthenticationResponseMock = (
+  overrideResponse: Partial<Extract<MachineAuthenticationPolicy, object>> = {},
+): MachineAuthenticationPolicy => ({
+  EnabledCredentialKinds: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineCredentialKind)),
+    undefined,
+  ]),
+  CredentialKind: faker.helpers.arrayElement([
+    faker.helpers.arrayElement([
+      "ApiKey",
+      "Certificate",
+      "CertificateAndApiKey",
+      "ClientCredentials",
+    ] as const),
+    null,
+  ]),
+  CertificateLifetimeDays: faker.helpers.arrayElement([
+    faker.number.int(),
+    null,
+  ]),
+  ...overrideResponse,
+});
+
 export const getSetMachineAuthenticationResponseMock = (
   overrideResponse: Partial<Extract<MachineAuthenticationPolicy, object>> = {},
 ): MachineAuthenticationPolicy => ({
+  EnabledCredentialKinds: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineCredentialKind)),
+    undefined,
+  ]),
   CredentialKind: faker.helpers.arrayElement([
-    "ApiKey",
-    "Certificate",
-    "CertificateAndApiKey",
-    "ClientCredentials",
-  ] as const),
+    faker.helpers.arrayElement([
+      "ApiKey",
+      "Certificate",
+      "CertificateAndApiKey",
+      "ClientCredentials",
+    ] as const),
+    null,
+  ]),
   CertificateLifetimeDays: faker.helpers.arrayElement([
     faker.number.int(),
     null,
@@ -1416,6 +1513,30 @@ export const getGetCertificateAuthorityMockHandler = (
   );
 };
 
+export const getGetMachineAuthenticationMockHandler = (
+  overrideResponse?:
+    | MachineAuthenticationPolicy
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<MachineAuthenticationPolicy> | MachineAuthenticationPolicy),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/access/points/:key/machine-authentication",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetMachineAuthenticationResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getSetMachineAuthenticationMockHandler = (
   overrideResponse?:
     | MachineAuthenticationPolicy
@@ -1807,6 +1928,7 @@ export const getAccessMock = () => [
   getResetMachineAccessMockHandler(),
   getDeleteMachineAccessMockHandler(),
   getGetCertificateAuthorityMockHandler(),
+  getGetMachineAuthenticationMockHandler(),
   getSetMachineAuthenticationMockHandler(),
   getGetAuthConfigurationMockHandler(),
   getRenewMachineCertificateMockHandler(),

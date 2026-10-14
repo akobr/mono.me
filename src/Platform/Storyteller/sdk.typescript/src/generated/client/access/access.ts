@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.8.2631
+ * OpenAPI spec version: 0.9.9.10198
  */
 import type {
   AccessPoint,
@@ -381,6 +381,26 @@ export const getCertificateAuthority = async (
     ...options,
     method: "GET",
   });
+};
+
+export const getGetMachineAuthenticationUrl = (key: string) => {
+  return `/v1/access/points/${encodeURIComponent(String(key))}/machine-authentication`;
+};
+
+/**
+ * The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
+ */
+export const getMachineAuthentication = async (
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<MachineAuthenticationPolicy> => {
+  return storytellerFetch<MachineAuthenticationPolicy>(
+    getGetMachineAuthenticationUrl(key),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
 };
 
 export const getSetMachineAuthenticationUrl = (key: string) => {
