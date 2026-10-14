@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.7.38817
+ * OpenAPI spec version: 0.9.8.2631
  */
 
 export type GetExecutionsParams = {
@@ -23,4 +23,12 @@ export type GetExecutionsParams = {
    * The continuation token for multi-page queries.
    */
   continuationToken?: string;
+  /**
+   * Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.
+   */
+  includeInactive?: boolean;
+  /**
+   * Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.
+   */
+  includeDeleted?: boolean;
 };

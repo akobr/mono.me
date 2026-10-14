@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.7.38817
+ * OpenAPI spec version: 0.9.8.2631
  */
 import type {
   Annotation,
@@ -21,6 +21,7 @@ import type {
   AnnotationsResponseUnit,
   AnnotationsResponseUnitOfExecution,
   AnnotationsResponseUsage,
+  GetAnnotationParams,
   GetAnnotationsParams,
   GetContextsParams,
   GetDeletedAnnotationsParams,
@@ -131,8 +132,21 @@ export const getGetAnnotationUrl = (
   project: string,
   view: string,
   key: string,
+  params?: GetAnnotationParams,
 ) => {
-  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}?${stringifiedParams}`
+    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/annotations/${encodeURIComponent(String(key))}`;
 };
 
 export const getAnnotation = async (
@@ -140,10 +154,11 @@ export const getAnnotation = async (
   project: string,
   view: string,
   key: string,
+  params?: GetAnnotationParams,
   options?: Parameters<typeof storytellerFetch>[1],
 ): Promise<Annotation> => {
   return storytellerFetch<Annotation>(
-    getGetAnnotationUrl(organization, project, view, key),
+    getGetAnnotationUrl(organization, project, view, key, params),
     {
       ...options,
       method: "GET",

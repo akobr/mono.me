@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.7.38817
+ * OpenAPI spec version: 0.9.8.2631
  */
 import * as zod from "zod";
 
@@ -18,6 +18,18 @@ export const GetAnnotationsQueryParams = zod.object({
     .string()
     .optional()
     .describe("The continuation token for multi-page queries."),
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getAnnotationsResponseAnnotationsItemAnnotationTypeDefault = `Responsibility`;
@@ -320,6 +332,21 @@ export const GetAnnotationParams = zod.object({
   project: zod.string().describe("Target project name."),
   view: zod.string().describe("The target view inside the project."),
   key: zod.string().describe("The key of the requested annotation."),
+});
+
+export const GetAnnotationQueryParams = zod.object({
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getAnnotationResponseAnnotationTypeDefault = `Responsibility`;
@@ -648,6 +675,18 @@ export const GetDescendantsQueryParams = zod.object({
     .string()
     .optional()
     .describe("The continuation token for multi-page queries."),
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getDescendantsResponseAnnotationsItemAnnotationTypeDefault = `Responsibility`;
@@ -876,6 +915,18 @@ export const GetResponsibilitiesQueryParams = zod.object({
     .string()
     .optional()
     .describe("The continuation token for multi-page queries."),
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getResponsibilitiesResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
@@ -1016,6 +1067,18 @@ export const GetSubjectsQueryParams = zod.object({
     .string()
     .optional()
     .describe("The continuation token for multi-page queries."),
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getSubjectsResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
@@ -1159,6 +1222,18 @@ export const GetUsagesQueryParams = zod.object({
     .string()
     .optional()
     .describe("The continuation token for multi-page queries."),
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getUsagesResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
@@ -1303,6 +1378,18 @@ export const GetContextsQueryParams = zod.object({
     .string()
     .optional()
     .describe("The continuation token for multi-page queries."),
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getContextsResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
@@ -1451,6 +1538,18 @@ export const GetExecutionsQueryParams = zod.object({
     .string()
     .optional()
     .describe("The continuation token for multi-page queries."),
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getExecutionsResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
@@ -1596,6 +1695,18 @@ export const GetUnitsQueryParams = zod.object({
     .string()
     .optional()
     .describe("The continuation token for multi-page queries."),
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getUnitsResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
@@ -1749,6 +1860,18 @@ export const GetUnitsOfExecutionQueryParams = zod.object({
     .string()
     .optional()
     .describe("The continuation token for multi-page queries."),
+  includeInactive: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.",
+    ),
+  includeDeleted: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.",
+    ),
 });
 
 export const getUnitsOfExecutionResponseAnnotationsItemOneAnnotationTypeDefault = `Responsibility`;
