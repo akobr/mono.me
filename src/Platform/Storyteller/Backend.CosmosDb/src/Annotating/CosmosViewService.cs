@@ -107,9 +107,6 @@ public class CosmosViewService : IViewService
             Description = NormalizeDescription(model.Description),
         };
 
-        // a view registered before the stamps stores the stamp built from its legacy fields instead
-        entity = entity with { Created = entity.GetCreated(), CreatedAt = null, CreatedBy = null };
-
         await container.UpsertItemAsync(entity, new PartitionKey(partitionKey));
         return entity.ToView();
     }

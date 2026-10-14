@@ -62,8 +62,6 @@ Measured on the Cosmos emulator, as the average of 20 creates of the same item:
 
 Excluding only the names saves little (14.5 RU for the annotation); the ids and times account for most of the cost.
 
-## Items stored before the stamps
+## Stored data
 
-Configurations, configuration history, schemas, templates, their history, and views stored before the stamps carry the author as a string (`account: {sub}`, `application: {machineId}` or `system`) and a separate time (`CreationTime`, `CreatedAt`, or none). They are not migrated. Their entities keep those fields as nullable legacy properties, and the reads build the stamp from them (`LegacyAuthors`): `account:` gives an `Account`, `application:` a `Machine`, `system` or nothing `System`, and anything else an `Account` with the text as its id. The time is the old time field, or the item's last write (`_ts`) where there was none. The next write of the item stores the stamp and drops the legacy fields; a history item archived from a legacy item gets the converted stamp.
-
-Key/value items, their versions and audit events, and the key/value policy changed shape without a compatibility path. They were merged on the day of the change, and no deployment held key/value data to keep.
+Every stored item carries its stamps, and the entities declare them required. Items written before the stamps (with an `Author` string) are not read or converted: the databases were recreated with the change, because no deployment held data to keep.

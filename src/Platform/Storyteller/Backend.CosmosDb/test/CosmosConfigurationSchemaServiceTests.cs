@@ -476,7 +476,7 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
                 ProjectName = project,
                 ViewName = string.Empty,
                 Content = StrictNameSchema(),
-                Author = "legacy",
+                Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
                 Version = 9,
             },
             new PartitionKey($"{project}.schema"));

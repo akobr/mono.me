@@ -6,11 +6,8 @@ public record class GenerateTemplateEntity : Entity
 {
     public required JObject Content { get; init; }
 
-    // The write that produced the current version; null on items stored before the stamps (see GetModified).
-    public AuditStamp? Modified { get; init; }
-
-    // Legacy author string of items stored before the stamps; never written again.
-    public string? Author { get; init; }
+    // The write that produced the current version.
+    public required AuditStamp Modified { get; init; }
 
     public ulong Version { get; init; }
 }

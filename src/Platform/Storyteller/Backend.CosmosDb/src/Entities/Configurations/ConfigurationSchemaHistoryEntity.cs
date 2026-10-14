@@ -1,4 +1,3 @@
-using System;
 using System.Text.Json.Serialization;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -11,13 +10,8 @@ public record class ConfigurationSchemaHistoryEntity : Entity
 
     public required JObject Content { get; init; }
 
-    // The write that produced this version; null on items stored before the stamps (see GetModified).
-    public AuditStamp? Modified { get; init; }
-
-    // Legacy author and time of items stored before the stamps; never written again.
-    public string? Author { get; init; }
-
-    public DateTimeOffset? CreationTime { get; init; }
+    // The write that produced this version.
+    public required AuditStamp Modified { get; init; }
 
     [JsonProperty("ttl")]
     [JsonPropertyName("ttl")]

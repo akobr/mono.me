@@ -40,7 +40,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
     {
         // Current templates only: "{view}.gen." excludes the state ("gns") and history ("gnv") items.
         var prefix = $"{view}.{EntityIdPrefixTypes.GenerateTemplate}.";
-        var query = new QueryDefinition("SELECT c.id, c.Version, c.Modified, c.Author, c._ts FROM c WHERE STARTSWITH(c.id, @prefix)")
+        var query = new QueryDefinition("SELECT c.id, c.Version, c.Modified FROM c WHERE STARTSWITH(c.id, @prefix)")
             .WithParameter("@prefix", prefix);
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
@@ -56,7 +56,7 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
             {
                 AnnotationType = row.Id[prefix.Length..],
                 Version = row.Version,
-                Modified = row.GetModified(),
+                Modified = row.Modified,
             }));
         }
 
@@ -372,7 +372,6 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
             Version = Math.Max(existing.Version, state?.LastVersion ?? 0) + 1,
             Content = newContent,
             Modified = modified,
-            Author = null,
         };
 
         // save history of the previous version together with the next version atomically

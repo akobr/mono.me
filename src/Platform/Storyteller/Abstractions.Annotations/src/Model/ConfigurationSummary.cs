@@ -14,7 +14,7 @@ public record class ConfigurationSummary
     public required ulong Version { get; init; }
 
     // The write that produced the current version.
-    public AuditStamp? Modified { get; init; }
+    public required AuditStamp Modified { get; init; }
 
     // Hash of the calculated (effective) document; null until it is calculated.
     public string? Hash { get; init; }
@@ -53,7 +53,7 @@ public record class ConfigurationSchemaSummary
 
     public required ulong Version { get; init; }
 
-    public AuditStamp? Modified { get; init; }
+    public required AuditStamp Modified { get; init; }
 }
 
 // A template of a view without its content, for listings.
@@ -64,5 +64,5 @@ public record class ConfigurationTemplateSummary
 
     public required ulong Version { get; init; }
 
-    public AuditStamp? Modified { get; init; }
+    public required AuditStamp Modified { get; init; }
 }

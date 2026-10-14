@@ -437,7 +437,7 @@ public class CosmosConfigurationTemplateServiceTests(Startup startup)
                 ViewName = Constants.DefaultViewName,
                 AnnotationKey = "exe",
                 Name = "exe",
-                Author = "legacy",
+                Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
                 Content = JObject.Parse("""{ "legacy": true }"""),
             },
             new PartitionKey(partitionKey));

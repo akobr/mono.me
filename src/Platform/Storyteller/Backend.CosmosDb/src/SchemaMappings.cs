@@ -12,7 +12,7 @@ internal static class SchemaMappings
         AnnotationKey = annotationKey,
         Version = entity.Version,
         Content = entity.Content,
-        Modified = entity.GetModified(),
+        Modified = entity.Modified,
     };
 
     public static ConfigurationSchema ToConfigurationSchema(this ConfigurationSchemaHistoryEntity entity, string? annotationType, string? annotationKey) => new()
@@ -22,20 +22,20 @@ internal static class SchemaMappings
         AnnotationKey = annotationKey,
         Version = entity.Version,
         Content = entity.Content,
-        Modified = entity.GetModified(),
+        Modified = entity.Modified,
     };
 
     public static ConfigurationVersion ToConfigurationVersion(this ConfigurationSchemaEntity entity) => new()
     {
         Version = (uint)entity.Version,
-        Modified = entity.GetModified(),
+        Modified = entity.Modified,
         ExpirationTime = DateTimeOffset.MaxValue,
     };
 
     public static ConfigurationVersion ToConfigurationVersion(this ConfigurationSchemaHistoryEntity entity) => new()
     {
         Version = (uint)entity.Version,
-        Modified = entity.GetModified(),
+        Modified = entity.Modified,
         ExpirationTime = entity.GetExpirationTime(),
     };
 
@@ -49,6 +49,6 @@ internal static class SchemaMappings
         ViewName = entity.ViewName,
         Version = entity.Version,
         Content = entity.Content,
-        Modified = entity.GetModified(),
+        Modified = entity.Modified,
     };
 }
