@@ -50,6 +50,8 @@ public static class CommandNames
     public const string VERSIONS = "versions";
     public const string RESTORE = "restore";
     public const string HISTORY = "history";
+    public const string EXPORT = "export";
+    public const string IMPORT = "import";
     public const string DELETED = "deleted";
     public const string TRASH = "trash";
 

@@ -28,6 +28,21 @@ The background half is `Api.Functions/src/Transfers/ConfigurationTransferFunctio
 
 Locally, the Aspire host (`Aspire.Host/src/AppHost.cs`) runs Azurite on the default ports, so `UseDevelopmentStorage=true` of `local.settings.json` works unchanged. Without Aspire, start Azurite (`npx azurite`) before the Functions host.
 
+## CLI
+
+Two subcommands of `sform story config` work on the context's organization, project and view (`-p`, `-v` as everywhere):
+
+```
+sform story config export [-f|--format folder|git] [-o|--output <path>] [-x|--extract] [--timeout <minutes>]
+sform story config import <zip-or-folder> [--dry-run] [--force] [--timeout <minutes>]
+```
+
+- `export` waits for the job (every second, then every 2 and 3 seconds) and saves the zip under the server's file name, in the current folder, in the folder `--output` names, or as the file it names. `--extract` unpacks into a new or empty folder instead (by default the file name without `.zip`), so `sform story config export -f git -x` leaves a checked-out repository; entries outside the folder are refused.
+- `import` takes a zip, or a folder whose `*.json` files (in subfolders too, without `.git`) it packs in memory, for example a clone of an exported repository. It prints the counts and a table of every file that was not unchanged. It exits with `2` when a file failed or the server rejected the upload.
+- After `--timeout` (10 minutes) both stop waiting and print the job id; the job continues on the server.
+
+The commands are `Cli/src/Commands/Configuration/ConfigExportCommand.cs` and `ConfigImportCommand.cs`, with `Services/ConfigurationArchives.cs` (packing and unpacking through `IFileSystem`) and `Services/TransferPolling.cs`.
+
 ## What travels
 
 Only the annotations' **own documents**: the `Content` of the configuration item `{view}.cnf.{key}` and of its versions `{view}.cfv.{key}.{version}` ([inheritance.md](inheritance.md)).
