@@ -64,7 +64,7 @@ public partial class CosmosAnnotationService : IAnnotationService
 
     public async Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request)
     {
-        var model = new RequestProcessModel(request);
+        var model = new RequestProcessModel(request) { Now = _timeProvider.GetUtcNow() };
 
         var processFunctionsInOrder = new Func<RequestProcessModel, Task>[]
         {
@@ -646,6 +646,14 @@ public partial class CosmosAnnotationService : IAnnotationService
             _ => matches,
         };
 
+        // an undefined IsDisabled fails every comparison in Cosmos, so "!= true" alone would drop it; the validity
+        // window is checked on the page below: the dates keep the offset they were written with, so Cosmos can't
+        // compare them as strings
+        if (!model.Request.IncludeInactive)
+        {
+            matches = matches.Where(r => !r.IsDisabled.IsDefined() || r.IsDisabled == null || r.IsDisabled == false);
+        }
+
         if (model.Request.DeletionRootsOnly)
         {
             matches = matches.Where(r => r.Deletion!.IsRoot);
@@ -682,6 +690,8 @@ public partial class CosmosAnnotationService : IAnnotationService
         var results = await feed.ReadNextAsync();
         var mapped = results
             .Where(entity => descendantsOf is null || (AnnotationKey.TryParse(entity.AnnotationKey, out var key) && key.IsDescendantOf(descendantsOf)))
+            .Where(entity => model.Request.IncludeInactive
+                             || AnnotationStatusExtensions.GetStatus(entity.IsDisabled, entity.ValidFrom, entity.ExpiresAt, model.Now) == AnnotationStatus.Active)
             .Select(entity => entity.ToModel<TEntity, TAnnotation>())
             .ToList();
         model.Annotations = model.Annotations.Concat(mapped);

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using _42.Platform.Storyteller.Annotating;
@@ -20,6 +21,9 @@ public class RequestProcessModel
     }
 
     public AnnotationsRequest Request { get; }
+
+    // The time the statuses of the request are evaluated at (AnnotationStatus).
+    public DateTimeOffset Now { get; init; }
 
     public bool HasPartitionKey { get; }
 

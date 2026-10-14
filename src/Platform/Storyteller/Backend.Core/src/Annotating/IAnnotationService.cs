@@ -2,7 +2,8 @@ namespace _42.Platform.Storyteller.Annotating;
 
 public interface IAnnotationService
 {
-    // Active annotations only: a soft-deleted annotation does not exist for these reads.
+    // Annotations that are not deleted, whatever their status (AnnotationStatus): a soft-deleted annotation does not
+    // exist for these reads, a disabled, scheduled or expired one does.
     Task<bool> ExistAnnotationAsync(FullKey fullKey);
 
     Task<Annotation?> GetAnnotationAsync(FullKey fullKey);
@@ -17,6 +18,8 @@ public interface IAnnotationService
         string view,
         IReadOnlyCollection<AnnotationKey> keys);
 
+    // Only the annotations that are not deleted and active now, unless the request includes the others
+    // (AnnotationsRequest.Deleted and IncludeInactive). A page can hold fewer items than the page size.
     Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request);
 
     // The deleted annotations of a view, newest deletion first, with their Deletion. One query over every partition
