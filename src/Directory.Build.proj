@@ -1,5 +1,6 @@
 <Project Sdk="Microsoft.Build.Traversal">
   <ItemGroup>
-    <ProjectReference Include="**\*.*?proj" />
+    <!-- bin and obj hold generated projects, such as the WorkerExtensions project of a Functions app with triggers -->
+    <ProjectReference Include="**\*.*?proj" Exclude="**\bin\**;**\obj\**" />
   </ItemGroup>
 </Project>
