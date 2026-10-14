@@ -182,16 +182,33 @@ namespace _42.Platform.Storyteller.Sdk
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<string> GetCertificateAuthorityAsync(System.Threading.CancellationToken cancellationToken);
 
+        /// <remarks>
+        /// The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
+        /// </remarks>
         /// <param name="key">The key of the access point (organization.project).</param>
-        /// <param name="body">The machine authentication policy to set.</param>
-        /// <returns>The updated machine authentication policy.</returns>
+        /// <returns>The machine authentication policy of the project.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key);
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
+        /// </remarks>
+        /// <param name="key">The key of the access point (organization.project).</param>
+        /// <returns>The machine authentication policy of the project.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key, System.Threading.CancellationToken cancellationToken);
+
+        /// <param name="key">The key of the access point (organization.project).</param>
+        /// <param name="body">The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.</param>
+        /// <returns>The updated machine authentication policy, with every property filled.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body);
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="key">The key of the access point (organization.project).</param>
-        /// <param name="body">The machine authentication policy to set.</param>
-        /// <returns>The updated machine authentication policy.</returns>
+        /// <param name="body">The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.</param>
+        /// <returns>The updated machine authentication policy, with every property filled.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body, System.Threading.CancellationToken cancellationToken);
 
@@ -1971,9 +1988,136 @@ namespace _42.Platform.Storyteller.Sdk
             }
         }
 
+        /// <remarks>
+        /// The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
+        /// </remarks>
         /// <param name="key">The key of the access point (organization.project).</param>
-        /// <param name="body">The machine authentication policy to set.</param>
-        /// <returns>The updated machine authentication policy.</returns>
+        /// <returns>The machine authentication policy of the project.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key)
+        {
+            return GetMachineAuthenticationAsync(key, System.Threading.CancellationToken.None);
+        }
+
+        /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
+        /// <remarks>
+        /// The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
+        /// </remarks>
+        /// <param name="key">The key of the access point (organization.project).</param>
+        /// <returns>The machine authentication policy of the project.</returns>
+        /// <exception cref="ApiException">A server side error occurred.</exception>
+        public virtual async System.Threading.Tasks.Task<MachineAuthenticationPolicy> GetMachineAuthenticationAsync(string key, System.Threading.CancellationToken cancellationToken)
+        {
+            if (key == null)
+                throw new System.ArgumentNullException("key");
+
+            var client_ = _httpClient;
+            var disposeClient_ = false;
+            try
+            {
+                using (var request_ = new System.Net.Http.HttpRequestMessage())
+                {
+                    request_.Method = new System.Net.Http.HttpMethod("GET");
+                    request_.Headers.Accept.Add(System.Net.Http.Headers.MediaTypeWithQualityHeaderValue.Parse("application/json"));
+
+                    var urlBuilder_ = new System.Text.StringBuilder();
+                    if (!string.IsNullOrEmpty(_baseUrl)) urlBuilder_.Append(_baseUrl);
+                    // Operation Path: "v1/access/points/{key}/machine-authentication"
+                    urlBuilder_.Append("v1/access/points/");
+                    urlBuilder_.Append(System.Uri.EscapeDataString(ConvertToString(key, System.Globalization.CultureInfo.InvariantCulture)));
+                    urlBuilder_.Append("/machine-authentication");
+
+                    PrepareRequest(client_, request_, urlBuilder_);
+
+                    var url_ = urlBuilder_.ToString();
+                    request_.RequestUri = new System.Uri(url_, System.UriKind.RelativeOrAbsolute);
+
+                    PrepareRequest(client_, request_, url_);
+
+                    var response_ = await client_.SendAsync(request_, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
+                    var disposeResponse_ = true;
+                    try
+                    {
+                        var headers_ = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.IEnumerable<string>>();
+                        foreach (var item_ in response_.Headers)
+                            headers_[item_.Key] = item_.Value;
+                        if (response_.Content != null && response_.Content.Headers != null)
+                        {
+                            foreach (var item_ in response_.Content.Headers)
+                                headers_[item_.Key] = item_.Value;
+                        }
+
+                        ProcessResponse(client_, response_);
+
+                        var status_ = (int)response_.StatusCode;
+                        if (status_ == 200)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<MachineAuthenticationPolicy>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The key is not organization.project.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 401)
+                        {
+                            string responseText_ = ( response_.Content == null ) ? string.Empty : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation", status_, responseText_, headers_, null);
+                        }
+                        else
+                        if (status_ == 403)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("The caller is authenticated, but its role on the organization or project does not allow the operation.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        if (status_ == 500)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("Unexpected error occurred on the service.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                        }
+                        else
+                        {
+                            var responseData_ = response_.Content == null ? null : await ReadAsStringAsync(response_.Content, cancellationToken).ConfigureAwait(false);
+                            throw new ApiException("The HTTP status code of the response was not expected (" + status_ + ").", status_, responseData_, headers_, null);
+                        }
+                    }
+                    finally
+                    {
+                        if (disposeResponse_)
+                            response_.Dispose();
+                    }
+                }
+            }
+            finally
+            {
+                if (disposeClient_)
+                    client_.Dispose();
+            }
+        }
+
+        /// <param name="key">The key of the access point (organization.project).</param>
+        /// <param name="body">The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.</param>
+        /// <returns>The updated machine authentication policy, with every property filled.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body)
         {
@@ -1982,8 +2126,8 @@ namespace _42.Platform.Storyteller.Sdk
 
         /// <param name="cancellationToken">A cancellation token that can be used by other objects or threads to receive notice of cancellation.</param>
         /// <param name="key">The key of the access point (organization.project).</param>
-        /// <param name="body">The machine authentication policy to set.</param>
-        /// <returns>The updated machine authentication policy.</returns>
+        /// <param name="body">The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.</param>
+        /// <returns>The updated machine authentication policy, with every property filled.</returns>
         /// <exception cref="ApiException">A server side error occurred.</exception>
         public virtual async System.Threading.Tasks.Task<MachineAuthenticationPolicy> SetMachineAuthenticationAsync(string key, MachineAuthenticationPolicy body, System.Threading.CancellationToken cancellationToken)
         {
@@ -2041,6 +2185,16 @@ namespace _42.Platform.Storyteller.Sdk
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
                             return objectResponse_.Object;
+                        }
+                        else
+                        if (status_ == 400)
+                        {
+                            var objectResponse_ = await ReadObjectResponseAsync<ErrorResponse>(response_, headers_, cancellationToken).ConfigureAwait(false);
+                            if (objectResponse_.Object == null)
+                            {
+                                throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
+                            }
+                            throw new ApiException<ErrorResponse>("No kind is enabled, a kind doesn\'t exist, the default kind is not enabled, or the certificate lifetime is out of the deployment\'s bounds.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 401)
@@ -24053,6 +24207,12 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("LastRenewalAt", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public System.DateTimeOffset? LastRenewalAt { get; set; }
 
+        [Newtonsoft.Json.JsonProperty("CertificateLifetimeDays", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public int? CertificateLifetimeDays { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("CertificateNotAfter", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        public System.DateTimeOffset? CertificateNotAfter { get; set; }
+
         [Newtonsoft.Json.JsonProperty("TokenEndpoint", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string TokenEndpoint { get; set; }
 
@@ -24087,6 +24247,10 @@ namespace _42.Platform.Storyteller.Sdk
         [Newtonsoft.Json.JsonProperty("AnnotationKey", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public string AnnotationKey { get; set; }
 
+        [Newtonsoft.Json.JsonProperty("CredentialKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public MachineAccessCreateCredentialKind? CredentialKind { get; set; }
+
         [Newtonsoft.Json.JsonProperty("CertificateLifetimeDays", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public int? CertificateLifetimeDays { get; set; }
 
@@ -24105,9 +24269,12 @@ namespace _42.Platform.Storyteller.Sdk
     public partial class MachineAuthenticationPolicy
     {
 
-        [Newtonsoft.Json.JsonProperty("CredentialKind", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+        [Newtonsoft.Json.JsonProperty("EnabledCredentialKinds", Required = Newtonsoft.Json.Required.DisallowNull, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore, ItemConverterType = typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
+        public System.Collections.Generic.ICollection<MachineCredentialKind> EnabledCredentialKinds { get; set; }
+
+        [Newtonsoft.Json.JsonProperty("CredentialKind", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         [Newtonsoft.Json.JsonConverter(typeof(Newtonsoft.Json.Converters.StringEnumConverter))]
-        public MachineAuthenticationPolicyCredentialKind CredentialKind { get; set; } = _42.Platform.Storyteller.Sdk.MachineAuthenticationPolicyCredentialKind.ApiKey;
+        public MachineAuthenticationPolicyCredentialKind? CredentialKind { get; set; }
 
         [Newtonsoft.Json.JsonProperty("CertificateLifetimeDays", Required = Newtonsoft.Json.Required.Default, NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
         public int? CertificateLifetimeDays { get; set; }
@@ -24561,6 +24728,24 @@ namespace _42.Platform.Storyteller.Sdk
 
         [System.Runtime.Serialization.EnumMember(Value = @"Owner")]
         Owner = 5,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MachineCredentialKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ApiKey")]
+        ApiKey = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Certificate")]
+        Certificate = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"CertificateAndApiKey")]
+        CertificateAndApiKey = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ClientCredentials")]
+        ClientCredentials = 3,
 
     }
 
@@ -25380,6 +25565,24 @@ namespace _42.Platform.Storyteller.Sdk
 
         [System.Runtime.Serialization.EnumMember(Value = @"SecretsReadWrite")]
         SecretsReadWrite = 7,
+
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("NJsonSchema", "14.6.3.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))")]
+    public enum MachineAccessCreateCredentialKind
+    {
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ApiKey")]
+        ApiKey = 0,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"Certificate")]
+        Certificate = 1,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"CertificateAndApiKey")]
+        CertificateAndApiKey = 2,
+
+        [System.Runtime.Serialization.EnumMember(Value = @"ClientCredentials")]
+        ClientCredentials = 3,
 
     }
 

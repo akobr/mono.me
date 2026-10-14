@@ -3,8 +3,9 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.8.2631
+ * OpenAPI spec version: 0.9.9.10198
  */
+import type { MachineAccessCreateCredentialKind } from "./machineAccessCreateCredentialKind";
 import type { MachineAccessCreateScope } from "./machineAccessCreateScope";
 
 export interface MachineAccessCreate {
@@ -12,6 +13,8 @@ export interface MachineAccessCreate {
   Project?: string;
   Scope?: MachineAccessCreateScope;
   AnnotationKey?: string;
+  /** @nullable */
+  CredentialKind?: MachineAccessCreateCredentialKind;
   /** @nullable */
   CertificateLifetimeDays?: number | null;
 }

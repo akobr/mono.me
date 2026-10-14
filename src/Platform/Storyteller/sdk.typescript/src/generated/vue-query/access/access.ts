@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.8.2631
+ * OpenAPI spec version: 0.9.9.10198
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -1401,6 +1401,112 @@ export function useGetCertificateAuthority<
   return query;
 }
 
+export const getGetMachineAuthenticationUrl = (key: string) => {
+  return `/v1/access/points/${encodeURIComponent(String(key))}/machine-authentication`;
+};
+
+/**
+ * The machine credential kinds the project enables, the default kind and the default certificate lifetime of new machines. Every property is filled; without a stored policy the deployment defaults apply.
+ */
+export const getMachineAuthentication = async (
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<MachineAuthenticationPolicy> => {
+  return storytellerFetch<MachineAuthenticationPolicy>(
+    getGetMachineAuthenticationUrl(key),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetMachineAuthenticationQueryKey = (
+  key: MaybeRefOrGetter<string>,
+) => {
+  return ["v1", "access", "points", key, "machine-authentication"] as const;
+};
+
+export const getGetMachineAuthenticationQueryOptions = <
+  TData = Awaited<ReturnType<typeof getMachineAuthentication>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(
+  key: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getMachineAuthentication>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetMachineAuthenticationQueryKey(key);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getMachineAuthentication>>
+  > = ({ signal }) =>
+    getMachineAuthentication(toValue(key), { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () => toValue(key) !== null && toValue(key) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getMachineAuthentication>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetMachineAuthenticationQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getMachineAuthentication>>
+>;
+export type GetMachineAuthenticationQueryError =
+  ErrorType<ErrorResponse | void>;
+
+export function useGetMachineAuthentication<
+  TData = Awaited<ReturnType<typeof getMachineAuthentication>>,
+  TError = ErrorType<ErrorResponse | void>,
+>(
+  key: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getMachineAuthentication>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetMachineAuthenticationQueryOptions(key, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
 export const getSetMachineAuthenticationUrl = (key: string) => {
   return `/v1/access/points/${encodeURIComponent(String(key))}/machine-authentication`;
 };
@@ -1449,7 +1555,7 @@ export const getSetMachineAuthenticationMutationKey = () =>
   ["setMachineAuthentication"] as const;
 
 export const getSetMachineAuthenticationMutationOptions = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse | void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -1492,14 +1598,14 @@ export type SetMachineAuthenticationMutationResult = NonNullable<
 export type SetMachineAuthenticationMutationBody =
   BodyType<MachineAuthenticationPolicy> | undefined;
 export type SetMachineAuthenticationMutationError =
-  ErrorType<void | ErrorResponse>;
+  ErrorType<ErrorResponse | void>;
 export type SetMachineAuthenticationMutationVariables = {
   key: string;
   data?: BodyType<MachineAuthenticationPolicy>;
 };
 
 export const useSetMachineAuthentication = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse | void>,
   TContext = unknown,
 >(
   options?: {

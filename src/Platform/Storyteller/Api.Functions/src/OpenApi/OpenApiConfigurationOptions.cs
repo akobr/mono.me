@@ -35,6 +35,7 @@ public class OpenApiConfigurationOptions : DefaultOpenApiConfigurationOptions
     [
         new AnnotationDocumentFilter(),
         new AccountRoleSchemaDocumentFilter(),
+        new MachineCredentialKindDocumentFilter(),
         new ApiKeySecuritySchemeDocumentFilter(),
         new MtlsSecuritySchemeDocumentFilter(),
         new OAuthSecuritySchemeDocumentFilter(),
