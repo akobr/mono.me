@@ -29,6 +29,9 @@ public record class MachineAccess : IMachineAccess
 
     public DateTimeOffset? CertificateNotAfter { get; init; }
 
+    // CertificateAndApiKey only: the machine has no certificate of its own and presents a shared certificate of the project.
+    public bool UsesSharedCertificate { get; init; }
+
     // ClientCredentials only, returned on create and not stored. Get, list, and reset omit them.
     // TokenEndpoint is where the machine exchanges Id and AccessKey for a token. TokenScope is
     // the scope parameter that exchange needs.

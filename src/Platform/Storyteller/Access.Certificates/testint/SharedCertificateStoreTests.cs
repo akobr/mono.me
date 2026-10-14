@@ -74,7 +74,20 @@ public class SharedCertificateStoreTests(CosmosFixture fixture)
         cert2.Label.Length.ShouldBeGreaterThan("dup-label".Length);
     }
 
-    private async Task EnsureAccessPointAsync()
+    [Fact]
+    public async Task Issue_InAProjectWithoutCertificateAndApiKey_IsNotSupported()
+    {
+        const string apiKeyProject = "sharedoff";
+        var service = fixture.Services.GetRequiredService<SharedCertificateService>();
+        await EnsureAccessPointAsync(apiKeyProject, MachineCredentialKind.ApiKey);
+
+        await Should.ThrowAsync<MachineAccessNotSupportedException>(
+            () => service.IssueAsync(Organization, apiKeyProject, "not-allowed", 365));
+        (await service.ListAsync(Organization, apiKeyProject)).ShouldBeEmpty();
+    }
+
+    // Shared certificates follow CertificateAndApiKey, so the project enables it.
+    private async Task EnsureAccessPointAsync(string project = Project, MachineCredentialKind kind = MachineCredentialKind.CertificateAndApiKey)
     {
         try
         {
@@ -82,7 +95,7 @@ public class SharedCertificateStoreTests(CosmosFixture fixture)
             await accessService.CreateAccessPointAsync(new AccessPointCreate
             {
                 Organization = Organization,
-                Project = Project,
+                Project = project,
                 OwnerId = "test-owner",
             });
         }
@@ -90,5 +103,10 @@ public class SharedCertificateStoreTests(CosmosFixture fixture)
         {
             // Already exists.
         }
+
+        await fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>().SetAsync(
+            Organization,
+            project,
+            new MachineAuthenticationPolicy { EnabledCredentialKinds = [kind] });
     }
 }

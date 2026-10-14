@@ -28,6 +28,8 @@ public interface IMachineAccess
 
     DateTimeOffset? CertificateNotAfter { get; }
 
+    bool UsesSharedCertificate { get; }
+
     string? TokenEndpoint { get; }
 
     string? TokenScope { get; }

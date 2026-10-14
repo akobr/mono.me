@@ -188,6 +188,23 @@ public class MachineAuthenticationPoliciesTests
     }
 
     [Theory]
+    [InlineData(new[] { MachineCredentialKind.CertificateAndApiKey }, true)]
+    [InlineData(new[] { MachineCredentialKind.ApiKey, MachineCredentialKind.CertificateAndApiKey }, true)]
+    [InlineData(new[] { MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate }, false)]
+    [InlineData(new[] { MachineCredentialKind.ClientCredentials }, false)]
+    public void AllowsSharedCertificates_FollowsCertificateAndApiKey(MachineCredentialKind[] kinds, bool expected)
+    {
+        new MachineAuthenticationPolicy { EnabledCredentialKinds = kinds }.AllowsSharedCertificates().ShouldBe(expected);
+    }
+
+    [Fact]
+    public void AllowsSharedCertificates_LegacyPolicy_FollowsItsOneKind()
+    {
+        new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.CertificateAndApiKey }.AllowsSharedCertificates().ShouldBeTrue();
+        new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.Certificate }.AllowsSharedCertificates().ShouldBeFalse();
+    }
+
+    [Theory]
     [InlineData(MachineCredentialKind.ApiKey, false)]
     [InlineData(MachineCredentialKind.Certificate, true)]
     [InlineData(MachineCredentialKind.CertificateAndApiKey, true)]

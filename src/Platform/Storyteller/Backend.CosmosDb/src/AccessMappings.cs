@@ -46,5 +46,6 @@ internal static class AccessMappings
         LastRenewalAt = e.LastRenewalAt,
         CertificateLifetimeDays = e.CertificateLifetimeDays,
         CertificateNotAfter = e.NotAfter,
+        UsesSharedCertificate = e.UsesSharedCertificate,
     };
 }

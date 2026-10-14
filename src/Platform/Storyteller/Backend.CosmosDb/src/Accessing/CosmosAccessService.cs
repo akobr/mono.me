@@ -454,6 +454,7 @@ public class CosmosAccessService : IAccessService
             CertificateThumbprint = machineAccess.CertificateThumbprint,
             CertificateLifetimeDays = machineAccess.CertificateLifetimeDays,
             NotAfter = machineAccess.CertificateNotAfter,
+            UsesSharedCertificate = machineAccess.UsesSharedCertificate,
             HashedSecret = existing?.HashedSecret,
         };
 

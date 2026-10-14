@@ -118,7 +118,67 @@ public class PolicyAwareCredentialKindTests
         _lifetimes.ShouldBe([45]);
     }
 
-    private static MachineAccessCreate Model(MachineCredentialKind? kind = null, int? lifetimeDays = null)
+    [Fact]
+    public async Task Create_CertificateAndApiKeyWithASharedCertificate_IssuesNoCertificate()
+    {
+        var access = await CreateService().CreateMachineAccessAsync(
+            Model(MachineCredentialKind.CertificateAndApiKey, lifetimeDays: 30, useSharedCertificate: true));
+
+        access.CredentialKind.ShouldBe(MachineCredentialKind.CertificateAndApiKey);
+        access.UsesSharedCertificate.ShouldBeTrue();
+        access.AccessKey.ShouldStartWith("2s.");
+        access.Certificate.ShouldBeNull();
+        access.CertificatePassword.ShouldBeNull();
+        access.CertificateThumbprint.ShouldBeNull();
+        access.CertificateLifetimeDays.ShouldBeNull();
+        access.CertificateNotAfter.ShouldBeNull();
+        _authority.VerifyNoOtherCalls();
+        _records.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Create_ASharedCertificateWithTheDefaultCertificateAndApiKeyKind_IssuesNoCertificate()
+    {
+        SetPolicy(new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.CertificateAndApiKey],
+            CredentialKind = MachineCredentialKind.CertificateAndApiKey,
+        });
+
+        var access = await CreateService().CreateMachineAccessAsync(Model(useSharedCertificate: true));
+
+        access.CredentialKind.ShouldBe(MachineCredentialKind.CertificateAndApiKey);
+        access.UsesSharedCertificate.ShouldBeTrue();
+        _authority.VerifyNoOtherCalls();
+    }
+
+    [Theory]
+    [InlineData(MachineCredentialKind.ApiKey)]
+    [InlineData(MachineCredentialKind.Certificate)]
+    [InlineData(null)]
+    public async Task Create_ASharedCertificateWithAnotherKind_IsNotSupported(MachineCredentialKind? kind)
+    {
+        // the project default is Certificate
+        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(
+            () => CreateService().CreateMachineAccessAsync(Model(kind, useSharedCertificate: true)));
+
+        exception.Message.ShouldStartWith("Only CertificateAndApiKey machines can use a shared certificate");
+        _hashStore.VerifyNoOtherCalls();
+        _authority.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task Create_CertificateAndApiKeyWithoutASharedCertificate_IssuesItsOwn()
+    {
+        var access = await CreateService().CreateMachineAccessAsync(
+            Model(MachineCredentialKind.CertificateAndApiKey, useSharedCertificate: false));
+
+        access.UsesSharedCertificate.ShouldBeFalse();
+        access.CertificateThumbprint.ShouldBe("THUMBPRINT");
+        _lifetimes.ShouldBe([90]);
+    }
+
+    private static MachineAccessCreate Model(MachineCredentialKind? kind = null, int? lifetimeDays = null, bool? useSharedCertificate = null)
     {
         return new MachineAccessCreate
         {
@@ -127,6 +187,7 @@ public class PolicyAwareCredentialKindTests
             Scope = MachineAccessScope.DefaultRead,
             CredentialKind = kind,
             CertificateLifetimeDays = lifetimeDays,
+            UseSharedCertificate = useSharedCertificate,
         };
     }
 

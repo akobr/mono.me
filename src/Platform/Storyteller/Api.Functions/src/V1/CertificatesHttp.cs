@@ -140,6 +140,7 @@ public class CertificatesHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(SharedCertificateCreate), Description = "The label and optional lifetime for the shared certificate.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(SharedCertificate), Description = "The issued shared certificate with PKCS#12 data.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "An invalid label, or the project does not enable CertificateAndApiKey, which shared certificates belong to.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
     public async Task<IActionResult> PostSharedCertificate(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.SharedCertificates)]
@@ -161,8 +162,15 @@ public class CertificatesHttp
             return new BadRequestObjectResult(new ErrorResponse { Message = "Invalid certificate label. Only letters, digits, hyphens, underscores, and dots are allowed." });
         }
 
-        var certificate = await _sharedCertService.IssueAsync(organization, project, model.Label, model.LifetimeDays);
-        return new OkObjectResult(certificate);
+        try
+        {
+            var certificate = await _sharedCertService.IssueAsync(organization, project, model.Label, model.LifetimeDays);
+            return new OkObjectResult(certificate);
+        }
+        catch (MachineAccessNotSupportedException exception)
+        {
+            return new BadRequestObjectResult(new ErrorResponse { Message = exception.Message });
+        }
     }
 
     [Function(nameof(DeleteSharedCertificate))]

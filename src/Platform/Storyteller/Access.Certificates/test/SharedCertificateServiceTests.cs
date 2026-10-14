@@ -29,6 +29,7 @@ public class SharedCertificateServiceTests
         var service = new SharedCertificateService(
             authority,
             storeMock.Object,
+            PolicyStore(MachineCredentialKind.CertificateAndApiKey),
             Options.Create(_options),
             NullLogger<SharedCertificateService>.Instance);
 
@@ -62,6 +63,7 @@ public class SharedCertificateServiceTests
         var service = new SharedCertificateService(
             authority,
             storeMock.Object,
+            PolicyStore(MachineCredentialKind.CertificateAndApiKey),
             Options.Create(_options),
             NullLogger<SharedCertificateService>.Instance);
 
@@ -82,6 +84,7 @@ public class SharedCertificateServiceTests
         var service = new SharedCertificateService(
             authorityMock.Object,
             storeMock.Object,
+            PolicyStore(MachineCredentialKind.CertificateAndApiKey),
             Options.Create(_options),
             NullLogger<SharedCertificateService>.Instance);
 
@@ -89,5 +92,50 @@ public class SharedCertificateServiceTests
 
         result.ShouldBeTrue();
         storeMock.Verify(s => s.RevokeAsync("org1", "proj1", "THUMBPRINT"), Times.Once);
+    }
+
+    [Fact]
+    public async Task IssueAsync_AProjectWithoutCertificateAndApiKey_IsNotSupported()
+    {
+        var storeMock = new Mock<ISharedCertificateStore>();
+        var authorityMock = new Mock<IClientCertificateAuthority>();
+
+        var service = new SharedCertificateService(
+            authorityMock.Object,
+            storeMock.Object,
+            PolicyStore(MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate),
+            Options.Create(_options),
+            NullLogger<SharedCertificateService>.Instance);
+
+        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(
+            () => service.IssueAsync("org1", "proj1", "my-service", 365));
+
+        exception.Message.ShouldBe("The project org1.proj1 does not enable CertificateAndApiKey, which shared certificates belong to.");
+        authorityMock.VerifyNoOtherCalls();
+        storeMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task RevokeAsync_AProjectWithoutCertificateAndApiKey_StillRevokes()
+    {
+        var storeMock = new Mock<ISharedCertificateStore>();
+        storeMock.Setup(s => s.RevokeAsync("org1", "proj1", "THUMBPRINT")).ReturnsAsync(true);
+
+        var service = new SharedCertificateService(
+            new Mock<IClientCertificateAuthority>().Object,
+            storeMock.Object,
+            PolicyStore(MachineCredentialKind.ApiKey),
+            Options.Create(_options),
+            NullLogger<SharedCertificateService>.Instance);
+
+        (await service.RevokeAsync("org1", "proj1", "THUMBPRINT")).ShouldBeTrue();
+    }
+
+    private static IMachineAuthenticationPolicyStore PolicyStore(params MachineCredentialKind[] kinds)
+    {
+        var policyStore = new Mock<IMachineAuthenticationPolicyStore>();
+        policyStore.Setup(store => store.GetAsync("org1", "proj1"))
+            .ReturnsAsync(new MachineAuthenticationPolicy { EnabledCredentialKinds = kinds });
+        return policyStore.Object;
     }
 }

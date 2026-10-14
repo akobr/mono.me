@@ -9,17 +9,20 @@ public class SharedCertificateService
 {
     private readonly IClientCertificateAuthority _authority;
     private readonly ISharedCertificateStore _store;
+    private readonly IMachineAuthenticationPolicyStore _policyStore;
     private readonly IOptions<MachineAuthenticationOptions> _options;
     private readonly ILogger<SharedCertificateService> _logger;
 
     public SharedCertificateService(
         IClientCertificateAuthority authority,
         ISharedCertificateStore store,
+        IMachineAuthenticationPolicyStore policyStore,
         IOptions<MachineAuthenticationOptions> options,
         ILogger<SharedCertificateService> logger)
     {
         _authority = authority;
         _store = store;
+        _policyStore = policyStore;
         _options = options;
         _logger = logger;
     }
@@ -31,6 +34,15 @@ public class SharedCertificateService
         int? requestedLifetimeDays)
     {
         var opts = _options.Value;
+        var policy = await _policyStore.GetEffectiveAsync(organization, project, opts);
+
+        // Shared certificates follow CertificateAndApiKey; listing and revoking stay open, to clean up.
+        if (!policy.AllowsSharedCertificates())
+        {
+            throw new MachineAccessNotSupportedException(
+                $"The project {organization}.{project} does not enable {MachineCredentialKind.CertificateAndApiKey}, which shared certificates belong to.");
+        }
+
         var lifetimeDays = Math.Clamp(
             requestedLifetimeDays ?? opts.CertificateLifetimeDays,
             opts.MinCertificateLifetimeDays,

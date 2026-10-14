@@ -15,4 +15,7 @@ public record class MachineAccessCreate
 
     // Kinds with a certificate only. Null: the project's default certificate lifetime.
     public int? CertificateLifetimeDays { get; init; }
+
+    // CertificateAndApiKey only: no certificate is issued for the machine, it presents a shared certificate of the project.
+    public bool? UseSharedCertificate { get; init; }
 }

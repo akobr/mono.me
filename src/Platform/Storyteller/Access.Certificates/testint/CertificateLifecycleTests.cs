@@ -112,6 +112,41 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
     }
 
     [Fact]
+    public async Task SharedCertificateMachine_IsStoredWithoutACertificateOfItsOwn()
+    {
+        const string sharedProject = "sharedmachines";
+
+        var accessService = fixture.Services.GetRequiredService<IAccessService>();
+        var policyStore = fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>();
+        await EnsureAccessPointAsync(accessService, sharedProject);
+        await policyStore.SetAsync(Organization, sharedProject, new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.CertificateAndApiKey],
+        });
+
+        var machine = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
+        {
+            Organization = Organization,
+            Project = sharedProject,
+            Scope = MachineAccessScope.DefaultRead,
+            UseSharedCertificate = true,
+        });
+
+        machine.Certificate.ShouldBeNull();
+        machine.AccessKey.ShouldStartWith("2s.");
+
+        var stored = await accessService.GetMachineAccessAsync(Organization, sharedProject, machine.Id);
+        stored!.CredentialKind.ShouldBe(MachineCredentialKind.CertificateAndApiKey);
+        stored.UsesSharedCertificate.ShouldBeTrue();
+        stored.CertificateThumbprint.ShouldBeNull();
+        stored.CertificateLifetimeDays.ShouldBeNull();
+        stored.CertificateNotAfter.ShouldBeNull();
+
+        var validated = await fixture.Services.GetRequiredService<IApiKeyValidator>().ValidateAsync(machine.AccessKey);
+        validated!.CredentialKind.ShouldBe(MachineCredentialKind.CertificateAndApiKey);
+    }
+
+    [Fact]
     public async Task ApiKeyMachineAccess_CreateAndVerify()
     {
         var accessService = fixture.Services.GetRequiredService<IAccessService>();
