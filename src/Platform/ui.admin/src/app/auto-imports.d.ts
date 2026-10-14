@@ -28,6 +28,7 @@ declare global {
   const typeColorsStyleId: typeof import('./stores/type-appearance').typeColorsStyleId
   const undoKeys: typeof import('./composables/useAnnotationActions').undoKeys
   const useAnnotationActions: typeof import('./composables/useAnnotationActions').useAnnotationActions
+  const useAnnotationBulkCreate: typeof import('./composables/useAnnotationBulkCreate').useAnnotationBulkCreate
   const useAnnotationCreate: typeof import('./composables/useAnnotationCreate').useAnnotationCreate
   const useAnnotationFilter: typeof import('./composables/useAnnotationFilter').useAnnotationFilter
   const useAppConfig: typeof import('../node_modules/@nuxt/ui/dist/runtime/vue/composables/useAppConfig.js').useAppConfig
@@ -71,7 +72,7 @@ declare global {
 // for type re-export
 declare global {
   // @ts-ignore
-  export type { DeletionOutcome, RestoreOutcome } from './composables/useAnnotationActions'
+  export type { DeletionOutcome, RestoreOutcome, BulkCreateOutcome } from './composables/useAnnotationActions'
   import('./composables/useAnnotationActions')
   // @ts-ignore
   export type { ListMode } from './composables/useAnnotationFilter'

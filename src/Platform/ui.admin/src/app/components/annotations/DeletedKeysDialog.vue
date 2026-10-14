@@ -4,9 +4,13 @@ import type { DeletedKeyChoice } from '@/composables/useDeletedKeyCheck'
 
 /**
  * Asked before a create touches deleted keys (spec 4.5): restore them, which keeps their configuration and history,
- * or create new ones, which replaces them. Used with useDeletedKeyCheck by every flow that creates keys.
+ * or create new ones, which replaces them. Used with useDeletedKeyCheck by every flow that creates keys; a flow that
+ * writes nothing over the restored keys (Bulk create) names the action "Restore".
  */
-withDefaults(defineProps<{ deleted: Annotation[]; loading?: boolean }>(), { loading: false })
+withDefaults(defineProps<{ deleted: Annotation[]; loading?: boolean; restoreLabel?: string }>(), {
+  loading: false,
+  restoreLabel: 'Restore and update',
+})
 const emit = defineEmits<{ choose: [choice: DeletedKeyChoice] }>()
 const open = defineModel<boolean>('open', { default: false })
 </script>
@@ -50,7 +54,7 @@ const open = defineModel<boolean>('open', { default: false })
         @click="emit('choose', 'create')"
       />
       <UButton
-        label="Restore and update"
+        :label="restoreLabel"
         icon="i-lucide-archive-restore"
         :loading="loading"
         autofocus

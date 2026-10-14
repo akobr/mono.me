@@ -5,11 +5,8 @@ import {
   type RouteLocationRaw,
   type Router,
 } from 'vue-router'
-import type { Scope } from '@/stores/context'
 import { isRememberedSection, usePageMemoryStore } from '@/stores/page-memory'
-import { viewLocation } from '@/utils/context-paths'
-
-const sameView = (a: Scope, b: Scope) => a.org === b.org && a.project === b.project && a.view === b.view
+import { sameView, viewLocation } from '@/utils/context-paths'
 
 /**
  * Brings the user back to where they left the annotations, configurations or graph section of a view (filter,

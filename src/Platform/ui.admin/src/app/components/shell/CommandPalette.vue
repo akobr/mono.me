@@ -21,6 +21,7 @@ const navigation = useNavigationContext()
 const shortcuts = useShortcutsHelp()
 const sidebar = useSidebar()
 const create = useAnnotationCreate()
+const bulkCreate = useAnnotationBulkCreate()
 const canEdit = useCan('edit')
 
 const open = ref(false)
@@ -92,6 +93,14 @@ const actionItems = computed<CommandPaletteItem[]>(() => [
           onSelect: async () => {
             await router.push(`${viewBase.value}/annotations`)
             create.show()
+          },
+        },
+        {
+          label: 'Bulk create annotations',
+          icon: 'i-lucide-list-plus',
+          onSelect: async () => {
+            await router.push(`${viewBase.value}/annotations`)
+            bulkCreate.show()
           },
         },
       ]

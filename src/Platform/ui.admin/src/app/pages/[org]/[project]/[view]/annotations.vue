@@ -53,6 +53,7 @@ const scrollTop = computed({
   set: (value: number) => (memory.value.scrollTop = value),
 })
 const { open: creating } = useAnnotationCreate()
+const { open: bulkCreating } = useAnnotationBulkCreate()
 
 watch(
   () => context.scope,
@@ -235,6 +236,21 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
               @click="context.scope && catalog.load(context.scope, { force: true })"
             />
           </UTooltip>
+          <!-- Not below sm, where the navbar has no room for a third button: the command palette and the empty
+               state open it there. Icon-only until lg, where the sidebar is collapsed and the label would push the
+               right group over the breadcrumb. -->
+          <UTooltip v-if="canEdit" text="Bulk create annotations">
+            <UButton
+              label="Bulk create"
+              aria-label="Bulk create"
+              icon="i-lucide-list-plus"
+              color="neutral"
+              variant="outline"
+              class="hidden sm:inline-flex"
+              :ui="{ label: 'hidden lg:inline' }"
+              @click="bulkCreating = true"
+            />
+          </UTooltip>
           <UButton
             v-if="canEdit"
             label="New"
@@ -290,9 +306,18 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
         v-else-if="catalog.status === 'ready' && catalog.loadedCount === 0"
         icon="i-lucide-tags"
         title="No annotations in this view"
-        description="Create the first annotation, or import them with the sform CLI."
+        description="Create the first annotations, or import them with the sform CLI."
       >
-        <UButton v-if="canEdit" label="New annotation" icon="i-lucide-plus" @click="creating = true" />
+        <template v-if="canEdit">
+          <UButton label="New annotation" icon="i-lucide-plus" @click="creating = true" />
+          <UButton
+            label="Bulk create"
+            icon="i-lucide-list-plus"
+            color="neutral"
+            variant="outline"
+            @click="bulkCreating = true"
+          />
+        </template>
       </EmptyState>
       <AnnotationGrid
         v-else-if="desktop"
@@ -313,6 +338,7 @@ const progressLabel = computed(() => `Loaded ${new Intl.NumberFormat().format(ca
 
       <p class="sr-only" aria-live="polite">{{ activeLabel }}</p>
       <AnnotationCreateDialog v-if="canEdit" v-model:open="creating" @created="open" />
+      <AnnotationBulkCreateDialog v-if="canEdit" v-model:open="bulkCreating" />
     </template>
   </UDashboardPanel>
 
