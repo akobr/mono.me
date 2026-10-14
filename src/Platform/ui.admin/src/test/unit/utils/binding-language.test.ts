@@ -67,6 +67,20 @@ describe('binding language (424-10)', () => {
       expect(explainBinding('@-x', server)?.problem).toContain('`-` cannot follow `@`')
     })
 
+    it('reads a call of a source name as that source', () => {
+      const secret = catalogView({
+        Functions: [],
+        Sources: [{ Name: 'secret', Summary: 'Secrets of the store.', IsDefault: false, IsSecret: true, Examples: [] }],
+      })
+
+      expect(explainBinding('@secret(db.password)', secret)).toMatchObject({
+        kind: 'sourced',
+        name: 'secret',
+        title: 'Secret source',
+        problem: undefined,
+      })
+    })
+
     it('warns about a path only when the server has no default source', () => {
       expect(explainBinding('@a.b', noDefault)?.problem).toContain('No `default` source is registered')
       expect(explainBinding('@a.b', server)?.problem).toBeUndefined()
