@@ -4,7 +4,8 @@ import { metaOf } from '@/utils/annotation-key'
 
 /**
  * Type chip: icon and code in the type color (color is never the only signal). `label` shows the name instead of the
- * code and `icon` only the icon; the code itself is shown only on Schemas (424-34).
+ * code and `icon` only the icon; the code itself is shown only on Schemas (424-34). A name longer than the room it
+ * has, such as a long custom name in a grid column, ends with an ellipsis; the title holds the whole name.
  */
 const props = withDefaults(defineProps<{ type?: string | null; variant?: 'chip' | 'icon' | 'label' }>(), {
   type: undefined,
@@ -27,12 +28,12 @@ const meta = computed(() => metaOf(props.type))
   </span>
   <span
     v-else-if="meta"
-    class="inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium whitespace-nowrap"
+    class="inline-flex max-w-full min-w-0 items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs font-medium whitespace-nowrap"
     :class="[meta.textClass, meta.bgClass]"
     :title="meta.label"
   >
     <UIcon :name="meta.icon" class="size-3.5 shrink-0" />
-    <span class="font-mono">{{ variant === 'label' ? meta.label : meta.code }}</span>
+    <span class="truncate font-mono">{{ variant === 'label' ? meta.label : meta.code }}</span>
   </span>
   <span v-else class="text-dimmed">–</span>
 </template>

@@ -1,6 +1,7 @@
 import { glob, readFile } from 'node:fs/promises'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Annotation } from '@42for.net/2splatform.sdk'
+import AnnotationTypeBadge from '@/components/annotations/AnnotationTypeBadge.vue'
 import DeletedKeysDialog from '@/components/annotations/DeletedKeysDialog.vue'
 import GraphTooltip from '@/components/graph/GraphTooltip.vue'
 import { applyTypeAppearance } from '@/utils/type-appearance'
@@ -44,6 +45,19 @@ describe('type names instead of codes', () => {
     const card = document.body.querySelector('[role="tooltip"]')!
     expect(card.querySelector('[title="Job"]')?.textContent?.trim()).toBe('Job')
     expect(card.textContent).toContain('exe.northwind.invoicing.prod')
+    view.host.unmount()
+  })
+
+  it('cuts a long name with an ellipsis and keeps the whole name in the title', async () => {
+    const name = 'Very long execution type name for tests'
+    applyTypeAppearance({ exe: { label: name } })
+    const view = mountInApp(AnnotationTypeBadge, { type: 'exe', variant: 'label' })
+    await settle()
+
+    const chip = view.inner().element as HTMLElement
+    expect(chip.title).toBe(name)
+    expect(chip.classList).toContain('max-w-full')
+    expect(chip.querySelector('.truncate')?.textContent).toBe(name)
     view.host.unmount()
   })
 
