@@ -22,6 +22,7 @@ Phase 2 covers the Administration UI (sections 2.1 to 2.9) of [Binding Catalog w
   - an unquoted argument of a function whose signature quotes it (`@config(maxPrice)`);
   - a path when the server has no `default` source.
 - An unknown function or source is reported only when `known` is set, so nothing is flagged before the catalog arrives.
+- **Addition:** `@name(path)` where `name` is a registered source (and not a function) is explained as that source. The open native key-value store (PR #69, 424-5) registers the sources `default`, `public` and `secret` and calls them as `@public(db.host)` and `@secret(db.password)`. With this rule, the UI does not report those calls as unknown functions once that change is merged.
 - `bindingCompletionContext(prefix)` returns `start` (with `nested` inside interpolation or math), `source` or `argument` (with the function, the argument index and the text typed so far).
 - **Deviation:** the spec had a separate `annotationType` context. The `argument` context carries the index instead, and the completion source maps the second argument of `annotation` to the types. That also covers any function whose parameter lists `Values`.
 - Also added:
@@ -81,8 +82,8 @@ Phase 2 covers the Administration UI (sections 2.1 to 2.9) of [Binding Catalog w
 
 ### 2.8 Tests
 
-- **Unit** (Vitest, 341 pass in 36 files; there were 308 in 33 files):
-  - `test/unit/utils/binding-language.test.ts` (14): every kind and mistake of `explainBinding`, the behavior before the catalog is known, every completion context, `quotedArguments`, `quoteFor`, `pointersOf`, `ancestorKeyOf` for every type of an `uxe` key, and the ancestor types of a key and of a type.
+- **Unit** (Vitest, 342 pass in 36 files; there were 308 in 33 files):
+  - `test/unit/utils/binding-language.test.ts` (15): every kind and mistake of `explainBinding`, a source called by its name, the behavior before the catalog is known, every completion context, `quotedArguments`, `quoteFor`, `pointersOf`, `ancestorKeyOf` for every type of an `uxe` key, and the ancestor types of a key and of a type.
   - `test/unit/configuration/binding-editor.test.ts` (13): the completion source on JSON and YAML `EditorState`s: options after `@` and inside interpolation, the range that is replaced, the snippet quotes, sources, config and annotation pointers (and which ancestor is asked), ancestor types, nothing in plain strings, keys or numbers. Also the stable identity of the source, `stringAt`/`decodeString`, and the hover card.
   - `test/unit/configuration/binding-reference.test.ts` (4): the sections and entries, the filter, **Use** emitting and closing, and no **Use** for object bindings.
   - `schema-form.test.ts` (+2): the explanation of a valid expression and of `@sbt.northwind/baseUrl`, and **Use** from the reference replacing a field's value.
@@ -102,6 +103,16 @@ Phase 2 covers the Administration UI (sections 2.1 to 2.9) of [Binding Catalog w
 - `docs/42for.net/platform/configuration.md`, Bindings: a paragraph that the functions and sources depend on the deployment and that the admin UI lists and completes them.
 
 ### Notes
+
+- **Native key-value store.** The issue also names the bindings to the native key-value storage. That store is PR #69 (424-5), which is not merged into `main`, so this branch cannot build on it. What is ready for it:
+  - its sources appear in the catalog, the reference and the completion without any change, because the catalog lists every registered source;
+  - they get summaries and examples once `KeyValueBindingSource` implements `IDescribedBinding`;
+  - `@public(…)` and `@secret(…)` are explained as sources (2.1).
+
+  Completing the keys of the store inside those calls needs the key listing of #69 and is left for a follow-up.
+- **Merging with #69.** `git merge-tree` of this branch with `feat/platform/key-value-storage` merges `Binding.Core/src/EntryPoint.cs` cleanly: this branch adds the `IBindingCatalog` registration, and #69 changes the executor factory above it.
+  - It conflicts where both regenerated or extended the same lists: the generated TypeScript SDK and `Sdk.NSwag` (each regenerated them from its own export: `open.api.v0.9.2.json` here, `open.api.v0.9.5.json` in #69), `sdk.typescript/src/package.json` (the version), the `Sdk.NSwag` README, `RouteTableTests.cs` and `app/mock/all-handlers.ts`.
+  - Whichever merges second should take the other's code and export and regenerate the SDKs once more.
 
 - `app/utils/bindings.ts` still detects envelopes by `$jsonlogic`, `$jsone` or `$definition` (the original admin UI design). The server's envelope is `$binding` plus `$definition`, so real envelopes are still detected through `$definition`. The detection was left unchanged; only the highlighting learned `$binding` and `$context`.
 - Two unit tests still use `@rst.invoicing/retries` as a sample binding. They test detection only, and the explanation line now marks it as a likely mistake, which they do not check.

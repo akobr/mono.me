@@ -331,6 +331,20 @@ export function explainBinding(text: string, catalog: BindingCatalogView): Bindi
 
 function explainCall(called: string, rest: string, catalog: BindingCatalogView): BindingExplanation {
   const entry = catalog.functions.find((candidate) => candidate.Name === called)
+  const source = entry ? undefined : catalog.sources.find((candidate) => candidate.Name === called)
+  // A server where a source can be called by its name (`@secret(db.password)`) lists it as a source, not a function.
+  if (source) {
+    return {
+      kind: 'sourced',
+      name: called,
+      title: source.IsSecret ? 'Secret source' : 'Source',
+      summary: source.Summary || syntaxOf('sourced').summary,
+      syntax: `@${called}(path.to.value)`,
+      example: source.Examples?.[0],
+      problem: rest.endsWith(')') ? undefined : 'A source call ends with `)`.',
+    }
+  }
+
   const syntax = syntaxOf('function')
   const explanation: BindingExplanation = {
     kind: 'function',
