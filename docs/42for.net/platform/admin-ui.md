@@ -95,6 +95,14 @@ The breadcrumb and **Lineage** show its ancestors in merge order.
 
 **New** creates an annotation from its type and names. Its time zone (the zone of **Valid from** and **Expires**) starts as the project's default time zone from **Settings**, and the dialog lets you pick another one. Missing ancestors created with it get the same zone.
 
+**Bulk create** creates many annotations from a list of keys, typed or pasted, one per line. A line that starts with a type code is that key (`rst.invoicing`). A line without a code is a [compact line](using-the-platform#writing-the-catalog), read by its number of parts: `northwind` is a subject, `northwind.invoicing` a usage, `northwind.invoicing.production` an execution, and four parts a unit of execution. Responsibilities, contexts and units need their code.
+
+- Before anything is created, the dialog lists every line with the key it becomes and whether it is **New**, **Exists**, a **Duplicate** or **Invalid**, and counts the missing ancestors. An invalid line (a code with the wrong number of parts, an empty part, more than four parts without a code, or a tab, `/`, `\`, `?` or `#` in a name) blocks the create until you fix it, or until **Remove invalid lines** removes it.
+- The missing ancestors are created with the keys, and keys that already exist are skipped, so the same list can be sent again, for example after an error.
+- The new annotations get only their key and name: no title and no time zone. Add those, labels and configurations afterwards.
+- One run takes at most 1,000 keys, sent 100 per request.
+- On a phone, open it from the command palette (**Bulk create annotations**), or from the empty view.
+
 ### Deleting and restoring
 
 **Delete** moves the annotation and everything below it in the graph to **Deleted**, with their configuration. The toast after a delete says until when they can be restored and offers **Undo**. The bulk bar deletes the same way.
@@ -105,7 +113,7 @@ The breadcrumb and **Lineage** show its ancestors in merge order.
 - **Delete permanently** removes it for good, with its history. Only Administrators and Owners see it, and it asks you to type the key.
 - Opening a deleted key shows when and by whom it was deleted, its history, and **Restore**.
 
-Creating an annotation whose key, or an ancestor's key, is deleted asks first: **Restore and update** brings back the deleted annotation with its configuration and history; **Create new** replaces it with an empty one.
+Creating an annotation whose key, or an ancestor's key, is deleted asks first: **Restore and update** brings back the deleted annotation with its configuration and history; **Create new** replaces it with an empty one. **Bulk create** asks the same for all its keys at once, and offers **Restore** instead of **Restore and update**, since it writes nothing over them.
 
 The command palette (`Ctrl K` / `⌘ K`) finds annotations, pages, projects and actions.
 
