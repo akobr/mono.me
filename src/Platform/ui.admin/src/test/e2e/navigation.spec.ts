@@ -53,3 +53,13 @@ test('updates the sections when another view is opened', async ({ page }, testIn
     '/acme/billing/default/annotations',
   )
 })
+
+// The unit tests compare the src of the logo only; this checks that the browser loads the 128 px 42 logo (424-32).
+test('shows the 42 logo at the top of the navigation menu', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/annotations')
+
+  const scope = isMobile(testInfo) ? await menu(page, testInfo) : page
+  const logo = scope.getByRole('link', { name: '2S Admin home' }).locator('img')
+  await expect(logo).toBeVisible()
+  await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(128)
+})
