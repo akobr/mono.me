@@ -50,7 +50,9 @@ public class StorytellerGetCommand : BaseContextCommand
                 Context.OrganizationName,
                 Context.ProjectName,
                 Context.ViewName,
-                AnnotationKey);
+                AnnotationKey,
+                null,
+                null);
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {

@@ -128,7 +128,9 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ProjectName,
             Context.ViewName,
             nameQuery: QuerySubjects,
-            continuationToken: ContinuationToken);
+            continuationToken: ContinuationToken,
+            includeInactive: null,
+            includeDeleted: null);
 
         Console.WriteHeader("Subjects");
 
@@ -159,7 +161,9 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ProjectName,
             Context.ViewName,
             nameQuery: QueryResponsibilities,
-            continuationToken: ContinuationToken);
+            continuationToken: ContinuationToken,
+            includeInactive: null,
+            includeDeleted: null);
 
         Console.WriteHeader("Responsibilities");
 
@@ -191,7 +195,9 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ViewName,
             responsibilityNameQuery: QueryResponsibilities,
             subjectNameQuery: QuerySubjects,
-            continuationToken: ContinuationToken);
+            continuationToken: ContinuationToken,
+            includeInactive: null,
+            includeDeleted: null);
 
         Console.WriteHeader("Usages");
 
@@ -223,7 +229,9 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ViewName,
             subjectNameQuery: QuerySubjects,
             nameQuery: QueryContexts,
-            continuationToken: ContinuationToken);
+            continuationToken: ContinuationToken,
+            includeInactive: null,
+            includeDeleted: null);
 
         Console.WriteHeader("Contexts");
 
@@ -256,7 +264,9 @@ public class StorytellerListCommand : BaseContextCommand
             subjectNameQuery: QuerySubjects,
             responsibilityNameQuery: QueryResponsibilities,
             contextNameQuery: QueryContexts,
-            continuationToken: ContinuationToken);
+            continuationToken: ContinuationToken,
+            includeInactive: null,
+            includeDeleted: null);
 
         Console.WriteHeader("Executions");
 
@@ -288,7 +298,9 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ViewName,
             annotationKey,
             "all",
-            ContinuationToken);
+            ContinuationToken,
+            null,
+            null);
 
         Console.WriteHeader("All descendants");
 
@@ -312,7 +324,7 @@ public class StorytellerListCommand : BaseContextCommand
 
     private async Task RenderAnnotationsAsync()
     {
-        var response = await _annotationsApi.GetAnnotationsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, null);
+        var response = await _annotationsApi.GetAnnotationsAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, null, null, null);
         Console.WriteHeader("Annotations");
 
         if (response.Annotations.Count < 1)
@@ -354,7 +366,9 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ProjectName,
             Context.ViewName,
             nameQuery: QueryResponsibilities,
-            continuationToken: ContinuationToken);
+            continuationToken: ContinuationToken,
+            includeInactive: null,
+            includeDeleted: null);
 
         var root = new Composition("Tree of responsibilities");
 
@@ -381,7 +395,9 @@ public class StorytellerListCommand : BaseContextCommand
                 subjectNameQuery: QuerySubjects,
                 responsibilityNameQuery: responsibility.Name,
                 contextNameQuery: QueryContexts,
-                continuationToken: null);
+                continuationToken: null,
+                includeInactive: null,
+                includeDeleted: null);
 
             foreach (var execution in executionsResponse.Annotations)
             {
@@ -426,7 +442,9 @@ public class StorytellerListCommand : BaseContextCommand
             Context.ProjectName,
             Context.ViewName,
             nameQuery: QuerySubjects,
-            continuationToken: ContinuationToken);
+            continuationToken: ContinuationToken,
+            includeInactive: null,
+            includeDeleted: null);
 
         var root = new Composition("Tree of subjects");
 
@@ -452,7 +470,9 @@ public class StorytellerListCommand : BaseContextCommand
                 subjectNameQuery: subject.Name,
                 responsibilityNameQuery: QueryResponsibilities,
                 contextNameQuery: QueryContexts,
-                continuationToken: null);
+                continuationToken: null,
+                includeInactive: null,
+                includeDeleted: null);
 
             foreach (var execution in executionsResponse.Annotations)
             {
