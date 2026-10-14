@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.9.10198
+ * OpenAPI spec version: 0.9.11.55139
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -1988,7 +1988,7 @@ export const getIssueSharedCertificateMutationKey = () =>
   ["issueSharedCertificate"] as const;
 
 export const getIssueSharedCertificateMutationOptions = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse | void>,
   TContext = unknown,
 >(options?: {
   mutation?: UseMutationOptions<
@@ -2031,7 +2031,7 @@ export type IssueSharedCertificateMutationResult = NonNullable<
 export type IssueSharedCertificateMutationBody =
   BodyType<SharedCertificateCreate> | undefined;
 export type IssueSharedCertificateMutationError =
-  ErrorType<void | ErrorResponse>;
+  ErrorType<ErrorResponse | void>;
 export type IssueSharedCertificateMutationVariables = {
   organization: string;
   project: string;
@@ -2039,7 +2039,7 @@ export type IssueSharedCertificateMutationVariables = {
 };
 
 export const useIssueSharedCertificate = <
-  TError = ErrorType<void | ErrorResponse>,
+  TError = ErrorType<ErrorResponse | void>,
   TContext = unknown,
 >(
   options?: {

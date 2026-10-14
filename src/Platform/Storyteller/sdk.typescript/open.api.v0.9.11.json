@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.9.10198"
+    "version": "0.9.11.55139"
   },
   "servers": [
     {
@@ -3973,6 +3973,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SharedCertificate"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An invalid label, or the project does not enable CertificateAndApiKey, which shared certificates belong to.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -16212,6 +16222,9 @@
             "format": "date-time",
             "nullable": true
           },
+          "UsesSharedCertificate": {
+            "type": "boolean"
+          },
           "TokenEndpoint": {
             "type": "string"
           },
@@ -16259,6 +16272,10 @@
           "CertificateLifetimeDays": {
             "type": "integer",
             "format": "int32",
+            "nullable": true
+          },
+          "UseSharedCertificate": {
+            "type": "boolean",
             "nullable": true
           }
         }

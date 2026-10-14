@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.9.10198
+ * OpenAPI spec version: 0.9.11.55139
  */
 import * as zod from "zod";
 
@@ -347,6 +347,7 @@ export const GetMachineAccessesResponseItem = zod.object({
   LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),
   CertificateLifetimeDays: zod.int().nullish(),
   CertificateNotAfter: zod.iso.datetime({ offset: true }).nullish(),
+  UsesSharedCertificate: zod.boolean().optional(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
 });
@@ -387,6 +388,7 @@ export const CreateMachineAccessBody = zod.object({
     ])
     .nullish(),
   CertificateLifetimeDays: zod.int().nullish(),
+  UseSharedCertificate: zod.boolean().nullish(),
 });
 
 export const createMachineAccessResponseScopeDefault = `AnnotationRead`;
@@ -423,6 +425,7 @@ export const CreateMachineAccessResponse = zod.object({
   LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),
   CertificateLifetimeDays: zod.int().nullish(),
   CertificateNotAfter: zod.iso.datetime({ offset: true }).nullish(),
+  UsesSharedCertificate: zod.boolean().optional(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
 });
@@ -467,6 +470,7 @@ export const GetMachineAccessResponse = zod.object({
   LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),
   CertificateLifetimeDays: zod.int().nullish(),
   CertificateNotAfter: zod.iso.datetime({ offset: true }).nullish(),
+  UsesSharedCertificate: zod.boolean().optional(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
 });
@@ -511,6 +515,7 @@ export const ResetMachineAccessResponse = zod.object({
   LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),
   CertificateLifetimeDays: zod.int().nullish(),
   CertificateNotAfter: zod.iso.datetime({ offset: true }).nullish(),
+  UsesSharedCertificate: zod.boolean().optional(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
 });

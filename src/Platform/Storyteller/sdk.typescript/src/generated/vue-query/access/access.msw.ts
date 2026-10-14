@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.9.10198
+ * OpenAPI spec version: 0.9.11.55139
  */
 import { faker } from "@faker-js/faker";
 
@@ -337,6 +337,10 @@ export const getGetMachineAccessesResponseMock = (): MachineAccess[] =>
       faker.date.past().toISOString().slice(0, 19) + "Z",
       null,
     ]),
+    UsesSharedCertificate: faker.helpers.arrayElement([
+      faker.datatype.boolean(),
+      undefined,
+    ]),
     TokenEndpoint: faker.helpers.arrayElement([
       faker.string.alpha({ length: { min: 10, max: 20 } }),
       undefined,
@@ -405,6 +409,10 @@ export const getCreateMachineAccessResponseMock = (
   CertificateNotAfter: faker.helpers.arrayElement([
     faker.date.past().toISOString().slice(0, 19) + "Z",
     null,
+  ]),
+  UsesSharedCertificate: faker.helpers.arrayElement([
+    faker.datatype.boolean(),
+    undefined,
   ]),
   TokenEndpoint: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -476,6 +484,10 @@ export const getGetMachineAccessResponseMock = (
     faker.date.past().toISOString().slice(0, 19) + "Z",
     null,
   ]),
+  UsesSharedCertificate: faker.helpers.arrayElement([
+    faker.datatype.boolean(),
+    undefined,
+  ]),
   TokenEndpoint: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
@@ -545,6 +557,10 @@ export const getResetMachineAccessResponseMock = (
   CertificateNotAfter: faker.helpers.arrayElement([
     faker.date.past().toISOString().slice(0, 19) + "Z",
     null,
+  ]),
+  UsesSharedCertificate: faker.helpers.arrayElement([
+    faker.datatype.boolean(),
+    undefined,
   ]),
   TokenEndpoint: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
