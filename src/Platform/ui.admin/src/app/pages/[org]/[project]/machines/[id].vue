@@ -52,7 +52,8 @@ function close() {
         <dt class="text-muted">Object id</dt>
         <dd class="font-mono text-xs break-all">{{ machine.data.value?.ObjectId ?? '–' }}</dd>
         <dt class="text-muted">Certificate</dt>
-        <dd class="font-mono text-xs break-all">{{ machine.data.value?.CertificateThumbprint ?? '–' }}</dd>
+        <dd v-if="machine.data.value?.UsesSharedCertificate">A shared certificate of the project</dd>
+        <dd v-else class="font-mono text-xs break-all">{{ machine.data.value?.CertificateThumbprint ?? '–' }}</dd>
         <template v-if="machine.data.value?.CertificateLifetimeDays">
           <dt class="text-muted">Certificate lifetime</dt>
           <dd>{{ machine.data.value.CertificateLifetimeDays }} days</dd>

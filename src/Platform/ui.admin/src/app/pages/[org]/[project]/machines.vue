@@ -134,6 +134,14 @@ const daysLeft = (machine: MachineAccess) => certificateDaysLeft(machine, policy
                     size="sm"
                   />
                 </span>
+                <UBadge
+                  v-else-if="machine.UsesSharedCertificate"
+                  label="shared"
+                  icon="i-lucide-shield-check"
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                />
                 <span v-else class="text-dimmed">–</span>
               </td>
               <td class="px-3 py-2"><RelativeTime :value="machine.LastRenewalAt" /></td>

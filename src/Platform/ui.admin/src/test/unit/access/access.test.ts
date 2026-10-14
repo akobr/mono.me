@@ -5,13 +5,15 @@ import { setupServer } from 'msw/node'
 import {
   createMachineAccess,
   getMachineAuthentication,
+  issueSharedCertificate,
+  resetMachineAccess,
   setMachineAuthentication,
   type AccessPointMember,
   type MachineAccessCreate,
   type MachineAuthenticationPolicy,
 } from '@42for.net/2splatform.sdk'
 import { memberRules } from '@/utils/roles'
-import { certificateDaysLeft, issuesCertificates, machineSecret } from '@/utils/machines'
+import { allowsSharedCertificates, certificateDaysLeft, issuesCertificates, machineSecret } from '@/utils/machines'
 import MachineCreateDialog from '@/components/access/MachineCreateDialog.vue'
 import OneTimeSecretDialog from '@/components/access/OneTimeSecretDialog.vue'
 import MembersTable from '@/components/access/MembersTable.vue'
@@ -104,6 +106,18 @@ describe('machines', () => {
       apiKey: 'sk',
       credentialKind: 'ClientCredentials',
     })
+    expect(
+      machineSecret(
+        { Id: 'm2', AccessKey: 'st_y', CredentialKind: 'CertificateAndApiKey', UsesSharedCertificate: true },
+        'Created',
+      ),
+    ).toMatchObject({ apiKey: 'st_y', sharedCertificate: true, certificate: undefined })
+  })
+
+  it('allows shared certificates only with the CertificateAndApiKey kind', () => {
+    expect(allowsSharedCertificates({ EnabledCredentialKinds: ['ApiKey', 'CertificateAndApiKey'] })).toBe(true)
+    expect(allowsSharedCertificates({ EnabledCredentialKinds: ['ApiKey', 'Certificate'] })).toBe(false)
+    expect(allowsSharedCertificates(undefined)).toBe(false)
   })
 })
 
@@ -135,6 +149,35 @@ describe('machine authentication policy against the mock API', () => {
     })
   })
 
+  it('issues shared certificates and creates machines that use them only with CertificateAndApiKey', async () => {
+    await setMachineAuthentication('acme.billing', { EnabledCredentialKinds: ['ApiKey'] })
+    await expect(issueSharedCertificate('acme', 'billing', { Label: 'edge' })).rejects.toMatchObject({
+      status: 400,
+      message: 'The project acme.billing does not enable CertificateAndApiKey, which shared certificates belong to.',
+    })
+    await expect(
+      createMachineAccess('acme', 'billing', { Scope: 'DefaultRead', UseSharedCertificate: true }),
+    ).rejects.toMatchObject({ status: 400 })
+
+    await setMachineAuthentication('acme.billing', { EnabledCredentialKinds: ['ApiKey', 'CertificateAndApiKey'] })
+    expect((await issueSharedCertificate('acme', 'billing', { Label: 'edge' })).Label).toBe('edge')
+    const machine = await createMachineAccess('acme', 'billing', {
+      Scope: 'DefaultRead',
+      CredentialKind: 'CertificateAndApiKey',
+      UseSharedCertificate: true,
+      CertificateLifetimeDays: 30,
+    })
+    expect(machine).toMatchObject({ CredentialKind: 'CertificateAndApiKey', UsesSharedCertificate: true })
+    expect(machine.AccessKey).toBeDefined()
+    expect(machine.Certificate).toBeUndefined()
+    expect(machine.CertificateThumbprint).toBeUndefined()
+    expect(machine.CertificateLifetimeDays).toBeUndefined()
+
+    const reset = await resetMachineAccess('acme', 'billing', machine.Id!)
+    expect(reset.Certificate).toBeUndefined()
+    expect(reset.UsesSharedCertificate).toBe(true)
+  })
+
   it('rejects a default kind that is not enabled, and a policy without kinds', async () => {
     await expect(
       setMachineAuthentication('acme.billing', { EnabledCredentialKinds: ['ApiKey'], CredentialKind: 'Certificate' }),
@@ -146,7 +189,7 @@ describe('machine authentication policy against the mock API', () => {
 })
 
 describe('MachineCreateDialog', () => {
-  async function create(policy: MachineAuthenticationPolicy) {
+  async function create(policy: MachineAuthenticationPolicy, before?: () => Promise<void>) {
     const bodies: MachineAccessCreate[] = []
     server.use(
       http.post('*/api/v1/:org/:project/access/machines', async ({ request }) => {
@@ -162,6 +205,7 @@ describe('MachineCreateDialog', () => {
     const screen = await mountScreen(Harness, {})
     open.value = true
     await settle(6)
+    await before?.()
     const text = document.body.textContent ?? ''
     ;[...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Create')!.click()
     await settle(6)
@@ -189,7 +233,34 @@ describe('MachineCreateDialog', () => {
     })
 
     expect(text).not.toContain('Certificate lifetime (days)')
+    expect(text).not.toContain('Use a shared certificate of the project')
     expect(body).toMatchObject({ CredentialKind: 'ApiKey', CertificateLifetimeDays: null })
+  })
+
+  it('offers a shared certificate for CertificateAndApiKey and then asks no lifetime', async () => {
+    const policy: MachineAuthenticationPolicy = {
+      EnabledCredentialKinds: ['CertificateAndApiKey'],
+      CredentialKind: 'CertificateAndApiKey',
+      CertificateLifetimeDays: 90,
+    }
+
+    const own = await create(policy)
+    expect(own.text).toContain('Use a shared certificate of the project')
+    expect(own.text).toContain('Certificate lifetime (days)')
+    expect(own.body).toMatchObject({ CredentialKind: 'CertificateAndApiKey', CertificateLifetimeDays: 90 })
+    expect(own.body?.UseSharedCertificate).toBeUndefined()
+
+    const shared = await create(policy, async () => {
+      ;(document.body.querySelector('button[role="checkbox"]') as HTMLButtonElement).click()
+      await settle(4)
+    })
+    expect(shared.text).not.toContain('Certificate lifetime (days)')
+    expect(shared.text).toContain('No certificate is issued for this machine')
+    expect(shared.body).toMatchObject({
+      CredentialKind: 'CertificateAndApiKey',
+      CertificateLifetimeDays: null,
+      UseSharedCertificate: true,
+    })
   })
 })
 
@@ -209,6 +280,25 @@ describe('OneTimeSecretDialog', () => {
     expect(text).toContain('-d client_secret=sk_secret')
     expect(text).toContain('<token-endpoint>')
     expect(text).not.toContain('ApiKey')
+    view.host.unmount()
+  })
+
+  it('tells that a machine with a shared certificate got no certificate of its own', async () => {
+    const view = mountInApp(OneTimeSecretDialog, {
+      secret: {
+        title: 'Created',
+        apiKey: 'st_secret',
+        credentialKind: 'CertificateAndApiKey',
+        sharedCertificate: true,
+      },
+      onClose: () => {},
+    })
+    await settle()
+
+    const text = document.body.textContent ?? ''
+    expect(text).toContain('Uses a shared certificate')
+    expect(text).toContain('API key')
+    expect(text).not.toContain('Download .pfx')
     view.host.unmount()
   })
 
