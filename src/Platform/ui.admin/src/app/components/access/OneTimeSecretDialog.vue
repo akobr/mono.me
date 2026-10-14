@@ -13,6 +13,8 @@ export interface OneTimeSecret {
   /** Base64 PKCS#12 (.pfx). */
   certificate?: string
   certificatePassword?: string
+  /** A CertificateAndApiKey machine without a certificate of its own: it presents a shared certificate of the project. */
+  sharedCertificate?: boolean
   tokenEndpoint?: string
   tokenScope?: string
   fileName?: string
@@ -122,6 +124,15 @@ function close() {
             @click="downloadPfx"
           />
         </UFormField>
+
+        <UAlert
+          v-if="secret.sharedCertificate"
+          color="info"
+          variant="subtle"
+          icon="i-lucide-shield-check"
+          title="Uses a shared certificate"
+          description="No certificate was issued for this machine. It signs in with one of the project's shared certificates (Certificates page) together with this API key."
+        />
 
         <UFormField v-if="secret.certificatePassword" label="Certificate password">
           <div class="flex items-center gap-2">

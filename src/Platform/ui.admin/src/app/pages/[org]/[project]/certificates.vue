@@ -1,17 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useNow } from '@vueuse/core'
 import { issueSharedCertificate, revokeSharedCertificate, type SharedCertificate } from '@42for.net/2splatform.sdk'
-import { useGetSharedCertificates } from '@42for.net/2splatform.sdk/vue-query'
+import { useGetMachineAuthentication, useGetSharedCertificates } from '@42for.net/2splatform.sdk/vue-query'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { formatDate } from '@/utils/dates'
 import { errorMessage } from '@/utils/errors'
+import { allowsSharedCertificates } from '@/utils/machines'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
 // Shared certificates of the project (Administrator, spec section 13): issue (shown once), revoke by typing the
-// first 8 characters of the thumbprint, and a warning when one expires within 30 days.
+// first 8 characters of the thumbprint, and a warning when one expires within 30 days. Shared certificates follow the
+// CertificateAndApiKey kind of the machine authentication policy: without it they can't be issued and don't sign in,
+// while listing and revoking stay available.
 const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
@@ -22,6 +25,12 @@ const certificates = useGetSharedCertificates(
   () => context.project ?? '',
   { query: { enabled: () => !!context.project, meta: { silent: true } } },
 )
+
+const policy = useGetMachineAuthentication(() => context.projectKey ?? '', {
+  query: { enabled: () => !!context.projectKey, meta: { silent: true } },
+})
+// Unknown while the policy loads: keep issuing available, the API refuses it anyway.
+const disabled = computed(() => !!policy.data.value && !allowsSharedCertificates(policy.data.value))
 
 const issuing = ref(false)
 const label = ref('')
@@ -77,11 +86,20 @@ async function revoke() {
     <template #header>
       <AppNavbar title="Certificates">
         <template #right>
-          <UButton label="Issue certificate" icon="i-lucide-plus" @click="issuing = true" />
+          <UButton label="Issue certificate" icon="i-lucide-plus" :disabled="disabled" @click="issuing = true" />
         </template>
       </AppNavbar>
     </template>
     <template #body>
+      <UAlert
+        v-if="disabled"
+        class="mb-4"
+        color="info"
+        variant="subtle"
+        icon="i-lucide-shield-off"
+        title="Shared certificates are disabled"
+        description="Shared certificates belong to the CertificateAndApiKey credential kind, which the machine authentication policy of this project does not enable. New ones can't be issued and existing ones no longer sign in; enable the kind in Settings to use them again."
+      />
       <LoadingState v-if="certificates.isPending.value" />
       <ErrorState
         v-else-if="certificates.isError.value"

@@ -1,4 +1,9 @@
-import type { MachineAccess, MachineAccessCreateScope, MachineCredentialKind } from '@42for.net/2splatform.sdk'
+import type {
+  MachineAccess,
+  MachineAccessCreateScope,
+  MachineAuthenticationPolicy,
+  MachineCredentialKind,
+} from '@42for.net/2splatform.sdk'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
 /** What each machine scope allows (spec section 13: "a select with an explanation per scope"). */
@@ -16,12 +21,20 @@ export const scopeDescriptions: Record<MachineAccessCreateScope, string> = {
 export const credentialKindDescriptions: Record<MachineCredentialKind, string> = {
   ApiKey: 'An API key per machine (Authorization: ApiKey …).',
   Certificate: 'A client certificate per machine (mTLS).',
-  CertificateAndApiKey: 'A client certificate and an API key; both must be presented.',
+  CertificateAndApiKey:
+    'A client certificate (its own, or a shared certificate of the project) and an API key; both must be presented.',
   ClientCredentials: 'Client ID and secret of the identity provider, exchanged for a short-lived token.',
 }
 
 /** Every credential kind, in the order of the API. */
 export const credentialKinds = Object.keys(credentialKindDescriptions) as MachineCredentialKind[]
+
+/**
+ * Whether the project issues and accepts shared certificates: they are the certificate half of a CertificateAndApiKey
+ * login, so they follow that kind of the machine authentication policy.
+ */
+export const allowsSharedCertificates = (policy?: MachineAuthenticationPolicy | null) =>
+  !!policy?.EnabledCredentialKinds?.includes('CertificateAndApiKey')
 
 /** Whether machines of this kind get a client certificate (and with it a certificate lifetime). */
 export const issuesCertificates = (kind?: MachineCredentialKind | null) =>
@@ -59,6 +72,7 @@ export function machineSecret(machine: MachineAccess, title: string, baseUrl?: s
     credentialKind: machine.CredentialKind,
     certificate: machine.Certificate,
     certificatePassword: machine.CertificatePassword,
+    sharedCertificate: machine.UsesSharedCertificate,
     tokenEndpoint: machine.TokenEndpoint,
     tokenScope: machine.TokenScope,
     fileName: `${machine.Id ?? 'machine'}.pfx`,

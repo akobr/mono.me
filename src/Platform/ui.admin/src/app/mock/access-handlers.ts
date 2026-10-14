@@ -103,14 +103,17 @@ function withCredentials(
   machine: MachineAccess,
   kind: MachineCredentialKind,
   lifetimeDays?: number | null,
+  sharedCertificate = false,
 ): MachineAccess {
-  const certificate = kind === 'Certificate' || kind === 'CertificateAndApiKey'
+  // A CertificateAndApiKey machine with a shared certificate gets only its API key.
+  const certificate = (kind === 'Certificate' || kind === 'CertificateAndApiKey') && !sharedCertificate
   const lifetime = certificate
     ? (lifetimeDays ?? machine.CertificateLifetimeDays ?? deploymentLifetime.default)
     : undefined
   return {
     ...machine,
     CredentialKind: kind,
+    UsesSharedCertificate: sharedCertificate || undefined,
     AccessKey: kind === 'ApiKey' || kind === 'CertificateAndApiKey' ? `st_${random(40).toLowerCase()}` : undefined,
     Certificate: certificate ? fakeSecret() : undefined,
     CertificatePassword: certificate ? random(16) : undefined,
@@ -368,6 +371,9 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (!policy.EnabledCredentialKinds!.includes(kind)) {
         return errorResponse(400, `The credential kind ${kind} is not enabled in the project ${key}.`)
       }
+      if (body.UseSharedCertificate && kind !== 'CertificateAndApiKey') {
+        return errorResponse(400, `Only CertificateAndApiKey machines can use a shared certificate, not ${kind}.`)
+      }
       const machine = withCredentials(
         {
           Id: `mach-${random(6).toLowerCase()}`,
@@ -377,6 +383,7 @@ export const accessManagementHandlers: HttpHandler[] = [
         },
         kind,
         body.CertificateLifetimeDays ?? policy.CertificateLifetimeDays,
+        !!body.UseSharedCertificate,
       )
       ;((db.machines ??= {})[key] ??= []).push(stripSecrets(machine))
       return HttpResponse.json(machine, { status: 201 })
@@ -406,7 +413,12 @@ export const accessManagementHandlers: HttpHandler[] = [
         return denied ?? errorResponse(404, 'Not found.', 'NotFound')
       }
       // A reset follows the kind the machine was created with, as the API does.
-      const machine = withCredentials(list[index]!, list[index]!.CredentialKind ?? 'ApiKey')
+      const machine = withCredentials(
+        list[index]!,
+        list[index]!.CredentialKind ?? 'ApiKey',
+        undefined,
+        !!list[index]!.UsesSharedCertificate,
+      )
       list[index] = stripSecrets(machine)
       return HttpResponse.json(machine)
     }),
@@ -440,6 +452,17 @@ export const accessManagementHandlers: HttpHandler[] = [
       const denied = requireRole(db, key, 'Administrator')
       if (denied) {
         return denied
+      }
+      // Shared certificates follow CertificateAndApiKey, as in the API.
+      if (
+        !effectivePolicy(db.accessPoints[key]?.MachineAuthentication).EnabledCredentialKinds!.includes(
+          'CertificateAndApiKey',
+        )
+      ) {
+        return errorResponse(
+          400,
+          `The project ${key} does not enable CertificateAndApiKey, which shared certificates belong to.`,
+        )
       }
       const body = (await request.json()) as SharedCertificateCreate
       const certificate: SharedCertificate = {

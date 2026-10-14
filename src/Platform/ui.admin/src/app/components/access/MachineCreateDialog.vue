@@ -15,7 +15,8 @@ import { credentialKindDescriptions, credentialKinds, issuesCertificates, scopeD
 /**
  * New machine access (spec section 13): scope, an optional annotation restriction, the credential kind (one of the
  * kinds the project enables, 424-14) and the certificate lifetime. The project policy preselects the kind and the
- * lifetime; without it (still loading) the server applies the project defaults.
+ * lifetime; without it (still loading) the server applies the project defaults. A CertificateAndApiKey machine can use
+ * a shared certificate of the project instead of its own: then no certificate (and no lifetime) is issued for it.
  */
 const props = defineProps<{ policy?: MachineAuthenticationPolicy }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -28,6 +29,7 @@ const scope = ref<MachineAccessCreateScope>('DefaultRead')
 const annotationKey = ref('')
 const kind = ref<MachineCredentialKind>()
 const lifetime = ref<number>(365)
+const useSharedCertificate = ref(false)
 const saving = ref(false)
 const failure = ref<string>()
 
@@ -40,11 +42,15 @@ watch(open, (value) => {
     failure.value = undefined
     kind.value = props.policy?.CredentialKind ?? kindItems.value[0]
     lifetime.value = props.policy?.CertificateLifetimeDays ?? 365
+    useSharedCertificate.value = false
     if (context.org && context.project) {
       void catalog.load({ org: context.org, project: context.project, view: 'default' })
     }
   }
 })
+
+const sharedCertificate = computed(() => kind.value === 'CertificateAndApiKey' && useSharedCertificate.value)
+const ownCertificate = computed(() => issuesCertificates(kind.value) && !sharedCertificate.value)
 
 const scopes = Object.entries(scopeDescriptions).map(([value, description]) => ({ label: value, value, description }))
 const keys = computed(() => [...catalog.byKey.keys()].toSorted())
@@ -59,7 +65,8 @@ async function create() {
       Scope: scope.value,
       AnnotationKey: annotationKey.value.trim() || undefined,
       CredentialKind: kind.value,
-      CertificateLifetimeDays: issuesCertificates(kind.value) ? lifetime.value : null,
+      CertificateLifetimeDays: ownCertificate.value ? lifetime.value : null,
+      UseSharedCertificate: sharedCertificate.value || undefined,
     })
     open.value = false
     annotationKey.value = ''
@@ -93,7 +100,17 @@ async function create() {
         <UFormField v-if="kind" label="Credential kind" :help="credentialKindDescriptions[kind]">
           <USelect v-model="kind" :items="kindItems" :disabled="kindItems.length < 2" class="w-full" />
         </UFormField>
-        <UFormField v-if="issuesCertificates(kind)" label="Certificate lifetime (days)">
+        <UFormField
+          v-if="kind === 'CertificateAndApiKey'"
+          :help="
+            useSharedCertificate
+              ? 'No certificate is issued for this machine: it signs in with a shared certificate of the project and its API key.'
+              : 'A certificate is issued for this machine.'
+          "
+        >
+          <UCheckbox v-model="useSharedCertificate" label="Use a shared certificate of the project" />
+        </UFormField>
+        <UFormField v-if="ownCertificate" label="Certificate lifetime (days)">
           <UInputNumber v-model="lifetime" :min="1" :max="825" class="w-40" />
         </UFormField>
         <UAlert v-if="failure" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="failure" />

@@ -47,3 +47,40 @@ test('creates a machine and downloads its certificate', async ({ page }) => {
   await secret.getByRole('button', { name: 'Done' }).click()
   await expect(secret).toBeHidden()
 })
+
+test('shared certificates follow CertificateAndApiKey, and a machine can use one instead of its own', async ({
+  page,
+}) => {
+  // The seeded project enables only API keys, so its shared certificate is disabled.
+  await openApp(page, '/acme/billing/certificates')
+  await expect(page.getByText('Shared certificates are disabled')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Issue certificate' })).toBeDisabled()
+
+  await goto(page, '/acme/billing/settings')
+  await page.getByRole('checkbox', { name: 'CertificateAndApiKey', exact: true }).click()
+  await page.getByRole('button', { name: 'Save policy' }).click()
+  await expect(page.getByText('Machine policy saved', { exact: true })).toBeVisible()
+
+  await goto(page, '/acme/billing/certificates')
+  await expect(page.getByRole('button', { name: 'Issue certificate' })).toBeEnabled()
+  await expect(page.getByText('Shared certificates are disabled')).toBeHidden()
+
+  // A CertificateAndApiKey machine with a shared certificate gets only its API key.
+  await goto(page, '/acme/billing/machines')
+  await page.getByRole('button', { name: 'New machine' }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'New machine access' })
+  await dialog.getByRole('combobox', { name: 'Credential kind' }).click()
+  await page.getByRole('option', { name: 'CertificateAndApiKey', exact: true }).click()
+  await expect(dialog.getByText('Certificate lifetime (days)')).toBeVisible()
+  await dialog.getByRole('checkbox', { name: 'Use a shared certificate of the project' }).check()
+  await expect(dialog.getByText('Certificate lifetime (days)')).toBeHidden()
+  await dialog.getByRole('button', { name: 'Create' }).click()
+
+  const secret = page.getByRole('dialog').filter({ hasText: 'Shown only once' })
+  await expect(secret.getByText('Uses a shared certificate')).toBeVisible()
+  await expect(secret.getByRole('button', { name: 'Download .pfx' })).toHaveCount(0)
+  await secret.getByRole('checkbox', { name: 'I have stored these credentials' }).check()
+  await secret.getByRole('button', { name: 'Done' }).click()
+
+  await expect(page.getByText('shared', { exact: true })).toBeVisible()
+})
