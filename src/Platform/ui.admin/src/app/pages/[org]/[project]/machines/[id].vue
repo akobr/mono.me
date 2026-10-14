@@ -5,7 +5,8 @@ import { useGetMachineAccess } from '@42for.net/2splatform.sdk/vue-query'
 import { useContextStore } from '@/stores/context'
 import { scopeDescriptions } from '@/utils/machines'
 
-// One machine access: scope, restriction, credential kind and certificate. Reset and delete live in the list.
+// One machine access: scope, restriction, credential kind and certificate (with its lifetime and expiry). Reset and
+// delete live in the list.
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
@@ -52,6 +53,14 @@ function close() {
         <dd class="font-mono text-xs break-all">{{ machine.data.value?.ObjectId ?? '–' }}</dd>
         <dt class="text-muted">Certificate</dt>
         <dd class="font-mono text-xs break-all">{{ machine.data.value?.CertificateThumbprint ?? '–' }}</dd>
+        <template v-if="machine.data.value?.CertificateLifetimeDays">
+          <dt class="text-muted">Certificate lifetime</dt>
+          <dd>{{ machine.data.value.CertificateLifetimeDays }} days</dd>
+        </template>
+        <template v-if="machine.data.value?.CertificateNotAfter">
+          <dt class="text-muted">Certificate expires</dt>
+          <dd><RelativeTime :value="machine.data.value.CertificateNotAfter" /></dd>
+        </template>
         <dt class="text-muted">Last renewal</dt>
         <dd><RelativeTime :value="machine.data.value?.LastRenewalAt" /></dd>
         <template v-if="machine.data.value?.TokenEndpoint">

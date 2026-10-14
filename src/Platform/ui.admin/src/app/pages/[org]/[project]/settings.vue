@@ -4,20 +4,21 @@ import { useQueryClient } from '@tanstack/vue-query'
 import {
   getCertificateAuthority,
   setMachineAuthentication,
-  type MachineAuthenticationPolicy,
+  type MachineCredentialKind,
 } from '@42for.net/2splatform.sdk'
-import { useGetAccessPoint } from '@42for.net/2splatform.sdk/vue-query'
+import { useGetAccessPoint, useGetMachineAuthentication } from '@42for.net/2splatform.sdk/vue-query'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useProjectSettingsStore } from '@/stores/project-settings'
 import { dateFormatItems, type DateFormat } from '@/utils/dates'
 import { errorMessage } from '@/utils/errors'
-import { credentialKindDescriptions, issuesCertificates } from '@/utils/machines'
+import { credentialKindDescriptions, credentialKinds, issuesCertificates } from '@/utils/machines'
 import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appearance'
 
-// Project settings (spec section 13): the machine authentication policy (Administrator), the CA certificate
-// download (PEM; the SDK fetcher returns non-JSON bodies as text) and project information. The default time zone of
+// Project settings (spec section 13): the machine authentication policy (Administrator: the enabled credential
+// kinds, the default kind and certificate lifetime of new machines, 424-14), the CA certificate download (PEM; the
+// SDK fetcher returns non-JSON bodies as text) and project information. The default time zone of
 // new annotations (424-12), the date format (424-23) and the names, colors and icons of the annotation types (424-13)
 // are kept in this browser, so they apply at once, like Preferences.
 const context = useContextStore()
@@ -63,22 +64,52 @@ const accessPoint = useGetAccessPoint(() => context.projectKey ?? '', {
   query: { enabled: () => !!context.projectKey && canAdmin.value, meta: { silent: true } },
 })
 
-const policy = ref<MachineAuthenticationPolicy>({ CredentialKind: 'ApiKey', CertificateLifetimeDays: 90 })
+// The policy as the API resolves it: every property is filled, deployment defaults included.
+const machinePolicy = useGetMachineAuthentication(() => context.projectKey ?? '', {
+  query: { enabled: () => !!context.projectKey && canAdmin.value, meta: { silent: true } },
+})
+
+const enabledKinds = ref<MachineCredentialKind[]>(['ApiKey'])
+const defaultKind = ref<MachineCredentialKind>('ApiKey')
+const lifetime = ref(365)
 watch(
-  () => accessPoint.data.value?.MachineAuthentication,
-  (value) => value && (policy.value = { ...value }),
+  () => machinePolicy.data.value,
+  (value) => {
+    if (value) {
+      enabledKinds.value = [...(value.EnabledCredentialKinds ?? [])]
+      defaultKind.value = value.CredentialKind ?? enabledKinds.value[0] ?? 'ApiKey'
+      lifetime.value = value.CertificateLifetimeDays ?? lifetime.value
+    }
+  },
   { immediate: true },
 )
 
+// The default is one of the enabled kinds; unchecking it moves the default to the first enabled kind.
+watch(enabledKinds, (kinds) => {
+  if (kinds.length > 0 && !kinds.includes(defaultKind.value)) {
+    defaultKind.value = credentialKinds.find((kind) => kinds.includes(kind))!
+  }
+})
+
 const saving = ref(false)
-const kinds = Object.entries(credentialKindDescriptions).map(([value]) => ({ label: value, value }))
+const kindItems = credentialKinds.map((kind) => ({
+  label: kind,
+  value: kind,
+  description: credentialKindDescriptions[kind],
+}))
+const defaultKindItems = computed(() => credentialKinds.filter((kind) => enabledKinds.value.includes(kind)))
+const anyCertificates = computed(() => enabledKinds.value.some(issuesCertificates))
 
 async function savePolicy() {
+  if (enabledKinds.value.length === 0) {
+    return
+  }
   saving.value = true
   try {
     await setMachineAuthentication(context.projectKey!, {
-      CredentialKind: policy.value.CredentialKind,
-      CertificateLifetimeDays: issuesCertificates(policy.value) ? policy.value.CertificateLifetimeDays : null,
+      EnabledCredentialKinds: credentialKinds.filter((kind) => enabledKinds.value.includes(kind)),
+      CredentialKind: defaultKind.value,
+      CertificateLifetimeDays: anyCertificates.value ? lifetime.value : null,
     })
     await invalidateAccess(queryClient, context.projectKey!, context.org, context.project)
     toast.add({ title: 'Machine policy saved', color: 'success', icon: 'i-lucide-check' })
@@ -206,26 +237,42 @@ async function downloadCa() {
             </div>
           </template>
           <p v-if="!canAdmin" class="text-sm text-muted">The policy is visible and editable for Administrators.</p>
-          <LoadingState v-else-if="accessPoint.isPending.value" />
+          <LoadingState v-else-if="machinePolicy.isPending.value" />
           <ErrorState
-            v-else-if="accessPoint.isError.value"
-            :error="accessPoint.error.value"
+            v-else-if="machinePolicy.isError.value"
+            :error="machinePolicy.error.value"
             compact
-            @retry="accessPoint.refetch()"
+            @retry="machinePolicy.refetch()"
           />
           <form v-else class="space-y-4" @submit.prevent="savePolicy">
             <UFormField
-              label="Credential kind"
-              :help="policy.CredentialKind ? credentialKindDescriptions[policy.CredentialKind] : undefined"
+              label="Enabled credential kinds"
+              help="Each new machine picks one of these."
+              :error="enabledKinds.length === 0 ? 'Enable at least one kind.' : undefined"
             >
-              <USelect v-model="policy.CredentialKind" :items="kinds" class="w-full max-w-sm" />
+              <UCheckboxGroup v-model="enabledKinds" :items="kindItems" />
             </UFormField>
-            <UFormField v-if="issuesCertificates(policy)" label="Certificate lifetime (days)">
-              <UInputNumber v-model="policy.CertificateLifetimeDays" :min="1" :max="825" class="w-40" />
+            <UFormField label="Default for new machines" help="Preselected when a machine is created.">
+              <USelect
+                v-model="defaultKind"
+                :items="defaultKindItems"
+                :disabled="defaultKindItems.length === 0"
+                class="w-full max-w-sm"
+              />
             </UFormField>
-            <p class="text-xs text-muted">The policy applies to machines created or reset after the change.</p>
+            <UFormField
+              v-if="anyCertificates"
+              label="Default certificate lifetime (days)"
+              help="Preselected when a machine with a certificate is created; renewals keep the machine's lifetime."
+            >
+              <UInputNumber v-model="lifetime" :min="1" :max="825" class="w-40" />
+            </UFormField>
+            <p class="text-xs text-muted">
+              Machines keep the kind they were created with. Disabling a kind stops every machine that uses it until the
+              kind is enabled again.
+            </p>
             <div class="flex justify-end">
-              <UButton type="submit" label="Save policy" :loading="saving" />
+              <UButton type="submit" label="Save policy" :loading="saving" :disabled="enabledKinds.length === 0" />
             </div>
           </form>
         </UCard>
