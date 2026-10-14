@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, ref } from 'vue'
+import { defineComponent, h, ref, type Ref } from 'vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import {
@@ -189,6 +189,23 @@ describe('machine authentication policy against the mock API', () => {
 })
 
 describe('MachineCreateDialog', () => {
+  /** Mounts the dialog with a policy that a test may replace, and opens it. */
+  async function openDialog(policy: Ref<MachineAuthenticationPolicy | undefined>) {
+    const open = ref(false)
+    const Harness = defineComponent({
+      setup: () => () =>
+        h(MachineCreateDialog, {
+          open: open.value,
+          'onUpdate:open': (value: boolean) => (open.value = value),
+          policy: policy.value,
+        }),
+    })
+    const screen = await mountScreen(Harness, {})
+    open.value = true
+    await settle(6)
+    return screen
+  }
+
   async function create(policy: MachineAuthenticationPolicy, before?: () => Promise<void>) {
     const bodies: MachineAccessCreate[] = []
     server.use(
@@ -197,14 +214,7 @@ describe('MachineCreateDialog', () => {
         return HttpResponse.json({ Id: 'm1', AccessKey: '' }, { status: 201 })
       }),
     )
-    const open = ref(false)
-    const Harness = defineComponent({
-      setup: () => () =>
-        h(MachineCreateDialog, { open: open.value, 'onUpdate:open': (value: boolean) => (open.value = value), policy }),
-    })
-    const screen = await mountScreen(Harness, {})
-    open.value = true
-    await settle(6)
+    const screen = await openDialog(ref(policy))
     await before?.()
     const text = document.body.textContent ?? ''
     ;[...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Create')!.click()
@@ -235,6 +245,42 @@ describe('MachineCreateDialog', () => {
     expect(text).not.toContain('Certificate lifetime (days)')
     expect(text).not.toContain('Use a shared certificate of the project')
     expect(body).toMatchObject({ CredentialKind: 'ApiKey', CertificateLifetimeDays: null })
+  })
+
+  it('preselects the kind of a policy that arrives after the dialog opened, keeping a picked kind', async () => {
+    const policy = ref<MachineAuthenticationPolicy>()
+    const screen = await openDialog(policy)
+    expect(document.body.textContent).not.toContain('Credential kind')
+
+    policy.value = {
+      EnabledCredentialKinds: ['ApiKey', 'Certificate'],
+      CredentialKind: 'Certificate',
+      CertificateLifetimeDays: 30,
+    }
+    await settle(4)
+    expect(document.body.textContent).toContain('Credential kind')
+    expect(document.body.textContent).toContain('Certificate lifetime (days)')
+
+    // A later policy (a refetch) does not replace the kind that is already picked while it stays enabled...
+    policy.value = { EnabledCredentialKinds: ['ApiKey', 'Certificate'], CredentialKind: 'ApiKey' }
+    await settle(4)
+    expect(document.body.textContent).toContain('Certificate lifetime (days)')
+
+    // ...but a kind the policy no longer enables gives way to its default, which is what Create sends.
+    const bodies: MachineAccessCreate[] = []
+    server.use(
+      http.post('*/api/v1/:org/:project/access/machines', async ({ request }) => {
+        bodies.push((await request.json()) as MachineAccessCreate)
+        return HttpResponse.json({ Id: 'm1', AccessKey: '' }, { status: 201 })
+      }),
+    )
+    policy.value = { EnabledCredentialKinds: ['ApiKey'], CredentialKind: 'ApiKey' }
+    await settle(4)
+    expect(document.body.textContent).not.toContain('Certificate lifetime (days)')
+    ;[...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Create')!.click()
+    await settle(6)
+    expect(bodies[0]).toMatchObject({ CredentialKind: 'ApiKey', CertificateLifetimeDays: null })
+    screen.host.unmount()
   })
 
   it('offers a shared certificate for CertificateAndApiKey and then asks no lifetime', async () => {

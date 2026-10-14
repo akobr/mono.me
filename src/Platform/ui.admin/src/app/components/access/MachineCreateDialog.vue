@@ -49,6 +49,24 @@ watch(open, (value) => {
   }
 })
 
+// The policy may arrive, or change, after the dialog opened: preselect its kind when none is picked yet (the lifetime
+// field shows only once a kind is picked, so it has not been edited either), and replace a picked kind the policy no
+// longer enables. A picked kind that stays enabled is kept.
+watch(
+  () => props.policy,
+  (policy) => {
+    if (!open.value || !policy) {
+      return
+    }
+    if (!kind.value) {
+      kind.value = policy.CredentialKind ?? kindItems.value[0]
+      lifetime.value = policy.CertificateLifetimeDays ?? lifetime.value
+    } else if (!kindItems.value.includes(kind.value)) {
+      kind.value = policy.CredentialKind ?? kindItems.value[0]
+    }
+  },
+)
+
 const sharedCertificate = computed(() => kind.value === 'CertificateAndApiKey' && useSharedCertificate.value)
 const ownCertificate = computed(() => issuesCertificates(kind.value) && !sharedCertificate.value)
 
