@@ -72,6 +72,46 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
     }
 
     [Fact]
+    public async Task MachinesOfTheEnabledKinds_KeepTheirKindLifetimeAndExpiry()
+    {
+        const string mixedProject = "mixedproj";
+
+        var accessService = fixture.Services.GetRequiredService<IAccessService>();
+        var policyStore = fixture.Services.GetRequiredService<IMachineAuthenticationPolicyStore>();
+        await EnsureAccessPointAsync(accessService, mixedProject);
+        await policyStore.SetAsync(Organization, mixedProject, new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate],
+            CredentialKind = MachineCredentialKind.ApiKey,
+            CertificateLifetimeDays = 120,
+        });
+
+        var apiKeyMachine = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
+        {
+            Organization = Organization,
+            Project = mixedProject,
+            Scope = MachineAccessScope.DefaultRead,
+        });
+        var certificateMachine = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
+        {
+            Organization = Organization,
+            Project = mixedProject,
+            Scope = MachineAccessScope.DefaultRead,
+            CredentialKind = MachineCredentialKind.Certificate,
+        });
+
+        var storedApiKey = await accessService.GetMachineAccessAsync(Organization, mixedProject, apiKeyMachine.Id);
+        var storedCertificate = await accessService.GetMachineAccessAsync(Organization, mixedProject, certificateMachine.Id);
+
+        storedApiKey!.CredentialKind.ShouldBe(MachineCredentialKind.ApiKey);
+        storedApiKey.CertificateLifetimeDays.ShouldBeNull();
+        storedCertificate!.CredentialKind.ShouldBe(MachineCredentialKind.Certificate);
+        storedCertificate.CertificateLifetimeDays.ShouldBe(120);
+        storedCertificate.CertificateNotAfter.ShouldNotBeNull();
+        storedCertificate.CertificateNotAfter.Value.ShouldBe(DateTimeOffset.UtcNow.AddDays(120), TimeSpan.FromDays(1));
+    }
+
+    [Fact]
     public async Task ApiKeyMachineAccess_CreateAndVerify()
     {
         var accessService = fixture.Services.GetRequiredService<IAccessService>();
@@ -138,14 +178,14 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         reset!.AccessKey.ShouldNotBe(originalKey);
     }
 
-    private static async Task EnsureAccessPointAsync(IAccessService accessService)
+    private static async Task EnsureAccessPointAsync(IAccessService accessService, string project = Project)
     {
         try
         {
             await accessService.CreateAccessPointAsync(new AccessPointCreate
             {
                 Organization = Organization,
-                Project = Project,
+                Project = project,
                 OwnerId = "test-owner",
             });
         }

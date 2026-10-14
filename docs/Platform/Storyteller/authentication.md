@@ -2,7 +2,7 @@
 
 Storyteller accepts user bearer tokens from one identity provider per deployment: **Microsoft Entra ID** or **WorkOS AuthKit**. The provider only proves who the caller is and which coarse scopes they hold. Access to organizations and projects is still decided by Storyteller's own account roles in Cosmos.
 
-Machine credentials (structured `2s.` API keys and mTLS certificates) do not depend on the user provider. They work the same under either one.
+Machine credentials (structured `2s.` API keys and mTLS certificates) do not depend on the user provider. They work the same under either one. Which kinds a project's machines may use is set by its [machine authentication policy](#machine-authentication-policy).
 
 ## Selecting the provider
 
@@ -184,6 +184,43 @@ One `sform` build therefore follows whichever provider the server at `general.ba
 
 Entra ID sign-in still uses MSAL with the cache in `~/.42for.net/msal.cache`.
 
+## Machine authentication policy
+
+A project enables one or more **machine credential kinds**, and each machine uses one of them. Machines of different kinds can work side by side in one project, for example an API-key service next to an mTLS one.
+
+| Kind | The machine sends |
+|---|---|
+| `ApiKey` | `Authorization: ApiKey` with its structured `2s.` key. |
+| `Certificate` | Its client certificate. |
+| `CertificateAndApiKey` | A certificate (its own, or a shared certificate of the project) and its API key. |
+| `ClientCredentials` | `Authorization: Bearer` with a token of the identity provider, see [Machine access with client credentials](#machine-access-with-client-credentials). |
+
+The policy (`MachineAuthenticationPolicy`) is stored on the project's access point:
+
+| Property | Description |
+|---|---|
+| `EnabledCredentialKinds` | The kinds the project's machines may use. |
+| `CredentialKind` | The default kind: preselected for a new machine, and used when a create request names none. One of the enabled kinds. |
+| `CertificateLifetimeDays` | The default certificate lifetime of new machines, in days. When it is not set, `MachineAuth:CertificateLifetimeDays` (365) applies. |
+
+Without a stored policy a project enables only `MachineAuth:DefaultCredentialKind` (`ApiKey`). A policy stored before projects could enable several kinds has only `CredentialKind`; it enables that one kind.
+
+`GET v1/access/points/{organization}.{project}/machine-authentication` returns the policy with every property filled, so a client does not have to know the deployment defaults. It needs `Contributor`, because Contributors create machines. `PUT` on the same route sets it, needs `Administrator`, and returns the filled policy too. The body may leave out `CredentialKind` (the first listed kind becomes the default) and `CertificateLifetimeDays` (the project then follows the deployment default). A body with only `CredentialKind` enables that one kind, as older clients send it. `PUT` returns `400` when:
+
+* no kind is enabled;
+* a kind does not exist;
+* `CredentialKind` is not one of `EnabledCredentialKinds`;
+* `CertificateLifetimeDays` is outside `MachineAuth:MinCertificateLifetimeDays` to `MachineAuth:MaxCertificateLifetimeDays` (1 to 3,650 days).
+
+```json
+PUT v1/access/points/acme.billing/machine-authentication
+{ "EnabledCredentialKinds": [ "ApiKey", "Certificate" ], "CredentialKind": "Certificate", "CertificateLifetimeDays": 90 }
+```
+
+**Creating a machine.** `MachineAccessCreate.CredentialKind` picks the kind; without it the project default is used. A kind the project does not enable fails with `400`. A machine with a certificate gets `MachineAccessCreate.CertificateLifetimeDays`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. The machine keeps its kind and its lifetime: reset and delete follow the kind, and a certificate renewal issues the new certificate with the same lifetime. Machines created before the lifetime was stored renew with `MachineAuth:CertificateLifetimeDays`.
+
+**Every machine call** is accepted only when the machine presents what its own kind requires, and the project still enables that kind. A `CertificateAndApiKey` machine that sends only its API key is rejected, even if the project also enables `ApiKey`. Disabling a kind stops every machine of that kind at once (up to the 60-second cache of the policy); enable it again and they work again. To move a machine to another kind, create a new machine and delete the old one.
+
 ## Machine access with client credentials
 
 Storyteller API keys and mTLS certificates work under every user provider. In addition, a project can use **identity provider client credentials** (`ClientCredentials`): the machine exchanges a client ID and secret for a short-lived JWT at the identity provider and sends it as a bearer token.
@@ -200,15 +237,15 @@ sform machine machine-auth --credential-kind client-credentials
 sform machine create
 ```
 
-`machine create` prints the client ID (also the machine ID in Storyteller), the client secret (shown once), the token URL and, for Entra ID, the token scope, with a `curl` example. `sform machine reset <id>` replaces the secret and `sform machine delete <id>` removes the provider's client. Both follow the kind the machine was created with, even if the project policy changed since.
+The first command enables only `ClientCredentials`. A project can enable it next to other kinds; `machine create --credential-kind client-credentials` then picks it for one machine. `machine create` prints the client ID (also the machine ID in Storyteller), the client secret (shown once), the token URL and, for Entra ID, the token scope, with a `curl` example. `sform machine reset <id>` replaces the secret and `sform machine delete <id>` removes the provider's client. Both follow the kind the machine was created with, even if the project policy changed since.
 
 Every provider's tokens are checked for the same things:
 
 * the provider's signature (RS256), issuer, audience and lifetime;
-* that the project named by the request has the `ClientCredentials` policy;
+* that the project named by the request enables `ClientCredentials`;
 * that the project owns the machine.
 
-A token that fails any of these gets 401. Projects with the `ClientCredentials` policy in turn reject API keys and certificates. Scopes come only from what Storyteller put into the client; `roles` or `scp` claims from elsewhere in the provider are dropped.
+A token that fails any of these gets 401. API keys and certificates are accepted only for machines of the kinds the project enables, see [Machine authentication policy](#machine-authentication-policy). Scopes come only from what Storyteller put into the client; `roles` or `scp` claims from elsewhere in the provider are dropped.
 
 ### The `MachineAccess` object
 
@@ -223,11 +260,13 @@ Create returns the secret once. Get and list read the stored record: the secret 
 | `AccessKey` | string | Secret. Create and reset return it in full: the structured `2s.` API key, or the client secret for client credentials. A certificate-only machine returns an empty string. Stored copies keep the first three characters and then `***`, or `***` when the value is shorter. |
 | `Scope` | `MachineAccessScope` | What the machine may call. `AnnotationRead` grants `Annotation.Read`. `AnnotationReadWrite` grants `Annotation.Read` and `Annotation.ReadWrite`. `ConfigurationRead` grants `Configuration.Read`. `ConfigurationReadWrite` grants `Configuration.Read` and `Configuration.ReadWrite`. `DefaultRead` grants `Default.Read`, `Annotation.Read` and `Configuration.Read`. `DefaultReadWrite` grants those three plus `Default.ReadWrite`, `Annotation.ReadWrite` and `Configuration.ReadWrite`. `SecretsRead` grants `Configuration.Read` and `Configuration.Secrets`, `SecretsReadWrite` adds `Configuration.ReadWrite`; such a machine receives [key/value secrets](key-values.md#secret-delivery) under the project's mTLS rule. Entra ID stores `DefaultReadWrite` for any `…ReadWrite` request and `DefaultRead` otherwise, and keeps the two secrets scopes as they are. |
 | `AnnotationKey` | string | Annotation key supplied at creation, stored and returned with the machine. A machine certificate also copies it onto the `annotationKey` claim. |
-| `CredentialKind` | `MachineCredentialKind` | `ApiKey`, `Certificate`, `CertificateAndApiKey` or `ClientCredentials`. Taken from the project policy at creation and kept when the policy later changes. |
+| `CredentialKind` | `MachineCredentialKind` | `ApiKey`, `Certificate`, `CertificateAndApiKey` or `ClientCredentials`. Chosen at creation from the kinds the project enables (the project default when the request names none) and kept when the policy later changes. |
 | `CertificateThumbprint` | string | Thumbprint of the machine's current certificate. Present for `Certificate` and `CertificateAndApiKey`, and updated when the certificate is renewed. |
 | `Certificate` | string | Base64 PKCS#12 of a newly issued machine certificate. Returned on create. Cosmos keeps no copy, so get, list and reset omit it. |
 | `CertificatePassword` | string | Password for that PKCS#12. Returned on create. Cosmos keeps no copy, so get, list and reset omit it. |
 | `LastRenewalAt` | date-time | UTC time of the last certificate renewal. Present after the first renewal. |
+| `CertificateLifetimeDays` | integer | Lifetime of the machine's certificates in days, chosen at creation. Renewals keep it. Present for `Certificate` and `CertificateAndApiKey` machines created since it is stored. |
+| `CertificateNotAfter` | date-time | When the current certificate expires. Present for machines created since it is stored, and updated by renewal. |
 | `TokenEndpoint` | string | Token URL for client credentials, returned on create. AuthKit uses `{AuthKitDomain}/oauth2/token`. Entra ID uses `https://login.microsoftonline.com/{MachineAuth:AzureAd:TenantId}/oauth2/v2.0/token`. Keycloak uses `{ServerUrl}/realms/{Realm}/protocol/openid-connect/token`. Cosmos keeps no copy, so get, list and reset omit it. |
 | `TokenScope` | string | `scope` form field for the token request. Entra ID sets `api://{Auth:ClientId}/.default` on create. AuthKit and Keycloak leave it empty; their tokens carry the machine's scopes without this parameter. Cosmos keeps no copy, so get, list and reset omit it. |
 
@@ -293,7 +332,7 @@ A deployment has four machine credential kinds. `ClientCredentials` with AuthKit
 
 ### What each call does
 
-A machine call that names a project goes through `CheckAccessToAsync`. That reads the organization container and then point-reads the `MachineAccessEntity` whose id is the machine id, in partition `{project}.access`. A missing document is rejected. A client-credentials call also reads the project policy (`IMachineAuthenticationPolicyStore`, cached for 60 seconds) and is accepted only when that policy is `ClientCredentials`.
+A machine call that names a project goes through `CheckAccessToAsync`. That reads the organization container and then point-reads the `MachineAccessEntity` whose id is the machine id, in partition `{project}.access`. A missing document is rejected. Every machine call also reads the project policy (`IMachineAuthenticationPolicyStore`, cached for 60 seconds): an API key or certificate call checks that the machine's own kind is enabled, and a client-credentials call that `ClientCredentials` is enabled.
 
 | Kind | Sent on each call | Work beside the membership read |
 |---|---|---|
@@ -334,7 +373,7 @@ When the Cosmos write after a successful create fails, Storyteller asks WorkOS t
 
 `ApiKey` creates no identity-provider object and uses no token endpoint. Create generates a secret, stores its hash, and upserts one Cosmos document. Each call parses the key and compares the hash. The secret stays valid until reset, so it travels on every call, and a leaked key works until then. This is the kind that can reach a few hundred thousand machines on Cosmos throughput alone. The list and the get-by-id behaviour above still apply, and one busy project is still one hot partition.
 
-`Certificate` issues a PKCS#12 from Storyteller's CA and stores the thumbprint on `MachineAccessEntity`. Renewal reads that entity. Authentication reads `IClientCertificateStore`. `AddCertificateMachineAccess` registers `InMemoryClientCertificateStore` as a fallback, and `AddCosmosDbAnnotations` replaces it with `CosmosClientCertificateStore`: one document per certificate in the organization container, partition `{project}.access`, id `mcert.{thumbprint}`, with a `ttl` that removes it 30 days after the certificate expires. A certificate issued on one Functions instance is therefore recognized on every other one and after a restart. Lookups are cached in the process, hits for 5 minutes and misses for 30 seconds, so a revoked certificate is refused everywhere within 5 minutes. A few hundred thousand certificates are a few hundred thousand small documents, which Cosmos holds without trouble; the hot partition is still one busy project. Chain building runs on every call. Shared certificates use a separate Cosmos store; validating one loads every shared certificate in the project partition.
+`Certificate` issues a PKCS#12 from Storyteller's CA and stores the thumbprint, the lifetime and the expiry on `MachineAccessEntity`. Renewal reads that entity. Authentication reads `IClientCertificateStore`. `AddCertificateMachineAccess` registers `InMemoryClientCertificateStore` as a fallback, and `AddCosmosDbAnnotations` replaces it with `CosmosClientCertificateStore`: one document per certificate in the organization container, partition `{project}.access`, id `mcert.{thumbprint}`, with a `ttl` that removes it 30 days after the certificate expires. A certificate issued on one Functions instance is therefore recognized on every other one and after a restart. Lookups are cached in the process, hits for 5 minutes and misses for 30 seconds, so a revoked certificate is refused everywhere within 5 minutes. A few hundred thousand certificates are a few hundred thousand small documents, which Cosmos holds without trouble; the hot partition is still one busy project. Chain building runs on every call. Shared certificates use a separate Cosmos store; validating one loads every shared certificate in the project partition.
 
 `CertificateAndApiKey` does both. Both halves are durable in Cosmos, so the pair works on every instance.
 
@@ -351,7 +390,7 @@ The two status codes mean different things, so a client knows whether signing in
 | `401` | The credentials are missing, invalid or expired, or the token lacks the required scope. Machine credentials that fail their checks also get 401. | none |
 | `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 
-A user role check runs on every project endpoint (`CheckAccessToProjectAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`. Shared certificates, access points and the machine authentication policy need `Administrator`. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check.
+A user role check runs on every project endpoint (`CheckAccessToProjectAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`, and so does reading the machine authentication policy. Shared certificates, access points and setting the machine authentication policy need `Administrator`. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check.
 
 Other access-management errors use the same `ErrorResponse` shape, without exception details:
 

@@ -9,7 +9,7 @@ namespace _42.Platform.Storyteller.Api.Security;
 
 // A bearer token does not name its project, so the project policy is checked once the request
 // resolves one (CheckAccessToAsync): an identity provider machine token is accepted only by a
-// ClientCredentials project. API key and certificate machines are checked by
+// project that enables ClientCredentials. API key and certificate machines are checked by
 // MachineAuthenticationMiddleware.
 public static class MachineCredentialPolicy
 {
@@ -22,14 +22,14 @@ public static class MachineCredentialPolicy
         }
 
         var policyStore = context.InstanceServices.GetService<IMachineAuthenticationPolicyStore>();
-        var options = context.InstanceServices.GetService<IOptions<MachineAuthenticationOptions>>()?.Value;
-        var policy = policyStore is null ? null : await policyStore.GetAsync(organization, project);
-        var requiredKind = policy?.CredentialKind ?? options?.DefaultCredentialKind ?? MachineCredentialKind.ApiKey;
+        var options = context.InstanceServices.GetService<IOptions<MachineAuthenticationOptions>>()?.Value ?? new MachineAuthenticationOptions();
+        var stored = policyStore is null ? null : await policyStore.GetAsync(organization, project);
+        var policy = MachineAuthenticationPolicies.Resolve(stored, options);
 
-        if (requiredKind != MachineCredentialKind.ClientCredentials)
+        if (!policy.IsEnabled(MachineCredentialKind.ClientCredentials))
         {
             throw new SecurityTokenException(
-                $"The project {organization}.{project} requires {requiredKind} machine credentials, not client credentials.");
+                $"The project {organization}.{project} does not enable client credentials for machines ({string.Join(", ", policy.EnabledCredentialKinds!)}).");
         }
     }
 }

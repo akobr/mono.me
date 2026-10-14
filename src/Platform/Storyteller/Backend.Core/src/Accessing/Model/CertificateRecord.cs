@@ -11,4 +11,5 @@ public record CertificateRecord(
     bool IsRevoked,
     MachineAccessScope Scope,
     string? AnnotationKey,
-    DateTimeOffset? LastRenewalAt);
+    DateTimeOffset? LastRenewalAt,
+    MachineCredentialKind? CredentialKind = null);

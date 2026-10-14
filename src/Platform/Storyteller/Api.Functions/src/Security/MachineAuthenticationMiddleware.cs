@@ -169,30 +169,19 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
             scope = apiKeyResult.Scope;
         }
 
-        // Resolve project policy and check if presented credentials satisfy it.
-        var policyStore = context.InstanceServices.GetRequiredService<IMachineAuthenticationPolicyStore>();
-        var policy = await policyStore.GetAsync(organization, project);
-        var requiredKind = policy?.CredentialKind ?? options.DefaultCredentialKind;
-
+        // The machine presents what its own kind requires, and the project still enables that kind.
         var hasCert = certResult is not null;
         var hasApiKey = apiKeyResult is not null;
+        var machineKind = ResolveMachineKind(certResult, apiKeyResult);
 
-        var policySatisfied = requiredKind switch
-        {
-            MachineCredentialKind.ApiKey => hasApiKey,
-            MachineCredentialKind.Certificate => hasCert,
-            MachineCredentialKind.CertificateAndApiKey => hasCert && hasApiKey,
+        var policyStore = context.InstanceServices.GetRequiredService<IMachineAuthenticationPolicyStore>();
+        var policy = await policyStore.GetEffectiveAsync(organization, project, options);
 
-            // Such projects accept only identity provider tokens, handled by BearerAuthenticationMiddleware.
-            MachineCredentialKind.ClientCredentials => false,
-            _ => false,
-        };
-
-        if (!policySatisfied)
+        if (!policy.IsEnabled(machineKind) || !machineKind.IsSatisfiedBy(hasCert, hasApiKey))
         {
             _logger.LogWarning(
-                "Policy {RequiredKind} not satisfied (hasCert={HasCert}, hasApiKey={HasApiKey}) for {Url}",
-                requiredKind, hasCert, hasApiKey, httpReqData.Url.AbsolutePath);
+                "Machine kind {MachineKind} not satisfied or not enabled (hasCert={HasCert}, hasApiKey={HasApiKey}) for {Url}",
+                machineKind, hasCert, hasApiKey, httpReqData.Url.AbsolutePath);
             await RespondUnauthorizedAsync(context, httpReqData);
             return;
         }
@@ -231,6 +220,26 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         }
 
         await next(context);
+    }
+
+    // The kind the machine was created with, from its certificate or its API key. A store that does not
+    // record it leaves the kind the presented credentials form.
+    private static MachineCredentialKind ResolveMachineKind(
+        Accessing.Model.ClientCertificateValidationResult? certResult,
+        ApiKeyValidationResult? apiKeyResult)
+    {
+        var machineCertificateKind = certResult?.Kind == Accessing.Model.ClientCertificateKind.Machine
+            ? certResult.CredentialKind
+            : null;
+
+        return machineCertificateKind
+            ?? apiKeyResult?.CredentialKind
+            ?? (certResult, apiKeyResult) switch
+            {
+                (not null, not null) => MachineCredentialKind.CertificateAndApiKey,
+                (not null, null) => MachineCredentialKind.Certificate,
+                _ => MachineCredentialKind.ApiKey,
+            };
     }
 
     private static X509Certificate2? TryExtractCertificate(
@@ -278,9 +287,14 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         }
     }
 
-    private static async Task RespondUnauthorizedAsync(FunctionContext context, HttpRequestData httpReqData)
+    protected virtual void AssignResponse(FunctionContext context, HttpResponseData response)
     {
-        var response = httpReqData.CreateResponse(HttpStatusCode.Unauthorized);
         context.GetInvocationResult().Value = response;
+    }
+
+    private Task RespondUnauthorizedAsync(FunctionContext context, HttpRequestData httpReqData)
+    {
+        AssignResponse(context, httpReqData.CreateResponse(HttpStatusCode.Unauthorized));
+        return Task.CompletedTask;
     }
 }

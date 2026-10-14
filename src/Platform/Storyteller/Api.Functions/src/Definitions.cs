@@ -212,6 +212,7 @@ public static class Definitions
             public const string DeleteMachineAccess = nameof(DeleteMachineAccess);
 
             public const string GetCertificateAuthority = nameof(GetCertificateAuthority);
+            public const string GetMachineAuthentication = nameof(GetMachineAuthentication);
             public const string SetMachineAuthentication = nameof(SetMachineAuthentication);
 
             public const string RenewMachineCertificate = nameof(RenewMachineCertificate);

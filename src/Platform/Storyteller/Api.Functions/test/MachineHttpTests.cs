@@ -8,6 +8,7 @@ using _42.Platform.Storyteller.Api.V1;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
@@ -48,9 +49,90 @@ public class MachineHttpTests
             ]);
     }
 
-    private static AccessHttp CreateHttp(RecordingAccess access)
+    [Fact]
+    public async Task GetMachineAuthentication_WithoutAStoredPolicy_ReturnsTheDeploymentDefaults()
     {
-        return new AccessHttp(access, NullLogger<AccessHttp>.Instance);
+        var http = CreateHttp(new RecordingAccess(Machine()), new PolicyStore());
+
+        var result = await http.GetMachineAuthentication(ContributorRequest(), "Org1.Proj1");
+
+        var policy = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAuthenticationPolicy>();
+        policy.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.Certificate]);
+        policy.CredentialKind.ShouldBe(MachineCredentialKind.Certificate);
+        policy.CertificateLifetimeDays.ShouldBe(180);
+    }
+
+    [Fact]
+    public async Task GetMachineAuthentication_LegacyPolicy_IsReturnedWithItsOneKindEnabled()
+    {
+        var store = new PolicyStore { Stored = new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey, CertificateLifetimeDays = 30 } };
+        var http = CreateHttp(new RecordingAccess(Machine()), store);
+
+        var result = await http.GetMachineAuthentication(ContributorRequest(), "org1.proj1");
+
+        var policy = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAuthenticationPolicy>();
+        policy.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.ApiKey]);
+        policy.CertificateLifetimeDays.ShouldBe(30);
+        store.Reads.ShouldBe(["org1.proj1"]);
+    }
+
+    [Fact]
+    public async Task PutMachineAuthentication_StoresTheNormalizedPolicyAndReturnsTheEffectiveOne()
+    {
+        var store = new PolicyStore();
+        var http = CreateHttp(new RecordingAccess(Machine()), store);
+        var requested = new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.ClientCredentials, MachineCredentialKind.ApiKey],
+        };
+
+        var result = await http.PutMachineAuthentication(ContributorRequest(), requested, "org1.proj1");
+
+        store.Stored.ShouldNotBeNull();
+        store.Stored.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.ApiKey, MachineCredentialKind.ClientCredentials]);
+        store.Stored.CredentialKind.ShouldBe(MachineCredentialKind.ClientCredentials);
+        store.Stored.CertificateLifetimeDays.ShouldBeNull();
+        var policy = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAuthenticationPolicy>();
+        policy.CertificateLifetimeDays.ShouldBe(180);
+    }
+
+    [Fact]
+    public async Task PutMachineAuthentication_InvalidPolicy_IsBadRequestAndNotStored()
+    {
+        var store = new PolicyStore();
+        var http = CreateHttp(new RecordingAccess(Machine()), store);
+        var requested = new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.Certificate],
+            CredentialKind = MachineCredentialKind.ApiKey,
+        };
+
+        var result = await http.PutMachineAuthentication(ContributorRequest(), requested, "org1.proj1");
+
+        result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<Models.ErrorResponse>()
+            .Message.ShouldBe("The default credential kind ApiKey is not one of the enabled kinds.");
+        store.Stored.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task MachineAuthentication_OfAnOrganization_IsBadRequest()
+    {
+        var http = CreateHttp(new RecordingAccess(Machine()), new PolicyStore());
+        var policy = new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey };
+
+        (await http.GetMachineAuthentication(ContributorRequest(), "org1")).ShouldBeOfType<BadRequestObjectResult>();
+        (await http.PutMachineAuthentication(ContributorRequest(), policy, "org1")).ShouldBeOfType<BadRequestObjectResult>();
+    }
+
+    private static AccessHttp CreateHttp(RecordingAccess access, IMachineAuthenticationPolicyStore? policyStore = null)
+    {
+        var options = Options.Create(new MachineAuthenticationOptions
+        {
+            DefaultCredentialKind = MachineCredentialKind.Certificate,
+            CertificateLifetimeDays = 180,
+        });
+
+        return new AccessHttp(access, NullLogger<AccessHttp>.Instance, policyStore: policyStore, machineOptions: options);
     }
 
     private static TestHttpRequestData ContributorRequest()
@@ -75,6 +157,25 @@ public class MachineHttpTests
             Scope = MachineAccessScope.DefaultRead,
             CredentialKind = MachineCredentialKind.ClientCredentials,
         };
+    }
+
+    private sealed class PolicyStore : IMachineAuthenticationPolicyStore
+    {
+        public MachineAuthenticationPolicy? Stored { get; set; }
+
+        public List<string> Reads { get; } = [];
+
+        public Task<MachineAuthenticationPolicy?> GetAsync(string organization, string project)
+        {
+            Reads.Add($"{organization}.{project}");
+            return Task.FromResult(Stored);
+        }
+
+        public Task SetAsync(string organization, string project, MachineAuthenticationPolicy policy)
+        {
+            Stored = policy;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class RecordingAccess(MachineAccess machine) : IAccessService

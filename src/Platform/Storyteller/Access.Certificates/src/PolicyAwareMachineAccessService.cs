@@ -30,9 +30,26 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
         _identityProviderService = identityProviderService;
     }
 
+    // The machine picks one of the kinds its project enables (the project default when it names none).
+    // A certificate gets the requested lifetime, else the project default.
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
-        var credentialKind = await ResolveCredentialKindAsync(model.Organization, model.Project);
+        var policy = await _policyStore.GetEffectiveAsync(model.Organization, model.Project, _options.Value);
+        var credentialKind = model.CredentialKind ?? policy.CredentialKind!.Value;
+
+        if (!policy.IsEnabled(credentialKind))
+        {
+            throw new MachineAccessNotSupportedException(
+                $"The credential kind {credentialKind} is not enabled in the project {model.Organization}.{model.Project}.");
+        }
+
+        model = model with
+        {
+            CredentialKind = credentialKind,
+            CertificateLifetimeDays = credentialKind.IssuesCertificate()
+                ? model.CertificateLifetimeDays ?? policy.CertificateLifetimeDays
+                : null,
+        };
 
         return credentialKind switch
         {
@@ -85,12 +102,6 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
         return existingAccess.CredentialKind == MachineCredentialKind.ClientCredentials
             ? await RequireIdentityProviderService().DeleteMachineAccessAsync(existingAccess, organization, project)
             : await DeleteMachineAccessAsync(existingAccess.ObjectId, organization, project);
-    }
-
-    private async Task<MachineCredentialKind> ResolveCredentialKindAsync(string organization, string project)
-    {
-        var policy = await _policyStore.GetAsync(organization, project);
-        return policy?.CredentialKind ?? _options.Value.DefaultCredentialKind;
     }
 
     private IIdentityProviderMachineAccessService RequireIdentityProviderService()

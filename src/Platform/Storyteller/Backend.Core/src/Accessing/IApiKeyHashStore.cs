@@ -14,4 +14,5 @@ public interface IApiKeyHashStore
     Task<bool> DeleteAsync(string organization, string project, string machineAccessId);
 }
 
-public record ApiKeyHashEntry(string HashedSecret, MachineAccessScope Scope);
+// CredentialKind is the kind the machine was created with; null when the store does not know it.
+public record ApiKeyHashEntry(string HashedSecret, MachineAccessScope Scope, MachineCredentialKind? CredentialKind = null);

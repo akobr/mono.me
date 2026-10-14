@@ -89,7 +89,8 @@ public class ApiKeyMachineAccessService : IMachineAccessService, IApiKeyValidato
             parsed.Organization,
             parsed.Project,
             parsed.MachineAccessId,
-            entry.Scope);
+            entry.Scope,
+            entry.CredentialKind);
     }
 
     private static string GenerateSecret()
