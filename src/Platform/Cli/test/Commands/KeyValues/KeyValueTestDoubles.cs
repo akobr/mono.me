@@ -30,10 +30,8 @@ internal static class KeyValueTestContext
         Protection = protection,
         Value = value,
         Version = version,
-        Author = "account: ada",
-        CreatedBy = "account: ada",
-        CreatedAt = DateTimeOffset.UnixEpoch,
-        UpdatedAt = DateTimeOffset.UnixEpoch,
+        Created = new AuditStamp { At = DateTimeOffset.UnixEpoch, By = new AuditActor { Kind = AuditActorKind.Account, Id = "ada", Name = "Ada Lovelace" } },
+        Modified = new AuditStamp { At = DateTimeOffset.UnixEpoch, By = new AuditActor { Kind = AuditActorKind.Account, Id = "ada", Name = "Ada Lovelace" } },
     };
 
     public static ApiException NotFound(string key) => Error(HttpStatusCode.NotFound, $"The key '{key}' does not exist.", "KeyValueNotFound");
@@ -89,8 +87,7 @@ internal sealed class TestRecipient : IDisposable
             Name = id,
             IsEnabled = true,
             PublicKey = new RsaJsonWebKey { Kty = "RSA", N = jwk.N, E = jwk.E },
-            CreatedAt = DateTimeOffset.UnixEpoch,
-            CreatedBy = "test",
+            Created = new AuditStamp { At = DateTimeOffset.UnixEpoch, By = new AuditActor { Kind = AuditActorKind.Account, Id = "test" } },
         };
     }
 

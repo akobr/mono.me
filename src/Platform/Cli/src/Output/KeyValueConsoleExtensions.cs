@@ -48,7 +48,7 @@ public static class KeyValueConsoleExtensions
                     cells.Add(KeyValueLevels.IsSecret(item.Protection) ? KeyValueLevels.Mask : item.IsReference ? $"{item.Value} (reference)" : item.Value ?? string.Empty);
                 }
 
-                cells.AddRange([item.Version.ToString(CultureInfo.InvariantCulture), item.Author, KeyValueTimes.Format(item.UpdatedAt)]);
+                cells.AddRange([item.Version.ToString(CultureInfo.InvariantCulture), AuditConsoleExtensions.FormatActor(item.Modified?.By), KeyValueTimes.Format(item.Modified?.At)]);
 
                 if (showDeleted)
                 {
@@ -74,8 +74,8 @@ public static class KeyValueConsoleExtensions
             {
                 version.Version.ToString(CultureInfo.InvariantCulture) + (version.IsCurrent ? " (current)" : string.Empty),
                 version.Protection.ToString(),
-                version.Author,
-                KeyValueTimes.Format(version.CreationTime),
+                AuditConsoleExtensions.FormatActor(version.Modified?.By),
+                KeyValueTimes.Format(version.Modified?.At),
                 version.IsCurrent ? "—" : KeyValueTimes.Format(version.ExpirationTime),
             },
             new[] { "Version", "Level", "Author", "Created", "Expires" });
@@ -164,8 +164,8 @@ public static class KeyValueConsoleExtensions
                 recipient.Name,
                 recipient.IsEnabled ? "enabled" : "disabled",
                 $"RSA {ModulusBits(recipient.PublicKey)} bits",
-                KeyValueTimes.Format(recipient.CreatedAt),
-                recipient.CreatedBy,
+                KeyValueTimes.Format(recipient.Created?.At),
+                AuditConsoleExtensions.FormatActor(recipient.Created?.By),
             },
             new[] { "Id", "Name", "State", "Key", "Added", "By" });
     }
@@ -188,7 +188,7 @@ public static class KeyValueConsoleExtensions
                 item.Operation.ToString() + (item.Count > 1 ? $" ×{item.Count}" : string.Empty),
                 string.IsNullOrEmpty(item.Key) ? item.View ?? string.Empty : $"{item.View}/{item.Key}" + (item.Version is null ? string.Empty : $"@{item.Version}"),
                 item.Protection?.ToString() ?? string.Empty,
-                item.Actor,
+                AuditConsoleExtensions.FormatActor(item.Actor),
                 item.Channel.ToString(),
                 item.Detail ?? string.Empty,
             },

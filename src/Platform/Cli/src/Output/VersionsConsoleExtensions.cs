@@ -20,15 +20,15 @@ public static class VersionsConsoleExtensions
             version => new[]
             {
                 version.Version.ToString(CultureInfo.InvariantCulture),
-                version.Author,
-                FormatTime(version.CreationTime),
+                AuditConsoleExtensions.FormatActor(version.Modified?.By),
+                FormatTime(version.Modified?.At),
                 version.IsCurrent() ? "—" : FormatTime(version.ExpirationTime),
             },
             new[] { "Version", "Author", "Created", "Expires" });
     }
 
-    private static string FormatTime(DateTimeOffset time)
+    private static string FormatTime(DateTimeOffset? time)
     {
-        return time.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+        return time is null ? "—" : time.Value.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
     }
 }
