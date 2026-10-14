@@ -8,27 +8,44 @@ using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Entities.Access;
 using Microsoft.Azure.Cosmos;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller;
 
+// Shared certificates of a project, listed on every call that presents one. The list is cached per project:
+// 5 minutes when it has certificates, 30 seconds when it is empty; a revocation is seen by other instances
+// within the longer time, the same bound as for machine certificates.
 public class CosmosSharedCertificateStore : ISharedCertificateStore
 {
     private const string IdPrefix = "scr.";
 
+    private static readonly TimeSpan ListExpiration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan EmptyListExpiration = TimeSpan.FromSeconds(30);
+
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerOptions _serializerOptions;
+    private readonly IMemoryCache _cache;
 
     public CosmosSharedCertificateStore(
         IContainerRepositoryProvider repositoryProvider,
-        IOptions<JsonSerializerOptions> serializerOptions)
+        IOptions<JsonSerializerOptions> serializerOptions,
+        IMemoryCache cache)
     {
         _repositoryProvider = repositoryProvider;
         _serializerOptions = serializerOptions.Value;
+        _cache = cache;
     }
 
     public async Task<IReadOnlyList<SharedCertificate>> ListAsync(string organization, string project)
     {
+        var cacheKey = GetCacheKey(organization, project);
+
+        if (_cache.TryGetValue(cacheKey, out IReadOnlyList<SharedCertificate>? cached) && cached is not null)
+        {
+            return cached;
+        }
+
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = new PartitionKey($"{project}.access");
 
@@ -58,6 +75,7 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
             }
         }
 
+        _cache.Set<IReadOnlyList<SharedCertificate>>(cacheKey, results, results.Count == 0 ? EmptyListExpiration : ListExpiration);
         return results;
     }
 
@@ -79,6 +97,7 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
         };
 
         await repository.Container.CreateItemAsync(entity, partitionKey);
+        _cache.Remove(GetCacheKey(organization, project));
     }
 
     public async Task<bool> RevokeAsync(string organization, string project, string thumbprint)
@@ -95,11 +114,13 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
 
         if (entity is null)
         {
+            _cache.Remove(GetCacheKey(organization, project));
             return false;
         }
 
         var updated = entity with { IsRevoked = true };
         await repository.Container.ReplaceItemAsync(updated, id, partitionKey);
+        _cache.Remove(GetCacheKey(organization, project));
         return true;
     }
 
@@ -123,5 +144,10 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
         }
 
         return false;
+    }
+
+    private static string GetCacheKey(string organization, string project)
+    {
+        return $"scert:list:{organization}.{project}";
     }
 }
