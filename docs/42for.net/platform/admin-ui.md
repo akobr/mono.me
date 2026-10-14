@@ -48,7 +48,7 @@ The tree shows only subjects, or only responsibilities, at the root, with every 
 
 So an annotation with two parents appears under both of them, for example an execution under its context and under its usage. Checking the box of one of its rows selects the annotation for the bulk actions, so all its rows are checked. A parent missing from the catalog is shown as a "(missing)" row. With a filter, the tree keeps the matching annotations and the rows above them, dimmed.
 
-The **Type** column shows the full name of each type, with its icon and color, including the names from **Settings** and your Preferences. On a phone the list shows only the icon, to keep room for the name and key.
+The **Type** column, here and on **Configurations**, shows the full name of each type, with its icon and color, including the names from **Settings** and your Preferences. On a phone the list shows only the icon, to keep room for the name and key.
 
 Selecting a row opens its detail from the right, over the list. The list keeps its scroll position, selection and filter, and the part you can still see stays usable: selecting another row switches the detail. Two buttons in the detail header change how it opens:
 
@@ -172,7 +172,7 @@ Every date in the UI has the same format: `yyyy-mm-dd` (`2026-10-13`) until some
 
 - Like the time zone, the project's values are kept in your browser until the API stores project settings.
 - The colors come from a palette that keeps WCAG AA contrast in both themes, and the icons from a fixed set.
-- Only the way a type is shown changes. Keys keep their codes (`exe`), and the API, the documents and the filter (`type:exe`, `type:execution`) keep the type names.
+- Only the way a type is shown changes. Keys keep their codes (`exe`), and the API, the documents and the filter (`type:exe`, `type:execution`) keep the type names. The type chips on **Schemas** keep showing the codes.
 
 New credentials (API keys, certificates with their password, client secrets) are shown **once**. The dialog stays open until you confirm that you stored them. Copies to the clipboard are announced, and the UI never keeps the credentials.
 
