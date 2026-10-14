@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.9.10198
+ * OpenAPI spec version: 0.9.11.55139
  */
 
 export interface SharedCertificateCreate {
