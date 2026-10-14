@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.5.59171"
+    "version": "0.9.6.55325"
   },
   "servers": [
     {
@@ -10116,7 +10116,7 @@
             }
           },
           "400": {
-            "description": "InvalidKey, ValueTooLarge, ProtectionRequired, InvalidSecretReference, InvalidClientEncryptedValue or UnknownRecipient.",
+            "description": "InvalidKey, ValueRequired, ValueTooLarge, InvalidContentType, ProtectionRequired, InvalidSecretReference, InvalidClientEncryptedValue or UnknownRecipient.",
             "content": {
               "application/json": {
                 "schema": {
