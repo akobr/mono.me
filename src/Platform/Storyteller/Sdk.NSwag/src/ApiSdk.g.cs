@@ -17221,7 +17221,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("InvalidKey, ValueTooLarge, ProtectionRequired, InvalidSecretReference, InvalidClientEncryptedValue or UnknownRecipient.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("InvalidKey, ValueRequired, ValueTooLarge, InvalidContentType, ProtectionRequired, InvalidSecretReference, InvalidClientEncryptedValue or UnknownRecipient.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 401)
