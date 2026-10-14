@@ -15,7 +15,9 @@ namespace _42.Platform.Cli.Commands.Configuration;
     typeof(ConfigPatchCommand),
     typeof(ConfigDeleteCommand),
     typeof(ConfigDiffCommand),
-    typeof(ConfigVersionsCommand))]
+    typeof(ConfigVersionsCommand),
+    typeof(ConfigExportCommand),
+    typeof(ConfigImportCommand))]
 
 [Command(CommandNames.CONFIG, CommandNames.CONFIGURATION, Description = "Get and manage configuration in context of an annotation.")]
 public class ConfigGetCommand : BaseContextCommand
