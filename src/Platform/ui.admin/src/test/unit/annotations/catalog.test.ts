@@ -79,6 +79,27 @@ describe('catalog store', () => {
     await expect.poll(() => catalog.configured?.has('exe.northwind.invoicing.prod')).toBe(true)
   })
 
+  it('asks every list for the inactive annotations too, and not for the deleted ones', async () => {
+    const asked: URL[] = []
+    server.use(
+      ...Object.keys(types).map((segment) =>
+        http.get(`*/api/v1/acme/billing/default/${segment}`, ({ request }) => {
+          asked.push(new URL(request.url))
+          return HttpResponse.json({ Annotations: [] })
+        }),
+      ),
+      configurations,
+    )
+
+    await useCatalogStore().load(scope)
+
+    expect(asked).toHaveLength(7)
+    for (const url of asked) {
+      expect(url.searchParams.get('includeInactive')).toBe('true')
+      expect(url.searchParams.has('includeDeleted')).toBe(false)
+    }
+  })
+
   it('falls back to GetAnnotations when a type endpoint fails', async () => {
     server.use(
       ...typeHandlers({ executions: () => HttpResponse.json({ Message: 'Down' }, { status: 503 }) }),

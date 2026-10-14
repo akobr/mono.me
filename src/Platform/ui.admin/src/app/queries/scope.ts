@@ -20,11 +20,19 @@ import { metaOf, type AnnotationTypeCode } from '@/utils/annotation-key'
 // Thin wrappers that bind org, project and view of the current context to the generated composables, so
 // screens pass only the key (spec section 6).
 
+/** One annotation whatever its status: the API answers 404 AnnotationInactive for an inactive one without the flag. */
 export function useAnnotation(key: MaybeRefOrGetter<string | undefined>) {
   const scope = useScope()
-  return useGetAnnotation(scope.org, scope.project, scope.view, () => toValue(key) ?? '', undefined, {
-    query: { enabled: () => !!toValue(key) && !!scope.view(), staleTime: 30_000, refetchOnWindowFocus: true },
-  })
+  return useGetAnnotation(
+    scope.org,
+    scope.project,
+    scope.view,
+    () => toValue(key) ?? '',
+    { includeInactive: true },
+    {
+      query: { enabled: () => !!toValue(key) && !!scope.view(), staleTime: 30_000, refetchOnWindowFocus: true },
+    },
+  )
 }
 
 /** The change history of an annotation, active or deleted (404 for a purged or unknown key). */

@@ -37,6 +37,8 @@ Selecting the screen you are already on in the sidebar goes back to its start: t
 - **Grid:** sortable, resizable columns.
 - **Tree:** by subject or by responsibility.
 
+The catalog shows every status: active, disabled, scheduled and expired, each with its badge. The API returns only active annotations unless it is asked for the others, and the admin UI always asks; filter with `is:active` to see what services see. Deleted annotations are on their own page (**Deleted**).
+
 The tree shows only subjects, or only responsibilities, at the root, with every path down to their descendants:
 
 | Perspective | Paths |

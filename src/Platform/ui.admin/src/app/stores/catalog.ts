@@ -33,19 +33,25 @@ type PageFetcher = (
   signal: AbortSignal,
 ) => Promise<{ Annotations?: Annotation[]; ContinuationToken?: string }>
 
+/**
+ * The API lists only active annotations by default; the catalog shows every status (badges, `is:` filters), so it
+ * asks for the disabled, scheduled and expired ones too. Deleted annotations have their own page.
+ */
+const pageParams = (token: string | undefined) => ({ continuationToken: token, includeInactive: true })
+
 /** The seven per-type list endpoints, paged concurrently (spec section 6). */
 const typeFetchers: PageFetcher[] = [
-  (s, token, signal) => getResponsibilities(s.org, s.project, s.view, { continuationToken: token }, { signal }),
-  (s, token, signal) => getSubjects(s.org, s.project, s.view, { continuationToken: token }, { signal }),
-  (s, token, signal) => getUsages(s.org, s.project, s.view, { continuationToken: token }, { signal }),
-  (s, token, signal) => getContexts(s.org, s.project, s.view, { continuationToken: token }, { signal }),
-  (s, token, signal) => getExecutions(s.org, s.project, s.view, { continuationToken: token }, { signal }),
-  (s, token, signal) => getUnits(s.org, s.project, s.view, { continuationToken: token }, { signal }),
-  (s, token, signal) => getUnitsOfExecution(s.org, s.project, s.view, { continuationToken: token }, { signal }),
+  (s, token, signal) => getResponsibilities(s.org, s.project, s.view, pageParams(token), { signal }),
+  (s, token, signal) => getSubjects(s.org, s.project, s.view, pageParams(token), { signal }),
+  (s, token, signal) => getUsages(s.org, s.project, s.view, pageParams(token), { signal }),
+  (s, token, signal) => getContexts(s.org, s.project, s.view, pageParams(token), { signal }),
+  (s, token, signal) => getExecutions(s.org, s.project, s.view, pageParams(token), { signal }),
+  (s, token, signal) => getUnits(s.org, s.project, s.view, pageParams(token), { signal }),
+  (s, token, signal) => getUnitsOfExecution(s.org, s.project, s.view, pageParams(token), { signal }),
 ]
 
 const fallbackFetcher: PageFetcher = (s, token, signal) =>
-  getAnnotations(s.org, s.project, s.view, { continuationToken: token }, { signal })
+  getAnnotations(s.org, s.project, s.view, pageParams(token), { signal })
 
 interface Snapshot {
   savedAt: number
