@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { deleteMachineAccess, resetMachineAccess, type MachineAccess } from '@42for.net/2splatform.sdk'
-import { useGetAccessPoint, useGetMachineAccesses } from '@42for.net/2splatform.sdk/vue-query'
+import { useGetMachineAccesses, useGetMachineAuthentication } from '@42for.net/2splatform.sdk/vue-query'
 import { useBootState } from '@/boot/state'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
-import { certificateDaysLeft, issuesCertificates, machineSecret } from '@/utils/machines'
+import { certificateDaysLeft, machineSecret } from '@/utils/machines'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
 // Machine access of the project (spec section 13). Create and Reset return credentials once; they go straight
-// to OneTimeSecretDialog and are never cached.
+// to OneTimeSecretDialog and are never cached. The project policy (readable by Contributors) gives the kinds and the
+// default certificate lifetime of new machines (424-14).
 const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const canManage = useCan('machines')
-const canAdmin = useCan('manageAccess')
 const boot = useBootState()
 const detail = useDetailPanel()
 
@@ -25,10 +25,9 @@ const machines = useGetMachineAccesses(
   () => context.project ?? '',
   { query: { enabled: () => !!context.project, meta: { silent: true } } },
 )
-const accessPoint = useGetAccessPoint(() => context.projectKey ?? '', {
-  query: { enabled: () => !!context.projectKey && canAdmin.value, meta: { silent: true } },
+const policy = useGetMachineAuthentication(() => context.projectKey ?? '', {
+  query: { enabled: () => !!context.projectKey && canManage.value, meta: { silent: true } },
 })
-const policy = computed(() => accessPoint.data.value?.MachineAuthentication)
 
 const creating = ref(false)
 const resetting = ref<MachineAccess>()
@@ -73,7 +72,7 @@ async function remove() {
   }
 }
 
-const daysLeft = (machine: MachineAccess) => certificateDaysLeft(machine, policy.value?.CertificateLifetimeDays)
+const daysLeft = (machine: MachineAccess) => certificateDaysLeft(machine, policy.data.value?.CertificateLifetimeDays)
 </script>
 
 <template>
@@ -156,11 +155,7 @@ const daysLeft = (machine: MachineAccess) => certificateDaysLeft(machine, policy
         </table>
       </div>
 
-      <MachineCreateDialog
-        v-model:open="creating"
-        :issues-certificates="issuesCertificates(policy)"
-        @created="created"
-      />
+      <MachineCreateDialog v-model:open="creating" :policy="policy.data.value" @created="created" />
       <ConfirmDialog
         :open="!!resetting"
         :title="`Reset ${resetting?.Id}?`"

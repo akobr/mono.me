@@ -16,16 +16,21 @@ test('invites a member to the project', async ({ page }) => {
 })
 
 test('creates a machine and downloads its certificate', async ({ page }) => {
-  // The project policy has to issue certificates first.
+  // The project has to enable a kind with a certificate first; API keys stay the default.
   await openApp(page, '/acme/billing/settings')
-  await page.getByRole('combobox', { name: 'Credential kind' }).click()
-  await page.getByRole('option', { name: 'Certificate', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'Certificate', exact: true }).click()
+  await expect(page.getByText('Default certificate lifetime (days)')).toBeVisible()
   await page.getByRole('button', { name: 'Save policy' }).click()
   await expect(page.getByText('Machine policy saved', { exact: true })).toBeVisible()
 
+  // The machine picks the certificate kind.
   await goto(page, '/acme/billing/machines')
   await page.getByRole('button', { name: 'New machine' }).first().click()
-  await page.getByRole('dialog', { name: 'New machine access' }).getByRole('button', { name: 'Create' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New machine access' })
+  await dialog.getByRole('combobox', { name: 'Credential kind' }).click()
+  await page.getByRole('option', { name: 'Certificate', exact: true }).click()
+  await expect(dialog.getByText('Certificate lifetime (days)')).toBeVisible()
+  await dialog.getByRole('button', { name: 'Create' }).click()
 
   const secret = page.getByRole('dialog').filter({ hasText: 'Shown only once' })
   await expect(secret).toBeVisible()

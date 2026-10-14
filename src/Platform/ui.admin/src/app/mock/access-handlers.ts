@@ -7,6 +7,7 @@ import type {
   MachineAccess,
   MachineAccessCreate,
   MachineAuthenticationPolicy,
+  MachineCredentialKind,
   MemberRoleUpdate,
   SharedCertificate,
   SharedCertificateCreate,
@@ -51,9 +52,62 @@ const ownerCount = (db: MockDb, key: string) =>
 
 const machineScope = (params: { org: string; project: string }) => `${params.org}.${params.project}`
 
-function withCredentials(machine: MachineAccess, policy: MachineAuthenticationPolicy | undefined): MachineAccess {
-  const kind = policy?.CredentialKind ?? 'ApiKey'
+const credentialKinds: MachineCredentialKind[] = ['ApiKey', 'Certificate', 'CertificateAndApiKey', 'ClientCredentials']
+const deploymentLifetime = { min: 1, max: 3650, default: 365 }
+
+/** The policy as the API resolves it (424-14): the enabled kinds in enum order, a default among them, a lifetime. */
+function effectivePolicy(stored: MachineAuthenticationPolicy | undefined): MachineAuthenticationPolicy {
+  const listed = stored?.EnabledCredentialKinds?.length
+    ? stored.EnabledCredentialKinds
+    : stored?.CredentialKind
+      ? [stored.CredentialKind]
+      : ['ApiKey' as const]
+  const enabled = credentialKinds.filter((kind) => listed.includes(kind))
+  const defaultKind =
+    stored?.CredentialKind && enabled.includes(stored.CredentialKind) ? stored.CredentialKind : listed[0]
+  return {
+    EnabledCredentialKinds: enabled,
+    CredentialKind: defaultKind,
+    CertificateLifetimeDays: Math.min(
+      Math.max(stored?.CertificateLifetimeDays ?? deploymentLifetime.default, deploymentLifetime.min),
+      deploymentLifetime.max,
+    ),
+  }
+}
+
+/** The 400 messages of PUT …/machine-authentication. */
+function policyError(policy: MachineAuthenticationPolicy): string | undefined {
+  const kinds = policy.EnabledCredentialKinds?.length
+    ? policy.EnabledCredentialKinds
+    : policy.CredentialKind
+      ? [policy.CredentialKind]
+      : []
+  const unknown = kinds.find((kind) => !credentialKinds.includes(kind))
+  const days = policy.CertificateLifetimeDays
+  if (kinds.length === 0) {
+    return 'Enable at least one machine credential kind.'
+  }
+  if (unknown) {
+    return `The machine credential kind ${unknown} doesn't exist.`
+  }
+  if (policy.CredentialKind && !kinds.includes(policy.CredentialKind)) {
+    return `The default credential kind ${policy.CredentialKind} is not one of the enabled kinds.`
+  }
+  if (days != null && (days < deploymentLifetime.min || days > deploymentLifetime.max)) {
+    return `The certificate lifetime must be between ${deploymentLifetime.min} and ${deploymentLifetime.max} days.`
+  }
+  return undefined
+}
+
+function withCredentials(
+  machine: MachineAccess,
+  kind: MachineCredentialKind,
+  lifetimeDays?: number | null,
+): MachineAccess {
   const certificate = kind === 'Certificate' || kind === 'CertificateAndApiKey'
+  const lifetime = certificate
+    ? (lifetimeDays ?? machine.CertificateLifetimeDays ?? deploymentLifetime.default)
+    : undefined
   return {
     ...machine,
     CredentialKind: kind,
@@ -61,6 +115,8 @@ function withCredentials(machine: MachineAccess, policy: MachineAuthenticationPo
     Certificate: certificate ? fakeSecret() : undefined,
     CertificatePassword: certificate ? random(16) : undefined,
     CertificateThumbprint: certificate ? random(40) : undefined,
+    CertificateLifetimeDays: lifetime,
+    CertificateNotAfter: lifetime ? new Date(Date.now() + lifetime * 86_400_000).toISOString() : undefined,
     TokenEndpoint: kind === 'ClientCredentials' ? 'https://auth.example.com/oauth2/token' : undefined,
     TokenScope: kind === 'ClientCredentials' ? `storyteller:${machine.Scope}` : undefined,
     LastRenewalAt: new Date().toISOString(),
@@ -251,6 +307,16 @@ export const accessManagementHandlers: HttpHandler[] = [
     }),
   ),
 
+  http.get<{ key: string }>(
+    `${api}/access/points/:key/machine-authentication`,
+    withDb((db, { params }) => {
+      return (
+        requireRole(db, params.key, 'Contributor') ??
+        HttpResponse.json(effectivePolicy(db.accessPoints[params.key]?.MachineAuthentication))
+      )
+    }),
+  ),
+
   http.put<{ key: string }>(
     `${api}/access/points/:key/machine-authentication`,
     withDb(async (db, { params, request }) => {
@@ -259,8 +325,13 @@ export const accessManagementHandlers: HttpHandler[] = [
         return denied
       }
       const policy = (await request.json()) as MachineAuthenticationPolicy
-      db.accessPoints[params.key] = { ...db.accessPoints[params.key], MachineAuthentication: policy }
-      return HttpResponse.json(policy)
+      const invalid = policyError(policy)
+      if (invalid) {
+        return errorResponse(400, invalid)
+      }
+      const stored = { ...effectivePolicy(policy), CertificateLifetimeDays: policy.CertificateLifetimeDays }
+      db.accessPoints[params.key] = { ...db.accessPoints[params.key], MachineAuthentication: stored }
+      return HttpResponse.json(effectivePolicy(stored))
     }),
   ),
 
@@ -292,6 +363,11 @@ export const accessManagementHandlers: HttpHandler[] = [
         return denied
       }
       const body = (await request.json()) as MachineAccessCreate
+      const policy = effectivePolicy(db.accessPoints[key]?.MachineAuthentication)
+      const kind = body.CredentialKind ?? policy.CredentialKind!
+      if (!policy.EnabledCredentialKinds!.includes(kind)) {
+        return errorResponse(400, `The credential kind ${kind} is not enabled in the project ${key}.`)
+      }
       const machine = withCredentials(
         {
           Id: `mach-${random(6).toLowerCase()}`,
@@ -299,7 +375,8 @@ export const accessManagementHandlers: HttpHandler[] = [
           Scope: body.Scope,
           AnnotationKey: body.AnnotationKey,
         },
-        db.accessPoints[key]?.MachineAuthentication,
+        kind,
+        body.CertificateLifetimeDays ?? policy.CertificateLifetimeDays,
       )
       ;((db.machines ??= {})[key] ??= []).push(stripSecrets(machine))
       return HttpResponse.json(machine, { status: 201 })
@@ -328,7 +405,8 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (denied || index < 0) {
         return denied ?? errorResponse(404, 'Not found.', 'NotFound')
       }
-      const machine = withCredentials(list[index]!, db.accessPoints[key]?.MachineAuthentication)
+      // A reset follows the kind the machine was created with, as the API does.
+      const machine = withCredentials(list[index]!, list[index]!.CredentialKind ?? 'ApiKey')
       list[index] = stripSecrets(machine)
       return HttpResponse.json(machine)
     }),

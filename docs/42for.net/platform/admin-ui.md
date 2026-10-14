@@ -155,9 +155,11 @@ Saving sends only your changes. Two situations stop a save:
 | --- | --- | --- |
 | Members | Administrator | Roles of the organization and of each project. Organization and project roles are independent. Only Owners grant Owner, and the last Owner stays. |
 | Invitations | Administrator | Invite by email with a role and an expiry; resend, revoke or copy the link. |
-| Machines | Contributor | Credentials for services: scope, an optional annotation restriction, reset and delete. |
+| Machines | Contributor | Credentials for services: scope, an optional annotation restriction, the credential kind and certificate lifetime, reset and delete. |
 | Certificates | Administrator | Shared client certificates: issue, revoke, expiry warnings. |
 | Settings | Everyone (policy: Administrator, time zone, date format and types: Contributor) | The default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy and the CA certificate download. |
+
+**Machine authentication** on Settings (Administrator) enables the credential kinds the project's machines may use: API keys, client certificates (mTLS), both together, or client credentials of the identity provider. It also sets the default kind and the default certificate lifetime of new machines. **New machine** on Machines preselects both, and lets you pick any other enabled kind and lifetime. Machines keep the kind they were created with; disabling a kind stops every machine that uses it until it is enabled again. The machine detail shows the certificate lifetime and when the certificate expires.
 
 The **default time zone** is `UTC` until you change it. It is kept in your browser, so other people and other browsers keep their own until the API stores project settings.
 

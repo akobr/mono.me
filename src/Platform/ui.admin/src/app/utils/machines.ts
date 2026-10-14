@@ -1,4 +1,4 @@
-import type { MachineAccess, MachineAccessCreateScope, MachineAuthenticationPolicy } from '@42for.net/2splatform.sdk'
+import type { MachineAccess, MachineAccessCreateScope, MachineCredentialKind } from '@42for.net/2splatform.sdk'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
 /** What each machine scope allows (spec section 13: "a select with an explanation per scope"). */
@@ -13,23 +13,37 @@ export const scopeDescriptions: Record<MachineAccessCreateScope, string> = {
   SecretsReadWrite: 'Reads and writes configurations and key/value secrets (over mTLS when the project requires it).',
 }
 
-export const credentialKindDescriptions: Record<NonNullable<MachineAuthenticationPolicy['CredentialKind']>, string> = {
+export const credentialKindDescriptions: Record<MachineCredentialKind, string> = {
   ApiKey: 'An API key per machine (Authorization: ApiKey …).',
   Certificate: 'A client certificate per machine (mTLS).',
   CertificateAndApiKey: 'A client certificate and an API key; both must be presented.',
   ClientCredentials: 'Client ID and secret of the identity provider, exchanged for a short-lived token.',
 }
 
-export const issuesCertificates = (policy?: MachineAuthenticationPolicy) =>
-  policy?.CredentialKind === 'Certificate' || policy?.CredentialKind === 'CertificateAndApiKey'
+/** Every credential kind, in the order of the API. */
+export const credentialKinds = Object.keys(credentialKindDescriptions) as MachineCredentialKind[]
 
-/** Days until the machine certificate expires, from the last renewal and the policy lifetime; undefined if unknown. */
+/** Whether machines of this kind get a client certificate (and with it a certificate lifetime). */
+export const issuesCertificates = (kind?: MachineCredentialKind | null) =>
+  kind === 'Certificate' || kind === 'CertificateAndApiKey'
+
+/**
+ * Days until the machine certificate expires: from its expiry, else from the last renewal and the machine's
+ * lifetime (or the fallback, for machines created before the lifetime was stored); undefined if unknown.
+ */
 export function certificateDaysLeft(
   machine: MachineAccess,
-  lifetimeDays: number | null | undefined,
+  fallbackLifetimeDays?: number | null,
   now = Date.now(),
 ): number | undefined {
-  if (!machine.CertificateThumbprint || !machine.LastRenewalAt || !lifetimeDays) {
+  if (!machine.CertificateThumbprint) {
+    return undefined
+  }
+  if (machine.CertificateNotAfter) {
+    return Math.floor((Date.parse(machine.CertificateNotAfter) - now) / 86_400_000)
+  }
+  const lifetimeDays = machine.CertificateLifetimeDays ?? fallbackLifetimeDays
+  if (!machine.LastRenewalAt || !lifetimeDays) {
     return undefined
   }
   const expires = Date.parse(machine.LastRenewalAt) + lifetimeDays * 86_400_000

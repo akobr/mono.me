@@ -80,7 +80,11 @@ function accessPoint(key: string, members: Record<string, AccountRole>): AccessP
   return {
     Key: key,
     AccessMap: members,
-    MachineAuthentication: { CredentialKind: 'ApiKey', CertificateLifetimeDays: 90 },
+    MachineAuthentication: {
+      EnabledCredentialKinds: ['ApiKey'],
+      CredentialKind: 'ApiKey',
+      CertificateLifetimeDays: 90,
+    },
   }
 }
 
@@ -205,6 +209,8 @@ export function createSeed(scenario: MockScenario): MockDb {
           AnnotationKey: 'exe.northwind.invoicing.prod',
           CredentialKind: 'Certificate',
           CertificateThumbprint: 'A1B2C3D4E5F60718293A4B5C6D7E8F9012345678',
+          CertificateLifetimeDays: 90,
+          CertificateNotAfter: new Date(Date.now() + 20 * 86_400_000).toISOString(),
           LastRenewalAt: new Date(Date.now() - 70 * 86_400_000).toISOString(),
         },
       ],
