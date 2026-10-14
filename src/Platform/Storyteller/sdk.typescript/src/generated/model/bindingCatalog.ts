@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.2.44924
+ * OpenAPI spec version: 0.9.7.38817
  */
 import type { BindingFunctionDescriptor } from "./bindingFunctionDescriptor";
 import type { BindingSourceDescriptor } from "./bindingSourceDescriptor";

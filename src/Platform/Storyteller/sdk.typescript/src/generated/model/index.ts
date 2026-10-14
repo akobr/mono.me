@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.6.55325
+ * OpenAPI spec version: 0.9.7.38817
  */
 
 export * from "./accessPoint";
@@ -53,6 +53,11 @@ export * from "./auditActor";
 export * from "./auditActorKind";
 export * from "./auditStamp";
 export * from "./authConfiguration";
+export * from "./bindingCatalog";
+export * from "./bindingExample";
+export * from "./bindingFunctionDescriptor";
+export * from "./bindingParameterDescription";
+export * from "./bindingSourceDescriptor";
 export * from "./byokSettings";
 export * from "./byokSettingsHealth";
 export * from "./byokSettingsUpdate";

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.6.55325
+ * OpenAPI spec version: 0.9.7.38817
  */
 import { faker } from "@faker-js/faker";
 
@@ -11,11 +11,121 @@ import { HttpResponse, http } from "msw";
 import type { RequestHandlerOptions } from "msw";
 
 import type {
+  BindingCatalog,
   Configuration,
   ConfigurationVersion,
   ConfigurationsResponse,
   DiffResult,
 } from "../../model";
+
+export const getGetBindingCatalogResponseMock = (
+  overrideResponse: Partial<Extract<BindingCatalog, object>> = {},
+): BindingCatalog => ({
+  Functions: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Name: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Summary: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Signature: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Parameters: faker.helpers.arrayElement([
+        Array.from(
+          { length: faker.number.int({ min: 1, max: 10 }) },
+          (_, i) => i + 1,
+        ).map(() => ({
+          Name: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Description: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          IsOptional: faker.helpers.arrayElement([
+            faker.datatype.boolean(),
+            undefined,
+          ]),
+          Values: faker.helpers.arrayElement([
+            Array.from(
+              { length: faker.number.int({ min: 1, max: 10 }) },
+              (_, i) => i + 1,
+            ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+            undefined,
+          ]),
+        })),
+        undefined,
+      ]),
+      Examples: faker.helpers.arrayElement([
+        Array.from(
+          { length: faker.number.int({ min: 1, max: 10 }) },
+          (_, i) => i + 1,
+        ).map(() => ({
+          Expression: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Description: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        })),
+        undefined,
+      ]),
+    })),
+    undefined,
+  ]),
+  Sources: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Name: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Summary: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      IsDefault: faker.helpers.arrayElement([
+        faker.datatype.boolean(),
+        undefined,
+      ]),
+      IsSecret: faker.helpers.arrayElement([
+        faker.datatype.boolean(),
+        undefined,
+      ]),
+      Examples: faker.helpers.arrayElement([
+        Array.from(
+          { length: faker.number.int({ min: 1, max: 10 }) },
+          (_, i) => i + 1,
+        ).map(() => ({
+          Expression: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+          Description: faker.helpers.arrayElement([
+            faker.string.alpha({ length: { min: 10, max: 20 } }),
+            undefined,
+          ]),
+        })),
+        undefined,
+      ]),
+    })),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
 
 export const getGetConfigurationsResponseMock = (
   overrideResponse: Partial<Extract<ConfigurationsResponse, object>> = {},
@@ -492,6 +602,30 @@ export const getGetConfigurationViewDiffResponseMock = (
     '@@ -1,4 +1,5 @@\n {\n-  "owner": "team-a",\n+  "owner": "team-b",\n+  "tag": "v2",\n   "version": 1\n }',
   ]);
 
+export const getGetBindingCatalogMockHandler = (
+  overrideResponse?:
+    | BindingCatalog
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<BindingCatalog> | BindingCatalog),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/:organization/:project/bindings",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetBindingCatalogResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGetConfigurationsMockHandler = (
   overrideResponse?:
     | ConfigurationsResponse
@@ -759,6 +893,7 @@ export const getGetConfigurationViewDiffMockHandler = (
   );
 };
 export const getConfigurationsMock = () => [
+  getGetBindingCatalogMockHandler(),
   getGetConfigurationsMockHandler(),
   getGetConfigurationMockHandler(),
   getSetConfigurationMockHandler(),

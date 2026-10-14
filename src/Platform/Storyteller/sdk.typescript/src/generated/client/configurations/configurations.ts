@@ -3,9 +3,10 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.6.55325
+ * OpenAPI spec version: 0.9.7.38817
  */
 import type {
+  BindingCatalog,
   Configuration,
   ConfigurationVersion,
   ConfigurationsResponse,
@@ -21,6 +22,30 @@ import type {
 } from "../../model";
 
 import { storytellerFetch } from "../../../lib/fetcher";
+
+export const getGetBindingCatalogUrl = (
+  organization: string,
+  project: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/bindings`;
+};
+
+/**
+ * The binding functions and sources registered on the server, with descriptions and examples. Values are never resolved.
+ */
+export const getBindingCatalog = async (
+  organization: string,
+  project: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<BindingCatalog> => {
+  return storytellerFetch<BindingCatalog>(
+    getGetBindingCatalogUrl(organization, project),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
 
 export const getGetConfigurationsUrl = (
   organization: string,

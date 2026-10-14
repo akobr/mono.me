@@ -3,9 +3,65 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.6.55325
+ * OpenAPI spec version: 0.9.7.38817
  */
 import * as zod from "zod";
+
+/**
+ * The binding functions and sources registered on the server, with descriptions and examples. Values are never resolved.
+ */
+export const GetBindingCatalogParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+});
+
+export const GetBindingCatalogResponse = zod.object({
+  Functions: zod
+    .array(
+      zod.object({
+        Name: zod.string().optional(),
+        Summary: zod.string().optional(),
+        Signature: zod.string().optional(),
+        Parameters: zod
+          .array(
+            zod.object({
+              Name: zod.string().optional(),
+              Description: zod.string().optional(),
+              IsOptional: zod.boolean().optional(),
+              Values: zod.array(zod.string()).optional(),
+            }),
+          )
+          .optional(),
+        Examples: zod
+          .array(
+            zod.object({
+              Expression: zod.string().optional(),
+              Description: zod.string().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+  Sources: zod
+    .array(
+      zod.object({
+        Name: zod.string().optional(),
+        Summary: zod.string().optional(),
+        IsDefault: zod.boolean().optional(),
+        IsSecret: zod.boolean().optional(),
+        Examples: zod
+          .array(
+            zod.object({
+              Expression: zod.string().optional(),
+              Description: zod.string().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .optional(),
+});
 
 /**
  * Configurations of the view without their documents, up to 1000 per page.
