@@ -229,6 +229,7 @@ The same with `sform`, which sets the whole policy (`-k` is required, the first 
 sform machine machine-auth -k api-key -k certificate -d certificate -l 90
 sform machine machine-auth                 # prints the policy
 sform machine create -k api-key            # without -k: the project default
+sform machine create -s                    # CertificateAndApiKey with a shared certificate, no certificate of its own
 ```
 
 **Creating a machine.** `MachineAccessCreate.CredentialKind` picks the kind; without it the project default is used. A kind the project does not enable fails with `400`. `MachineAccessCreate.UseSharedCertificate` creates a `CertificateAndApiKey` machine with no certificate of its own: it gets only its API key, `UsesSharedCertificate` is set, and it signs in with one of the project's shared certificates and that key. Any other kind with `UseSharedCertificate` fails with `400`. A machine with a certificate of its own gets `MachineAccessCreate.CertificateLifetimeDays`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. The machine keeps its kind and its lifetime: reset and delete follow the kind, and a certificate renewal issues the new certificate with the same lifetime. Machines created before the lifetime was stored renew with `MachineAuth:CertificateLifetimeDays`.

@@ -148,6 +148,55 @@ public class MachineCreateCommandTests
         sent.CertificateLifetimeDays.ShouldBe(30);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("certificate-and-api-key")]
+    public async Task SharedCertificate_SendsCertificateAndApiKeyWithoutALifetime(string? kind)
+    {
+        MachineAccessCreate? sent = null;
+        _accessApi
+            .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
+            .Callback((string _, string _, MachineAccessCreate body) => sent = body)
+            .ReturnsAsync(new MachineAccess
+            {
+                Id = "m1",
+                AccessKey = "api-key",
+                CredentialKind = MachineAccessCredentialKind.CertificateAndApiKey,
+                UsesSharedCertificate = true,
+            });
+
+        var exitCode = await Execute(kind, lifetimeDays: 30, useSharedCertificate: true);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        sent!.CredentialKind.ShouldBe(MachineAccessCreateCredentialKind.CertificateAndApiKey);
+        sent.UseSharedCertificate.ShouldBe(true);
+        sent.CertificateLifetimeDays.ShouldBeNull();
+        _console.Lines.ShouldContain(line => line.Contains("shared certificate of the project"));
+    }
+
+    [Fact]
+    public async Task SharedCertificate_WithAnotherKind_FailsWithoutCallingTheServer()
+    {
+        var exitCode = await Execute("api-key", useSharedCertificate: true);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_INPUT_PARSING);
+        _accessApi.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task WithoutSharedCertificate_SendsNoFlag()
+    {
+        MachineAccessCreate? sent = null;
+        _accessApi
+            .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
+            .Callback((string _, string _, MachineAccessCreate body) => sent = body)
+            .ReturnsAsync(new MachineAccess { Id = "m1", AccessKey = "api-key" });
+
+        await Execute("certificate-and-api-key");
+
+        sent!.UseSharedCertificate.ShouldBeNull();
+    }
+
     [Fact]
     public async Task UnknownKind_FailsWithoutCallingTheServer()
     {
@@ -169,7 +218,7 @@ public class MachineCreateCommandTests
         return _console.Lines.Single(line => line.TrimStart().StartsWith(start));
     }
 
-    private Task<int> Execute(string? credentialKind = null, int? lifetimeDays = null)
+    private Task<int> Execute(string? credentialKind = null, int? lifetimeDays = null, bool useSharedCertificate = false)
     {
         var command = new MachineCreateCommand(
             _console.Object,
@@ -180,6 +229,7 @@ public class MachineCreateCommandTests
         {
             CredentialKind = credentialKind,
             LifetimeDays = lifetimeDays,
+            UseSharedCertificate = useSharedCertificate,
         };
 
         return command.OnExecuteAsync();
