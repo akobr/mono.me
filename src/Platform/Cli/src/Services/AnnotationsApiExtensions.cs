@@ -7,7 +7,7 @@ namespace _42.Platform.Cli.Services;
 public static class AnnotationsApiExtensions
 {
     /// <summary>
-    /// Gets an active annotation.
+    /// Gets an annotation that is not deleted, whatever its status (disabled, scheduled and expired ones too).
     /// </summary>
     /// <returns>The annotation, or null when it doesn't exist or is deleted.</returns>
     public static async Task<Annotation?> TryGetAnnotationAsync(
@@ -19,7 +19,7 @@ public static class AnnotationsApiExtensions
     {
         try
         {
-            return await @this.GetAnnotationAsync(organization, project, view, annotationKey, null, null);
+            return await @this.GetAnnotationAsync(organization, project, view, annotationKey, includeInactive: true, includeDeleted: null);
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {

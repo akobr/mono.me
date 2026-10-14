@@ -51,8 +51,8 @@ public class StorytellerGetCommand : BaseContextCommand
                 Context.ProjectName,
                 Context.ViewName,
                 AnnotationKey,
-                null,
-                null);
+                includeInactive: true,
+                includeDeleted: null);
         }
         catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.NotFound)
         {

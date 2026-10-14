@@ -134,11 +134,11 @@ The relation is the structure. These fields are the catalog you can show to a pe
 | `documentationLink` | A deeper page, a runbook, or a contract |
 | `labels` | Free tags: `billing`, `beta`, `pci`, `eu` |
 | `values` | A small JSON object of facts other configuration may read |
-| `isDisabled` | The record stays visible and is marked inactive |
+| `isDisabled` | The record stays in the catalog, out of effect |
 | `validFrom`, `expiresAt` | A trial, a subscription window, a version that retires on a date |
 | `timeZone` | The zone in which that window, or a unit's schedule, is interpreted |
 
-`isDisabled` and the validity window are data on the annotation. A service, or the scheduler when it arrives, reads them and decides whether the record should run. The catalog keeps the record either way, which is what you want when someone asks why a customer stopped receiving a feature on a given day.
+`isDisabled` and the validity window decide whether a record is **active**. The API answers only active records by default, so a service that lists the executions of a customer, or reads one of them, does not get a disabled, not-yet-valid or expired one by accident. Tools that manage the catalog ask for the others with `includeInactive=true`, as the admin UI and `sform story --inactive` do. The catalog keeps the record either way, which is what you want when someone asks why a customer stopped receiving a feature on a given day. Configuration is not filtered: an inactive record still resolves its documents.
 
 `values` is the bridge into configuration. A resolved document can pull a field from the annotation, or from an ancestor, with an `@annotation(...)` expression. The customer tier can live on the subject, and every execution can refer to it, without copying the tier into every document.
 
