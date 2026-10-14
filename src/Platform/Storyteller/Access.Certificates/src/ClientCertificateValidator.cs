@@ -78,13 +78,17 @@ public class ClientCertificateValidator : IClientCertificateValidator
             return await ValidateMachineCertificateAsync(clientCertificate, identity);
         }
 
-        // Shared certificates: SAN + chain validation, then check revocation status.
+        // Shared certificates: SAN + chain validation, then the certificate must be known to the project and not revoked.
         var thumbprint = clientCertificate.Thumbprint;
-        var sharedCerts = await _sharedCertificateStore.ListAsync(identity.Organization, identity.Project);
-        var sharedRecord = sharedCerts.FirstOrDefault(
-            c => string.Equals(c.Thumbprint, thumbprint, StringComparison.OrdinalIgnoreCase));
+        var sharedRecord = await _sharedCertificateStore.GetByThumbprintAsync(identity.Organization, identity.Project, thumbprint);
 
-        if (sharedRecord is { IsRevoked: true })
+        if (sharedRecord is null)
+        {
+            _logger.LogWarning("Shared certificate {Thumbprint} is not issued for {Organization}/{Project}", thumbprint, identity.Organization, identity.Project);
+            return null;
+        }
+
+        if (sharedRecord.IsRevoked)
         {
             _logger.LogWarning("Shared certificate {Thumbprint} is revoked", thumbprint);
             return null;

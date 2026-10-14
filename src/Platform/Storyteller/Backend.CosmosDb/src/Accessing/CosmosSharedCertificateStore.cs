@@ -13,15 +13,17 @@ using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Storyteller;
 
-// Shared certificates of a project, listed on every call that presents one. The list is cached per project:
-// 5 minutes when it has certificates, 30 seconds when it is empty; a revocation is seen by other instances
-// within the longer time, the same bound as for machine certificates.
+// Shared certificates of a project. A call that presents one reads it by thumbprint: hits are cached for 5 minutes,
+// misses for 30 seconds, like machine certificates. The admin list is cached per project, 5 minutes when it has
+// certificates and 30 seconds when it is empty. A revocation is seen by other instances within 5 minutes.
 public class CosmosSharedCertificateStore : ISharedCertificateStore
 {
     private const string IdPrefix = "scr.";
 
     private static readonly TimeSpan ListExpiration = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan EmptyListExpiration = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan HitExpiration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan MissExpiration = TimeSpan.FromSeconds(30);
 
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly JsonSerializerOptions _serializerOptions;
@@ -64,19 +66,32 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
 
             foreach (var entity in response)
             {
-                results.Add(new SharedCertificate
-                {
-                    Thumbprint = entity.Thumbprint,
-                    Label = entity.Label,
-                    NotBefore = entity.NotBefore,
-                    NotAfter = entity.NotAfter,
-                    IsRevoked = entity.IsRevoked,
-                });
+                results.Add(ToModel(entity));
             }
         }
 
         _cache.Set<IReadOnlyList<SharedCertificate>>(cacheKey, results, results.Count == 0 ? EmptyListExpiration : ListExpiration);
         return results;
+    }
+
+    public async Task<SharedCertificate?> GetByThumbprintAsync(string organization, string project, string thumbprint)
+    {
+        var cacheKey = GetThumbprintCacheKey(organization, project, thumbprint);
+
+        if (_cache.TryGetValue(cacheKey, out CachedCertificate? cached) && cached is not null)
+        {
+            return cached.Certificate;
+        }
+
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var entity = await repository.Container.TryReadItemAsync(
+            $"{IdPrefix}{thumbprint.ToUpperInvariant()}",
+            new PartitionKey($"{project}.access"),
+            stream => stream.DeserializeSystemTextJson<SharedCertificateEntity>(_serializerOptions));
+
+        var certificate = entity is null ? null : ToModel(entity);
+        _cache.Set(cacheKey, new CachedCertificate(certificate), certificate is null ? MissExpiration : HitExpiration);
+        return certificate;
     }
 
     public async Task StoreAsync(string organization, string project, SharedCertificate certificate)
@@ -97,7 +112,7 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
         };
 
         await repository.Container.CreateItemAsync(entity, partitionKey);
-        _cache.Remove(GetCacheKey(organization, project));
+        Evict(organization, project, certificate.Thumbprint);
     }
 
     public async Task<bool> RevokeAsync(string organization, string project, string thumbprint)
@@ -114,13 +129,13 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
 
         if (entity is null)
         {
-            _cache.Remove(GetCacheKey(organization, project));
+            Evict(organization, project, thumbprint);
             return false;
         }
 
         var updated = entity with { IsRevoked = true };
         await repository.Container.ReplaceItemAsync(updated, id, partitionKey);
-        _cache.Remove(GetCacheKey(organization, project));
+        Evict(organization, project, thumbprint);
         return true;
     }
 
@@ -150,4 +165,26 @@ public class CosmosSharedCertificateStore : ISharedCertificateStore
     {
         return $"scert:list:{organization}.{project}";
     }
+
+    private static string GetThumbprintCacheKey(string organization, string project, string thumbprint)
+    {
+        return $"scert:thumb:{organization}.{project}:{thumbprint.ToUpperInvariant()}";
+    }
+
+    private static SharedCertificate ToModel(SharedCertificateEntity entity) => new()
+    {
+        Thumbprint = entity.Thumbprint,
+        Label = entity.Label,
+        NotBefore = entity.NotBefore,
+        NotAfter = entity.NotAfter,
+        IsRevoked = entity.IsRevoked,
+    };
+
+    private void Evict(string organization, string project, string thumbprint)
+    {
+        _cache.Remove(GetCacheKey(organization, project));
+        _cache.Remove(GetThumbprintCacheKey(organization, project, thumbprint));
+    }
+
+    private sealed record CachedCertificate(SharedCertificate? Certificate);
 }

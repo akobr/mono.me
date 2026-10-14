@@ -7,6 +7,8 @@ public interface ISharedCertificateStore
 {
     Task<IReadOnlyList<SharedCertificate>> ListAsync(string organization, string project);
 
+    Task<SharedCertificate?> GetByThumbprintAsync(string organization, string project, string thumbprint);
+
     Task StoreAsync(string organization, string project, SharedCertificate certificate);
 
     Task<bool> RevokeAsync(string organization, string project, string thumbprint);

@@ -36,13 +36,7 @@ public class ClientCertificateValidatorTests
                 .ReturnsAsync(record);
         }
 
-        if (sharedStore is null)
-        {
-            var sharedStoreMock = new Mock<ISharedCertificateStore>();
-            sharedStoreMock.Setup(s => s.ListAsync(It.IsAny<string>(), It.IsAny<string>()))
-                .ReturnsAsync(new List<SharedCertificate>());
-            sharedStore = sharedStoreMock.Object;
-        }
+        sharedStore ??= new Mock<ISharedCertificateStore>().Object;
 
         return new ClientCertificateValidator(
             caProviderMock.Object,
@@ -70,11 +64,26 @@ public class ClientCertificateValidatorTests
         result.Scope.ShouldBe(MachineAccessScope.DefaultRead);
     }
 
+    private static ISharedCertificateStore SharedStoreWith(X509Certificate2 leaf, bool isRevoked = false)
+    {
+        var sharedStoreMock = new Mock<ISharedCertificateStore>();
+        sharedStoreMock.Setup(s => s.GetByThumbprintAsync("org1", "proj1", leaf.Thumbprint))
+            .ReturnsAsync(new SharedCertificate
+            {
+                Thumbprint = leaf.Thumbprint,
+                Label = "svc",
+                NotBefore = leaf.NotBefore,
+                NotAfter = leaf.NotAfter,
+                IsRevoked = isRevoked,
+            });
+        return sharedStoreMock.Object;
+    }
+
     [Fact]
     public async Task ValidateAsync_ValidSharedCert_ReturnsSharedResult()
     {
         var leaf = TestCertificateHelper.IssueSharedLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "svc");
-        var validator = CreateValidator();
+        var validator = CreateValidator(sharedStore: SharedStoreWith(leaf));
 
         var result = await validator.ValidateAsync(leaf);
 
@@ -83,6 +92,27 @@ public class ClientCertificateValidatorTests
         result.Organization.ShouldBe("org1");
         result.Project.ShouldBe("proj1");
         result.MachineAccessId.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ValidateAsync_SharedCertNotInStore_ReturnsNull()
+    {
+        // signed by the trusted CA with a well-formed shared SAN, but never issued for the project
+        var leaf = TestCertificateHelper.IssueSharedLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "svc");
+        var validator = CreateValidator();
+
+        var result = await validator.ValidateAsync(leaf);
+        result.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task ValidateAsync_RevokedSharedCert_ReturnsNull()
+    {
+        var leaf = TestCertificateHelper.IssueSharedLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "svc");
+        var validator = CreateValidator(sharedStore: SharedStoreWith(leaf, isRevoked: true));
+
+        var result = await validator.ValidateAsync(leaf);
+        result.ShouldBeNull();
     }
 
     [Fact]

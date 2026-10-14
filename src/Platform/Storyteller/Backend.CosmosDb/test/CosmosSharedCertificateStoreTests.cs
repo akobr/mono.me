@@ -58,6 +58,26 @@ public class CosmosSharedCertificateStoreTests(Startup startup)
     }
 
     [Fact]
+    public async Task GetByThumbprint_FindsIssuedCertificates_AndFollowsRevocation()
+    {
+        var project = $"scert-{Guid.NewGuid():N}"[..20];
+        var store = CreateStore();
+        var certificate = NewCertificate("edge");
+
+        (await store.GetByThumbprintAsync(Org, project, certificate.Thumbprint)).Should().BeNull();
+        await store.StoreAsync(Org, project, certificate);
+
+        var found = await store.GetByThumbprintAsync(Org, project, certificate.Thumbprint.ToLowerInvariant());
+        found.Should().NotBeNull("the write evicted the cached miss and the lookup ignores case");
+        found!.Label.Should().Be("edge");
+        found.IsRevoked.Should().BeFalse();
+
+        await store.RevokeAsync(Org, project, certificate.Thumbprint);
+        (await store.GetByThumbprintAsync(Org, project, certificate.Thumbprint))!.IsRevoked.Should().BeTrue();
+        (await CreateStore().GetByThumbprintAsync(Org, "other-project", certificate.Thumbprint)).Should().BeNull("projects are isolated");
+    }
+
+    [Fact]
     public void Registration_UsesTheCosmosStore()
     {
         Context.Services.GetRequiredService<ISharedCertificateStore>().Should().BeOfType<CosmosSharedCertificateStore>();
