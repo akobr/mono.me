@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { Window } from 'happy-dom'
 
 // The favicon is the 42 logo drawn at 16 and 32 px, the same files as the docs site (424-32). Vite copies public/ as
 // it is and keeps the links of index.html, so each link must point at a file of the size it declares.
@@ -10,10 +11,10 @@ const root = fileURLToPath(new URL('../../..', import.meta.url))
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
-/** The attributes of every <link> of the HTML. */
-const links = (html: string) =>
-  [...html.matchAll(/<link\b[^>]*>/g)].map(([tag]) =>
-    Object.fromEntries([...tag.matchAll(/([\w-]+)="([^"]*)"/g)].map(([, name, value]) => [name!, value!])),
+/** The attributes of the <link rel="icon"> elements in the head; commented-out markup is not an element. */
+const iconLinks = (html: string) =>
+  [...new new Window().DOMParser().parseFromString(html, 'text/html').head.querySelectorAll('link[rel="icon"]')].map(
+    (link) => Object.fromEntries([...link.attributes].map(({ name, value }) => [name, value])),
   )
 
 /** The size in the IHDR chunk, which follows the signature of every PNG. */
@@ -30,7 +31,7 @@ describe('favicon', () => {
   })
 
   it('links the 42 logo at 32 and 16 px', async () => {
-    const icons = links(html).filter((link) => link.rel === 'icon')
+    const icons = iconLinks(html)
 
     expect(icons.map((icon) => icon.sizes)).toEqual(['32x32', '16x16'])
     for (const icon of icons) {
