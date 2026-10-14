@@ -48,6 +48,7 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - `?mock-scenario=new-user` starts without an account (onboarding); `?mock-scenario=invited` starts without an account but with a pending invitation; `?mock-scenario=large` puts 16,317 annotations into `acme/billing/default` (performance of the grid and the graph); `?mock-scenario=default` returns to the seeded data.
 - `window.storytellerMock.reset()` resets the data of the current scenario.
 - The mock API keeps deleted annotations restorable and records a change history per key, like the API (`app/mock/annotation-handlers.ts`, `app/mock/audit.ts`). A re-created key starts without its configuration.
+- `POST …/annotations/simple` (bulk create) reads its lines as the API does (`app/mock/simple-lines.ts`): it creates the keys with their missing ancestors, skips existing keys, and answers `400` above 100 lines.
 
 ### End-to-end and visual tests
 
@@ -62,7 +63,8 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - a machine with a `.pfx` download;
 - a graph node opened by mouse and by keyboard;
 - delete and Undo, restore from Deleted (with and without descendants), create over a deleted key, permanent delete for Administrators only, the history and the configuration link;
-- axe (WCAG 2.1 AA) on the main screens and on Deleted.
+- bulk create from a list of keys, with the missing ancestors, and its absence for a Reader;
+- axe (WCAG 2.1 AA) on the main screens, on Deleted and on the bulk create dialog.
 
 Each test gets a fresh context, so the mock data starts from the scenario's seed. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of `npx playwright install chromium`.
 
