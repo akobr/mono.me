@@ -9,6 +9,7 @@ using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Json;
 using _42.Platform.Storyteller.KeyValues;
+using _42.Platform.Storyteller.Transferring;
 
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Extensions.OpenApi;
@@ -87,6 +88,10 @@ var host = new HostBuilder()
 
         // The usage counters and the aggregated binding reads of key/value pairs are written every minute.
         services.AddHostedService<KeyValueUsageFlushService>();
+
+        // Export and import of configurations: jobs in Cosmos DB, archives and the queue in AzureWebJobsStorage
+        services.AddConfigurationTransfers(context.Configuration);
+        services.AddAzureStorageConfigurationTransfers(context.Configuration);
 
         // Add authentication by API keys
         services.AddApiKeyMachineAccess();

@@ -100,6 +100,13 @@ public sealed class GitRepositoryWriter
         WriteEntry(archive, ".git/index", index, now, CompressionLevel.Optimal);
     }
 
+    // Zip times cannot be before 1980.
+    internal static DateTimeOffset ZipTime(DateTimeOffset value)
+    {
+        var minimum = new DateTimeOffset(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        return value < minimum ? minimum : value;
+    }
+
     private byte[] CreateTree()
     {
         using var tree = new MemoryStream();
@@ -126,13 +133,6 @@ public sealed class GitRepositoryWriter
     private static void WriteDirectory(ZipArchive archive, string name, DateTimeOffset modifiedAt)
     {
         archive.CreateEntry(name).LastWriteTime = ZipTime(modifiedAt);
-    }
-
-    // Zip times cannot be before 1980.
-    internal static DateTimeOffset ZipTime(DateTimeOffset value)
-    {
-        var minimum = new DateTimeOffset(1980, 1, 1, 0, 0, 0, TimeSpan.Zero);
-        return value < minimum ? minimum : value;
     }
 
     private sealed record class TrackedFile(byte[] Id, byte[] Content, DateTimeOffset ModifiedAt);

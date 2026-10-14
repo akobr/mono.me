@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { configureStoryteller, getStorytellerConfig, storytellerFetch, type StorytellerConfig } from '../lib/fetcher'
 import { hasErrorCode, isAborted, isForbidden, isPreconditionFailed, StorytellerError } from '../lib/errors'
 import { deleteAnnotation } from '../generated/client/annotations/annotations'
+import { getConfigurationExportArchive, startConfigurationImport } from '../generated/client/configurations/configurations'
 
 interface Call {
   url: string
@@ -72,6 +73,41 @@ describe('storytellerFetch', () => {
     await expect(storytellerFetch<string>('/v1/access/certificate-authority')).resolves.toBe(pem)
     await expect(storytellerFetch<string>('/v1/o/p/v/configuration/k/versions/2/diff?format=unified')).resolves.toBe('@@ -1 +1 @@')
     await expect(storytellerFetch('/v1/x')).resolves.toEqual({ ok: true })
+  })
+
+  it('returns zip archives as a Blob with their bytes', async () => {
+    const bytes = new Uint8Array([0x50, 0x4b, 0x05, 0x06, 0xff, 0x00, 0x80])
+    const { fetch } = fakeFetch(new Response(bytes, { status: 200, headers: { 'content-type': 'application/zip' } }))
+    configure({ fetch })
+
+    const archive = await getConfigurationExportArchive('acme', 'web', 'default', 'job-1')
+
+    expect(archive).toBeInstanceOf(Blob)
+    expect(new Uint8Array(await archive.arrayBuffer())).toEqual(bytes)
+  })
+
+  it('still reports the JSON error of a request for an archive', async () => {
+    const { fetch } = fakeFetch(json({ Message: 'Not ready.', ErrorCode: 'TransferNotReady' }, 409))
+    configure({ fetch })
+
+    const error = await getConfigurationExportArchive('acme', 'web', 'default', 'job-1').catch((caught: unknown) => caught)
+
+    expect(error).toBeInstanceOf(StorytellerError)
+    expect(hasErrorCode(error, 'TransferNotReady')).toBe(true)
+  })
+
+  it('sends an import archive as the zip body with its options', async () => {
+    const { fetch, calls } = fakeFetch(json({ Id: 'job-2', Status: 'Queued' }, 202))
+    configure({ fetch })
+    const archive = new Blob([new Uint8Array([0x50, 0x4b, 0x05, 0x06])], { type: 'application/zip' })
+
+    const started = await startConfigurationImport('acme', 'web', 'default', archive, { dryRun: true, fileName: 'configs.zip' })
+
+    expect(started).toEqual({ Id: 'job-2', Status: 'Queued' })
+    expect(calls[0]?.url).toBe('https://api.example.com/api/v1/acme/web/default/configurations/imports?dryRun=true&fileName=configs.zip')
+    expect(calls[0]?.init.method).toBe('POST')
+    expect(calls[0]?.init.body).toBe(archive)
+    expect(new Headers(calls[0]?.init.headers).get('Content-Type')).toBe('application/zip')
   })
 
   it('returns undefined for 204 and empty bodies', async () => {

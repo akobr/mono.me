@@ -14,6 +14,7 @@ internal sealed class TestHttpRequestData : HttpRequestData
         IDictionary<string, string>? headers = null,
         string method = "GET",
         string? body = null,
+        byte[]? bodyBytes = null,
         Uri? url = null)
         : base(functionContext)
     {
@@ -22,7 +23,9 @@ internal sealed class TestHttpRequestData : HttpRequestData
         Headers = headers is null
             ? new HttpHeadersCollection()
             : new HttpHeadersCollection(headers);
-        Body = body is null ? new MemoryStream() : new MemoryStream(Encoding.UTF8.GetBytes(body));
+        Body = bodyBytes is not null
+            ? new MemoryStream(bodyBytes)
+            : body is null ? new MemoryStream() : new MemoryStream(Encoding.UTF8.GetBytes(body));
         Cookies = [];
         IdentityList = [];
         Query = new NameValueCollection();

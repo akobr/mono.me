@@ -1,9 +1,16 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Local Azure Storage via Azurite
-//var storage = builder.AddAzureStorage("storage").RunAsEmulator();
-//var queues = storage.AddQueues("queues");
-//var blobs = storage.AddBlobs("blobs");
+// Local Azure Storage via Azurite, on the default ports, so AzureWebJobsStorage=UseDevelopmentStorage=true of the
+// Functions host reaches it: the queue and the archives of configuration exports and imports live there.
+var storage = builder
+    .AddAzureStorage("storage")
+    .RunAsEmulator(emulator =>
+    {
+        emulator.WithBlobPort(10000);
+        emulator.WithQueuePort(10001);
+        emulator.WithTablePort(10002);
+        emulator.WithLifetime(ContainerLifetime.Persistent);
+    });
 
 // Local Cosmos DB emulator
 /*var cosmos = builder.AddAzureCosmosDB("cosmos")
@@ -37,7 +44,9 @@ var apiFunctions = builder.AddProject<Projects.Api_Functions>("api-functions")
     .WaitFor(cosmos)
     .WithEnvironment("AzureKeyVaults__default", keyVault.GetEndpoint("https"))
     .WithEnvironment("KeyValues__Protection__Emulator", "true")
-    .WaitFor(keyVault);
+    .WaitFor(keyVault)
+    .WithEnvironment("AzureWebJobsStorage", "UseDevelopmentStorage=true")
+    .WaitFor(storage);
 
 // Administration UI (src/Platform/ui.admin): the Vite dev server on the fixed port 5173, which is the redirect URI
 // registered in the WorkOS staging environment. Run `npm ci` in ui.admin/src (and build the TypeScript SDK) first.

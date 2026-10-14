@@ -55,6 +55,16 @@ public class ExceptionHandlingMiddlewareTests
         HasValue(body, nameof(Models.ErrorResponse.Error)).ShouldBeTrue();
     }
 
+    // A queue or timer invocation has no response to write: it fails, so the runtime delivers the message again.
+    [Fact]
+    public async Task Invoke_UnmappedExceptionWithoutHttpRequest_IsRethrown()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var context = FunctionTestDoubles.CreateNonHttp(services);
+
+        await Should.ThrowAsync<InvalidOperationException>(() => InvokeThrowingAsync(context, new InvalidOperationException("boom")));
+    }
+
     private static async Task InvokeThrowingAsync(FunctionContext context, Exception exception)
     {
         var middleware = new ExceptionHandlingMiddleware(NullLogger<ExceptionHandlingMiddleware>.Instance);

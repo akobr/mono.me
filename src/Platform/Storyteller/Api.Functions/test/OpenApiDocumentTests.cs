@@ -88,4 +88,20 @@ public class OpenApiDocumentTests
             method.GetParameters().Single(argument => argument.Name == name).DefaultValue.ShouldBe(false);
         }
     }
+
+    [Fact]
+    public void ConfigurationTransferSchemas_ArePublished()
+    {
+        var helper = new DocumentHelper(new RouteConstraintFilter(), new OpenApiSchemaAcceptor());
+        var methods = typeof(ConfigurationTransferHttp).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly).ToList();
+
+        var schemas = helper.GetOpenApiSchemas(methods, new DefaultNamingStrategy(), VisitorCollection.CreateInstance());
+
+        schemas.Keys.ShouldContain("ConfigurationExportCreate");
+        schemas.Keys.ShouldContain("ConfigurationImportSummary");
+        schemas.Keys.ShouldContain("ConfigurationImportItem");
+        schemas["ConfigurationExport"].Properties.Keys.ShouldContain("FileName");
+        schemas["ConfigurationImport"].Properties.Keys.ShouldContain("Items");
+        schemas["ConfigurationImportItem"].Properties["Outcome"].Enum.Count.ShouldBe(5);
+    }
 }

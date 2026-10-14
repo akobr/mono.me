@@ -150,6 +150,24 @@ public partial class RouteTableTests
         actionRoutes.SelectMany(trigger => trigger.Methods!).ShouldAllBe(method => string.Equals(method, "post", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Theory]
+    [InlineData("POST v1/{}/{}/{}/configurations/exports")]
+    [InlineData("GET v1/{}/{}/{}/configurations/exports/{}")]
+    [InlineData("GET v1/{}/{}/{}/configurations/exports/{}/archive")]
+    [InlineData("POST v1/{}/{}/{}/configurations/imports")]
+    [InlineData("GET v1/{}/{}/{}/configurations/imports/{}")]
+    public void ConfigurationTransferRoutes_AreRegistered(string expected)
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"));
+
+        routes.ShouldContain(expected);
+    }
+
     [GeneratedRegex("{[^}]+}")]
     private static partial Regex Parameter();
 }

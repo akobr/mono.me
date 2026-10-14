@@ -10,8 +10,6 @@ public sealed class GitPackWriter
 {
     public const int MaxDeltaDepth = 49;
 
-    private const int HeaderLength = 12;
-
     private readonly MemoryStream _pack = new();
     private readonly Dictionary<string, PackedObject> _objects = new(StringComparer.Ordinal);
 
@@ -130,7 +128,7 @@ public sealed class GitPackWriter
 
     private static byte[] CreateEntry(GitObjectType type, byte[] data, long baseDistance)
     {
-        using var entry = new MemoryStream(data.Length / 2 + 32);
+        using var entry = new MemoryStream((data.Length / 2) + 32);
 
         // type and size: 3 bits of type and 4 bits of size, then 7 bits of size per byte
         var size = (long)data.Length;

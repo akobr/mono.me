@@ -43,7 +43,8 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
 
             if (httpReqData is null)
             {
-                return;
+                // a queue or timer invocation fails, so the runtime delivers it again
+                throw;
             }
 
             var httpErrorResponse = httpReqData.CreateResponse(HttpStatusCode.InternalServerError);
