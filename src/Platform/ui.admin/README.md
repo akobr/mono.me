@@ -20,7 +20,7 @@ npm run dev:mock   # http://localhost:5174, API served by MSW in the browser, fa
 npm run dev        # http://localhost:5173, real API (VITE_API_BASE_URL) and AuthKit
 ```
 
-After a change of the SDK, rebuild it and reinstall it here: `rm -rf node_modules/@42for.net && npm install`.
+After a change of the SDK, rebuild it and reinstall it here: `rm -rf node_modules/@42for.net && npm install`. The SDK is a file: dependency, so a rebuilt SDK changes neither the lockfile nor the version, and the dev server would keep pre-bundling the old copy (two instances of `@tanstack/vue-query`: `client.defaultQueryOptions is not a function`). `build/sdk-freshness.ts` stamps the installed `dist`: a changed stamp forces the re-optimization at the start, and a running dev server re-optimizes and restarts when the reinstall lands.
 
 The dev server pre-bundles every package imported in `app/` when it starts (`optimizeDeps.entries` in `vite.config.ts`), so moving to another page never re-optimizes the dependencies and reloads the app. A package that only a virtual module imports, like `vue-router/experimental` from the generated routes, goes into `optimizeDeps.include`. `test/unit/build/dependency-prebundling.test.ts` checks both.
 
