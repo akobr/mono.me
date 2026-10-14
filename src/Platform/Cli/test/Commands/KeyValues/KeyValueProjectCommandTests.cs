@@ -143,7 +143,7 @@ public class KeyValueProjectCommandTests
     public async Task Audit_PassesTheFilters_AndRejectsUnknownOperations()
     {
         _api.Setup(api => api.GetKeyValueAuditAsync("org1", "proj1", null, "db.password", "Reveal", It.IsAny<DateTimeOffset?>(), null, null))
-            .ReturnsAsync(new KeyValueAuditResponse { Items = [new KeyValueAuditEvent { Id = "1", Time = DateTimeOffset.UnixEpoch, Operation = KeyValueAuditEventOperation.Reveal, Actor = "account: ada", Channel = KeyValueAuditEventChannel.User, View = "default", Key = "db.password", Count = 1 }], Count = 1 });
+            .ReturnsAsync(new KeyValueAuditResponse { Items = [new KeyValueAuditEvent { Id = "1", Time = DateTimeOffset.UnixEpoch, Operation = KeyValueAuditEventOperation.Reveal, Actor = new AuditActor { Kind = AuditActorKind.Account, Id = "ada" }, Channel = KeyValueAuditEventChannel.User, View = "default", Key = "db.password", Count = 1 }], Count = 1 });
 
         var exitCode = await new KeyValueAuditCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Key = "db.password", Operation = "reveal", From = "2026-10-01" }.OnExecuteAsync();
         var unknown = await new KeyValueAuditCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object) { Operation = "peek" }.OnExecuteAsync();
@@ -181,7 +181,6 @@ public class KeyValueProjectCommandTests
         Key = key,
         Protection = protection,
         Version = 1,
-        Author = "a",
-        UpdatedAt = DateTimeOffset.UnixEpoch,
+        Modified = new AuditStamp { At = DateTimeOffset.UnixEpoch, By = new AuditActor { Kind = AuditActorKind.Account, Id = "a" } },
     };
 }
