@@ -16,6 +16,7 @@ import {
   type AnnotationTypeCode,
 } from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
+import { annotationStatus } from '@/utils/annotation-status'
 import {
   appendAudit,
   auditOf,
@@ -53,6 +54,32 @@ const listOf = (db: MockDb, params: ScopeParams, code?: AnnotationTypeCode) =>
   [...annotationsOf(db, params.org, params.project, params.view).values()].filter(
     (annotation) => !code || codeOfKey(annotation.AnnotationKey) === code,
   )
+
+/** The include flags of the annotation reads; without them the API returns only active annotations. */
+function includesOf(request: Request) {
+  const query = new URL(request.url).searchParams
+  return {
+    inactive: query.get('includeInactive') === 'true',
+    deleted: query.get('includeDeleted') === 'true',
+  }
+}
+
+/**
+ * A list read like the API's: active annotations, plus the inactive ones with `includeInactive` and the deleted
+ * ones with `includeDeleted` (a deleted one that is not active needs both).
+ */
+function readableOf(db: MockDb, params: ScopeParams, request: Request, code?: AnnotationTypeCode) {
+  const include = includesOf(request)
+  const now = Date.now()
+  const deleted = include.deleted
+    ? Object.values(overridesOf(db, params.org, params.project, params.view).trash ?? {}).filter(
+        (annotation) => !code || codeOfKey(annotation.AnnotationKey) === code,
+      )
+    : []
+  return [...listOf(db, params, code), ...deleted].filter(
+    (annotation) => include.inactive || annotationStatus(annotation, now) === 'active',
+  )
+}
 
 const perType: [string, AnnotationTypeCode][] = [
   ['responsibilities', 'rst'],
@@ -449,7 +476,7 @@ export const annotationHandlers: HttpHandler[] = [
         const denied = requireRole(db, projectKey(params), 'Reader')
         return (
           denied ??
-          page(listOf(db, params, code), request, (items, token) => ({
+          page(readableOf(db, params, request, code), request, (items, token) => ({
             Annotations: items,
             ContinuationToken: token,
             Count: items.length,
@@ -465,7 +492,7 @@ export const annotationHandlers: HttpHandler[] = [
       const denied = requireRole(db, projectKey(params), 'Reader')
       return (
         denied ??
-        page(listOf(db, params), request, (items, token) => ({
+        page(readableOf(db, params, request), request, (items, token) => ({
           Annotations: items,
           ContinuationToken: token,
           Count: items.length,
@@ -613,15 +640,26 @@ export const annotationHandlers: HttpHandler[] = [
 
   http.get<ScopeParams & { key: string }>(
     `${api}/annotations/:key`,
-    withDb((db, { params }) => {
+    withDb((db, { params, request }) => {
       const denied = requireRole(db, projectKey(params), 'Reader')
       if (denied) {
         return denied
       }
-      const annotation = annotationsOf(db, params.org, params.project, params.view).get(params.key)
-      return annotation
+      const include = includesOf(request)
+      const annotation =
+        annotationsOf(db, params.org, params.project, params.view).get(params.key) ??
+        (include.deleted ? overridesOf(db, params.org, params.project, params.view).trash?.[params.key] : undefined)
+      if (!annotation) {
+        return errorResponse(404, `The annotation ${params.key} does not exist.`, 'NotFound')
+      }
+      const status = annotationStatus(annotation)
+      return status === 'active' || include.inactive
         ? HttpResponse.json(annotation)
-        : errorResponse(404, `The annotation ${params.key} does not exist.`, 'NotFound')
+        : errorResponse(
+            404,
+            `The annotation '${params.key}' is ${status}; read it with includeInactive=true.`,
+            'AnnotationInactive',
+          )
     }),
   ),
 
