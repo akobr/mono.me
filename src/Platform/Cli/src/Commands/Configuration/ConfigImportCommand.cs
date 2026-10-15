@@ -111,7 +111,8 @@ public class ConfigImportCommand : BaseContextCommand
 
         if (finished.Status == ConfigurationImportStatus.Failed)
         {
-            Console.WriteLine($"The import failed: {finished.Error}".ThemedError(Console.Theme));
+            // the server writes the whole message, prefix included
+            Console.WriteLine((finished.Error ?? "The import failed.").ThemedError(Console.Theme));
             return ExitCodes.ERROR_CRASH;
         }
 
