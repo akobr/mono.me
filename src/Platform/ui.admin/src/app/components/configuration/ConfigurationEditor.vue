@@ -202,6 +202,7 @@ async function create(fromTemplate: boolean) {
     catalog.setConfiguration(props.annotationKey, {
       AnnotationKey: props.annotationKey,
       Version: saved.Version,
+      Modified: saved.Modified,
       HasContent: true,
     })
     await invalidateConfiguration(queryClient, context.scope, props.annotationKey)
