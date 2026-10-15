@@ -53,7 +53,6 @@ internal sealed class InMemoryTransferStore : IConfigurationTransferStore
         return Task.FromResult(ActiveCount);
     }
 
-
     private static string Key(string organization, string project, string view, ConfigurationTransferKind kind, string id) => $"{organization}|{project}|{view}|{kind}|{id}";
 }
 
