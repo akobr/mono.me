@@ -49,7 +49,6 @@ public sealed class ConfigurationTransferService : IConfigurationTransferService
         string project,
         string view,
         ConfigurationArchiveFormat format,
-        string author,
         AuditActor actor,
         CancellationToken cancellationToken = default)
     {
@@ -65,7 +64,6 @@ public sealed class ConfigurationTransferService : IConfigurationTransferService
                 View = view,
                 Kind = ConfigurationTransferKind.Export,
                 Id = id,
-                Author = author,
                 Export = new ConfigurationExport
                 {
                     Id = id,
@@ -122,7 +120,6 @@ public sealed class ConfigurationTransferService : IConfigurationTransferService
         string? fileName,
         bool force,
         bool dryRun,
-        string author,
         AuditActor actor,
         CancellationToken cancellationToken = default)
     {
@@ -152,7 +149,6 @@ public sealed class ConfigurationTransferService : IConfigurationTransferService
                 View = view,
                 Kind = ConfigurationTransferKind.Import,
                 Id = id,
-                Author = author,
                 Import = new ConfigurationImport
                 {
                     Id = id,
@@ -313,10 +309,9 @@ public sealed class ConfigurationTransferService : IConfigurationTransferService
                 : await _configurations.ImportConfigurationAsync(
                     FullKey.Create(file.Key, record.Organization, record.Project, record.View),
                     file.Content!,
-                    record.Author,
+                    import.CreatedBy,
                     import.IsForced,
-                    import.IsDryRun,
-                    import.CreatedBy);
+                    import.IsDryRun);
 
             progress.Add(file, result with { Message = Truncate(result.Message) });
 

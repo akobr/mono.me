@@ -69,7 +69,6 @@ public class ConfigurationTransferHttp
             project,
             view,
             format,
-            request.GetAuthor(),
             request.GetAuditActor(),
             request.FunctionContext.CancellationToken);
 
@@ -191,7 +190,6 @@ public class ConfigurationTransferHttp
             fileName,
             force,
             dryRun,
-            request.GetAuthor(),
             request.GetAuditActor(),
             cancellationToken);
 

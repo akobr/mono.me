@@ -8,7 +8,6 @@ public interface IConfigurationTransferService
         string project,
         string view,
         ConfigurationArchiveFormat format,
-        string author,
         AuditActor actor,
         CancellationToken cancellationToken = default);
 
@@ -32,7 +31,6 @@ public interface IConfigurationTransferService
         string? fileName,
         bool force,
         bool dryRun,
-        string author,
         AuditActor actor,
         CancellationToken cancellationToken = default);
 

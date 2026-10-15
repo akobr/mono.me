@@ -20,6 +20,7 @@ declare global {
   const injectBindingAssist: typeof import('./composables/useBindingAssist').injectBindingAssist
   const isRememberedSection: typeof import('./stores/page-memory').isRememberedSection
   const onSignOut: typeof import('./stores/session').onSignOut
+  const pollDelays: typeof import('./stores/transfers').pollDelays
   const provideBindingAssist: typeof import('./composables/useBindingAssist').provideBindingAssist
   const rememberedSections: typeof import('./stores/page-memory').rememberedSections
   const runLimited: typeof import('./composables/useAnnotationActions').runLimited
@@ -66,6 +67,7 @@ declare global {
   const useSidebar: typeof import('./composables/useSidebar').useSidebar
   const useToast: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useToast').useToast
   const useTour: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useTour').useTour
+  const useTransfersStore: typeof import('./stores/transfers').useTransfersStore
   const useTypeAppearanceStore: typeof import('./stores/type-appearance').useTypeAppearanceStore
   const useUnsavedChanges: typeof import('./composables/useUnsavedChanges').useUnsavedChanges
 }
@@ -110,4 +112,7 @@ declare global {
   // @ts-ignore
   export type { AccountStatus } from './stores/session'
   import('./stores/session')
+  // @ts-ignore
+  export type { TransferPhase, ExportJob, ImportJob, TransferJob, ImportOptions } from './stores/transfers'
+  import('./stores/transfers')
 }
