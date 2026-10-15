@@ -8,7 +8,6 @@ namespace _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring;
 
 public class ConfigurationTransferServiceTests
 {
-    private const string Author = "account: user_01";
 
     private readonly ManualTimeProvider _time = new(Start);
     private readonly InMemoryTransferStore _store = new();
@@ -34,7 +33,7 @@ public class ConfigurationTransferServiceTests
     [Fact]
     public async Task StartExport_StoresAndQueuesAJob()
     {
-        var export = await _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Git, Author, Actor);
+        var export = await _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Git, Actor);
 
         export.Status.ShouldBe(ConfigurationTransferStatus.Queued);
         export.Format.ShouldBe(ConfigurationArchiveFormat.Git);
@@ -55,7 +54,7 @@ public class ConfigurationTransferServiceTests
         _store.ActiveCount = _options.MaxActiveTransfers;
 
         var exception = await Should.ThrowAsync<ConflictException>(
-            () => _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Author, Actor));
+            () => _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Actor));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.TransferLimit);
         _queue.Messages.ShouldBeEmpty();
@@ -67,7 +66,7 @@ public class ConfigurationTransferServiceTests
         _queue.Failure = new InvalidOperationException("queue down");
 
         await Should.ThrowAsync<InvalidOperationException>(
-            () => _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Author, Actor));
+            () => _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Actor));
 
         var saved = _store.Saves[^1].Export!;
         saved.Status.ShouldBe(ConfigurationTransferStatus.Failed);
@@ -83,7 +82,7 @@ public class ConfigurationTransferServiceTests
             History("rst.b", false, (1, "a", 0, """{"b":1}""")),
         ];
 
-        var started = await _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Author, Actor);
+        var started = await _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Actor);
         _time.Now = Start.AddMinutes(1);
         await _service.ProcessAsync(_queue.Messages.Single());
 
@@ -107,7 +106,7 @@ public class ConfigurationTransferServiceTests
     [Fact]
     public async Task OpenExportArchive_TellsMissingFromNotReady()
     {
-        var export = await _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Author, Actor);
+        var export = await _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Actor);
 
         var notReady = await Should.ThrowAsync<ConflictException>(() => _service.OpenExportArchiveAsync("acme", "main", "default", export.Id));
         notReady.ErrorCode.ShouldBe(ErrorCodes.TransferNotReady);
@@ -119,7 +118,7 @@ public class ConfigurationTransferServiceTests
     public async Task ProcessExport_ExceptionFailsTheJob()
     {
         _configurations.Histories = null!;
-        var export = await _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Author, Actor);
+        var export = await _service.StartExportAsync("acme", "main", "default", ConfigurationArchiveFormat.Folder, Actor);
 
         await _service.ProcessAsync(_queue.Messages.Single());
 
@@ -136,7 +135,7 @@ public class ConfigurationTransferServiceTests
         using var body = new MemoryStream("not a zip"u8.ToArray());
 
         var exception = await Should.ThrowAsync<InvalidInputException>(
-            () => _service.StartImportAsync("acme", "main", "default", body, "configs.zip", false, false, Author, Actor));
+            () => _service.StartImportAsync("acme", "main", "default", body, "configs.zip", false, false, Actor));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.InvalidArchive);
         _storage.Archives.ShouldBeEmpty();
@@ -164,7 +163,7 @@ public class ConfigurationTransferServiceTests
             ("rst.updated.4.json", "{}"),
             ("export.json", "{}"));
 
-        var started = await _service.StartImportAsync("acme", "main", "default", zip, @"C:\exports\configs.zip", true, false, Author, Actor);
+        var started = await _service.StartImportAsync("acme", "main", "default", zip, @"C:\exports\configs.zip", true, false, Actor);
         started.FileName.ShouldBe("configs.zip");
         started.IsForced.ShouldBeTrue();
         started.IsDryRun.ShouldBeFalse();
@@ -187,7 +186,7 @@ public class ConfigurationTransferServiceTests
 
         // the invalid file never reaches the configurations
         _configurations.Imports.Select(call => call.Key.Annotation.ToString()).ShouldBe(["rst.created", "rst.missing", "rst.unchanged", "rst.updated"]);
-        _configurations.Imports.ShouldAllBe(call => call.Author == Author && call.Force && !call.DryRun && call.Actor == Actor);
+        _configurations.Imports.ShouldAllBe(call => call.Force && !call.DryRun && call.Actor == Actor);
         _configurations.Imports[0].Key.ViewName.ShouldBe("default");
 
         // the upload is removed once the job is done
@@ -198,7 +197,7 @@ public class ConfigurationTransferServiceTests
     public async Task ProcessImport_PassesTheDryRun()
     {
         using var zip = Zip(("rst.a.json", """{"a":1}"""));
-        await _service.StartImportAsync("acme", "main", "default", zip, null, false, true, Author, Actor);
+        await _service.StartImportAsync("acme", "main", "default", zip, null, false, true, Actor);
 
         await _service.ProcessAsync(_queue.Messages.Single());
 
@@ -211,7 +210,7 @@ public class ConfigurationTransferServiceTests
     {
         _options.MaxReportedItems = 2;
         using var zip = Zip(("rst.a.json", "1"), ("rst.b.json", "2"), ("rst.c.json", "3"));
-        var started = await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Author, Actor);
+        var started = await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Actor);
 
         await _service.ProcessAsync(_queue.Messages.Single());
 
@@ -226,7 +225,7 @@ public class ConfigurationTransferServiceTests
     {
         var files = Enumerable.Range(0, 120).Select(index => ($"rst.k{index:D3}.json", "{\"a\":1}")).ToArray();
         using var zip = Zip(files);
-        var started = await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Author, Actor);
+        var started = await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Actor);
 
         await _service.ProcessAsync(_queue.Messages.Single());
 
@@ -248,7 +247,7 @@ public class ConfigurationTransferServiceTests
     public async Task Process_LeavesAFinishedJobAlone()
     {
         using var zip = Zip(("rst.a.json", """{"a":1}"""));
-        await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Author, Actor);
+        await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Actor);
         var message = _queue.Messages.Single();
 
         await _service.ProcessAsync(message);
@@ -269,7 +268,7 @@ public class ConfigurationTransferServiceTests
     public async Task ProcessImport_FailsWithoutTheUpload()
     {
         using var zip = Zip(("rst.a.json", """{"a":1}"""));
-        var started = await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Author, Actor);
+        var started = await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Actor);
         _storage.Archives.Clear();
 
         await _service.ProcessAsync(_queue.Messages.Single());
@@ -283,7 +282,7 @@ public class ConfigurationTransferServiceTests
     public async Task Purge_DeletesArchivesAfterTheRetention()
     {
         using var zip = Zip(("rst.a.json", """{"a":1}"""));
-        await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Author, Actor);
+        await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Actor);
 
         _time.Now = Start.AddHours(24);
         (await _service.PurgeExpiredAsync()).ShouldBe(0);

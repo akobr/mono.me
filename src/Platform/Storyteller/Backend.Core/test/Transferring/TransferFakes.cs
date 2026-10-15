@@ -112,16 +112,16 @@ internal sealed class FakeConfigurationService : IConfigurationService
 
     public Func<FullKey, JObject, ConfigurationImportResult> Import { get; set; } = (_, _) => new ConfigurationImportResult(ConfigurationImportOutcome.Created, 1);
 
-    public List<(FullKey Key, JObject Content, string Author, bool Force, bool DryRun, AuditActor? Actor)> Imports { get; } = [];
+    public List<(FullKey Key, JObject Content, AuditActor Actor, bool Force, bool DryRun)> Imports { get; } = [];
 
     public Task<IReadOnlyList<ConfigurationHistory>> GetConfigurationHistoriesAsync(string organization, string project, string view, CancellationToken cancellationToken = default)
     {
         return Task.FromResult(Histories);
     }
 
-    public Task<ConfigurationImportResult> ImportConfigurationAsync(FullKey key, JObject content, string author, bool force = false, bool dryRun = false, AuditActor? actor = null)
+    public Task<ConfigurationImportResult> ImportConfigurationAsync(FullKey key, JObject content, AuditActor actor, bool force = false, bool dryRun = false)
     {
-        Imports.Add((key, content, author, force, dryRun, actor));
+        Imports.Add((key, content, actor, force, dryRun));
         return Task.FromResult(Import(key, content));
     }
 
@@ -139,9 +139,9 @@ internal sealed class FakeConfigurationService : IConfigurationService
 
     public Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key) => throw new NotSupportedException();
 
-    public Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, string author, bool force = false, AuditActor? actor = null) => throw new NotSupportedException();
+    public Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force = false) => throw new NotSupportedException();
 
-    public Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, string author, bool force = false, AuditActor? actor = null) => throw new NotSupportedException();
+    public Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, AuditActor actor, bool force = false) => throw new NotSupportedException();
 
     public Task ClearConfigurationAsync(FullKey key, AuditActor? actor = null) => throw new NotSupportedException();
 

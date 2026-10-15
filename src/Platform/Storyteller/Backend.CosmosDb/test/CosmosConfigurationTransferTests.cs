@@ -16,7 +16,7 @@ public class CosmosConfigurationTransferTests(Startup startup)
 {
     private const string Project = "transfer-tests";
     private const string View = Constants.DefaultViewName;
-    private const string Author = "account: importer";
+    private static readonly AuditActor Author = AuditActor.Account("importer", "Importer");
 
     private IAnnotationService Annotations => Context.Services.GetRequiredService<IAnnotationService>();
 
@@ -29,8 +29,8 @@ public class CosmosConfigurationTransferTests(Startup startup)
         await CreateAsync(project, View, "rst.hist-one", "unt.hist-one.unit");
         var key = Key("rst.hist-one", project);
 
-        await Configurations.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{"a":1}"""), "account: first");
-        await Configurations.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{"a":2}"""), "account: second");
+        await Configurations.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{"a":1}"""), AuditActor.Account("first", "First"));
+        await Configurations.CreateOrUpdateConfigurationAsync(key, JObject.Parse("""{"a":2}"""), AuditActor.Account("second", "Second"));
 
         // the unit has no document of its own; reading it caches the inherited one in an empty item
         (await Configurations.GetRawConfigurationAsync(Key("unt.hist-one.unit", project)))!.Content["a"]!.Value<int>().Should().Be(2);
@@ -41,10 +41,10 @@ public class CosmosConfigurationTransferTests(Startup startup)
         var history = histories[0];
         history.Versions.Select(version => version.Version).Should().Equal(1UL, 2UL);
         history.Versions[0].Content["a"]!.Value<int>().Should().Be(1);
-        history.Versions[0].Author.Should().Be("account: first");
+        history.Versions[0].Author.Should().Be("First");
         history.Current.Should().BeSameAs(history.Versions[1]);
         history.Current!.Content["a"]!.Value<int>().Should().Be(2);
-        history.Current.Author.Should().Be("account: second");
+        history.Current.Author.Should().Be("Second");
         history.Current.CreatedAt.Should().BeOnOrAfter(history.Versions[0].CreatedAt);
     }
 
@@ -99,7 +99,7 @@ public class CosmosConfigurationTransferTests(Startup startup)
 
         var stored = await Configurations.GetConfigurationVersionContentAsync(key, 2);
         JToken.DeepEquals(stored!.Content, JObject.Parse("""{"list":[3],"b":2}""")).Should().BeTrue();
-        stored.Author.Should().Be(Author);
+        stored.Modified.By.Should().Be(Author);
 
         var unchanged = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"b":2,"list":[3]}"""), Author);
         unchanged.Should().Be(new ConfigurationImportResult(ConfigurationImportOutcome.Unchanged, 2));
@@ -173,7 +173,7 @@ public class CosmosConfigurationTransferTests(Startup startup)
             View,
             AnnotationTypeCodes.Responsibility,
             JObject.Parse("""{"type":"object","properties":{"a":{"type":"number"}}}"""),
-            "test",
+            AuditActor.Account("test"),
             false);
 
         var rejected = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"a":"text"}"""), Author);
@@ -195,7 +195,7 @@ public class CosmosConfigurationTransferTests(Startup startup)
         var key = Key("rst.import-audit");
         var actor = new AuditActor { Kind = AuditActorKind.Account, Id = "user_importer", Name = "Importer" };
 
-        await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"a":1}"""), Author, actor: actor);
+        await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"a":1}"""), actor);
 
         var history = await Annotations.GetAnnotationHistoryAsync(key);
         var entry = history!.Entries.First();
@@ -242,7 +242,6 @@ public class CosmosConfigurationTransferTests(Startup startup)
             View = View,
             Kind = ConfigurationTransferKind.Export,
             Id = id,
-            Author = Author,
             Export = new ConfigurationExport
             {
                 Id = id,
@@ -260,7 +259,6 @@ public class CosmosConfigurationTransferTests(Startup startup)
 
         var read = await store.GetAsync(TestConstants.Organization, "transfer-store", View, ConfigurationTransferKind.Export, id);
         read!.Export.Should().BeEquivalentTo(record.Export);
-        read.Author.Should().Be(Author);
         (await store.GetAsync(TestConstants.Organization, "transfer-store", "other", ConfigurationTransferKind.Export, id)).Should().BeNull();
         (await store.GetAsync(TestConstants.Organization, "transfer-store", View, ConfigurationTransferKind.Import, id)).Should().BeNull();
 

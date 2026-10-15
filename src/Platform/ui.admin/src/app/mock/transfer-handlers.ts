@@ -136,7 +136,7 @@ function buildArchive(
       }
     }
 
-    manifest.push({ AnnotationKey: key, File: fileNameOf(key), Version: current.Version, Author: current.Author })
+    manifest.push({ AnnotationKey: key, File: fileNameOf(key), Version: current.Version, Author: current.Modified.By?.Name ?? current.Modified.By?.Id })
   }
 
   if (format === 'Git') {

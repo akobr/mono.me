@@ -25,8 +25,6 @@ public sealed record class ConfigurationTransferEntity
     // A copy of the job's status, for the count of active jobs.
     public required ConfigurationTransferStatus Status { get; init; }
 
-    public required string Author { get; init; }
-
     public ConfigurationExport? Export { get; init; }
 
     public ConfigurationImport? Import { get; init; }

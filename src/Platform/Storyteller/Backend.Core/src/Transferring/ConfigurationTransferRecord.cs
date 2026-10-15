@@ -13,9 +13,6 @@ public sealed record class ConfigurationTransferRecord
 
     public required string Id { get; init; }
 
-    // The requester as the Author of configuration versions written by an import.
-    public required string Author { get; init; }
-
     public ConfigurationExport? Export { get; init; }
 
     public ConfigurationImport? Import { get; init; }

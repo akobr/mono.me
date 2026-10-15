@@ -32,7 +32,7 @@ public class ConfigurationTransferHttpTests
         var accepted = result.ShouldBeOfType<AcceptedResult>();
         var export = accepted.Value.ShouldBeOfType<ConfigurationExport>();
         accepted.Location.ShouldBe($"https://host/api/v1/acme/web/default/configurations/exports/{export.Id}");
-        _transfers.Calls.ShouldBe([$"export acme/web/default Git account: user_01"]);
+        _transfers.Calls.ShouldBe([$"export acme/web/default Git user_01"]);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class ConfigurationTransferHttpTests
     {
         await Http().StartConfigurationExport(Request(), null, "acme", "web", "default");
 
-        _transfers.Calls.ShouldBe(["export acme/web/default Folder account: user_01"]);
+        _transfers.Calls.ShouldBe(["export acme/web/default Folder user_01"]);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class ConfigurationTransferHttpTests
     [Fact]
     public async Task GetExport_OfAnotherViewIsNotFound()
     {
-        var export = await _transfers.StartExportAsync("acme", "web", "default", ConfigurationArchiveFormat.Folder, "a", AuditActor.System);
+        var export = await _transfers.StartExportAsync("acme", "web", "default", ConfigurationArchiveFormat.Folder, AuditActor.System);
 
         var found = await Http().GetConfigurationExport(Request(), "acme", "web", "default", export.Id);
         found.ShouldBeOfType<OkObjectResult>().Value.ShouldBe(export);
@@ -67,7 +67,7 @@ public class ConfigurationTransferHttpTests
     [Fact]
     public async Task GetExportArchive_IsTheZipNamedByTheExport()
     {
-        var export = await _transfers.StartExportAsync("acme", "web", "default", ConfigurationArchiveFormat.Folder, "a", AuditActor.System);
+        var export = await _transfers.StartExportAsync("acme", "web", "default", ConfigurationArchiveFormat.Folder, AuditActor.System);
 
         var result = await Http().GetConfigurationExportArchive(Request(), "acme", "web", "default", export.Id);
 
@@ -88,7 +88,7 @@ public class ConfigurationTransferHttpTests
         var accepted = result.ShouldBeOfType<AcceptedResult>();
         var import = accepted.Value.ShouldBeOfType<ConfigurationImport>();
         accepted.Location.ShouldBe($"https://host/api/v1/acme/web/default/configurations/imports/{import.Id}");
-        _transfers.Calls.ShouldBe([$"import acme/web/default {zip.Length} bytes configs.zip force dry-run account: user_01"]);
+        _transfers.Calls.ShouldBe([$"import acme/web/default {zip.Length} bytes configs.zip force dry-run user_01"]);
     }
 
     [Theory]
@@ -198,9 +198,9 @@ public class ConfigurationTransferHttpTests
 
         public List<string> Calls { get; } = [];
 
-        public Task<ConfigurationExport> StartExportAsync(string organization, string project, string view, ConfigurationArchiveFormat format, string author, AuditActor actor, CancellationToken cancellationToken = default)
+        public Task<ConfigurationExport> StartExportAsync(string organization, string project, string view, ConfigurationArchiveFormat format, AuditActor actor, CancellationToken cancellationToken = default)
         {
-            Calls.Add($"export {organization}/{project}/{view} {format} {author}");
+            Calls.Add($"export {organization}/{project}/{view} {format} {actor.Id}");
             var id = Guid.NewGuid().ToString("N");
             var export = new ConfigurationExport
             {
@@ -227,9 +227,9 @@ public class ConfigurationTransferHttpTests
             return (export, new MemoryStream([1, 2, 3]));
         }
 
-        public Task<ConfigurationImport> StartImportAsync(string organization, string project, string view, Stream archive, string? fileName, bool force, bool dryRun, string author, AuditActor actor, CancellationToken cancellationToken = default)
+        public Task<ConfigurationImport> StartImportAsync(string organization, string project, string view, Stream archive, string? fileName, bool force, bool dryRun, AuditActor actor, CancellationToken cancellationToken = default)
         {
-            Calls.Add($"import {organization}/{project}/{view} {archive.Length - archive.Position} bytes {fileName} {(force ? "force" : "-")} {(dryRun ? "dry-run" : "-")} {author}");
+            Calls.Add($"import {organization}/{project}/{view} {archive.Length - archive.Position} bytes {fileName} {(force ? "force" : "-")} {(dryRun ? "dry-run" : "-")} {actor.Id}");
             return Task.FromResult(new ConfigurationImport
             {
                 Id = Guid.NewGuid().ToString("N"),
