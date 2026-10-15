@@ -27,7 +27,7 @@ public class ConfigurationTransferCommandTests
 
     private readonly AnnotationCommandFixture _fixture = new();
     private readonly Mock<IConfigurationsApiClient> _api = new(MockBehavior.Strict);
-    private readonly MockFileSystem _fileSystem = new(new Dictionary<string, MockFileData>(), @"C:\work");
+    private readonly MockFileSystem _fileSystem = new(new Dictionary<string, MockFileData>(), P(@"C:\work"));
 
     [Fact]
     public async Task Export_WaitsAndSavesTheArchiveUnderTheServersName()
@@ -38,7 +38,7 @@ public class ConfigurationTransferCommandTests
         var exitCode = await Export(format: "GIT");
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        _fileSystem.File.Exists($@"C:\work\{FileName}").ShouldBeTrue();
+        _fileSystem.File.Exists(P($@"C:\work\{FileName}")).ShouldBeTrue();
         _fixture.Line("Exporting").ShouldBe("Exporting the configurations of org1.proj1.default (git)…");
         _api.Verify(api => api.GetConfigurationExportAsync(Org, Project, View, "job-1"), Times.Exactly(3));
     }
@@ -48,14 +48,14 @@ public class ConfigurationTransferCommandTests
     {
         StartsExport(ConfigurationExportCreateFormat.Folder, Export(ConfigurationExportStatus.Succeeded));
         ServesArchive(Zip(("rst.a.json", "{}")));
-        _fileSystem.AddDirectory(@"C:\exports");
+        _fileSystem.AddDirectory(P(@"C:\exports"));
 
-        (await Export(output: @"C:\exports")).ShouldBe(ExitCodes.SUCCESS);
-        _fileSystem.File.Exists($@"C:\exports\{FileName}").ShouldBeTrue();
+        (await Export(output: P(@"C:\exports"))).ShouldBe(ExitCodes.SUCCESS);
+        _fileSystem.File.Exists(P($@"C:\exports\{FileName}")).ShouldBeTrue();
 
         ServesArchive(Zip(("rst.a.json", "{}")));
-        (await Export(output: @"C:\other\backup.zip")).ShouldBe(ExitCodes.SUCCESS);
-        _fileSystem.File.Exists(@"C:\other\backup.zip").ShouldBeTrue();
+        (await Export(output: P(@"C:\other\backup.zip"))).ShouldBe(ExitCodes.SUCCESS);
+        _fileSystem.File.Exists(P(@"C:\other\backup.zip")).ShouldBeTrue();
     }
 
     [Fact]
@@ -67,9 +67,9 @@ public class ConfigurationTransferCommandTests
         var exitCode = await Export(format: "git", extract: true);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        var folder = @"C:\work\configurations-org1-proj1-default-20261014-013012Z";
-        _fileSystem.File.ReadAllText($@"{folder}\rst.a.json").ShouldBe("{\"a\":1}\n");
-        _fileSystem.File.ReadAllText($@"{folder}\.git\HEAD").ShouldBe("ref: refs/heads/main\n");
+        var folder = P(@"C:\work\configurations-org1-proj1-default-20261014-013012Z");
+        _fileSystem.File.ReadAllText(_fileSystem.Path.Combine(folder, "rst.a.json")).ShouldBe("{\"a\":1}\n");
+        _fileSystem.File.ReadAllText(_fileSystem.Path.Combine(folder, ".git", "HEAD")).ShouldBe("ref: refs/heads/main\n");
     }
 
     [Fact]
@@ -77,12 +77,12 @@ public class ConfigurationTransferCommandTests
     {
         StartsExport(ConfigurationExportCreateFormat.Folder, Export(ConfigurationExportStatus.Succeeded));
         ServesArchive(Zip(("rst.a.json", "{}")));
-        _fileSystem.AddFile(@"C:\target\keep.txt", new MockFileData("keep"));
+        _fileSystem.AddFile(P(@"C:\target\keep.txt"), new MockFileData("keep"));
 
-        var exitCode = await Export(output: @"C:\target", extract: true);
+        var exitCode = await Export(output: P(@"C:\target"), extract: true);
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        _fixture.Line("The folder").ShouldBe(@"The folder 'C:\target' is not empty.");
+        _fixture.Line("The folder").ShouldBe($"The folder '{P(@"C:\target")}' is not empty.");
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class ConfigurationTransferCommandTests
         var exitCode = await Export();
 
         exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
-        _fixture.Line("The export failed").ShouldBe("The export failed: The export failed: boom");
+        _fixture.Line("The export failed").ShouldBe("The export failed: boom");
     }
 
     [Fact]
@@ -119,10 +119,10 @@ public class ConfigurationTransferCommandTests
     [Fact]
     public async Task Import_OfAFolder_PacksItsJsonFilesWithoutGit()
     {
-        _fileSystem.AddFile(@"C:\work\configs\rst.a.json", new MockFileData("{\"a\":1}"));
-        _fileSystem.AddFile(@"C:\work\configs\subjects\sbt.b.json", new MockFileData("{\"b\":2}"));
-        _fileSystem.AddFile(@"C:\work\configs\notes.txt", new MockFileData("notes"));
-        _fileSystem.AddFile(@"C:\work\configs\.git\rst.inside.json", new MockFileData("{}"));
+        _fileSystem.AddFile(P(@"C:\work\configs\rst.a.json"), new MockFileData("{\"a\":1}"));
+        _fileSystem.AddFile(P(@"C:\work\configs\subjects\sbt.b.json"), new MockFileData("{\"b\":2}"));
+        _fileSystem.AddFile(P(@"C:\work\configs\notes.txt"), new MockFileData("notes"));
+        _fileSystem.AddFile(P(@"C:\work\configs\.git\rst.inside.json"), new MockFileData("{}"));
         List<string>? uploaded = null;
         StartsImport(
             force: null,
@@ -142,7 +142,7 @@ public class ConfigurationTransferCommandTests
     [Fact]
     public async Task Import_OfAZip_ListsTheItemsAndFailsWithFailedFiles()
     {
-        _fileSystem.AddFile(@"C:\work\export.zip", new MockFileData(Zip(("rst.a.json", "{}"))));
+        _fileSystem.AddFile(P(@"C:\work\export.zip"), new MockFileData(Zip(("rst.a.json", "{}"))));
         var items = new List<ConfigurationImportItem>
         {
             new() { Path = "rst.a.json", AnnotationKey = "rst.a", Outcome = ConfigurationImportItemOutcome.Updated, Version = 4 },
@@ -169,7 +169,7 @@ public class ConfigurationTransferCommandTests
     [Fact]
     public async Task Import_RejectedByTheServer_PrintsItsMessage()
     {
-        _fileSystem.AddFile(@"C:\work\bad.zip", new MockFileData("not a zip"));
+        _fileSystem.AddFile(P(@"C:\work\bad.zip"), new MockFileData("not a zip"));
         _api
             .Setup(api => api.StartConfigurationImportAsync(Org, Project, View, null, null, "bad.zip", It.IsAny<Stream>()))
             .ThrowsAsync(AnnotationCommandFixture.Error(400, "InvalidArchive", "The body is not a zip archive."));
@@ -194,11 +194,14 @@ public class ConfigurationTransferCommandTests
     {
         using var archive = new MemoryStream(Zip(("../evil.json", "{}")));
 
-        var exception = await Should.ThrowAsync<InvalidOperationException>(() => ConfigurationArchives.ExtractAsync(_fileSystem, archive, @"C:\work\out"));
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() => ConfigurationArchives.ExtractAsync(_fileSystem, archive, P(@"C:\work\out")));
 
         exception.Message.ShouldBe("The archive entry '../evil.json' points outside the folder.");
-        _fileSystem.File.Exists(@"C:\work\evil.json").ShouldBeFalse();
+        _fileSystem.File.Exists(P(@"C:\work\evil.json")).ShouldBeFalse();
     }
+
+    // The mock file system takes Windows paths; on Unix they become /work, /exports, …
+    private static string P(string path) => MockUnixSupport.Path(path);
 
     private static ConfigurationExport Export(ConfigurationExportStatus status, string? error = null)
     {

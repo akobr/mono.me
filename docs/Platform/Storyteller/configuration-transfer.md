@@ -16,8 +16,8 @@ All routes are below `v1/{organization}/{project}/{view}/configurations`, with t
 | `POST` | `…/imports?force=&dryRun=&fileName=` with the zip as the body (`application/zip`) | `202` `ConfigurationImport`, `Location` of the job; `400 InvalidArchive`; `413 ArchiveTooLarge`; `409 TransferLimit` |
 | `GET` | `…/imports/{id}` | `200` `ConfigurationImport` with the summary and the items; `404` |
 
-- **Export** needs the scope `Configuration.Read`, `Configuration.Write`, `Default.Read` or `Default.Write` and any role on the project, like reading one configuration. The archive holds only own documents, which every reader can read.
-- **Import**, and reading an import, needs `Configuration.Write` or `Default.Write` and `Contributor`, like writing a configuration.
+- **Export** needs the scope `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read` or `Default.ReadWrite` and any role on the project, like reading one configuration. The archive holds only own documents, which every reader can read.
+- **Import**, and reading an import, needs `Configuration.ReadWrite` or `Default.ReadWrite` and `Contributor`, like writing a configuration.
 - Machines are allowed with the same scopes. The caller's author string becomes the `Author` of imported versions, and its audit actor the job's `CreatedBy` and the actor of each audit entry.
 - The upload is copied into memory up to `MaxArchiveBytes` (a larger `Content-Length` is refused before reading) and must start with a zip signature; then the central directory is checked (see [Limits](#limits)).
 

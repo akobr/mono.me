@@ -14,6 +14,11 @@ public static class ConfigurationArchives
 {
     private const string GitFolder = ".git";
 
+    // Paths differ only by case on Windows; elsewhere a case mismatch is another folder.
+    private static readonly StringComparison PathComparison = OperatingSystem.IsWindows()
+        ? StringComparison.OrdinalIgnoreCase
+        : StringComparison.Ordinal;
+
     /// <summary>
     /// Packs every *.json file below the folder, in subfolders too and without .git folders, into a zip in memory.
     /// Entry names are the paths relative to the folder, with '/'.
@@ -79,7 +84,7 @@ public static class ConfigurationArchives
             var target = fileSystem.Path.GetFullPath(fileSystem.Path.Combine(root, entry.FullName));
             var isDirectory = entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\');
 
-            if (!(target + (isDirectory ? fileSystem.Path.DirectorySeparatorChar : string.Empty)).StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            if (!(target + (isDirectory ? fileSystem.Path.DirectorySeparatorChar : string.Empty)).StartsWith(prefix, PathComparison))
             {
                 throw new InvalidOperationException($"The archive entry '{entry.FullName}' points outside the folder.");
             }

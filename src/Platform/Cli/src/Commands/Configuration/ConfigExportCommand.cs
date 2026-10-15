@@ -95,7 +95,8 @@ public class ConfigExportCommand : BaseContextCommand
 
         if (finished.Status == ConfigurationExportStatus.Failed)
         {
-            Console.WriteLine($"The export failed: {finished.Error}".ThemedError(Console.Theme));
+            // the server writes the whole message, prefix included
+            Console.WriteLine((finished.Error ?? "The export failed.").ThemedError(Console.Theme));
             return ExitCodes.ERROR_CRASH;
         }
 
