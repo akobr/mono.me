@@ -214,7 +214,7 @@ public sealed class ConfigurationTransferService : IConfigurationTransferService
                 await ImportAsync(running, cancellationToken);
             }
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogError(exception, "The {Kind} job {Id} of {Organization}.{Project}.{View} failed.", message.Kind, message.Id, message.Organization, message.Project, message.View);
             await FailAsync(message, exception is StorytellerException ? exception.Message : $"The {message.Kind.ToString().ToLowerInvariant()} failed: {exception.Message}", cancellationToken);
@@ -374,7 +374,7 @@ public sealed class ConfigurationTransferService : IConfigurationTransferService
                     import => import with { Status = ConfigurationTransferStatus.Failed, Error = Truncate(error), CompletedAt = now, ExpiresAt = now + _options.Retention }),
                 cancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogError(exception, "The failure of the {Kind} job {Id} was not saved.", message.Kind, message.Id);
         }
@@ -412,7 +412,7 @@ public sealed class ConfigurationTransferService : IConfigurationTransferService
         {
             await _storage.DeleteAsync(name, cancellationToken);
         }
-        catch (Exception exception) when (exception is not OperationCanceledException)
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogWarning(exception, "The archive {Name} was not deleted; the purge removes it later.", name);
         }

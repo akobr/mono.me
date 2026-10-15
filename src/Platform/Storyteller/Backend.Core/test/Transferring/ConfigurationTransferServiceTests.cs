@@ -8,7 +8,6 @@ namespace _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring;
 
 public class ConfigurationTransferServiceTests
 {
-
     private readonly ManualTimeProvider _time = new(Start);
     private readonly InMemoryTransferStore _store = new();
     private readonly RecordingTransferQueue _queue = new();
@@ -218,6 +217,20 @@ public class ConfigurationTransferServiceTests
         import.Summary!.Failed.ShouldBe(3);
         import.Items!.Count.ShouldBe(2);
         import.AreItemsTruncated.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task ProcessImport_TimeoutOfACallFailsTheJob()
+    {
+        _configurations.Import = (_, _) => throw new TaskCanceledException("The request timed out.");
+        using var zip = Zip(("rst.a.json", """{"a":1}"""));
+        var started = await _service.StartImportAsync("acme", "main", "default", zip, null, false, false, Actor);
+
+        await _service.ProcessAsync(_queue.Messages.Single());
+
+        var import = (await _service.GetImportAsync("acme", "main", "default", started.Id))!;
+        import.Status.ShouldBe(ConfigurationTransferStatus.Failed);
+        import.Error.ShouldBe("The import failed: The request timed out.");
     }
 
     [Fact]

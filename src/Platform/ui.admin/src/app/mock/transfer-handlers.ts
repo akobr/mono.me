@@ -312,6 +312,10 @@ export const transferHandlers: HttpHandler[] = [
   http.get<ScopeParams & { id: string }>(
     `${api}/exports/:id`,
     withDb((db, { params }) => {
+      const denied = requireRole(db, `${params.org}.${params.project}`, 'Reader')
+      if (denied) {
+        return denied
+      }
       const job = findJob('export', params)
       if (!job) {
         return notFound('export', params.id)
@@ -335,21 +339,28 @@ export const transferHandlers: HttpHandler[] = [
     }),
   ),
 
-  http.get<ScopeParams & { id: string }>(`${api}/exports/:id/archive`, ({ params }) => {
-    const job = findJob('export', params)
-    if (!job) {
-      return notFound('export', params.id)
-    }
-    if (!job.archive) {
-      return errorResponse(409, `The export '${params.id}' is not ready yet (${job.state.Status}).`, 'TransferNotReady')
-    }
-    return new HttpResponse(job.archive, {
-      headers: {
-        'Content-Type': 'application/zip',
-        'Content-Disposition': `attachment; filename=${job.state.FileName}`,
-      },
-    })
-  }),
+  http.get<ScopeParams & { id: string }>(
+    `${api}/exports/:id/archive`,
+    withDb((db, { params }) => {
+      const denied = requireRole(db, `${params.org}.${params.project}`, 'Reader')
+      if (denied) {
+        return denied
+      }
+      const job = findJob('export', params)
+      if (!job) {
+        return notFound('export', params.id)
+      }
+      if (!job.archive) {
+        return errorResponse(409, `The export '${params.id}' is not ready yet (${job.state.Status}).`, 'TransferNotReady')
+      }
+      return new HttpResponse(job.archive, {
+        headers: {
+          'Content-Type': 'application/zip',
+          'Content-Disposition': `attachment; filename=${job.state.FileName}`,
+        },
+      })
+    }),
+  ),
 
   http.post<ScopeParams>(
     `${api}/imports`,
