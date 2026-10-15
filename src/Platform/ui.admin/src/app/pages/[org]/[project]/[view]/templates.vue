@@ -5,6 +5,7 @@ import { useGetTemplates } from '@42for.net/2splatform.sdk/vue-query'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { metaOf, typeCodes, typeMeta } from '@/utils/annotation-key'
+import { actorName } from '@/utils/audit'
 
 // The seven annotation types with their template (companion spec E8): presence, version, author, and how many
 // configurations of the view use it. The detail is a nested route.
@@ -57,7 +58,8 @@ const selected = computed(() => (route.params as { type?: string }).type)
             <AnnotationTypeBadge :type="row.code" variant="label" />
             <span v-if="row.summary" class="font-mono text-xs">v{{ row.summary.Version }}</span>
             <UBadge v-else label="No template" color="neutral" variant="outline" size="sm" />
-            <AuditActorLink v-if="row.summary?.Modified" :actor="row.summary.Modified.By" subtle class="text-sm" />
+            <!-- plain text: the whole row is a link already -->
+            <span v-if="row.summary?.Modified" class="text-sm text-muted">{{ actorName(row.summary.Modified.By) }}</span>
             <RelativeTime v-if="row.summary?.Modified" :value="row.summary.Modified.At" class="text-xs text-dimmed" />
             <span class="ms-auto text-xs text-muted"
               >{{ row.configurations }} configuration{{ row.configurations === 1 ? '' : 's' }}</span

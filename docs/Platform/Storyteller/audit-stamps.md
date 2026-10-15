@@ -64,4 +64,4 @@ Excluding only the names saves little (14.5 RU for the annotation); the ids and 
 
 ## Stored data
 
-Every stored item carries its stamps, and the entities declare them required. Items written before the stamps (with an `Author` string) are not read or converted: the databases were recreated with the change, because no deployment held data to keep.
+Every stored item carries its stamps, and the entities declare them required. Nothing in the repository migrates or reads items written before the stamps (with `Author`, `CreatedBy` or `DeletedAt` fields instead), so **upgrading to this version requires recreating the Cosmos database** (drop it and create it again with DbCreator, `2sInitDb`). Keeping such records is unsupported unless a migration or a legacy mapping is added; they fail to read or show without a stamp. No deployment held data to keep when the stamps were introduced.
