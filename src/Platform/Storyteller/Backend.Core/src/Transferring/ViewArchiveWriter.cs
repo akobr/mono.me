@@ -247,8 +247,8 @@ public static class ViewArchiveWriter
             .ToList();
     }
 
-    // One commit per version, by the version's author at its time: "Add <document> (version n)" for the first version
-    // in the export, "Update <document> to version n" for the next ones.
+    // One commit per version, by the version's actor (or author) at its time: "Add <document> (version n)" for the
+    // first version in the export, "Update <document> to version n" for the next ones.
     private static GitDocument GetGitDocument(
         ViewDocumentKind kind,
         string? annotationType,
@@ -259,7 +259,9 @@ public static class ViewArchiveWriter
         var description = ViewArchiveNames.Describe(kind, annotationType, annotationKey);
         var commits = versions
             .Select((version, index) => new GitCommit(
-                GitSignature.FromAuthor(version.Author, version.CreatedAt),
+                version.Actor is not null
+                    ? GitSignature.FromActor(version.Actor, version.CreatedAt)
+                    : GitSignature.FromAuthor(version.Author, version.CreatedAt),
                 index == 0 ? $"Add {description} (version {version.Version})" : $"Update {description} to version {version.Version}",
                 version.Content))
             .ToList();

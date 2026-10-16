@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
@@ -199,6 +200,8 @@ public class AnnotationBindingFunctionTests
         }
 
         public Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request) => throw new NotSupportedException();
+
+        public Task<IReadOnlyList<Annotation>> GetViewAnnotationsAsync(string organization, string project, string view, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task<Annotation?> GetDeletedAnnotationAsync(FullKey fullKey) => throw new NotSupportedException();
 

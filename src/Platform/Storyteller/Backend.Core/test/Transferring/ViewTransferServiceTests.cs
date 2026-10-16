@@ -13,18 +13,29 @@ public class ViewTransferServiceTests
     private readonly ManualTimeProvider _time = new(Start);
     private readonly InMemoryTransferStore _store = new();
     private readonly RecordingTransferQueue _queue = new();
-    private readonly FakeConfigurationService _configurations = new();
+    private readonly ExportReads _reads = new();
+    private readonly FakeAnnotationService _annotations;
+    private readonly FakeSchemaService _schemas;
+    private readonly FakeTemplateService _templates;
+    private readonly FakeConfigurationService _configurations;
     private readonly InMemoryArchiveStorage _storage;
     private readonly ViewTransferOptions _options = new();
     private readonly ViewTransferService _service;
 
     public ViewTransferServiceTests()
     {
+        _annotations = new FakeAnnotationService(_reads);
+        _schemas = new FakeSchemaService(_reads);
+        _templates = new FakeTemplateService(_reads);
+        _configurations = new FakeConfigurationService(_reads);
         _storage = new InMemoryArchiveStorage(_time);
         _service = new ViewTransferService(
             _store,
             _storage,
             _queue,
+            _annotations,
+            _schemas,
+            _templates,
             _configurations,
             Options.Create(_options),
             _time,
@@ -77,11 +88,7 @@ public class ViewTransferServiceTests
     [Fact]
     public async Task ProcessExport_StoresTheArchive()
     {
-        _configurations.Histories =
-        [
-            History("rst.a", true, (1, "a", 0, """{"a":1}"""), (2, "a", 1, """{"a":2}""")),
-            History("rst.b", false, (1, "a", 0, """{"b":1}""")),
-        ];
+        SetEveryKind();
 
         var started = await _service.StartExportAsync("acme", "main", "default", ViewArchiveFormat.Folder, Actor);
         _time.Now = Start.AddMinutes(1);
@@ -92,8 +99,14 @@ public class ViewTransferServiceTests
         export.StartedAt.ShouldBe(Start.AddMinutes(1));
         export.CompletedAt.ShouldBe(Start.AddMinutes(1));
         export.ExpiresAt.ShouldBe(Start.AddMinutes(1).AddHours(24));
+        export.Include.ShouldBeNull();
+        export.AnnotationCount.ShouldBe(2);
+        export.SchemaCount.ShouldBe(1);
+        export.TemplateCount.ShouldBe(0);
         export.ConfigurationCount.ShouldBe(1);
-        export.VersionCount.ShouldBe(3);
+
+        // schemas 2 + templates 1 + configurations 3; annotations have no versions
+        export.VersionCount.ShouldBe(6);
 
         var (opened, archive) = await _service.OpenExportArchiveAsync("acme", "main", "default", started.Id);
         opened.ShouldBe(export);
@@ -102,8 +115,61 @@ public class ViewTransferServiceTests
         await archive.CopyToAsync(buffer);
         export.Size.ShouldBe(buffer.Length);
         ReadTextEntries(buffer.ToArray()).Keys.ShouldBe(
-            ["configurations/rst.a.conf.1.json", "configurations/rst.a.conf.json", "configurations/rst.b.conf.1.json", "export.json"],
+            [
+                "annotations/rst.a.json",
+                "annotations/rst.b.json",
+                "schemas/exe.schema.1.json",
+                "schemas/exe.schema.json",
+                "templates/unt.template.1.json",
+                "configurations/rst.a.conf.1.json",
+                "configurations/rst.a.conf.json",
+                "configurations/rst.b.conf.1.json",
+                "export.json",
+            ],
             ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task ProcessExport_ReadsTheKindsInReverseDependencyOrder()
+    {
+        await _service.StartExportAsync("acme", "main", "default", ViewArchiveFormat.Git, Actor);
+        await _service.ProcessAsync(_queue.Messages.Single());
+
+        // a document read first still finds its dependency in a later read
+        _reads.Reads.ShouldBe(
+        [
+            (ViewArchiveContent.Configurations, "acme", "main", "default"),
+            (ViewArchiveContent.Templates, "acme", "main", "default"),
+            (ViewArchiveContent.Schemas, "acme", "main", "default"),
+            (ViewArchiveContent.Annotations, "acme", "main", "default"),
+        ]);
+    }
+
+    [Fact]
+    public async Task ProcessExport_ReadsAndCountsOnlyTheIncludedKinds()
+    {
+        SetEveryKind();
+        var message = await QueueExportAsync([ViewArchiveContent.Templates, ViewArchiveContent.Annotations]);
+
+        await _service.ProcessAsync(message);
+
+        _reads.Reads.Select(read => read.Content).ShouldBe([ViewArchiveContent.Templates, ViewArchiveContent.Annotations]);
+
+        var export = (await _service.GetExportAsync("acme", "main", "default", message.Id))!;
+        export.Status.ShouldBe(ViewTransferStatus.Succeeded);
+        export.Include.ShouldBe([ViewArchiveContent.Templates, ViewArchiveContent.Annotations]);
+        export.AnnotationCount.ShouldBe(2);
+        export.TemplateCount.ShouldBe(0);
+        export.SchemaCount.ShouldBeNull();
+        export.ConfigurationCount.ShouldBeNull();
+        export.VersionCount.ShouldBe(1);
+
+        var (_, archive) = await _service.OpenExportArchiveAsync("acme", "main", "default", message.Id);
+        using var buffer = new MemoryStream();
+        await archive.CopyToAsync(buffer);
+        var entries = ReadTextEntries(buffer.ToArray());
+        entries.Keys.ShouldBe(["annotations/rst.a.json", "annotations/rst.b.json", "templates/unt.template.1.json", "export.json"], ignoreOrder: true);
+        entries["export.json"].ShouldContain("\"Include\": [\n    \"Annotations\",\n    \"Templates\"\n  ]");
     }
 
     [Fact]
@@ -332,5 +398,45 @@ public class ViewTransferServiceTests
         using var zip = Zip(("rst.a.conf.json", "{}"));
         using var archive = new ZipArchive(zip, ZipArchiveMode.Read, leaveOpen: true);
         archive.Entries.Count.ShouldBe(1);
+    }
+
+    // Two annotations, a type schema with two versions, a deleted template and two configurations, one cleared.
+    private void SetEveryKind()
+    {
+        _annotations.Annotations = [ActiveAnnotation("rst.a"), ActiveAnnotation("rst.b")];
+        _schemas.Histories = [Schema(ViewDocumentKind.TypeSchema, "exe", null, true, (1, "a", 0, """{"type":"object"}"""), (2, "a", 1, """{"type":"object","required":["a"]}"""))];
+        _templates.Histories = [Template("unt", false, (1, "a", 0, """{"t":1}"""))];
+        _configurations.Histories =
+        [
+            History("rst.a", true, (1, "a", 0, """{"a":1}"""), (2, "a", 1, """{"a":2}""")),
+            History("rst.b", false, (1, "a", 0, """{"b":1}""")),
+        ];
+    }
+
+    // An export job of the view "acme.main.default" with the include, queued without StartExportAsync.
+    private async Task<ViewTransferMessage> QueueExportAsync(IReadOnlyList<ViewArchiveContent> include)
+    {
+        var id = Guid.NewGuid().ToString("N");
+        var record = await _store.CreateAsync(new ViewTransferRecord
+        {
+            Organization = "acme",
+            Project = "main",
+            View = "default",
+            Kind = ViewTransferKind.Export,
+            Id = id,
+            Export = new ViewExport
+            {
+                Id = id,
+                Status = ViewTransferStatus.Queued,
+                Format = ViewArchiveFormat.Folder,
+                Include = include,
+                FileName = "export.zip",
+                CreatedAt = Start,
+                CreatedBy = Actor,
+                ExpiresAt = Start.AddHours(24),
+            },
+        });
+
+        return record.ToMessage();
     }
 }

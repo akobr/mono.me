@@ -448,6 +448,8 @@ public class AnnotationsHttpTests
             return Task.FromResult(new AnnotationsResponse());
         }
 
+        public Task<IReadOnlyList<Annotation>> GetViewAnnotationsAsync(string organization, string project, string view, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+
         public Task<AnnotationsResponse> GetDeletedAnnotationsAsync(string organization, string project, string view, bool rootsOnly = true, string? deletionId = null, string? continuationToken = null)
         {
             Calls.Add($"deleted:{organization}:{project}:{view}:{rootsOnly}:{deletionId}:{continuationToken}");
