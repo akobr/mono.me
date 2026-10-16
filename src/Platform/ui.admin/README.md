@@ -142,7 +142,8 @@ src/
 ├── app/
 │   ├── main.ts                    # boot: app-config → SDK fetcher → AuthKit → Pinia, Vue Query, router, Nuxt UI
 │   ├── App.vue                    # <UApp>, layout switch on route.meta.layout
-│   ├── assets/                    # css/main.css (Tailwind, Nuxt UI, fonts, type tokens), images/ (the 42 logo)
+│   ├── assets/                    # css/main.css (Tailwind, Nuxt UI theme with the purple accent, fonts, type
+│   │                              #   tokens), images/ (the 42 logo)
 │   ├── boot/                      # app-config, auth (AuthKit), api (SDK fetcher), query (QueryClient), api-errors
 │   ├── router/                    # router + guards (auth: sign-in, account, onboarding; context: org/project/view;
 │   │                              #   page-memory: back to where a section was left)
