@@ -124,7 +124,7 @@ async function save(options: { overwrite?: boolean } = {}) {
   try {
     if (isClientEncrypted(targetLevel)) {
       if (enabledRecipients.value.length === 0) {
-        saveError.value = 'The project has no enabled recipient; add one in the Secrets settings.'
+        saveError.value = 'The project has no enabled recipient; add one in the Secrets section of Settings.'
         return
       }
       value = await encryptForRecipients(
@@ -153,9 +153,9 @@ async function save(options: { overwrite?: boolean } = {}) {
       const fresh = await pair.refetch()
       conflict.value = { version: fresh.data?.Version, author: fresh.data?.Modified ? actorName(fresh.data.Modified.By) : undefined }
     } else if (hasErrorCode(error, 'ProtectionNotAllowed')) {
-      saveError.value = `${error.message} An Administrator allows levels in the Secrets settings.`
+      saveError.value = `${error.message} An Administrator allows levels in the Secrets section of Settings.`
     } else if (hasErrorCode(error, 'CustomerKeyUnavailable')) {
-      saveError.value = `${error.message} The project's customer key (BYOK) is disabled, deleted or unreachable; see the Secrets settings.`
+      saveError.value = `${error.message} The project's customer key (BYOK) is disabled, deleted or unreachable; see the Secrets section of Settings.`
     } else {
       saveError.value = errorMessage(error)
     }

@@ -23,7 +23,7 @@ export interface LevelMeta {
   description: string
   /** What a project needs before the level can be allowed. */
   requirement?: string
-  /** The cost hint of the Secrets settings. */
+  /** The cost hint in the Secrets section of Settings. */
   cost: string
 }
 
