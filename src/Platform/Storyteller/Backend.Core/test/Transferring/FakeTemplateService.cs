@@ -4,10 +4,18 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring;
 
-// Only the member an export uses.
-internal sealed class FakeTemplateService(ExportReads? reads = null) : IConfigurationTemplateService
+// Only the members an export and an import use.
+internal sealed class FakeTemplateService(ExportReads? reads = null, ImportLog? imports = null) : IConfigurationTemplateService
 {
     public IReadOnlyList<TemplateHistory> Histories { get; set; } = [];
+
+    public Func<string, JObject, ViewImportResult> Import { get; set; } = (_, _) => new ViewImportResult(ViewImportOutcome.Created, 1);
+
+    public Task<ViewImportResult> ImportTemplateAsync(string organization, string project, string view, string annotationType, JObject content, ViewImportOptions options)
+    {
+        imports?.Add(ViewDocumentKind.Template, annotationType, null, options, null);
+        return Task.FromResult(Import(annotationType, content));
+    }
 
     public Task<IReadOnlyList<TemplateHistory>> GetTemplateHistoriesAsync(string organization, string project, string view, CancellationToken cancellationToken = default)
     {
@@ -32,6 +40,4 @@ internal sealed class FakeTemplateService(ExportReads? reads = null) : IConfigur
     public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint version) => throw new NotSupportedException();
 
     public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint fromVersion, uint toVersion) => throw new NotSupportedException();
-
-    public Task<ViewImportResult> ImportTemplateAsync(string organization, string project, string view, string annotationType, JObject content, ViewImportOptions options) => throw new NotSupportedException();
 }

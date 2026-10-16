@@ -4,15 +4,38 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring;
 
-// Only the member an export uses.
-internal sealed class FakeAnnotationService(ExportReads? reads = null) : IAnnotationService
+// Only the members an export and an import use.
+internal sealed class FakeAnnotationService(ExportReads? reads = null, ImportLog? imports = null) : IAnnotationService
 {
     public IReadOnlyList<Annotation> Annotations { get; set; } = [];
+
+    // The stored annotations that are not deleted, by canonical key.
+    public HashSet<string> Active { get; set; } = new(StringComparer.Ordinal);
+
+    // The keys of each existence read.
+    public List<IReadOnlyList<string>> ActiveReads { get; } = [];
+
+    // By default an active key is unchanged, and any other one is created and recorded in the overlay, as the
+    // Cosmos import does.
+    public Func<FullKey, JObject, ViewImportOverlay, ViewImportResult>? Import { get; set; }
 
     public Task<IReadOnlyList<Annotation>> GetViewAnnotationsAsync(string organization, string project, string view, CancellationToken cancellationToken = default)
     {
         reads?.Add(ViewArchiveContent.Annotations, organization, project, view);
         return Task.FromResult(Annotations);
+    }
+
+    public Task<IReadOnlySet<string>> FindActiveAnnotationKeysAsync(string organization, string project, string view, IReadOnlyCollection<AnnotationKey> keys, CancellationToken cancellationToken = default)
+    {
+        var requested = keys.Select(key => key.ToString()).ToList();
+        ActiveReads.Add(requested);
+        return Task.FromResult<IReadOnlySet<string>>(requested.Where(Active.Contains).ToHashSet(StringComparer.Ordinal));
+    }
+
+    public Task<ViewImportResult> ImportAnnotationAsync(FullKey key, JObject content, ViewImportOptions options, ViewImportOverlay overlay)
+    {
+        imports?.Add(ViewDocumentKind.Annotation, null, key.Annotation.ToString(), options, overlay);
+        return Task.FromResult((Import ?? ImportByDefault)(key, content, overlay));
     }
 
     public Task<bool> ExistAnnotationAsync(FullKey fullKey) => throw new NotSupportedException();
@@ -45,5 +68,14 @@ internal sealed class FakeAnnotationService(ExportReads? reads = null) : IAnnota
 
     public Task<AnnotationHistory?> GetAnnotationHistoryAsync(FullKey fullKey) => throw new NotSupportedException();
 
-    public Task<ViewImportResult> ImportAnnotationAsync(FullKey key, JObject content, ViewImportOptions options, ViewImportOverlay overlay) => throw new NotSupportedException();
+    private ViewImportResult ImportByDefault(FullKey key, JObject content, ViewImportOverlay overlay)
+    {
+        if (Active.Contains(key.Annotation.ToString()))
+        {
+            return new ViewImportResult(ViewImportOutcome.Unchanged);
+        }
+
+        overlay.AddActiveAnnotation(key.Annotation);
+        return new ViewImportResult(ViewImportOutcome.Created);
+    }
 }

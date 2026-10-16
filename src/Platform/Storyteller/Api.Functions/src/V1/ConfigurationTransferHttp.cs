@@ -64,11 +64,13 @@ public class ConfigurationTransferHttp
             return new BadRequestObjectResult(new ErrorResponse($"Unknown archive format '{format}'."));
         }
 
+        // every kind, until the route takes the include filter with its scopes (Phase 2)
         var export = await _transfers.StartExportAsync(
             organization,
             project,
             view,
             format,
+            null,
             request.GetAuditActor(),
             request.FunctionContext.CancellationToken);
 
@@ -188,6 +190,8 @@ public class ConfigurationTransferHttp
             view,
             archive,
             fileName,
+            null,
+            ViewImportExisting.Overwrite,
             force,
             dryRun,
             request.GetAuditActor(),

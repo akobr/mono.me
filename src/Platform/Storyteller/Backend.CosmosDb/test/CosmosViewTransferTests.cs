@@ -1,11 +1,18 @@
+#nullable enable
+
 using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Transferring;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
@@ -272,6 +279,57 @@ public class CosmosViewTransferTests(Startup startup)
     }
 
     [Fact]
+    public async Task ActiveAnnotationKeys_LeaveOutDeletedAndMissingOnes()
+    {
+        const string project = "transfer-active-keys";
+        const string organization = TestConstants.Organization;
+        await CreateAsync(project, View, "unt.ak-kept.ak-unit", "rst.ak-gone");
+        await CreateAsync(project, "other", "sbt.ak-elsewhere");
+        await Annotations.CreateAnnotationAsync(
+            organization,
+            AnnotationFactory.CreateDefault(AnnotationKey.Parse("rst.ak-off"), project, View) with { IsDisabled = true },
+            Author);
+        await Annotations.DeleteAnnotationAsync(Key("rst.ak-gone", project));
+
+        var keys = await Annotations.FindActiveAnnotationKeysAsync(
+            organization,
+            project,
+            View,
+            new[] { "rst.ak-kept", "unt.ak-kept.ak-unit", "rst.ak-gone", "rst.ak-off", "rst.ak-never", "sbt.ak-elsewhere" }.Select(AnnotationKey.Parse).ToList());
+
+        // a disabled annotation is not deleted
+        keys.Should().BeEquivalentTo("rst.ak-kept", "unt.ak-kept.ak-unit", "rst.ak-off");
+        (await Annotations.FindActiveAnnotationKeysAsync(organization, project, View, [])).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task SchemaKeys_HoldTheSchemasOfTheViewWithADocument()
+    {
+        const string project = "transfer-schema-keys";
+        const string organization = TestConstants.Organization;
+        await CreateAsync(project, View, "rst.sk-pay", "sbt.sk-north");
+
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Execution, StringProperty("a"), Author, false);
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "rst.sk-pay", StringProperty("p"), Author, false);
+        await Schemas.SetDescendantTypeSchemaAsync(organization, project, View, "sbt.sk-north", AnnotationTypeCodes.Execution, StringProperty("d"), Author, false);
+
+        // deleted, empty, or in another view
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Unit, StringProperty("u"), Author, false);
+        await Schemas.DeleteSchemaAsync(organization, project, View, AnnotationTypeCodes.Unit);
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Usage, new JObject(), Author, false);
+        await Schemas.SetSchemaAsync(organization, project, "other", AnnotationTypeCodes.Responsibility, StringProperty("o"), Author, false);
+
+        var keys = await Schemas.GetSchemaKeysAsync(organization, project, View);
+
+        keys.Should().BeEquivalentTo(
+        [
+            SchemaKey.ForType(AnnotationTypeCodes.Execution),
+            SchemaKey.ForAnnotation("rst.sk-pay"),
+            SchemaKey.ForDescendantType("sbt.sk-north", AnnotationTypeCodes.Execution),
+        ]);
+    }
+
+    [Fact]
     public async Task Import_CreatesThenReplacesThenLeavesAnEqualDocument()
     {
         await CreateAsync(Project, View, "rst.import-replace");
@@ -466,6 +524,151 @@ public class CosmosViewTransferTests(Startup startup)
         (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(-5))).Should().Be(0);
     }
 
+    [Fact]
+    public async Task Store_KeepsTheOptionsAndTheSummariesOfAnImport()
+    {
+        var store = Context.Services.GetRequiredService<IViewTransferStore>();
+        var id = Guid.NewGuid().ToString("N");
+        var now = DateTimeOffset.UtcNow;
+        var record = new ViewTransferRecord
+        {
+            Organization = TestConstants.Organization,
+            Project = "transfer-store-import",
+            View = View,
+            Kind = ViewTransferKind.Import,
+            Id = id,
+            Import = new ViewImport
+            {
+                Id = id,
+                Status = ViewTransferStatus.Succeeded,
+                Include = [ViewArchiveContent.Schemas, ViewArchiveContent.Configurations],
+                Existing = ViewImportExisting.Skip,
+                IsDryRun = true,
+                CreatedAt = now,
+                CreatedBy = AnnotationServiceTestExtensions.TestActor,
+                ExpiresAt = now.AddHours(24),
+                Summary = new ViewImportSummary { Created = 1, Skipped = 1, Warnings = 1, ExcludedFiles = 2, IgnoredFiles = 3 },
+                Summaries =
+                [
+                    new ViewImportSummary { Content = ViewArchiveContent.Schemas, Created = 1, Warnings = 1 },
+                    new ViewImportSummary { Content = ViewArchiveContent.Configurations, Skipped = 1 },
+                ],
+                Items =
+                [
+                    new ViewImportItem
+                    {
+                        Path = "schemas/sbt.north.exe.schema.json",
+                        Kind = ViewDocumentKind.DescendantTypeSchema,
+                        AnnotationType = AnnotationTypeCodes.Execution,
+                        AnnotationKey = "sbt.north",
+                        Outcome = ViewImportOutcome.Created,
+                        Warnings = [new ViewImportWarning { Code = ErrorCodes.SchemaViolation, Message = "forced" }],
+                    },
+                    new ViewImportItem
+                    {
+                        Path = "configurations/rst.pay.conf.json",
+                        Kind = ViewDocumentKind.Configuration,
+                        AnnotationKey = "rst.pay",
+                        Outcome = ViewImportOutcome.Skipped,
+                        ErrorCode = ErrorCodes.DocumentExists,
+                        Message = "kept",
+                    },
+                ],
+            },
+        };
+
+        await store.CreateAsync(record);
+        var read = await store.GetAsync(TestConstants.Organization, "transfer-store-import", View, ViewTransferKind.Import, id);
+
+        read!.Import.Should().BeEquivalentTo(record.Import);
+    }
+
+    [Fact]
+    public async Task Transfer_RoundTripsEveryKindIntoAnotherView()
+    {
+        const string project = "transfer-round-trip";
+        const string organization = TestConstants.Organization;
+        await SeedViewAsync(project);
+        var transfers = new Transfers(Context.Services);
+
+        var export = await transfers.ExportAsync(project, View, ViewArchiveFormat.Folder);
+        export.Job.Status.Should().Be(ViewTransferStatus.Succeeded);
+        (export.Job.AnnotationCount, export.Job.SchemaCount, export.Job.TemplateCount, export.Job.ConfigurationCount).Should().Be((6, 3, 1, 2));
+
+        // a dry run into a fresh view writes nothing and reports what the real run does
+        var dryRun = await transfers.ImportAsync(project, "rt-copy", export.Archive, dryRun: true);
+        dryRun.Status.Should().Be(ViewTransferStatus.Succeeded);
+        (await Annotations.ExistAnnotationAsync(Key("rst.rt-pay", project, "rt-copy"))).Should().BeFalse();
+        (await Templates.GetTemplateAsync(organization, project, "rt-copy", AnnotationTypeCodes.Execution)).Should().BeNull();
+
+        var imported = await transfers.ImportAsync(project, "rt-copy", export.Archive);
+        imported.Status.Should().Be(ViewTransferStatus.Succeeded);
+        imported.Summaries.Should().Equal(
+            new ViewImportSummary { Content = ViewArchiveContent.Annotations, Created = 6 },
+            new ViewImportSummary { Content = ViewArchiveContent.Schemas, Created = 3 },
+            new ViewImportSummary { Content = ViewArchiveContent.Templates, Created = 1 },
+            new ViewImportSummary { Content = ViewArchiveContent.Configurations, Created = 2 });
+        imported.Summary.Should().Be(new ViewImportSummary { Created = 12, IgnoredFiles = 3 });
+        dryRun.Summaries.Should().Equal(imported.Summaries);
+        dryRun.Items!.Select(item => (item.Path, item.Outcome)).Should().Equal(imported.Items!.Select(item => (item.Path, item.Outcome)));
+
+        // the copy holds what the source holds
+        var source = await Annotations.GetAnnotationAsync(Key("rst.rt-pay", project));
+        var copy = await Annotations.GetAnnotationAsync(Key("rst.rt-pay", project, "rt-copy"));
+        AnnotationAuditDiff.Compute(source!, copy! with { ViewName = View }, 1000).IsEmpty.Should().BeTrue();
+        copy!.Values!["since"].ToString().Should().Be("2026-10-01T08:00:00Z");
+        (await Annotations.GetAnnotationAsync(Key("unt.rt-pay.rt-unit", project, "rt-copy")))!.Title.Should().Be("Requests");
+
+        var template = await Templates.GetTemplateAsync(organization, project, "rt-copy", AnnotationTypeCodes.Execution);
+        JToken.DeepEquals(template!.Content, JObject.Parse("""{"timeout":30,"retries":3}""")).Should().BeTrue();
+        var schema = await Schemas.GetDescendantTypeSchemaAsync(organization, project, "rt-copy", "sbt.rt-north", AnnotationTypeCodes.Execution);
+        JToken.DeepEquals(schema!.Content, StringProperty("zone")).Should().BeTrue();
+        var configuration = await Configurations.GetConfigurationVersionContentAsync(Key("rst.rt-pay", project, "rt-copy"), 1);
+        JToken.DeepEquals(configuration!.Content, (await Configurations.GetConfigurationVersionContentAsync(Key("rst.rt-pay", project), 2))!.Content).Should().BeTrue();
+
+        // the import is idempotent: a second run, as after a cut-off invocation, finds every document unchanged
+        var again = await transfers.ImportAsync(project, "rt-copy", export.Archive);
+        again.Summary.Should().Be(new ViewImportSummary { Unchanged = 12, IgnoredFiles = 3 });
+        again.Items.Should().BeEmpty();
+
+        // Skip keeps a document the copy changed, Overwrite replaces it
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.rt-pay", project, "rt-copy"), JObject.Parse("""{"tier":"bronze"}"""), Author);
+        var skipped = await transfers.ImportAsync(project, "rt-copy", export.Archive, existing: ViewImportExisting.Skip);
+        skipped.Items!.Select(item => (item.Kind, item.AnnotationKey, item.Outcome, item.ErrorCode)).Should().Equal(
+            (ViewDocumentKind.Configuration, "rst.rt-pay", ViewImportOutcome.Skipped, ErrorCodes.DocumentExists));
+        var overwritten = await transfers.ImportAsync(project, "rt-copy", export.Archive, dryRun: true);
+        overwritten.Items!.Select(item => (item.Kind, item.AnnotationKey, item.Outcome)).Should().Equal(
+            (ViewDocumentKind.Configuration, "rst.rt-pay", ViewImportOutcome.Updated));
+    }
+
+    [Fact]
+    public async Task Transfer_ImportsTheWorkingTreeOfAGitExportWithAnIncludeFilter()
+    {
+        const string project = "transfer-git-trip";
+        const string organization = TestConstants.Organization;
+        await SeedViewAsync(project);
+        var transfers = new Transfers(Context.Services);
+
+        var export = await transfers.ExportAsync(project, View, ViewArchiveFormat.Git);
+        var imported = await transfers.ImportAsync(
+            project,
+            "git-copy",
+            export.Archive,
+            include: [ViewArchiveContent.Configurations, ViewArchiveContent.Annotations]);
+
+        // the .git folder is hidden, and the git format has no export.json and no version files
+        imported.Status.Should().Be(ViewTransferStatus.Succeeded);
+        imported.Include.Should().Equal(ViewArchiveContent.Annotations, ViewArchiveContent.Configurations);
+        imported.Summaries.Should().Equal(
+            new ViewImportSummary { Content = ViewArchiveContent.Annotations, Created = 6 },
+            new ViewImportSummary { Content = ViewArchiveContent.Configurations, Created = 2 });
+        imported.Summary.Should().Be(new ViewImportSummary { Created = 8, ExcludedFiles = 4 });
+
+        (await Configurations.GetConfigurationVersionContentAsync(Key("exe.rt-north.rt-pay.rt-prod", project, "git-copy"), 1))!.Content["zone"]!.Value<string>().Should().Be("west");
+        (await Templates.GetTemplateAsync(organization, project, "git-copy", AnnotationTypeCodes.Execution)).Should().BeNull();
+        (await Schemas.ListSchemasAsync(organization, project, "git-copy")).Should().BeEmpty();
+    }
+
     private static JObject StringProperty(string name)
     {
         return new JObject
@@ -492,5 +695,126 @@ public class CosmosViewTransferTests(Startup startup)
             content,
             new ViewImportOptions { Actor = actor, Force = force, DryRun = dryRun },
             new ViewImportOverlay());
+    }
+
+    // Every kind in the default view of the project: six annotations, two of them with content; a type, a
+    // descendant-type and an annotation schema; a template with two versions; two configurations, one with two
+    // versions. Dates are kept as strings, so they must survive the round trip.
+    private async Task SeedViewAsync(string project)
+    {
+        const string organization = TestConstants.Organization;
+        await CreateAsync(project, View, "unt.rt-pay.rt-unit", "exe.rt-north.rt-pay.rt-prod");
+        await Annotations.SetAnnotationAsync(
+            organization,
+            AnnotationFactory.CreateDefault(AnnotationKey.Parse("rst.rt-pay"), project, View) with
+            {
+                Title = "Payments",
+                Labels = ["eu"],
+                Values = new Dictionary<string, object> { ["tier"] = "gold", ["since"] = "2026-10-01T08:00:00Z", ["limit"] = 1000 },
+                TimeZone = "Europe/Prague",
+            },
+            Author);
+        await Annotations.SetAnnotationAsync(
+            organization,
+            AnnotationFactory.CreateDefault(AnnotationKey.Parse("unt.rt-pay.rt-unit"), project, View) with { Title = "Requests" },
+            Author);
+
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Execution, StringProperty("region"), Author, false);
+        await Schemas.SetDescendantTypeSchemaAsync(organization, project, View, "sbt.rt-north", AnnotationTypeCodes.Execution, StringProperty("zone"), Author, false);
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "rst.rt-pay", StringProperty("tier"), Author, false);
+
+        await Templates.CreateOrUpdateTemplateAsync(organization, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{"timeout":30}"""), Author);
+        await Templates.CreateOrUpdateTemplateAsync(organization, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{"retries":3}"""), Author);
+
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.rt-pay", project), JObject.Parse("""{"tier":"silver"}"""), Author);
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.rt-pay", project), JObject.Parse("""{"tier":"gold","since":"2026-10-01T08:00:00Z"}"""), Author);
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("exe.rt-north.rt-pay.rt-prod", project), JObject.Parse("""{"region":"eu","zone":"west"}"""), Author);
+    }
+
+    // The transfer service over the Cosmos DB services and job store, with the archives and the queue in memory. Each
+    // call runs its job to the end.
+    private sealed class Transfers
+    {
+        private readonly MemoryQueue _queue = new();
+        private readonly ViewTransferService _service;
+
+        public Transfers(IServiceProvider services)
+        {
+            _service = new ViewTransferService(
+                services.GetRequiredService<IViewTransferStore>(),
+                new MemoryArchives(),
+                _queue,
+                services.GetRequiredService<IAnnotationService>(),
+                services.GetRequiredService<IConfigurationSchemaService>(),
+                services.GetRequiredService<IConfigurationTemplateService>(),
+                services.GetRequiredService<IConfigurationService>(),
+                Options.Create(new ViewTransferOptions()),
+                TimeProvider.System,
+                NullLogger<ViewTransferService>.Instance);
+        }
+
+        public async Task<(ViewExport Job, byte[] Archive)> ExportAsync(string project, string view, ViewArchiveFormat format)
+        {
+            var started = await _service.StartExportAsync(TestConstants.Organization, project, view, format, null, Author);
+            await _service.ProcessAsync(_queue.Messages[^1]);
+
+            var (export, archive) = await _service.OpenExportArchiveAsync(TestConstants.Organization, project, view, started.Id);
+            await using (archive)
+            {
+                using var buffer = new MemoryStream();
+                await archive.CopyToAsync(buffer);
+                return (export, buffer.ToArray());
+            }
+        }
+
+        public async Task<ViewImport> ImportAsync(
+            string project,
+            string view,
+            byte[] archive,
+            IReadOnlyList<ViewArchiveContent>? include = null,
+            ViewImportExisting existing = ViewImportExisting.Overwrite,
+            bool dryRun = false)
+        {
+            using var stream = new MemoryStream(archive);
+            var started = await _service.StartImportAsync(TestConstants.Organization, project, view, stream, "export.zip", include, existing, false, dryRun, Author);
+            await _service.ProcessAsync(_queue.Messages[^1]);
+            return (await _service.GetImportAsync(TestConstants.Organization, project, view, started.Id))!;
+        }
+    }
+
+    private sealed class MemoryArchives : IViewArchiveStorage
+    {
+        private readonly Dictionary<string, byte[]> _archives = new(StringComparer.Ordinal);
+
+        public async Task UploadAsync(string name, Stream content, CancellationToken cancellationToken = default)
+        {
+            using var buffer = new MemoryStream();
+            await content.CopyToAsync(buffer, cancellationToken);
+            _archives[name] = buffer.ToArray();
+        }
+
+        public Task<Stream?> OpenReadAsync(string name, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<Stream?>(_archives.TryGetValue(name, out var archive) ? new MemoryStream(archive, writable: false) : null);
+        }
+
+        public Task DeleteAsync(string name, CancellationToken cancellationToken = default)
+        {
+            _archives.Remove(name);
+            return Task.CompletedTask;
+        }
+
+        public Task<int> DeleteOlderThanAsync(DateTimeOffset threshold, CancellationToken cancellationToken = default) => Task.FromResult(0);
+    }
+
+    private sealed class MemoryQueue : IViewTransferQueue
+    {
+        public List<ViewTransferMessage> Messages { get; } = [];
+
+        public Task EnqueueAsync(ViewTransferMessage message, CancellationToken cancellationToken = default)
+        {
+            Messages.Add(message);
+            return Task.CompletedTask;
+        }
     }
 }
