@@ -53,6 +53,15 @@ const first = useKeyValueAudit(params, canAdmin)
 const more = ref<KeyValueAuditEvent[]>([])
 const nextToken = ref<string | null>()
 const loadingMore = ref(false)
+// A page of more events belongs to the filters it was asked for: changing them starts a new generation, and a page
+// that arrives for an older one is dropped.
+let generation = 0
+
+watch(params, () => {
+  generation++
+  more.value = []
+  nextToken.value = undefined
+})
 
 watch(
   () => first.data.value,
@@ -69,16 +78,21 @@ async function loadMore() {
   if (!context.org || !context.project || !nextToken.value) {
     return
   }
+  const started = generation
   loadingMore.value = true
   try {
     const page = await getKeyValueAudit(context.org, context.project, {
       ...params.value,
       continuationToken: nextToken.value,
     })
-    more.value = [...more.value, ...(page.Items ?? [])]
-    nextToken.value = page.ContinuationToken
+    if (started === generation) {
+      more.value = [...more.value, ...(page.Items ?? [])]
+      nextToken.value = page.ContinuationToken
+    }
   } catch (error) {
-    toast.add({ title: 'The next page did not load', description: errorMessage(error), color: 'error' })
+    if (started === generation) {
+      toast.add({ title: 'The next page did not load', description: errorMessage(error), color: 'error' })
+    }
   } finally {
     loadingMore.value = false
   }
