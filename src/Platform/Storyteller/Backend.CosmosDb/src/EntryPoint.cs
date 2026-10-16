@@ -138,9 +138,9 @@ public static class EntryPoint
 
         // Machine certificates in Cosmos, so every instance recognizes them (AddCertificateMachineAccess keeps this one).
         services.AddSingleton<IClientCertificateStore, CosmosClientCertificateStore>();
-        // Export and import jobs. The service is added by AddConfigurationTransfers, the archives and the queue
+        // Export and import jobs. The service is added by AddViewTransfers, the archives and the queue
         // by Backend.AzureStorage.
-        services.AddSingleton<IConfigurationTransferStore, CosmosConfigurationTransferStore>();
+        services.AddSingleton<IViewTransferStore, CosmosViewTransferStore>();
 
         // Invitations: the identity provider may replace the sender (AuthKit sends the email through WorkOS).
         services.Configure<InvitationOptions>(configuration.GetSection(InvitationOptions.SectionName));

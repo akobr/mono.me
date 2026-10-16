@@ -27,10 +27,10 @@ public class ConfigurationTransferHttpTests
         var http = Http();
         var request = Request(url: "https://host/api/v1/acme/web/default/configurations/exports");
 
-        var result = await http.StartConfigurationExport(request, new ConfigurationExportCreate { Format = ConfigurationArchiveFormat.Git }, "acme", "web", "default");
+        var result = await http.StartConfigurationExport(request, new ViewExportCreate { Format = ViewArchiveFormat.Git }, "acme", "web", "default");
 
         var accepted = result.ShouldBeOfType<AcceptedResult>();
-        var export = accepted.Value.ShouldBeOfType<ConfigurationExport>();
+        var export = accepted.Value.ShouldBeOfType<ViewExport>();
         accepted.Location.ShouldBe($"https://host/api/v1/acme/web/default/configurations/exports/{export.Id}");
         _transfers.Calls.ShouldBe([$"export acme/web/default Git user_01"]);
     }
@@ -46,7 +46,7 @@ public class ConfigurationTransferHttpTests
     [Fact]
     public async Task StartExport_RejectsAnUnknownFormat()
     {
-        var result = await Http().StartConfigurationExport(Request(), new ConfigurationExportCreate { Format = (ConfigurationArchiveFormat)7 }, "acme", "web", "default");
+        var result = await Http().StartConfigurationExport(Request(), new ViewExportCreate { Format = (ViewArchiveFormat)7 }, "acme", "web", "default");
 
         result.ShouldBeOfType<BadRequestObjectResult>();
         _transfers.Calls.ShouldBeEmpty();
@@ -55,7 +55,7 @@ public class ConfigurationTransferHttpTests
     [Fact]
     public async Task GetExport_OfAnotherViewIsNotFound()
     {
-        var export = await _transfers.StartExportAsync("acme", "web", "default", ConfigurationArchiveFormat.Folder, AuditActor.System);
+        var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, AuditActor.System);
 
         var found = await Http().GetConfigurationExport(Request(), "acme", "web", "default", export.Id);
         found.ShouldBeOfType<OkObjectResult>().Value.ShouldBe(export);
@@ -67,7 +67,7 @@ public class ConfigurationTransferHttpTests
     [Fact]
     public async Task GetExportArchive_IsTheZipNamedByTheExport()
     {
-        var export = await _transfers.StartExportAsync("acme", "web", "default", ConfigurationArchiveFormat.Folder, AuditActor.System);
+        var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, AuditActor.System);
 
         var result = await Http().GetConfigurationExportArchive(Request(), "acme", "web", "default", export.Id);
 
@@ -86,7 +86,7 @@ public class ConfigurationTransferHttpTests
         var result = await Http().StartConfigurationImport(request, "acme", "web", "default", force: true, dryRun: true, fileName: "configs.zip");
 
         var accepted = result.ShouldBeOfType<AcceptedResult>();
-        var import = accepted.Value.ShouldBeOfType<ConfigurationImport>();
+        var import = accepted.Value.ShouldBeOfType<ViewImport>();
         accepted.Location.ShouldBe($"https://host/api/v1/acme/web/default/configurations/imports/{import.Id}");
         _transfers.Calls.ShouldBe([$"import acme/web/default {zip.Length} bytes configs.zip force dry-run user_01"]);
     }
@@ -107,7 +107,7 @@ public class ConfigurationTransferHttpTests
     [Fact]
     public async Task StartImport_RejectsATooLargeBody()
     {
-        var http = Http(new ConfigurationTransferOptions { MaxArchiveBytes = 2048 });
+        var http = Http(new ViewTransferOptions { MaxArchiveBytes = 2048 });
         var result = await http.StartConfigurationImport(Request(new byte[4096]), "acme", "web", "default");
 
         var error = result.ShouldBeOfType<ObjectResult>();
@@ -119,7 +119,7 @@ public class ConfigurationTransferHttpTests
     [Fact]
     public async Task StartImport_RejectsATooLargeDeclaredLength()
     {
-        var http = Http(new ConfigurationTransferOptions { MaxArchiveBytes = 2048 });
+        var http = Http(new ViewTransferOptions { MaxArchiveBytes = 2048 });
         var request = Request(EmptyZip(), headers: new Dictionary<string, string> { ["Content-Length"] = "999999" });
 
         var result = await http.StartConfigurationImport(request, "acme", "web", "default");
@@ -137,7 +137,7 @@ public class ConfigurationTransferHttpTests
     public async Task QueueFunction_ProcessesAValidMessage()
     {
         var functions = new ConfigurationTransferFunctions(_transfers, NullLogger<ConfigurationTransferFunctions>.Instance);
-        var message = new ConfigurationTransferMessage("acme", "web", "default", ConfigurationTransferKind.Import, "0123");
+        var message = new ViewTransferMessage("acme", "web", "default", ViewTransferKind.Import, "0123");
 
         await functions.ProcessConfigurationTransfer(message.ToJson(), CancellationToken.None);
 
@@ -187,27 +187,27 @@ public class ConfigurationTransferHttpTests
         return request;
     }
 
-    private ConfigurationTransferHttp Http(ConfigurationTransferOptions? options = null)
+    private ConfigurationTransferHttp Http(ViewTransferOptions? options = null)
     {
-        return new ConfigurationTransferHttp(_transfers, OwnerAccess.Create(), Options.Create(options ?? new ConfigurationTransferOptions()));
+        return new ConfigurationTransferHttp(_transfers, OwnerAccess.Create(), Options.Create(options ?? new ViewTransferOptions()));
     }
 
-    private sealed class RecordingTransfers : IConfigurationTransferService
+    private sealed class RecordingTransfers : IViewTransferService
     {
-        private readonly Dictionary<string, ConfigurationExport> _exports = [];
+        private readonly Dictionary<string, ViewExport> _exports = [];
 
         public List<string> Calls { get; } = [];
 
-        public Task<ConfigurationExport> StartExportAsync(string organization, string project, string view, ConfigurationArchiveFormat format, AuditActor actor, CancellationToken cancellationToken = default)
+        public Task<ViewExport> StartExportAsync(string organization, string project, string view, ViewArchiveFormat format, AuditActor actor, CancellationToken cancellationToken = default)
         {
             Calls.Add($"export {organization}/{project}/{view} {format} {actor.Id}");
             var id = Guid.NewGuid().ToString("N");
-            var export = new ConfigurationExport
+            var export = new ViewExport
             {
                 Id = id,
-                Status = ConfigurationTransferStatus.Succeeded,
+                Status = ViewTransferStatus.Succeeded,
                 Format = format,
-                FileName = ConfigurationFileNames.GetArchiveFileName(organization, project, view, format, Now),
+                FileName = ViewArchiveNames.GetArchiveFileName(organization, project, view, format, Now),
                 CreatedAt = Now,
                 CreatedBy = actor,
                 ExpiresAt = Now.AddHours(24),
@@ -216,24 +216,24 @@ public class ConfigurationTransferHttpTests
             return Task.FromResult(export);
         }
 
-        public Task<ConfigurationExport?> GetExportAsync(string organization, string project, string view, string id, CancellationToken cancellationToken = default)
+        public Task<ViewExport?> GetExportAsync(string organization, string project, string view, string id, CancellationToken cancellationToken = default)
         {
             return Task.FromResult(_exports.GetValueOrDefault($"{organization}/{project}/{view}/{id}"));
         }
 
-        public async Task<(ConfigurationExport Export, Stream Archive)> OpenExportArchiveAsync(string organization, string project, string view, string id, CancellationToken cancellationToken = default)
+        public async Task<(ViewExport Export, Stream Archive)> OpenExportArchiveAsync(string organization, string project, string view, string id, CancellationToken cancellationToken = default)
         {
             var export = await GetExportAsync(organization, project, view, id, cancellationToken) ?? throw new NotFoundException("missing");
             return (export, new MemoryStream([1, 2, 3]));
         }
 
-        public Task<ConfigurationImport> StartImportAsync(string organization, string project, string view, Stream archive, string? fileName, bool force, bool dryRun, AuditActor actor, CancellationToken cancellationToken = default)
+        public Task<ViewImport> StartImportAsync(string organization, string project, string view, Stream archive, string? fileName, bool force, bool dryRun, AuditActor actor, CancellationToken cancellationToken = default)
         {
             Calls.Add($"import {organization}/{project}/{view} {archive.Length - archive.Position} bytes {fileName} {(force ? "force" : "-")} {(dryRun ? "dry-run" : "-")} {actor.Id}");
-            return Task.FromResult(new ConfigurationImport
+            return Task.FromResult(new ViewImport
             {
                 Id = Guid.NewGuid().ToString("N"),
-                Status = ConfigurationTransferStatus.Queued,
+                Status = ViewTransferStatus.Queued,
                 FileName = fileName,
                 IsDryRun = dryRun,
                 IsForced = force,
@@ -243,12 +243,12 @@ public class ConfigurationTransferHttpTests
             });
         }
 
-        public Task<ConfigurationImport?> GetImportAsync(string organization, string project, string view, string id, CancellationToken cancellationToken = default)
+        public Task<ViewImport?> GetImportAsync(string organization, string project, string view, string id, CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<ConfigurationImport?>(null);
+            return Task.FromResult<ViewImport?>(null);
         }
 
-        public Task ProcessAsync(ConfigurationTransferMessage message, CancellationToken cancellationToken = default)
+        public Task ProcessAsync(ViewTransferMessage message, CancellationToken cancellationToken = default)
         {
             Calls.Add($"process {message.Kind} {message.Id}");
             return Task.CompletedTask;
