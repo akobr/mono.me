@@ -98,6 +98,7 @@ A new API version:
 
 1. Export the OpenAPI document into `open.api.v{version}.json` here and in `../Sdk.NSwag`. The API test `OpenApiExportTests` renders it with the engine of the Functions host, so no host has to run: `STORYTELLER_OPENAPI_EXPORT=<path> dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTests"` (the running host serves the same document at `/api/openapi/v3.json`). Remove the superseded `open.api.v*.json` here; `../Sdk.NSwag` keeps its history.
 2. `npm run generate`, review the diff of `src/generated`, run the tests, commit.
+3. A new tag (a new folder under `src/generated/vue-query`) also goes into `src/msw.ts` by hand: its `get<Tag>Mock()` into `getStorytellerMock()`, and an `export *` of its `.msw` file. `test/msw.test.ts` fails until it is there. The other entries pick a new tag up through the generated `index.ts` files.
 
 `dotnet build` builds `sdk.typescript.esproj` without Node. Pass `-p:BuildJavaScript=true` to also run `npm install` and `npm run build`.
 
@@ -146,7 +147,7 @@ const { publicJwk, privateJwk } = await generateRecipientKeyPair()         // a 
 
 ## Export and import of a view
 
-The `transfers` tag runs the jobs that export the documents of a view into a zip and import a zip into a view: `startViewExport`, `getViewExport`, `getViewExportArchive`, `startViewImport` and `getViewImport` (`docs/Platform/Storyteller/export-import.md`). `Include` and the import's `include` list the kinds (`ViewArchiveContent`: `Annotations`, `Schemas`, `Templates`, `Configurations`), all four when empty; the query sends them comma-separated. `existing` is `Overwrite` (the default) or `Skip`. The archive comes back as a `Blob`.
+The `transfers` tag runs the jobs that export the documents of a view into a zip and import a zip into a view: `startViewExport`, `getViewExport`, `getViewExportArchive`, `startViewImport` and `getViewImport` (`docs/Platform/Storyteller/export-import.md`). `Include` and the import's `include` list the kinds (`ViewArchiveContent`: `Annotations`, `Schemas`, `Templates`, `Configurations`), all four when empty; the query sends them comma-separated. `existing` is `Overwrite` (the default) or `Skip`. The archive comes back as a `Blob`. Their Vue Query composables are under `./vue-query`, Zod schemas under `./zod`, and MSW handlers under `./msw` (`getTransfersMock()`, part of `getStorytellerMock()`, and `getStartViewExportMockHandler(…)` and the rest).
 
 ```ts
 import { getViewExport, getViewExportArchive, getViewImport, startViewExport, startViewImport } from '@42for.net/2splatform.sdk'

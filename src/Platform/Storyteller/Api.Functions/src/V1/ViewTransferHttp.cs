@@ -10,6 +10,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
 namespace _42.Platform.Storyteller.Api.V1;
@@ -285,13 +286,21 @@ public class ViewTransferHttp
         return export;
     }
 
-    // The scopes of every included kind (null or empty: all four); a stored job has its include resolved.
+    // The scopes of every included kind (null or empty: all four); a stored job has its include resolved. A request
+    // without credentials has no scopes at all: it is 401, as on every route, not a 403 that asks it to change include.
     private void CheckScopes(HttpRequestData request, IReadOnlyList<ViewArchiveContent>? include, ViewTransferKind kind, bool isJob = false)
     {
-        if (ChecksScopes)
+        if (!ChecksScopes)
         {
-            ViewTransferScopes.Ensure(request.GetScopes(), include, kind, isJob);
+            return;
         }
+
+        if (request.GetClaims().Count == 0)
+        {
+            throw new SecurityTokenException("Missing credentials.");
+        }
+
+        ViewTransferScopes.Ensure(request.GetScopes(), include, kind, isJob);
     }
 
     private ObjectResult TooLarge()
