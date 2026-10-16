@@ -6,8 +6,9 @@ import { useTransfersStore, type ExportJob } from '@/stores/transfers'
 import { errorMessage } from '@/utils/errors'
 
 /**
- * Starts an export of the view's configurations (spec 4.2). The server builds the zip in the background; when it is
- * ready, the store downloads it and the dialog closes. Closing the dialog earlier keeps the export going.
+ * Starts an export of the view (spec 4.2): every kind, since the dialog has no include. The server builds the zip in
+ * the background; when it is ready, the store downloads it and the dialog closes. Closing the dialog earlier keeps the
+ * export going.
  */
 const props = defineProps<{ scope: Scope }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -22,7 +23,7 @@ const formats = [
   {
     label: 'Folder',
     value: 'Folder',
-    description: 'The current documents as <key>.json and earlier versions as <key>.<version>.json, with export.json.',
+    description: 'One folder per kind with the current documents, earlier versions as version files, and export.json.',
   },
   {
     label: 'Git repository',
@@ -64,7 +65,7 @@ async function start() {
   error.value = undefined
 
   try {
-    jobId.value = (await transfers.startExport(props.scope, format.value)).id
+    jobId.value = (await transfers.startExport(props.scope, { format: format.value })).id
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
@@ -77,7 +78,7 @@ async function start() {
   <UModal
     v-model:open="open"
     title="Export configurations"
-    :description="`The own documents of every configuration in ${scope.view}, as a zip. Templates, schemas and secrets are not included.`"
+    :description="`The annotations, schemas, templates and configurations of ${scope.view}, as a zip. Secrets and effective documents are not included.`"
     :ui="{ footer: 'justify-end' }"
   >
     <template #body>

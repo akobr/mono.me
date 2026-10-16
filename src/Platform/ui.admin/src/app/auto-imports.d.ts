@@ -114,6 +114,6 @@ declare global {
   export type { AccountStatus } from './stores/session'
   import('./stores/session')
   // @ts-ignore
-  export type { TransferPhase, ExportJob, ImportJob, TransferJob, ImportOptions } from './stores/transfers'
+  export type { TransferPhase, ExportJob, ImportJob, TransferJob, ExportOptions, ImportOptions } from './stores/transfers'
   import('./stores/transfers')
 }

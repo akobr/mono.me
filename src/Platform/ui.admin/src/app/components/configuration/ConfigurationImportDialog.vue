@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import type { Scope } from '@/stores/context'
-import { useTransfersStore, type ImportJob } from '@/stores/transfers'
+import { useTransfersStore, type ImportJob, type ImportOptions } from '@/stores/transfers'
 import { errorMessage } from '@/utils/errors'
 
 /**
- * Imports a zip into the view (spec 4.3): every <key>.json replaces the stored document as a new version unless it
- * is equal. The dialog shows the progress and the result; closing it keeps the import going, and opening it again
+ * Imports a zip into the view (spec 4.3): every kind, recognized by the file names, replaces the stored document unless
+ * it is equal. The dialog shows the progress and the result; closing it keeps the import going, and opening it again
  * shows the view's latest import.
  */
 const props = defineProps<{ scope: Scope }>()
@@ -55,7 +55,7 @@ watch(
 
 onBeforeUnmount(() => release?.())
 
-async function start(options: { dryRun: boolean; force: boolean }, archive: File) {
+async function start(options: ImportOptions, archive: File) {
   starting.value = true
   error.value = undefined
 
@@ -74,10 +74,11 @@ function importSelected() {
   }
 }
 
-/** The checked file again, for real. */
+/** The checked file again, for real, with the same options. */
 function importNow() {
   if (job.value) {
-    void start({ dryRun: false, force: job.value.state.IsForced ?? false }, job.value.file)
+    const { Include, Existing, IsForced } = job.value.state
+    void start({ include: Include, existing: Existing, force: IsForced, dryRun: false }, job.value.file)
   }
 }
 
@@ -96,7 +97,7 @@ function newImport() {
   <UModal
     v-model:open="open"
     title="Import configurations"
-    description="A zip of <annotation-key>.json files, for example an export. Each file replaces the annotation's own document as a new version unless it is equal; other configurations are left alone."
+    description="A zip of a view, for example an export. Files are recognized by their names: <key>.json is an annotation, <key>.conf.json a configuration, and templates and schemas have their own suffixes. Each document replaces the stored one unless it is equal; nothing is deleted."
     :ui="{ content: 'max-w-2xl', footer: 'justify-end' }"
   >
     <template #body>
@@ -106,7 +107,7 @@ function newImport() {
             v-model="file"
             accept=".zip,application/zip"
             label="Drop a zip here"
-            description="Version files, export.json and .git folders are ignored."
+            description="Version files, export.json and hidden folders are ignored."
             icon="i-lucide-file-archive"
             class="min-h-36 w-full"
             :disabled="starting"
@@ -119,8 +120,8 @@ function newImport() {
             />
             <UCheckbox
               v-model="force"
-              label="Store documents that violate their schema"
-              description="Without it, such files fail and the others are imported."
+              label="Store schemas and configurations that break each other"
+              description="Without it, they fail and the rest is imported."
             />
           </div>
         </template>

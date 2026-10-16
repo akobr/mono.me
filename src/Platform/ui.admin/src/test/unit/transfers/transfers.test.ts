@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { toRaw } from 'vue'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import {
@@ -13,7 +14,7 @@ import {
   type ViewImportExisting,
 } from '@42for.net/2splatform.sdk'
 import { mockHandlers } from '@/mock/all-handlers'
-import { fileNameOf, parseFileName, resetTransfers } from '@/mock/transfer-handlers'
+import { resetTransfers } from '@/mock/transfer-handlers'
 import { createZip, crc32, readZip, textFile } from '@/mock/zip'
 import { maxWaitMs, useTransfersStore, type ExportJob, type ImportJob } from '@/stores/transfers'
 import { importCounts } from '@/utils/transfers'
@@ -25,6 +26,7 @@ const server = setupServer(...mockHandlers)
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
 afterEach(() => {
   server.resetHandlers()
+  server.events.removeAllListeners()
   resetTransfers()
   vi.useRealTimers()
 })
@@ -65,17 +67,18 @@ describe('mock zip', () => {
   it('computes the CRC-32 of zlib', () => {
     expect(crc32(new TextEncoder().encode('123456789'))).toBe(0xcbf43926)
   })
-})
 
-describe('mock file names', () => {
-  it('encode and parse like the API', () => {
-    expect(fileNameOf('rst.a:b')).toBe('rst.a%3Ab.json')
-    expect(fileNameOf('rst.payments', 3)).toBe('rst.payments.3.json')
-    expect(parseFileName('rst.a%3Ab.json')).toEqual({ key: 'rst.a:b', version: undefined })
-    expect(parseFileName('rst.payments.3.json')).toEqual({ key: 'rst.payments', version: 3 })
-    expect(parseFileName('usg.shop.payments.json')).toEqual({ key: 'usg.shop.payments', version: undefined })
-    expect(parseFileName('export.json')).toBeUndefined()
-    expect(parseFileName('rst.a%2Eb.json')).toBeUndefined()
+  it('writes the time of each entry, or the time of the zip', () => {
+    const zip = createZip(
+      [textFile('a.json', '{}', new Date(2026, 9, 14, 13, 30, 12)), textFile('b.json', '{}')],
+      new Date(2025, 0, 2, 3, 4, 6),
+    )
+    const view = new DataView(zip.buffer)
+    // the DOS time and date of the local headers: a.json at 0, b.json after its 30 + 6 + 2 bytes
+    const entryTime = (offset: number) => [view.getUint16(offset + 10, true), view.getUint16(offset + 12, true)]
+
+    expect(entryTime(0)).toEqual([(13 << 11) | (30 << 5) | 6, (46 << 9) | (10 << 5) | 14])
+    expect(entryTime(38)).toEqual([(3 << 11) | (4 << 5) | 3, (45 << 9) | (1 << 5) | 2])
   })
 })
 
@@ -99,7 +102,7 @@ describe('transfers store', () => {
     const finished: string[] = []
     transfers.onFinished((job) => finished.push(`${job.kind}:${job.phase}`))
 
-    const job = await transfers.startExport(scope, 'Git')
+    const job = await transfers.startExport(scope, { format: 'Git' })
 
     expect(job.phase).toBe('running')
     expect(JSON.parse(sessionStorage.getItem('2s-admin:pending-exports')!)).toEqual([
@@ -124,7 +127,7 @@ describe('transfers store', () => {
     )
     const transfers = useTransfersStore()
 
-    const job = await transfers.startExport(scope, 'Folder')
+    const job = await transfers.startExport(scope, { format: 'Folder' })
     await settle(job)
 
     expect(job.phase).toBe('failed')
@@ -139,14 +142,14 @@ describe('transfers store', () => {
       ),
     )
     const transfers = useTransfersStore()
-    const expired = await transfers.startExport(scope, 'Folder')
+    const expired = await transfers.startExport(scope, { format: 'Folder' })
     await settle(expired)
     expect(expired.error).toBe('The job has expired.')
 
     server.use(
       http.get('*/api/v1/:org/:project/:view/exports/:id', () => HttpResponse.json({ Id: 'y', Status: 'Running' })),
     )
-    const slow = await transfers.startExport(scope, 'Folder')
+    const slow = await transfers.startExport(scope, { format: 'Folder' })
     await vi.advanceTimersByTimeAsync(maxWaitMs + 10_000)
     expect(slow.phase).toBe('failed')
     expect(slow.error).toMatch(/did not end within 15 minutes/)
@@ -154,7 +157,7 @@ describe('transfers store', () => {
 
   it('resumes the exports that ran before a reload', async () => {
     const first = useTransfersStore()
-    const job = await first.startExport(scope, 'Folder')
+    const job = await first.startExport(scope, { format: 'Folder' })
     const pending = sessionStorage.getItem('2s-admin:pending-exports')
 
     // a reload: a new store reads what the previous page left
@@ -170,9 +173,53 @@ describe('transfers store', () => {
     expect(resumed.phase).toBe('done')
   })
 
+  it('passes the options of an export and an import to the API, and leaves out the defaults', async () => {
+    const requests: Request[] = []
+    server.events.on('request:start', ({ request }) => {
+      if (request.method === 'POST') {
+        requests.push(request.clone())
+      }
+    })
+    const transfers = useTransfersStore()
+    const file = new File([createZip([textFile('rst.payments.json', '{}')])], 'view.zip', { type: 'application/zip' })
+
+    const partial = await transfers.startExport(scope, { format: 'Git', include: ['Annotations', 'Templates'] })
+    const all = await transfers.startExport(scope, { format: 'Folder', include: [] })
+    const checked = await transfers.startImport(scope, file, {
+      include: ['Schemas', 'Configurations'],
+      existing: 'Skip',
+      force: true,
+      dryRun: true,
+    })
+    await transfers.startImport(scope, file, { existing: 'Overwrite', force: false, dryRun: false })
+    const plain = await transfers.startImport(scope, file)
+
+    const [partialRequest, allRequest, ...importRequests] = requests
+    expect(await partialRequest!.json()).toEqual({ Format: 'Git', Include: ['Annotations', 'Templates'] })
+    expect(await allRequest!.json()).toEqual({ Format: 'Folder' })
+    expect(importRequests.map((request) => Object.fromEntries(new URL(request.url).searchParams))).toEqual([
+      { include: 'Schemas,Configurations', existing: 'Skip', force: 'true', dryRun: 'true', fileName: 'view.zip' },
+      { existing: 'Overwrite', fileName: 'view.zip' },
+      { fileName: 'view.zip' },
+    ])
+
+    // the jobs keep what the server resolved
+    expect(partial.state).toMatchObject({ Format: 'Git', Include: ['Annotations', 'Templates'] })
+    expect(all.state.Include).toEqual(['Annotations', 'Schemas', 'Templates', 'Configurations'])
+    expect(checked.state).toMatchObject({
+      Include: ['Schemas', 'Configurations'],
+      Existing: 'Skip',
+      IsForced: true,
+      IsDryRun: true,
+    })
+    expect(plain.state).toMatchObject({ Existing: 'Overwrite', IsForced: false, IsDryRun: false })
+    // the uploaded file stays with the job, so a checked archive can be imported for real
+    expect(toRaw(checked.file)).toBe(file)
+  })
+
   it('imports a zip with its options and keeps the latest import of the view', async () => {
     const transfers = useTransfersStore()
-    const zip = createZip([textFile('rst.no-such-annotation.json', '{"a":1}'), textFile('export.json', '{}')])
+    const zip = createZip([textFile('rst.no-such-annotation.conf.json', '{"a":1}'), textFile('export.json', '{}')])
     const file = new File([zip], 'configs.zip', { type: 'application/zip' })
     let query: URLSearchParams | undefined
     server.events.on('request:start', ({ request }) => {
@@ -189,6 +236,9 @@ describe('transfers store', () => {
     expect(query?.get('fileName')).toBe('configs.zip')
     expect(job.phase).toBe('done')
     expect(job.state.Summary).toMatchObject({ Skipped: 1, IgnoredFiles: 1 })
+    expect(job.state.Items).toEqual([
+      expect.objectContaining({ Kind: 'Configuration', Outcome: 'Skipped', ErrorCode: 'AnnotationNotFound' }),
+    ])
     expect(transfers.latestImport(scope)).toBe(job as ImportJob)
     expect(transfers.latestImport({ ...scope, view: 'staging' })).toBeUndefined()
 
@@ -253,7 +303,10 @@ describe('mock transfer options', () => {
     const exported = await getViewExport(org, project, view, started.Id!)
 
     expect(exported.Include).toEqual(['Templates'])
-    expect(exported.ConfigurationCount).toBeNull()
+    // the API leaves the null counts of the kinds left out out of its answer
+    expect(exported).not.toHaveProperty('ConfigurationCount')
+    expect(exported).not.toHaveProperty('AnnotationCount')
+    expect(exported.TemplateCount).toBe(2)
   })
 
   it('refuses an unknown kind or existing mode like the API', async () => {
