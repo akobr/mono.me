@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
 using System.IO.Compression;
@@ -8,11 +9,12 @@ using System.Threading.Tasks;
 namespace _42.Platform.Cli.Services;
 
 /// <summary>
-/// Zips of configuration documents on the local disk: a folder packed for an import, an export unpacked into a folder.
+/// Zips of the documents of a view on the local disk: a folder packed for an import, an export unpacked into a folder.
 /// </summary>
-public static class ConfigurationArchives
+public static class ViewArchives
 {
-    private const string GitFolder = ".git";
+    private const string JsonExtension = ".json";
+    private const string MacOsFolder = "__MACOSX";
 
     // Paths differ only by case on Windows; elsewhere a case mismatch is another folder.
     private static readonly StringComparison PathComparison = OperatingSystem.IsWindows()
@@ -20,7 +22,8 @@ public static class ConfigurationArchives
         : StringComparison.Ordinal;
 
     /// <summary>
-    /// Packs every *.json file below the folder, in subfolders too and without .git folders, into a zip in memory.
+    /// Packs every *.json file below the folder, in subfolders too, into a zip in memory. Hidden folders and files
+    /// (.git, .github, .vscode, ._*) and a __MACOSX folder are left out, as the server skips them (<see cref="IsSkippedPath"/>).
     /// Entry names are the paths relative to the folder, with '/'.
     /// </summary>
     /// <returns>The zip, positioned at its start, and the number of packed files.</returns>
@@ -32,10 +35,7 @@ public static class ConfigurationArchives
 
         using (var zip = new ZipArchive(archive, ZipArchiveMode.Create, leaveOpen: true))
         {
-            var files = fileSystem.Directory
-                .EnumerateFiles(root, "*.json", SearchOption.AllDirectories)
-                .Select(path => (Path: path, Relative: fileSystem.Path.GetRelativePath(root, path).Replace('\\', '/')))
-                .Where(file => !file.Relative.Split('/').Any(segment => segment.Equals(GitFolder, StringComparison.OrdinalIgnoreCase)))
+            var files = EnumerateDocuments(fileSystem, root, string.Empty)
                 .OrderBy(file => file.Relative, StringComparer.Ordinal);
 
             foreach (var file in files)
@@ -50,6 +50,19 @@ public static class ConfigurationArchives
 
         archive.Position = 0;
         return (archive, count);
+    }
+
+    /// <summary>
+    /// Whether the server's archive reader passes over a path (with '/' separators) without counting it: any hidden folder
+    /// or file (a segment starting with '.') and the __MACOSX folder of a zip. The same rule as ViewArchiveNames.IsSkippedPath.
+    /// </summary>
+    public static bool IsSkippedPath(string path)
+    {
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        return segments.Length == 0
+               || segments.Any(segment => segment.StartsWith('.') && segment != ".")
+               || segments[0].Equals(MacOsFolder, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -107,5 +120,35 @@ public static class ConfigurationArchives
         }
 
         return count;
+    }
+
+    // The *.json files below a folder (the extension in any case, as the server reads it), without descending into the
+    // skipped folders, so a large .git is never walked.
+    private static IEnumerable<(string Path, string Relative)> EnumerateDocuments(IFileSystem fileSystem, string folder, string relativeFolder)
+    {
+        foreach (var path in fileSystem.Directory.EnumerateFiles(folder))
+        {
+            var relative = relativeFolder + fileSystem.Path.GetFileName(path);
+
+            if (relative.EndsWith(JsonExtension, StringComparison.OrdinalIgnoreCase) && !IsSkippedPath(relative))
+            {
+                yield return (path, relative);
+            }
+        }
+
+        foreach (var subfolder in fileSystem.Directory.EnumerateDirectories(folder))
+        {
+            var relative = relativeFolder + fileSystem.Path.GetFileName(subfolder) + "/";
+
+            if (IsSkippedPath(relative))
+            {
+                continue;
+            }
+
+            foreach (var file in EnumerateDocuments(fileSystem, subfolder, relative))
+            {
+                yield return file;
+            }
+        }
     }
 }
