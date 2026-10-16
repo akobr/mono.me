@@ -12,7 +12,7 @@ stateDiagram-v2
   Active --> Active: update
   Active --> Deleted: delete (with all its descendants)
   Deleted --> Active: restore (also when a descendant is restored)
-  Deleted --> Active: re-create (a write to the key; new content, empty configuration)
+  Deleted --> Active: re-create (a write or an import of the key; new content, empty configuration)
   Deleted --> Purged: permanent delete, or the retention runs out
   Purged --> Active: create the key again (a new annotation with a new audit)
   Purged --> [*]
@@ -48,7 +48,7 @@ Each flag removes one condition, so a deleted annotation that is also disabled n
 - **Lists.** Without `includeInactive`, Cosmos drops the disabled annotations (an undefined, `null` or `false` `IsDisabled` is enabled), and each page is filtered in memory by the validity window, because the dates are stored with the offset the client sent and can't be compared as strings. A page can therefore hold fewer items than the page size, or none, and still have a continuation token: follow it until it is absent. `Count` is the number of returned items.
 - **One key.** Without `includeInactive`, an annotation that is not active answers `404` with `ErrorCode` `AnnotationInactive` and a message naming the status, so clients can tell it from a missing one (plain `404`). With `includeDeleted`, a deleted key is returned with its `Deletion` instead of `404`.
 
-**Not filtered by status:** `ExistAnnotation`, every write (an update, delete, restore or purge acts on an inactive annotation as on an active one, and a delete cascades to inactive descendants), the reads of deleted annotations (`…/deleted…`), the history, the `@annotation` binding, and the configuration reads and listings. A configuration of a disabled or expired annotation still resolves.
+**Not filtered by status:** `ExistAnnotation`, every write (an update, delete, restore or purge acts on an inactive annotation as on an active one, and a delete cascades to inactive descendants), the reads of deleted annotations (`…/deleted…`), the history, the `@annotation` binding, the configuration reads and listings, and the export of a view ([Export and import](#export-and-import)). A configuration of a disabled or expired annotation still resolves.
 
 ## Items
 
@@ -87,12 +87,24 @@ A second delete of the same key returns the existing deletion. A delete that did
 
 ## Re-create
 
-A create of a deleted key (`SetAnnotation`, `SetAnnotations`, `SetAnnotationsSimple`) re-creates it, and so does a create below a deleted ancestor, which re-creates the ancestor. Any Contributor may do it. The API never asks; clients look up deleted keys first and offer a restore.
+A create of a deleted key re-creates it, and so does a create below a deleted ancestor, which re-creates the ancestor. Four calls do it: `SetAnnotation`, `SetAnnotations`, `SetAnnotationsSimple`, and the import of an annotation file with `Existing` set to `Overwrite` ([Export and import](#export-and-import)). Any Contributor may do it. The API never asks; clients look up deleted keys first and offer a restore.
 
 - The item is replaced by the new content, with empty relation arrays and a new `Created` stamp.
 - The configuration is deleted after its content went to the versions. The first new configuration version continues the numbering, so the versions of the previous lifetime stay visible until they expire.
 - The audit continues with a `Recreated` entry (time, actor, and the replaced `DeletionId`).
 - The children deleted with the previous version stay deleted and become roots.
+
+## Export and import
+
+An [export of a view](export-import.md) holds every annotation that is not deleted, whatever its status, as a file of its editable members. Deleted annotations, the audit, `Deletion` and the relation arrays stay with the platform. The `Created` and `Modified` stamps are listed in the manifest, for information only.
+
+An import writes an annotation file the way `SetAnnotation` does, with the usual audit entries by the importing caller:
+
+- An active key whose content differs is updated with an `Updated` entry; with `Existing` set to `Skip`, it is kept. An equal one is left alone.
+- A missing key is created with its missing ancestors (`Created`, with the cause `Ancestor` on the ancestors).
+- With `Existing` set to `Overwrite` (the default), a deleted key, or a key below a deleted ancestor, is re-created as [above](#re-create) (`Recreated`). The import reports it with the warning `AnnotationRecreated`. With `Skip`, the file is skipped with `AnnotationDeleted`, and the deleted keys stay deleted.
+
+The archive carries no audit, and the import adds no cause of its own. The rules of the content are in [export-import.md](export-import.md#annotations).
 
 ## Permanent delete and expiry
 
@@ -107,7 +119,7 @@ The audit document of an annotation holds its entries, oldest first:
 | Action | Recorded when | Content |
 | --- | --- | --- |
 | `Created` | create, an automatic ancestor | Cause `Ancestor` for an automatic ancestor |
-| `Recreated` | a create of a deleted key | The replaced `DeletionId`; cause `Ancestor` for an ancestor |
+| `Recreated` | a create or an import of a deleted key | The replaced `DeletionId`; cause `Ancestor` for an ancestor |
 | `Updated` | an update that changes something | `Fields`, `Labels`, `Values` |
 | `Deleted` | delete | `DeletionId`; cause `Cascade` on descendants; `DescendantCount` on the root |
 | `Restored` | restore | `DeletionId`; cause `Cascade` or `Ancestor`; `DescendantCount` on a restore with descendants |
