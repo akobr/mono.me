@@ -43,6 +43,7 @@ A `View` has `Name`, `Description`, `Created` (the [audit stamp](audit-stamps.md
 | Read deleted annotations and the history of an annotation | `Reader` on the project |
 | Delete, restore, and re-create annotations | `Contributor` on the project; machines with annotation write |
 | Delete an annotation permanently (`DELETE …/annotations/deleted/{key}`) | `Administrator` on the project, users only: machine credentials get `403` |
+| Export a view, import into a view, and read those jobs | Any role on the project to export, `Contributor` to import and to read an import, and the scopes of every included kind (see [export-import.md](export-import.md#access)) |
 | Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, or the scope `Configuration.Secrets` (see [key-values.md](key-values.md#secret-delivery)) |
 | Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project |
 
