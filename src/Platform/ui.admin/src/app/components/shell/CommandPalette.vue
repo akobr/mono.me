@@ -146,6 +146,7 @@ defineShortcuts({
   'g-g': () => go(navigationBase.value && `${navigationBase.value}/graph`),
   'g-t': () => go(navigationBase.value && `${navigationBase.value}/templates`),
   'g-s': () => go(navigationBase.value && `${navigationBase.value}/schemas`),
+  'g-e': () => go(navigationBase.value && `${navigationBase.value}/export-import`),
 })
 </script>
 

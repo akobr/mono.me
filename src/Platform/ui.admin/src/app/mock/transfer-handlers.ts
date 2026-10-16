@@ -47,7 +47,8 @@ import { errorResponse, requireRole, withDb } from './handlers'
 import { createZip, readZip, textFile, type ZipFile } from './zip'
 
 // Exports and imports of a view, on the routes and with the options of the API (export-import.md). A job is Running on
-// its first read and ends on the second one, so the UI shows its progress.
+// its first read and ends on the second one, so the UI shows its progress. A finished import is kept in sessionStorage,
+// so the Export & Import page shows it again after a reload, as the API keeps its jobs for a day.
 //
 // An archive holds the four kinds of the mock database: annotations, the template: and schema: documents, and
 // configurations. The files are named like the API names them (archive-names.ts), one folder per kind, with
@@ -95,15 +96,55 @@ interface ImportJob {
 
 const jobs = new Map<string, ExportJob | ImportJob>()
 let sequence = 0
+const finishedImportsKey = '2s-admin:mock-finished-imports'
+const maxFinishedImports = 10
 
 const scopeOf = (params: ScopeParams): ScopeRef => ({ org: params.org, project: params.project, view: params.view })
 const sameScope = (left: ScopeRef, right: ScopeRef) =>
   left.org === right.org && left.project === right.project && left.view === right.view
 const newId = () => `job${Date.now().toString(36)}${(++sequence).toString(36)}`
 
+type FinishedImports = Record<string, { scope: ScopeRef; state: ViewImport }>
+
+function readFinishedImports(): FinishedImports {
+  try {
+    return (JSON.parse(globalThis.sessionStorage?.getItem(finishedImportsKey) ?? '{}') as FinishedImports) ?? {}
+  } catch {
+    return {}
+  }
+}
+
+/** A finished import outlives a reload of the page, as the API keeps a job for 24 hours; the last ten are kept. */
+function keepFinishedImport(id: string, job: ImportJob): void {
+  const entries = Object.entries(readFinishedImports()).filter(([key]) => key !== id)
+  entries.push([id, { scope: job.scope, state: job.state }])
+
+  try {
+    globalThis.sessionStorage?.setItem(
+      finishedImportsKey,
+      JSON.stringify(Object.fromEntries(entries.slice(-maxFinishedImports))),
+    )
+  } catch {
+    // no room or no storage: a reload forgets the job, as if it had expired
+  }
+}
+
+/** A finished import of an earlier page load. */
+function restoreFinishedImport(id: string): ImportJob | undefined {
+  const stored = readFinishedImports()[id]
+  if (!stored) {
+    return undefined
+  }
+
+  const job: ImportJob = { kind: 'import', scope: stored.scope, state: stored.state, reads: 2, files: [] }
+  jobs.set(id, job)
+  return job
+}
+
 /** Clears the jobs between tests. */
 export function resetTransfers(): void {
   jobs.clear()
+  globalThis.sessionStorage?.removeItem(finishedImportsKey)
 }
 
 /** A defined name in any case, as the API reads kinds and modes. */
@@ -1163,7 +1204,7 @@ function runImport(db: MockDb, job: ImportJob): void {
 // Routes
 
 function findJob<T extends 'export' | 'import'>(kind: T, params: ScopeParams & { id: string }) {
-  const job = jobs.get(params.id)
+  const job = jobs.get(params.id) ?? (kind === 'import' ? restoreFinishedImport(params.id) : undefined)
   return job && job.kind === kind && sameScope(job.scope, scopeOf(params))
     ? (job as Extract<ExportJob | ImportJob, { kind: T }>)
     : undefined
@@ -1342,6 +1383,7 @@ export const transferHandlers: HttpHandler[] = [
         job.state = { ...job.state, Status: 'Running', StartedAt: new Date().toISOString() }
       } else if (job.state.Status === 'Running') {
         runImport(db, job)
+        keepFinishedImport(params.id, job)
       }
       return HttpResponse.json(job.state)
     }),

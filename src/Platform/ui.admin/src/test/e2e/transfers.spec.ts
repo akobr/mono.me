@@ -1,120 +1,226 @@
 import { readFile } from 'node:fs/promises'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { createZip, readZip, textFile, type ZipFile } from '../../app/mock/zip'
-import { isMobile, openApp } from './support'
+import { goto, isMobile, openApp } from './support'
 
-const path = '/acme/billing/default/configurations'
+// The Export & Import page of a view (spec 4.1-4.4 of the Export and Import of a View), against the mock API.
+const path = '/acme/billing/default/export-import'
 
-/** Exports the view in a format and returns the downloaded files. */
-async function exportView(page: Page, format: 'Folder' | 'Git repository') {
-  await page.getByRole('button', { name: 'Export configurations' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Export configurations' })
-  await dialog.getByRole('radio', { name: format }).click()
+const section = (page: Page, name: 'Export' | 'Import' | 'Latest import') =>
+  page.getByRole('region', { name, exact: true })
+
+/** The navigation menu: the docked sidebar, or on a phone the slideover behind the menu button. */
+async function menu(page: Page, testInfo: TestInfo): Promise<Locator> {
+  if (isMobile(testInfo)) {
+    await page.getByRole('button', { name: 'Open navigation' }).click()
+    return page.getByRole('dialog')
+  }
+  return page.locator('nav').filter({ has: page.getByRole('link', { name: 'Organizations' }) })
+}
+
+/** Exports the view with the given kinds and format, and returns the downloaded zip. */
+async function exportView(
+  page: Page,
+  options: { leaveOut?: string[]; format?: 'Folder of JSON files' | 'Git repository' } = {},
+) {
+  const panel = section(page, 'Export')
+  for (const kind of options.leaveOut ?? []) {
+    await panel.getByRole('checkbox', { name: kind, exact: true }).click()
+  }
+  await panel.getByRole('radio', { name: options.format ?? 'Folder of JSON files' }).click()
 
   const downloading = page.waitForEvent('download')
-  await dialog.getByRole('button', { name: 'Export', exact: true }).click()
+  await panel.getByRole('button', { name: 'Export', exact: true }).click()
   const download = await downloading
 
-  await expect(dialog).toBeHidden()
-  await expect(page.getByText(/^Exported \d+ configurations?$/)).toBeVisible()
-
+  await expect(panel.getByText(/was downloaded\.$/)).toBeVisible()
   const files = await readZip(new Uint8Array(await readFile((await download.path())!)))
   return { name: download.suggestedFilename(), files }
 }
 
-const text = (file: ZipFile) => new TextDecoder().decode(file.data)
+/** Puts a zip of the files into the Import section. */
+async function chooseArchive(page: Page, files: ZipFile[], name = 'edited.zip') {
+  await section(page, 'Import')
+    .locator('input[type="file"]')
+    .setInputFiles({ name, mimeType: 'application/zip', buffer: Buffer.from(createZip(files)) })
+}
 
-test('exports the view as a folder', async ({ page }) => {
+/** The documents of the result: the rows of the table on desktop, the entries of the list on a phone. */
+const documents = (page: Page, testInfo: TestInfo) =>
+  isMobile(testInfo)
+    ? section(page, 'Latest import').getByRole('list', { name: 'Documents' }).getByRole('listitem')
+    : section(page, 'Latest import').getByRole('table', { name: 'Documents' }).getByRole('row')
+
+const text = (file: ZipFile) => new TextDecoder().decode(file.data)
+const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`
+
+test('opens the page from the sidebar and with g e; the configurations page has no transfer buttons', async ({
+  page,
+}, testInfo) => {
+  await openApp(page, '/acme/billing/default/configurations')
+  await expect(page.getByRole('button', { name: 'Export configurations' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Import configurations' })).toHaveCount(0)
+
+  await (await menu(page, testInfo)).getByRole('link', { name: 'Export & Import' }).click()
+  await expect(page).toHaveURL(path)
+  await expect(section(page, 'Export')).toBeVisible()
+  await expect(section(page, 'Import')).toBeVisible()
+
+  await goto(page, '/acme/billing/default/templates')
+  await page.keyboard.press('g')
+  await page.keyboard.press('e')
+  await expect(page).toHaveURL(path)
+})
+
+test('exports only the annotations and templates', async ({ page }) => {
   await openApp(page, path)
 
-  const { name, files } = await exportView(page, 'Folder')
+  const { name, files } = await exportView(page, { leaveOut: ['Schemas', 'Configurations'] })
 
   expect(name).toMatch(/^export-acme-billing-default-\d{8}-\d{6}Z\.zip$/)
   const names = files.map((file) => file.name)
-  expect(names).toContain('export.json')
-  // one folder per kind; the version files sit next to their current file
-  expect(names).toEqual(expect.arrayContaining(['annotations/rst.invoicing.json', 'templates/exe.template.json']))
-  expect(names.some((file) => /^configurations\/[a-z]{3}\..+\.conf\.\d+\.json$/.test(file))).toBe(true)
-  expect(
-    names
-      .filter((file) => file !== 'export.json')
-      .every((file) => /^(annotations|schemas|templates|configurations)\/[^/]+\.json$/.test(file)),
-  ).toBe(true)
+  expect(names).toEqual(
+    expect.arrayContaining(['export.json', 'annotations/rst.invoicing.json', 'templates/exe.template.json']),
+  )
+  expect(names.filter((file) => file !== 'export.json').every((file) => /^(annotations|templates)\//.test(file))).toBe(
+    true,
+  )
+  expect(JSON.parse(text(files.find((file) => file.name === 'export.json')!)).Include).toEqual([
+    'Annotations',
+    'Templates',
+  ])
+  await expect(page.getByText(/^Exported \d+ annotations and \d+ templates$/)).toBeVisible()
 })
 
 test('exports the view as a git repository', async ({ page }) => {
   await openApp(page, path)
 
-  const { name, files } = await exportView(page, 'Git repository')
+  const { name, files } = await exportView(page, { format: 'Git repository' })
 
   expect(name).toMatch(/^export-acme-billing-default-git-\d{8}-\d{6}Z\.zip$/)
   expect(files.map((file) => file.name)).toContain('.git/HEAD')
   expect(files.map((file) => file.name)).not.toContain('export.json')
 })
 
-test('imports an edited export: a dry run, then for real', async ({ page }, testInfo) => {
-  test.skip(isMobile(testInfo), 'The file picker flow is the same on phones; one run is enough.')
+test('needs at least one kind to export', async ({ page }) => {
   await openApp(page, path)
-  const { files } = await exportView(page, 'Folder')
+  const panel = section(page, 'Export')
 
-  // change one current document, add a key without an annotation and a broken file
-  const manifest = JSON.parse(text(files.find((file) => file.name === 'export.json')!)) as {
-    Configurations: { AnnotationKey: string; File: string }[]
+  for (const kind of ['Annotations', 'Schemas', 'Templates', 'Configurations']) {
+    await panel.getByRole('checkbox', { name: kind, exact: true }).click()
   }
-  const { AnnotationKey: key, File: fileName } = manifest.Configurations[0]!
-  const current = files.find((file) => file.name === fileName)!
-  const changed = { ...(JSON.parse(text(current)) as Record<string, unknown>), importedByTest: true }
-  const archive = createZip([
-    textFile(current.name, JSON.stringify(changed, null, 2)),
-    textFile('rst.no-such-annotation.conf.json', '{"a":1}'),
-    textFile('rst.broken.conf.json', '{"a":'),
-    textFile('notes.txt', 'ignored'),
-  ])
 
-  await page.getByRole('button', { name: 'Import configurations' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Import configurations' })
-  await dialog.locator('input[type="file"]').setInputFiles({
-    name: 'edited.zip',
-    mimeType: 'application/zip',
-    buffer: Buffer.from(archive),
-  })
-  await dialog.getByRole('checkbox', { name: 'Only check, write nothing' }).click()
-  await dialog.getByRole('button', { name: 'Check', exact: true }).click()
-
-  await expect(dialog.getByText('was checked; nothing was written.')).toBeVisible()
-  const items = dialog.getByRole('list', { name: 'Files' })
-  await expect(items.getByRole('listitem').filter({ hasText: key })).toContainText('To update')
-  await expect(items.getByRole('listitem').filter({ hasText: 'rst.no-such-annotation' })).toContainText(
-    'has no annotation rst.no-such-annotation',
-  )
-  await expect(items.getByRole('listitem').filter({ hasText: 'rst.broken' })).toContainText('Fails')
-
-  await dialog.getByRole('button', { name: 'Import now' }).click()
-  await expect(dialog.getByText('was imported.')).toBeVisible()
-  const updated = items.getByRole('listitem').filter({ hasText: key })
-  await expect(updated).toContainText('Updated')
-  await expect(updated.getByRole('link', { name: key })).toBeVisible()
-  await expect(dialog.getByRole('list', { name: 'Summary' })).toContainText('Ignored files 1')
+  await expect(panel.getByText('Pick at least one kind.')).toBeVisible()
+  await expect(panel.getByRole('button', { name: 'Export', exact: true })).toBeDisabled()
 })
 
-test('a reader can export but not import', async ({ page }) => {
-  await openApp(page, '/northwind/portal/default/configurations')
+test('checks an edited archive per kind, with a warning, and then imports it', async ({ page }, testInfo) => {
+  test.skip(isMobile(testInfo), 'The flow is the same on phones; the Skip test covers the list of a phone.')
+  await openApp(page, path)
+  const { files } = await exportView(page)
+  const file = (name: string) => files.find((entry) => entry.name === name)!
+  const edit = (name: string, change: Record<string, unknown>) =>
+    textFile(name, json({ ...(JSON.parse(text(file(name))) as Record<string, unknown>), ...change }))
 
-  await expect(page.getByRole('button', { name: 'Export configurations' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Import configurations' })).toHaveCount(0)
+  await chooseArchive(page, [
+    edit('annotations/rst.invoicing.json', { Title: 'Edited by the test' }),
+    // a new execution below a missing subject, usage and context: AncestorCreated
+    textFile('elsewhere/exe.newco.billing.prod.json', json({ Title: 'New execution' })),
+    edit('templates/exe.template.json', { importedByTest: true }),
+    edit('schemas/exe.schema.json', { description: 'Edited by the test' }),
+    file('templates/exe.template.1.json'),
+    file('export.json'),
+  ])
+  await section(page, 'Import').getByRole('button', { name: 'Check', exact: true }).click()
+
+  const result = section(page, 'Latest import')
+  await expect(result.getByText('Checked: nothing was written')).toBeVisible()
+  const summary = result.getByRole('table', { name: 'Summary' })
+  // Kind, To create, To update, Unchanged, To skip, Fails, Warnings, Excluded files, Ignored files
+  await expect(summary.getByRole('row', { name: /^Annotations/ })).toHaveText(/Annotations\s*1\s*1\s*0\s*0\s*0\s*1/)
+  await expect(summary.getByRole('row', { name: /^Schemas/ })).toHaveText(/Schemas\s*0\s*1\s*0\s*0\s*0\s*0/)
+  await expect(summary.getByRole('row', { name: /^Templates/ })).toHaveText(/Templates\s*0\s*1\s*0\s*0\s*0\s*0/)
+  await expect(summary.getByRole('row', { name: /^Total/ })).toHaveText(/Total\s*1\s*3\s*0\s*0\s*0\s*1\s*0\s*2$/)
+
+  const rows = documents(page, testInfo)
+  const created = rows.filter({ hasText: 'exe.newco.billing.prod' })
+  await expect(created).toContainText('To create')
+  await expect(created).toContainText('AncestorCreated')
+  await expect(created).toContainText('The missing ancestors')
+  await expect(rows.filter({ hasText: 'templates/exe.template.json' })).toContainText('To update')
+  await expect(rows.filter({ hasText: 'schemas/exe.schema.json' })).toContainText('Type schema')
+
+  // the warnings chip leaves the annotation with the warning
+  await result.getByRole('button', { name: 'Warnings 1' }).click()
+  await expect(rows.filter({ hasText: 'exe.' })).toHaveCount(1)
+  await result.getByRole('button', { name: 'Warnings 1' }).click()
+
+  await result.getByRole('button', { name: 'Import now' }).click()
+  await expect(result.getByText('Imported', { exact: true })).toBeVisible()
+  const updated = rows.filter({ hasText: 'annotations/rst.invoicing.json' })
+  await expect(updated).toContainText('Updated')
+  await expect(
+    rows.filter({ hasText: 'templates/exe.template.json' }).getByRole('link', { name: 'exe' }),
+  ).toHaveAttribute('href', '/acme/billing/default/templates/exe')
+  await expect(rows.filter({ hasText: 'schemas/exe.schema.json' }).getByRole('link', { name: 'exe' })).toHaveAttribute(
+    'href',
+    '/acme/billing/default/schemas/type/exe',
+  )
+
+  await updated.getByRole('link', { name: 'rst.invoicing' }).click()
+  await expect(page).toHaveURL('/acme/billing/default/annotations/rst.invoicing')
+  await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Edited by the test')
+})
+
+test('keeps what the view has with Skip, and shows the result again after a reload', async ({ page }, testInfo) => {
+  await openApp(page, path)
+
+  await chooseArchive(page, [
+    textFile('annotations/rst.invoicing.json', json({ Title: 'Edited by the test' })),
+    textFile('annotations/rst.skipped-by-the-test.json', json({ Title: 'New' })),
+  ])
+  const panel = section(page, 'Import')
+  await panel.getByRole('radio', { name: 'Skip' }).click()
+  await panel.getByRole('button', { name: 'Import', exact: true }).click()
+
+  const result = section(page, 'Latest import')
+  await expect(result.getByText('Imported', { exact: true })).toBeVisible()
+  const skipped = documents(page, testInfo).filter({ hasText: 'annotations/rst.invoicing.json' })
+  await expect(skipped).toContainText('Skipped')
+  await expect(skipped).toContainText('DocumentExists')
+  await expect(skipped).toContainText('The view has a different annotation rst.invoicing, and Skip keeps it.')
+  // the document stays, so it is linked
+  await expect(skipped.getByRole('link', { name: 'rst.invoicing' })).toHaveAttribute(
+    'href',
+    '/acme/billing/default/annotations/rst.invoicing',
+  )
+
+  await result.getByRole('button', { name: 'Skipped 1' }).click()
+  await expect(documents(page, testInfo).filter({ hasText: 'rst.skipped-by-the-test' })).toHaveCount(0)
+
+  await page.reload()
+  await page.waitForLoadState('networkidle')
+  await expect(section(page, 'Latest import').getByText('Imported', { exact: true })).toBeVisible()
+  await expect(documents(page, testInfo).filter({ hasText: 'annotations/rst.invoicing.json' })).toContainText(
+    'DocumentExists',
+  )
+})
+
+test('a reader can export but sees the import notice', async ({ page }) => {
+  await openApp(page, '/northwind/portal/default/export-import')
+
+  await expect(section(page, 'Export').getByRole('button', { name: 'Export', exact: true })).toBeEnabled()
+  await expect(section(page, 'Import').getByText('Importing needs the Contributor role')).toBeVisible()
+  await expect(section(page, 'Import').locator('input[type="file"]')).toHaveCount(0)
 })
 
 test('a file that is not a zip is refused by the import', async ({ page }, testInfo) => {
   test.skip(isMobile(testInfo), 'One run is enough.')
   await openApp(page, path)
-  await page.getByRole('button', { name: 'Import configurations' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Import configurations' })
-  await dialog.locator('input[type="file"]').setInputFiles({
-    name: 'not-a-zip.zip',
-    mimeType: 'application/zip',
-    buffer: Buffer.from('not a zip'),
-  })
-  await dialog.getByRole('button', { name: 'Import', exact: true }).click()
+  await section(page, 'Import')
+    .locator('input[type="file"]')
+    .setInputFiles({ name: 'not-a-zip.zip', mimeType: 'application/zip', buffer: Buffer.from('not a zip') })
+  await section(page, 'Import').getByRole('button', { name: 'Import', exact: true }).click()
 
-  await expect(dialog.getByText('The body is not a zip archive.')).toBeVisible()
+  await expect(section(page, 'Import').getByText('The body is not a zip archive.')).toBeVisible()
 })

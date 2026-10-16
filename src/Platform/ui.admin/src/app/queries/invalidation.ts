@@ -1,6 +1,8 @@
 import type { QueryClient } from '@tanstack/vue-query'
+import type { ViewArchiveContent, ViewImport } from '@42for.net/2splatform.sdk'
 import { invalidateByPath, removeByPath } from '@42for.net/2splatform.sdk/vue-query'
 import type { Scope } from '@/stores/context'
+import { recreatedAnnotations, writtenConfigurations, writtenContents } from '@/utils/transfers'
 
 // Path-prefix invalidation after mutations (spec section 6). Query keys are the path segments of the request,
 // so a prefix covers a resource and everything below it (versions, diffs, resolved).
@@ -13,6 +15,11 @@ export function invalidateAnnotation(client: QueryClient, scope: Scope, key: str
 
 export function forgetAnnotation(client: QueryClient, scope: Scope, key: string): void {
   removeByPath(client, `${base(scope)}/annotations/${key}`)
+}
+
+/** Every annotation query of the view: the annotations, their histories, and the deleted ones. */
+export function invalidateAnnotations(client: QueryClient, scope: Scope): Promise<void> {
+  return invalidateByPath(client, `${base(scope)}/annotations`)
 }
 
 /** The lists and the entries of deleted annotations (`/annotations/deleted…`). */
@@ -44,12 +51,63 @@ export async function invalidateTemplate(client: QueryClient, scope: Scope, type
   ])
 }
 
+/** Every template of the view, their versions, and the list. */
+export async function invalidateTemplates(client: QueryClient, scope: Scope): Promise<void> {
+  await Promise.all([
+    invalidateByPath(client, `${base(scope)}/template`),
+    invalidateByPath(client, `${base(scope)}/templates`),
+  ])
+}
+
 /** Every schema kind, and the combined schemas (`/configuration-schema/{key}/definition`) below the same prefix. */
 export async function invalidateSchemas(client: QueryClient, scope: Scope): Promise<void> {
   await Promise.all([
     invalidateByPath(client, `${base(scope)}/configuration-schema`),
     invalidateByPath(client, `${base(scope)}/configuration-schemas`),
   ])
+}
+
+/**
+ * After a real import (spec 4.5 of the Export and Import of a View), the queries of the kinds it wrote. Returns them.
+ * - annotations: every annotation query;
+ * - schemas: the schema queries and every configuration query, since validation changes;
+ * - templates: the template queries and every effective document (`/configuration/{key}`);
+ * - configurations: the configurations it wrote, as after a save.
+ */
+export async function invalidateImport(
+  client: QueryClient,
+  scope: Scope,
+  state: ViewImport,
+): Promise<ReadonlySet<ViewArchiveContent>> {
+  const written = writtenContents(state)
+  const tasks: Promise<void>[] = []
+
+  if (written.has('Annotations')) {
+    tasks.push(invalidateAnnotations(client, scope))
+  }
+
+  if (written.has('Schemas')) {
+    tasks.push(invalidateSchemas(client, scope))
+  }
+
+  if (written.has('Templates')) {
+    tasks.push(invalidateTemplates(client, scope))
+  }
+
+  // A re-created annotation empties its configuration, and a truncated list may not name every configuration written.
+  if (
+    written.has('Schemas') ||
+    written.has('Templates') ||
+    recreatedAnnotations(state) ||
+    (written.has('Configurations') && !!state.AreItemsTruncated)
+  ) {
+    tasks.push(invalidateAllConfigurations(client, scope))
+  }
+
+  tasks.push(...writtenConfigurations(state).map((key) => invalidateConfiguration(client, scope, key)))
+
+  await Promise.all(tasks)
+  return written
 }
 
 export async function invalidateAccess(
