@@ -59,7 +59,7 @@ public class GitRepositoryTests
     public void Git_CommitsEveryVersionInTimeOrder()
     {
         var zip = Write(
-            ConfigurationArchiveFormat.Git,
+            ViewArchiveFormat.Git,
             History("rst.b", true, (1, "account: user_02", 2, """{"b":1}"""), (2, "account: user_02", 10, """{"b":2}""")),
             History("rst.a", true, (1, "account: user_01", 0, """{"a":1}"""), (2, "application: machine-1", 5, """{"a":2}""")));
 
@@ -77,18 +77,18 @@ public class GitRepositoryTests
         history[2].Author.ShouldBe($"application: machine-1 <application.machine-1@2s.platform> {Start.AddMinutes(5).ToUnixTimeSeconds()} +0000");
         history[2].Committer.ShouldBe(history[2].Author);
 
-        history[0].Files.Keys.ShouldBe(["rst.a.json"]);
-        history[1].Files.Keys.ShouldBe(["rst.a.json", "rst.b.json"]);
-        history[2].Files["rst.a.json"].ShouldBe("{\n  \"a\": 2\n}\n");
-        history[2].Files["rst.b.json"].ShouldBe("{\n  \"b\": 1\n}\n");
-        history[3].Files["rst.b.json"].ShouldBe("{\n  \"b\": 2\n}\n");
+        history[0].Files.Keys.ShouldBe(["rst.a.conf.json"]);
+        history[1].Files.Keys.ShouldBe(["rst.a.conf.json", "rst.b.conf.json"]);
+        history[2].Files["rst.a.conf.json"].ShouldBe("{\n  \"a\": 2\n}\n");
+        history[2].Files["rst.b.conf.json"].ShouldBe("{\n  \"b\": 1\n}\n");
+        history[3].Files["rst.b.conf.json"].ShouldBe("{\n  \"b\": 2\n}\n");
     }
 
     [Fact]
     public void Git_KeepsTheVersionsOfAKeyInOrderWhenTimesAreEqual()
     {
         var zip = Write(
-            ConfigurationArchiveFormat.Git,
+            ViewArchiveFormat.Git,
             History("rst.a", true, (1, "a", 0, """{"a":1}"""), (2, "a", 0, """{"a":2}"""), (3, "a", 0, """{"a":3}""")));
 
         new GitTestReader(zip).GetHistory().Select(commit => commit.Message.Trim()).ShouldBe(
@@ -99,7 +99,7 @@ public class GitRepositoryTests
     public void Git_RemovesClearedConfigurationsInTheLastCommit()
     {
         var zip = Write(
-            ConfigurationArchiveFormat.Git,
+            ViewArchiveFormat.Git,
             History("rst.cleared", false, (1, "a", 0, """{"c":1}""")),
             History("rst.kept", true, (1, "a", 1, """{"k":1}""")));
 
@@ -109,15 +109,15 @@ public class GitRepositoryTests
         history.Count.ShouldBe(3);
         history[^1].Message.ShouldBe("Remove cleared configurations\n\nrst.cleared\n");
         history[^1].Author.ShouldStartWith("2S Platform <system@2s.platform> ");
-        history[^1].Files.Keys.ShouldBe(["rst.kept.json"]);
-        reader.Files.Keys.Where(name => !name.StartsWith(".git/", StringComparison.Ordinal)).ShouldBe(["rst.kept.json"]);
+        history[^1].Files.Keys.ShouldBe(["rst.kept.conf.json"]);
+        reader.Files.Keys.Where(name => !name.StartsWith(".git/", StringComparison.Ordinal)).ShouldBe(["rst.kept.conf.json"]);
     }
 
     [Fact]
     public void Git_ChecksOutTheLastCommitWithItsIndex()
     {
         var zip = Write(
-            ConfigurationArchiveFormat.Git,
+            ViewArchiveFormat.Git,
             History("usg.shop.payments", true, (1, "a", 0, """{"u":1}""")),
             History("rst.a:b", true, (1, "a", 1, """{"a":1}"""), (2, "a", 2, """{"a":2}""")));
 
@@ -128,7 +128,7 @@ public class GitRepositoryTests
             .ToDictionary(file => file.Key, file => Encoding.UTF8.GetString(file.Value));
 
         workingTree.ShouldBe(last.Files, ignoreOrder: true);
-        workingTree.Keys.ShouldContain("rst.a%3Ab.json");
+        workingTree.Keys.ShouldContain("rst.a%3Ab.conf.json");
 
         reader.Head.ShouldBe("ref: refs/heads/main\n");
         reader.Files.ShouldContainKey(".git/config");
@@ -161,13 +161,13 @@ public class GitRepositoryTests
         }
 
         position.ShouldBe(index.Length - 20);
-        names.ShouldBe(["rst.a%3Ab.json", "usg.shop.payments.json"]);
+        names.ShouldBe(["rst.a%3Ab.conf.json", "usg.shop.payments.conf.json"]);
     }
 
     [Fact]
     public void Git_EmptyViewIsAnUnbornBranch()
     {
-        var reader = new GitTestReader(Write(ConfigurationArchiveFormat.Git));
+        var reader = new GitTestReader(Write(ViewArchiveFormat.Git));
 
         reader.Head.ShouldBe("ref: refs/heads/main\n");
         reader.Branch.ShouldBeNull();
@@ -189,21 +189,21 @@ public class GitRepositoryTests
             .Append(History("rst.versioned", true, versions))
             .ToArray();
 
-        var zip = Write(ConfigurationArchiveFormat.Git, histories);
+        var zip = Write(ViewArchiveFormat.Git, histories);
         var reader = new GitTestReader(zip);
 
         reader.GetHistory().Count.ShouldBe(150);
         reader.DeltaCount.ShouldBeGreaterThan(200);
 
         var pack = reader.Files.Single(file => file.Key.EndsWith(".pack", StringComparison.Ordinal)).Value;
-        var rawDocuments = histories.Sum(history => history.Versions.Sum(version => ConfigurationDocumentJson.Serialize(version.Content).Length));
+        var rawDocuments = histories.Sum(history => history.Versions.Sum(version => ViewDocumentJson.Serialize(version.Content).Length));
         pack.Length.ShouldBeLessThan(rawDocuments / 5);
     }
 
     [Fact]
     public void Git_PackIsStoredWithoutRecompression()
     {
-        var zip = Write(ConfigurationArchiveFormat.Git, History("rst.a", true, (1, "a", 0, """{"a":1}""")));
+        var zip = Write(ViewArchiveFormat.Git, History("rst.a", true, (1, "a", 0, """{"a":1}""")));
 
         using var archive = new ZipArchive(new MemoryStream(zip), ZipArchiveMode.Read);
         var pack = archive.Entries.Single(entry => entry.FullName.EndsWith(".pack", StringComparison.Ordinal));
@@ -231,7 +231,7 @@ public class GitRepositoryTests
         }
 
         var zip = Write(
-            ConfigurationArchiveFormat.Git,
+            ViewArchiveFormat.Git,
             History("rst.payments", true, (1, "account: user_01", 0, """{"retries":1}"""), (2, "account: user_02", 5, """{"retries":2}""")),
             History("sbt.shop", true, (1, "application: machine-1", 3, """{"theme":"dark"}""")),
             History("rst.cleared", false, (1, "account: user_01", 1, """{"old":true}""")));
@@ -252,8 +252,8 @@ public class GitRepositoryTests
                 $"account: user_02|account.user_02@2s.platform|{Start.AddMinutes(5).ToUnixTimeSeconds()}|Update rst.payments to version 2",
                 $"2S Platform|system@2s.platform|{Start.AddDays(1).ToUnixTimeSeconds()}|Remove cleared configurations",
             ]));
-            RunGit(directory.FullName, "show HEAD~4:rst.payments.json").ShouldBe("{\n  \"retries\": 1\n}");
-            RunGit(directory.FullName, "ls-files").ShouldBe("rst.payments.json\nsbt.shop.json");
+            RunGit(directory.FullName, "show HEAD~4:rst.payments.conf.json").ShouldBe("{\n  \"retries\": 1\n}");
+            RunGit(directory.FullName, "ls-files").ShouldBe("rst.payments.conf.json\nsbt.shop.conf.json");
         }
         finally
         {

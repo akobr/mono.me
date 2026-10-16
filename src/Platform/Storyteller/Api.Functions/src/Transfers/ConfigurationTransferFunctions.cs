@@ -8,10 +8,10 @@ namespace _42.Platform.Storyteller.Api.Transfers;
 // Both use the default connection (AzureWebJobsStorage), like the storage clients of the jobs.
 public class ConfigurationTransferFunctions
 {
-    private readonly IConfigurationTransferService _transfers;
+    private readonly IViewTransferService _transfers;
     private readonly ILogger<ConfigurationTransferFunctions> _logger;
 
-    public ConfigurationTransferFunctions(IConfigurationTransferService transfers, ILogger<ConfigurationTransferFunctions> logger)
+    public ConfigurationTransferFunctions(IViewTransferService transfers, ILogger<ConfigurationTransferFunctions> logger)
     {
         _transfers = transfers;
         _logger = logger;
@@ -19,10 +19,10 @@ public class ConfigurationTransferFunctions
 
     [Function(nameof(ProcessConfigurationTransfer))]
     public async Task ProcessConfigurationTransfer(
-        [QueueTrigger(ConfigurationTransferNames.Queue)] string message,
+        [QueueTrigger(ViewTransferNames.Queue)] string message,
         CancellationToken cancellationToken)
     {
-        if (!ConfigurationTransferMessage.TryParse(message, out var transfer))
+        if (!ViewTransferMessage.TryParse(message, out var transfer))
         {
             // a retry cannot make it valid, so it is dropped instead of ending in the poison queue
             _logger.LogError("A configuration transfer message is not valid and was dropped: {Message}", message);

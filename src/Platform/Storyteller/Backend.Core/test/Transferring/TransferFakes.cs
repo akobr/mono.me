@@ -11,16 +11,16 @@ internal sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     public override DateTimeOffset GetUtcNow() => Now;
 }
 
-internal sealed class InMemoryTransferStore : IConfigurationTransferStore
+internal sealed class InMemoryTransferStore : IViewTransferStore
 {
-    private readonly Dictionary<string, ConfigurationTransferRecord> _records = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ViewTransferRecord> _records = new(StringComparer.Ordinal);
     private int _version;
 
-    public List<ConfigurationTransferRecord> Saves { get; } = [];
+    public List<ViewTransferRecord> Saves { get; } = [];
 
     public int ActiveCount { get; set; }
 
-    public Task<ConfigurationTransferRecord> CreateAsync(ConfigurationTransferRecord record, CancellationToken cancellationToken = default)
+    public Task<ViewTransferRecord> CreateAsync(ViewTransferRecord record, CancellationToken cancellationToken = default)
     {
         var saved = record with { ETag = $"\"{++_version}\"" };
         _records.Add(Key(record.Organization, record.Project, record.View, record.Kind, record.Id), saved);
@@ -28,24 +28,24 @@ internal sealed class InMemoryTransferStore : IConfigurationTransferStore
         return Task.FromResult(saved);
     }
 
-    public Task<ConfigurationTransferRecord?> GetAsync(string organization, string project, string view, ConfigurationTransferKind kind, string id, CancellationToken cancellationToken = default)
+    public Task<ViewTransferRecord?> GetAsync(string organization, string project, string view, ViewTransferKind kind, string id, CancellationToken cancellationToken = default)
     {
         return Task.FromResult(_records.GetValueOrDefault(Key(organization, project, view, kind, id)));
     }
 
-    public Task<ConfigurationTransferRecord?> TryReplaceAsync(ConfigurationTransferRecord record, CancellationToken cancellationToken = default)
+    public Task<ViewTransferRecord?> TryReplaceAsync(ViewTransferRecord record, CancellationToken cancellationToken = default)
     {
         var key = Key(record.Organization, record.Project, record.View, record.Kind, record.Id);
 
         if (!_records.TryGetValue(key, out var stored) || stored.ETag != record.ETag)
         {
-            return Task.FromResult<ConfigurationTransferRecord?>(null);
+            return Task.FromResult<ViewTransferRecord?>(null);
         }
 
         var saved = record with { ETag = $"\"{++_version}\"" };
         _records[key] = saved;
         Saves.Add(saved);
-        return Task.FromResult<ConfigurationTransferRecord?>(saved);
+        return Task.FromResult<ViewTransferRecord?>(saved);
     }
 
     public Task<int> CountActiveAsync(string organization, string project, DateTimeOffset changedSince, CancellationToken cancellationToken = default)
@@ -53,10 +53,10 @@ internal sealed class InMemoryTransferStore : IConfigurationTransferStore
         return Task.FromResult(ActiveCount);
     }
 
-    private static string Key(string organization, string project, string view, ConfigurationTransferKind kind, string id) => $"{organization}|{project}|{view}|{kind}|{id}";
+    private static string Key(string organization, string project, string view, ViewTransferKind kind, string id) => $"{organization}|{project}|{view}|{kind}|{id}";
 }
 
-internal sealed class InMemoryArchiveStorage(TimeProvider time) : IConfigurationArchiveStorage
+internal sealed class InMemoryArchiveStorage(TimeProvider time) : IViewArchiveStorage
 {
     public Dictionary<string, (byte[] Content, DateTimeOffset Modified)> Archives { get; } = new(StringComparer.Ordinal);
 
@@ -86,13 +86,13 @@ internal sealed class InMemoryArchiveStorage(TimeProvider time) : IConfiguration
     }
 }
 
-internal sealed class RecordingTransferQueue : IConfigurationTransferQueue
+internal sealed class RecordingTransferQueue : IViewTransferQueue
 {
-    public List<ConfigurationTransferMessage> Messages { get; } = [];
+    public List<ViewTransferMessage> Messages { get; } = [];
 
     public Exception? Failure { get; set; }
 
-    public Task EnqueueAsync(ConfigurationTransferMessage message, CancellationToken cancellationToken = default)
+    public Task EnqueueAsync(ViewTransferMessage message, CancellationToken cancellationToken = default)
     {
         if (Failure is not null)
         {
@@ -109,7 +109,7 @@ internal sealed class FakeConfigurationService : IConfigurationService
 {
     public IReadOnlyList<ConfigurationHistory> Histories { get; set; } = [];
 
-    public Func<FullKey, JObject, ConfigurationImportResult> Import { get; set; } = (_, _) => new ConfigurationImportResult(ConfigurationImportOutcome.Created, 1);
+    public Func<FullKey, JObject, ViewImportResult> Import { get; set; } = (_, _) => new ViewImportResult(ViewImportOutcome.Created, 1);
 
     public List<(FullKey Key, JObject Content, AuditActor Actor, bool Force, bool DryRun)> Imports { get; } = [];
 
@@ -118,7 +118,7 @@ internal sealed class FakeConfigurationService : IConfigurationService
         return Task.FromResult(Histories);
     }
 
-    public Task<ConfigurationImportResult> ImportConfigurationAsync(FullKey key, JObject content, AuditActor actor, bool force = false, bool dryRun = false)
+    public Task<ViewImportResult> ImportConfigurationAsync(FullKey key, JObject content, AuditActor actor, bool force = false, bool dryRun = false)
     {
         Imports.Add((key, content, actor, force, dryRun));
         return Task.FromResult(Import(key, content));

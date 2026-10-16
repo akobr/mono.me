@@ -714,7 +714,7 @@ public class CosmosConfigurationService : IConfigurationService
             .ToList();
     }
 
-    public async Task<ConfigurationImportResult> ImportConfigurationAsync(
+    public async Task<ViewImportResult> ImportConfigurationAsync(
         FullKey key,
         JObject content,
         AuditActor actor,
@@ -727,8 +727,8 @@ public class CosmosConfigurationService : IConfigurationService
         switch (await AnnotationItemStore.ReadStateAsync(repository.Container, key))
         {
             case AnnotationItemState.Missing:
-                return new ConfigurationImportResult(
-                    ConfigurationImportOutcome.Skipped,
+                return new ViewImportResult(
+                    ViewImportOutcome.Skipped,
                     ErrorCode: ErrorCodes.AnnotationNotFound,
                     Message: $"The view {key.ViewName} has no annotation {annotationKey}.");
 
@@ -745,13 +745,13 @@ public class CosmosConfigurationService : IConfigurationService
         }
         catch (JsonPatchException exception)
         {
-            return new ConfigurationImportResult(ConfigurationImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
+            return new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
         }
 
         if (!document.HasValues)
         {
-            return new ConfigurationImportResult(
-                ConfigurationImportOutcome.Skipped,
+            return new ViewImportResult(
+                ViewImportOutcome.Skipped,
                 ErrorCode: ErrorCodes.EmptyDocument,
                 Message: "An empty document is not imported; delete the configuration to clear it.");
         }
@@ -764,7 +764,7 @@ public class CosmosConfigurationService : IConfigurationService
 
         if (hasContent && JToken.DeepEquals(existing!.Content, document))
         {
-            return new ConfigurationImportResult(ConfigurationImportOutcome.Unchanged, existing.Version);
+            return new ViewImportResult(ViewImportOutcome.Unchanged, existing.Version);
         }
 
         if (!force && _schemaService is not null)
@@ -776,25 +776,25 @@ public class CosmosConfigurationService : IConfigurationService
             catch (SchemaValidationException exception)
             {
                 var errors = exception.ValidationErrors.SelectMany(error => error.Errors);
-                return new ConfigurationImportResult(
-                    ConfigurationImportOutcome.Failed,
+                return new ViewImportResult(
+                    ViewImportOutcome.Failed,
                     ErrorCode: ErrorCodes.SchemaViolation,
                     Message: $"The document violates its schema: {string.Join("; ", errors)}");
             }
         }
 
-        var outcome = hasContent ? ConfigurationImportOutcome.Updated : ConfigurationImportOutcome.Created;
+        var outcome = hasContent ? ViewImportOutcome.Updated : ViewImportOutcome.Created;
 
         if (dryRun)
         {
-            return new ConfigurationImportResult(outcome);
+            return new ViewImportResult(outcome);
         }
 
         try
         {
             // validated above, so the write skips the schema
             var written = await WriteConfigurationAsync(key, document, actor, force: true, merge: false);
-            return new ConfigurationImportResult(outcome, written.Version);
+            return new ViewImportResult(outcome, written.Version);
         }
         catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.AnnotationDeleted)
         {
@@ -1213,10 +1213,10 @@ public class CosmosConfigurationService : IConfigurationService
         return keys;
     }
 
-    private static ConfigurationImportResult DeletedImport(string annotationKey)
+    private static ViewImportResult DeletedImport(string annotationKey)
     {
-        return new ConfigurationImportResult(
-            ConfigurationImportOutcome.Skipped,
+        return new ViewImportResult(
+            ViewImportOutcome.Skipped,
             ErrorCode: ErrorCodes.AnnotationDeleted,
             Message: $"The annotation {annotationKey} is deleted; restore it before importing its configuration.");
     }

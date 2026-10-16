@@ -97,11 +97,11 @@ public class OpenApiDocumentTests
 
         var schemas = helper.GetOpenApiSchemas(methods, new DefaultNamingStrategy(), VisitorCollection.CreateInstance());
 
-        schemas.Keys.ShouldContain("ConfigurationExportCreate");
-        schemas.Keys.ShouldContain("ConfigurationImportSummary");
-        schemas.Keys.ShouldContain("ConfigurationImportItem");
-        schemas["ConfigurationExport"].Properties.Keys.ShouldContain("FileName");
-        schemas["ConfigurationImport"].Properties.Keys.ShouldContain("Items");
-        schemas["ConfigurationImportItem"].Properties["Outcome"].Enum.Count.ShouldBe(5);
+        schemas.Keys.ShouldContain("ViewExportCreate");
+        schemas.Keys.ShouldContain("ViewImportSummary");
+        schemas.Keys.ShouldContain("ViewImportItem");
+        schemas["ViewExport"].Properties.Keys.ShouldContain("FileName");
+        schemas["ViewImport"].Properties.Keys.ShouldContain("Items");
+        schemas["ViewImportItem"].Properties["Outcome"].Enum.Count.ShouldBe(5);
     }
 }

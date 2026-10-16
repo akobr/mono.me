@@ -32,9 +32,9 @@ internal static class TransferTestData
         };
     }
 
-    public static ConfigurationArchiveSource Source(params ConfigurationHistory[] histories)
+    public static ViewArchiveSource Source(params ConfigurationHistory[] histories)
     {
-        return new ConfigurationArchiveSource
+        return new ViewArchiveSource
         {
             Organization = "acme",
             Project = "main",
@@ -45,10 +45,10 @@ internal static class TransferTestData
         };
     }
 
-    public static byte[] Write(ConfigurationArchiveFormat format, params ConfigurationHistory[] histories)
+    public static byte[] Write(ViewArchiveFormat format, params ConfigurationHistory[] histories)
     {
         using var stream = new MemoryStream();
-        ConfigurationArchiveWriter.Write(stream, Source(histories), format);
+        ViewArchiveWriter.Write(stream, Source(histories), format);
         return stream.ToArray();
     }
 
