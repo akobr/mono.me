@@ -101,13 +101,19 @@ public static class Definitions
                 public const string VersionDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}/diff";
                 public const string VersionDiffCustom = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}/diff/{{{Parameters.VersionFrom}}}";
                 public const string ViewDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/diff/{{{Parameters.ViewTo}}}";
+            }
+        }
 
-                // Literal segments below "configurations" (plural); a single configuration lives below "configuration".
-                public const string Exports = $"{Configurations}/exports";
-                public const string Export = $"{Configurations}/exports/{{{Parameters.Id}}}";
-                public const string ExportArchive = $"{Configurations}/exports/{{{Parameters.Id}}}/archive";
-                public const string Imports = $"{Configurations}/imports";
-                public const string Import = $"{Configurations}/imports/{{{Parameters.Id}}}";
+        public static class Transfers
+        {
+            public static class V1
+            {
+                // Literal segments after the view; "views" is a reserved view name, so they never meet the view routes.
+                public const string Exports = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/exports";
+                public const string Export = $"{Exports}/{{{Parameters.Id}}}";
+                public const string ExportArchive = $"{Exports}/{{{Parameters.Id}}}/archive";
+                public const string Imports = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/imports";
+                public const string Import = $"{Imports}/{{{Parameters.Id}}}";
             }
         }
 
@@ -283,12 +289,15 @@ public static class Definitions
             public const string GetConfigurationVersionDiff = nameof(GetConfigurationVersionDiff);
             public const string GetConfigurationVersionDiffCustom = nameof(GetConfigurationVersionDiffCustom);
             public const string GetConfigurationViewDiff = nameof(GetConfigurationViewDiff);
+        }
 
-            public const string StartConfigurationExport = nameof(StartConfigurationExport);
-            public const string GetConfigurationExport = nameof(GetConfigurationExport);
-            public const string GetConfigurationExportArchive = nameof(GetConfigurationExportArchive);
-            public const string StartConfigurationImport = nameof(StartConfigurationImport);
-            public const string GetConfigurationImport = nameof(GetConfigurationImport);
+        public static class Transfers
+        {
+            public const string StartViewExport = nameof(StartViewExport);
+            public const string GetViewExport = nameof(GetViewExport);
+            public const string GetViewExportArchive = nameof(GetViewExportArchive);
+            public const string StartViewImport = nameof(StartViewImport);
+            public const string GetViewImport = nameof(GetViewImport);
         }
 
         public static class ConfigurationSchema
@@ -408,6 +417,8 @@ public static class Definitions
         public const string To = "to";
         public const string IncludeInactive = "includeInactive";
         public const string FileName = "fileName";
+        public const string Include = "include";
+        public const string Existing = "existing";
     }
 
     public static class Tags
@@ -418,6 +429,7 @@ public static class Definitions
         public const string Schemas = nameof(Schemas);
         public const string Templates = nameof(Templates);
         public const string KeyValues = nameof(KeyValues);
+        public const string Transfers = nameof(Transfers);
     }
 
     public static class Descriptions
@@ -461,6 +473,11 @@ public static class Definitions
         public const string IdExport = "The id of the export.";
         public const string IdImport = "The id of the import.";
         public const string ResponseTransferLimit = "The project already has the maximum of exports and imports in progress (TransferLimit).";
+        public const string ResponseUnauthenticated = "Missing or invalid credentials.";
+        public const string ResponseTransferForbiddenExport = "No role on the project, or a scope of an included kind is missing (AccessDenied). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing scope.";
+        public const string ResponseTransferForbiddenImport = "The role on the project is below Contributor, or a scope of an included kind is missing (AccessDenied). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing scope.";
+        public const string TransferInclude = "The kinds to import, comma-separated and case-insensitive: Annotations, Schemas, Templates, Configurations. Empty means all four. The files of the other kinds are counted as excluded.";
+        public const string TransferExisting = "What happens to a document the view already has: Overwrite (default) writes the file as a new version, updates an annotation and re-creates a deleted one; Skip keeps the stored document. An equal document is Unchanged either way.";
     }
 
     public static class Errors
