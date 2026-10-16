@@ -1,6 +1,17 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
+import {
+  getViewExport,
+  getViewExportArchive,
+  getViewImport,
+  hasErrorCode,
+  startViewExport,
+  startViewImport,
+  type StorytellerError,
+  type ViewArchiveContent,
+  type ViewImportExisting,
+} from '@42for.net/2splatform.sdk'
 import { mockHandlers } from '@/mock/all-handlers'
 import { fileNameOf, parseFileName, resetTransfers } from '@/mock/transfer-handlers'
 import { createZip, crc32, readZip, textFile } from '@/mock/zip'
@@ -100,14 +111,14 @@ describe('transfers store', () => {
     expect(job.phase).toBe('done')
     expect(job.state.Status).toBe('Succeeded')
     expect(vi.mocked(saveBlob)).toHaveBeenCalledWith(expect.any(Blob), job.state.FileName)
-    expect(job.state.FileName).toMatch(/^configurations-acme-billing-default-git-\d{8}-\d{6}Z\.zip$/)
+    expect(job.state.FileName).toMatch(/^export-acme-billing-default-git-\d{8}-\d{6}Z\.zip$/)
     expect(finished).toEqual(['export:done'])
     expect(sessionStorage.getItem('2s-admin:pending-exports')).toBeNull()
   })
 
   it('reports a failed export with the error of the server', async () => {
     server.use(
-      http.get('*/api/v1/:org/:project/:view/configurations/exports/:id', () =>
+      http.get('*/api/v1/:org/:project/:view/exports/:id', () =>
         HttpResponse.json({ Id: 'x', Status: 'Failed', Error: 'The export failed: boom' }),
       ),
     )
@@ -123,7 +134,7 @@ describe('transfers store', () => {
 
   it('stops at an expired job and after the waiting limit', async () => {
     server.use(
-      http.get('*/api/v1/:org/:project/:view/configurations/exports/:id', () =>
+      http.get('*/api/v1/:org/:project/:view/exports/:id', () =>
         HttpResponse.json({ Message: 'gone', ErrorCode: 'NotFound' }, { status: 404 }),
       ),
     )
@@ -133,9 +144,7 @@ describe('transfers store', () => {
     expect(expired.error).toBe('The job has expired.')
 
     server.use(
-      http.get('*/api/v1/:org/:project/:view/configurations/exports/:id', () =>
-        HttpResponse.json({ Id: 'y', Status: 'Running' }),
-      ),
+      http.get('*/api/v1/:org/:project/:view/exports/:id', () => HttpResponse.json({ Id: 'y', Status: 'Running' })),
     )
     const slow = await transfers.startExport(scope, 'Folder')
     await vi.advanceTimersByTimeAsync(maxWaitMs + 10_000)
@@ -167,7 +176,7 @@ describe('transfers store', () => {
     const file = new File([zip], 'configs.zip', { type: 'application/zip' })
     let query: URLSearchParams | undefined
     server.events.on('request:start', ({ request }) => {
-      if (request.method === 'POST' && request.url.includes('/configurations/imports')) {
+      if (request.method === 'POST' && request.url.includes('/acme/billing/default/imports')) {
         query = new URL(request.url).searchParams
       }
     })
@@ -185,5 +194,84 @@ describe('transfers store', () => {
 
     transfers.dismiss(job.id)
     expect(transfers.latestImport(scope)).toBeUndefined()
+  })
+})
+
+describe('mock transfer options', () => {
+  const { org, project, view } = scope
+
+  /** The second read of a mock job ends it. */
+  async function finishedImport(id: string) {
+    await getViewImport(org, project, view, id)
+    return await getViewImport(org, project, view, id)
+  }
+
+  /** The files of a folder export of the view. */
+  async function exportedFiles() {
+    const started = await startViewExport(org, project, view, { Format: 'Folder' })
+    await getViewExport(org, project, view, started.Id!)
+    const exported = await getViewExport(org, project, view, started.Id!)
+    expect(exported.Include).toEqual(['Annotations', 'Schemas', 'Templates', 'Configurations'])
+    return await readZip(
+      new Uint8Array(await (await getViewExportArchive(org, project, view, started.Id!)).arrayBuffer()),
+    )
+  }
+
+  it('keeps a stored configuration with existing=Skip and counts the kinds left out as excluded', async () => {
+    const files = await exportedFiles()
+    const manifest = JSON.parse(new TextDecoder().decode(files.find((file) => file.name === 'export.json')!.data)) as {
+      Configurations: { AnnotationKey: string; File: string }[]
+    }
+    const { AnnotationKey: key, File: name } = manifest.Configurations[0]!
+    const edited = createZip([textFile(name, '{"editedByTest":true}')])
+
+    const skipped = await startViewImport(org, project, view, new Blob([edited]), { existing: 'Skip', dryRun: true })
+    const excluded = await startViewImport(org, project, view, new Blob([edited]), {
+      include: ['Annotations', 'Templates'],
+    })
+
+    expect(skipped).toMatchObject({
+      Existing: 'Skip',
+      Include: ['Annotations', 'Schemas', 'Templates', 'Configurations'],
+    })
+    expect((await finishedImport(skipped.Id!)).Items).toEqual([
+      expect.objectContaining({
+        Kind: 'Configuration',
+        AnnotationKey: key,
+        Outcome: 'Skipped',
+        ErrorCode: 'DocumentExists',
+      }),
+    ])
+    expect(excluded).toMatchObject({ Existing: 'Overwrite', Include: ['Annotations', 'Templates'] })
+    expect((await finishedImport(excluded.Id!)).Summary).toMatchObject({ ExcludedFiles: 1, Updated: 0 })
+  })
+
+  it('exports no configuration when include leaves them out', async () => {
+    const started = await startViewExport(org, project, view, { Include: ['templates' as ViewArchiveContent] })
+    await getViewExport(org, project, view, started.Id!)
+
+    const exported = await getViewExport(org, project, view, started.Id!)
+
+    expect(exported.Include).toEqual(['Templates'])
+    expect(exported.ConfigurationCount).toBeNull()
+  })
+
+  it('refuses an unknown kind or existing mode like the API', async () => {
+    const zip = new Blob([createZip([textFile('rst.a.json', '{}')])])
+
+    const kind = await startViewImport(org, project, view, zip, { include: ['Secrets' as ViewArchiveContent] }).catch(
+      (error: unknown) => error,
+    )
+    const existing = await startViewImport(org, project, view, zip, { existing: 'Merge' as ViewImportExisting }).catch(
+      (error: unknown) => error,
+    )
+    const exportKind = await startViewExport(org, project, view, { Include: ['Secrets' as ViewArchiveContent] }).catch(
+      (error: unknown) => error,
+    )
+
+    expect(hasErrorCode(kind, 'InvalidQuery')).toBe(true)
+    expect((kind as StorytellerError).message).toContain("unknown kind 'Secrets'")
+    expect(hasErrorCode(existing, 'InvalidQuery')).toBe(true)
+    expect((exportKind as StorytellerError).status).toBe(400)
   })
 })

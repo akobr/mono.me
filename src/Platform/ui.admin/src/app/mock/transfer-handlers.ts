@@ -1,9 +1,11 @@
 import { http, HttpResponse, type HttpHandler } from 'msw'
 import type {
-  ConfigurationExport,
-  ConfigurationExportCreate,
-  ConfigurationImport,
-  ConfigurationImportItem,
+  ViewArchiveContent,
+  ViewExport,
+  ViewExportCreate,
+  ViewImport,
+  ViewImportExisting,
+  ViewImportItem,
 } from '@42for.net/2splatform.sdk'
 import { getAnnotationTypeInfo, type AnnotationTypeCode } from '@/utils/annotation-key'
 import { appendAudit, mockActor, newEntry } from './audit'
@@ -13,19 +15,23 @@ import { documentIds, getDocument, putVersion, type ScopeRef } from './documents
 import { errorResponse, requireRole, withDb } from './handlers'
 import { createZip, readZip, textFile, type ZipFile } from './zip'
 
-// Exports and imports of configurations (spec 4.4). A job is Running on its first read and ends on the second one,
-// so the UI shows its progress. An export is always the folder layout (a git export only adds .git/HEAD; the mock
-// writes no repository); an import writes the documents like the API, with the same outcomes.
+// Exports and imports of a view, on the routes and with the options of the API (export-import.md). A job is Running on
+// its first read and ends on the second one, so the UI shows its progress. The mock still knows only the configurations
+// of the first spec, as <key>.json files: include filters them, and existing=Skip keeps a stored one. An export is
+// always the folder layout (a git export only adds .git/HEAD; the mock writes no repository); an import writes the
+// documents like the API, with the same outcomes.
 
-const api = '*/api/v1/:org/:project/:view/configurations'
+const api = '*/api/v1/:org/:project/:view'
 const day = 86_400_000
+const kinds: readonly ViewArchiveContent[] = ['Annotations', 'Schemas', 'Templates', 'Configurations']
+const existingModes: readonly ViewImportExisting[] = ['Overwrite', 'Skip']
 
 type ScopeParams = { org: string; project: string; view: string }
 
 interface ExportJob {
   kind: 'export'
   scope: ScopeRef
-  state: ConfigurationExport
+  state: ViewExport
   reads: number
   archive?: Uint8Array<ArrayBuffer>
 }
@@ -33,7 +39,7 @@ interface ExportJob {
 interface ImportJob {
   kind: 'import'
   scope: ScopeRef
-  state: ConfigurationImport
+  state: ViewImport
   reads: number
   files: ZipFile[]
 }
@@ -50,6 +56,27 @@ const newId = () => `job${Date.now().toString(36)}${(++sequence).toString(36)}`
 export function resetTransfers(): void {
   jobs.clear()
 }
+
+/** A defined name in any case, as the API reads kinds and modes. */
+const matchName = <T extends string>(names: readonly T[], value: unknown) =>
+  typeof value === 'string' ? names.find((name) => name.toLowerCase() === value.trim().toLowerCase()) : undefined
+
+/** The included kinds in import order, all four for none, as the API resolves them; or the first unknown value. */
+export function resolveInclude(values: readonly unknown[]): { include: ViewArchiveContent[] } | { unknown: unknown } {
+  const picked = new Set<ViewArchiveContent>()
+
+  for (const value of values) {
+    const kind = matchName(kinds, value)
+    if (!kind) {
+      return { unknown: value }
+    }
+    picked.add(kind)
+  }
+
+  return { include: picked.size ? kinds.filter((kind) => picked.has(kind)) : [...kinds] }
+}
+
+const kindNames = `${kinds.slice(0, -1).join(', ')} or ${kinds.at(-1)}`
 
 const reserved = new Set(['%', '<', '>', ':', '"', '/', '\\', '|', '?', '*'])
 
@@ -111,13 +138,15 @@ function buildArchive(
   db: MockDb,
   scope: ScopeRef,
   format: 'Folder' | 'Git',
+  include: readonly ViewArchiveContent[],
 ): { zip: Uint8Array<ArrayBuffer>; configurations: number; versions: number } {
   const files: ZipFile[] = []
   const manifest: unknown[] = []
+  const ids = include.includes('Configurations') ? documentIds(db, scope, 'configuration:').toSorted() : []
   let configurations = 0
   let versions = 0
 
-  for (const id of documentIds(db, scope, 'configuration:').toSorted()) {
+  for (const id of ids) {
     const key = id.slice('configuration:'.length)
     const stored = (getDocument(db, scope, id)?.versions ?? []).filter((version) => version.Content)
 
@@ -136,7 +165,12 @@ function buildArchive(
       }
     }
 
-    manifest.push({ AnnotationKey: key, File: fileNameOf(key), Version: current.Version, Author: current.Modified.By?.Name ?? current.Modified.By?.Id })
+    manifest.push({
+      AnnotationKey: key,
+      File: fileNameOf(key),
+      Version: current.Version,
+      Author: current.Modified.By?.Name ?? current.Modified.By?.Id,
+    })
   }
 
   if (format === 'Git') {
@@ -151,11 +185,12 @@ function buildArchive(
 async function runImport(db: MockDb, job: ImportJob): Promise<void> {
   const { scope, state } = job
   const annotations = annotationsOf(db, scope.org, scope.project, scope.view)
-  const summary = { Created: 0, Updated: 0, Unchanged: 0, Skipped: 0, Failed: 0, IgnoredFiles: 0 }
-  const items: ConfigurationImportItem[] = []
+  const summary = { Created: 0, Updated: 0, Unchanged: 0, Skipped: 0, Failed: 0, ExcludedFiles: 0, IgnoredFiles: 0 }
+  const items: ViewImportItem[] = []
   const seen = new Map<string, string>()
+  const isIncluded = state.Include?.includes('Configurations') ?? true
 
-  const report = (item: ConfigurationImportItem) => {
+  const report = (item: ViewImportItem) => {
     summary[item.Outcome!] += 1
     if (item.Outcome !== 'Unchanged') {
       items.push(item)
@@ -178,7 +213,12 @@ async function runImport(db: MockDb, job: ImportJob): Promise<void> {
       continue
     }
 
-    const base = { Path: file.name, AnnotationKey: parsed.key }
+    if (!isIncluded) {
+      summary.ExcludedFiles += 1
+      continue
+    }
+
+    const base = { Path: file.name, Kind: 'Configuration', AnnotationKey: parsed.key } as const
     if (seen.has(parsed.key)) {
       report({
         ...base,
@@ -233,6 +273,13 @@ async function runImport(db: MockDb, job: ImportJob): Promise<void> {
 
       if (stored && JSON.stringify(stored) === JSON.stringify(content)) {
         report({ ...base, Outcome: 'Unchanged', Version: storedVersion })
+      } else if (stored && state.Existing === 'Skip') {
+        report({
+          ...base,
+          Outcome: 'Skipped',
+          ErrorCode: 'DocumentExists',
+          Message: `The view has a different configuration of ${parsed.key}, and Skip keeps it.`,
+        })
       } else if (errors.length) {
         report({
           ...base,
@@ -290,16 +337,24 @@ export const transferHandlers: HttpHandler[] = [
       if (denied) {
         return denied
       }
-      const body = (await request.json().catch(() => ({}))) as ConfigurationExportCreate
+      const body = ((await request.json().catch(() => ({}))) ?? {}) as ViewExportCreate
       const format = body.Format === 'Git' ? 'Git' : 'Folder'
+      const resolved = resolveInclude(body.Include ?? [])
+      if ('unknown' in resolved) {
+        return errorResponse(
+          400,
+          `Include has the unknown kind ${JSON.stringify(resolved.unknown)}. Use ${kindNames}, or an empty list for all four.`,
+        )
+      }
       const now = new Date()
       const stamp = now.toISOString().replaceAll('-', '').replace('T', '-').replaceAll(':', '').slice(0, 15)
       const id = newId()
-      const state: ConfigurationExport = {
+      const state: ViewExport = {
         Id: id,
         Status: 'Queued',
         Format: format,
-        FileName: `configurations-${params.org}-${params.project}-${params.view}${format === 'Git' ? '-git' : ''}-${stamp}Z.zip`,
+        Include: resolved.include,
+        FileName: `export-${params.org}-${params.project}-${params.view}${format === 'Git' ? '-git' : ''}-${stamp}Z.zip`,
         CreatedAt: now.toISOString(),
         CreatedBy: mockActor(db),
         ExpiresAt: new Date(now.getTime() + day).toISOString(),
@@ -324,13 +379,15 @@ export const transferHandlers: HttpHandler[] = [
       if (job.state.Status === 'Queued') {
         job.state = { ...job.state, Status: 'Running', StartedAt: new Date().toISOString() }
       } else if (job.state.Status === 'Running') {
-        const built = buildArchive(db, job.scope, job.state.Format === 'Git' ? 'Git' : 'Folder')
+        const include = job.state.Include ?? kinds
+        const built = buildArchive(db, job.scope, job.state.Format === 'Git' ? 'Git' : 'Folder', include)
         job.archive = built.zip
         job.state = {
           ...job.state,
           Status: 'Succeeded',
           CompletedAt: new Date().toISOString(),
-          ConfigurationCount: built.configurations,
+          // the count of a kind the export left out is null, as in the API
+          ConfigurationCount: include.includes('Configurations') ? built.configurations : null,
           VersionCount: built.versions,
           Size: built.zip.length,
         }
@@ -351,7 +408,11 @@ export const transferHandlers: HttpHandler[] = [
         return notFound('export', params.id)
       }
       if (!job.archive) {
-        return errorResponse(409, `The export '${params.id}' is not ready yet (${job.state.Status}).`, 'TransferNotReady')
+        return errorResponse(
+          409,
+          `The export '${params.id}' is not ready yet (${job.state.Status}).`,
+          'TransferNotReady',
+        )
       }
       return new HttpResponse(job.archive, {
         headers: {
@@ -369,6 +430,30 @@ export const transferHandlers: HttpHandler[] = [
       if (denied) {
         return denied
       }
+      const query = new URL(request.url).searchParams
+      // the options first, as in the API; include is comma-separated or repeated
+      const resolved = resolveInclude(
+        query
+          .getAll('include')
+          .flatMap((value) => value.split(','))
+          .filter((value) => value.trim()),
+      )
+      if ('unknown' in resolved) {
+        return errorResponse(
+          400,
+          `The query parameter 'include' has the unknown kind '${String(resolved.unknown)}'. Use ${kindNames}, comma-separated, or leave it empty for all four.`,
+          'InvalidQuery',
+        )
+      }
+      const existingQuery = query.get('existing')?.trim()
+      const existing = existingQuery ? matchName(existingModes, existingQuery) : 'Overwrite'
+      if (!existing) {
+        return errorResponse(
+          400,
+          `The query parameter 'existing' must be Overwrite or Skip, not '${existingQuery}'.`,
+          'InvalidQuery',
+        )
+      }
       const bytes = new Uint8Array(await request.arrayBuffer())
       let files: ZipFile[]
       try {
@@ -376,13 +461,14 @@ export const transferHandlers: HttpHandler[] = [
       } catch {
         return errorResponse(400, 'The body is not a zip archive.', 'InvalidArchive')
       }
-      const query = new URL(request.url).searchParams
       const now = new Date()
       const id = newId()
-      const state: ConfigurationImport = {
+      const state: ViewImport = {
         Id: id,
         Status: 'Queued',
         FileName: query.get('fileName') ?? undefined,
+        Include: resolved.include,
+        Existing: existing,
         IsDryRun: query.get('dryRun') === 'true',
         IsForced: query.get('force') === 'true',
         CreatedAt: now.toISOString(),

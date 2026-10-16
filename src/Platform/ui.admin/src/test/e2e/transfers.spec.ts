@@ -29,7 +29,7 @@ test('exports the configurations of the view as a folder', async ({ page }) => {
 
   const { name, files } = await exportView(page, 'Folder')
 
-  expect(name).toMatch(/^configurations-acme-billing-default-\d{8}-\d{6}Z\.zip$/)
+  expect(name).toMatch(/^export-acme-billing-default-\d{8}-\d{6}Z\.zip$/)
   const names = files.map((file) => file.name)
   expect(names).toContain('export.json')
   expect(names.some((file) => /^[a-z]{3}\..+\.\d+\.json$/.test(file))).toBe(true)
@@ -41,7 +41,7 @@ test('exports the configurations of the view as a git repository', async ({ page
 
   const { name, files } = await exportView(page, 'Git repository')
 
-  expect(name).toMatch(/^configurations-acme-billing-default-git-\d{8}-\d{6}Z\.zip$/)
+  expect(name).toMatch(/^export-acme-billing-default-git-\d{8}-\d{6}Z\.zip$/)
   expect(files.map((file) => file.name)).toContain('.git/HEAD')
 })
 

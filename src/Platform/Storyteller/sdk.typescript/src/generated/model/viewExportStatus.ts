@@ -3,13 +3,13 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.21.3734
  */
 
-export type ConfigurationImportStatus =
-  (typeof ConfigurationImportStatus)[keyof typeof ConfigurationImportStatus];
+export type ViewExportStatus =
+  (typeof ViewExportStatus)[keyof typeof ViewExportStatus];
 
-export const ConfigurationImportStatus = {
+export const ViewExportStatus = {
   Queued: "Queued",
   Running: "Running",
   Succeeded: "Succeeded",

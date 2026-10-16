@@ -26,6 +26,7 @@ public static class ServicesCollectionExtensions
         ConfigureHttpClient<ISchemasApiClient, SchemasApiClient>(services);
         ConfigureHttpClient<IKeyValuesApiClient, KeyValuesApiClient>(services);
         ConfigureHttpClient<ITemplatesApiClient, TemplatesApiClient>(services);
+        ConfigureHttpClient<ITransfersApiClient, TransfersApiClient>(services);
 
         return services;
     }

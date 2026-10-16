@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { configureStoryteller, getStorytellerConfig, storytellerFetch, type StorytellerConfig } from '../lib/fetcher'
 import { hasErrorCode, isAborted, isForbidden, isPreconditionFailed, StorytellerError } from '../lib/errors'
 import { deleteAnnotation } from '../generated/client/annotations/annotations'
-import { getConfigurationExportArchive, startConfigurationImport } from '../generated/client/configurations/configurations'
+import { getViewExportArchive, startViewExport, startViewImport } from '../generated/client/transfers/transfers'
 
 interface Call {
   url: string
@@ -80,7 +80,7 @@ describe('storytellerFetch', () => {
     const { fetch } = fakeFetch(new Response(bytes, { status: 200, headers: { 'content-type': 'application/zip' } }))
     configure({ fetch })
 
-    const archive = await getConfigurationExportArchive('acme', 'web', 'default', 'job-1')
+    const archive = await getViewExportArchive('acme', 'web', 'default', 'job-1')
 
     expect(archive).toBeInstanceOf(Blob)
     expect(new Uint8Array(await archive.arrayBuffer())).toEqual(bytes)
@@ -90,7 +90,7 @@ describe('storytellerFetch', () => {
     const { fetch } = fakeFetch(json({ Message: 'Not ready.', ErrorCode: 'TransferNotReady' }, 409))
     configure({ fetch })
 
-    const error = await getConfigurationExportArchive('acme', 'web', 'default', 'job-1').catch((caught: unknown) => caught)
+    const error = await getViewExportArchive('acme', 'web', 'default', 'job-1').catch((caught: unknown) => caught)
 
     expect(error).toBeInstanceOf(StorytellerError)
     expect(hasErrorCode(error, 'TransferNotReady')).toBe(true)
@@ -101,13 +101,33 @@ describe('storytellerFetch', () => {
     configure({ fetch })
     const archive = new Blob([new Uint8Array([0x50, 0x4b, 0x05, 0x06])], { type: 'application/zip' })
 
-    const started = await startConfigurationImport('acme', 'web', 'default', archive, { dryRun: true, fileName: 'configs.zip' })
+    const started = await startViewImport('acme', 'web', 'default', archive, {
+      include: ['Annotations', 'Templates'],
+      existing: 'Skip',
+      dryRun: true,
+      fileName: 'view.zip',
+    })
 
     expect(started).toEqual({ Id: 'job-2', Status: 'Queued' })
-    expect(calls[0]?.url).toBe('https://api.example.com/api/v1/acme/web/default/configurations/imports?dryRun=true&fileName=configs.zip')
+    // the kinds go comma-separated (style form, explode false), as the API reads them
+    expect(calls[0]?.url).toBe(
+      'https://api.example.com/api/v1/acme/web/default/imports?include=Annotations%2CTemplates&existing=Skip&dryRun=true&fileName=view.zip',
+    )
     expect(calls[0]?.init.method).toBe('POST')
     expect(calls[0]?.init.body).toBe(archive)
     expect(new Headers(calls[0]?.init.headers).get('Content-Type')).toBe('application/zip')
+  })
+
+  it('sends an export request with its format and kinds as JSON', async () => {
+    const { fetch, calls } = fakeFetch(json({ Id: 'job-3', Status: 'Queued', Include: ['Annotations'] }, 202))
+    configure({ fetch })
+
+    const started = await startViewExport('acme', 'web', 'default', { Format: 'Git', Include: ['Annotations'] })
+
+    expect(started.Include).toEqual(['Annotations'])
+    expect(calls[0]?.url).toBe('https://api.example.com/api/v1/acme/web/default/exports')
+    expect(calls[0]?.init.method).toBe('POST')
+    expect(JSON.parse(String(calls[0]?.init.body))).toEqual({ Format: 'Git', Include: ['Annotations'] })
   })
 
   it('returns undefined for 204 and empty bodies', async () => {

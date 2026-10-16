@@ -35,7 +35,7 @@ The fetcher (`lib/fetcher.ts`, the Orval mutator):
 
 - prefixes `baseUrl` to the generated `/v1/...` paths,
 - adds `Authorization: Bearer …` when `getAccessToken` returns a token, and asks for a token once more after a `401` (with `forceRefresh: true`),
-- parses `application/json` and `application/*+json` bodies, returns `application/zip` and `application/octet-stream` bodies as a `Blob` (configuration export archives), and every other content type as text (PEM certificates, unified diffs),
+- parses `application/json` and `application/*+json` bodies, returns `application/zip` and `application/octet-stream` bodies as a `Blob` (the archives of view exports), and every other content type as text (PEM certificates, unified diffs),
 - throws `StorytellerError` (`status`, `message`, `hint`, `errorCode`, `schemaErrors`) for non-2xx responses, and with `status: 0` for network failures and aborts (`aborted: true`, `isAborted(error)`).
 
 With Vue Query, query keys are the path segments of the request, so cache invalidation can use paths:
@@ -142,4 +142,19 @@ await setKeyValue('acme', 'billing', 'default', 'db.password', { Protection: 'Hy
 
 const plain = await decryptClientSecret(value, privateKeyPem, 'api')       // the holder of a recipient's private key
 const { publicJwk, privateJwk } = await generateRecipientKeyPair()         // a new recipient: register publicJwk
+```
+
+## Export and import of a view
+
+The `transfers` tag runs the jobs that export the documents of a view into a zip and import a zip into a view: `startViewExport`, `getViewExport`, `getViewExportArchive`, `startViewImport` and `getViewImport` (`docs/Platform/Storyteller/export-import.md`). `Include` and the import's `include` list the kinds (`ViewArchiveContent`: `Annotations`, `Schemas`, `Templates`, `Configurations`), all four when empty; the query sends them comma-separated. `existing` is `Overwrite` (the default) or `Skip`. The archive comes back as a `Blob`.
+
+```ts
+import { getViewExport, getViewExportArchive, getViewImport, startViewExport, startViewImport } from '@42for.net/2splatform.sdk'
+
+const started = await startViewExport('acme', 'billing', 'default', { Format: 'Folder', Include: ['Annotations', 'Templates'] })
+const exported = await getViewExport('acme', 'billing', 'default', started.Id!)          // poll until Status is Succeeded
+const zip = await getViewExportArchive('acme', 'billing', 'default', exported.Id!)       // a Blob
+
+const check = await startViewImport('acme', 'billing', 'staging', zip, { include: ['Templates'], existing: 'Skip', dryRun: true })
+const result = await getViewImport('acme', 'billing', 'staging', check.Id!)              // Summaries per kind, Items with their Warnings
 ```
