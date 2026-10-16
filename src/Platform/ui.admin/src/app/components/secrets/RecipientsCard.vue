@@ -113,7 +113,7 @@ const canAdd = computed(() => name.value.trim().length > 0 && publicKey.value.tr
   <UCard>
     <template #header>
       <div class="flex items-center justify-between">
-        <h2 class="font-semibold">Recipients (HYOK)</h2>
+        <h3 class="font-semibold">Recipients (HYOK)</h3>
         <UButton v-if="editable && !adding" label="Add recipient" icon="i-lucide-plus" size="sm" @click="adding = true" />
       </div>
     </template>

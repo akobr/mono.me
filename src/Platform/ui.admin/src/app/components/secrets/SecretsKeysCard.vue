@@ -48,7 +48,7 @@ const rewrapProgress = computed(() => undefined)
 
 <template>
   <UCard>
-    <template #header><h2 class="font-semibold">Key-encryption keys</h2></template>
+    <template #header><h3 class="font-semibold">Key-encryption keys</h3></template>
     <div class="space-y-4 text-sm">
       <div v-for="entry in [{ level: 'Standard' as const, key: policy.Standard, label: 'Standard' }, { level: 'Hsm' as const, key: policy.Hsm?.Key, label: 'HSM' }]" :key="entry.level" class="flex flex-wrap items-start gap-3">
         <div class="min-w-0 flex-1">
