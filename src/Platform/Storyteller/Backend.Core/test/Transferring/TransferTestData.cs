@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
 
@@ -14,21 +15,59 @@ internal static class TransferTestData
     // versions: (version, author, minutes after Start, JSON); current: whether the last one is the current document
     public static ConfigurationHistory History(string key, bool hasCurrent, params (ulong Version, string Author, int Minutes, string Json)[] versions)
     {
-        var documents = versions
-            .Select(version => new ConfigurationDocument
-            {
-                Version = version.Version,
-                Author = version.Author,
-                CreatedAt = Start.AddMinutes(version.Minutes),
-                Content = JObject.Parse(version.Json),
-            })
-            .ToList();
+        var documents = Documents(versions);
 
         return new ConfigurationHistory
         {
             AnnotationKey = key,
             Versions = documents,
             Current = hasCurrent ? documents[^1] : null,
+        };
+    }
+
+    public static TemplateHistory Template(string type, bool hasCurrent, params (ulong Version, string Author, int Minutes, string Json)[] versions)
+    {
+        var documents = Documents(versions);
+
+        return new TemplateHistory
+        {
+            AnnotationType = type,
+            Versions = documents,
+            Current = hasCurrent ? documents[^1] : null,
+        };
+    }
+
+    // type: the type of a type or descendant-type schema; key: the annotation of an annotation schema or the
+    // ancestor of a descendant-type schema
+    public static SchemaHistory Schema(
+        ViewDocumentKind kind,
+        string? type,
+        string? key,
+        bool hasCurrent,
+        params (ulong Version, string Author, int Minutes, string Json)[] versions)
+    {
+        var documents = Documents(versions);
+
+        return new SchemaHistory
+        {
+            Kind = kind,
+            AnnotationType = type,
+            AnnotationKey = key,
+            Versions = documents,
+            Current = hasCurrent ? documents[^1] : null,
+        };
+    }
+
+    // An active annotation, created and modified at the minutes after Start.
+    public static Annotation ActiveAnnotation(string key, int createdMinutes = 0, int? modifiedMinutes = null, string? title = null)
+    {
+        var annotation = AnnotationFactory.CreateDefault(AnnotationKey.Parse(key), "main", "default");
+
+        return annotation with
+        {
+            Title = title,
+            Created = AuditStamp.Of(Actor, Start.AddMinutes(createdMinutes)),
+            Modified = AuditStamp.Of(AuditActor.Machine("machine-1"), Start.AddMinutes(modifiedMinutes ?? createdMinutes)),
         };
     }
 
@@ -41,14 +80,19 @@ internal static class TransferTestData
             View = "default",
             ExportedAt = Start.AddDays(1),
             ExportedBy = Actor,
-            Histories = histories,
+            Configurations = histories,
         };
     }
 
     public static byte[] Write(ViewArchiveFormat format, params ConfigurationHistory[] histories)
     {
+        return Write(Source(histories), format);
+    }
+
+    public static byte[] Write(ViewArchiveSource source, ViewArchiveFormat format = ViewArchiveFormat.Folder)
+    {
         using var stream = new MemoryStream();
-        ViewArchiveWriter.Write(stream, Source(histories), format);
+        ViewArchiveWriter.Write(stream, source, format);
         return stream.ToArray();
     }
 
@@ -87,5 +131,18 @@ internal static class TransferTestData
 
         stream.Position = 0;
         return stream;
+    }
+
+    private static List<ConfigurationDocument> Documents((ulong Version, string Author, int Minutes, string Json)[] versions)
+    {
+        return versions
+            .Select(version => new ConfigurationDocument
+            {
+                Version = version.Version,
+                Author = version.Author,
+                CreatedAt = Start.AddMinutes(version.Minutes),
+                Content = JObject.Parse(version.Json),
+            })
+            .ToList();
     }
 }
