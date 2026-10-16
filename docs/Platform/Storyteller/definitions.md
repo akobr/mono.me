@@ -194,7 +194,7 @@ sform story schema definition exe.northwind.invoicing.prod
 
 Validation looks at the stored configuration document, the `Content` that is about to be written. It does not look at the calculated document, the resolved document, inherited values, or template output. A property that exists only because a template or an ancestor contributed it is invisible to the schema. A required property has to be present in the stored document of the annotation being written.
 
-The check runs at two moments.
+The check runs at two moments. An import of a view runs a variant of both.
 
 **Saving a configuration.** `CreateOrUpdateConfigurationAsync` and `PatchConfigurationAsync` validate the document after merge, `$remove`, and `$patch`, and only when that work actually changed the content. The document is checked against the combined schema of that annotation in that view. An empty object is not checked, so `required` does not apply until the stored document has at least one property. When the view has no applicable schema, the write is stored as given.
 
@@ -207,6 +207,8 @@ The check runs at two moments.
 | Descendant type `D` on ancestor `A`, in view `V` | Configurations in `V` of type `D` that list `A` as an ancestor for `D` |
 
 Empty stored documents are skipped. Other views are skipped. A schema that is identical to the current document is not written again and is not checked.
+
+**Importing a view.** An [import](export-import.md#overlay) checks a schema against the configurations as the import leaves them. The archive's configurations replace the stored ones, the stored configurations of annotations the import re-creates are not checked, and the other layers come from the archive where it brings them. In a dry run, a configuration is validated against the archive's schemas too. A document that is not a JSON Schema fails with `InvalidSchema`, also with force.
 
 Reads of a configuration do not validate it. A document that fails its schema remains readable, including its calculated and resolved forms, until the next write.
 
@@ -237,6 +239,8 @@ Two sequences both work.
 **Publish the schema first.** PUT the schema once, read the `409` list, then PUT it again with `force=true`. The new schema is in force. Each listed configuration stays stored and readable. The next ordinary write of one of those configurations is rejected until its stored document complies. Repair them one by one, or pass `--force` on a configuration write that must remain outside the schema.
 
 **Repair the documents first.** PUT each configuration with `force=true` so the stored document already matches the schema you intend to publish. Then PUT the schema without force. The compliance scan sees documents that already match, and the schema is stored under the default rule.
+
+An [import](export-import.md) avoids the deadlock without force: an archive that holds the new schema and the repaired documents is checked as the import leaves the view. With force, an import stores what breaks and reports it with the warning `SchemaViolation`.
 
 Deleting a schema does not take force. A delete removes that view's document. The next read of the same id finds no schema.
 
