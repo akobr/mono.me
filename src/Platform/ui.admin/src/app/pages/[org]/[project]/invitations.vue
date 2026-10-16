@@ -1,16 +1,13 @@
 <script setup lang="ts">
-import { useContextStore } from '@/stores/context'
-
-const context = useContextStore()
+// The invitations of a project moved to its Members page (424-35); saved links keep working.
+definePage({
+  redirect: (to) => {
+    const params = to.params as { org: string; project: string }
+    return { path: `/${params.org}/${params.project}/members`, hash: '#invitations' }
+  },
+})
 </script>
 
 <template>
-  <UDashboardPanel id="project-invitations">
-    <template #header>
-      <AppNavbar title="Invitations" />
-    </template>
-    <template #body>
-      <InvitationsTable v-if="context.projectKey" :access-point-key="context.projectKey" />
-    </template>
-  </UDashboardPanel>
+  <span hidden />
 </template>

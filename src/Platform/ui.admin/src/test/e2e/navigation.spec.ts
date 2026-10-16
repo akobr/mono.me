@@ -79,3 +79,18 @@ test('changes the theme in the command palette, not in the top bar', async ({ pa
   await goto(page, '/account')
   await expect(page.getByRole('tab', { name: 'Dark' })).toHaveAttribute('aria-selected', 'true')
 })
+
+// The pages merged into others (424-35) redirect, so saved links keep working; the anchor shows the moved section.
+const movedPages: { from: string; to: string; section?: string }[] = [
+  { from: '/acme/billing/invitations', to: '/acme/billing/members#invitations', section: '#invitations' },
+]
+
+for (const moved of movedPages) {
+  test(`opens ${moved.from} on the page that took it over`, async ({ page }) => {
+    await openApp(page, moved.from)
+    await expect(page).toHaveURL(moved.to)
+    if (moved.section) {
+      await expect(page.locator(moved.section)).toBeInViewport()
+    }
+  })
+}
