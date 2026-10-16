@@ -119,7 +119,6 @@ declare module 'vue' {
     SidebarBrand: typeof import('./components/shell/SidebarBrand.vue')['default']
     TemplateDetail: typeof import('./components/templates/TemplateDetail.vue')['default']
     TextControl: typeof import('./components/configuration/renderers/TextControl.vue')['default']
-    ThemeToggle: typeof import('./components/shell/ThemeToggle.vue')['default']
     TimeZoneSelect: typeof import('./components/annotations/TimeZoneSelect.vue')['default']
     TransferToaster: typeof import('./components/configuration/TransferToaster.vue')['default']
     TreeCell: typeof import('./components/annotations/grid/TreeCell.vue')['default']
