@@ -1,3 +1,4 @@
+import { readdirSync } from 'node:fs'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -12,10 +13,16 @@ import {
   getKeyValues,
   getMembers,
   getTemplates,
+  getViewExport,
+  getViewExportArchive,
+  getViewImport,
   getViews,
   setMemberRole,
+  startViewExport,
+  startViewImport,
   StorytellerError,
 } from '../index'
+import * as mswEntry from '../msw'
 import { getGetMembersMockHandler, getStorytellerMock } from '../msw'
 import {
   AcceptInvitationResponse,
@@ -27,8 +34,12 @@ import {
   GetKeyValuesResponse,
   GetMembersResponse,
   GetTemplatesResponse,
+  GetViewExportResponse,
+  GetViewImportResponse,
   GetViewsResponse,
   SetMemberRoleBody,
+  StartViewExportResponse,
+  StartViewImportResponse,
 } from '../zod'
 
 // The generated MSW handlers answer every operation with Faker data, and the generated Zod schemas
@@ -54,10 +65,37 @@ describe('generated client against generated mocks', () => {
     ['getKeyValues', () => getKeyValues('acme', 'billing', 'default'), GetKeyValuesResponse],
     ['getKeyValuePolicy', () => getKeyValuePolicy('acme', 'billing'), GetKeyValuePolicyResponse],
     ['acceptInvitation', () => acceptInvitation('0192f0aa'), AcceptInvitationResponse],
+    ['startViewExport', () => startViewExport('acme', 'billing', 'default', { Format: 'Git', Include: ['Templates'] }), StartViewExportResponse],
+    ['getViewExport', () => getViewExport('acme', 'billing', 'default', 'job_01'), GetViewExportResponse],
+    ['startViewImport', () => startViewImport('acme', 'billing', 'default', new Blob(['PK'], { type: 'application/zip' }), { include: ['Templates'], existing: 'Skip' }), StartViewImportResponse],
+    ['getViewImport', () => getViewImport('acme', 'billing', 'default', 'job_02'), GetViewImportResponse],
   ] as const)('%s returns data that passes its Zod schema', async (_name, call, schema) => {
     const response = await call()
 
     expect(schema.safeParse(response).success).toBe(true)
+  })
+
+  it('downloads the archive of an export as a Blob', async () => {
+    await expect(getViewExportArchive('acme', 'billing', 'default', 'job_01')).resolves.toBeInstanceOf(Blob)
+  })
+
+  // msw.ts lists the tags by hand: a tag that is generated but missing there would serve and export nothing.
+  it('serves and exports the handlers of every generated tag', () => {
+    const served = new Set(getStorytellerMock().map((handler) => handler.info.header))
+    const tags = readdirSync(new URL('../generated/vue-query', import.meta.url), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+
+    expect(tags).toContain('transfers')
+    for (const tag of tags) {
+      const name = `get${tag.split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join('')}Mock`
+      const getTagMock = (mswEntry as Record<string, unknown>)[name]
+
+      expect(getTagMock, name).toBeTypeOf('function')
+      const headers = (getTagMock as () => Array<{ info: { header: string } }>)().map((handler) => handler.info.header)
+      expect(headers.length, name).toBeGreaterThan(0)
+      expect(headers.filter((header) => !served.has(header)), name).toEqual([])
+    }
   })
 
   it('sends bodies as JSON that pass the Zod body schema', async () => {
