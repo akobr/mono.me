@@ -244,6 +244,88 @@ describe('transfers store', () => {
 
     transfers.dismiss(job.id)
     expect(transfers.latestImport(scope)).toBeUndefined()
+    expect(sessionStorage.getItem('2s-admin:latest-imports')).toBeNull()
+  })
+
+  it('keeps the latest export of each view', async () => {
+    const transfers = useTransfersStore()
+
+    const first = await transfers.startExport(scope, { format: 'Folder' })
+    const second = await transfers.startExport(scope, { format: 'Git' })
+    const other = await transfers.startExport({ ...scope, view: 'staging' }, { format: 'Folder' })
+
+    expect(transfers.latestExport(scope)).toBe(second)
+    expect(transfers.latestExport({ ...scope, view: 'staging' })).toBe(other)
+    expect(first.phase).toBe('running')
+    await settle(second)
+  })
+
+  /** A reload: a new store reads what the previous page left in sessionStorage. */
+  async function reload(saved: string | null) {
+    const { createPinia, setActivePinia } = await import('pinia')
+    setActivePinia(createPinia())
+    if (saved) {
+      sessionStorage.setItem('2s-admin:latest-imports', saved)
+    }
+    const transfers = useTransfersStore()
+    const finished: string[] = []
+    transfers.onFinished((job) => finished.push(`${job.kind}:${job.phase}`))
+    transfers.resume()
+    return { transfers, finished }
+  }
+
+  const file = () => new File([createZip([textFile('rst.payments.json', '{}')])], 'view.zip')
+
+  it('shows the latest import of a view again after a reload, without reporting it again', async () => {
+    const first = useTransfersStore()
+    const checked = await first.startImport(scope, file(), { dryRun: true, existing: 'Skip' })
+    await settle(checked)
+    const saved = sessionStorage.getItem('2s-admin:latest-imports')
+    expect(JSON.parse(saved!)).toEqual([{ id: checked.id, scope, startedAt: checked.startedAt, finished: true }])
+
+    const { transfers, finished } = await reload(saved)
+    await vi.waitFor(() => expect(transfers.latestImport(scope)).toBeDefined())
+
+    const restored = transfers.latestImport(scope)!
+    expect(restored).toMatchObject({ id: checked.id, phase: 'done', startedAt: checked.startedAt })
+    expect(restored.state).toMatchObject({ Status: 'Succeeded', IsDryRun: true, Existing: 'Skip' })
+    // the file stayed with the previous page, so Import now is not offered
+    expect(restored.file).toBeUndefined()
+    expect(finished).toEqual([])
+  })
+
+  it('follows an import that ran during the reload and reports its end', async () => {
+    const first = useTransfersStore()
+    const running = await first.startImport(scope, file())
+    const saved = sessionStorage.getItem('2s-admin:latest-imports')
+    expect(JSON.parse(saved!)).toEqual([expect.objectContaining({ id: running.id, finished: false })])
+
+    const { transfers, finished } = await reload(saved)
+    await vi.waitFor(() => expect(transfers.latestImport(scope)).toBeDefined())
+    const resumed = transfers.latestImport(scope)!
+    await settle(resumed)
+
+    expect(resumed.phase).toBe('done')
+    expect(finished).toEqual(['import:done'])
+    expect(JSON.parse(sessionStorage.getItem('2s-admin:latest-imports')!)).toEqual([
+      expect.objectContaining({ id: running.id, finished: true }),
+    ])
+  })
+
+  it('forgets a saved import that has expired, and one that a newer import replaced', async () => {
+    const expired = JSON.stringify([{ id: 'gone', scope, startedAt: Date.now(), finished: true }])
+
+    const { transfers } = await reload(expired)
+    await vi.waitFor(() => expect(sessionStorage.getItem('2s-admin:latest-imports')).toBeNull())
+    expect(transfers.latestImport(scope)).toBeUndefined()
+
+    // older than the day the server keeps a job: not even asked for
+    const old = JSON.stringify([{ id: 'old', scope, startedAt: Date.now() - 25 * 60 * 60_000, finished: true }])
+    const later = await reload(old)
+    const newer = await later.transfers.startImport(scope, file(), { dryRun: true })
+    expect(JSON.parse(sessionStorage.getItem('2s-admin:latest-imports')!)).toEqual([
+      expect.objectContaining({ id: newer.id }),
+    ])
   })
 })
 
@@ -307,6 +389,21 @@ describe('mock transfer options', () => {
     expect(exported).not.toHaveProperty('ConfigurationCount')
     expect(exported).not.toHaveProperty('AnnotationCount')
     expect(exported.TemplateCount).toBe(2)
+  })
+
+  it('keeps a finished import for the next page load, as the API keeps its jobs', async () => {
+    const zip = new Blob([createZip([textFile('rst.invoicing.json', '{"Title":"Edited"}')])])
+    const started = await startViewImport(org, project, view, zip, { dryRun: true, fileName: 'edited.zip' })
+    const finished = await finishedImport(started.Id!)
+    const kept = sessionStorage.getItem('2s-admin:mock-finished-imports')
+    expect(JSON.parse(kept!)).toEqual({ [started.Id!]: { scope, state: finished } })
+
+    // the next page load has a new mock module without the job in memory, but the same tab storage
+    resetTransfers()
+    sessionStorage.setItem('2s-admin:mock-finished-imports', kept!)
+
+    expect(await getViewImport(org, project, view, started.Id!)).toEqual(finished)
+    await expect(getViewImport(org, project, 'staging', started.Id!)).rejects.toMatchObject({ status: 404 })
   })
 
   it('refuses an unknown kind or existing mode like the API', async () => {

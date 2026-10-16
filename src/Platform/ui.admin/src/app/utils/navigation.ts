@@ -98,6 +98,12 @@ export function buildNavigation(
         { label: 'Templates', icon: 'i-lucide-layout-template', to: `${base}/templates`, editRole: 'Contributor' },
         { label: 'Schemas', icon: 'i-lucide-braces', to: `${base}/schemas`, editRole: 'Contributor' },
         { label: 'Compare views', icon: 'i-lucide-git-compare', to: `${base}/compare` },
+        {
+          label: 'Export & Import',
+          icon: 'i-lucide-arrow-down-up',
+          to: `${base}/export-import`,
+          editRole: 'Contributor',
+        },
         { label: 'Deleted', icon: 'i-lucide-archive-restore', to: `${base}/deleted`, editRole: 'Contributor' },
       ],
     })

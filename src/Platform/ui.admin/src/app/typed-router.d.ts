@@ -182,6 +182,13 @@ declare module 'vue-router/auto-routes' {
       { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
+    '/[org]/[project]/[view]/export-import': RouteRecordInfo<
+      '/[org]/[project]/[view]/export-import',
+      '/:org/:project/:view/export-import',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
     '/[org]/[project]/[view]/graph': RouteRecordInfo<
       '/[org]/[project]/[view]/graph',
       '/:org/:project/:view/graph',
@@ -637,6 +644,14 @@ declare module 'vue-router/auto-routes' {
     'app/pages/[org]/[project]/[view]/deleted.vue': {
       routes:
         | '/[org]/[project]/[view]/deleted'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/export-import.vue': {
+      routes:
+        | '/[org]/[project]/[view]/export-import'
       views:
         | never
       pathParamNames:
