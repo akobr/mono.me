@@ -5,35 +5,36 @@ using Microsoft.Extensions.Logging;
 namespace _42.Platform.Storyteller.Api.Transfers;
 
 // The background half of the export and import jobs: the queue worker and the hourly purge of old archives.
-// Both use the default connection (AzureWebJobsStorage), like the storage clients of the jobs.
-public class ConfigurationTransferFunctions
+// Both use the default connection (AzureWebJobsStorage), like the storage clients of the jobs. The queue keeps the
+// storage name of the first spec (ViewTransferNames.Queue, configuration-transfers).
+public class ViewTransferFunctions
 {
     private readonly IViewTransferService _transfers;
-    private readonly ILogger<ConfigurationTransferFunctions> _logger;
+    private readonly ILogger<ViewTransferFunctions> _logger;
 
-    public ConfigurationTransferFunctions(IViewTransferService transfers, ILogger<ConfigurationTransferFunctions> logger)
+    public ViewTransferFunctions(IViewTransferService transfers, ILogger<ViewTransferFunctions> logger)
     {
         _transfers = transfers;
         _logger = logger;
     }
 
-    [Function(nameof(ProcessConfigurationTransfer))]
-    public async Task ProcessConfigurationTransfer(
+    [Function(nameof(ProcessViewTransfer))]
+    public async Task ProcessViewTransfer(
         [QueueTrigger(ViewTransferNames.Queue)] string message,
         CancellationToken cancellationToken)
     {
         if (!ViewTransferMessage.TryParse(message, out var transfer))
         {
             // a retry cannot make it valid, so it is dropped instead of ending in the poison queue
-            _logger.LogError("A configuration transfer message is not valid and was dropped: {Message}", message);
+            _logger.LogError("A view transfer message is not valid and was dropped: {Message}", message);
             return;
         }
 
         await _transfers.ProcessAsync(transfer, cancellationToken);
     }
 
-    [Function(nameof(PurgeConfigurationTransfers))]
-    public async Task PurgeConfigurationTransfers(
+    [Function(nameof(PurgeViewTransfers))]
+    public async Task PurgeViewTransfers(
         [TimerTrigger("0 17 * * * *")] TimerInfo timer,
         CancellationToken cancellationToken)
     {
@@ -41,7 +42,7 @@ public class ConfigurationTransferFunctions
 
         if (deleted > 0)
         {
-            _logger.LogInformation("{Count} expired configuration archives were deleted.", deleted);
+            _logger.LogInformation("{Count} expired transfer archives were deleted.", deleted);
         }
     }
 }
