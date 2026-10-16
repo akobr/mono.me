@@ -105,10 +105,26 @@ public class OpenApiExportTests
         include.GetProperty("style").GetString().ShouldBe("form");
         include.GetProperty("explode").GetBoolean().ShouldBeFalse("comma-separated");
         include.GetProperty("schema").GetProperty("type").GetString().ShouldBe("array");
-        include.GetProperty("schema").GetProperty("items").GetProperty("enum").EnumerateArray().Select(kind => kind.GetString())
-            .ShouldBe(["Annotations", "Schemas", "Templates", "Configurations"]);
-        parameters["existing"].GetProperty("schema").GetProperty("enum").EnumerateArray().Select(value => value.GetString()).ShouldBe(["Overwrite", "Skip"]);
-        parameters["existing"].GetProperty("schema").GetProperty("default").GetString().ShouldBe("Overwrite");
+        include.GetProperty("schema").GetProperty("items").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ViewArchiveContent");
+        parameters["existing"].GetProperty("schema").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ViewImportExisting");
+
+        // the kinds and the existing option are shared schemas, so both SDKs have one type for each
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        var content = schemas.GetProperty("ViewArchiveContent");
+        content.GetProperty("enum").EnumerateArray().Select(kind => kind.GetString()).ShouldBe(["Annotations", "Schemas", "Templates", "Configurations"]);
+        content.TryGetProperty("default", out _).ShouldBeFalse("no include means all four kinds, not the first");
+        var existing = schemas.GetProperty("ViewImportExisting");
+        existing.GetProperty("enum").EnumerateArray().Select(value => value.GetString()).ShouldBe(["Overwrite", "Skip"]);
+        existing.GetProperty("default").GetString().ShouldBe("Overwrite");
+
+        foreach (var name in new[] { "ViewExportCreate", "ViewExport", "ViewImport" })
+        {
+            schemas.GetProperty(name).GetProperty("properties").GetProperty("Include").GetProperty("items").GetProperty("$ref").GetString()
+                .ShouldBe("#/components/schemas/ViewArchiveContent", name);
+        }
+
+        schemas.GetProperty("ViewImport").GetProperty("properties").GetProperty("Existing").GetProperty("$ref").GetString()
+            .ShouldBe("#/components/schemas/ViewImportExisting");
     }
 
     internal static async Task<string> RenderAsync()
