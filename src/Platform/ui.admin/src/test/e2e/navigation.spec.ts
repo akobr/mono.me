@@ -63,3 +63,19 @@ test('shows the 42 logo at the top of the navigation menu', async ({ page }, tes
   await expect(logo).toBeVisible()
   await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(128)
 })
+
+// The top bar has no theme button (424-35); the command palette and the account page keep the theme.
+test('changes the theme in the command palette, not in the top bar', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/annotations')
+  await expect(page.getByRole('button', { name: 'Color mode' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Search…' }).click()
+  for (const mode of ['Light', 'Dark', 'System']) {
+    await expect(page.getByRole('option', { name: mode, exact: true })).toBeVisible()
+  }
+  await page.getByRole('option', { name: 'Dark', exact: true }).click()
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+
+  await goto(page, '/account')
+  await expect(page.getByRole('tab', { name: 'Dark' })).toHaveAttribute('aria-selected', 'true')
+})

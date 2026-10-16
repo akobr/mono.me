@@ -30,7 +30,6 @@ const { toggle } = useSidebar()
     <template #right>
       <slot name="right" />
       <UDashboardSearchButton :collapsed="true" variant="ghost" />
-      <ThemeToggle />
       <UserMenu />
     </template>
   </UDashboardNavbar>
