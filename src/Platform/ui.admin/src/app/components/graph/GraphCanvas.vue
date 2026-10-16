@@ -120,7 +120,7 @@ function draw() {
   const style = getComputedStyle(element)
   const text = cssVar(style, '--ui-text-highlighted', '#111')
   const muted = cssVar(style, '--ui-text-dimmed', '#999')
-  const primary = cssVar(style, '--ui-primary', '#4f46e5')
+  const primary = cssVar(style, '--ui-primary', '#8200db')
   const background = cssVar(style, '--ui-bg', '#fff')
 
   if (renderer) {

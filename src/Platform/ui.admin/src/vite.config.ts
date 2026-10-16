@@ -13,7 +13,7 @@ export default defineConfig(({ command, mode }) => ({
     VueRouter({ routesFolder: 'app/pages', dts: 'app/typed-router.d.ts' }),
     vue(),
     ui({
-      ui: { colors: { primary: 'indigo', neutral: 'zinc' } },
+      ui: { colors: { primary: 'purple', neutral: 'zinc' } },
       autoImport: { dirs: ['app/composables', 'app/stores'], dts: 'app/auto-imports.d.ts' },
       components: { dirs: ['app/components'], dts: 'app/components.d.ts' },
       // Bundle the lucide icons used in the source, so no request goes to the Iconify API (CSP connect-src).
