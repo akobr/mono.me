@@ -111,7 +111,7 @@ internal sealed class FakeConfigurationService(ExportReads? reads = null) : ICon
 
     public Func<FullKey, JObject, ViewImportResult> Import { get; set; } = (_, _) => new ViewImportResult(ViewImportOutcome.Created, 1);
 
-    public List<(FullKey Key, JObject Content, AuditActor Actor, bool Force, bool DryRun)> Imports { get; } = [];
+    public List<(FullKey Key, JObject Content, ViewImportOptions Options, ViewImportOverlay Overlay)> Imports { get; } = [];
 
     public Task<IReadOnlyList<ConfigurationHistory>> GetConfigurationHistoriesAsync(string organization, string project, string view, CancellationToken cancellationToken = default)
     {
@@ -119,9 +119,9 @@ internal sealed class FakeConfigurationService(ExportReads? reads = null) : ICon
         return Task.FromResult(Histories);
     }
 
-    public Task<ViewImportResult> ImportConfigurationAsync(FullKey key, JObject content, AuditActor actor, bool force = false, bool dryRun = false)
+    public Task<ViewImportResult> ImportConfigurationAsync(FullKey key, JObject content, ViewImportOptions options, ViewImportOverlay overlay)
     {
-        Imports.Add((key, content, actor, force, dryRun));
+        Imports.Add((key, content, options, overlay));
         return Task.FromResult(Import(key, content));
     }
 

@@ -258,7 +258,9 @@ public class ViewTransferServiceTests
 
         // the invalid file never reaches the configurations
         _configurations.Imports.Select(call => call.Key.Annotation.ToString()).ShouldBe(["rst.created", "rst.missing", "rst.unchanged", "rst.updated"]);
-        _configurations.Imports.ShouldAllBe(call => call.Force && !call.DryRun && call.Actor == Actor);
+        _configurations.Imports.ShouldAllBe(call => call.Options.Force && !call.Options.DryRun && call.Options.Actor == Actor);
+        _configurations.Imports.ShouldAllBe(call => call.Options.Existing == ViewImportExisting.Overwrite);
+        _configurations.Imports.Select(call => call.Overlay).Distinct().ShouldHaveSingleItem();
         _configurations.Imports[0].Key.ViewName.ShouldBe("default");
 
         // the upload is removed once the job is done
@@ -273,8 +275,8 @@ public class ViewTransferServiceTests
 
         await _service.ProcessAsync(_queue.Messages.Single());
 
-        _configurations.Imports.Single().DryRun.ShouldBeTrue();
-        _configurations.Imports.Single().Force.ShouldBeFalse();
+        _configurations.Imports.Single().Options.DryRun.ShouldBeTrue();
+        _configurations.Imports.Single().Options.Force.ShouldBeFalse();
     }
 
     [Fact]

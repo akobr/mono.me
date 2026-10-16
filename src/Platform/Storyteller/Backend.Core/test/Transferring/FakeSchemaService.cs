@@ -37,7 +37,7 @@ internal sealed class FakeSchemaService(ExportReads? reads = null) : IConfigurat
 
     public Task<CombinedConfigurationSchema?> GetCombinedSchemaAsync(string organization, string project, string view, string annotationKey) => throw new NotSupportedException();
 
-    public Task ValidateContentAsync(string organization, string project, string view, string annotationKey, JObject content) => throw new NotSupportedException();
+    public Task ValidateContentAsync(string organization, string project, string view, string annotationKey, JObject content, ViewImportOverlay? overlay = null) => throw new NotSupportedException();
 
     public Task<IReadOnlyCollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType) => throw new NotSupportedException();
 
@@ -62,4 +62,6 @@ internal sealed class FakeSchemaService(ExportReads? reads = null) : IConfigurat
     public Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint version) => throw new NotSupportedException();
 
     public Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint fromVersion, uint toVersion) => throw new NotSupportedException();
+
+    public Task<ViewImportResult> ImportSchemaAsync(ViewSchemaTarget target, JObject content, ViewImportOptions options, ViewImportOverlay overlay) => throw new NotSupportedException();
 }

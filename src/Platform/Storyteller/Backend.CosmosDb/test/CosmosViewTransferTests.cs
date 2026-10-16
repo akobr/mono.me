@@ -277,18 +277,18 @@ public class CosmosViewTransferTests(Startup startup)
         await CreateAsync(Project, View, "rst.import-replace");
         var key = Key("rst.import-replace");
 
-        var created = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"a":1,"list":[1,2]}"""), Author);
+        var created = await ImportAsync(key, JObject.Parse("""{"a":1,"list":[1,2]}"""), Author);
         created.Should().Be(new ViewImportResult(ViewImportOutcome.Created, 1));
 
         // a merge would keep "a" and unite the lists; an import replaces the document
-        var updated = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"list":[3],"b":2}"""), Author);
+        var updated = await ImportAsync(key, JObject.Parse("""{"list":[3],"b":2}"""), Author);
         updated.Should().Be(new ViewImportResult(ViewImportOutcome.Updated, 2));
 
         var stored = await Configurations.GetConfigurationVersionContentAsync(key, 2);
         JToken.DeepEquals(stored!.Content, JObject.Parse("""{"list":[3],"b":2}""")).Should().BeTrue();
         stored.Modified.By.Should().Be(Author);
 
-        var unchanged = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"b":2,"list":[3]}"""), Author);
+        var unchanged = await ImportAsync(key, JObject.Parse("""{"b":2,"list":[3]}"""), Author);
         unchanged.Should().Be(new ViewImportResult(ViewImportOutcome.Unchanged, 2));
 
         (await Configurations.GetConfigurationVersionsAsync(key)).Select(version => version.Version).Should().Equal(1u, 2u);
@@ -300,7 +300,7 @@ public class CosmosViewTransferTests(Startup startup)
         await CreateAsync(Project, View, "rst.import-directives");
         var key = Key("rst.import-directives");
 
-        var result = await Configurations.ImportConfigurationAsync(
+        var result = await ImportAsync(
             key,
             JObject.Parse("""{"a":1,"b":2,"$remove":["$.b"],"$patch":[{"op":"add","path":"/c","value":3}]}"""),
             Author);
@@ -309,7 +309,7 @@ public class CosmosViewTransferTests(Startup startup)
         var stored = await Configurations.GetConfigurationVersionContentAsync(key, 1);
         JToken.DeepEquals(stored!.Content, JObject.Parse("""{"a":1,"c":3}""")).Should().BeTrue();
 
-        var broken = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"$patch":[{"op":"remove","path":"/missing"}]}"""), Author);
+        var broken = await ImportAsync(key, JObject.Parse("""{"$patch":[{"op":"remove","path":"/missing"}]}"""), Author);
         broken.Outcome.Should().Be(ViewImportOutcome.Failed);
         broken.ErrorCode.Should().Be(ErrorCodes.PatchInvalid);
     }
@@ -320,15 +320,15 @@ public class CosmosViewTransferTests(Startup startup)
         await CreateAsync(Project, View, "rst.import-deleted", "rst.import-empty");
         await Annotations.DeleteAnnotationAsync(Key("rst.import-deleted"));
 
-        var missing = await Configurations.ImportConfigurationAsync(Key("rst.import-missing"), JObject.Parse("""{"a":1}"""), Author);
+        var missing = await ImportAsync(Key("rst.import-missing"), JObject.Parse("""{"a":1}"""), Author);
         missing.Outcome.Should().Be(ViewImportOutcome.Skipped);
         missing.ErrorCode.Should().Be(ErrorCodes.AnnotationNotFound);
 
-        var deleted = await Configurations.ImportConfigurationAsync(Key("rst.import-deleted"), JObject.Parse("""{"a":1}"""), Author);
+        var deleted = await ImportAsync(Key("rst.import-deleted"), JObject.Parse("""{"a":1}"""), Author);
         deleted.Outcome.Should().Be(ViewImportOutcome.Skipped);
         deleted.ErrorCode.Should().Be(ErrorCodes.AnnotationDeleted);
 
-        var empty = await Configurations.ImportConfigurationAsync(Key("rst.import-empty"), new JObject(), Author);
+        var empty = await ImportAsync(Key("rst.import-empty"), new JObject(), Author);
         empty.Outcome.Should().Be(ViewImportOutcome.Skipped);
         empty.ErrorCode.Should().Be(ErrorCodes.EmptyDocument);
 
@@ -341,7 +341,7 @@ public class CosmosViewTransferTests(Startup startup)
         await CreateAsync(Project, View, "rst.import-dry");
         var key = Key("rst.import-dry");
 
-        var result = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"a":1}"""), Author, dryRun: true);
+        var result = await ImportAsync(key, JObject.Parse("""{"a":1}"""), Author, dryRun: true);
 
         result.Should().Be(new ViewImportResult(ViewImportOutcome.Created));
         (await Configurations.HasConfigurationContentAsync(key)).Should().BeFalse();
@@ -363,16 +363,19 @@ public class CosmosViewTransferTests(Startup startup)
             AuditActor.Account("test"),
             false);
 
-        var rejected = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"a":"text"}"""), Author);
+        var rejected = await ImportAsync(key, JObject.Parse("""{"a":"text"}"""), Author);
         rejected.Outcome.Should().Be(ViewImportOutcome.Failed);
         rejected.ErrorCode.Should().Be(ErrorCodes.SchemaViolation);
         rejected.Message.Should().StartWith("The document violates its schema: ");
 
-        var dryRun = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"a":"text"}"""), Author, dryRun: true);
+        var dryRun = await ImportAsync(key, JObject.Parse("""{"a":"text"}"""), Author, dryRun: true);
         dryRun.Outcome.Should().Be(ViewImportOutcome.Failed);
 
-        var forced = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"a":"text"}"""), Author, force: true);
-        forced.Should().Be(new ViewImportResult(ViewImportOutcome.Created, 1));
+        // a forced write is not silent
+        var forced = await ImportAsync(key, JObject.Parse("""{"a":"text"}"""), Author, force: true);
+        forced.Outcome.Should().Be(ViewImportOutcome.Created);
+        forced.Version.Should().Be(1UL);
+        forced.Warnings.Should().ContainSingle().Which.Code.Should().Be(ErrorCodes.SchemaViolation);
     }
 
     [Fact]
@@ -382,7 +385,7 @@ public class CosmosViewTransferTests(Startup startup)
         var key = Key("rst.import-audit");
         var actor = new AuditActor { Kind = AuditActorKind.Account, Id = "user_importer", Name = "Importer" };
 
-        await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{"a":1}"""), actor);
+        await ImportAsync(key, JObject.Parse("""{"a":1}"""), actor);
 
         var history = await Annotations.GetAnnotationHistoryAsync(key);
         var entry = history!.Entries.First();
@@ -407,10 +410,10 @@ public class CosmosViewTransferTests(Startup startup)
         // the read caches the inherited document in a new, empty item of version 0
         (await Configurations.GetRawConfigurationAsync(unit))!.Content["inherited"]!.Value<bool>().Should().BeTrue();
 
-        var first = await Configurations.ImportConfigurationAsync(unit, JObject.Parse("""{"own":3}"""), Author);
+        var first = await ImportAsync(unit, JObject.Parse("""{"own":3}"""), Author);
         first.Should().Be(new ViewImportResult(ViewImportOutcome.Created, 3));
 
-        var second = await Configurations.ImportConfigurationAsync(unit, JObject.Parse("""{"own":4}"""), Author);
+        var second = await ImportAsync(unit, JObject.Parse("""{"own":4}"""), Author);
         second.Should().Be(new ViewImportResult(ViewImportOutcome.Updated, 4));
 
         (await Configurations.GetConfigurationVersionsAsync(unit)).Select(version => version.Version).Should().Equal(1u, 2u, 3u, 4u);
@@ -480,5 +483,14 @@ public class CosmosViewTransferTests(Startup startup)
     private Task CreateAsync(string project, string view, params string[] keys)
     {
         return Annotations.CreateAnnotationsFromStringAsync(TestConstants.Organization, project, view, keys, AnnotationServiceTestExtensions.TestActor);
+    }
+
+    private Task<ViewImportResult> ImportAsync(FullKey key, JObject content, AuditActor actor, bool force = false, bool dryRun = false)
+    {
+        return Configurations.ImportConfigurationAsync(
+            key,
+            content,
+            new ViewImportOptions { Actor = actor, Force = force, DryRun = dryRun },
+            new ViewImportOverlay());
     }
 }
