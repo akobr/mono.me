@@ -1,11 +1,12 @@
 using System.IO.Compression;
 using _42.Platform.Storyteller.Transferring.Git;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Transferring;
 
 // Writes an export as a zip: the folder format with one folder per included kind, version files and export.json, or
-// a git repository. A kind without documents gets no folder, and a history without versions writes nothing.
-// Transitional: the git format writes the configurations only, flat, until it builds nested trees (1.8).
+// a git repository with the same folders and one history of every version. A kind without documents gets no folder,
+// and a history without versions writes nothing.
 public static class ViewArchiveWriter
 {
     public const int ManifestVersion = 2;
@@ -18,7 +19,7 @@ public static class ViewArchiveWriter
         using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
         {
             statistics = format == ViewArchiveFormat.Git
-                ? WriteGit(archive, source, content.Configurations)
+                ? WriteGit(archive, source, content)
                 : WriteFolder(archive, source, content);
         }
 
@@ -128,15 +129,7 @@ public static class ViewArchiveWriter
             configurations);
 
         WriteEntry(archive, ViewArchiveNames.ManifestFileName, ViewDocumentJson.SerializeManifest(manifest), source.ExportedAt);
-
-        return new ViewArchiveStatistics(
-            content.Annotations.Count,
-            content.Schemas.Count(history => history.Current is not null),
-            content.Templates.Count(history => history.Current is not null),
-            content.Configurations.Count(history => history.Current is not null),
-            content.Schemas.Sum(history => history.Versions.Count)
-            + content.Templates.Sum(history => history.Versions.Count)
-            + content.Configurations.Sum(history => history.Versions.Count));
+        return GetStatistics(content);
     }
 
     // The current document and the earlier versions of one history, next to each other in the folder of its kind.
@@ -172,68 +165,118 @@ public static class ViewArchiveWriter
         return (currentPath, earlier);
     }
 
-    private static ViewArchiveStatistics WriteGit(ZipArchive archive, ViewArchiveSource source, IReadOnlyList<ConfigurationHistory> histories)
+    // One history of every included document in the folders of the folder format. It is ordered by time and, within
+    // one time, like the import: by kind (annotations, schemas, templates, configurations), then name. Each document's
+    // versions stay in order even when their times are not. The last commit removes the deleted schemas, templates
+    // and configurations, whose last version is in the tree.
+    private static ViewArchiveStatistics WriteGit(ZipArchive archive, ViewArchiveSource source, Content content)
     {
+        var documents = GetGitDocuments(source, content);
         var repository = new GitRepositoryWriter();
-        var started = new HashSet<string>(StringComparer.Ordinal);
 
-        // a merge of the per-key histories by time: each key's versions stay in version order
-        var queue = new PriorityQueue<(int History, int Version), (DateTimeOffset At, string Key, ulong Version)>(VersionOrder.Instance);
+        // a merge of the documents: the next commit of each document waits in the queue, by its time, then by the
+        // position of its document
+        var queue = new PriorityQueue<(int Document, int Commit), (DateTimeOffset At, int Document)>();
 
-        for (var index = 0; index < histories.Count; index++)
+        for (var index = 0; index < documents.Count; index++)
         {
             Enqueue(index, 0);
         }
 
         while (queue.TryDequeue(out var next, out _))
         {
-            var history = histories[next.History];
-            var version = history.Versions[next.Version];
-            var fileName = ViewArchiveNames.GetConfigurationFileName(history.AnnotationKey);
-            var message = started.Add(history.AnnotationKey)
-                ? $"Add {history.AnnotationKey} (version {version.Version})"
-                : $"Update {history.AnnotationKey} to version {version.Version}";
-
-            repository.Commit(
-                [(fileName, ViewDocumentJson.Serialize(version.Content))],
-                GitSignature.FromAuthor(version.Author, version.CreatedAt),
-                message);
-
-            Enqueue(next.History, next.Version + 1);
+            var document = documents[next.Document];
+            var commit = document.Commits[next.Commit];
+            repository.Commit([(document.Path, ViewDocumentJson.Serialize(commit.Document))], commit.Signature, commit.Message);
+            Enqueue(next.Document, next.Commit + 1);
         }
 
-        // cleared configurations: their last version is in the tree, the current state has no document
-        var cleared = histories
-            .Where(history => history.Current is null)
-            .Select(history => history.AnnotationKey)
+        var deleted = documents
+            .Where(document => document.IsDeleted)
+            .Select(document => document.Path)
             .ToList();
 
-        if (cleared.Count > 0)
+        if (deleted.Count > 0)
         {
             repository.Commit(
-                cleared.Select(key => (ViewArchiveNames.GetConfigurationFileName(key), (byte[]?)null)),
+                deleted.Select(path => (path, (byte[]?)null)),
                 GitSignature.System(source.ExportedAt),
-                $"Remove cleared configurations\n\n{string.Join('\n', cleared)}");
+                $"Remove deleted documents\n\n{string.Join('\n', deleted)}");
         }
 
         repository.WriteTo(archive, source.ExportedAt);
+        return GetStatistics(content);
 
-        return new ViewArchiveStatistics(
-            0,
-            0,
-            0,
-            histories.Count(history => history.Current is not null),
-            histories.Sum(history => history.Versions.Count));
-
-        void Enqueue(int history, int version)
+        void Enqueue(int document, int commit)
         {
-            var versions = histories[history].Versions;
+            var commits = documents[document].Commits;
 
-            if (version < versions.Count)
+            if (commit < commits.Count)
             {
-                queue.Enqueue((history, version), (versions[version].CreatedAt, histories[history].AnnotationKey, versions[version].Version));
+                queue.Enqueue((document, commit), (commits[commit].Signature.When, document));
             }
         }
+    }
+
+    // The documents of the history in import order: annotations by depth in the graph, type and key (ancestors
+    // first); then type, descendant-type and annotation schemas, each by type and key; templates by type;
+    // configurations by key.
+    private static List<GitDocument> GetGitDocuments(ViewArchiveSource source, Content content)
+    {
+        var annotations = content.Annotations
+            .OrderBy(annotation => AnnotationKey.TryParse(annotation.AnnotationKey, out var key) ? key.GetDepth() : 0)
+            .ThenBy(annotation => annotation.AnnotationType)
+            .ThenBy(annotation => annotation.AnnotationKey, StringComparer.Ordinal)
+            .Select(annotation =>
+            {
+                // the commit is the creation of the key, its time and actor; the content is the current one
+                var created = annotation.Created ?? annotation.Modified;
+                var at = created?.At ?? source.ExportedAt;
+                var commit = new GitCommit(
+                    GitSignature.FromActor(created?.By, at),
+                    $"Add {ViewArchiveNames.Describe(ViewDocumentKind.Annotation, null, annotation.AnnotationKey)}",
+                    ViewAnnotationDocument.Write(annotation));
+
+                return new GitDocument(ViewArchiveNames.GetPath(ViewDocumentKind.Annotation, null, annotation.AnnotationKey), [commit], false);
+            });
+
+        return annotations
+            .Concat(content.Schemas.Select(history => GetGitDocument(history.Kind, history.AnnotationType, history.AnnotationKey, history.Versions, history.Current)))
+            .Concat(content.Templates.Select(history => GetGitDocument(ViewDocumentKind.Template, history.AnnotationType, null, history.Versions, history.Current)))
+            .Concat(content.Configurations.Select(history => GetGitDocument(ViewDocumentKind.Configuration, null, history.AnnotationKey, history.Versions, history.Current)))
+            .ToList();
+    }
+
+    // One commit per version, by the version's author at its time: "Add <document> (version n)" for the first version
+    // in the export, "Update <document> to version n" for the next ones.
+    private static GitDocument GetGitDocument(
+        ViewDocumentKind kind,
+        string? annotationType,
+        string? annotationKey,
+        IReadOnlyList<ConfigurationDocument> versions,
+        ConfigurationDocument? current)
+    {
+        var description = ViewArchiveNames.Describe(kind, annotationType, annotationKey);
+        var commits = versions
+            .Select((version, index) => new GitCommit(
+                GitSignature.FromAuthor(version.Author, version.CreatedAt),
+                index == 0 ? $"Add {description} (version {version.Version})" : $"Update {description} to version {version.Version}",
+                version.Content))
+            .ToList();
+
+        return new GitDocument(ViewArchiveNames.GetPath(kind, annotationType, annotationKey), commits, current is null);
+    }
+
+    private static ViewArchiveStatistics GetStatistics(Content content)
+    {
+        return new ViewArchiveStatistics(
+            content.Annotations.Count,
+            content.Schemas.Count(history => history.Current is not null),
+            content.Templates.Count(history => history.Current is not null),
+            content.Configurations.Count(history => history.Current is not null),
+            content.Schemas.Sum(history => history.Versions.Count)
+            + content.Templates.Sum(history => history.Versions.Count)
+            + content.Configurations.Sum(history => history.Versions.Count));
     }
 
     private static void WriteEntry(ZipArchive archive, string name, byte[] content, DateTimeOffset modifiedAt)
@@ -244,30 +287,17 @@ public static class ViewArchiveWriter
         stream.Write(content);
     }
 
-    private sealed class VersionOrder : IComparer<(DateTimeOffset At, string Key, ulong Version)>
-    {
-        public static readonly VersionOrder Instance = new();
-
-        public int Compare((DateTimeOffset At, string Key, ulong Version) x, (DateTimeOffset At, string Key, ulong Version) y)
-        {
-            var byTime = x.At.CompareTo(y.At);
-
-            if (byTime != 0)
-            {
-                return byTime;
-            }
-
-            var byKey = string.CompareOrdinal(x.Key, y.Key);
-            return byKey != 0 ? byKey : x.Version.CompareTo(y.Version);
-        }
-    }
-
     private sealed record class Content(
         IReadOnlyList<ViewArchiveContent> Include,
         IReadOnlyList<Annotation> Annotations,
         IReadOnlyList<SchemaHistory> Schemas,
         IReadOnlyList<TemplateHistory> Templates,
         IReadOnlyList<ConfigurationHistory> Configurations);
+
+    // A document of the git history at its path, with its commits in order; a deleted one is removed at the end.
+    private sealed record class GitDocument(string Path, IReadOnlyList<GitCommit> Commits, bool IsDeleted);
+
+    private sealed record class GitCommit(GitSignature Signature, string Message, JToken Document);
 
     // export.json, version 2. Every kind is listed, an excluded one empty; the import never reads it.
     private sealed record class Manifest(
