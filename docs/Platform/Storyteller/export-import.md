@@ -6,11 +6,19 @@ The code is in:
 
 - `src/Platform/Storyteller/Backend.Core/src/Transferring/`: the jobs, the file names, the archive reader and writer, the git writer, the import passes and the overlay;
 - `Backend.CosmosDb/src/`: the reads and imports of each kind (`Annotating/CosmosAnnotationService.Import.cs`, `Configuring/CosmosConfigurationSchemaService.Import.cs`, `CosmosConfigurationTemplateService.cs`, `CosmosConfigurationService.cs`) and the jobs (`Transferring/`);
-- `Backend.AzureStorage/src/`: the archives and the queue.
+- `Backend.AzureStorage/src/`: the archives and the queue;
+- `Api.Functions/src/`: the routes (`V1/ViewTransferHttp.cs`, `V1/ViewTransferRequests.cs`), the scopes (`Security/ViewTransferScopes.cs`), and the queue and timer functions (`Transfers/ViewTransferFunctions.cs`);
+- `Sdk.NSwag/` and `sdk.typescript/`: the clients generated from the OpenAPI document.
 
 The design and its decisions are in [the spec](specs/2026-10-15%20Export%20and%20Import%20of%20a%20View.md), which extends [the first spec](specs/2026-10-14%20Export%20and%20Import%20of%20Configurations.md) (configurations only).
 
-**State of the delivery.** The backend covers all four kinds (phase 1 of the spec). The routes are below the view with the include and existing options, and the OpenAPI document and both SDKs are regenerated from them (phase 2). The CLI and the admin UI call the new operations, but keep the commands and dialogs of the first spec, without include or existing, until phases 3 and 4. See [API](#api), [CLI](#cli) and [Administration UI](#administration-ui).
+**State of the delivery.** Phases 1 and 2 of the spec are done:
+
+- the backend covers all four kinds (phase 1);
+- the routes are below the view, take the include and existing options, and check the scopes of each included kind (phase 2);
+- the OpenAPI document, the C# SDK and the TypeScript SDK are generated from them (phase 2).
+
+The CLI (phase 3) and the admin UI's **Export & Import** page (phase 4) still follow. Until then, `sform story config export` and `import` and the dialogs of the Configurations page call the new operations without include or existing, so they cover all four kinds and overwrite. See [API](#api), [CLI](#cli) and [Administration UI](#administration-ui).
 
 ## What travels
 
@@ -256,7 +264,7 @@ The repository is written by `GitRepositoryWriter`, without a git library:
 | `force` | `false` | Store schemas and configurations that break each other, with the warning `SchemaViolation`. It never stores invalid JSON, an invalid JSON Schema, an annotation that breaks its rules, or a broken directive. |
 | `dryRun` | `false` | Decide every outcome and warning without writing anything. |
 
-`IViewTransferService.StartImportAsync` takes all four, and `StartExportAsync` takes `include`. The routes pass them through (see [API](#api)).
+`IViewTransferService.StartImportAsync` takes all four, and `StartExportAsync` takes `include`. The routes pass them through (see [Request options](#request-options)).
 
 ### Reading the archive
 
@@ -467,43 +475,115 @@ A summary counts `Created`, `Updated`, `Unchanged`, `Skipped` and `Failed`, and 
 
 ## API
 
-The routes are below `v1/{organization}/{project}/{view}`, with the tag `Transfers` (`Api.Functions/src/V1/ViewTransferHttp.cs`). `exports` and `imports` are literal segments after the view, and `views` is a reserved view name, so they meet no other route. The routes of the first spec below `…/configurations/` are gone; they were never released.
+The routes are below `v1/{organization}/{project}/{view}`, with the tag `Transfers`:
 
-| Method | Route | Operation | Answer |
+- `Api.Functions/src/V1/ViewTransferHttp.cs`: the five routes;
+- `V1/ViewTransferRequests.cs`: the parsing of the options;
+- `Security/ViewTransferScopes.cs`: the scopes per kind.
+
+`exports` and `imports` are literal segments after the view, and `views` is a reserved view name, so they meet no other route. The routes of the first spec below `…/configurations/` (`StartConfigurationExport` and its siblings, with the tag `Configurations`) are removed without a redirect; they were never released.
+
+### Routes
+
+| Method | Route | Operation | Success |
 | --- | --- | --- | --- |
-| `POST` | `…/exports` with `{ "Format": "Folder" \| "Git", "Include": [ … ] }` | `StartViewExport` | `202` `ViewExport`, `Location` of the job; `400` for an unknown format or kind; `409 TransferLimit` |
-| `GET` | `…/exports/{id}` | `GetViewExport` | `200` `ViewExport`; `404` for an unknown, expired or other view's export |
-| `GET` | `…/exports/{id}/archive` | `GetViewExportArchive` | `200` `application/zip`, `Content-Disposition` with the export's `FileName`; `409 TransferNotReady` while it is queued, running or failed; `404` |
-| `POST` | `…/imports?include=&existing=&force=&dryRun=&fileName=` with the zip as the body (`application/zip`) | `StartViewImport` | `202` `ViewImport`, `Location` of the job; `400 InvalidQuery` for an unknown kind or existing value; `400 InvalidArchive`; `413 ArchiveTooLarge`; `409 TransferLimit` |
-| `GET` | `…/imports/{id}` | `GetViewImport` | `200` `ViewImport` with the summaries and the items; `404` |
+| `POST` | `…/exports` with `{ "Format": "Folder" \| "Git", "Include": [ … ] }` | `StartViewExport` | `202` `ViewExport` |
+| `GET` | `…/exports/{id}` | `GetViewExport` | `200` `ViewExport` |
+| `GET` | `…/exports/{id}/archive` | `GetViewExportArchive` | `200` `application/zip`, with `Content-Disposition` naming the export's `FileName` |
+| `POST` | `…/imports?include=&existing=&force=&dryRun=&fileName=` with the zip as the body (`application/zip`) | `StartViewImport` | `202` `ViewImport` |
+| `GET` | `…/imports/{id}` | `GetViewImport` | `200` `ViewImport`, with the summaries and the items |
 
-**Options.**
+- A started job answers with its `Location`: the job below the collection it was posted to (`…/exports/{id}` or `…/imports/{id}`).
+- The job holds `Include` resolved: distinct, in import order, and all four when the request named none. An import also holds `Existing`, `IsDryRun` and `IsForced`.
+- A job is found only through the view it was started in (see [Jobs](#jobs)).
+- **Upload.** The zip is copied into memory up to `MaxArchiveBytes` (a larger `Content-Length` is refused before reading) and must start with a zip signature. Then its central directory is checked (see [Limits](#limits)).
 
-- The export body is read by the route itself: member names and values in any case, no body or `{}` exports a folder of all four kinds, and other members are ignored. `Include` is a list of kinds; an empty list or null means all four. An unknown format or kind, a number in their place, or a body that is not a JSON object answers `400` with a message that names it.
-- `include` of an import is a comma-separated list of `Annotations`, `Schemas`, `Templates` and `Configurations`, in any case. A repeated parameter works too, since its values arrive joined by commas. Empty means all four. An unknown name answers `400 InvalidQuery`, naming it.
-- `existing` is `Overwrite` (the default) or `Skip`, in any case; anything else answers `400 InvalidQuery`.
-- `force` and `dryRun` are `false` by default; `fileName` is only for display.
-- The job stores `Include` resolved (distinct, in import order, all four when the request named none), and answers with it.
+### Request options
 
-**Access.** The roles stay as in the first spec: any role on the project to export and read an export, `Contributor` to import and read an import. The scopes depend on the included kinds (`Api.Functions/src/Security/ViewTransferScopes.cs`):
+| Option | Where | Values | Default |
+| --- | --- | --- | --- |
+| `Format` | export, body | `Folder` or `Git` | `Folder` |
+| `Include` | export, body | a list of `Annotations`, `Schemas`, `Templates` and `Configurations` | all four |
+| `include` | import, query | the same kinds, comma-separated | all four |
+| `existing` | import, query | `Overwrite` or `Skip` | `Overwrite` |
+| `force` | import, query | `true` or `false` | `false` |
+| `dryRun` | import, query | `true` or `false` | `false` |
+| `fileName` | import, query | the name of the uploaded file | none |
+
+What the import options do is described under [Import](#import), in [Options](#options). The routes read them as follows:
+
+- **The export body** is read by the route itself rather than bound, so a mistake answers `400` with a message that names it.
+  - Member names, formats and kinds match in any case. Other members are ignored.
+  - No body, `{}`, null members and an empty `Include` export a folder of all four kinds.
+  - An unknown format or kind, a number in their place, an `Include` that is not a list, a body that is not a JSON object, and invalid JSON answer `400` without an error code. For example: `Include has the unknown kind "Secrets". Use Annotations, Schemas, Templates or Configurations, or an empty list for all four.`
+- **`include`** is read from the query, comma-separated and in any case.
+  - Spaces around a name and empty names are ignored, and a kind named twice counts once. Empty means all four.
+  - A repeated parameter (`include=annotations&include=templates`) works too, since the query joins its values with commas. Both SDKs send one comma-separated value.
+  - Only the names are kinds: a number, `annotation` or `Annotations|Schemas` is unknown. An unknown kind answers `400 InvalidQuery`, for example `The query parameter 'include' has the unknown kind 'secrets'. Use Annotations, Schemas, Templates or Configurations, comma-separated, or leave it empty for all four.`
+- **`existing`** is `Overwrite` or `Skip`, in any case. Empty means `Overwrite`. Anything else, including a number or `Overwrite,Skip`, answers `400 InvalidQuery`.
+- **`force`**, **`dryRun`** and **`fileName`** are bound as in the first spec. `fileName` is only for display: the job keeps its last path segment, without control characters, cut at 255 characters.
+
+### Status codes
+
+| Status | Error code | Route | When |
+| --- | --- | --- | --- |
+| `400` | | `StartViewExport` | The body is not valid JSON or not an object, or it names an unknown format or kind |
+| `400` | `InvalidQuery` | `StartViewImport` | `include` names an unknown kind, or `existing` is neither `Overwrite` nor `Skip` |
+| `400` | `InvalidArchive` | `StartViewImport` | The body is not a zip, or its central directory breaks a limit: more than `MaxArchiveEntries` entries, or document files declared larger than `MaxExtractedBytes` together (see [Limits](#limits)) |
+| `401` | | every route | Missing or invalid credentials, or a machine without access to the project |
+| `403` | `AccessDenied` | every route | A scope of an included kind is missing, or the caller's role is below the one the route needs (see [Access](#access)) |
+| `404` | `NotFound` | the three reads | The job doesn't exist in this view, or has expired. For the archive, also an expired archive. |
+| `409` | `TransferLimit` | both starts | The project already has `MaxActiveTransfers` jobs queued or running |
+| `409` | `TransferNotReady` | `GetViewExportArchive` | The export is queued, running or failed. The message of a failed one holds its error. |
+| `413` | `ArchiveTooLarge` | `StartViewImport` | The upload, or its declared `Content-Length`, is larger than `MaxArchiveBytes` |
+
+The checks run in this order, and the first failure answers:
+
+- `StartViewExport`: the body (`400`), the scopes (`403`), the role (`403`, or `401` for a machine), the job limit (`409`).
+- `StartViewImport`: `include` and `existing` (`400 InvalidQuery`), the scopes (`403`), the role (`403`, or `401` for a machine), the size (`413`), the zip signature (`400 InvalidArchive`), the job limit (`409`), the central directory (`400 InvalidArchive`).
+- The reads: the role, the job (`404`), and then the scopes of its `Include` (`403`). The download then checks the state (`409 TransferNotReady`) and opens the archive (`404`).
+
+### Access
+
+The roles stay as in the first spec: any role on the project to export and to read an export or download its archive, `Contributor` to import and to read an import. The scopes depend on the included kinds:
 
 | Included kind | Export, and reading an export | Import, and reading an import |
 | --- | --- | --- |
 | Annotations | `Annotation.Read`, `Annotation.ReadWrite`, `Default.Read` or `Default.ReadWrite` | `Annotation.ReadWrite` or `Default.ReadWrite` |
 | Schemas, Templates, Configurations | `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read` or `Default.ReadWrite` | `Configuration.ReadWrite` or `Default.ReadWrite` |
 
-- A request needs the scopes of every kind it includes. Reading a job, or downloading its archive, needs the scopes of the job's stored `Include`; a job without one counts as all four. The archive is not opened, and the job's state not told, before the scopes pass.
-- A missing scope answers `403 AccessDenied` (not `401`, which stays for missing or invalid credentials). The message names the kinds, the missing scopes and `include`, for example `Missing scope for annotations: importing them needs Annotation.ReadWrite or Default.ReadWrite. Without include, all four kinds are included; name the kinds to import in include.` So a machine with only `Configuration.ReadWrite` passes `include=schemas,templates,configurations`.
-- The order is: the options (`400`), the scopes (`403`), the role (`403`), then the body of an import (`413`, `400 InvalidArchive`). Reading a job checks the role, finds the job (`404`) and then checks its scopes.
-- Debug builds skip the scope and role checks (`DEV_AUTH`), as on every route. `ViewTransferHttp.ChecksScopes` follows that, and the tests turn it on.
+- **A request** needs the scopes of every kind it includes, and without include those of all four. `Default.Read` for an export, and `Default.ReadWrite` for an import, cover any include.
+- **Reading a job**, or downloading the archive of an export, needs the scopes of the job's stored `Include`, not of the request: the read scopes for an export, the write scopes for an import. A job without a stored `Include` counts as all four kinds. So polling an import needs the write scopes of its kinds too.
+  - The role is checked first. Then the job is read (`404`), and its scopes are checked (`403`).
+  - The archive is not opened, and the job's state not told, before the scopes pass.
+- **A missing scope** throws `AccessDeniedException`, which answers `403` with the error code `AccessDenied`. `401` stays for missing or invalid credentials. (In the first spec, a missing scope answered `401`.) The message has one sentence per rule that fails, and names the kinds, the scopes that would allow them, and `include`:
+
+  | Case | Message |
+  | --- | --- |
+  | A request without `include` | `Missing scope for annotations: importing them needs Annotation.ReadWrite or Default.ReadWrite. Without include, all four kinds are included; name the kinds to import in include.` |
+  | A request with `include` | `Missing scope for templates in include: exporting them needs Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite.` |
+  | Reading a job | `Missing scope for annotations in the include of this export: reading it needs Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite.` |
+
+  Kinds with the same rule share a sentence: `Missing scope for schemas, templates and configurations: exporting them needs …`.
+- So a machine with only `Configuration.ReadWrite` (the machine access scope `ConfigurationReadWrite`, see [authentication.md](authentication.md#the-machineaccess-object)) imports with `include=schemas,templates,configurations`, and exports with `"Include": [ "Schemas", "Templates", "Configurations" ]`.
 - Machines are allowed with the same scopes. The caller's audit actor becomes the job's `CreatedBy`, and the actor of written versions and audit entries.
+- **Debug builds** (`DEV_AUTH`) skip the scope and role checks, as on every route. The handler's internal `ChecksScopes` follows that by default. `ViewTransferHttpTests` turn it on, so the rules per kind and their wiring are tested in Debug too.
+- The granted scopes come from `HttpRequestDataExtensions.GetScopes()`: the `scp`, `roles` and scope claims, without an `App.` prefix. `CheckScope` and `TryCheckScope` use it as well.
 
-**Upload.** The upload is copied into memory up to `MaxArchiveBytes` (a larger `Content-Length` is refused before reading) and must start with a zip signature. Then the central directory is checked (see [Limits](#limits)).
+### OpenAPI and SDKs
 
-**OpenAPI.** `include` is published as an array with `style: form` and `explode: false` (comma-separated), and `existing` with the default `Overwrite`. `ViewTransferSchemaDocumentFilter` makes them, and the `Include` lists and `Existing` of the bodies and jobs, reference two shared schemas, `ViewArchiveContent` (without a default: no include means all four kinds) and `ViewImportExisting`. Inline, the generators would name an enum after each list (NSwag: `Include`, `Include2`, `Include3`, `Anonymous`). The document is `open.api.v0.9.21.json`, in `Sdk.NSwag` and `sdk.typescript`:
+The document publishes the five operations with the tag `Transfers`, each with its `401` and `403`.
+
+- `include` is an array with `style: form` and `explode: false`, so it is sent comma-separated. `existing` has the default `Overwrite`.
+- `ViewTransferSchemaDocumentFilter` makes both parameters, and the `Include` lists and `Existing` of the bodies and jobs, reference two shared schemas: `ViewArchiveContent` (without a default, since no include means all four kinds) and `ViewImportExisting`. Inline, the generators would name an enum after each list (NSwag: `Include`, `Include2`, `Include3`, `Anonymous`).
+- The other enums stay inline: the format (`ViewExportCreateFormat` in the body, `ViewExportFormat` on the job), the kind of a summary (`ViewImportSummaryContent`) and the kind of an item (`ViewImportItemKind`).
+
+The document is `open.api.v0.9.21.json`, in `Sdk.NSwag` and `sdk.typescript`:
 
 - The C# SDK has `ITransfersApiClient` (`TransfersApiClient`, registered by `AddStorytellerSdk`): `StartViewExportAsync`, `GetViewExportAsync`, `GetViewExportArchiveAsync` (a `FileResponse`), `StartViewImportAsync(…, IEnumerable<ViewArchiveContent> include, ViewImportExisting? existing, bool? force, bool? dryRun, string fileName, Stream body)` and `GetViewImportAsync`. It sends `include` comma-separated.
 - The TypeScript SDK has the `transfers` tag: `startViewExport`, `getViewExport`, `getViewExportArchive` (a `Blob`), `startViewImport(…, file, { include, existing, force, dryRun, fileName })` and `getViewImport`, with their Vue Query composables, Zod schemas and MSW handlers. `include` goes comma-separated (`include=Annotations%2CTemplates`).
+
+### Background functions
 
 The background half is `Api.Functions/src/Transfers/ViewTransferFunctions.cs`:
 
