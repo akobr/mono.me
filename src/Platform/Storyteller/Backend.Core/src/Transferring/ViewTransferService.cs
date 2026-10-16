@@ -13,9 +13,6 @@ public sealed class ViewTransferService : IViewTransferService
 
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(2);
 
-    // Transitional: imports cover the configurations only, until the passes of every kind (1.15).
-    private static readonly IReadOnlyList<ViewArchiveContent> TransitionalContent = [ViewArchiveContent.Configurations];
-
     // A job unchanged for this long counts as abandoned, so a crashed worker cannot block the project's limit.
     private static readonly TimeSpan ActiveWindow = TimeSpan.FromHours(1);
 
@@ -62,6 +59,7 @@ public sealed class ViewTransferService : IViewTransferService
         string project,
         string view,
         ViewArchiveFormat format,
+        IReadOnlyList<ViewArchiveContent>? include,
         AuditActor actor,
         CancellationToken cancellationToken = default)
     {
@@ -82,6 +80,7 @@ public sealed class ViewTransferService : IViewTransferService
                     Id = id,
                     Status = ViewTransferStatus.Queued,
                     Format = format,
+                    Include = ViewArchiveInclude.Resolve(include),
                     FileName = ViewArchiveNames.GetArchiveFileName(organization, project, view, format, now),
                     CreatedAt = now,
                     CreatedBy = actor,
@@ -131,6 +130,8 @@ public sealed class ViewTransferService : IViewTransferService
         string view,
         Stream archive,
         string? fileName,
+        IReadOnlyList<ViewArchiveContent>? include,
+        ViewImportExisting existing,
         bool force,
         bool dryRun,
         AuditActor actor,
@@ -167,6 +168,8 @@ public sealed class ViewTransferService : IViewTransferService
                     Id = id,
                     Status = ViewTransferStatus.Queued,
                     FileName = CleanFileName(fileName),
+                    Include = ViewArchiveInclude.Resolve(include),
+                    Existing = existing,
                     IsDryRun = dryRun,
                     IsForced = force,
                     CreatedAt = now,
@@ -313,9 +316,13 @@ public sealed class ViewTransferService : IViewTransferService
         int? Count(ViewArchiveContent content, int count) => include.Contains(content) ? count : null;
     }
 
+    // The passes of an import (1.15): the files of the included kinds are read, the annotations are imported (ancestors
+    // first), the overlay is filled, and the schemas, templates and configurations follow. A file that failed while
+    // reading is reported in the pass of its kind.
     private async Task ImportAsync(ViewTransferRecord record, CancellationToken cancellationToken)
     {
         var import = record.Import!;
+        var include = ViewArchiveInclude.Resolve(import.Include);
         var name = ViewTransferNames.GetArchiveName(record.ToMessage());
         ViewArchiveDocuments content;
 
@@ -325,10 +332,10 @@ public sealed class ViewTransferService : IViewTransferService
             using var buffer = new MemoryStream();
             await CopyWithLimitAsync(blob, buffer, _options.MaxArchiveBytes, cancellationToken);
             buffer.Position = 0;
-            content = ViewArchiveReader.Read(buffer, _options, TransitionalContent);
+            content = ViewArchiveReader.Read(buffer, _options, include);
         }
 
-        var progress = new ImportProgress(content.Files.Count, content.IgnoredFiles, content.ExcludedFiles, _options.MaxReportedItems);
+        var progress = new ImportProgress(include, content.Files.Count, content.IgnoredFiles, content.ExcludedFiles, _options.MaxReportedItems);
         var current = await SaveImportAsync(record, progress.Apply(import), cancellationToken);
         var savedAt = _time.GetUtcNow();
 
@@ -345,22 +352,25 @@ public sealed class ViewTransferService : IViewTransferService
             DryRun = import.IsDryRun,
         };
 
-        // Transitional: one overlay per job, still empty while only configurations are imported (1.15 fills it).
+        var files = OrderByPass(content.Files);
+        var stored = await ReadStoredAsync(record, files, options, cancellationToken);
         var overlay = new ViewImportOverlay();
+        var isOverlayFilled = false;
 
-        foreach (var file in content.Files)
+        foreach (var file in files)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var result = file.ErrorCode is not null
-                ? new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: file.ErrorCode, Message: file.Message)
-                : await _configurations.ImportConfigurationAsync(
-                    FullKey.Create(file.AnnotationKey!, record.Organization, record.Project, record.View),
-                    file.Content!,
-                    options,
-                    overlay);
+            // after the annotation pass, the keys that the import makes active are known
+            if (!isOverlayFilled && file.Kind != ViewDocumentKind.Annotation)
+            {
+                FillOverlay(files, stored, options, overlay);
+                isOverlayFilled = true;
+            }
 
-            progress.Add(file, result with { Message = Truncate(result.Message) });
+            var result = await ImportFileAsync(record, file, options, overlay);
+            Track(file, result, overlay);
+            progress.Add(file, Truncate(result));
 
             var now = _time.GetUtcNow();
 
@@ -388,6 +398,86 @@ public sealed class ViewTransferService : IViewTransferService
         {
             await TryDeleteArchiveAsync(name, cancellationToken);
         }
+    }
+
+    // What the overlay needs to know of the view before the annotation pass (1.10), with at most one read per kind:
+    // which annotations of the schema and configuration files are active, and, with Skip, which schemas and
+    // configurations the view already has. Templates are not in the overlay, and an annotation import reads its key.
+    private async Task<StoredDocuments> ReadStoredAsync(
+        ViewTransferRecord record,
+        IReadOnlyList<ViewArchiveFile> files,
+        ViewImportOptions options,
+        CancellationToken cancellationToken)
+    {
+        var (organization, project, view) = (record.Organization, record.Project, record.View);
+        var candidates = files.Where(IsOverlayCandidate).ToList();
+        var keys = candidates
+            .Where(file => file.Kind != ViewDocumentKind.TypeSchema)
+            .Select(file => file.AnnotationKey!)
+            .DistinctBy(key => key.ToString(), StringComparer.Ordinal)
+            .ToList();
+
+        var annotations = keys.Count > 0
+            ? await _annotations.FindActiveAnnotationKeysAsync(organization, project, view, keys, cancellationToken)
+            : new HashSet<string>();
+
+        var isSkip = options.Existing == ViewImportExisting.Skip;
+        var schemas = isSkip && candidates.Any(file => file.Kind != ViewDocumentKind.Configuration)
+            ? await _schemas.GetSchemaKeysAsync(organization, project, view, cancellationToken)
+            : new HashSet<SchemaKey>();
+        var configurations = isSkip && candidates.Any(file => file.Kind == ViewDocumentKind.Configuration)
+            ? await ReadConfigurationKeysAsync(organization, project, view, cancellationToken)
+            : new HashSet<string>();
+
+        return new StoredDocuments(annotations, schemas, configurations);
+    }
+
+    // The annotations of the view whose own document is not empty, through the pages of the configuration listing.
+    private async Task<IReadOnlySet<string>> ReadConfigurationKeysAsync(string organization, string project, string view, CancellationToken cancellationToken)
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        string? continuationToken = null;
+
+        do
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var page = await _configurations.ListConfigurationsAsync(organization, project, view, continuationToken: continuationToken);
+            keys.UnionWith(page.Configurations.Where(configuration => configuration.HasContent).Select(configuration => configuration.AnnotationKey));
+            continuationToken = page.ContinuationToken;
+        }
+        while (!string.IsNullOrEmpty(continuationToken));
+
+        return keys;
+    }
+
+    private Task<ViewImportResult> ImportFileAsync(ViewTransferRecord record, ViewArchiveFile file, ViewImportOptions options, ViewImportOverlay overlay)
+    {
+        if (file.ErrorCode is not null)
+        {
+            return Task.FromResult(new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: file.ErrorCode, Message: file.Message));
+        }
+
+        var (organization, project, view) = (record.Organization, record.Project, record.View);
+
+        return file.Kind switch
+        {
+            ViewDocumentKind.Annotation => _annotations.ImportAnnotationAsync(
+                FullKey.Create(file.AnnotationKey!, organization, project, view),
+                file.Content!,
+                options,
+                overlay),
+            ViewDocumentKind.Template => _templates.ImportTemplateAsync(organization, project, view, file.AnnotationType!, file.Content!, options),
+            ViewDocumentKind.Configuration => _configurations.ImportConfigurationAsync(
+                FullKey.Create(file.AnnotationKey!, organization, project, view),
+                file.Content!,
+                options,
+                overlay),
+            _ => _schemas.ImportSchemaAsync(
+                new ViewSchemaTarget(organization, project, view, file.Kind, file.AnnotationType, file.AnnotationKey?.ToString()),
+                file.Content!,
+                options,
+                overlay),
+        };
     }
 
     private async Task<ViewTransferRecord?> SaveImportAsync(ViewTransferRecord record, ViewImport import, CancellationToken cancellationToken)
@@ -516,16 +606,138 @@ public sealed class ViewTransferService : IViewTransferService
         return message is { Length: > MaxMessageLength } ? $"{message[..(MaxMessageLength - 1)]}…" : message;
     }
 
-    // Counts of an import while it runs; the reported items stop at the limit.
-    private sealed class ImportProgress(int total, int ignoredFiles, int excludedFiles, int maxItems)
+    // The message and the warnings as the job stores them.
+    private static ViewImportResult Truncate(ViewImportResult result)
+    {
+        return result with
+        {
+            Message = Truncate(result.Message),
+            Warnings = result.Warnings?.Select(warning => warning with { Message = Truncate(warning.Message)! }).ToList(),
+        };
+    }
+
+    // The files in the passes of an import (Order): annotations by depth in the graph, type and key, so ancestors come
+    // first; type, descendant-type and annotation schemas, each by type and key; templates by type; configurations by
+    // key. A duplicate follows the file that holds its document (the first path).
+    private static List<ViewArchiveFile> OrderByPass(IReadOnlyList<ViewArchiveFile> files)
+    {
+        return files
+            .OrderBy(file => ViewArchiveNames.GetContent(file.Kind))
+            .ThenBy(file => file.Kind)
+            .ThenBy(file => file.Kind == ViewDocumentKind.Annotation ? file.AnnotationKey!.GetDepth() : 0)
+            .ThenBy(file => file.Kind == ViewDocumentKind.Annotation ? file.AnnotationKey!.Type : default)
+            .ThenBy(file => file.AnnotationType, StringComparer.Ordinal)
+            .ThenBy(file => file.AnnotationKey?.ToString(), StringComparer.Ordinal)
+            .ThenBy(file => file.Path, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    // A schema or configuration file that the import may write: read without an error, and not empty.
+    private static bool IsOverlayCandidate(ViewArchiveFile file)
+    {
+        return file.ErrorCode is null
+               && file.Content is { HasValues: true }
+               && file.Kind is not (ViewDocumentKind.Annotation or ViewDocumentKind.Template);
+    }
+
+    // The schemas and configurations of the archive that the import will write (1.10), once the annotation pass is
+    // done: not empty, of an annotation that is active (stored, or made active by the import), and allowed by
+    // Existing. With Skip, a document the view already has stays, except the configuration of a re-created
+    // annotation, which the re-create emptied. Whether a schema is a valid JSON Schema is left to the schema service,
+    // which ignores the invalid layers of the overlay.
+    private static void FillOverlay(IEnumerable<ViewArchiveFile> files, StoredDocuments stored, ViewImportOptions options, ViewImportOverlay overlay)
+    {
+        var isSkip = options.Existing == ViewImportExisting.Skip;
+
+        foreach (var file in files.Where(IsOverlayCandidate))
+        {
+            var key = file.AnnotationKey?.ToString();
+            var hasAnnotation = key is not null && (stored.ActiveAnnotations.Contains(key) || overlay.ActiveAnnotations.Contains(key));
+
+            if (file.Kind == ViewDocumentKind.Configuration)
+            {
+                if (hasAnnotation
+                    && (!isSkip || !stored.Configurations.Contains(key!) || overlay.RecreatedAnnotations.Contains(key!)))
+                {
+                    overlay.SetConfiguration(file.AnnotationKey!, file.Content!);
+                }
+
+                continue;
+            }
+
+            var schemaKey = GetSchemaKey(file);
+
+            if ((file.Kind == ViewDocumentKind.TypeSchema || hasAnnotation)
+                && (!isSkip || !stored.Schemas.Contains(schemaKey)))
+            {
+                overlay.SetSchema(schemaKey, file.Content!);
+            }
+        }
+    }
+
+    // The overlay follows the outcomes. An annotation that fails, or is skipped for a failed ancestor, fails what hangs
+    // on it. A schema or configuration that fails or is skipped is not written, so it leaves the overlay. A duplicate
+    // file changes nothing: its document is the one of the first file.
+    private static void Track(ViewArchiveFile file, ViewImportResult result, ViewImportOverlay overlay)
+    {
+        if (file.ErrorCode == ErrorCodes.DuplicateFile)
+        {
+            return;
+        }
+
+        switch (file.Kind)
+        {
+            case ViewDocumentKind.Annotation:
+                if (result.Outcome == ViewImportOutcome.Failed || result.ErrorCode == ErrorCodes.DependencyFailed)
+                {
+                    overlay.AddFailedAnnotation(file.AnnotationKey!);
+                }
+
+                break;
+
+            case ViewDocumentKind.Template:
+                break;
+
+            case ViewDocumentKind.Configuration:
+                if (result.Outcome is ViewImportOutcome.Failed or ViewImportOutcome.Skipped)
+                {
+                    overlay.RemoveConfiguration(file.AnnotationKey!);
+                }
+
+                break;
+
+            default:
+                if (result.Outcome is ViewImportOutcome.Failed or ViewImportOutcome.Skipped)
+                {
+                    overlay.RemoveSchema(GetSchemaKey(file));
+                }
+
+                break;
+        }
+    }
+
+    private static SchemaKey GetSchemaKey(ViewArchiveFile file)
+    {
+        return file.Kind switch
+        {
+            ViewDocumentKind.TypeSchema => SchemaKey.ForType(file.AnnotationType!),
+            ViewDocumentKind.AnnotationSchema => SchemaKey.ForAnnotation(file.AnnotationKey!.ToString()),
+            _ => SchemaKey.ForDescendantType(file.AnnotationKey!.ToString(), file.AnnotationType!),
+        };
+    }
+
+    // The stored documents an import needs to know of before its annotation pass, by canonical keys.
+    private sealed record class StoredDocuments(
+        IReadOnlySet<string> ActiveAnnotations,
+        IReadOnlySet<SchemaKey> Schemas,
+        IReadOnlySet<string> Configurations);
+
+    // Counts of an import while it runs, in total and per included kind; the reported items stop at the limit.
+    private sealed class ImportProgress(IReadOnlyList<ViewArchiveContent> include, int total, int ignoredFiles, int excludedFiles, int maxItems)
     {
         private readonly List<ViewImportItem> _items = [];
-        private int _created;
-        private int _updated;
-        private int _unchanged;
-        private int _skipped;
-        private int _failed;
-        private int _warnings;
+        private readonly Counts _total = new();
+        private readonly Dictionary<ViewArchiveContent, Counts> _counts = include.ToDictionary(content => content, _ => new Counts());
         private bool _truncated;
 
         public int Processed { get; private set; }
@@ -533,33 +745,17 @@ public sealed class ViewTransferService : IViewTransferService
         public void Add(ViewArchiveFile file, ViewImportResult result)
         {
             Processed++;
+            _total.Add(result);
 
-            switch (result.Outcome)
+            // the reader returns the included kinds only
+            if (_counts.TryGetValue(ViewArchiveNames.GetContent(file.Kind), out var counts))
             {
-                case ViewImportOutcome.Created:
-                    _created++;
-                    break;
-
-                case ViewImportOutcome.Updated:
-                    _updated++;
-                    break;
-
-                case ViewImportOutcome.Unchanged:
-                    _unchanged++;
-                    return;
-
-                case ViewImportOutcome.Skipped:
-                    _skipped++;
-                    break;
-
-                default:
-                    _failed++;
-                    break;
+                counts.Add(result);
             }
 
-            if (result.Warnings is { Count: > 0 })
+            if (result.Outcome == ViewImportOutcome.Unchanged)
             {
-                _warnings++;
+                return;
             }
 
             if (_items.Count >= maxItems)
@@ -588,20 +784,66 @@ public sealed class ViewTransferService : IViewTransferService
             {
                 TotalCount = total,
                 ProcessedCount = Processed,
-                Summary = new ViewImportSummary
+                Summary = _total.ToSummary(null) with { ExcludedFiles = excludedFiles, IgnoredFiles = ignoredFiles },
+                Summaries = include.Select(content => _counts[content].ToSummary(content)).ToList(),
+                Items = _items.ToList(),
+                AreItemsTruncated = _truncated,
+            };
+        }
+
+        private sealed class Counts
+        {
+            private int _created;
+            private int _updated;
+            private int _unchanged;
+            private int _skipped;
+            private int _failed;
+            private int _warnings;
+
+            public void Add(ViewImportResult result)
+            {
+                switch (result.Outcome)
                 {
+                    case ViewImportOutcome.Created:
+                        _created++;
+                        break;
+
+                    case ViewImportOutcome.Updated:
+                        _updated++;
+                        break;
+
+                    case ViewImportOutcome.Unchanged:
+                        _unchanged++;
+                        return;
+
+                    case ViewImportOutcome.Skipped:
+                        _skipped++;
+                        break;
+
+                    default:
+                        _failed++;
+                        break;
+                }
+
+                if (result.Warnings is { Count: > 0 })
+                {
+                    _warnings++;
+                }
+            }
+
+            public ViewImportSummary ToSummary(ViewArchiveContent? content)
+            {
+                return new ViewImportSummary
+                {
+                    Content = content,
                     Created = _created,
                     Updated = _updated,
                     Unchanged = _unchanged,
                     Skipped = _skipped,
                     Failed = _failed,
                     Warnings = _warnings,
-                    ExcludedFiles = excludedFiles,
-                    IgnoredFiles = ignoredFiles,
-                },
-                Items = _items.ToList(),
-                AreItemsTruncated = _truncated,
-            };
+                };
+            }
         }
     }
 }

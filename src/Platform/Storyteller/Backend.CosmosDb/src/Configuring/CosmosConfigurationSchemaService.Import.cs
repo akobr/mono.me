@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
+using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Transferring;
 using Microsoft.Azure.Cosmos;
 using Newtonsoft.Json;
@@ -18,6 +20,41 @@ namespace _42.Platform.Storyteller.Configuring;
 public partial class CosmosConfigurationSchemaService
 {
     private const int MaxListedViolations = 20;
+
+    public async Task<IReadOnlySet<SchemaKey>> GetSchemaKeysAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default)
+    {
+        // current documents only ("{view}.cfs."), and an empty schema is no document, as in an export
+        var prefix = $"{view}.{EntityIdPrefixTypes.ConfigurationSchema}.";
+        var query = new QueryDefinition(
+                "SELECT VALUE c.id FROM c WHERE STARTSWITH(c.id, @prefix) "
+                + "AND IS_OBJECT(c.Content) AND ARRAY_LENGTH(ObjectToArray(c.Content)) > 0")
+            .WithParameter("@prefix", prefix);
+
+        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        using var iterator = container.GetItemQueryIterator<string>(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(GetSchemaPartitionKey(project)) });
+
+        var keys = new HashSet<SchemaKey>();
+
+        while (iterator.HasMoreResults)
+        {
+            foreach (var id in await iterator.ReadNextAsync(cancellationToken))
+            {
+                // the identities an import names: lower-case type codes and canonical keys
+                if (ParseSuffix(id[prefix.Length..]) is { } identity && IsExportable(identity))
+                {
+                    keys.Add(new SchemaKey(ToDocumentKind(identity.Kind), identity.Type, identity.Key));
+                }
+            }
+        }
+
+        return keys;
+    }
 
     public async Task<ViewImportResult> ImportSchemaAsync(ViewSchemaTarget target, JObject content, ViewImportOptions options, ViewImportOverlay overlay)
     {

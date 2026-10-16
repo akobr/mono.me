@@ -32,7 +32,7 @@ public class ConfigurationTransferHttpTests
         var accepted = result.ShouldBeOfType<AcceptedResult>();
         var export = accepted.Value.ShouldBeOfType<ViewExport>();
         accepted.Location.ShouldBe($"https://host/api/v1/acme/web/default/configurations/exports/{export.Id}");
-        _transfers.Calls.ShouldBe([$"export acme/web/default Git user_01"]);
+        _transfers.Calls.ShouldBe([$"export acme/web/default Git all user_01"]);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class ConfigurationTransferHttpTests
     {
         await Http().StartConfigurationExport(Request(), null, "acme", "web", "default");
 
-        _transfers.Calls.ShouldBe(["export acme/web/default Folder user_01"]);
+        _transfers.Calls.ShouldBe(["export acme/web/default Folder all user_01"]);
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public class ConfigurationTransferHttpTests
     [Fact]
     public async Task GetExport_OfAnotherViewIsNotFound()
     {
-        var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, AuditActor.System);
+        var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, null, AuditActor.System);
 
         var found = await Http().GetConfigurationExport(Request(), "acme", "web", "default", export.Id);
         found.ShouldBeOfType<OkObjectResult>().Value.ShouldBe(export);
@@ -67,7 +67,7 @@ public class ConfigurationTransferHttpTests
     [Fact]
     public async Task GetExportArchive_IsTheZipNamedByTheExport()
     {
-        var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, AuditActor.System);
+        var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, null, AuditActor.System);
 
         var result = await Http().GetConfigurationExportArchive(Request(), "acme", "web", "default", export.Id);
 
@@ -88,7 +88,7 @@ public class ConfigurationTransferHttpTests
         var accepted = result.ShouldBeOfType<AcceptedResult>();
         var import = accepted.Value.ShouldBeOfType<ViewImport>();
         accepted.Location.ShouldBe($"https://host/api/v1/acme/web/default/configurations/imports/{import.Id}");
-        _transfers.Calls.ShouldBe([$"import acme/web/default {zip.Length} bytes configs.zip force dry-run user_01"]);
+        _transfers.Calls.ShouldBe([$"import acme/web/default {zip.Length} bytes configs.zip all Overwrite force dry-run user_01"]);
     }
 
     [Theory]
@@ -198,9 +198,9 @@ public class ConfigurationTransferHttpTests
 
         public List<string> Calls { get; } = [];
 
-        public Task<ViewExport> StartExportAsync(string organization, string project, string view, ViewArchiveFormat format, AuditActor actor, CancellationToken cancellationToken = default)
+        public Task<ViewExport> StartExportAsync(string organization, string project, string view, ViewArchiveFormat format, IReadOnlyList<ViewArchiveContent>? include, AuditActor actor, CancellationToken cancellationToken = default)
         {
-            Calls.Add($"export {organization}/{project}/{view} {format} {actor.Id}");
+            Calls.Add($"export {organization}/{project}/{view} {format} {(include is null ? "all" : string.Join(',', include))} {actor.Id}");
             var id = Guid.NewGuid().ToString("N");
             var export = new ViewExport
             {
@@ -227,9 +227,9 @@ public class ConfigurationTransferHttpTests
             return (export, new MemoryStream([1, 2, 3]));
         }
 
-        public Task<ViewImport> StartImportAsync(string organization, string project, string view, Stream archive, string? fileName, bool force, bool dryRun, AuditActor actor, CancellationToken cancellationToken = default)
+        public Task<ViewImport> StartImportAsync(string organization, string project, string view, Stream archive, string? fileName, IReadOnlyList<ViewArchiveContent>? include, ViewImportExisting existing, bool force, bool dryRun, AuditActor actor, CancellationToken cancellationToken = default)
         {
-            Calls.Add($"import {organization}/{project}/{view} {archive.Length - archive.Position} bytes {fileName} {(force ? "force" : "-")} {(dryRun ? "dry-run" : "-")} {actor.Id}");
+            Calls.Add($"import {organization}/{project}/{view} {archive.Length - archive.Position} bytes {fileName} {(include is null ? "all" : string.Join(',', include))} {existing} {(force ? "force" : "-")} {(dryRun ? "dry-run" : "-")} {actor.Id}");
             return Task.FromResult(new ViewImport
             {
                 Id = Guid.NewGuid().ToString("N"),

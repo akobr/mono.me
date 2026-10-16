@@ -1,3 +1,4 @@
+using System.Globalization;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
@@ -104,14 +105,23 @@ internal sealed class RecordingTransferQueue : IViewTransferQueue
     }
 }
 
-// Only the two members an export and an import use.
-internal sealed class FakeConfigurationService(ExportReads? reads = null) : IConfigurationService
+// Only the members an export and an import use.
+internal sealed class FakeConfigurationService(ExportReads? reads = null, ImportLog? imports = null) : IConfigurationService
 {
     public IReadOnlyList<ConfigurationHistory> Histories { get; set; } = [];
 
     public Func<FullKey, JObject, ViewImportResult> Import { get; set; } = (_, _) => new ViewImportResult(ViewImportOutcome.Created, 1);
 
     public List<(FullKey Key, JObject Content, ViewImportOptions Options, ViewImportOverlay Overlay)> Imports { get; } = [];
+
+    // The stored configurations of the listing: the key and whether its own document has content.
+    public IReadOnlyList<(string Key, bool HasContent)> Listed { get; set; } = [];
+
+    // Configurations per page of the listing.
+    public int PageSize { get; set; } = 1000;
+
+    // The continuation token of each listing request.
+    public List<string?> ListReads { get; } = [];
 
     public Task<IReadOnlyList<ConfigurationHistory>> GetConfigurationHistoriesAsync(string organization, string project, string view, CancellationToken cancellationToken = default)
     {
@@ -122,14 +132,39 @@ internal sealed class FakeConfigurationService(ExportReads? reads = null) : ICon
     public Task<ViewImportResult> ImportConfigurationAsync(FullKey key, JObject content, ViewImportOptions options, ViewImportOverlay overlay)
     {
         Imports.Add((key, content, options, overlay));
+        imports?.Add(ViewDocumentKind.Configuration, null, key.Annotation.ToString(), options, overlay);
         return Task.FromResult(Import(key, content));
+    }
+
+    public Task<ConfigurationsResponse> ListConfigurationsAsync(string organization, string project, string view, string? annotationType = null, string? keyPrefix = null, string? continuationToken = null)
+    {
+        ListReads.Add(continuationToken);
+        var skip = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+        var page = Listed
+            .Skip(skip)
+            .Take(PageSize)
+            .Select(listed => new ConfigurationSummary
+            {
+                AnnotationKey = listed.Key,
+                AnnotationType = AnnotationKey.Parse(listed.Key).Type,
+                Version = 1,
+                Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UnixEpoch),
+                HasContent = listed.HasContent,
+            })
+            .ToList();
+        var next = skip + page.Count;
+
+        return Task.FromResult(new ConfigurationsResponse
+        {
+            Configurations = page,
+            ContinuationToken = next < Listed.Count ? next.ToString(CultureInfo.InvariantCulture) : null,
+            Count = page.Count,
+        });
     }
 
     public Task<bool> HasConfigurationContentAsync(FullKey key) => throw new NotSupportedException();
 
     public Task<Configuration?> GetRawConfigurationAsync(FullKey key) => throw new NotSupportedException();
-
-    public Task<ConfigurationsResponse> ListConfigurationsAsync(string organization, string project, string view, string? annotationType = null, string? keyPrefix = null, string? continuationToken = null) => throw new NotSupportedException();
 
     public Task<Configuration?> GetResolvedConfigurationAsync(FullKey key, bool includeSecrets = false) => throw new NotSupportedException();
 
