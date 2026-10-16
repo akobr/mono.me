@@ -93,7 +93,7 @@ export function buildNavigation(
       entries: [
         { label: 'Annotations', icon: 'i-lucide-tags', to: `${base}/annotations`, editRole: 'Contributor' },
         { label: 'Configurations', icon: 'i-lucide-settings-2', to: `${base}/configurations`, editRole: 'Contributor' },
-        { label: 'Key values', icon: 'i-lucide-key-round', to: `${base}/key-values`, editRole: 'Contributor' },
+        { label: 'Values store', icon: 'i-lucide-vault', to: `${base}/key-values`, editRole: 'Contributor' },
         { label: 'Graph', icon: 'i-lucide-waypoints', to: `${base}/graph` },
         { label: 'Templates', icon: 'i-lucide-layout-template', to: `${base}/templates`, editRole: 'Contributor' },
         { label: 'Schemas', icon: 'i-lucide-braces', to: `${base}/schemas`, editRole: 'Contributor' },

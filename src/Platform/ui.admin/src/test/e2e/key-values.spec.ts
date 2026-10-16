@@ -65,7 +65,7 @@ test('filters the list by level, clears the filter, and the app survives leaving
   await (await menu(page, testInfo)).getByRole('link', { name: 'Annotations', exact: true }).click()
   await expect(page).toHaveURL(/\/annotations/)
   await expect(page.getByText('rst.invoicing').first()).toBeVisible()
-  await (await menu(page, testInfo)).getByRole('link', { name: 'Key values', exact: true }).click()
+  await (await menu(page, testInfo)).getByRole('link', { name: 'Values store', exact: true }).click()
   await expect(page.getByText('db.password').first()).toBeVisible()
 })
 
