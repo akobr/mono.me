@@ -53,22 +53,24 @@ test('creates a machine and downloads its certificate', async ({ page }) => {
 test('shared certificates follow CertificateAndApiKey, and a machine can use one instead of its own', async ({
   page,
 }) => {
-  // The seeded project enables only API keys, so its shared certificate is disabled.
-  await openApp(page, '/acme/billing/certificates')
-  await expect(page.getByText('Shared certificates are disabled')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Issue certificate' })).toBeDisabled()
+  // The seeded project enables only API keys, so its shared certificate is disabled. The shared certificates are a
+  // section of the Machines page (424-35).
+  await openApp(page, '/acme/billing/machines')
+  const certificates = page.locator('#shared-certificates')
+  await expect(certificates.getByRole('heading', { name: 'Shared certificates' })).toBeVisible()
+  await expect(certificates.getByText('Shared certificates are disabled')).toBeVisible()
+  await expect(certificates.getByRole('button', { name: 'Issue certificate' })).toBeDisabled()
 
   await goto(page, '/acme/billing/settings')
   await page.getByRole('checkbox', { name: 'CertificateAndApiKey', exact: true }).click()
   await page.getByRole('button', { name: 'Save policy' }).click()
   await expect(page.getByText('Machine policy saved', { exact: true })).toBeVisible()
 
-  await goto(page, '/acme/billing/certificates')
-  await expect(page.getByRole('button', { name: 'Issue certificate' })).toBeEnabled()
-  await expect(page.getByText('Shared certificates are disabled')).toBeHidden()
+  await goto(page, '/acme/billing/machines')
+  await expect(certificates.getByRole('button', { name: 'Issue certificate' })).toBeEnabled()
+  await expect(certificates.getByText('Shared certificates are disabled')).toBeHidden()
 
   // A CertificateAndApiKey machine with a shared certificate gets only its API key.
-  await goto(page, '/acme/billing/machines')
   await page.getByRole('button', { name: 'New machine' }).first().click()
   const dialog = page.getByRole('dialog', { name: 'New machine access' })
   await dialog.getByRole('combobox', { name: 'Credential kind' }).click()
