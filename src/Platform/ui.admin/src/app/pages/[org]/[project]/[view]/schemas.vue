@@ -89,7 +89,7 @@ const current = computed(() => route.path)
               v-for="row in section.rows"
               :key="row.id"
               class="flex flex-wrap items-center gap-3 px-4 py-2.5"
-              :class="current === row.to ? 'bg-primary/5' : ''"
+              :class="current === row.to ? 'bg-primary/4' : ''"
             >
               <AnnotationTypeBadge v-if="row.code" :type="row.code" />
               <RouterLink

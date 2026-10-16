@@ -39,7 +39,7 @@ defineExpose({ scrollElement: () => scroller.value ?? undefined })
         <button
           type="button"
           class="flex size-full flex-col justify-center gap-1 px-4 text-start active:bg-elevated"
-          :class="rows[item.index]!.key === selectedKey ? 'bg-primary/10' : ''"
+          :class="rows[item.index]!.key === selectedKey ? 'bg-primary/8' : ''"
           :aria-current="rows[item.index]!.key === selectedKey ? 'true' : undefined"
           @click="emit('open', rows[item.index]!.key)"
         >

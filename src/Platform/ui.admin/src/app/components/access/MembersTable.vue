@@ -123,7 +123,7 @@ async function remove() {
             v-for="{ member, rules } in rows"
             :id="`member-${member.AccountId}`"
             :key="member.AccountId"
-            :class="member.AccountId === highlight ? 'bg-primary/10' : undefined"
+            :class="member.AccountId === highlight ? 'bg-primary/8' : undefined"
             :aria-current="member.AccountId === highlight ? 'true' : undefined"
           >
             <td class="px-3 py-2">

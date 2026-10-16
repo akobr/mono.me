@@ -22,7 +22,7 @@ const expired = (entry: ConfigurationVersion) =>
       v-for="(entry, index) in sorted"
       :key="entry.Version"
       class="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm"
-      :class="entry.Version === selected || entry.Version === from ? 'bg-primary/5' : ''"
+      :class="entry.Version === selected || entry.Version === from ? 'bg-primary/4' : ''"
     >
       <span class="w-10 font-mono font-semibold text-highlighted">v{{ entry.Version }}</span>
       <UBadge v-if="entry.Version === current" label="current" color="primary" variant="subtle" size="sm" />
