@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Abstractions;
 using System.Threading.Tasks;
@@ -8,16 +9,16 @@ using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
-namespace _42.Platform.Cli.Commands.Configuration;
+namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.IMPORT, Description = "Import configuration documents into the view from a zip or a folder: every <annotation-key>.json replaces the stored document as a new version unless it is equal.")]
-public class ConfigImportCommand : BaseContextCommand
+[Command(CommandNames.IMPORT, Description = "Import a zip or a folder into the view: annotations, schemas, templates and configurations, each recognized by its file name. Only current documents are imported, never versions, and nothing is deleted.")]
+public class StorytellerImportCommand : BaseContextCommand
 {
     private readonly ITransfersApiClient _transfersApi;
     private readonly IFileSystem _fileSystem;
     private readonly TransferPolling _polling;
 
-    public ConfigImportCommand(
+    public StorytellerImportCommand(
         IExtendedConsole console,
         ICommandContext context,
         ITransfersApiClient transfersApi,
@@ -30,31 +31,44 @@ public class ConfigImportCommand : BaseContextCommand
         _polling = polling;
     }
 
-    [Argument(0, Description = "A zip, for example an export, or a folder; its *.json files are packed, without .git folders.")]
+    [Argument(0, Name = "zip-or-folder", Description = "A zip, for example an export, or a folder; its *.json files are packed, without hidden folders and files (.git, .github, ._*).")]
     public string Path { get; set; } = string.Empty;
 
-    [Option("--dry-run", CommandOptionType.NoValue, Description = "Validate and compare only; nothing is written.")]
+    [Option("-i|--include", CommandOptionType.MultipleValue, ValueName = "kinds", Description = "The kinds to import: annotations, schemas, templates and configurations, comma-separated or repeated; all four by default. Files of other kinds are excluded.")]
+    public string[]? Include { get; set; }
+
+    [Option("-e|--existing", CommandOptionType.SingleValue, ValueName = "mode", Description = "What happens to a document the view already has: 'overwrite' (default) writes the file as a new version or an update; 'skip' keeps it.")]
+    public string? Existing { get; set; }
+
+    [Option("--dry-run", CommandOptionType.NoValue, Description = "Validate and compare only, and report every outcome and warning; nothing is written.")]
     public bool IsDryRun { get; set; }
 
-    [Option("--force", CommandOptionType.NoValue, Description = "Store documents even if they violate their schema.")]
+    [Option("--force", CommandOptionType.NoValue, Description = "Store schemas and configurations that break each other, with a warning; without it, they fail and the rest is imported.")]
     public bool IsForced { get; set; }
 
-    [Option("--timeout", CommandOptionType.SingleValue, Description = "Minutes to wait for the import (10 by default); the import continues on the server after that.")]
+    [Option("--timeout", CommandOptionType.SingleValue, ValueName = "minutes", Description = "Minutes to wait for the import; the import continues on the server after that.")]
     public int TimeoutMinutes { get; set; } = 10;
 
     protected override async Task<int> ExecuteAsync()
     {
+        if (!ViewTransferArguments.TryParseInclude(Include, out var include, out var error)
+            || !ViewTransferArguments.TryParseExisting(Existing, out var existing, out error))
+        {
+            Console.WriteLine(error.ThemedError(Console.Theme));
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
         Stream archive;
         string fileName;
 
         if (!string.IsNullOrWhiteSpace(Path) && _fileSystem.Directory.Exists(Path))
         {
-            var (packed, count) = ConfigurationArchives.PackFolder(_fileSystem, Path);
+            var (packed, count) = ViewArchives.PackFolder(_fileSystem, Path);
 
             if (count == 0)
             {
                 packed.Dispose();
-                Console.WriteLine($"The folder '{Path}' has no *.json files.".ThemedError(Console.Theme));
+                Console.WriteLine($"The folder '{Path}' has no *.json files outside hidden folders.".ThemedError(Console.Theme));
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
 
@@ -82,22 +96,22 @@ public class ConfigImportCommand : BaseContextCommand
                     Context.OrganizationName,
                     Context.ProjectName,
                     Context.ViewName,
-                    include: null,
-                    existing: null,
+                    include,
+                    existing,
                     IsForced ? true : null,
                     IsDryRun ? true : null,
                     fileName,
                     archive);
             }
-            catch (ApiException exception) when (exception.StatusCode is 400 or 409 or 413)
+            catch (ApiException exception) when (exception.StatusCode is 400 or 401 or 403 or 409 or 413)
             {
                 Console.WriteLine(exception.GetErrorMessage().ThemedError(Console.Theme));
-                return ExitCodes.ERROR_WRONG_INPUT;
+                return exception.StatusCode is 401 or 403 ? ExitCodes.WARNING_UNAUTHORIZED_ACCESS : ExitCodes.ERROR_WRONG_INPUT;
             }
         }
 
         Console.WriteLine(
-            $"Importing {fileName} into {Context.OrganizationName}.{Context.ProjectName}.{Context.ViewName}{(IsDryRun ? " (dry run)" : string.Empty)}…"
+            $"Importing {fileName} into {Context.OrganizationName}.{Context.ProjectName}.{Context.ViewName}{FormatOptions(include, existing)}…"
                 .ThemedLowlight(Console.Theme));
 
         var (finished, isDone) = await _polling.WaitAsync(
@@ -120,6 +134,36 @@ public class ConfigImportCommand : BaseContextCommand
 
         Console.WriteHeader($"Import of {fileName}");
         Console.WriteImport(finished);
+
+        // warnings do not change the exit code
         return finished.Summary?.Failed > 0 ? ExitCodes.ERROR_WRONG_INPUT : ExitCodes.SUCCESS;
+    }
+
+    // " (annotations and templates, skip existing, forced, dry run)", or nothing for the defaults.
+    private string FormatOptions(IReadOnlyList<ViewArchiveContent>? include, ViewImportExisting? existing)
+    {
+        var options = new List<string>();
+
+        if (include is not null)
+        {
+            options.Add(ViewTransferArguments.FormatKinds(include));
+        }
+
+        if (existing == ViewImportExisting.Skip)
+        {
+            options.Add("skip existing");
+        }
+
+        if (IsForced)
+        {
+            options.Add("forced");
+        }
+
+        if (IsDryRun)
+        {
+            options.Add("dry run");
+        }
+
+        return options.Count == 0 ? string.Empty : $" ({string.Join(", ", options)})";
     }
 }

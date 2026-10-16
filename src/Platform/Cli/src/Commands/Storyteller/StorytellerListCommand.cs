@@ -22,6 +22,8 @@ namespace _42.Platform.Cli.Commands.Storyteller;
     typeof(StorytellerRestoreCommand),
     typeof(StorytellerDeletedCommand),
     typeof(StorytellerHistoryCommand),
+    typeof(StorytellerExportCommand),
+    typeof(StorytellerImportCommand),
     typeof(ConfigGetCommand),
     typeof(KeyValueListCommand),
     typeof(TemplateGetCommand),

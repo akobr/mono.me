@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace _42.Platform.Cli.Services;
 
 /// <summary>
-/// Waits for an export or an import of configurations, which the server runs in the background: polls every second,
+/// Waits for an export or an import of a view, which the server runs in the background: polls every second,
 /// then every two and three seconds, until the job ends or the timeout runs out.
 /// </summary>
 public class TransferPolling
