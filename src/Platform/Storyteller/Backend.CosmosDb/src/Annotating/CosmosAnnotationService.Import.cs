@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
@@ -12,6 +14,25 @@ namespace _42.Platform.Storyteller.Annotating;
 // reports what the real run does.
 public partial class CosmosAnnotationService
 {
+    // The states of the annotation items in one read of many items, for the overlay of an import.
+    public async Task<IReadOnlySet<string>> FindActiveAnnotationKeysAsync(
+        string organization,
+        string project,
+        string view,
+        IReadOnlyCollection<AnnotationKey> keys,
+        CancellationToken cancellationToken = default)
+    {
+        var states = await AnnotationItemStore.ReadStatesAsync(
+            Store(organization).Container,
+            keys.Select(key => FullKey.Create(key, organization, project, view)),
+            cancellationToken);
+
+        return states
+            .Where(state => state.Value == AnnotationItemState.Active)
+            .Select(state => state.Key)
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
     public async Task<ViewImportResult> ImportAnnotationAsync(FullKey key, JObject content, ViewImportOptions options, ViewImportOverlay overlay)
     {
         if (!ViewAnnotationDocument.TryRead(content, key, out var annotation, out var errorCode, out var message))

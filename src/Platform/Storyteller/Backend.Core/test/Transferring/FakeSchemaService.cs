@@ -4,10 +4,29 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring;
 
-// Only the member an export uses.
-internal sealed class FakeSchemaService(ExportReads? reads = null) : IConfigurationSchemaService
+// Only the members an export and an import use.
+internal sealed class FakeSchemaService(ExportReads? reads = null, ImportLog? imports = null) : IConfigurationSchemaService
 {
     public IReadOnlyList<SchemaHistory> Histories { get; set; } = [];
+
+    // The stored schemas with a document, for the existence read.
+    public HashSet<SchemaKey> Stored { get; set; } = [];
+
+    public int KeyReads { get; private set; }
+
+    public Func<ViewSchemaTarget, JObject, ViewImportOverlay, ViewImportResult> Import { get; set; } = (_, _, _) => new ViewImportResult(ViewImportOutcome.Created, 1);
+
+    public Task<IReadOnlySet<SchemaKey>> GetSchemaKeysAsync(string organization, string project, string view, CancellationToken cancellationToken = default)
+    {
+        KeyReads++;
+        return Task.FromResult<IReadOnlySet<SchemaKey>>(Stored);
+    }
+
+    public Task<ViewImportResult> ImportSchemaAsync(ViewSchemaTarget target, JObject content, ViewImportOptions options, ViewImportOverlay overlay)
+    {
+        imports?.Add(target.Kind, target.AnnotationType, target.AnnotationKey, options, overlay);
+        return Task.FromResult(Import(target, content, overlay));
+    }
 
     public Task<IReadOnlyList<SchemaHistory>> GetSchemaHistoriesAsync(string organization, string project, string view, CancellationToken cancellationToken = default)
     {
@@ -62,6 +81,4 @@ internal sealed class FakeSchemaService(ExportReads? reads = null) : IConfigurat
     public Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint version) => throw new NotSupportedException();
 
     public Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint fromVersion, uint toVersion) => throw new NotSupportedException();
-
-    public Task<ViewImportResult> ImportSchemaAsync(ViewSchemaTarget target, JObject content, ViewImportOptions options, ViewImportOverlay overlay) => throw new NotSupportedException();
 }

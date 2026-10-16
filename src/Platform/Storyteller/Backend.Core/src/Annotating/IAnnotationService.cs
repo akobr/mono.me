@@ -74,6 +74,15 @@ public interface IAnnotationService
 
     Task<AnnotationHistory?> GetAnnotationHistoryAsync(FullKey fullKey);
 
+    // The keys among the given ones whose annotation is not deleted, whatever its status, as canonical strings
+    // (AnnotationKey.ToString()). One read of many items, no query (the existence check before an import).
+    Task<IReadOnlySet<string>> FindActiveAnnotationKeysAsync(
+        string organization,
+        string project,
+        string view,
+        IReadOnlyCollection<AnnotationKey> keys,
+        CancellationToken cancellationToken = default);
+
     // Imports the file of an annotation (ViewAnnotationDocument): the content replaces the one of an active key, and
     // a missing key is created with its missing ancestors. A deleted key or ancestor is re-created with Overwrite and
     // skipped (AnnotationDeleted) with Skip. An ancestor that failed in this import skips the file (DependencyFailed).
