@@ -115,7 +115,7 @@ The breadcrumb and **Lineage** show its ancestors in merge order.
 
 Creating an annotation whose key, or an ancestor's key, is deleted asks first: **Restore and update** brings back the deleted annotation with its configuration and history; **Create new** replaces it with an empty one. **Bulk create** asks the same for all its keys at once, and offers **Restore** instead of **Restore and update**, since it writes nothing over them.
 
-The command palette (`Ctrl K` / `⌘ K`) finds annotations, pages, projects and actions.
+The command palette (`Ctrl K` / `⌘ K`) finds annotations, pages, projects and actions, and switches the theme.
 
 ## Configuration
 
@@ -170,11 +170,10 @@ Only your own documents travel: templates, schemas and resolved secrets stay out
 
 | Screen | Who | What |
 | --- | --- | --- |
-| Members | Administrator | Roles of the organization and of each project. Organization and project roles are independent. Only Owners grant Owner, and the last Owner stays. |
-| Invitations | Administrator | Invite by email with a role and an expiry; resend, revoke or copy the link. |
-| Machines | Contributor | Credentials for services: scope, an optional annotation restriction, the credential kind and certificate lifetime, reset and delete. |
-| Certificates | Administrator | Shared client certificates: issue, revoke, expiry warnings. |
-| Settings | Everyone (policy: Administrator, time zone, date format and types: Contributor) | The default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy and the CA certificate download. |
+| Members | Administrator | Roles of the organization and of each project. Organization and project roles are independent. Only Owners grant Owner, and the last Owner stays. Below the members, **Invitations**: invite by email with a role and an expiry; resend, revoke or copy the link. |
+| Machines | Contributor (shared certificates: Administrator) | Credentials for services: scope, an optional annotation restriction, the credential kind and certificate lifetime, reset and delete. Below the machines, **Shared certificates**: issue, revoke, expiry warnings. |
+| Settings | Everyone (policies: Administrator, time zone, date format and types: Contributor) | The default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy, the CA certificate download and, in the **Secrets** section, how the key values of the project are protected. |
+| Monitor | Administrator | The **Usage** of the key values (totals, estimated charges, a daily chart) and the **Audit** trail of secrets, one tab each. |
 
 **Machine authentication** on Settings (Administrator) enables the credential kinds the project's machines may use: API keys, client certificates (mTLS), both together, or client credentials of the identity provider. It also sets the default kind and the default certificate lifetime of new machines. **New machine** on Machines preselects both, and lets you pick any other enabled kind and lifetime. Machines keep the kind they were created with; disabling a kind stops every machine that uses it until it is enabled again. The machine detail shows the certificate lifetime and when the certificate expires.
 
@@ -215,7 +214,7 @@ The UI adapts to the screen:
 - **Tablet:** the detail slides in from the right, or opens in full screen.
 - **Desktop:** the resizable sidebar sits beside the list; the detail opens over the list, pinned beside it and resizable, or in full screen.
 
-It follows the system light or dark theme unless you pick one on the account page. The account page also keeps your other preferences: row density, editor formats, the date format and your own names, colors and icons of the annotation types.
+It follows the system light or dark theme unless you pick one in the command palette or on the account page. The account page also keeps your other preferences: row density, editor formats, the date format and your own names, colors and icons of the annotation types.
 
 Buttons, links, the selected item and the focus use the purple of the 42 logo: a deeper shade in the light theme and a lighter one in the dark theme, so text in it keeps WCAG AA contrast in both.
 
