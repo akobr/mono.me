@@ -7,9 +7,11 @@ import {
   isStorytellerError,
   startViewExport,
   startViewImport,
+  type ViewArchiveContent,
   type ViewExport,
   type ViewExportCreateFormat,
   type ViewImport,
+  type ViewImportExisting,
 } from '@42for.net/2splatform.sdk'
 import { saveBlob } from '@/utils/download'
 import { errorMessage } from '@/utils/errors'
@@ -42,9 +44,21 @@ export interface ImportJob extends TransferJobBase {
 
 export type TransferJob = ExportJob | ImportJob
 
+export interface ExportOptions {
+  format: ViewExportCreateFormat
+  /** The kinds to export; none or an empty list means all four, as in the API. */
+  include?: readonly ViewArchiveContent[]
+}
+
 export interface ImportOptions {
-  dryRun: boolean
-  force: boolean
+  /** The kinds to import; none or an empty list means all four, as in the API. */
+  include?: readonly ViewArchiveContent[]
+  /** What happens to documents the view already has; the API's default is Overwrite. */
+  existing?: ViewImportExisting
+  /** Store schemas and configurations that break each other, with a warning. */
+  force?: boolean
+  /** Decide every outcome and warning without writing. */
+  dryRun?: boolean
 }
 
 interface PendingExport {
@@ -64,10 +78,13 @@ const sameScope = (left: Scope, right: Scope) =>
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+/** The include of a request: the kinds in the given order, or none for all four. */
+const includeOf = (include: readonly ViewArchiveContent[] | undefined) => (include?.length ? [...include] : undefined)
+
 /**
- * Exports and imports of configurations (spec 4.2, 4.3). The server runs them as jobs, so they are tracked here,
- * not by a page: leaving the Configurations page does not stop the download of a finished export, and pending
- * exports are resumed after a reload. Components show the progress; TransferToaster reports the ends.
+ * Exports and imports of a view (export-import.md; spec 4.5 of the Export and Import of a View). The server runs them
+ * as jobs, so they are tracked here, not by a page: leaving the page does not stop the download of a finished export,
+ * and pending exports are resumed after a reload. Components show the progress; TransferToaster reports the ends.
  */
 export const useTransfersStore = defineStore('transfers', () => {
   const jobs = ref<TransferJob[]>([])
@@ -95,8 +112,11 @@ export const useTransfersStore = defineStore('transfers', () => {
     return () => watched.value.delete(id)
   }
 
-  async function startExport(scope: Scope, format: ViewExportCreateFormat): Promise<ExportJob> {
-    const state = await startViewExport(scope.org, scope.project, scope.view, { Format: format })
+  async function startExport(scope: Scope, options: ExportOptions): Promise<ExportJob> {
+    const state = await startViewExport(scope.org, scope.project, scope.view, {
+      Format: options.format,
+      Include: includeOf(options.include),
+    })
     const job = track<ExportJob>({
       kind: 'export',
       id: state.Id!,
@@ -110,10 +130,13 @@ export const useTransfersStore = defineStore('transfers', () => {
     return job
   }
 
-  async function startImport(scope: Scope, file: File, options: ImportOptions): Promise<ImportJob> {
+  /** Uploads a zip; the options left out get the API's defaults (all four kinds, Overwrite, no force, a real run). */
+  async function startImport(scope: Scope, file: File, options: ImportOptions = {}): Promise<ImportJob> {
     const state = await startViewImport(scope.org, scope.project, scope.view, file, {
-      dryRun: options.dryRun || undefined,
+      include: includeOf(options.include),
+      existing: options.existing,
       force: options.force || undefined,
+      dryRun: options.dryRun || undefined,
       fileName: file.name,
     })
     const job = track<ImportJob>({

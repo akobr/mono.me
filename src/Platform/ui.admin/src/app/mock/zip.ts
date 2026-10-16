@@ -4,6 +4,8 @@
 export interface ZipFile {
   name: string
   data: Uint8Array
+  /** The time of the entry when it is written; the zip's time when unset. The reader does not set it. */
+  modified?: Date
 }
 
 const encoder = new TextEncoder()
@@ -35,18 +37,18 @@ function dosTime(date: Date): [number, number] {
   return [time, day]
 }
 
-export function textFile(name: string, text: string): ZipFile {
-  return { name, data: encoder.encode(text) }
+export function textFile(name: string, text: string, modified?: Date): ZipFile {
+  return { name, data: encoder.encode(text), ...(modified ? { modified } : {}) }
 }
 
-/** A zip with stored (uncompressed) entries and UTF-8 names. */
+/** A zip with stored (uncompressed) entries and UTF-8 names; each entry has its own time or the zip's. */
 export function createZip(files: ZipFile[], modified = new Date()): Uint8Array<ArrayBuffer> {
-  const [time, date] = dosTime(modified)
   const locals: Uint8Array[] = []
   const centrals: Uint8Array[] = []
   let offset = 0
 
   for (const file of files) {
+    const [time, date] = dosTime(file.modified ?? modified)
     const name = encoder.encode(file.name)
     const crc = crc32(file.data)
 

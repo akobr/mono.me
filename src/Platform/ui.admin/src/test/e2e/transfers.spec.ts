@@ -24,7 +24,7 @@ async function exportView(page: Page, format: 'Folder' | 'Git repository') {
 
 const text = (file: ZipFile) => new TextDecoder().decode(file.data)
 
-test('exports the configurations of the view as a folder', async ({ page }) => {
+test('exports the view as a folder', async ({ page }) => {
   await openApp(page, path)
 
   const { name, files } = await exportView(page, 'Folder')
@@ -32,17 +32,24 @@ test('exports the configurations of the view as a folder', async ({ page }) => {
   expect(name).toMatch(/^export-acme-billing-default-\d{8}-\d{6}Z\.zip$/)
   const names = files.map((file) => file.name)
   expect(names).toContain('export.json')
-  expect(names.some((file) => /^[a-z]{3}\..+\.\d+\.json$/.test(file))).toBe(true)
-  expect(names.filter((file) => file !== 'export.json').every((file) => file.endsWith('.json'))).toBe(true)
+  // one folder per kind; the version files sit next to their current file
+  expect(names).toEqual(expect.arrayContaining(['annotations/rst.invoicing.json', 'templates/exe.template.json']))
+  expect(names.some((file) => /^configurations\/[a-z]{3}\..+\.conf\.\d+\.json$/.test(file))).toBe(true)
+  expect(
+    names
+      .filter((file) => file !== 'export.json')
+      .every((file) => /^(annotations|schemas|templates|configurations)\/[^/]+\.json$/.test(file)),
+  ).toBe(true)
 })
 
-test('exports the configurations of the view as a git repository', async ({ page }) => {
+test('exports the view as a git repository', async ({ page }) => {
   await openApp(page, path)
 
   const { name, files } = await exportView(page, 'Git repository')
 
   expect(name).toMatch(/^export-acme-billing-default-git-\d{8}-\d{6}Z\.zip$/)
   expect(files.map((file) => file.name)).toContain('.git/HEAD')
+  expect(files.map((file) => file.name)).not.toContain('export.json')
 })
 
 test('imports an edited export: a dry run, then for real', async ({ page }, testInfo) => {
@@ -59,8 +66,8 @@ test('imports an edited export: a dry run, then for real', async ({ page }, test
   const changed = { ...(JSON.parse(text(current)) as Record<string, unknown>), importedByTest: true }
   const archive = createZip([
     textFile(current.name, JSON.stringify(changed, null, 2)),
-    textFile('rst.no-such-annotation.json', '{"a":1}'),
-    textFile('rst.broken.json', '{"a":'),
+    textFile('rst.no-such-annotation.conf.json', '{"a":1}'),
+    textFile('rst.broken.conf.json', '{"a":'),
     textFile('notes.txt', 'ignored'),
   ])
 
