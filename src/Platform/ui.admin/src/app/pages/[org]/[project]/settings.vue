@@ -8,6 +8,7 @@ import {
 } from '@42for.net/2splatform.sdk'
 import { useGetAccessPoint, useGetMachineAuthentication } from '@42for.net/2splatform.sdk/vue-query'
 import { invalidateAccess } from '@/queries/invalidation'
+import { useKeyValuePolicy } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useProjectSettingsStore } from '@/stores/project-settings'
@@ -20,7 +21,9 @@ import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appea
 // kinds, the default kind and certificate lifetime of new machines, 424-14), the CA certificate download (PEM; the
 // SDK fetcher returns non-JSON bodies as text) and project information. The default time zone of
 // new annotations (424-12), the date format (424-23) and the names, colors and icons of the annotation types (424-13)
-// are kept in this browser, so they apply at once, like Preferences.
+// are kept in this browser, so they apply at once, like Preferences. The secrets settings of the old Secrets page
+// (spec 29.6: allowed levels, the keys, the customer key and the recipients) are the last section since 424-35; every
+// reader sees them, Administrators change them.
 const context = useContextStore()
 const projectSettings = useProjectSettingsStore()
 const preferences = usePreferencesStore()
@@ -68,6 +71,16 @@ const accessPoint = useGetAccessPoint(() => context.projectKey ?? '', {
 const machinePolicy = useGetMachineAuthentication(() => context.projectKey ?? '', {
   query: { enabled: () => !!context.projectKey && canAdmin.value, meta: { silent: true } },
 })
+
+const secretsPolicy = useKeyValuePolicy()
+const recipients = computed(() => secretsPolicy.data.value?.Recipients ?? [])
+
+// #secrets (the old Secrets page and the BYOK banner link here) scrolls once the cards above it have their final size.
+useHashScroll(
+  () =>
+    !secretsPolicy.isPending.value &&
+    !(canAdmin.value && (machinePolicy.isPending.value || accessPoint.isPending.value)),
+)
 
 const enabledKinds = ref<MachineCredentialKind[]>(['ApiKey'])
 const defaultKind = ref<MachineCredentialKind>('ApiKey')
@@ -272,7 +285,12 @@ async function downloadCa() {
               kind is enabled again.
             </p>
             <div class="flex justify-end">
-              <UButton type="submit" label="Save policy" :loading="saving" :disabled="enabledKinds.length === 0" />
+              <UButton
+                type="submit"
+                label="Save machine policy"
+                :loading="saving"
+                :disabled="enabledKinds.length === 0"
+              />
             </div>
           </form>
         </UCard>
@@ -290,6 +308,29 @@ async function downloadCa() {
             @click="downloadCa"
           />
         </UCard>
+
+        <section id="secrets" class="scroll-mt-4 space-y-6">
+          <div class="space-y-1">
+            <h2 class="text-xs font-semibold text-muted uppercase">Secrets</h2>
+            <p class="text-sm text-muted">
+              How the key values of the project are protected. Everyone in the project sees these settings;
+              Administrators change them.
+            </p>
+          </div>
+          <LoadingState v-if="secretsPolicy.isPending.value" />
+          <ErrorState
+            v-else-if="secretsPolicy.isError.value"
+            :error="secretsPolicy.error.value"
+            compact
+            @retry="secretsPolicy.refetch()"
+          />
+          <template v-else-if="secretsPolicy.data.value">
+            <SecretsPolicyCard :policy="secretsPolicy.data.value" :editable="canAdmin" />
+            <SecretsKeysCard :policy="secretsPolicy.data.value" :editable="canAdmin" />
+            <ByokCard :policy="secretsPolicy.data.value" :editable="canAdmin" />
+            <RecipientsCard :recipients="recipients" :editable="canAdmin" />
+          </template>
+        </section>
       </div>
     </template>
   </UDashboardPanel>

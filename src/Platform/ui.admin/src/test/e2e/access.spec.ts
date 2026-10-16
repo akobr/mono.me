@@ -22,7 +22,7 @@ test('creates a machine and downloads its certificate', async ({ page }) => {
   await openApp(page, '/acme/billing/settings')
   await page.getByRole('checkbox', { name: 'Certificate', exact: true }).click()
   await expect(page.getByText('Default certificate lifetime (days)')).toBeVisible()
-  await page.getByRole('button', { name: 'Save policy' }).click()
+  await page.getByRole('button', { name: 'Save machine policy' }).click()
   await expect(page.getByText('Machine policy saved', { exact: true })).toBeVisible()
 
   // The machine picks the certificate kind.
@@ -63,7 +63,7 @@ test('shared certificates follow CertificateAndApiKey, and a machine can use one
 
   await goto(page, '/acme/billing/settings')
   await page.getByRole('checkbox', { name: 'CertificateAndApiKey', exact: true }).click()
-  await page.getByRole('button', { name: 'Save policy' }).click()
+  await page.getByRole('button', { name: 'Save machine policy' }).click()
   await expect(page.getByText('Machine policy saved', { exact: true })).toBeVisible()
 
   await goto(page, '/acme/billing/machines')

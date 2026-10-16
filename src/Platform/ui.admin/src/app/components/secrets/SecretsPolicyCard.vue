@@ -158,7 +158,7 @@ async function save() {
       <UAlert v-if="failure" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="failure" />
 
       <div v-if="editable" class="flex justify-end">
-        <UButton label="Save policy" :disabled="!dirty" :loading="saving" @click="save" />
+        <UButton label="Save secrets policy" :disabled="!dirty" :loading="saving" @click="save" />
       </div>
     </div>
   </UCard>

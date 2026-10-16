@@ -87,9 +87,13 @@ test('a reader cannot reveal, create or change the policy', async ({ page }, tes
   await openApp(page, '/northwind/portal/default/key-values')
   await expect(page.getByRole('button', { name: 'New key' })).toHaveCount(0)
 
-  await goto(page, '/northwind/portal/secrets')
-  await expect(page.getByText('Administrator', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Save policy' })).toHaveCount(0)
+  // The secrets settings are the Secrets section of the project's Settings (424-35).
+  await goto(page, '/northwind/portal/settings#secrets')
+  const secrets = page.locator('#secrets')
+  await expect(secrets).toBeInViewport()
+  await expect(secrets.getByText('Administrator', { exact: true }).first()).toBeVisible()
+  await expect(secrets.getByRole('switch', { name: 'Allow Standard' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Save secrets policy' })).toHaveCount(0)
   expect(testInfo.project.name).toBeTruthy()
 })
 
@@ -195,7 +199,7 @@ test('exports the view as an .env file', async ({ page }) => {
 })
 
 test('sets up a customer key with the BYOK wizard', async ({ page }) => {
-  await openApp(page, '/acme/billing/secrets')
+  await openApp(page, '/acme/billing/settings#secrets')
   await page.getByRole('button', { name: 'Show the setup' }).click()
   await expect(page.getByText('Key Vault Crypto Service Encryption User').first()).toBeVisible()
 
