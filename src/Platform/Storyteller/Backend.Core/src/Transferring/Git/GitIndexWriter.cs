@@ -5,7 +5,9 @@ using System.Text;
 namespace _42.Platform.Storyteller.Transferring.Git;
 
 // Writes .git/index (version 2) for the checked-out working tree, so `git status` of the extracted folder is clean.
-// Only size and modification time of the stat data are known; git compares the content once and refreshes the rest.
+// Entries are files with their full paths ("templates/exe.template.json"), in the byte order of the path that git
+// requires; directories have no entries of their own. Only size and modification time of the stat data are known;
+// git compares the content once and refreshes the rest.
 public static class GitIndexWriter
 {
     private const uint RegularFileMode = 0x81A4; // 100644

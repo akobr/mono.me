@@ -246,8 +246,10 @@ public class ViewArchiveWriterTests
             ["configurations/rst.cleared.conf.1.json", "configurations/rst.cleared.conf.2.json"]);
     }
 
-    [Fact]
-    public void Write_CountsDocumentsAndVersions()
+    [Theory]
+    [InlineData(ViewArchiveFormat.Folder)]
+    [InlineData(ViewArchiveFormat.Git)]
+    public void Write_CountsDocumentsAndVersions(ViewArchiveFormat format)
     {
         using var stream = new MemoryStream();
         var source = View() with
@@ -255,7 +257,7 @@ public class ViewArchiveWriterTests
             Schemas = [.. View().Schemas, Schema(ViewDocumentKind.TypeSchema, "rst", null, false, (1, "a", 0, "{}"))],
         };
 
-        var statistics = ViewArchiveWriter.Write(stream, source, ViewArchiveFormat.Folder);
+        var statistics = ViewArchiveWriter.Write(stream, source, format);
 
         // versions: schemas 2 + 1 + 2 + 1, templates 2, configurations 2 + 1
         statistics.ShouldBe(new ViewArchiveStatistics(AnnotationCount: 2, SchemaCount: 3, TemplateCount: 1, ConfigurationCount: 2, VersionCount: 11));

@@ -1,7 +1,7 @@
 namespace _42.Platform.Storyteller.Transferring.Git;
 
 // A git delta that turns the base into the target: copy the common prefix of both, insert the middle of the
-// target, copy the common suffix. One commit changes one region of a document or of the flat tree, so this
+// target, copy the common suffix. One commit changes one region of a document or of each tree on its path, so this
 // small encoder is enough to keep consecutive versions cheap.
 public static class GitDelta
 {

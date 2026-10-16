@@ -10,7 +10,7 @@ public sealed record class GitSignature(string Name, string Email, DateTimeOffse
 
     public static GitSignature System(DateTimeOffset when) => new("2S Platform", $"system@{EmailDomain}", when);
 
-    // The author string of a configuration version becomes the name; the e-mail is derived from it:
+    // The author string of a version becomes the name; the e-mail is derived from it:
     // "account: user_01" → "account: user_01 <account.user_01@2s.platform>".
     public static GitSignature FromAuthor(string? author, DateTimeOffset when)
     {
@@ -30,6 +30,18 @@ public sealed record class GitSignature(string Name, string Email, DateTimeOffse
 
         var email = local.ToString().Trim('.', '-');
         return new GitSignature(name, $"{(email.Length == 0 ? "unknown" : email)}@{EmailDomain}", when);
+    }
+
+    // An audit actor is named like an author string: "account: <id>", "machine: <id>", or the system signature.
+    // The display name is a snapshot that can change, so the id names the actor.
+    public static GitSignature FromActor(AuditActor? actor, DateTimeOffset when)
+    {
+        return actor?.Kind switch
+        {
+            AuditActorKind.Account => FromAuthor($"account: {actor.Id}", when),
+            AuditActorKind.Machine => FromAuthor($"machine: {actor.Id}", when),
+            _ => System(when),
+        };
     }
 
     // "Name <email> 1760405412 +0000"
