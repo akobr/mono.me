@@ -16,19 +16,19 @@ public class ConfigExportCommand : BaseContextCommand
     private const string GitFormat = "git";
     private const string ZipExtension = ".zip";
 
-    private readonly IConfigurationsApiClient _configurationApi;
+    private readonly ITransfersApiClient _transfersApi;
     private readonly IFileSystem _fileSystem;
     private readonly TransferPolling _polling;
 
     public ConfigExportCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IConfigurationsApiClient configurationApi,
+        ITransfersApiClient transfersApi,
         IFileSystem fileSystem,
         TransferPolling polling)
         : base(console, context)
     {
-        _configurationApi = configurationApi;
+        _transfersApi = transfersApi;
         _fileSystem = fileSystem;
         _polling = polling;
     }
@@ -47,15 +47,15 @@ public class ConfigExportCommand : BaseContextCommand
 
     protected override async Task<int> ExecuteAsync()
     {
-        ConfigurationExportCreateFormat format;
+        ViewExportCreateFormat format;
 
         if (Format.Equals(FolderFormat, StringComparison.OrdinalIgnoreCase))
         {
-            format = ConfigurationExportCreateFormat.Folder;
+            format = ViewExportCreateFormat.Folder;
         }
         else if (Format.Equals(GitFormat, StringComparison.OrdinalIgnoreCase))
         {
-            format = ConfigurationExportCreateFormat.Git;
+            format = ViewExportCreateFormat.Git;
         }
         else
         {
@@ -64,15 +64,15 @@ public class ConfigExportCommand : BaseContextCommand
         }
 
         var target = $"{Context.OrganizationName}.{Context.ProjectName}.{Context.ViewName}";
-        ConfigurationExport export;
+        ViewExport export;
 
         try
         {
-            export = await _configurationApi.StartConfigurationExportAsync(
+            export = await _transfersApi.StartViewExportAsync(
                 Context.OrganizationName,
                 Context.ProjectName,
                 Context.ViewName,
-                new ConfigurationExportCreate { Format = format });
+                new ViewExportCreate { Format = format });
         }
         catch (ApiException exception) when (exception.StatusCode == 409)
         {
@@ -83,8 +83,8 @@ public class ConfigExportCommand : BaseContextCommand
         Console.WriteLine($"Exporting the configurations of {target} ({Format.ToLowerInvariant()})…".ThemedLowlight(Console.Theme));
 
         var (finished, isDone) = await _polling.WaitAsync(
-            () => _configurationApi.GetConfigurationExportAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, export.Id),
-            job => job.Status is ConfigurationExportStatus.Succeeded or ConfigurationExportStatus.Failed,
+            () => _transfersApi.GetViewExportAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, export.Id),
+            job => job.Status is ViewExportStatus.Succeeded or ViewExportStatus.Failed,
             TimeSpan.FromMinutes(TimeoutMinutes));
 
         if (!isDone)
@@ -93,14 +93,14 @@ public class ConfigExportCommand : BaseContextCommand
             return ExitCodes.WARNING_ABORTED;
         }
 
-        if (finished.Status == ConfigurationExportStatus.Failed)
+        if (finished.Status == ViewExportStatus.Failed)
         {
             // the server writes the whole message, prefix included
             Console.WriteLine((finished.Error ?? "The export failed.").ThemedError(Console.Theme));
             return ExitCodes.ERROR_CRASH;
         }
 
-        using var archive = await _configurationApi.GetConfigurationExportArchiveAsync(
+        using var archive = await _transfersApi.GetViewExportArchiveAsync(
             Context.OrganizationName,
             Context.ProjectName,
             Context.ViewName,

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.21.3734
  */
 
 export type ConfigurationValues = { [key: string]: unknown };

@@ -106,7 +106,7 @@ async function readBody(response: Response): Promise<unknown> {
     return undefined
   }
 
-  // Archives (configuration exports) stay binary; reading them as text would corrupt them.
+  // Archives (view exports) stay binary; reading them as text would corrupt them.
   if (response.ok && isBinary(response.headers.get('content-type') ?? '')) {
     return await response.blob()
   }

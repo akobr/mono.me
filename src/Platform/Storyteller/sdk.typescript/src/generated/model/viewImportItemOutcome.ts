@@ -3,13 +3,13 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.21.3734
  */
 
-export type ConfigurationImportItemOutcome =
-  (typeof ConfigurationImportItemOutcome)[keyof typeof ConfigurationImportItemOutcome];
+export type ViewImportItemOutcome =
+  (typeof ViewImportItemOutcome)[keyof typeof ViewImportItemOutcome];
 
-export const ConfigurationImportItemOutcome = {
+export const ViewImportItemOutcome = {
   Created: "Created",
   Updated: "Updated",
   Unchanged: "Unchanged",

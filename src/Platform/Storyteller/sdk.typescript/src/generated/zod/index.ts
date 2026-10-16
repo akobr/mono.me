@@ -4,3 +4,4 @@ export * from "./configurations/configurations";
 export * from "./key-values/key-values";
 export * from "./schemas/schemas";
 export * from "./templates/templates";
+export * from "./transfers/transfers";

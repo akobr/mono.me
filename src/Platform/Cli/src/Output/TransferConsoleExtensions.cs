@@ -9,9 +9,9 @@ public static class TransferConsoleExtensions
     /// <summary>
     /// Writes the counts of an import and a table of the files that were not unchanged.
     /// </summary>
-    public static void WriteImport(this IExtendedConsole @this, ConfigurationImport import)
+    public static void WriteImport(this IExtendedConsole @this, ViewImport import)
     {
-        var summary = import.Summary ?? new ConfigurationImportSummary();
+        var summary = import.Summary ?? new ViewImportSummary();
         @this.WriteLine(
             $"{(import.IsDryRun ? "Would create" : "Created")} {summary.Created}, "
             + $"{(import.IsDryRun ? "would update" : "updated")} {summary.Updated}, "

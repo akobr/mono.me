@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ConfigurationImport, ConfigurationImportItem } from '@42for.net/2splatform.sdk'
+import type { ViewImport, ViewImportItem } from '@42for.net/2splatform.sdk'
 import type { Scope } from '@/stores/context'
 
 /** The outcome of an import (spec 4.3): the counts, and every file that was not unchanged. */
-const props = defineProps<{ result: ConfigurationImport; scope: Scope }>()
+const props = defineProps<{ result: ViewImport; scope: Scope }>()
 
 type Color = 'success' | 'info' | 'neutral' | 'warning' | 'error'
 
-const outcomes: Record<
-  NonNullable<ConfigurationImportItem['Outcome']>,
-  { color: Color; dryRun: string; label: string }
-> = {
+const outcomes: Record<NonNullable<ViewImportItem['Outcome']>, { color: Color; dryRun: string; label: string }> = {
   Created: { color: 'success', label: 'Created', dryRun: 'To create' },
   Updated: { color: 'info', label: 'Updated', dryRun: 'To update' },
   Unchanged: { color: 'neutral', label: 'Unchanged', dryRun: 'Unchanged' },
@@ -30,7 +27,7 @@ const counts = computed(() => {
   ]
 })
 
-const label = (outcome: ConfigurationImportItem['Outcome']) =>
+const label = (outcome: ViewImportItem['Outcome']) =>
   outcome ? (props.result.IsDryRun ? outcomes[outcome].dryRun : outcomes[outcome].label) : ''
 
 const link = (key: string) => `/${props.scope.org}/${props.scope.project}/${props.scope.view}/configurations/${key}`
