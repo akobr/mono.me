@@ -34,7 +34,7 @@ The design and its decisions are in [the spec](specs/2026-10-15%20Export%20and%2
 - `GetConfigurationHistoriesAsync`;
 - `GetTemplateHistoriesAsync`: one query of the partition `{project}.template`;
 - `GetSchemaHistoriesAsync`: one query of the partition `{project}.schema`, and one read of the states of the annotations the schemas name;
-- `GetViewAnnotationsAsync`: the pages of `GetAnnotationsAsync` over every type, with `IncludeInactive`.
+- `GetViewAnnotationsAsync`: the pages of one query over the partitions of the project, for the annotations of the view that are not deleted, of every type and status. It reads the items with System.Text.Json, as the point reads do, so `Values` keep the text that Cosmos DB answers for their strings and numbers. The LINQ queries of `GetAnnotationsAsync` read them with the SDK's Newtonsoft serializer, which turns numbers into doubles and date strings into local dates.
 
 The reads are not a snapshot, so they run in reverse dependency order: configurations, templates, schemas, annotations. A document read first still finds its dependency in a later read, unless the dependency was deleted in between. That is rarer than a creation during the export.
 
@@ -265,7 +265,7 @@ The repository is written by `GitRepositoryWriter`, without a git library:
 - A document of an included kind becomes a file of the import: its path, kind, type code and key, with its content or an error code and message.
 - A document of a kind that `include` leaves out counts as **excluded**. It is not decompressed.
 - Version files of any kind, `export.json` and every other name count as **ignored**. An import never replays a history.
-- Comments are allowed and duplicate properties rejected. Annotation files keep strings that look like dates as strings, as the annotation reads do. The other kinds parse them as dates, as their reads do. So an exported document compares equal when it is imported back, and importing an export changes nothing.
+- Comments and trailing commas are allowed, and duplicate properties rejected. Annotation files are parsed as the annotation reads parse them (System.Text.Json): strings that look like dates stay strings, and numbers keep their text. The other kinds parse dates and doubles, as their reads do (Newtonsoft). So an exported document compares equal when it is imported back, and importing an export changes nothing.
 - A file fails with `InvalidDocument` when it is not a JSON object, cannot be decompressed, or is larger than `MaxDocumentBytes`.
 - A descendant-type schema whose type cannot descend from its key fails with `InvalidKey` without being decompressed.
 
@@ -328,7 +328,7 @@ So an archive that changes a schema and its configurations together imports with
    - A member missing from the file is cleared, because an import replaces the content. A unit without `UnitType` or `UnitDefinition` gets the defaults of a create (`event`, `unknown`). `{}` is a valid annotation: the key without content.
    - `AnnotationRules` apply ([annotation-lifecycle.md](annotation-lifecycle.md#validation)). A violation fails with `InvalidAnnotation`.
 2. **A failed ancestor**, one in `FailedAnnotations`, skips the file with `DependencyFailed`. Creating the key would create that ancestor with defaults.
-3. **An active key** is compared with `AnnotationAuditDiff`.
+3. **An active key** is compared with `AnnotationAuditDiff`. Numbers that are the same double are equal ([annotation-lifecycle.md](annotation-lifecycle.md#audit)), so the shortest text that a query exports equals the 17 digits that the point read of the import returns.
    - Equal: `Unchanged`.
    - Different, with `Skip`: `Skipped` with `DocumentExists`.
    - Different, with `Overwrite`: the content is replaced with an `Updated` audit entry, and the outcome is `Updated`.
@@ -422,9 +422,7 @@ A written document can carry warnings (`ViewImportItem.Warnings`, each a `Code` 
 - **Cost.** Each annotation takes several requests: reads of the key and its ancestors, and the writes of a create or an update. Each schema runs the compliance query of a save: one query over the configurations it affects and one validation per configuration. With `Skip`, the existence reads list the view's schemas and configurations once. An archive with thousands of annotations, or with many type schemas over many configurations, takes much longer than one with configurations only.
 - **Timeout.** A job is one invocation of the queue function, bound by the Functions timeout of the hosting plan (`host.json` sets no `functionTimeout`).
 - **Retries.** An import is idempotent. When an invocation is cut off, the queue delivers the message again, and the whole job runs again. The documents the first run wrote are then `Unchanged`. After three deliveries (`maxDequeueCount`), the message goes to the poison queue, and the job stays `Running` until its `ttl` runs out. Resuming where a run stopped is not supported.
-- **Failures of the whole job.** A few errors of one file still fail the whole job, with the exception's message, instead of the file:
-  - a `$remove` entry that is not a valid JSONPath;
-  - concurrent changes that outlast the retries of a write, for example of an annotation or a schema.
+- **Failures of the whole job.** Concurrent changes that outlast the retries of a write, for example of an annotation or a schema, still fail the whole job, with the exception's message, instead of the file. A `$remove` entry that is not a valid JSONPath, or that takes the whole document (`$`), fails its file with `PatchInvalid`.
 
 ## Jobs
 

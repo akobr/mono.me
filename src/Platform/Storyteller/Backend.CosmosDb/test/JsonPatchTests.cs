@@ -78,6 +78,32 @@ public class JsonPatchTests
         (await act.Should().ThrowAsync<JsonPatchException>()).Which.Kind.Should().Be(JsonPatchFailureKind.Invalid);
     }
 
+    [Theory]
+    [InlineData("$[")]
+    [InlineData("$..[?(@.x")]
+    [InlineData("$.list[?(@.name =~ /[/)]")]
+    [InlineData("$")]
+    public void RemoveRequested_BrokenPath_ThrowsInvalid(string path)
+    {
+        var document = JObject.Parse("""{ "retries": 3, "list": [{ "name": "a" }] }""");
+        document["$remove"] = new JArray(path);
+
+        var act = () => document.RemoveRequested();
+
+        var exception = act.Should().Throw<JsonPatchException>().Which;
+        exception.Kind.Should().Be(JsonPatchFailureKind.Invalid);
+        exception.ErrorCode.Should().Be(ErrorCodes.PatchInvalid);
+        exception.Message.Should().Contain(path);
+    }
+
+    [Fact]
+    public void RemoveRequested_TokenMatchedTwice_IsRemovedOnce()
+    {
+        var document = JObject.Parse("""{ "a": 1, "b": 2, "list": [1, 2], "$remove": ["$['a','a']", "$.list[0,0]"] }""");
+
+        document.RemoveRequested().Should().BeEquivalentTo(JObject.Parse("""{ "b": 2, "list": [2] }"""));
+    }
+
     [Fact]
     public async Task ApplyPatchRequested_FailedTest_ThrowsTestFailed()
     {

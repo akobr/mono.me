@@ -127,7 +127,7 @@ The audit document of an annotation holds its entries, oldest first:
 
 - **Fields** keep the previous and the new value of `Title`, `DocumentationLink`, `IsDisabled`, `ValidFrom`, `ExpiresAt`, `TimeZone` and, for units, `UnitType`. `Description` and `UnitDefinition` record only that they changed.
 - **Labels** list the added and the removed labels.
-- **Values** list the changed keys with the kind of both sides; primitive values are stored, objects and arrays only by their kind.
+- **Values** list the changed keys with the kind of both sides; primitive values are stored, objects and arrays only by their kind. Two numbers are the same value when their decimal values are equal. They are also the same when they are the same double and one of them has a fraction or an exponent: Cosmos DB stores such a number as a double, and writes it with 17 digits in a point read but with the fewest digits in a query (`3.1415926535897931` and `3.141592653589793`). Integers compare exactly.
 - Strings are cut at `Audit:MaxValueLength` (256) with `IsPreviousTruncated` or `IsValueTruncated`.
 - Each entry has the [actor](audit-stamps.md#the-actor) (`Account`, `Machine` or `System`, with an id and a display name) and the time.
 
