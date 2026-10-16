@@ -63,7 +63,7 @@ const encode = (character: string) =>
     .map((byte) => `%${byte.toString(16).toUpperCase().padStart(2, '0')}`)
     .join('')
 
-/** <key>.json or <key>.<version>.json, each segment percent-encoded like the API (configuration-transfer.md). */
+/** <key>.json or <key>.<version>.json, each segment percent-encoded like the API (export-import.md). */
 export function fileNameOf(key: string, version?: number): string {
   const segments = key
     .split('.')

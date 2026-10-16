@@ -16,7 +16,7 @@ using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribut
 
 namespace _42.Platform.Storyteller.Api.V1;
 
-// Export and import of the configurations of a view, as jobs processed in the background (configuration-transfer.md).
+// Export and import of the configurations of a view, as jobs processed in the background (export-import.md).
 public class ConfigurationTransferHttp
 {
     private readonly IViewTransferService _transfers;
