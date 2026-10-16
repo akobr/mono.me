@@ -102,7 +102,7 @@ const healthColor = computed(() => (health.value === 'Healthy' ? 'success' : hea
   <UCard>
     <template #header>
       <div class="flex items-center justify-between">
-        <h2 class="font-semibold">Bring your own key</h2>
+        <h3 class="font-semibold">Bring your own key</h3>
         <UBadge v-if="policy.Byok" :label="health ?? 'Unknown'" :color="healthColor" variant="subtle" size="sm" icon="i-lucide-key-square" />
       </div>
     </template>
@@ -113,7 +113,7 @@ const healthColor = computed(() => (health.value === 'Healthy' ? 'success' : hea
       </p>
 
       <section class="space-y-2">
-        <h3 class="font-medium">1. Consent and role</h3>
+        <h4 class="font-medium">1. Consent and role</h4>
         <UButton v-if="!setup && !setupError" label="Show the setup" color="neutral" variant="outline" size="sm" @click="loadSetup" />
         <UAlert v-if="setupError" color="warning" variant="subtle" icon="i-lucide-circle-alert" :description="setupError" />
         <div v-if="setup" class="space-y-2">
@@ -131,7 +131,7 @@ const healthColor = computed(() => (health.value === 'Healthy' ? 'success' : hea
       </section>
 
       <section class="space-y-2">
-        <h3 class="font-medium">2. The key</h3>
+        <h4 class="font-medium">2. The key</h4>
         <UFormField label="Key URI (versionless)">
           <UInput v-model="keyUri" class="w-full font-mono" placeholder="https://my-vault.vault.azure.net/keys/storyteller-kek" :disabled="!editable" />
         </UFormField>
@@ -144,7 +144,7 @@ const healthColor = computed(() => (health.value === 'Healthy' ? 'success' : hea
       </section>
 
       <section class="space-y-2">
-        <h3 class="font-medium">3. Verify</h3>
+        <h4 class="font-medium">3. Verify</h4>
         <dl v-if="policy.Byok" class="grid grid-cols-[9rem_minmax(0,1fr)] gap-x-3 gap-y-0.5 text-xs">
           <dt class="text-muted">Health</dt>
           <dd>{{ policy.Byok.Health ?? 'Unknown' }}</dd>

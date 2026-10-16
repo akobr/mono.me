@@ -102,7 +102,7 @@ async function save() {
   <UCard>
     <template #header>
       <div class="flex items-center justify-between">
-        <h2 class="font-semibold">Allowed levels</h2>
+        <h3 class="font-semibold">Allowed levels</h3>
         <UBadge v-if="!editable" label="Administrator" icon="i-lucide-lock" color="neutral" variant="subtle" size="sm" />
       </div>
     </template>
