@@ -53,11 +53,11 @@ const first = useKeyValueAudit(params, canAdmin)
 const more = ref<KeyValueAuditEvent[]>([])
 const nextToken = ref<string | null>()
 const loadingMore = ref(false)
-// A page of more events belongs to the filters it was asked for: changing them starts a new generation, and a page
-// that arrives for an older one is dropped.
+// A page of more events belongs to the project and filters it was asked for: changing them starts a new generation,
+// and a page that arrives for an older one is dropped.
 let generation = 0
 
-watch(params, () => {
+watch([params, () => context.org, () => context.project], () => {
   generation++
   more.value = []
   nextToken.value = undefined
