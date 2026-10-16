@@ -1,4 +1,6 @@
 using _42.Platform.Storyteller.Annotating;
+using _42.Platform.Storyteller.Transferring;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring;
 
@@ -42,4 +44,6 @@ internal sealed class FakeAnnotationService(ExportReads? reads = null) : IAnnota
     public Task<AnnotationPurgeResult> PurgeAnnotationAsync(FullKey fullKey, AuditActor actor) => throw new NotSupportedException();
 
     public Task<AnnotationHistory?> GetAnnotationHistoryAsync(FullKey fullKey) => throw new NotSupportedException();
+
+    public Task<ViewImportResult> ImportAnnotationAsync(FullKey key, JObject content, ViewImportOptions options, ViewImportOverlay overlay) => throw new NotSupportedException();
 }

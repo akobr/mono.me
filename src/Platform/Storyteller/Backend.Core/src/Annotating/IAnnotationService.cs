@@ -1,3 +1,6 @@
+using _42.Platform.Storyteller.Transferring;
+using Newtonsoft.Json.Linq;
+
 namespace _42.Platform.Storyteller.Annotating;
 
 public interface IAnnotationService
@@ -70,4 +73,11 @@ public interface IAnnotationService
     Task<AnnotationPurgeResult> PurgeAnnotationAsync(FullKey fullKey, AuditActor actor);
 
     Task<AnnotationHistory?> GetAnnotationHistoryAsync(FullKey fullKey);
+
+    // Imports the file of an annotation (ViewAnnotationDocument): the content replaces the one of an active key, and
+    // a missing key is created with its missing ancestors. A deleted key or ancestor is re-created with Overwrite and
+    // skipped (AnnotationDeleted) with Skip. An ancestor that failed in this import skips the file (DependencyFailed).
+    // The writes are the ones of SetAnnotationAsync, with their audit entries by the options' actor. The keys it
+    // makes active, and the re-created ones among them, are recorded in the overlay, also in a dry run.
+    Task<ViewImportResult> ImportAnnotationAsync(FullKey key, JObject content, ViewImportOptions options, ViewImportOverlay overlay);
 }

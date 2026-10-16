@@ -31,4 +31,16 @@ public interface IConfigurationTemplateService
         string project,
         string view,
         CancellationToken cancellationToken = default);
+
+    // Replaces the template of the type with the given document as a new version, unless it is equal (an import).
+    // $remove and $patch apply to the document alone, as on a create. An empty document is skipped (a template is
+    // cleared by a delete), and with Skip so is a different stored template. Templates have no schema, so Force does
+    // not apply.
+    Task<ViewImportResult> ImportTemplateAsync(
+        string organization,
+        string project,
+        string view,
+        string annotationType,
+        JObject content,
+        ViewImportOptions options);
 }
