@@ -2,9 +2,11 @@ import { readFile } from 'node:fs/promises'
 import { expect, test } from '@playwright/test'
 import { goto, openApp } from './support'
 
-test('invites a member to the project', async ({ page }) => {
-  await openApp(page, '/acme/billing/invitations')
-  await page.getByRole('button', { name: 'Invite' }).first().click()
+test('invites a member to the project from its Members page', async ({ page }) => {
+  await openApp(page, '/acme/billing/members')
+  const invitations = page.locator('#invitations')
+  await expect(invitations.getByRole('heading', { name: 'Invitations' })).toBeVisible()
+  await invitations.getByRole('button', { name: 'Invite' }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Invite people' })
   await dialog.getByPlaceholder('ada@example.com').fill('marie@example.com')
@@ -12,7 +14,7 @@ test('invites a member to the project', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Send invitations' }).click()
 
   await expect(dialog).toBeHidden()
-  await expect(page.getByText('marie@example.com').first()).toBeVisible()
+  await expect(invitations.getByText('marie@example.com').first()).toBeVisible()
 })
 
 test('creates a machine and downloads its certificate', async ({ page }) => {

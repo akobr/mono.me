@@ -4,7 +4,7 @@ import type { Scope } from '@/stores/context'
 export const viewSections = ['annotations', 'configurations', 'graph', 'templates', 'schemas', 'compare'] as const
 
 /** Sections that live under /{org}/{project}/… */
-export const projectSections = ['views', 'members', 'invitations', 'machines', 'certificates', 'settings'] as const
+export const projectSections = ['views', 'members', 'machines', 'certificates', 'settings'] as const
 
 export type ViewSection = (typeof viewSections)[number]
 export type ProjectSection = (typeof projectSections)[number]

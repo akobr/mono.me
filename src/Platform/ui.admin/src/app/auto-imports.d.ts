@@ -48,6 +48,7 @@ declare global {
   const useDetailPanel: typeof import('./composables/useDetailPanel').useDetailPanel
   const useFileUpload: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFileUpload').useFileUpload
   const useFormField: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useFormField').useFormField
+  const useHashScroll: typeof import('./composables/useHashScroll').useHashScroll
   const useKbd: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useKbd').useKbd
   const useNavigationContext: typeof import('./composables/useNavigationContext').useNavigationContext
   const useOverlay: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useOverlay').useOverlay
