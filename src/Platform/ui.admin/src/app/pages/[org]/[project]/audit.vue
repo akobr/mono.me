@@ -3,7 +3,7 @@
 definePage({
   redirect: (to) => {
     const params = to.params as { org: string; project: string }
-    return { path: `/${params.org}/${params.project}/monitor`, query: { tab: 'audit' } }
+    return { path: `/${params.org}/${params.project}/monitor`, query: { ...to.query, tab: 'audit' } }
   },
 })
 </script>
