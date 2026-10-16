@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Configuring;
@@ -22,4 +23,12 @@ public interface IConfigurationTemplateService
     Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint version);
 
     Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint fromVersion, uint toVersion);
+
+    // The templates of a view and their versions still in the history, one per type code, for an export. An empty
+    // document is not a version; a deleted template has versions but no current document.
+    Task<IReadOnlyList<TemplateHistory>> GetTemplateHistoriesAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default);
 }

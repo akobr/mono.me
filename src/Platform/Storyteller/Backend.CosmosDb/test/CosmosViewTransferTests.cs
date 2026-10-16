@@ -22,6 +22,10 @@ public class CosmosViewTransferTests(Startup startup)
 
     private IConfigurationService Configurations => Context.Services.GetRequiredService<IConfigurationService>();
 
+    private IConfigurationTemplateService Templates => Context.Services.GetRequiredService<IConfigurationTemplateService>();
+
+    private IConfigurationSchemaService Schemas => Context.Services.GetRequiredService<IConfigurationSchemaService>();
+
     [Fact]
     public async Task Histories_HoldTheOwnDocumentsAndTheirVersions()
     {
@@ -42,6 +46,7 @@ public class CosmosViewTransferTests(Startup startup)
         history.Versions.Select(version => version.Version).Should().Equal(1UL, 2UL);
         history.Versions[0].Content["a"]!.Value<int>().Should().Be(1);
         history.Versions[0].Author.Should().Be("First");
+        history.Versions[0].Actor.Should().Be(AuditActor.Account("first", "First"));
         history.Current.Should().BeSameAs(history.Versions[1]);
         history.Current!.Content["a"]!.Value<int>().Should().Be(2);
         history.Current.Author.Should().Be("Second");
@@ -82,6 +87,188 @@ public class CosmosViewTransferTests(Startup startup)
         var histories = await Configurations.GetConfigurationHistoriesAsync(TestConstants.Organization, project, View);
 
         histories.Select(history => history.AnnotationKey).Should().Equal("rst.kept");
+    }
+
+    [Fact]
+    public async Task TemplateHistories_HoldEveryTypeWithItsVersionsAndDeletedTemplates()
+    {
+        const string project = "transfer-templates";
+        const string organization = TestConstants.Organization;
+        var first = AuditActor.Account("first", "First");
+        var machine = AuditActor.Machine("deployer");
+
+        await Templates.CreateOrUpdateTemplateAsync(organization, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{"a":1}"""), first);
+        await Templates.CreateOrUpdateTemplateAsync(organization, project, View, AnnotationTypeCodes.Execution, JObject.Parse("""{"b":2}"""), machine);
+        await Templates.CreateOrUpdateTemplateAsync(organization, project, View, AnnotationTypeCodes.Unit, JObject.Parse("""{"u":1}"""), first);
+        await Templates.DeleteTemplateAsync(organization, project, View, AnnotationTypeCodes.Unit);
+
+        // an empty document is not a version
+        await Templates.CreateOrUpdateTemplateAsync(organization, project, View, AnnotationTypeCodes.Usage, new JObject(), first);
+        await Templates.CreateOrUpdateTemplateAsync(organization, project, View, AnnotationTypeCodes.Usage, JObject.Parse("""{"g":1}"""), first);
+        await Templates.CreateOrUpdateTemplateAsync(organization, project, View, AnnotationTypeCodes.Context, new JObject(), first);
+
+        // other views and projects are left out
+        await Templates.CreateOrUpdateTemplateAsync(organization, project, "other", AnnotationTypeCodes.Responsibility, JObject.Parse("""{"o":1}"""), first);
+        await Templates.CreateOrUpdateTemplateAsync(organization, "transfer-templates-2", View, AnnotationTypeCodes.Responsibility, JObject.Parse("""{"o":1}"""), first);
+
+        var histories = await Templates.GetTemplateHistoriesAsync(organization, project, View);
+
+        histories.Select(history => history.AnnotationType).Should().Equal(AnnotationTypeCodes.Execution, AnnotationTypeCodes.Unit, AnnotationTypeCodes.Usage);
+
+        var execution = histories[0];
+        execution.Versions.Select(version => version.Version).Should().Equal(1UL, 2UL);
+        execution.Versions[0].Author.Should().Be("First");
+        execution.Versions[0].Actor.Should().Be(first);
+        JToken.DeepEquals(execution.Versions[0].Content, JObject.Parse("""{"a":1}""")).Should().BeTrue();
+        execution.Current.Should().BeSameAs(execution.Versions[1]);
+        JToken.DeepEquals(execution.Current!.Content, JObject.Parse("""{"a":1,"b":2}""")).Should().BeTrue();
+        execution.Current.Author.Should().Be("deployer");
+        execution.Current.Actor.Should().Be(machine);
+        execution.Current.CreatedAt.Should().BeOnOrAfter(execution.Versions[0].CreatedAt);
+
+        // a deleted template has its versions but no current document
+        var unit = histories[1];
+        unit.Current.Should().BeNull();
+        unit.Versions.Select(version => version.Version).Should().Equal(1UL);
+        JToken.DeepEquals(unit.Versions[0].Content, JObject.Parse("""{"u":1}""")).Should().BeTrue();
+
+        var usage = histories[2];
+        usage.Versions.Select(version => version.Version).Should().Equal(2UL);
+        usage.Current.Should().BeSameAs(usage.Versions[0]);
+    }
+
+    [Fact]
+    public async Task SchemaHistories_HoldEveryKindWithItsVersionsAndDeletedSchemas()
+    {
+        const string project = "transfer-schemas";
+        const string organization = TestConstants.Organization;
+        var author = AuditActor.Account("schemer", "Schemer");
+        await CreateAsync(project, View, "rst.payments", "sbt.northwind");
+
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Execution, StringProperty("a"), author, false);
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Execution, StringProperty("b"), author, false);
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Unit, StringProperty("u"), author, false);
+        await Schemas.DeleteSchemaAsync(organization, project, View, AnnotationTypeCodes.Unit);
+        await Schemas.SetDescendantTypeSchemaAsync(organization, project, View, "sbt.northwind", AnnotationTypeCodes.Execution, StringProperty("d"), author, false);
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "sbt.northwind", StringProperty("n"), author, false);
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "rst.payments", StringProperty("p"), author, false);
+        await Schemas.DeleteAnnotationSchemaAsync(organization, project, View, "rst.payments");
+
+        // an empty document is not a version
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Usage, new JObject(), author, false);
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Usage, StringProperty("g"), author, false);
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Context, new JObject(), author, false);
+
+        // other views are left out
+        await CreateAsync(project, "other", "rst.payments");
+        await Schemas.SetSchemaAsync(organization, project, "other", AnnotationTypeCodes.Responsibility, StringProperty("o"), author, false);
+        await Schemas.SetAnnotationSchemaAsync(organization, project, "other", "rst.payments", StringProperty("o"), author, false);
+
+        var histories = await Schemas.GetSchemaHistoriesAsync(organization, project, View);
+
+        histories.Select(history => (history.Kind, history.AnnotationType, history.AnnotationKey)).Should().Equal(
+            (ViewDocumentKind.TypeSchema, AnnotationTypeCodes.Execution, null),
+            (ViewDocumentKind.TypeSchema, AnnotationTypeCodes.Unit, null),
+            (ViewDocumentKind.TypeSchema, AnnotationTypeCodes.Usage, null),
+            (ViewDocumentKind.DescendantTypeSchema, AnnotationTypeCodes.Execution, "sbt.northwind"),
+            (ViewDocumentKind.AnnotationSchema, null, "rst.payments"),
+            (ViewDocumentKind.AnnotationSchema, null, "sbt.northwind"));
+
+        var execution = histories[0];
+        execution.Versions.Select(version => version.Version).Should().Equal(1UL, 2UL);
+        JToken.DeepEquals(execution.Versions[0].Content, StringProperty("a")).Should().BeTrue();
+        execution.Current.Should().BeSameAs(execution.Versions[1]);
+        JToken.DeepEquals(execution.Current!.Content, StringProperty("b")).Should().BeTrue();
+        execution.Current.Author.Should().Be("Schemer");
+        execution.Current.Actor.Should().Be(author);
+
+        // a deleted schema has its versions but no current document
+        histories[1].Current.Should().BeNull();
+        histories[1].Versions.Select(version => version.Version).Should().Equal(1UL);
+        histories[4].Current.Should().BeNull();
+        histories[4].Versions.Select(version => version.Version).Should().Equal(1UL);
+        JToken.DeepEquals(histories[4].Versions[0].Content, StringProperty("p")).Should().BeTrue();
+
+        histories[2].Versions.Select(version => version.Version).Should().Equal(2UL);
+        histories[2].Current.Should().BeSameAs(histories[2].Versions[0]);
+        JToken.DeepEquals(histories[3].Current!.Content, StringProperty("d")).Should().BeTrue();
+        JToken.DeepEquals(histories[5].Current!.Content, StringProperty("n")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task SchemaHistories_LeaveOutSchemasOfDeletedAndMissingAnnotations()
+    {
+        const string project = "transfer-schema-scope";
+        const string organization = TestConstants.Organization;
+        var author = AuditActor.Account("schemer", "Schemer");
+        await CreateAsync(project, View, "rst.kept", "rst.gone", "cnt.gone.child");
+        await CreateAsync(project, "other", "rst.elsewhere");
+        await Annotations.CreateAnnotationAsync(
+            organization,
+            AnnotationFactory.CreateDefault(AnnotationKey.Parse("rst.off"), project, View) with { IsDisabled = true },
+            AnnotationServiceTestExtensions.TestActor);
+
+        await Schemas.SetSchemaAsync(organization, project, View, AnnotationTypeCodes.Context, StringProperty("t"), author, false);
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "rst.kept", StringProperty("k"), author, false);
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "rst.off", StringProperty("o"), author, false);
+
+        // deleted: rst.gone itself, sbt.gone with its context
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "rst.gone", StringProperty("g"), author, false);
+        await Schemas.SetDescendantTypeSchemaAsync(organization, project, View, "rst.gone", AnnotationTypeCodes.Unit, StringProperty("g"), author, false);
+        await Schemas.SetDescendantTypeSchemaAsync(organization, project, View, "sbt.gone", AnnotationTypeCodes.Context, StringProperty("g"), author, false);
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "cnt.gone.child", StringProperty("g"), author, false);
+
+        // missing: never created, or only in another view
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "rst.never", StringProperty("m"), author, false);
+        await Schemas.SetDescendantTypeSchemaAsync(organization, project, View, "sbt.never", AnnotationTypeCodes.Execution, StringProperty("m"), author, false);
+        await Schemas.SetAnnotationSchemaAsync(organization, project, View, "rst.elsewhere", StringProperty("m"), author, false);
+
+        await Annotations.DeleteAnnotationAsync(Key("rst.gone", project));
+        await Annotations.DeleteAnnotationAsync(Key("sbt.gone", project));
+
+        var histories = await Schemas.GetSchemaHistoriesAsync(organization, project, View);
+
+        // a disabled annotation is not deleted: its schema stays
+        histories.Select(history => (history.Kind, history.AnnotationType, history.AnnotationKey)).Should().Equal(
+            (ViewDocumentKind.TypeSchema, AnnotationTypeCodes.Context, null),
+            (ViewDocumentKind.AnnotationSchema, null, "rst.kept"),
+            (ViewDocumentKind.AnnotationSchema, null, "rst.off"));
+    }
+
+    [Fact]
+    public async Task ViewAnnotations_HoldEveryTypeAndStatusWithoutDeletedOnes()
+    {
+        const string project = "transfer-annotations";
+        const string organization = TestConstants.Organization;
+        await CreateAsync(project, View, "unt.va-kept.unit", "cnt.va-sub.va-ctx", "unt.va-gone.unit");
+        await CreateAsync(project, "other", "rst.va-other");
+        await Annotations.CreateAnnotationAsync(
+            organization,
+            AnnotationFactory.CreateDefault(AnnotationKey.Parse("rst.va-off"), project, View) with { IsDisabled = true, Title = "Off" },
+            Author);
+        await Annotations.CreateAnnotationAsync(
+            organization,
+            AnnotationFactory.CreateDefault(AnnotationKey.Parse("sbt.va-expired"), project, View) with { ExpiresAt = DateTimeOffset.UtcNow.AddDays(-1) },
+            Author);
+        await Annotations.DeleteAnnotationAsync(Key("rst.va-gone", project));
+
+        var annotations = await Annotations.GetViewAnnotationsAsync(organization, project, View);
+
+        annotations.Select(annotation => annotation.AnnotationKey).Should().BeEquivalentTo(
+            "rst.va-kept",
+            "unt.va-kept.unit",
+            "sbt.va-sub",
+            "cnt.va-sub.va-ctx",
+            "rst.va-off",
+            "sbt.va-expired");
+        annotations.Should().OnlyContain(annotation => annotation.Created != null && annotation.Modified != null && annotation.Deletion == null);
+
+        var off = annotations.Single(annotation => annotation.AnnotationKey == "rst.va-off");
+        off.Should().BeOfType<Responsibility>();
+        off.IsDisabled.Should().BeTrue();
+        off.Title.Should().Be("Off");
+        off.Created!.By.Should().Be(Author);
+        annotations.Single(annotation => annotation.AnnotationKey == "unt.va-kept.unit").Should().BeOfType<Unit>();
     }
 
     [Fact]
@@ -274,6 +461,15 @@ public class CosmosViewTransferTests(Startup startup)
         var succeeded = await store.TryReplaceAsync(running! with { Export = running.Export! with { Status = ViewTransferStatus.Succeeded } });
         succeeded.Should().NotBeNull();
         (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(-5))).Should().Be(0);
+    }
+
+    private static JObject StringProperty(string name)
+    {
+        return new JObject
+        {
+            ["type"] = "object",
+            ["properties"] = new JObject { [name] = new JObject { ["type"] = "string" } },
+        };
     }
 
     private static FullKey Key(string annotationKey, string project = Project, string view = View)

@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using _42.Platform.Storyteller.Transferring;
 using _42.Platform.Storyteller.Transferring.Git;
+using Newtonsoft.Json.Linq;
 using static _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring.TransferTestData;
 
 namespace _42.Platform.Storyteller.Backend.Core.UnitTests.Transferring;
@@ -259,6 +260,35 @@ public class GitRepositoryTests
         history[2].Files["configurations/rst.a.conf.json"].ShouldBe("{\n  \"a\": 2\n}\n");
         history[2].Files["configurations/rst.b.conf.json"].ShouldBe("{\n  \"b\": 1\n}\n");
         history[3].Files["configurations/rst.b.conf.json"].ShouldBe("{\n  \"b\": 2\n}\n");
+    }
+
+    [Fact]
+    public void Git_SignsAVersionWithItsActorLikeAnAnnotation()
+    {
+        var first = new ConfigurationDocument
+        {
+            Version = 1,
+            Author = "Ada",
+            Actor = AuditActor.Account("user_01", "Ada"),
+            CreatedAt = Start,
+            Content = JObject.Parse("""{"a":1}"""),
+        };
+        var second = first with { Version = 2, Author = "Deployer", Actor = AuditActor.Machine("machine-1", "Deployer"), CreatedAt = Start.AddMinutes(1) };
+        var third = first with { Version = 3, Author = "Ada", Actor = AuditActor.System, CreatedAt = Start.AddMinutes(2) };
+        var fourth = first with { Version = 4, Author = "account: user_02", Actor = null, CreatedAt = Start.AddMinutes(3) };
+        var source = Source(new ConfigurationHistory { AnnotationKey = "rst.a", Versions = [first, second, third, fourth], Current = fourth });
+
+        var history = new GitTestReader(Write(source, ViewArchiveFormat.Git)).GetHistory();
+
+        // the display name is a snapshot, the id names the actor; without an actor the author string signs
+        history.Select(commit => commit.Author).ShouldBe(
+        [
+            $"account: user_01 <account.user_01@2s.platform> {Start.ToUnixTimeSeconds()} +0000",
+            $"machine: machine-1 <machine.machine-1@2s.platform> {Start.AddMinutes(1).ToUnixTimeSeconds()} +0000",
+            $"2S Platform <system@2s.platform> {Start.AddMinutes(2).ToUnixTimeSeconds()} +0000",
+            $"account: user_02 <account.user_02@2s.platform> {Start.AddMinutes(3).ToUnixTimeSeconds()} +0000",
+        ]);
+        history.Select(commit => commit.Committer).ShouldBe(history.Select(commit => commit.Author));
     }
 
     [Fact]

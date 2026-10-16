@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Annotations;
@@ -93,6 +94,37 @@ public partial class CosmosAnnotationService : IAnnotationService
             Annotations = model.Annotations,
             Count = model.TotalCount,
         };
+    }
+
+    public async Task<IReadOnlyList<Annotation>> GetViewAnnotationsAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default)
+    {
+        var annotations = new List<Annotation>();
+        string? continuationToken = null;
+
+        // a disabled, scheduled or expired annotation is exported as well: only a deleted one is not in the view
+        do
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var page = await GetAnnotationsAsync(new AnnotationsRequest
+            {
+                Organization = organization,
+                Project = project,
+                View = view,
+                Types = Enum.GetValues<AnnotationType>(),
+                IncludeInactive = true,
+                ContinuationToken = continuationToken,
+            });
+
+            annotations.AddRange(page.Annotations);
+            continuationToken = page.ContinuationToken;
+        }
+        while (continuationToken is not null);
+
+        return annotations;
     }
 
     public Task<Annotation> SetAnnotationAsync(string organization, Annotation annotation, AuditActor actor)
