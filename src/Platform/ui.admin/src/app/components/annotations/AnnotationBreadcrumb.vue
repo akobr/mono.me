@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { LocationQuery } from 'vue-router'
+import type { LocationQueryRaw } from 'vue-router'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { metaOf, parseAnnotationKey } from '@/utils/annotation-key'
@@ -14,9 +14,9 @@ const props = withDefaults(
   defineProps<{
     annotationKey: string
     perspective: TreePerspective
-    query?: LocationQuery
-    /** The screen the links stay on. */
-    section?: 'annotations' | 'graph'
+    query?: LocationQueryRaw
+    /** The screen the links stay on: the configuration detail links to the ancestors' configurations. */
+    section?: 'annotations' | 'graph' | 'configurations'
   }>(),
   { query: undefined, section: 'annotations' },
 )

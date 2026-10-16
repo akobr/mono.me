@@ -66,7 +66,15 @@ function close() {
             @click="closePanel"
           />
         </div>
-        <div class="flex">
+        <!-- The row of the annotation detail, Lineage at the right; the screen has no perspective switch (subject). -->
+        <div class="flex flex-wrap items-center gap-2">
+          <AnnotationBreadcrumb
+            :annotation-key="key"
+            perspective="subject"
+            section="configurations"
+            :query="query"
+            class="min-w-0 flex-1"
+          />
           <AnnotationLineage :annotation-key="key" section="configurations" :query="query" />
         </div>
         <UNavigationMenu :items="tabs" highlight class="-mb-3" :ui="{ link: 'text-sm' }" />
