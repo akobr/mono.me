@@ -17,8 +17,8 @@ const screens: [string, string][] = [
   ['key values', '/acme/billing/default/key-values'],
   ['key value detail', '/acme/billing/default/key-values/db.password'],
   ['secrets settings', '/acme/billing/settings#secrets'],
-  ['audit', '/acme/billing/audit'],
-  ['usage', '/acme/billing/usage'],
+  ['monitor usage', '/acme/billing/monitor'],
+  ['monitor audit', '/acme/billing/monitor?tab=audit'],
   ['account', '/account'],
 ]
 

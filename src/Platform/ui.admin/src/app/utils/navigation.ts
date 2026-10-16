@@ -113,8 +113,7 @@ export function buildNavigation(
         { label: 'Members', icon: 'i-lucide-users', to: `${base}/members`, minRole: 'Administrator' },
         { label: 'Machines', icon: 'i-lucide-computer', to: `${base}/machines`, minRole: 'Contributor' },
         { label: 'Settings', icon: 'i-lucide-settings', to: `${base}/settings` },
-        { label: 'Audit', icon: 'i-lucide-scroll-text', to: `${base}/audit`, minRole: 'Administrator' },
-        { label: 'Usage', icon: 'i-lucide-gauge', to: `${base}/usage`, minRole: 'Administrator' },
+        { label: 'Monitor', icon: 'i-lucide-activity', to: `${base}/monitor`, minRole: 'Administrator' },
       ],
     })
   }

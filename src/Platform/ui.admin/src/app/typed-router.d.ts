@@ -357,6 +357,13 @@ declare module 'vue-router/auto-routes' {
       { org: ParamValue<false>, project: ParamValue<false> },
       | never
     >,
+    '/[org]/[project]/monitor': RouteRecordInfo<
+      '/[org]/[project]/monitor',
+      '/:org/:project/monitor',
+      { org: ParamValue<true>, project: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false> },
+      | never
+    >,
     '/[org]/[project]/secrets': RouteRecordInfo<
       '/[org]/[project]/secrets',
       '/:org/:project/secrets',
@@ -842,6 +849,14 @@ declare module 'vue-router/auto-routes' {
     'app/pages/[org]/[project]/members.vue': {
       routes:
         | '/[org]/[project]/members'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/monitor.vue': {
+      routes:
+        | '/[org]/[project]/monitor'
       views:
         | never
       pathParamNames:
