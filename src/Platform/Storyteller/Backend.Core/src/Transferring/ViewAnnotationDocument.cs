@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
 using _42.Platform.Storyteller.Annotating;
 using Newtonsoft.Json;
@@ -40,12 +41,50 @@ public static class ViewAnnotationDocument
 
     private static readonly JsonSerializerOptions ContentOptions = new();
 
+    // The rules of ViewDocumentJson.Parse; a trailing comma is accepted there too.
+    private static readonly JsonReaderOptions ReaderOptions = new()
+    {
+        AllowTrailingCommas = true,
+        CommentHandling = JsonCommentHandling.Skip,
+        MaxDepth = ViewDocumentJson.MaxDepth,
+    };
+
     // A JSON object with comments allowed and duplicate properties rejected; anything else throws Newtonsoft's
-    // JsonException. Strings that look like dates stay strings, as the annotation reads (System.Text.Json) keep them,
-    // so an exported annotation reads back equal.
+    // JsonException. It is read as the annotation reads (System.Text.Json) read it, so an exported annotation reads
+    // back equal: strings that look like dates stay strings, and numbers keep their text (JRaw), which a double would
+    // round and a decimal refuse beyond its range.
     public static JObject Parse(Stream stream)
     {
-        return ViewDocumentJson.Parse(stream, DateParseHandling.None);
+        string text;
+
+        using (var reader = new StreamReader(stream, ViewDocumentJson.Utf8, detectEncodingFromByteOrderMarks: true))
+        {
+            text = reader.ReadToEnd();
+        }
+
+        var json = new Utf8JsonReader(Encoding.UTF8.GetBytes(text), ReaderOptions);
+
+        try
+        {
+            if (!json.Read() || json.TokenType != JsonTokenType.StartObject)
+            {
+                throw new JsonReaderException("The document is not a JSON object.");
+            }
+
+            var document = ReadObject(ref json);
+
+            if (json.Read())
+            {
+                throw new JsonReaderException("The document continues after its JSON object.");
+            }
+
+            return document;
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidOperationException)
+        {
+            // a syntax error, or an escaped string that is not valid UTF-16
+            throw new JsonReaderException(exception.Message, exception);
+        }
     }
 
     public static JObject Write(Annotation annotation)
@@ -223,19 +262,99 @@ public static class ViewAnnotationDocument
     // A value of Values: a JsonElement when read from Cosmos DB or the API, any object when built in code.
     private static JToken ToToken(object? value)
     {
-        switch (value)
+        return value switch
         {
-            case null:
-            case JsonElement { ValueKind: JsonValueKind.Undefined }:
-                return JValue.CreateNull();
+            null => JValue.CreateNull(),
+            JToken token => token.DeepClone(),
+            JsonElement element => FromElement(element),
+            _ => FromElement(JsonSerializer.SerializeToElement(value, value.GetType())),
+        };
+    }
 
-            case JToken token:
-                return token.DeepClone();
+    // As Parse reads it back: strings stay strings, and numbers keep the text they are stored with.
+    private static JToken FromElement(JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                var document = new JObject();
+
+                foreach (var property in element.EnumerateObject())
+                {
+                    // the last of the same name wins, as in the reads
+                    document[property.Name] = FromElement(property.Value);
+                }
+
+                return document;
+
+            case JsonValueKind.Array:
+                return new JArray(element.EnumerateArray().Select(item => FromElement(item)));
+
+            case JsonValueKind.String:
+                return new JValue(element.GetString());
+
+            case JsonValueKind.Number:
+                return new JRaw(element.GetRawText());
+
+            case JsonValueKind.True:
+            case JsonValueKind.False:
+                return new JValue(element.GetBoolean());
+
+            default:
+                return JValue.CreateNull();
+        }
+    }
+
+    private static JObject ReadObject(ref Utf8JsonReader json)
+    {
+        var document = new JObject();
+
+        while (json.Read() && json.TokenType == JsonTokenType.PropertyName)
+        {
+            var name = json.GetString()!;
+
+            if (document.ContainsKey(name))
+            {
+                throw new JsonReaderException($"The property '{name}' is in its object twice.");
+            }
+
+            json.Read();
+            document.Add(name, ReadValue(ref json));
         }
 
-        var raw = value is JsonElement element ? element.GetRawText() : JsonSerializer.Serialize(value, value.GetType());
-        using var reader = new JsonTextReader(new StringReader(raw)) { DateParseHandling = DateParseHandling.None };
-        return JToken.ReadFrom(reader);
+        return document;
+    }
+
+    private static JToken ReadValue(ref Utf8JsonReader json)
+    {
+        switch (json.TokenType)
+        {
+            case JsonTokenType.StartObject:
+                return ReadObject(ref json);
+
+            case JsonTokenType.StartArray:
+                var array = new JArray();
+
+                while (json.Read() && json.TokenType != JsonTokenType.EndArray)
+                {
+                    array.Add(ReadValue(ref json));
+                }
+
+                return array;
+
+            case JsonTokenType.String:
+                return new JValue(json.GetString());
+
+            case JsonTokenType.Number:
+                return new JRaw(Encoding.UTF8.GetString(json.ValueSpan));
+
+            case JsonTokenType.True:
+            case JsonTokenType.False:
+                return new JValue(json.GetBoolean());
+
+            default:
+                return JValue.CreateNull();
+        }
     }
 
     private sealed record class MemberSet(IReadOnlyDictionary<string, string> Editable, IReadOnlySet<string> Ignored)

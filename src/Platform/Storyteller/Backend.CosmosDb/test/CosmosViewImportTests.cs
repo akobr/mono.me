@@ -407,6 +407,12 @@ public class CosmosViewImportTests(Startup startup)
         broken.Outcome.Should().Be(ViewImportOutcome.Failed);
         broken.ErrorCode.Should().Be(ErrorCodes.PatchInvalid);
 
+        // a $remove that is not a JSONPath fails the file, not the job
+        var brokenRemove = await Templates.ImportTemplateAsync(Organization, project, View, type, JObject.Parse("""{ "a": 3, "$remove": ["$["] }"""), Options());
+        brokenRemove.Outcome.Should().Be(ViewImportOutcome.Failed);
+        brokenRemove.ErrorCode.Should().Be(ErrorCodes.PatchInvalid);
+        brokenRemove.Message.Should().Contain("'$remove' has an invalid JSONPath '$['");
+
         var empty = await Templates.ImportTemplateAsync(Organization, project, View, type, new JObject(), Options());
         empty.Should().Be(Skipped(ErrorCodes.EmptyDocument, "An empty document is not imported; delete the template to clear it."));
 

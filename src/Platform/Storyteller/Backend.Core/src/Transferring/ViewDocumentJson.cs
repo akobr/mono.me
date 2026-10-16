@@ -5,11 +5,14 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Transferring;
 
-// How documents are written into and read from an archive. Reading uses the date handling of the reads from Cosmos DB,
-// so an exported document compares equal to the stored one when it is imported back: configurations, templates and
-// schemas parse dates (Newtonsoft), annotations keep them as strings (System.Text.Json, ViewAnnotationDocument).
+// How documents are written into and read from an archive. Reading uses the date and number handling of the reads from
+// Cosmos DB, so an exported document compares equal to the stored one when it is imported back: configurations,
+// templates and schemas parse dates and doubles (Newtonsoft), annotations keep dates as strings and numbers as their
+// text (System.Text.Json, ViewAnnotationDocument.Parse).
 public static class ViewDocumentJson
 {
+    public const int MaxDepth = 64;
+
     public static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     private static readonly JsonLoadSettings LoadSettings = new()
@@ -48,15 +51,15 @@ public static class ViewDocumentJson
     }
 
     // A JSON object with comments allowed and duplicate properties rejected; anything else throws JsonException.
-    public static JObject Parse(Stream stream, DateParseHandling dateParseHandling = DateParseHandling.DateTime)
+    public static JObject Parse(Stream stream)
     {
         using var reader = new StreamReader(stream, Utf8, detectEncodingFromByteOrderMarks: true);
         using var json = new JsonTextReader(reader)
         {
-            DateParseHandling = dateParseHandling,
+            DateParseHandling = DateParseHandling.DateTime,
             DateTimeZoneHandling = DateTimeZoneHandling.RoundtripKind,
             FloatParseHandling = FloatParseHandling.Double,
-            MaxDepth = 64,
+            MaxDepth = MaxDepth,
         };
 
         while (json.Read() && json.TokenType == JsonToken.Comment)

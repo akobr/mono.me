@@ -102,25 +102,28 @@ public partial class CosmosAnnotationService : IAnnotationService
         string view,
         CancellationToken cancellationToken = default)
     {
+        // Read as the point reads read the items (System.Text.Json), so Values keep the text Cosmos DB answers and an
+        // exported annotation compares equal when it is imported back. The LINQ queries of GetAnnotationsAsync read
+        // them with the SDK's Newtonsoft serializer, which turns numbers into doubles and date strings into local
+        // dates. Every partition of the project; only annotation items carry AnnotationType. A disabled, scheduled or
+        // expired annotation is exported as well: only a deleted one is not in the view.
+        var query = new QueryDefinition(
+                "SELECT * FROM c WHERE STARTSWITH(c.PartitionKey, @projectPrefix) AND c.ProjectName = @project "
+                + "AND c.ViewName = @view AND IS_DEFINED(c.AnnotationType) AND NOT IS_DEFINED(c.Deletion)")
+            .WithParameter("@projectPrefix", $"{project}.")
+            .WithParameter("@project", project)
+            .WithParameter("@view", view);
+
+        var store = Store(organization);
         var annotations = new List<Annotation>();
         string? continuationToken = null;
 
-        // a disabled, scheduled or expired annotation is exported as well: only a deleted one is not in the view
         do
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var page = await GetAnnotationsAsync(new AnnotationsRequest
-            {
-                Organization = organization,
-                Project = project,
-                View = view,
-                Types = Enum.GetValues<AnnotationType>(),
-                IncludeInactive = true,
-                ContinuationToken = continuationToken,
-            });
-
-            annotations.AddRange(page.Annotations);
-            continuationToken = page.ContinuationToken;
+            var (entities, nextToken) = await store.QueryPageAsync(query, continuationToken);
+            annotations.AddRange(entities.Select(entity => entity.ToModel()));
+            continuationToken = nextToken;
         }
         while (continuationToken is not null);
 
