@@ -10,10 +10,12 @@ using Moq;
 namespace _42.Platform.Cli.UnitTests.Commands;
 
 // Records the plain text of every line the command writes: WriteLine calls, and the documents of Write, WriteImportant
-// and WriteHeader (which render a document and then end the line). Themed spans are reduced to their text.
+// and WriteHeader (which render a document and then end the line). Themed spans are reduced to their text. Tables are
+// recorded apart from the lines, as their headers and the text of each cell.
 internal sealed class RecordingConsole
 {
     private readonly List<string> _lines = [];
+    private readonly List<RecordedTable> _tables = [];
     private readonly StringBuilder _pending = new();
 
     public RecordingConsole()
@@ -39,6 +41,22 @@ internal sealed class RecordingConsole
             .Callback<Document>(document => _pending.Append(ToText(document)));
         Mock.Setup(console => console.WriteExactDocument(It.IsAny<Document>()))
             .Callback<Document>(document => _pending.Append(ToText(document)));
+        Mock.Setup(console => console.WriteTable(
+                It.IsAny<IEnumerable<It.IsAnyType>>(),
+                It.IsAny<Func<It.IsAnyType, IEnumerable<Cell>>>(),
+                It.IsAny<IEnumerable<IHeaderColumn>?>()))
+            .Callback(new InvocationAction(invocation =>
+            {
+                var rows = (IEnumerable)invocation.Arguments[0];
+                var render = (Delegate)invocation.Arguments[1];
+                var headers = (IEnumerable<IHeaderColumn>?)invocation.Arguments[2];
+
+                _tables.Add(new RecordedTable(
+                    headers?.Select(header => ToText(header.Content)).ToList() ?? [],
+                    rows.Cast<object?>()
+                        .Select(row => ((IEnumerable<Cell>)render.DynamicInvoke(row)!).Select(cell => ToText(cell)).ToList())
+                        .ToList()));
+            }));
     }
 
     public Mock<IExtendedConsole> Mock { get; } = new();
@@ -46,6 +64,8 @@ internal sealed class RecordingConsole
     public IExtendedConsole Object => Mock.Object;
 
     public IReadOnlyList<string> Lines => _lines;
+
+    public IReadOnlyList<RecordedTable> Tables => _tables;
 
     private static string ToText(object? element)
     {

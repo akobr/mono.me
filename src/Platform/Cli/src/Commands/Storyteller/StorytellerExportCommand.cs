@@ -7,20 +7,18 @@ using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 
-namespace _42.Platform.Cli.Commands.Configuration;
+namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.EXPORT, Description = "Export the configurations of the view as a zip: a folder of JSON files with their versions, or a git repository with every version as a commit.")]
-public class ConfigExportCommand : BaseContextCommand
+[Command(CommandNames.EXPORT, Description = "Export the view as a zip: its annotations, schemas, templates and configurations, as a folder of JSON files with the versions, or as a git repository with every version as a commit.")]
+public class StorytellerExportCommand : BaseContextCommand
 {
-    private const string FolderFormat = "folder";
-    private const string GitFormat = "git";
     private const string ZipExtension = ".zip";
 
     private readonly ITransfersApiClient _transfersApi;
     private readonly IFileSystem _fileSystem;
     private readonly TransferPolling _polling;
 
-    public ConfigExportCommand(
+    public StorytellerExportCommand(
         IExtendedConsole console,
         ICommandContext context,
         ITransfersApiClient transfersApi,
@@ -33,33 +31,27 @@ public class ConfigExportCommand : BaseContextCommand
         _polling = polling;
     }
 
-    [Option("-f|--format", CommandOptionType.SingleValue, Description = "The format of the archive: 'folder' (default) or 'git'.")]
-    public string Format { get; set; } = FolderFormat;
+    [Option("-f|--format", CommandOptionType.SingleValue, ValueName = "format", Description = "The format of the archive: 'folder' or 'git'.")]
+    public string Format { get; set; } = ViewTransferArguments.FolderFormat;
 
-    [Option("-o|--output", CommandOptionType.SingleValue, Description = "The file of the zip, or a folder for it; the server's file name in the current folder by default. With --extract, the folder to unpack into.")]
+    [Option("-i|--include", CommandOptionType.MultipleValue, ValueName = "kinds", Description = "The kinds to export: annotations, schemas, templates and configurations, comma-separated or repeated; all four by default.")]
+    public string[]? Include { get; set; }
+
+    [Option("-o|--output", CommandOptionType.SingleValue, ValueName = "path", Description = "The file of the zip, or a folder for it; the server's file name in the current folder by default. With --extract, the folder to unpack into.")]
     public string? Output { get; set; }
 
     [Option("-x|--extract", CommandOptionType.NoValue, Description = "Unpack the archive into a new or empty folder instead of saving the zip.")]
     public bool IsExtractRequested { get; set; }
 
-    [Option("--timeout", CommandOptionType.SingleValue, Description = "Minutes to wait for the export (10 by default); the export continues on the server after that.")]
+    [Option("--timeout", CommandOptionType.SingleValue, ValueName = "minutes", Description = "Minutes to wait for the export; the export continues on the server after that.")]
     public int TimeoutMinutes { get; set; } = 10;
 
     protected override async Task<int> ExecuteAsync()
     {
-        ViewExportCreateFormat format;
-
-        if (Format.Equals(FolderFormat, StringComparison.OrdinalIgnoreCase))
+        if (!ViewTransferArguments.TryParseFormat(Format, out var format, out var error)
+            || !ViewTransferArguments.TryParseInclude(Include, out var include, out error))
         {
-            format = ViewExportCreateFormat.Folder;
-        }
-        else if (Format.Equals(GitFormat, StringComparison.OrdinalIgnoreCase))
-        {
-            format = ViewExportCreateFormat.Git;
-        }
-        else
-        {
-            Console.WriteLine($"Unknown format '{Format}'; use 'folder' or 'git'.".ThemedError(Console.Theme));
+            Console.WriteLine(error.ThemedError(Console.Theme));
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
@@ -68,19 +60,22 @@ public class ConfigExportCommand : BaseContextCommand
 
         try
         {
+            // always a body: the API answers 400 to the null that the SDK sends for a missing one
             export = await _transfersApi.StartViewExportAsync(
                 Context.OrganizationName,
                 Context.ProjectName,
                 Context.ViewName,
-                new ViewExportCreate { Format = format });
+                new ViewExportCreate { Format = format, Include = include is null ? null : [.. include] });
         }
-        catch (ApiException exception) when (exception.StatusCode == 409)
+        catch (ApiException exception) when (exception.StatusCode is 400 or 401 or 403 or 409)
         {
             Console.WriteLine(exception.GetErrorMessage().ThemedError(Console.Theme));
-            return ExitCodes.ERROR_WRONG_INPUT;
+            return exception.StatusCode is 401 or 403 ? ExitCodes.WARNING_UNAUTHORIZED_ACCESS : ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        Console.WriteLine($"Exporting the configurations of {target} ({Format.ToLowerInvariant()})…".ThemedLowlight(Console.Theme));
+        Console.WriteLine(
+            $"Exporting the {ViewTransferArguments.FormatKinds(include)} of {target} ({format.ToString().ToLowerInvariant()})…"
+                .ThemedLowlight(Console.Theme));
 
         var (finished, isDone) = await _polling.WaitAsync(
             () => _transfersApi.GetViewExportAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, export.Id),
@@ -114,7 +109,7 @@ public class ConfigExportCommand : BaseContextCommand
 
             try
             {
-                await ConfigurationArchives.ExtractAsync(_fileSystem, archive.Stream, destination);
+                await ViewArchives.ExtractAsync(_fileSystem, archive.Stream, destination);
             }
             catch (InvalidOperationException exception)
             {
@@ -137,9 +132,7 @@ public class ConfigExportCommand : BaseContextCommand
         }
 
         Console.WriteImportant(
-            $"Exported {TransferConsoleExtensions.Count(finished.ConfigurationCount, "configuration")} with "
-            + $"{TransferConsoleExtensions.Count(finished.VersionCount, "version")} ({TransferConsoleExtensions.FormatSize(finished.Size)}) "
-            + $"{(IsExtractRequested ? "into" : "to")} {destination}.");
+            $"Exported {TransferConsoleExtensions.FormatExportSummary(finished)} {(IsExtractRequested ? "into" : "to")} {destination}.");
         return ExitCodes.SUCCESS;
     }
 
