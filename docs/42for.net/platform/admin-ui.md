@@ -134,7 +134,7 @@ The JSON and YAML editors help with bindings too:
 - Inside `@config("…")` the list offers the paths of this configuration; inside `@annotation("…")` the fields of the annotation's values, or of the ancestor named by the second argument; the second argument offers the ancestor types.
 - Hovering a binding explains it, the same way as the line under a form field.
 
-**Lineage** in the header lists the ancestors in merge order, the order in which their configuration is inherited. Each ancestor opens its own configuration.
+The header has the breadcrumb of the annotation detail, always by subject: the parents of the annotation up to its subject. **Lineage**, at its right, lists every ancestor in merge order, the order in which their configuration is inherited. Each ancestor, in the breadcrumb or in **Lineage**, opens its own configuration.
 
 Saving sends only your changes. Two situations stop a save:
 
