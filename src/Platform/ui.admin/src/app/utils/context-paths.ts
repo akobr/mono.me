@@ -1,7 +1,15 @@
 import type { Scope } from '@/stores/context'
 
 /** Sections that live under /{org}/{project}/{view}/… */
-export const viewSections = ['annotations', 'configurations', 'graph', 'templates', 'schemas', 'compare'] as const
+export const viewSections = [
+  'annotations',
+  'configurations',
+  'graph',
+  'templates',
+  'schemas',
+  'compare',
+  'export-import',
+] as const
 
 /** Sections that live under /{org}/{project}/… */
 export const projectSections = ['views', 'members', 'machines', 'settings', 'monitor'] as const

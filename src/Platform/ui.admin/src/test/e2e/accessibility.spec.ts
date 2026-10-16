@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { createZip, textFile } from '../../app/mock/zip'
 import { expectAccessible, openApp, openBulkCreate, signedOut } from './support'
 
 // Accessibility of the main screens (spec section 15): no serious or critical axe violations (WCAG 2.1 AA), in the
@@ -11,6 +12,8 @@ const screens: [string, string][] = [
   ['templates', '/acme/billing/default/templates/exe'],
   ['schemas', '/acme/billing/default/schemas'],
   ['graph', '/acme/billing/default/graph'],
+  ['export and import', '/acme/billing/default/export-import'],
+  ['export and import of a reader', '/northwind/portal/default/export-import'],
   ['members', '/acme/billing/members'],
   ['machines', '/acme/billing/machines'],
   ['settings', '/acme/billing/settings'],
@@ -56,16 +59,24 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
-    for (const [name, button] of [
-      ['export', 'Export configurations'],
-      ['import', 'Import configurations'],
-    ] as const) {
-      test(`the ${name} dialog has no serious accessibility violations`, async ({ page }) => {
-        await openApp(page, '/acme/billing/default/configurations')
-        await page.getByRole('button', { name: button }).click()
-        await page.getByRole('dialog').waitFor()
-        await expectAccessible(page)
+    test('the result of an import has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/acme/billing/default/export-import')
+      // an update, a create with a warning, a skip and an ignored file
+      const archive = createZip([
+        textFile('annotations/rst.invoicing.json', '{"Title":"Edited"}'),
+        textFile('annotations/exe.newco.billing.prod.json', '{}'),
+        textFile('configurations/rst.no-such-annotation.conf.json', '{"a":1}'),
+        textFile('notes.txt', 'ignored'),
+      ])
+      const panel = page.getByRole('region', { name: 'Import', exact: true })
+      await panel.locator('input[type="file"]').setInputFiles({
+        name: 'edited.zip',
+        mimeType: 'application/zip',
+        buffer: Buffer.from(archive),
       })
-    }
+      await panel.getByRole('button', { name: 'Check', exact: true }).click()
+      await expect(page.getByText('Checked: nothing was written')).toBeVisible()
+      await expectAccessible(page)
+    })
   })
 }

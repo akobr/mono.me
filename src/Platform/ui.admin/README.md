@@ -1,6 +1,6 @@
 # 2S Admin UI
 
-Single-page administration application of the 2S Platform: organizations, projects and views, annotations, configurations, templates and schemas, the values store, members and invitations, machines and shared certificates, settings and monitoring.
+Single-page administration application of the 2S Platform: organizations, projects and views, annotations, configurations, templates and schemas, the export and import of a view, the values store, members and invitations, machines and shared certificates, settings and monitoring.
 
 - **Stack:** Vue 3.5 + TypeScript, Vite, Vue Router 5 (file-based, typed routes), Nuxt UI 4 (through its Vite plugin, no Nuxt), Pinia, TanStack Query for Vue, VeeValidate + Zod 4.
 - **API client:** the generated SDK [`@42for.net/2splatform.sdk`](../Storyteller/sdk.typescript/README.md) (fetch functions, Vue Query composables, Zod schemas, MSW mocks).
@@ -65,8 +65,8 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - delete and Undo, restore from Deleted (with and without descendants), create over a deleted key, permanent delete for Administrators only, the history and the configuration link;
 - bulk create from a list of keys, with the missing ancestors, and its absence for a Reader;
 - the project pages of the menu per role, the redirects of the merged pages to their sections, and the theme in the command palette;
-- the `prod` badge of the default view in the menu, the switcher and its list of views, and its absence on another view;
-- axe (WCAG 2.1 AA) on the main screens, on Deleted and on the bulk create dialog.
+- the Export & Import page from the sidebar and with `g e`: an export of some kinds, a git export, a check of an edited archive with its result per kind and **Import now**, an import with **Skip** shown again after a reload, and the notice of a Reader;
+- axe (WCAG 2.1 AA) on the main screens, on Deleted, on the bulk create dialog and on the result of an import.
 
 Each test gets a fresh context, so the mock data starts from the scenario's seed. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of `npx playwright install chromium`.
 
@@ -165,4 +165,5 @@ src/
 - **Roles:** `useRole()` and `<RoleGate>` read the caller's role from `Account.AccessMap` (an organization role does not grant project access).
 - **Forms:** VeeValidate 4 with Zod 4 through `forms/typed-schema.ts` (`@vee-validate/zod` supports Zod 3 only).
 - **Values store** (`pages/[org]/[project]/[view]/key-values*`, `components/key-values/`, `components/secrets/`, `components/monitor/`): the key values of a view with their levels, the detail with Reveal (masked again after 60 seconds, never cached) and Set new value, versions loaded only on request, import in three steps and export through a Blob URL, the Secrets section of the project's Settings (allowed levels, keys and rotation, the BYOK wizard, recipients), and the Usage and Audit tabs of the Monitor page (`pages/[org]/[project]/monitor.vue`, `?tab=audit`). HYOK values are encrypted in the browser with `@42for.net/2splatform.sdk/hyok` before they leave; `app/mock/key-value-handlers.ts` is the stateful mock behind them. See [key-values.md](../../../docs/Platform/Storyteller/key-values.md#admin-ui).
+- **Export & Import** (`pages/[org]/[project]/[view]/export-import.vue`, `components/transfer/`, `stores/transfers.ts`): the Export section (the kinds, a folder of JSON files or a git repository, the download when the job is ready), the Import section (a zip, the kinds, Overwrite or Skip, force, Check and Import), and the result of the view's latest import (the counts per kind, filter chips, a table or a list with links to the documents, **Import now** after a check). The store follows the jobs outside the page: after a reload, pending exports are resumed and the latest import of each view is read again. `TransferToaster` reports the ends and refreshes the queries of the kinds an import wrote; `app/mock/transfer-handlers.ts` is the stateful mock. See [export-import.md](../../../docs/Platform/Storyteller/export-import.md).
 - **Graph** (`components/graph/`): the d3-force simulation runs in a Web Worker (`simulation.worker.ts`), seeded with a layered layout (`layout-seed.ts`) and streamed as positions. Nodes, links and arrowheads are drawn with WebGL 2 (`webgl-renderer.ts`); names, highlights and rings are drawn on a Canvas 2D overlay. Without WebGL 2, or with `localStorage['2s-admin:graph-renderer'] = 'canvas'`, Canvas 2D draws everything (fine up to a few thousand nodes).
