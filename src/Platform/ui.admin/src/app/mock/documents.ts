@@ -101,7 +101,10 @@ function configurationContent(annotation: Annotation, version: number): Record<s
 
 const configurationKeysCache = new WeakMap<ReadonlyMap<string, Annotation>, Map<string, number>>()
 
-/** About a third of the annotations has a configuration, with 1-12 versions. */
+/**
+ * About a third of the seeded annotations has a configuration, with 1-12 versions. An annotation created later (by the
+ * API or an import) starts without one, as on the server, so a dry run of an import predicts the real run.
+ */
 function configurationKeys(annotations: ReadonlyMap<string, Annotation>): Map<string, number> {
   const cached = configurationKeysCache.get(annotations)
   if (cached) {
@@ -109,8 +112,8 @@ function configurationKeys(annotations: ReadonlyMap<string, Annotation>): Map<st
   }
   const result = new Map<string, number>()
   let index = 0
-  for (const key of annotations.keys()) {
-    if (hash(key) % 3 === 0) {
+  for (const [key, annotation] of annotations) {
+    if (annotation.Created?.By?.Kind === 'System' && hash(key) % 3 === 0) {
       result.set(key, (index++ % 12) + 1)
     }
   }

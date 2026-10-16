@@ -111,7 +111,7 @@ const depthOf = (key: string) => depths[codeOfKey(key) ?? 'rst']
 const mergeOrderOf = (key: string) => getAnnotationTypeInfo(key.slice(0, key.indexOf('.')))?.mergeOrder ?? 0
 
 /** The order of GetAllAncestorKeys: by depth, then type, then an ordinal comparison of the key (roots first). */
-const byDepthTypeKey = (a: string, b: string) =>
+export const byDepthTypeKey = (a: string, b: string) =>
   depthOf(a) - depthOf(b) || mergeOrderOf(a) - mergeOrderOf(b) || (a < b ? -1 : a > b ? 1 : 0)
 
 const isDescendant = (candidate: string, key: string) => candidate !== key && getAllAncestors(candidate).includes(key)
@@ -166,9 +166,10 @@ function defaultAncestor(params: ScopeParams, key: string, from: Annotation): An
 
 /**
  * Stores an annotation like SetAnnotation: a missing key is created with its missing ancestors, an active one is
- * updated (nothing is written without a change), and a deleted key or ancestor is re-created empty.
+ * updated (nothing is written without a change), and a deleted key or ancestor is re-created empty. The import of an
+ * archive writes through it too (transfer-handlers.ts).
  */
-function store(db: MockDb, params: ScopeParams, annotation: Annotation): Annotation {
+export function storeAnnotation(db: MockDb, params: ScopeParams, annotation: Annotation): Annotation {
   const scope = scopeOf(params)
   const overrides = overridesOf(db, params.org, params.project, params.view)
   const trash = trashOf(overrides)
@@ -263,6 +264,15 @@ const limits: [keyof Annotation, number][] = [
   ['DocumentationLink', 2048],
 ]
 
+/** The problems AnnotationRules finds, one sentence each; none for a valid annotation. */
+export function annotationProblems(annotation: Annotation): string[] {
+  const record = annotation as unknown as Record<string, unknown>
+  return limits
+    .map(([field, max]) => [field, String(record[field] ?? '').length, max] as const)
+    .filter(([, length, max]) => length > max)
+    .map(([field, length, max]) => `${field} has ${length} characters, at most ${max} are allowed.`)
+}
+
 function invalidAnnotation(annotation: Annotation, key?: string): Response | undefined {
   if (!isValidAnnotationKey(annotation.AnnotationKey ?? '')) {
     return errorResponse(400, `The annotation key '${annotation.AnnotationKey}' is not valid.`, 'InvalidKey')
@@ -276,10 +286,7 @@ function invalidAnnotation(annotation: Annotation, key?: string): Response | und
   if (missing?.length) {
     return errorResponse(400, `Invalid annotation object in body: missing ${missing.join(', ')}.`, 'InvalidInput')
   }
-  const problems = limits
-    .map(([field, max]) => [field, String(record[field] ?? '').length, max] as const)
-    .filter(([, length, max]) => length > max)
-    .map(([field, length, max]) => `${field} has ${length} characters, at most ${max} are allowed.`)
+  const problems = annotationProblems(annotation)
   if (problems.length) {
     return errorResponse(
       400,
@@ -529,7 +536,7 @@ export const annotationHandlers: HttpHandler[] = [
       const existing = annotationsOf(db, params.org, params.project, params.view)
       const created = body
         .filter((annotation) => !existing.has(annotation.AnnotationKey))
-        .map((annotation) => store(db, params, annotation))
+        .map((annotation) => storeAnnotation(db, params, annotation))
       return HttpResponse.json(created)
     }),
   ),
@@ -570,9 +577,9 @@ export const annotationHandlers: HttpHandler[] = [
         }
 
         const missing = getAllAncestors(key).filter((ancestor) => !active.has(ancestor))
-        // only what the key gives; store() adds the relations
+        // only what the key gives; storeAnnotation() adds the relations
         const parsed = parseAnnotationKey(key)!
-        const stored = store(db, params, {
+        const stored = storeAnnotation(db, params, {
           ProjectName: params.project,
           ViewName: params.view,
           AnnotationKey: key,
@@ -742,7 +749,7 @@ export const annotationHandlers: HttpHandler[] = [
         return invalid
       }
       const parsed = parseAnnotationKey(params.key)!
-      return HttpResponse.json(store(db, params, { ...body, Name: parsed.name }))
+      return HttpResponse.json(storeAnnotation(db, params, { ...body, Name: parsed.name }))
     }),
   ),
 
