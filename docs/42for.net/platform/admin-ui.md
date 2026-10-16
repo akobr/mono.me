@@ -217,8 +217,10 @@ The UI adapts to the screen:
 
 It follows the system light or dark theme unless you pick one on the account page. The account page also keeps your other preferences: row density, editor formats, the date format and your own names, colors and icons of the annotation types.
 
+Buttons, links, the selected item and the focus use the purple of the 42 logo: a deeper shade in the light theme and a lighter one in the dark theme, so text in it keeps WCAG AA contrast in both.
+
 Accessibility:
-- The screens are tested against WCAG 2.1 AA (axe).
+- The screens are tested against WCAG 2.1 AA (axe), in the light and the dark theme.
 - Types and statuses always carry an icon and text, not only a color. That holds for renamed and recolored types too.
 - Reduced motion turns off the graph animation and panel transitions.
 
