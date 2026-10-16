@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { safeReturnTo } from '@/utils/return-to'
 import { groupMemberships, hasOrganization } from '@/utils/memberships'
-import { currentSection, projectTarget, viewTarget } from '@/utils/context-paths'
+import { currentSection, projectTarget, viewLocation, viewTarget } from '@/utils/context-paths'
 import { accessibleContext, buildNavigation, mergeContext, navigationScope } from '@/utils/navigation'
 import { clampDetailWidth, detailMode } from '@/utils/detail-panel'
 import { describeError } from '@/utils/errors'
@@ -77,6 +77,19 @@ describe('context paths', () => {
       '/acme/billing/staging/graph',
     )
     expect(viewTarget('/acme/billing/members', 'acme', 'billing', 'staging')).toBe('/acme/billing/staging/annotations')
+  })
+
+  // monitor is not a reserved view name; the Monitor page has no pages below it (424-35).
+  it('tells the Monitor page from a view named monitor', () => {
+    expect(currentSection('/acme/billing/monitor/graph/rst.x')).toEqual({ kind: 'view', name: 'graph' })
+    expect(viewLocation('/acme/billing/monitor/annotations')).toEqual({
+      scope: { org: 'acme', project: 'billing', view: 'monitor' },
+      section: 'annotations',
+      root: true,
+    })
+    expect(projectTarget('/acme/billing/monitor/graph/rst.x', 'acme', 'shipping')).toBe('/acme/shipping/default/graph')
+    expect(viewTarget('/acme/billing/monitor/graph', 'acme', 'billing', 'default')).toBe('/acme/billing/default/graph')
+    expect(currentSection('/acme/billing/machines/graph')).toEqual({ kind: 'project', name: 'machines' })
   })
 })
 
