@@ -32,4 +32,6 @@ internal sealed class FakeTemplateService(ExportReads? reads = null) : IConfigur
     public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint version) => throw new NotSupportedException();
 
     public Task<DiffResult> GetTemplateVersionChangesAsync(string organization, string project, string view, string annotationType, uint fromVersion, uint toVersion) => throw new NotSupportedException();
+
+    public Task<ViewImportResult> ImportTemplateAsync(string organization, string project, string view, string annotationType, JObject content, ViewImportOptions options) => throw new NotSupportedException();
 }

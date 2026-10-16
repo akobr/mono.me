@@ -8,6 +8,7 @@ using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Binding;
 using _42.Platform.Storyteller.Binding.Language;
 using _42.Platform.Storyteller.Configuring;
+using _42.Platform.Storyteller.Transferring;
 using FluentAssertions;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -226,5 +227,7 @@ public class AnnotationBindingFunctionTests
         public Task<AnnotationPurgeResult> PurgeAnnotationAsync(FullKey fullKey, AuditActor actor) => throw new NotSupportedException();
 
         public Task<AnnotationHistory?> GetAnnotationHistoryAsync(FullKey fullKey) => throw new NotSupportedException();
+
+        public Task<ViewImportResult> ImportAnnotationAsync(FullKey key, JObject content, ViewImportOptions options, ViewImportOverlay overlay) => throw new NotSupportedException();
     }
 }
