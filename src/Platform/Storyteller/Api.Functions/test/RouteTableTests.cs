@@ -150,13 +150,14 @@ public partial class RouteTableTests
         actionRoutes.SelectMany(trigger => trigger.Methods!).ShouldAllBe(method => string.Equals(method, "post", StringComparison.OrdinalIgnoreCase));
     }
 
+    // Literal segments after the view: "views" is a reserved view name, so they never meet the view routes.
     [Theory]
-    [InlineData("POST v1/{}/{}/{}/configurations/exports")]
-    [InlineData("GET v1/{}/{}/{}/configurations/exports/{}")]
-    [InlineData("GET v1/{}/{}/{}/configurations/exports/{}/archive")]
-    [InlineData("POST v1/{}/{}/{}/configurations/imports")]
-    [InlineData("GET v1/{}/{}/{}/configurations/imports/{}")]
-    public void ConfigurationTransferRoutes_AreRegistered(string expected)
+    [InlineData("POST v1/{}/{}/{}/exports")]
+    [InlineData("GET v1/{}/{}/{}/exports/{}")]
+    [InlineData("GET v1/{}/{}/{}/exports/{}/archive")]
+    [InlineData("POST v1/{}/{}/{}/imports")]
+    [InlineData("GET v1/{}/{}/{}/imports/{}")]
+    public void ViewTransferRoutes_AreRegistered(string expected)
     {
         var routes = typeof(AccessHttp).Assembly
             .GetTypes()

@@ -10,7 +10,7 @@ The code is in:
 
 The design and its decisions are in [the spec](specs/2026-10-15%20Export%20and%20Import%20of%20a%20View.md), which extends [the first spec](specs/2026-10-14%20Export%20and%20Import%20of%20Configurations.md) (configurations only).
 
-**State of the delivery.** The backend covers all four kinds (phase 1 of the spec). The routes, the SDKs, the CLI and the admin UI keep the shape of the first spec until phases 2 to 4. They don't pass the include and existing options yet, so every export and import through them covers all four kinds, and an import overwrites. See [API](#api), [CLI](#cli) and [Administration UI](#administration-ui).
+**State of the delivery.** The backend covers all four kinds (phase 1 of the spec), and the routes are below the view with the include and existing options (phase 2). The committed OpenAPI document and both SDKs, the CLI and the admin UI still call the routes of the first spec until they are regenerated and adapted (phases 2 to 4). See [API](#api), [CLI](#cli) and [Administration UI](#administration-ui).
 
 ## What travels
 
@@ -256,7 +256,7 @@ The repository is written by `GitRepositoryWriter`, without a git library:
 | `force` | `false` | Store schemas and configurations that break each other, with the warning `SchemaViolation`. It never stores invalid JSON, an invalid JSON Schema, an annotation that breaks its rules, or a broken directive. |
 | `dryRun` | `false` | Decide every outcome and warning without writing anything. |
 
-`IViewTransferService.StartImportAsync` takes all four, and `StartExportAsync` takes `include`. The routes don't pass `include` and `existing` yet (phase 2): through them, an import covers every kind with `Overwrite`.
+`IViewTransferService.StartImportAsync` takes all four, and `StartExportAsync` takes `include`. The routes pass them through (see [API](#api)).
 
 ### Reading the archive
 
@@ -467,28 +467,46 @@ A summary counts `Created`, `Updated`, `Unchanged`, `Skipped` and `Failed`, and 
 
 ## API
 
-Phase 2 of the spec replaces these routes. Until then, the routes of the first spec stay below `v1/{organization}/{project}/{view}/configurations`, with the tag `Configurations` (`Api.Functions/src/V1/ConfigurationTransferHttp.cs`). They answer with the new model.
+The routes are below `v1/{organization}/{project}/{view}`, with the tag `Transfers` (`Api.Functions/src/V1/ViewTransferHttp.cs`). `exports` and `imports` are literal segments after the view, and `views` is a reserved view name, so they meet no other route. The routes of the first spec below `…/configurations/` are gone; they were never released.
 
-| Method | Route | Answer |
+| Method | Route | Operation | Answer |
+| --- | --- | --- | --- |
+| `POST` | `…/exports` with `{ "Format": "Folder" \| "Git", "Include": [ … ] }` | `StartViewExport` | `202` `ViewExport`, `Location` of the job; `400` for an unknown format or kind; `409 TransferLimit` |
+| `GET` | `…/exports/{id}` | `GetViewExport` | `200` `ViewExport`; `404` for an unknown, expired or other view's export |
+| `GET` | `…/exports/{id}/archive` | `GetViewExportArchive` | `200` `application/zip`, `Content-Disposition` with the export's `FileName`; `409 TransferNotReady` while it is queued, running or failed; `404` |
+| `POST` | `…/imports?include=&existing=&force=&dryRun=&fileName=` with the zip as the body (`application/zip`) | `StartViewImport` | `202` `ViewImport`, `Location` of the job; `400 InvalidQuery` for an unknown kind or existing value; `400 InvalidArchive`; `413 ArchiveTooLarge`; `409 TransferLimit` |
+| `GET` | `…/imports/{id}` | `GetViewImport` | `200` `ViewImport` with the summaries and the items; `404` |
+
+**Options.**
+
+- The export body is read by the route itself: member names and values in any case, no body or `{}` exports a folder of all four kinds, and other members are ignored. `Include` is a list of kinds; an empty list or null means all four. An unknown format or kind, a number in their place, or a body that is not a JSON object answers `400` with a message that names it.
+- `include` of an import is a comma-separated list of `Annotations`, `Schemas`, `Templates` and `Configurations`, in any case. A repeated parameter works too, since its values arrive joined by commas. Empty means all four. An unknown name answers `400 InvalidQuery`, naming it.
+- `existing` is `Overwrite` (the default) or `Skip`, in any case; anything else answers `400 InvalidQuery`.
+- `force` and `dryRun` are `false` by default; `fileName` is only for display.
+- The job stores `Include` resolved (distinct, in import order, all four when the request named none), and answers with it.
+
+**Access.** The roles stay as in the first spec: any role on the project to export and read an export, `Contributor` to import and read an import. The scopes depend on the included kinds (`Api.Functions/src/Security/ViewTransferScopes.cs`):
+
+| Included kind | Export, and reading an export | Import, and reading an import |
 | --- | --- | --- |
-| `POST` | `…/exports` with `{ "Format": "Folder" \| "Git" }` | `202` `ViewExport`, `Location` of the job; `409 TransferLimit` |
-| `GET` | `…/exports/{id}` | `200` `ViewExport`; `404` for an unknown, expired or other view's export |
-| `GET` | `…/exports/{id}/archive` | `200` `application/zip`, `Content-Disposition` with the export's `FileName`; `409 TransferNotReady` while it is queued, running or failed; `404` |
-| `POST` | `…/imports?force=&dryRun=&fileName=` with the zip as the body (`application/zip`) | `202` `ViewImport`, `Location` of the job; `400 InvalidArchive`; `413 ArchiveTooLarge`; `409 TransferLimit` |
-| `GET` | `…/imports/{id}` | `200` `ViewImport` with the summaries and the items; `404` |
+| Annotations | `Annotation.Read`, `Annotation.ReadWrite`, `Default.Read` or `Default.ReadWrite` | `Annotation.ReadWrite` or `Default.ReadWrite` |
+| Schemas, Templates, Configurations | `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read` or `Default.ReadWrite` | `Configuration.ReadWrite` or `Default.ReadWrite` |
 
-- They pass neither `include` nor `existing`. An export covers all four kinds: the request's `Include` is not read yet. An import covers all four kinds with `Overwrite`.
-- **Export** needs the scope `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read` or `Default.ReadWrite`, and any role on the project.
-- **Import**, and reading an import, needs `Configuration.ReadWrite` or `Default.ReadWrite`, and `Contributor`.
-- These are still the scopes of configurations. Until phase 2 checks the scopes of each included kind, a caller with them also exports and imports annotations.
+- A request needs the scopes of every kind it includes. Reading a job, or downloading its archive, needs the scopes of the job's stored `Include`; a job without one counts as all four. The archive is not opened, and the job's state not told, before the scopes pass.
+- A missing scope answers `403 AccessDenied` (not `401`, which stays for missing or invalid credentials). The message names the kinds, the missing scopes and `include`, for example `Missing scope for annotations: importing them needs Annotation.ReadWrite or Default.ReadWrite. Without include, all four kinds are included; name the kinds to import in include.` So a machine with only `Configuration.ReadWrite` passes `include=schemas,templates,configurations`.
+- The order is: the options (`400`), the scopes (`403`), the role (`403`), then the body of an import (`413`, `400 InvalidArchive`). Reading a job checks the role, finds the job (`404`) and then checks its scopes.
+- Debug builds skip the scope and role checks (`DEV_AUTH`), as on every route. `ViewTransferHttp.ChecksScopes` follows that, and the tests turn it on.
 - Machines are allowed with the same scopes. The caller's audit actor becomes the job's `CreatedBy`, and the actor of written versions and audit entries.
-- The upload is copied into memory up to `MaxArchiveBytes` (a larger `Content-Length` is refused before reading) and must start with a zip signature. Then the central directory is checked (see [Limits](#limits)).
-- The OpenAPI document of the running API names the schemas `View*`. The committed `Sdk.NSwag/open.api.v0.9.15.json`, the C# SDK and the TypeScript SDK keep the `Configuration*` names until phase 2 regenerates them.
 
-The background half is `Api.Functions/src/Transfers/ConfigurationTransferFunctions.cs`:
+**Upload.** The upload is copied into memory up to `MaxArchiveBytes` (a larger `Content-Length` is refused before reading) and must start with a zip signature. Then the central directory is checked (see [Limits](#limits)).
 
-- `ProcessConfigurationTransfer` is triggered by the queue `configuration-transfers` on `AzureWebJobsStorage`. `host.json` sets `batchSize` 4 and `maxDequeueCount` 3. A message that is not a valid job is logged and dropped. Any other failure fails the invocation (`ExceptionHandlingMiddleware` rethrows for invocations without an HTTP request), so the runtime delivers the message again.
-- `PurgeConfigurationTransfers` runs every hour at minute 17 and deletes archives older than the retention plus one hour.
+**OpenAPI.** `include` is published as an array of `ViewArchiveContent` with `style: form` and `explode: false` (comma-separated), and `existing` as the enum `ViewImportExisting` with the default `Overwrite`. The committed `Sdk.NSwag/open.api.v0.9.15.json`, the C# SDK and the TypeScript SDK keep the routes and the `Configuration*` names of the first spec until they are regenerated.
+
+The background half is `Api.Functions/src/Transfers/ViewTransferFunctions.cs`:
+
+- `ProcessViewTransfer` is triggered by the queue `configuration-transfers` on `AzureWebJobsStorage`. `host.json` sets `batchSize` 4 and `maxDequeueCount` 3. A message that is not a valid job is logged and dropped. Any other failure fails the invocation (`ExceptionHandlingMiddleware` rethrows for invocations without an HTTP request), so the runtime delivers the message again.
+- `PurgeViewTransfers` runs every hour at minute 17 and deletes archives older than the retention plus one hour.
+- Both functions had the names of the first spec (`ProcessConfigurationTransfer`, `PurgeConfigurationTransfers`). The queue, the container, the partition and the options section keep theirs (see [Storage](#storage)).
 
 Locally, the Aspire host (`Aspire.Host/src/AppHost.cs`) runs Azurite on the default ports, so `UseDevelopmentStorage=true` of `local.settings.json` works unchanged. Without Aspire, start Azurite (`npx azurite`) before the Functions host.
 
