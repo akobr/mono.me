@@ -95,7 +95,7 @@ const expiry = (entry: KeyValueVersion) =>
             </tr>
           </thead>
           <tbody class="divide-y divide-default">
-            <tr v-for="entry in rows" :key="entry.Version" :class="entry.IsCurrent ? 'bg-primary/5' : ''">
+            <tr v-for="entry in rows" :key="entry.Version" :class="entry.IsCurrent ? 'bg-primary/4' : ''">
               <td class="px-3 py-2 font-mono text-xs">v{{ entry.Version }}<span v-if="entry.IsCurrent" class="ms-1 text-muted">(current)</span></td>
               <td class="px-3 py-2"><KeyValueLevelBadge :level="entry.Protection" /></td>
               <td class="px-3 py-2"><AuditActorLink :actor="entry.Modified?.By" subtle /></td>

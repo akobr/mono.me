@@ -109,7 +109,7 @@ const columns: TableColumn<Row>[] = [
 ]
 
 const rowClass = (row: { original: Row }) =>
-  row.original.key === selectedKey.value ? '[&>td]:bg-[color-mix(in_oklab,var(--ui-primary)_12%,var(--ui-bg))]' : ''
+  row.original.key === selectedKey.value ? '[&>td]:bg-[color-mix(in_oklab,var(--ui-primary)_10%,var(--ui-bg))]' : ''
 </script>
 
 <template>

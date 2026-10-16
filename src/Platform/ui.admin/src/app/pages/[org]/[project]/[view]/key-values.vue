@@ -203,7 +203,7 @@ const resolveDropdown = () => resolveComponent('UDropdownMenu') as Component
 const resolveButton = () => resolveComponent('UButton') as Component
 
 const rowClass = (row: { original: KeyValueSummary }) =>
-  row.original.Key === selectedKey.value ? '[&>td]:bg-[color-mix(in_oklab,var(--ui-primary)_12%,var(--ui-bg))]' : ''
+  row.original.Key === selectedKey.value ? '[&>td]:bg-[color-mix(in_oklab,var(--ui-primary)_10%,var(--ui-bg))]' : ''
 
 const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...levels.map((level) => ({ label: levelMeta[level].label, value: level }))])
 </script>

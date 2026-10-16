@@ -60,7 +60,7 @@ const columns = computed(() =>
 const rowClass = (row: { original: TreeNode }) =>
   [
     // Opaque, so pinned (sticky) cells do not show the scrolled content through the highlight.
-    row.original.key === props.selectedKey ? '[&>td]:bg-[color-mix(in_oklab,var(--ui-primary)_12%,var(--ui-bg))]' : '',
+    row.original.key === props.selectedKey ? '[&>td]:bg-[color-mix(in_oklab,var(--ui-primary)_10%,var(--ui-bg))]' : '',
     row.original.id === props.activeId ? 'outline outline-1 -outline-offset-1 outline-primary/60' : '',
     row.original.matched || row.original.missing ? '' : 'opacity-50',
   ].join(' ')

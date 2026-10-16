@@ -53,7 +53,7 @@ const selected = computed(() => (route.params as { type?: string }).type)
           <RouterLink
             :to="`/${context.org}/${context.project}/${context.view}/templates/${row.code}`"
             class="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-elevated/50"
-            :class="selected === row.code ? 'bg-primary/5' : ''"
+            :class="selected === row.code ? 'bg-primary/4' : ''"
           >
             <AnnotationTypeBadge :type="row.code" variant="label" />
             <span v-if="row.summary" class="font-mono text-xs">v{{ row.summary.Version }}</span>
