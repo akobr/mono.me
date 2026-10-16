@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -12,7 +13,7 @@ public sealed class ViewTransferService : IViewTransferService
 
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(2);
 
-    // Transitional: exports and imports cover the configurations only, until the passes of every kind (1.15).
+    // Transitional: imports cover the configurations only, until the passes of every kind (1.15).
     private static readonly IReadOnlyList<ViewArchiveContent> TransitionalContent = [ViewArchiveContent.Configurations];
 
     // A job unchanged for this long counts as abandoned, so a crashed worker cannot block the project's limit.
@@ -24,6 +25,9 @@ public sealed class ViewTransferService : IViewTransferService
     private readonly IViewTransferStore _store;
     private readonly IViewArchiveStorage _storage;
     private readonly IViewTransferQueue _queue;
+    private readonly IAnnotationService _annotations;
+    private readonly IConfigurationSchemaService _schemas;
+    private readonly IConfigurationTemplateService _templates;
     private readonly IConfigurationService _configurations;
     private readonly ViewTransferOptions _options;
     private readonly TimeProvider _time;
@@ -33,6 +37,9 @@ public sealed class ViewTransferService : IViewTransferService
         IViewTransferStore store,
         IViewArchiveStorage storage,
         IViewTransferQueue queue,
+        IAnnotationService annotations,
+        IConfigurationSchemaService schemas,
+        IConfigurationTemplateService templates,
         IConfigurationService configurations,
         IOptions<ViewTransferOptions> options,
         TimeProvider time,
@@ -41,6 +48,9 @@ public sealed class ViewTransferService : IViewTransferService
         _store = store;
         _storage = storage;
         _queue = queue;
+        _annotations = annotations;
+        _schemas = schemas;
+        _templates = templates;
         _configurations = configurations;
         _options = options.Value;
         _time = time;
@@ -238,20 +248,32 @@ public sealed class ViewTransferService : IViewTransferService
     private async Task ExportAsync(ViewTransferRecord record, CancellationToken cancellationToken)
     {
         var export = record.Export!;
-        var histories = await _configurations.GetConfigurationHistoriesAsync(record.Organization, record.Project, record.View, cancellationToken);
+        var include = ViewArchiveInclude.Resolve(export.Include);
+        var (organization, project, view) = (record.Organization, record.Project, record.View);
+
+        // The reads are not a snapshot, so they run in reverse dependency order: configurations, templates, schemas,
+        // annotations. A document read first still finds its dependency in a later read unless it was deleted in
+        // between, which is rarer than a creation during the export.
+        var configurations = await ReadAsync(ViewArchiveContent.Configurations, () => _configurations.GetConfigurationHistoriesAsync(organization, project, view, cancellationToken));
+        var templates = await ReadAsync(ViewArchiveContent.Templates, () => _templates.GetTemplateHistoriesAsync(organization, project, view, cancellationToken));
+        var schemas = await ReadAsync(ViewArchiveContent.Schemas, () => _schemas.GetSchemaHistoriesAsync(organization, project, view, cancellationToken));
+        var annotations = await ReadAsync(ViewArchiveContent.Annotations, () => _annotations.GetViewAnnotationsAsync(organization, project, view, cancellationToken));
 
         using var buffer = new MemoryStream();
         var statistics = ViewArchiveWriter.Write(
             buffer,
             new ViewArchiveSource
             {
-                Organization = record.Organization,
-                Project = record.Project,
-                View = record.View,
+                Organization = organization,
+                Project = project,
+                View = view,
                 ExportedAt = export.StartedAt ?? _time.GetUtcNow(),
                 ExportedBy = export.CreatedBy,
-                Include = TransitionalContent,
-                Configurations = histories,
+                Include = include,
+                Annotations = annotations,
+                Schemas = schemas,
+                Templates = templates,
+                Configurations = configurations,
             },
             export.Format);
 
@@ -267,7 +289,10 @@ public sealed class ViewTransferService : IViewTransferService
                     Status = ViewTransferStatus.Succeeded,
                     CompletedAt = now,
                     ExpiresAt = now + _options.Retention,
-                    ConfigurationCount = statistics.ConfigurationCount,
+                    AnnotationCount = Count(ViewArchiveContent.Annotations, statistics.AnnotationCount),
+                    SchemaCount = Count(ViewArchiveContent.Schemas, statistics.SchemaCount),
+                    TemplateCount = Count(ViewArchiveContent.Templates, statistics.TemplateCount),
+                    ConfigurationCount = Count(ViewArchiveContent.Configurations, statistics.ConfigurationCount),
                     VersionCount = statistics.VersionCount,
                     Size = buffer.Length,
                 },
@@ -278,6 +303,14 @@ public sealed class ViewTransferService : IViewTransferService
         {
             _logger.LogWarning("The export {Id} was changed by another worker; its result was not saved.", record.Id);
         }
+
+        // a kind left out reads nothing and has no count
+        async Task<IReadOnlyList<T>> ReadAsync<T>(ViewArchiveContent content, Func<Task<IReadOnlyList<T>>> read)
+        {
+            return include.Contains(content) ? await read() : [];
+        }
+
+        int? Count(ViewArchiveContent content, int count) => include.Contains(content) ? count : null;
     }
 
     private async Task ImportAsync(ViewTransferRecord record, CancellationToken cancellationToken)

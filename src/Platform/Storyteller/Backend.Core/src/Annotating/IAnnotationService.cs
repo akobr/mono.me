@@ -22,6 +22,14 @@ public interface IAnnotationService
     // (AnnotationsRequest.Deleted and IncludeInactive). A page can hold fewer items than the page size.
     Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request);
 
+    // Every annotation of a view that is not deleted, of every type and status, with its Created and Modified stamps
+    // (an export). Pages through GetAnnotationsAsync.
+    Task<IReadOnlyList<Annotation>> GetViewAnnotationsAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default);
+
     // The deleted annotations of a view, newest deletion first, with their Deletion. One query over every partition
     // of the project, up to 1000 per page.
     Task<AnnotationsResponse> GetDeletedAnnotationsAsync(

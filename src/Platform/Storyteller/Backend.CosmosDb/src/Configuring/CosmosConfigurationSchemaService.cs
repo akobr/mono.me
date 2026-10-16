@@ -2,10 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Json;
+using _42.Platform.Storyteller.Transferring;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Logging;
@@ -318,6 +321,84 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
             toVersion,
             $"Unknown version {fromVersion} of the schema for {typeCode} under {key} in view {view}.",
             $"Unknown version {toVersion} of the schema for {typeCode} under {key} in view {view}.");
+    }
+
+    public async Task<IReadOnlyList<SchemaHistory>> GetSchemaHistoriesAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default)
+    {
+        // one query of the partition: "{view}.cfs.{suffix}" and "{view}.csv.{suffix}.{n}", without the state items "css"
+        var currentPrefix = $"{view}.{EntityIdPrefixTypes.ConfigurationSchema}.";
+        var historyPrefix = $"{view}.{EntityIdPrefixTypes.ConfigurationSchemaVersion}.";
+        var query = new QueryDefinition(
+                "SELECT c.id, c.Version, c.Content, c.Modified FROM c WHERE STARTSWITH(c.id, @currentPrefix) OR STARTSWITH(c.id, @historyPrefix)")
+            .WithParameter("@currentPrefix", currentPrefix)
+            .WithParameter("@historyPrefix", historyPrefix);
+
+        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var histories = new DocumentHistories<(ViewDocumentKind Kind, string? Type, string? Key)>();
+        using var iterator = container.GetItemQueryStreamIterator(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(GetSchemaPartitionKey(project)) });
+
+        while (iterator.HasMoreResults)
+        {
+            using var response = await iterator.ReadNextAsync(cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var page = response.Content.DeserializeNewtonsoft<QueryPage<DocumentArchiveRow>>(_serializerOptions);
+
+            foreach (var row in page?.Documents ?? [])
+            {
+                var isCurrent = row.Id?.StartsWith(currentPrefix, StringComparison.Ordinal) == true;
+                string? suffix = null;
+
+                if (isCurrent)
+                {
+                    suffix = row.Id![currentPrefix.Length..];
+                }
+                else if (row.Id?.StartsWith(historyPrefix, StringComparison.Ordinal) == true)
+                {
+                    // "{suffix}.{n}"
+                    var rest = row.Id[historyPrefix.Length..];
+                    var versionDot = rest.LastIndexOf('.');
+                    suffix = versionDot > 0 ? rest[..versionDot] : null;
+                }
+
+                if (suffix is not null && ParseSuffix(suffix) is { } identity && IsExportable(identity))
+                {
+                    histories.Add((ToDocumentKind(identity.Kind), identity.Type, identity.Key), row, isCurrent);
+                }
+            }
+        }
+
+        var documents = histories.Build().ToList();
+
+        // annotation and descendant-type schemas follow their annotation, as configurations do: a deleted or missing
+        // annotation leaves them out
+        var states = await AnnotationItemStore.ReadStatesAsync(
+            container,
+            documents
+                .Select(document => document.Identity.Key)
+                .OfType<string>()
+                .Select(key => FullKey.Create(AnnotationKey.Parse(key), organization, project, view)),
+            cancellationToken);
+
+        return documents
+            .Where(document => document.Identity.Key is null || states.GetValueOrDefault(document.Identity.Key) == AnnotationItemState.Active)
+            .OrderBy(document => document.Identity.Kind)
+            .ThenBy(document => document.Identity.Type, StringComparer.Ordinal)
+            .ThenBy(document => document.Identity.Key, StringComparer.Ordinal)
+            .Select(document => new SchemaHistory
+            {
+                Kind = document.Identity.Kind,
+                AnnotationType = document.Identity.Type,
+                AnnotationKey = document.Identity.Key,
+                Versions = document.Versions,
+                Current = document.Current,
+            })
+            .ToList();
     }
 
     internal static JObject DeepMergeSchemas(IReadOnlyList<ConfigurationSchema> schemas)
@@ -899,28 +980,57 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
             : throw new ArgumentException($"Invalid annotation type code: {annotationType}");
     }
 
-    // The id suffix after "{view}.cfs." is "t.{type}", "a.{annotationKey}" or "d.{type}.{ancestorKey}" (SchemaIdentity).
     private static ConfigurationSchemaSummary? ToSchemaSummary(DocumentListingRow row, string suffix)
     {
-        var parts = suffix.Split('.', 3);
-        (ConfigurationSchemaKind Kind, string? Type, string? Key)? identity = parts switch
-        {
-            ["t", var type] => (ConfigurationSchemaKind.Type, type, null),
-            ["a", var first, var rest] => (ConfigurationSchemaKind.Annotation, null, $"{first}.{rest}"),
-            ["d", var type, var key] => (ConfigurationSchemaKind.DescendantType, type, key),
-            _ => null,
-        };
-
-        return identity is { } value
+        return ParseSuffix(suffix) is { } value
             ? new ConfigurationSchemaSummary
             {
-                Kind = value.Kind,
+                Kind = value.Kind switch
+                {
+                    SchemaKind.Type => ConfigurationSchemaKind.Type,
+                    SchemaKind.Annotation => ConfigurationSchemaKind.Annotation,
+                    _ => ConfigurationSchemaKind.DescendantType,
+                },
                 AnnotationType = value.Type,
                 AnnotationKey = value.Key,
                 Version = row.Version,
                 Modified = row.Modified,
             }
             : null;
+    }
+
+    // The id suffix after "{view}.cfs." (and after "{view}.csv." without the version) is "t.{type}",
+    // "a.{annotationKey}" or "d.{type}.{ancestorKey}" (SchemaIdentity).
+    private static (SchemaKind Kind, string? Type, string? Key)? ParseSuffix(string suffix)
+    {
+        return suffix.Split('.', 3) switch
+        {
+            ["t", var type] => (SchemaKind.Type, type, null),
+            ["a", var first, var rest] => (SchemaKind.Annotation, null, $"{first}.{rest}"),
+            ["d", var type, var key] => (SchemaKind.Descendant, type, key),
+            _ => null,
+        };
+    }
+
+    // An identity whose file names can be written: a type code as the writes store it (lower-case) and a key in its
+    // canonical form.
+    private static bool IsExportable((SchemaKind Kind, string? Type, string? Key) identity)
+    {
+        return (identity.Type is null
+                || (AnnotationTypeCodes.ValidCodes.ContainsKey(identity.Type)
+                    && string.Equals(identity.Type, identity.Type.ToLowerInvariant(), StringComparison.Ordinal)))
+               && (identity.Key is null
+                   || (AnnotationKey.TryParse(identity.Key, out var key) && string.Equals(key.ToString(), identity.Key, StringComparison.Ordinal)));
+    }
+
+    private static ViewDocumentKind ToDocumentKind(SchemaKind kind)
+    {
+        return kind switch
+        {
+            SchemaKind.Type => ViewDocumentKind.TypeSchema,
+            SchemaKind.Annotation => ViewDocumentKind.AnnotationSchema,
+            _ => ViewDocumentKind.DescendantTypeSchema,
+        };
     }
 
     private readonly record struct SchemaIdentity(

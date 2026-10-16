@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Annotations;
@@ -46,6 +47,53 @@ internal sealed class AnnotationItemStore
                && deletion.ValueKind == JsonValueKind.Object
             ? AnnotationItemState.Deleted
             : AnnotationItemState.Active;
+    }
+
+    // The states of the annotation items of the keys, by key, in one request and without deserializing them.
+    public static async Task<IReadOnlyDictionary<string, AnnotationItemState>> ReadStatesAsync(
+        Container container,
+        IEnumerable<FullKey> keys,
+        CancellationToken cancellationToken = default)
+    {
+        var states = new Dictionary<string, AnnotationItemState>(StringComparer.Ordinal);
+        var keysById = new Dictionary<string, string>(StringComparer.Ordinal);
+        var items = new List<(string Id, PartitionKey PartitionKey)>();
+
+        foreach (var key in keys)
+        {
+            var keyText = key.Annotation.ToString();
+            var id = AnnotationItemIds.Annotation(key.ViewName, keyText);
+
+            if (keysById.TryAdd(id, keyText))
+            {
+                states[keyText] = AnnotationItemState.Missing;
+                items.Add((id, new PartitionKey(key.GetPartitionKey())));
+            }
+        }
+
+        if (items.Count == 0)
+        {
+            return states;
+        }
+
+        using var response = await container.ReadManyItemsStreamAsync(items, cancellationToken: cancellationToken);
+        EnsureSuccess(response);
+        using var page = await JsonDocument.ParseAsync(response.Content, cancellationToken: cancellationToken);
+
+        foreach (var element in page.RootElement.GetProperty("Documents").EnumerateArray())
+        {
+            if (element.TryGetProperty("id", out var id)
+                && id.GetString() is { } idText
+                && keysById.TryGetValue(idText, out var keyText))
+            {
+                states[keyText] = element.TryGetProperty(nameof(AnnotationEntity.Deletion), out var deletion)
+                                  && deletion.ValueKind == JsonValueKind.Object
+                    ? AnnotationItemState.Deleted
+                    : AnnotationItemState.Active;
+            }
+        }
+
+        return states;
     }
 
     public async Task<AnnotationNode> LoadAsync(FullKey key, bool withConfiguration = true, bool withAudit = true)

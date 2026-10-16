@@ -28,12 +28,13 @@ internal sealed record DocumentListingRow
     public required AuditStamp Modified { get; init; }
 }
 
-// A configuration or one of its versions with its document, for an export.
-internal sealed record ConfigurationArchiveRow
+// A configuration, a template or a schema, or one of their versions, with its document, for an export.
+internal sealed record DocumentArchiveRow
 {
     [JsonProperty("id")]
     public string? Id { get; init; }
 
+    // Of configurations only.
     public string? AnnotationKey { get; init; }
 
     public ulong Version { get; init; }
@@ -42,6 +43,7 @@ internal sealed record ConfigurationArchiveRow
 
     public required AuditStamp Modified { get; init; }
 
+    // Of configurations only: set while the annotation is deleted.
     public string? AnnotationDeletionId { get; init; }
 }
 

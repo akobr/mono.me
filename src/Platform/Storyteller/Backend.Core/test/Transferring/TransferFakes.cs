@@ -105,7 +105,7 @@ internal sealed class RecordingTransferQueue : IViewTransferQueue
 }
 
 // Only the two members an export and an import use.
-internal sealed class FakeConfigurationService : IConfigurationService
+internal sealed class FakeConfigurationService(ExportReads? reads = null) : IConfigurationService
 {
     public IReadOnlyList<ConfigurationHistory> Histories { get; set; } = [];
 
@@ -115,6 +115,7 @@ internal sealed class FakeConfigurationService : IConfigurationService
 
     public Task<IReadOnlyList<ConfigurationHistory>> GetConfigurationHistoriesAsync(string organization, string project, string view, CancellationToken cancellationToken = default)
     {
+        reads?.Add(ViewArchiveContent.Configurations, organization, project, view);
         return Task.FromResult(Histories);
     }
 

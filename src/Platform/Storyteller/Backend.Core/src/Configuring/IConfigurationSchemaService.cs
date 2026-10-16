@@ -1,3 +1,4 @@
+using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Configuring;
@@ -52,4 +53,13 @@ public interface IConfigurationSchemaService
     Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint version);
 
     Task<DiffResult> GetDescendantTypeSchemaVersionChangesAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, uint fromVersion, uint toVersion);
+
+    // The schemas of a view and their versions still in the history, one per document (kind, type, key), for an
+    // export. The annotation and descendant-type schemas of an annotation that is deleted or missing are left out. An
+    // empty document is not a version; a deleted schema has versions but no current document.
+    Task<IReadOnlyList<SchemaHistory>> GetSchemaHistoriesAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default);
 }

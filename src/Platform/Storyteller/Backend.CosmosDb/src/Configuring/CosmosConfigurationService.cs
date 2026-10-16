@@ -668,25 +668,23 @@ public class CosmosConfigurationService : IConfigurationService
             .WithParameter("@currentPrefix", currentPrefix)
             .WithParameter("@historyPrefix", $"{view}.{EntityIdPrefixTypes.ConfigurationVersion}.");
 
-        var documents = new Dictionary<string, (List<ConfigurationDocument> History, ConfigurationDocument? Current)>(StringComparer.Ordinal);
+        var histories = new DocumentHistories<string>(StringComparer.Ordinal);
         using var iterator = container.GetItemQueryStreamIterator(query);
 
         while (iterator.HasMoreResults)
         {
             using var response = await iterator.ReadNextAsync(cancellationToken);
             response.EnsureSuccessStatusCode();
-            var page = response.Content.DeserializeNewtonsoft<QueryPage<ConfigurationArchiveRow>>(_serializerOptions);
+            var page = response.Content.DeserializeNewtonsoft<QueryPage<DocumentArchiveRow>>(_serializerOptions);
 
             foreach (var row in page?.Documents ?? [])
             {
                 if (row.Id is null
                     || row.AnnotationKey is null
-                    || row.Content is null
-                    || !row.Content.HasValues
                     || deletedKeys.Contains(row.AnnotationKey)
                     || !AnnotationKey.TryParse(row.AnnotationKey, out _))
                 {
-                    // an empty document only caches the effective one; a deleted annotation hides its versions
+                    // a deleted annotation hides its versions
                     continue;
                 }
 
@@ -697,49 +695,13 @@ public class CosmosConfigurationService : IConfigurationService
                     continue;
                 }
 
-                var document = new ConfigurationDocument
-                {
-                    Version = row.Version,
-                    Author = row.Modified.By.Name ?? row.Modified.By.Id,
-                    CreatedAt = row.Modified.At,
-                    Content = row.Content,
-                };
-
-                if (!documents.TryGetValue(row.AnnotationKey, out var entry))
-                {
-                    entry = ([], null);
-                }
-
-                if (isCurrent)
-                {
-                    entry.Current = document;
-                }
-                else
-                {
-                    entry.History.Add(document);
-                }
-
-                documents[row.AnnotationKey] = entry;
+                histories.Add(row.AnnotationKey, row, isCurrent);
             }
         }
 
-        return documents
-            .OrderBy(item => item.Key, StringComparer.Ordinal)
-            .Select(item =>
-            {
-                var (history, current) = item.Value;
-                var versions = history
-                    .Where(version => current is null || version.Version < current.Version)
-                    .OrderBy(version => version.Version)
-                    .ToList();
-
-                if (current is not null)
-                {
-                    versions.Add(current);
-                }
-
-                return new ConfigurationHistory { AnnotationKey = item.Key, Versions = versions, Current = current };
-            })
+        return histories.Build()
+            .OrderBy(history => history.Identity, StringComparer.Ordinal)
+            .Select(history => new ConfigurationHistory { AnnotationKey = history.Identity, Versions = history.Versions, Current = history.Current })
             .ToList();
     }
 

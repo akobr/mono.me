@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Json;
+using _42.Platform.Storyteller.Transferring;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Options;
@@ -313,6 +315,60 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
             $"Unknown version {toVersion} of the template for {annotationType} in view {view}.");
     }
 
+    public async Task<IReadOnlyList<TemplateHistory>> GetTemplateHistoriesAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default)
+    {
+        // one query of the partition: "{view}.gen.{type}" and "{view}.gnv.{type}.{n}", without the state items "gns"
+        var currentPrefix = $"{view}.{EntityIdPrefixTypes.GenerateTemplate}.";
+        var historyPrefix = $"{view}.{EntityIdPrefixTypes.GenerateTemplateVersion}.";
+        var query = new QueryDefinition(
+                "SELECT c.id, c.Version, c.Content, c.Modified FROM c WHERE STARTSWITH(c.id, @currentPrefix) OR STARTSWITH(c.id, @historyPrefix)")
+            .WithParameter("@currentPrefix", currentPrefix)
+            .WithParameter("@historyPrefix", historyPrefix);
+
+        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var histories = new DocumentHistories<string>(StringComparer.Ordinal);
+        using var iterator = container.GetItemQueryStreamIterator(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = PartitionKeys.GetCosmosTemplate(project) });
+
+        while (iterator.HasMoreResults)
+        {
+            using var response = await iterator.ReadNextAsync(cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var page = response.Content.DeserializeNewtonsoft<QueryPage<DocumentArchiveRow>>(_serializerOptions);
+
+            foreach (var row in page?.Documents ?? [])
+            {
+                var isCurrent = row.Id?.StartsWith(currentPrefix, StringComparison.Ordinal) == true;
+                string? type = null;
+
+                if (isCurrent)
+                {
+                    type = row.Id![currentPrefix.Length..];
+                }
+                else if (row.Id?.StartsWith(historyPrefix, StringComparison.Ordinal) == true)
+                {
+                    // "{type}.{n}"
+                    type = row.Id[historyPrefix.Length..].Split('.')[0];
+                }
+
+                if (type is not null && IsTypeCode(type))
+                {
+                    histories.Add(type, row, isCurrent);
+                }
+            }
+        }
+
+        return histories.Build()
+            .OrderBy(history => history.Identity, StringComparer.Ordinal)
+            .Select(history => new TemplateHistory { AnnotationType = history.Identity, Versions = history.Versions, Current = history.Current })
+            .ToList();
+    }
+
     internal static string GetTemplateId(string view, string annotationType)
     {
         return $"{view}.{EntityIdPrefixTypes.GenerateTemplate}.{annotationType}";
@@ -482,5 +538,12 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         return AnnotationTypeCodes.ValidCodes.ContainsKey(normalized)
             ? normalized
             : throw new ArgumentOutOfRangeException(nameof(annotationType), annotationType, "Unknown annotation type code.");
+    }
+
+    // A type code as the writes store it, lower-case.
+    private static bool IsTypeCode(string annotationType)
+    {
+        return AnnotationTypeCodes.ValidCodes.ContainsKey(annotationType)
+               && string.Equals(annotationType, annotationType.ToLowerInvariant(), StringComparison.Ordinal);
     }
 }
