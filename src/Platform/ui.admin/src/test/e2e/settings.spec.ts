@@ -73,8 +73,14 @@ test('the configurations grid shows the type names of the settings', async ({ pa
 
 // The date format (424-23): yyyy-mm-dd until the project's Settings change it, overridden by Preferences.
 test('dates follow the date format of the project settings and Preferences', async ({ page }) => {
-  const certificates = '/acme/billing/certificates'
-  const expires = page.getByRole('row').filter({ hasText: 'ci-pipeline' }).getByRole('cell').nth(3)
+  // The shared certificates are a section of the Machines page (424-35).
+  const certificates = '/acme/billing/machines'
+  const expires = page
+    .locator('#shared-certificates')
+    .getByRole('row')
+    .filter({ hasText: 'ci-pipeline' })
+    .getByRole('cell')
+    .nth(3)
 
   async function pick(path: string, option: string | RegExp) {
     await goto(page, path)

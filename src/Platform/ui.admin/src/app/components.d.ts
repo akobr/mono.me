@@ -115,6 +115,7 @@ declare module 'vue' {
     SchemaFormPreview: typeof import('./components/schemas/SchemaFormPreview.vue')['default']
     SecretsKeysCard: typeof import('./components/secrets/SecretsKeysCard.vue')['default']
     SecretsPolicyCard: typeof import('./components/secrets/SecretsPolicyCard.vue')['default']
+    SharedCertificatesTable: typeof import('./components/access/SharedCertificatesTable.vue')['default']
     ShortcutsHelp: typeof import('./components/shell/ShortcutsHelp.vue')['default']
     SidebarBrand: typeof import('./components/shell/SidebarBrand.vue')['default']
     TemplateDetail: typeof import('./components/templates/TemplateDetail.vue')['default']

@@ -131,7 +131,7 @@ function close() {
           variant="subtle"
           icon="i-lucide-shield-check"
           title="Uses a shared certificate"
-          description="No certificate was issued for this machine. It signs in with one of the project's shared certificates (Certificates page) together with this API key."
+          description="No certificate was issued for this machine. It signs in with one of the project's shared certificates (Machines page) together with this API key."
         />
 
         <UFormField v-if="secret.certificatePassword" label="Certificate password">

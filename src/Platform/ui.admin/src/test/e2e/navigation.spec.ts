@@ -83,6 +83,11 @@ test('changes the theme in the command palette, not in the top bar', async ({ pa
 // The pages merged into others (424-35) redirect, so saved links keep working; the anchor shows the moved section.
 const movedPages: { from: string; to: string; section?: string }[] = [
   { from: '/acme/billing/invitations', to: '/acme/billing/members#invitations', section: '#invitations' },
+  {
+    from: '/acme/billing/certificates',
+    to: '/acme/billing/machines#shared-certificates',
+    section: '#shared-certificates',
+  },
 ]
 
 for (const moved of movedPages) {
