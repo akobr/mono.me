@@ -26,7 +26,8 @@ public interface IAnnotationService
     Task<AnnotationsResponse> GetAnnotationsAsync(AnnotationsRequest request);
 
     // Every annotation of a view that is not deleted, of every type and status, with its Created and Modified stamps
-    // (an export). Pages through GetAnnotationsAsync.
+    // (an export). Values are read as the point reads read them (System.Text.Json, JsonElement): date strings stay
+    // strings, and numbers keep the text Cosmos DB answers.
     Task<IReadOnlyList<Annotation>> GetViewAnnotationsAsync(
         string organization,
         string project,

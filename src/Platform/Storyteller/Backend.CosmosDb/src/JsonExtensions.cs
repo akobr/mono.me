@@ -84,17 +84,41 @@ public static class JsonExtensions
                          .Where(prop => prop.Type == JTokenType.String)
                          .Select(prop => prop.ToString()))
             {
-                var tokens = @this.SelectTokens(path).ToArray();
+                JToken[] tokens;
+
+                try
+                {
+                    tokens = @this.SelectTokens(path).ToArray();
+                }
+                catch (Exception exception) when (exception is Newtonsoft.Json.JsonException or ArgumentException)
+                {
+                    // not a JSONPath, or a filter with an invalid regular expression: a broken directive, as a
+                    // broken $patch is
+                    throw new JsonPatchException(
+                        $"'{removePropertyName}' has an invalid JSONPath '{path}': {exception.Message}",
+                        JsonPatchFailureKind.Invalid);
+                }
 
                 foreach (var token in tokens)
                 {
+                    if (token == @this)
+                    {
+                        throw new JsonPatchException(
+                            $"'{removePropertyName}' cannot remove the whole document ('{path}').",
+                            JsonPatchFailureKind.Invalid);
+                    }
+
+                    // a token the path matches twice ($['a','a']) is removed once
                     var container = token.Parent;
                     if (container is not null
                         && container.Type == JTokenType.Property)
                     {
-                        container.Remove();
+                        if (container.Parent is not null)
+                        {
+                            container.Remove();
+                        }
                     }
-                    else
+                    else if (container is not null)
                     {
                         token.Remove();
                     }

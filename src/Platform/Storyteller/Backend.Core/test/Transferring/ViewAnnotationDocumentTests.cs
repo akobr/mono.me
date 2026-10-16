@@ -163,6 +163,66 @@ public class ViewAnnotationDocumentTests
         AnnotationAuditDiff.Compute(original, ReadBack(original), MaxValueLength).IsEmpty.ShouldBeTrue();
     }
 
+    [Fact]
+    public void RoundTrip_KeepsTheTextOfNumbersThatADoubleDoesNotHold()
+    {
+        // Cosmos DB answers 17 digits for doubles that 16 hold (Math.PI, 1/3); the API takes more digits and any
+        // exponent; a double, as the reads of the other kinds parse numbers, would shorten them all
+        const string json = """
+            {
+              "pi": 3.1415926535897931,
+              "third": 0.33333333333333331,
+              "precise": 0.30000000000000001,
+              "long": 1.234567890123456789012345678901234567890,
+              "huge": 1E+300,
+              "beyond": 1e400,
+              "tiny": 5E-324,
+              "negative": -0.0,
+              "list": [1.0000000000000001,{"deep":2.50}]
+            }
+            """;
+        var original = Create("rst.payments") with { Values = Values(json) };
+
+        var file = Serialize(original);
+        var read = ReadBack(original);
+
+        AnnotationAuditDiff.Compute(original, read, MaxValueLength).IsEmpty.ShouldBeTrue();
+        var values = read.Values!;
+
+        foreach (var name in new[] { "pi", "third", "precise", "long", "huge", "beyond", "tiny", "negative", "list" })
+        {
+            var text = ((JsonElement)original.Values![name]).GetRawText();
+            ((JsonElement)values[name]).GetRawText().ShouldBe(text);
+
+            if (name != "list")
+            {
+                file.ShouldContain($"\"{name}\": {text}");
+            }
+        }
+
+        file.ShouldContain("""
+                "list": [
+                  1.0000000000000001,
+                  {
+                    "deep": 2.50
+                  }
+                ]
+            """.ReplaceLineEndings("\n"));
+    }
+
+    [Fact]
+    public void Parse_KeepsTheTextOfNumbers()
+    {
+        var document = Parse("""{"Values":{"pi":3.1415926535897931,"count":12345678901234567890123,"list":[0.30000000000000001]}}""");
+
+        var read = ViewAnnotationDocument.TryRead(document, Key("rst.payments"), out var annotation, out var errorCode, out var message);
+
+        read.ShouldBeTrue($"{errorCode}: {message}");
+        ((JsonElement)annotation!.Values!["pi"]).GetRawText().ShouldBe("3.1415926535897931");
+        ((JsonElement)annotation.Values["count"]).GetRawText().ShouldBe("12345678901234567890123");
+        ((JsonElement)annotation.Values["list"]).GetRawText().ShouldBe("[0.30000000000000001]");
+    }
+
     [Theory]
     [InlineData("rst.payments")]
     [InlineData("sbt.northwind")]
@@ -356,11 +416,24 @@ public class ViewAnnotationDocumentTests
         document["Values"]!["at"]!.Value<string>().ShouldBe("2026-10-14T01:30:12Z");
     }
 
+    [Fact]
+    public void Parse_AllowsTrailingCommasAsTheOtherKindsDo()
+    {
+        const string json = """{"Labels":["eu",],"Values":{"a":1,},}""";
+
+        Parse(json)["Labels"]!.Values<string>().ShouldBe(["eu"]);
+        ViewDocumentJson.Parse(new MemoryStream(Encoding.UTF8.GetBytes(json)))["Labels"]!.Values<string>().ShouldBe(["eu"]);
+    }
+
     [Theory]
     [InlineData("""{"Title":"a","Title":"b"}""")]
     [InlineData("""{"Values":{"a":1,"a":2}}""")]
     [InlineData("[]")]
+    [InlineData("")]
     [InlineData("""{"Title":"a"} {}""")]
+    [InlineData("{\"Title\":\"a\"}\n// end\n]")]
+    [InlineData("""{"Values":{"n":NaN}}""")]
+    [InlineData("""{"Title":"\uD800"}""")]
     public void Parse_RejectsWhatIsNotOneObjectWithUniqueMembers(string json)
     {
         Should.Throw<Newtonsoft.Json.JsonException>(() => Parse(json));

@@ -147,7 +147,7 @@ Versioning follows configuration versioning:
 
 Objects merge property by property. A scalar written by the incoming object replaces the current value. An array is unioned with the current array. Nested objects merge the same way. Merged tokens are copied, so the template item stays unchanged.
 
-`$remove` and `$patch` are write-time instructions. `CreateOrUpdateConfigurationAsync` applies them to stored content through `RemoveRequested` and `ApplyPatchRequested`. Calculation uses `MergeInto` only, so a `$remove` or `$patch` property inside a template is copied into the calculated document as an ordinary property.
+`$remove` and `$patch` are write-time instructions. `CreateOrUpdateConfigurationAsync` applies them to stored content through `RemoveRequested` and `ApplyPatchRequested`. Calculation uses `MergeInto` only, so a `$remove` or `$patch` property inside a template is copied into the calculated document as an ordinary property. A `$remove` entry that is not a valid JSONPath, or that takes the whole document (`$`), is a broken directive, like a broken `$patch`: `JsonPatchException` with `PatchInvalid` (`400` on the routes). A token that one entry matches twice is removed once.
 
 ## Where the template sits
 

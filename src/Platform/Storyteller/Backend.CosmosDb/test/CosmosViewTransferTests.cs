@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -370,6 +371,43 @@ public class CosmosViewTransferTests(Startup startup)
         var broken = await ImportAsync(key, JObject.Parse("""{"$patch":[{"op":"remove","path":"/missing"}]}"""), Author);
         broken.Outcome.Should().Be(ViewImportOutcome.Failed);
         broken.ErrorCode.Should().Be(ErrorCodes.PatchInvalid);
+
+        // a $remove that is not a JSONPath, or that takes the whole document, fails the file, not the job
+        var brokenRemove = await ImportAsync(key, JObject.Parse("""{"a":2,"$remove":["$.a[?(@.x"]}"""), Author);
+        var wholeRemove = await ImportAsync(key, JObject.Parse("""{"a":2,"$remove":["$"]}"""), Author);
+        brokenRemove.Outcome.Should().Be(ViewImportOutcome.Failed);
+        brokenRemove.ErrorCode.Should().Be(ErrorCodes.PatchInvalid);
+        wholeRemove.Outcome.Should().Be(ViewImportOutcome.Failed);
+        wholeRemove.ErrorCode.Should().Be(ErrorCodes.PatchInvalid);
+        (await Configurations.GetConfigurationVersionsAsync(key)).Select(version => version.Version).Should().Equal(1u);
+    }
+
+    [Fact]
+    public async Task Transfer_ReportsABrokenRemoveDirectiveOnItsFileAndImportsTheRest()
+    {
+        const string project = "transfer-broken-remove";
+        var transfers = new Transfers(Context.Services);
+        var archive = Zip(
+            ("annotations/rst.broken-remove.json", """{"Title":"Broken remove"}"""),
+            ("annotations/rst.kept-remove.json", "{}"),
+            ("templates/exe.template.json", """{"a":1,"$remove":["$["]}"""),
+            ("templates/unt.template.json", """{"u":1,"v":2,"$remove":["$.v"]}"""),
+            ("configurations/rst.broken-remove.conf.json", """{"b":1,"$remove":["$..[?(@.x"]}"""),
+            ("configurations/rst.kept-remove.conf.json", """{"c":1}"""));
+
+        var imported = await transfers.ImportAsync(project, View, archive);
+
+        imported.Status.Should().Be(ViewTransferStatus.Succeeded);
+        imported.Items!.Select(item => (item.Path, item.Outcome, item.ErrorCode)).Should().Equal(
+            ("annotations/rst.broken-remove.json", ViewImportOutcome.Created, null),
+            ("annotations/rst.kept-remove.json", ViewImportOutcome.Created, null),
+            ("templates/exe.template.json", ViewImportOutcome.Failed, ErrorCodes.PatchInvalid),
+            ("templates/unt.template.json", ViewImportOutcome.Created, null),
+            ("configurations/rst.broken-remove.conf.json", ViewImportOutcome.Failed, ErrorCodes.PatchInvalid),
+            ("configurations/rst.kept-remove.conf.json", ViewImportOutcome.Created, null));
+        imported.Summary.Should().Be(new ViewImportSummary { Created = 4, Failed = 2 });
+        JToken.DeepEquals((await Templates.GetTemplateAsync(TestConstants.Organization, project, View, AnnotationTypeCodes.Unit))!.Content, JObject.Parse("""{"u":1}""")).Should().BeTrue();
+        (await Configurations.HasConfigurationContentAsync(Key("rst.kept-remove", project))).Should().BeTrue();
     }
 
     [Fact]
@@ -642,6 +680,50 @@ public class CosmosViewTransferTests(Startup startup)
     }
 
     [Fact]
+    public async Task Transfer_KeepsTheTextOfNumbersAndDatesOfValues()
+    {
+        const string project = "transfer-values-text";
+        var transfers = new Transfers(Context.Services);
+        var key = Key("rst.values-text", project);
+
+        // a point read answers 17 digits for some doubles (3.1415926535897931), a query the fewest (3.141592653589793);
+        // a date string parsed as a date, as the SDK's serializer of the LINQ queries does, loses its offset and its
+        // milliseconds
+        await Annotations.SetAnnotationAsync(
+            TestConstants.Organization,
+            AnnotationFactory.CreateDefault(key.Annotation, project, View) with
+            {
+                Values = new Dictionary<string, object>
+                {
+                    ["pi"] = Math.PI,
+                    ["third"] = 1.0 / 3,
+                    ["sum"] = 0.1 + 0.2,
+                    ["huge"] = 1e300,
+                    ["tiny"] = 1e-300,
+                    ["offset"] = "2026-01-01T10:00:00+02:00",
+                    ["millis"] = "2026-01-01T10:00:00.000Z",
+                    ["nested"] = new { list = new[] { 2.0 / 3 }, at = "2026-01-01T10:00:00+02:00" },
+                },
+            },
+            Author);
+        var stored = await Annotations.GetAnnotationAsync(key);
+
+        var export = await transfers.ExportAsync(project, View, ViewArchiveFormat.Folder);
+        var file = ReadEntry(export.Archive, "annotations/rst.values-text.json");
+        var imported = await transfers.ImportAsync(project, View, export.Archive, include: [ViewArchiveContent.Annotations]);
+        var skipped = await transfers.ImportAsync(project, View, export.Archive, include: [ViewArchiveContent.Annotations], existing: ViewImportExisting.Skip);
+
+        file.Should().Contain("\"offset\": \"2026-01-01T10:00:00+02:00\"").And.Contain("\"millis\": \"2026-01-01T10:00:00.000Z\"");
+        file.Should().Contain("\"at\": \"2026-01-01T10:00:00+02:00\"");
+        imported.Status.Should().Be(ViewTransferStatus.Succeeded);
+        imported.Summaries.Should().Equal(new ViewImportSummary { Content = ViewArchiveContent.Annotations, Unchanged = 1 });
+        imported.Items.Should().BeEmpty();
+        skipped.Summaries.Should().Equal(imported.Summaries);
+        (await Annotations.GetAnnotationHistoryAsync(key))!.Entries.Select(entry => entry.Action).Should().Equal(AnnotationAuditAction.Created);
+        AnnotationAuditDiff.Compute(stored!, (await Annotations.GetAnnotationAsync(key))!, 1000).IsEmpty.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Transfer_ImportsTheWorkingTreeOfAGitExportWithAnIncludeFilter()
     {
         const string project = "transfer-git-trip";
@@ -676,6 +758,29 @@ public class CosmosViewTransferTests(Startup startup)
             ["type"] = "object",
             ["properties"] = new JObject { [name] = new JObject { ["type"] = "string" } },
         };
+    }
+
+    private static byte[] Zip(params (string Path, string Content)[] files)
+    {
+        using var buffer = new MemoryStream();
+
+        using (var zip = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var (path, content) in files)
+            {
+                using var writer = new StreamWriter(zip.CreateEntry(path).Open());
+                writer.Write(content);
+            }
+        }
+
+        return buffer.ToArray();
+    }
+
+    private static string ReadEntry(byte[] archive, string path)
+    {
+        using var zip = new ZipArchive(new MemoryStream(archive), ZipArchiveMode.Read);
+        using var reader = new StreamReader(zip.GetEntry(path)!.Open());
+        return reader.ReadToEnd();
     }
 
     private static FullKey Key(string annotationKey, string project = Project, string view = View)

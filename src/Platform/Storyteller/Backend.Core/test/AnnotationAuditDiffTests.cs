@@ -143,6 +143,44 @@ public class AnnotationAuditDiffTests
         AnnotationAuditDiff.Compute(before, after, MaxValueLength).IsEmpty.ShouldBeTrue();
     }
 
+    [Theory]
+    [InlineData("3.1415926535897931", "3.141592653589793")]
+    [InlineData("0.33333333333333331", "0.3333333333333333")]
+    [InlineData("1e+300", "1E+300")]
+    [InlineData("1.50", "1.5")]
+    [InlineData("0.30000000000000001", "0.3")]
+    [InlineData("100", "1E2")]
+    [InlineData("-0.0", "0")]
+    [InlineData("""{"a":[1,{"b":3.1415926535897931}],"c":"x"}""", """{"c":"x","a":[1,{"b":3.141592653589793}]}""")]
+    public void Compute_NumbersOfTheSameDouble_CompareEqual(string before, string after)
+    {
+        // Cosmos DB writes a double with 17 digits in a point read and with the fewest digits in a query
+        var changes = AnnotationAuditDiff.Compute(
+            Usage() with { Values = JsonValues(before) },
+            Usage() with { Values = JsonValues(after) },
+            MaxValueLength);
+
+        changes.IsEmpty.ShouldBeTrue();
+    }
+
+    [Theory]
+    [InlineData("0.1", "0.2")]
+    [InlineData("3.1415926535897931", "3.14159265358979")]
+    [InlineData("9007199254740993", "9007199254740992")]
+    [InlineData("1", "\"1\"")]
+    [InlineData("[1.5,2.5]", "[1.5]")]
+    [InlineData("""{"a":1.5}""", """{"a":1.5,"b":1}""")]
+    [InlineData("""{"a":1.5}""", """{"b":1.5}""")]
+    public void Compute_OtherNumbersAndShapes_AreChanges(string before, string after)
+    {
+        var changes = AnnotationAuditDiff.Compute(
+            Usage() with { Values = JsonValues(before) },
+            Usage() with { Values = JsonValues(after) },
+            MaxValueLength);
+
+        changes.Values.ShouldHaveSingleItem().Change.ShouldBe(AnnotationValueChangeKind.Changed);
+    }
+
     [Fact]
     public void Compute_KindChange_KeepsThePrimitiveSide()
     {
@@ -161,6 +199,12 @@ public class AnnotationAuditDiffTests
     private static Dictionary<string, object> Values(params (string Key, object Value)[] values)
     {
         return values.ToDictionary(value => value.Key, value => value.Value);
+    }
+
+    // One value "v", as the annotation reads hold it.
+    private static Dictionary<string, object> JsonValues(string json)
+    {
+        return new Dictionary<string, object> { ["v"] = JsonSerializer.Deserialize<JsonElement>(json) };
     }
 
     private static Usage Usage()

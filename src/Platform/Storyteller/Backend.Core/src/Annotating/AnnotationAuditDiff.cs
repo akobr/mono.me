@@ -133,7 +133,7 @@ public static class AnnotationAuditDiff
             var previousElement = hasPrevious ? ToElement(previousValue) : (JsonElement?)null;
             var valueElement = hasValue ? ToElement(value) : (JsonElement?)null;
 
-            if (previousElement is { } p && valueElement is { } v && JsonElement.DeepEquals(p, v))
+            if (previousElement is { } p && valueElement is { } v && (JsonElement.DeepEquals(p, v) || AreEqualAsStored(p, v)))
             {
                 continue;
             }
@@ -172,6 +172,46 @@ public static class AnnotationAuditDiff
         }
 
         return changes;
+    }
+
+    // JsonElement.DeepEquals, except that two numbers are equal when they are the same double and one of them has a
+    // fraction or an exponent. Cosmos DB stores such a number as a double and writes it with 17 digits in a point read
+    // and with the fewest digits in a query (3.1415926535897931 and 3.141592653589793, 1e+300 and 1E+300), so an
+    // exported annotation compares equal to the stored one. Integers compare exactly, beyond a double too.
+    private static bool AreEqualAsStored(JsonElement left, JsonElement right)
+    {
+        if (left.ValueKind != right.ValueKind)
+        {
+            return false;
+        }
+
+        switch (left.ValueKind)
+        {
+            case JsonValueKind.Number:
+                return JsonElement.DeepEquals(left, right)
+                       || ((HasFractionOrExponent(left) || HasFractionOrExponent(right))
+                           && left.TryGetDouble(out var leftNumber)
+                           && right.TryGetDouble(out var rightNumber)
+                           && double.IsFinite(leftNumber)
+                           && leftNumber == rightNumber);
+
+            case JsonValueKind.Array:
+                return left.GetArrayLength() == right.GetArrayLength()
+                       && left.EnumerateArray().Zip(right.EnumerateArray()).All(pair => AreEqualAsStored(pair.First, pair.Second));
+
+            case JsonValueKind.Object:
+                return left.EnumerateObject().Count() == right.EnumerateObject().Count()
+                       && left.EnumerateObject().All(property =>
+                           right.TryGetProperty(property.Name, out var other) && AreEqualAsStored(property.Value, other));
+
+            default:
+                return JsonElement.DeepEquals(left, right);
+        }
+    }
+
+    private static bool HasFractionOrExponent(JsonElement number)
+    {
+        return number.GetRawText().AsSpan().IndexOfAny('.', 'e', 'E') >= 0;
     }
 
     private static JsonElement ToElement(object? value)
