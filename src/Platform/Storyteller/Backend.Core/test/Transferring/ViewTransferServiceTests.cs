@@ -101,7 +101,9 @@ public class ViewTransferServiceTests
         using var buffer = new MemoryStream();
         await archive.CopyToAsync(buffer);
         export.Size.ShouldBe(buffer.Length);
-        ReadTextEntries(buffer.ToArray()).Keys.ShouldBe(["rst.a.conf.1.json", "rst.a.conf.json", "rst.b.conf.1.json", "export.json"], ignoreOrder: true);
+        ReadTextEntries(buffer.ToArray()).Keys.ShouldBe(
+            ["configurations/rst.a.conf.1.json", "configurations/rst.a.conf.json", "configurations/rst.b.conf.1.json", "export.json"],
+            ignoreOrder: true);
     }
 
     [Fact]

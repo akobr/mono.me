@@ -25,6 +25,12 @@ public static class ViewArchiveNames
     public const string TemplateSuffix = "template";
     public const string SchemaSuffix = "schema";
 
+    // The folders of an export, one per kind; the import does not look at them.
+    public const string AnnotationsFolder = "annotations";
+    public const string SchemasFolder = "schemas";
+    public const string TemplatesFolder = "templates";
+    public const string ConfigurationsFolder = "configurations";
+
     // The pairs (ancestor type, descendant type) of AnnotationHierarchy, read from one sample key of every type.
     private static readonly HashSet<(string Ancestor, string Descendant)> DescendantTypes = AnnotationTypeCodes.ValidCodes
         .SelectMany(code => AnnotationHierarchy.GetAncestorSchemaSources(AnnotationKey.Parse(
@@ -88,6 +94,40 @@ public static class ViewArchiveNames
             ViewDocumentKind.AnnotationSchema => GetAnnotationSchemaFileName(key!, version),
             ViewDocumentKind.DescendantTypeSchema => GetDescendantTypeSchemaFileName(key!, type!, version),
             ViewDocumentKind.Annotation => throw new ArgumentOutOfRangeException(nameof(version), version, "Annotations have no versions."),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown document kind."),
+        };
+    }
+
+    // The path of a document in an export: the folder of its kind and its file name.
+    public static string GetPath(ViewDocumentKind kind, string? annotationType, string? annotationKey, ulong? version = null)
+    {
+        return $"{GetFolder(GetContent(kind))}/{GetFileName(kind, annotationType, annotationKey, version)}";
+    }
+
+    public static string GetFolder(ViewArchiveContent content)
+    {
+        return content switch
+        {
+            ViewArchiveContent.Annotations => AnnotationsFolder,
+            ViewArchiveContent.Schemas => SchemasFolder,
+            ViewArchiveContent.Templates => TemplatesFolder,
+            ViewArchiveContent.Configurations => ConfigurationsFolder,
+            _ => throw new ArgumentOutOfRangeException(nameof(content), content, "Unknown archive content."),
+        };
+    }
+
+    // A document in words, for messages: "annotation rst.payments", "type schema exe", "exe schema below
+    // sbt.northwind", "schema of rst.payments", "template exe", "configuration of rst.payments".
+    public static string Describe(ViewDocumentKind kind, string? annotationType, string? annotationKey)
+    {
+        return kind switch
+        {
+            ViewDocumentKind.Annotation => $"annotation {annotationKey}",
+            ViewDocumentKind.TypeSchema => $"type schema {annotationType}",
+            ViewDocumentKind.DescendantTypeSchema => $"{annotationType} schema below {annotationKey}",
+            ViewDocumentKind.AnnotationSchema => $"schema of {annotationKey}",
+            ViewDocumentKind.Template => $"template {annotationType}",
+            ViewDocumentKind.Configuration => $"configuration of {annotationKey}",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown document kind."),
         };
     }

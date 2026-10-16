@@ -387,6 +387,40 @@ public class ViewArchiveNamesTests
     }
 
     [Theory]
+    [InlineData(ViewDocumentKind.Annotation, null, "rst.payments", null, "annotations/rst.payments.json")]
+    [InlineData(ViewDocumentKind.TypeSchema, "exe", null, 1UL, "schemas/exe.schema.1.json")]
+    [InlineData(ViewDocumentKind.DescendantTypeSchema, "exe", "sbt.northwind", null, "schemas/sbt.northwind.exe.schema.json")]
+    [InlineData(ViewDocumentKind.AnnotationSchema, null, "rst.schema", null, "schemas/rst.%73chema.schema.json")]
+    [InlineData(ViewDocumentKind.Template, "EXE", null, 3UL, "templates/exe.template.3.json")]
+    [InlineData(ViewDocumentKind.Configuration, null, "rst.payments", null, "configurations/rst.payments.conf.json")]
+    public void GetPath_PutsEveryKindIntoItsFolder(ViewDocumentKind kind, string? type, string? key, ulong? version, string expected)
+    {
+        ViewArchiveNames.GetPath(kind, type, key, version).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(ViewArchiveContent.Annotations, "annotations")]
+    [InlineData(ViewArchiveContent.Schemas, "schemas")]
+    [InlineData(ViewArchiveContent.Templates, "templates")]
+    [InlineData(ViewArchiveContent.Configurations, "configurations")]
+    public void GetFolder_IsTheKindInLowerCase(ViewArchiveContent content, string expected)
+    {
+        ViewArchiveNames.GetFolder(content).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(ViewDocumentKind.Annotation, null, "rst.payments", "annotation rst.payments")]
+    [InlineData(ViewDocumentKind.TypeSchema, "exe", null, "type schema exe")]
+    [InlineData(ViewDocumentKind.DescendantTypeSchema, "exe", "sbt.northwind", "exe schema below sbt.northwind")]
+    [InlineData(ViewDocumentKind.AnnotationSchema, null, "rst.payments", "schema of rst.payments")]
+    [InlineData(ViewDocumentKind.Template, "exe", null, "template exe")]
+    [InlineData(ViewDocumentKind.Configuration, null, "rst.payments", "configuration of rst.payments")]
+    public void Describe_NamesTheDocument(ViewDocumentKind kind, string? type, string? key, string expected)
+    {
+        ViewArchiveNames.Describe(kind, type, key).ShouldBe(expected);
+    }
+
+    [Theory]
     [InlineData(ViewArchiveFormat.Folder, "export-acme-main-default-20261014-013012Z.zip")]
     [InlineData(ViewArchiveFormat.Git, "export-acme-main-default-git-20261014-013012Z.zip")]
     public void GetArchiveFileName_HasTheUtcTime(ViewArchiveFormat format, string expected)

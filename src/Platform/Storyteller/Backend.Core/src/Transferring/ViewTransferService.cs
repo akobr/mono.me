@@ -12,6 +12,9 @@ public sealed class ViewTransferService : IViewTransferService
 
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(2);
 
+    // Transitional: exports and imports cover the configurations only, until the passes of every kind (1.15).
+    private static readonly IReadOnlyList<ViewArchiveContent> TransitionalContent = [ViewArchiveContent.Configurations];
+
     // A job unchanged for this long counts as abandoned, so a crashed worker cannot block the project's limit.
     private static readonly TimeSpan ActiveWindow = TimeSpan.FromHours(1);
 
@@ -247,7 +250,8 @@ public sealed class ViewTransferService : IViewTransferService
                 View = record.View,
                 ExportedAt = export.StartedAt ?? _time.GetUtcNow(),
                 ExportedBy = export.CreatedBy,
-                Histories = histories,
+                Include = TransitionalContent,
+                Configurations = histories,
             },
             export.Format);
 
@@ -288,10 +292,10 @@ public sealed class ViewTransferService : IViewTransferService
             using var buffer = new MemoryStream();
             await CopyWithLimitAsync(blob, buffer, _options.MaxArchiveBytes, cancellationToken);
             buffer.Position = 0;
-            content = ViewArchiveReader.Read(buffer, _options);
+            content = ViewArchiveReader.Read(buffer, _options, TransitionalContent);
         }
 
-        var progress = new ImportProgress(content.Files.Count, content.IgnoredFiles, _options.MaxReportedItems);
+        var progress = new ImportProgress(content.Files.Count, content.IgnoredFiles, content.ExcludedFiles, _options.MaxReportedItems);
         var current = await SaveImportAsync(record, progress.Apply(import), cancellationToken);
         var savedAt = _time.GetUtcNow();
 
@@ -470,7 +474,7 @@ public sealed class ViewTransferService : IViewTransferService
     }
 
     // Counts of an import while it runs; the reported items stop at the limit.
-    private sealed class ImportProgress(int total, int ignoredFiles, int maxItems)
+    private sealed class ImportProgress(int total, int ignoredFiles, int excludedFiles, int maxItems)
     {
         private readonly List<ViewImportItem> _items = [];
         private int _created;
@@ -549,6 +553,7 @@ public sealed class ViewTransferService : IViewTransferService
                     Skipped = _skipped,
                     Failed = _failed,
                     Warnings = _warnings,
+                    ExcludedFiles = excludedFiles,
                     IgnoredFiles = ignoredFiles,
                 },
                 Items = _items.ToList(),
