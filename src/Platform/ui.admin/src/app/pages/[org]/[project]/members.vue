@@ -37,7 +37,7 @@ useHashScroll(() => !members.isPending.value)
           </p>
           <MembersTable :access-point-key="context.projectKey" :highlight="highlight" />
         </section>
-        <section id="invitations" class="scroll-mt-4 space-y-2">
+        <section id="invitations" tabindex="-1" class="scroll-mt-4 space-y-2 outline-none">
           <h2 class="text-xs font-semibold text-muted uppercase">Invitations</h2>
           <InvitationsTable :access-point-key="context.projectKey" />
         </section>

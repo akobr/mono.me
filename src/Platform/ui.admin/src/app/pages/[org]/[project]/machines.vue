@@ -173,7 +173,7 @@ useHashScroll(() => !machines.isPending.value)
             </table>
           </div>
         </section>
-        <section v-if="canAdmin" id="shared-certificates" class="scroll-mt-4 space-y-2">
+        <section v-if="canAdmin" id="shared-certificates" tabindex="-1" class="scroll-mt-4 space-y-2 outline-none">
           <h2 class="text-xs font-semibold text-muted uppercase">Shared certificates</h2>
           <SharedCertificatesTable />
         </section>

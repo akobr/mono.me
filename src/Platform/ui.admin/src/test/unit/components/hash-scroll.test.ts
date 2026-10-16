@@ -23,7 +23,12 @@ async function mountPage(path: string, ready = ref(true)) {
     setup() {
       useHashScroll(ready)
       // The section exists only once the content has loaded, as on the merged pages.
-      return () => h('div', [h('section', { id: 'members' }), ready.value ? h('section', { id: 'invitations' }) : null])
+      return () =>
+        h('div', [
+          h('section', { id: 'members', tabindex: -1 }),
+          ready.value ? h('section', { id: 'invitations', tabindex: -1 }) : null,
+          h('section', { id: '100%', tabindex: -1 }),
+        ])
     },
   })
   const wrapper = mount(Page, { attachTo: document.body, global: { plugins: [router] } })
@@ -45,11 +50,18 @@ afterEach(() => {
 })
 
 describe('hash scroll', () => {
-  it('scrolls to the section of the hash', async () => {
+  it('scrolls to the section of the hash and moves the focus to it', async () => {
     await mountPage('/acme/billing/members#invitations')
 
     expect(scrolls).toEqual(['invitations'])
     expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
+    expect(document.activeElement?.id).toBe('invitations')
+  })
+
+  it('looks the hash up as the router decoded it', async () => {
+    await mountPage('/acme/billing/members#100%25')
+
+    expect(scrolls).toEqual(['100%'])
   })
 
   it('waits until the content above the section has loaded', async () => {
