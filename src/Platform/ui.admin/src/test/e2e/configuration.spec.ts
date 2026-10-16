@@ -38,6 +38,27 @@ test('Lineage opens the configuration of an ancestor and keeps the filter', asyn
   await expect(page.getByRole('button', { name: 'Lineage' })).toBeDisabled()
 })
 
+test('the breadcrumb opens the configuration of a parent and keeps Lineage at the right', async ({ page }) => {
+  await openApp(page, `${path}?q=northwind`)
+  const breadcrumb = page.getByRole('navigation', { name: 'Annotation ancestors' })
+  await expect(breadcrumb.getByRole('link')).toHaveText(['Subject northwind', 'Context prod'])
+  await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText('Execution prod')
+
+  // As in the annotation detail: Lineage ends the row of the breadcrumb, level with it.
+  const row = (await breadcrumb.locator('..').boundingBox())!
+  const nav = (await breadcrumb.boundingBox())!
+  const lineage = (await page.getByRole('button', { name: 'Lineage' }).boundingBox())!
+  expect(Math.abs(lineage.x + lineage.width - (row.x + row.width))).toBeLessThan(1)
+  expect(lineage.x).toBeGreaterThanOrEqual(nav.x + nav.width)
+  expect(lineage.y).toBeLessThan(nav.y + nav.height)
+  expect(lineage.y + lineage.height).toBeGreaterThan(nav.y)
+
+  await breadcrumb.getByRole('link', { name: 'Context prod' }).click()
+  await expect(page).toHaveURL(/\/acme\/billing\/default\/configurations\/cnt\.northwind\.prod\?q=northwind$/)
+  await expect(page.getByRole('link', { name: 'Effective' })).toBeVisible()
+  await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText('Context prod')
+})
+
 test('the JSON editor completes a binding and explains it on hover', async ({ page }) => {
   await openFromTemplate(page)
   await page.getByRole('radio', { name: 'JSON' }).click()
