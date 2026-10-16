@@ -3,17 +3,21 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.21.3734
  */
 import type { AuditActor } from "./auditActor";
-import type { ConfigurationImportItem } from "./configurationImportItem";
-import type { ConfigurationImportStatus } from "./configurationImportStatus";
-import type { ConfigurationImportSummary } from "./configurationImportSummary";
+import type { ViewArchiveContent } from "./viewArchiveContent";
+import type { ViewImportExisting } from "./viewImportExisting";
+import type { ViewImportItem } from "./viewImportItem";
+import type { ViewImportStatus } from "./viewImportStatus";
+import type { ViewImportSummary } from "./viewImportSummary";
 
-export interface ConfigurationImport {
+export interface ViewImport {
   Id?: string;
-  Status?: ConfigurationImportStatus;
+  Status?: ViewImportStatus;
   FileName?: string;
+  Include?: ViewArchiveContent[];
+  Existing?: ViewImportExisting;
   IsDryRun?: boolean;
   IsForced?: boolean;
   CreatedAt?: string;
@@ -27,8 +31,9 @@ export interface ConfigurationImport {
   TotalCount?: number | null;
   /** @nullable */
   ProcessedCount?: number | null;
-  Summary?: ConfigurationImportSummary;
-  Items?: ConfigurationImportItem[];
+  Summary?: ViewImportSummary;
+  Summaries?: ViewImportSummary[];
+  Items?: ViewImportItem[];
   AreItemsTruncated?: boolean;
   Error?: string;
 }

@@ -1,15 +1,15 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import {
-  getConfigurationExport,
-  getConfigurationExportArchive,
-  getConfigurationImport,
+  getViewExport,
+  getViewExportArchive,
+  getViewImport,
   isStorytellerError,
-  startConfigurationExport,
-  startConfigurationImport,
-  type ConfigurationExport,
-  type ConfigurationExportCreateFormat,
-  type ConfigurationImport,
+  startViewExport,
+  startViewImport,
+  type ViewExport,
+  type ViewExportCreateFormat,
+  type ViewImport,
 } from '@42for.net/2splatform.sdk'
 import { saveBlob } from '@/utils/download'
 import { errorMessage } from '@/utils/errors'
@@ -30,12 +30,12 @@ interface TransferJobBase {
 
 export interface ExportJob extends TransferJobBase {
   kind: 'export'
-  state: ConfigurationExport
+  state: ViewExport
 }
 
 export interface ImportJob extends TransferJobBase {
   kind: 'import'
-  state: ConfigurationImport
+  state: ViewImport
   /** The uploaded file, so a dry run can be imported for real. */
   file: File
 }
@@ -95,8 +95,8 @@ export const useTransfersStore = defineStore('transfers', () => {
     return () => watched.value.delete(id)
   }
 
-  async function startExport(scope: Scope, format: ConfigurationExportCreateFormat): Promise<ExportJob> {
-    const state = await startConfigurationExport(scope.org, scope.project, scope.view, { Format: format })
+  async function startExport(scope: Scope, format: ViewExportCreateFormat): Promise<ExportJob> {
+    const state = await startViewExport(scope.org, scope.project, scope.view, { Format: format })
     const job = track<ExportJob>({
       kind: 'export',
       id: state.Id!,
@@ -111,7 +111,7 @@ export const useTransfersStore = defineStore('transfers', () => {
   }
 
   async function startImport(scope: Scope, file: File, options: ImportOptions): Promise<ImportJob> {
-    const state = await startConfigurationImport(scope.org, scope.project, scope.view, file, {
+    const state = await startViewImport(scope.org, scope.project, scope.view, file, {
       dryRun: options.dryRun || undefined,
       force: options.force || undefined,
       fileName: file.name,
@@ -131,8 +131,8 @@ export const useTransfersStore = defineStore('transfers', () => {
 
   /** Fetches the archive of a finished export and saves it under the export's name. */
   async function download(job: ExportJob): Promise<void> {
-    const archive = await getConfigurationExportArchive(job.scope.org, job.scope.project, job.scope.view, job.id)
-    saveBlob(archive, job.state.FileName ?? `configurations-${job.scope.view}.zip`)
+    const archive = await getViewExportArchive(job.scope.org, job.scope.project, job.scope.view, job.id)
+    saveBlob(archive, job.state.FileName ?? `export-${job.scope.view}.zip`)
   }
 
   /** Follows the exports that were still running before a reload. */
@@ -154,7 +154,7 @@ export const useTransfersStore = defineStore('transfers', () => {
         scope: pending.scope,
         startedAt: pending.startedAt,
         phase: 'running',
-        state: { Id: pending.id, Status: 'Queued' } as ConfigurationExport,
+        state: { Id: pending.id, Status: 'Queued' } as ViewExport,
       })
       void follow(job)
     }
@@ -186,9 +186,9 @@ export const useTransfersStore = defineStore('transfers', () => {
 
       try {
         if (job.kind === 'export') {
-          job.state = await getConfigurationExport(job.scope.org, job.scope.project, job.scope.view, job.id)
+          job.state = await getViewExport(job.scope.org, job.scope.project, job.scope.view, job.id)
         } else {
-          job.state = await getConfigurationImport(job.scope.org, job.scope.project, job.scope.view, job.id)
+          job.state = await getViewImport(job.scope.org, job.scope.project, job.scope.view, job.id)
         }
 
         failures = 0

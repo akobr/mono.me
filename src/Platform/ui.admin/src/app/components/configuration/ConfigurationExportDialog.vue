@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { ConfigurationExportCreateFormat } from '@42for.net/2splatform.sdk'
+import type { ViewExportCreateFormat } from '@42for.net/2splatform.sdk'
 import type { Scope } from '@/stores/context'
 import { useTransfersStore, type ExportJob } from '@/stores/transfers'
 import { errorMessage } from '@/utils/errors'
@@ -13,7 +13,7 @@ const props = defineProps<{ scope: Scope }>()
 const open = defineModel<boolean>('open', { default: false })
 
 const transfers = useTransfersStore()
-const format = ref<ConfigurationExportCreateFormat>('Folder')
+const format = ref<ViewExportCreateFormat>('Folder')
 const jobId = ref<string>()
 const starting = ref(false)
 const error = ref<string>()

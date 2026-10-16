@@ -3,14 +3,11 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.21.3734
  */
 import type {
   BindingCatalog,
   Configuration,
-  ConfigurationExport,
-  ConfigurationExportCreate,
-  ConfigurationImport,
   ConfigurationVersion,
   ConfigurationsResponse,
   DiffResult,
@@ -22,7 +19,6 @@ import type {
   PatchConfigurationParams,
   SetConfigurationBody,
   SetConfigurationParams,
-  StartConfigurationImportParams,
 } from "../../model";
 
 import { storytellerFetch } from "../../../lib/fetcher";
@@ -490,210 +486,6 @@ export const getConfigurationViewDiff = async (
       viewTo,
       params,
     ),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
-};
-
-export const getStartConfigurationExportUrl = (
-  organization: string,
-  project: string,
-  view: string,
-) => {
-  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configurations/exports`;
-};
-
-/**
- * Starts an export of the own documents of every configuration in the view, with their versions, as a zip: a folder of JSON files or a git repository. Poll the export until it has succeeded, then download its archive.
- */
-export const startConfigurationExport = async (
-  organization: string,
-  project: string,
-  view: string,
-  configurationExportCreate?: ConfigurationExportCreate,
-  options?: Parameters<typeof storytellerFetch>[1],
-): Promise<ConfigurationExport> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<
-      string | readonly string[] | undefined
-    >(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  return storytellerFetch<ConfigurationExport>(
-    getStartConfigurationExportUrl(organization, project, view),
-    {
-      ...options,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...getHeaders(options?.headers),
-      },
-      body: JSON.stringify(configurationExportCreate),
-    },
-  );
-};
-
-export const getGetConfigurationExportUrl = (
-  organization: string,
-  project: string,
-  view: string,
-  id: string,
-) => {
-  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configurations/exports/${encodeURIComponent(String(id))}`;
-};
-
-/**
- * The state of an export of the view.
- */
-export const getConfigurationExport = async (
-  organization: string,
-  project: string,
-  view: string,
-  id: string,
-  options?: Parameters<typeof storytellerFetch>[1],
-): Promise<ConfigurationExport> => {
-  return storytellerFetch<ConfigurationExport>(
-    getGetConfigurationExportUrl(organization, project, view, id),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
-};
-
-export const getGetConfigurationExportArchiveUrl = (
-  organization: string,
-  project: string,
-  view: string,
-  id: string,
-) => {
-  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configurations/exports/${encodeURIComponent(String(id))}/archive`;
-};
-
-/**
- * The zip of a succeeded export, named by Content-Disposition (the export's FileName).
- */
-export const getConfigurationExportArchive = async (
-  organization: string,
-  project: string,
-  view: string,
-  id: string,
-  options?: Parameters<typeof storytellerFetch>[1],
-): Promise<Blob> => {
-  return storytellerFetch<Blob>(
-    getGetConfigurationExportArchiveUrl(organization, project, view, id),
-    {
-      ...options,
-      method: "GET",
-    },
-  );
-};
-
-export const getStartConfigurationImportUrl = (
-  organization: string,
-  project: string,
-  view: string,
-  params?: StartConfigurationImportParams,
-) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? "null" : String(value));
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0
-    ? `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configurations/imports?${stringifiedParams}`
-    : `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configurations/imports`;
-};
-
-/**
- * Starts an import of a zip into the view: every <annotation-key>.json file, in any folder, replaces the annotation's own document as a new version unless it is equal. Version files, export.json and .git are ignored. Poll the import for the outcome of each file.
- */
-export const startConfigurationImport = async (
-  organization: string,
-  project: string,
-  view: string,
-  startConfigurationImportBody: Blob,
-  params?: StartConfigurationImportParams,
-  options?: Parameters<typeof storytellerFetch>[1],
-): Promise<ConfigurationImport> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {};
-    if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      );
-    }
-    const headers: Record<string, string | readonly string[]> = {};
-    for (const [name, value] of Object.entries<
-      string | readonly string[] | undefined
-    >(h)) {
-      if (value !== undefined) headers[name] = value;
-    }
-    return headers;
-  };
-  return storytellerFetch<ConfigurationImport>(
-    getStartConfigurationImportUrl(organization, project, view, params),
-    {
-      ...options,
-      method: "POST",
-      headers: {
-        "Content-Type": "application/zip",
-        ...getHeaders(options?.headers),
-      },
-      body: startConfigurationImportBody,
-    },
-  );
-};
-
-export const getGetConfigurationImportUrl = (
-  organization: string,
-  project: string,
-  view: string,
-  id: string,
-) => {
-  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configurations/imports/${encodeURIComponent(String(id))}`;
-};
-
-/**
- * The state of an import into the view, with the outcome of its files.
- */
-export const getConfigurationImport = async (
-  organization: string,
-  project: string,
-  view: string,
-  id: string,
-  options?: Parameters<typeof storytellerFetch>[1],
-): Promise<ConfigurationImport> => {
-  return storytellerFetch<ConfigurationImport>(
-    getGetConfigurationImportUrl(organization, project, view, id),
     {
       ...options,
       method: "GET",

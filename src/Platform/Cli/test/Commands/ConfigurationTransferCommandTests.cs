@@ -26,13 +26,13 @@ public class ConfigurationTransferCommandTests
     private static readonly DateTimeOffset Now = new(2026, 10, 14, 1, 30, 12, TimeSpan.Zero);
 
     private readonly AnnotationCommandFixture _fixture = new();
-    private readonly Mock<IConfigurationsApiClient> _api = new(MockBehavior.Strict);
+    private readonly Mock<ITransfersApiClient> _api = new(MockBehavior.Strict);
     private readonly MockFileSystem _fileSystem = new(new Dictionary<string, MockFileData>(), P(@"C:\work"));
 
     [Fact]
     public async Task Export_WaitsAndSavesTheArchiveUnderTheServersName()
     {
-        StartsExport(ConfigurationExportCreateFormat.Git, Export(ConfigurationExportStatus.Queued), Export(ConfigurationExportStatus.Running), Export(ConfigurationExportStatus.Succeeded));
+        StartsExport(ViewExportCreateFormat.Git, Export(ViewExportStatus.Queued), Export(ViewExportStatus.Running), Export(ViewExportStatus.Succeeded));
         ServesArchive(Zip(("rst.a.json", "{}")));
 
         var exitCode = await Export(format: "GIT");
@@ -40,13 +40,13 @@ public class ConfigurationTransferCommandTests
         exitCode.ShouldBe(ExitCodes.SUCCESS);
         _fileSystem.File.Exists(P($@"C:\work\{FileName}")).ShouldBeTrue();
         _fixture.Line("Exporting").ShouldBe("Exporting the configurations of org1.proj1.default (git)…");
-        _api.Verify(api => api.GetConfigurationExportAsync(Org, Project, View, "job-1"), Times.Exactly(3));
+        _api.Verify(api => api.GetViewExportAsync(Org, Project, View, "job-1"), Times.Exactly(3));
     }
 
     [Fact]
     public async Task Export_IntoAFolderUsesTheServersName_ElseTheGivenFile()
     {
-        StartsExport(ConfigurationExportCreateFormat.Folder, Export(ConfigurationExportStatus.Succeeded));
+        StartsExport(ViewExportCreateFormat.Folder, Export(ViewExportStatus.Succeeded));
         ServesArchive(Zip(("rst.a.json", "{}")));
         _fileSystem.AddDirectory(P(@"C:\exports"));
 
@@ -61,7 +61,7 @@ public class ConfigurationTransferCommandTests
     [Fact]
     public async Task Export_WithExtract_UnpacksIntoANewFolder()
     {
-        StartsExport(ConfigurationExportCreateFormat.Git, Export(ConfigurationExportStatus.Succeeded));
+        StartsExport(ViewExportCreateFormat.Git, Export(ViewExportStatus.Succeeded));
         ServesArchive(Zip((".git/", string.Empty), (".git/HEAD", "ref: refs/heads/main\n"), ("rst.a.json", "{\"a\":1}\n")));
 
         var exitCode = await Export(format: "git", extract: true);
@@ -75,7 +75,7 @@ public class ConfigurationTransferCommandTests
     [Fact]
     public async Task Export_WithExtract_RefusesAFolderThatIsNotEmpty()
     {
-        StartsExport(ConfigurationExportCreateFormat.Folder, Export(ConfigurationExportStatus.Succeeded));
+        StartsExport(ViewExportCreateFormat.Folder, Export(ViewExportStatus.Succeeded));
         ServesArchive(Zip(("rst.a.json", "{}")));
         _fileSystem.AddFile(P(@"C:\target\keep.txt"), new MockFileData("keep"));
 
@@ -88,7 +88,7 @@ public class ConfigurationTransferCommandTests
     [Fact]
     public async Task Export_ThatFails_PrintsTheError()
     {
-        StartsExport(ConfigurationExportCreateFormat.Folder, Export(ConfigurationExportStatus.Failed, error: "The export failed: boom"));
+        StartsExport(ViewExportCreateFormat.Folder, Export(ViewExportStatus.Failed, error: "The export failed: boom"));
 
         var exitCode = await Export();
 
@@ -99,7 +99,7 @@ public class ConfigurationTransferCommandTests
     [Fact]
     public async Task Export_StopsWaitingAfterTheTimeout()
     {
-        StartsExport(ConfigurationExportCreateFormat.Folder, Export(ConfigurationExportStatus.Running));
+        StartsExport(ViewExportCreateFormat.Folder, Export(ViewExportStatus.Running));
 
         var exitCode = await Export(timeout: 0);
 
@@ -129,7 +129,7 @@ public class ConfigurationTransferCommandTests
             dryRun: true,
             fileName: "configs.zip",
             onUpload: body => uploaded = Entries(body),
-            Import(ConfigurationImportStatus.Succeeded, dryRun: true, summary: new ConfigurationImportSummary { Created = 1, Unchanged = 1 }));
+            Import(ViewImportStatus.Succeeded, dryRun: true, summary: new ViewImportSummary { Created = 1, Unchanged = 1 }));
 
         var exitCode = await ImportAsync(@"configs", dryRun: true);
 
@@ -143,26 +143,26 @@ public class ConfigurationTransferCommandTests
     public async Task Import_OfAZip_ListsTheItemsAndFailsWithFailedFiles()
     {
         _fileSystem.AddFile(P(@"C:\work\export.zip"), new MockFileData(Zip(("rst.a.json", "{}"))));
-        var items = new List<ConfigurationImportItem>
+        var items = new List<ViewImportItem>
         {
-            new() { Path = "rst.a.json", AnnotationKey = "rst.a", Outcome = ConfigurationImportItemOutcome.Updated, Version = 4 },
-            new() { Path = "rst.b.json", AnnotationKey = "rst.b", Outcome = ConfigurationImportItemOutcome.Failed, ErrorCode = "SchemaViolation", Message = "The document violates its schema: …" },
+            new() { Path = "rst.a.json", AnnotationKey = "rst.a", Outcome = ViewImportItemOutcome.Updated, Version = 4 },
+            new() { Path = "rst.b.json", AnnotationKey = "rst.b", Outcome = ViewImportItemOutcome.Failed, ErrorCode = "SchemaViolation", Message = "The document violates its schema: …" },
         };
         StartsImport(
             force: true,
             dryRun: null,
             fileName: "export.zip",
             onUpload: _ => { },
-            Import(ConfigurationImportStatus.Running),
-            Import(ConfigurationImportStatus.Succeeded, summary: new ConfigurationImportSummary { Updated = 1, Failed = 1, IgnoredFiles = 1 }, items: items));
+            Import(ViewImportStatus.Running),
+            Import(ViewImportStatus.Succeeded, summary: new ViewImportSummary { Updated = 1, Failed = 1, IgnoredFiles = 1 }, items: items));
 
         var exitCode = await ImportAsync("export.zip", force: true);
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         _fixture.Line("Created").ShouldBe("Created 0, updated 1, unchanged 0, skipped 0, failed 1; 1 other file ignored.");
         _fixture.Console.Mock.Verify(console => console.WriteTable(
-            It.Is<IEnumerable<ConfigurationImportItem>>(rows => rows.Count() == 2),
-            It.IsAny<Func<ConfigurationImportItem, IEnumerable<Cell>>>(),
+            It.Is<IEnumerable<ViewImportItem>>(rows => rows.Count() == 2),
+            It.IsAny<Func<ViewImportItem, IEnumerable<Cell>>>(),
             It.IsAny<IEnumerable<_42.CLI.Toolkit.Output.IHeaderColumn>>()));
     }
 
@@ -171,7 +171,7 @@ public class ConfigurationTransferCommandTests
     {
         _fileSystem.AddFile(P(@"C:\work\bad.zip"), new MockFileData("not a zip"));
         _api
-            .Setup(api => api.StartConfigurationImportAsync(Org, Project, View, null, null, "bad.zip", It.IsAny<Stream>()))
+            .Setup(api => api.StartViewImportAsync(Org, Project, View, null, null, null, null, "bad.zip", It.IsAny<Stream>()))
             .ThrowsAsync(AnnotationCommandFixture.Error(400, "InvalidArchive", "The body is not a zip archive."));
 
         var exitCode = await ImportAsync("bad.zip");
@@ -203,9 +203,9 @@ public class ConfigurationTransferCommandTests
     // The mock file system takes Windows paths; on Unix they become /work, /exports, …
     private static string P(string path) => MockUnixSupport.Path(path);
 
-    private static ConfigurationExport Export(ConfigurationExportStatus status, string? error = null)
+    private static ViewExport Export(ViewExportStatus status, string? error = null)
     {
-        return new ConfigurationExport
+        return new ViewExport
         {
             Id = "job-1",
             Status = status,
@@ -219,13 +219,13 @@ public class ConfigurationTransferCommandTests
         };
     }
 
-    private static ConfigurationImport Import(
-        ConfigurationImportStatus status,
+    private static ViewImport Import(
+        ViewImportStatus status,
         bool dryRun = false,
-        ConfigurationImportSummary? summary = null,
-        List<ConfigurationImportItem>? items = null)
+        ViewImportSummary? summary = null,
+        List<ViewImportItem>? items = null)
     {
-        return new ConfigurationImport
+        return new ViewImport
         {
             Id = "job-2",
             Status = status,
@@ -264,19 +264,19 @@ public class ConfigurationTransferCommandTests
         return archive.Entries.Select(entry => entry.FullName).ToList();
     }
 
-    private void StartsExport(ConfigurationExportCreateFormat format, params ConfigurationExport[] states)
+    private void StartsExport(ViewExportCreateFormat format, params ViewExport[] states)
     {
         _api
-            .Setup(api => api.StartConfigurationExportAsync(Org, Project, View, It.Is<ConfigurationExportCreate>(body => body.Format == format)))
-            .ReturnsAsync(Export(ConfigurationExportStatus.Queued));
+            .Setup(api => api.StartViewExportAsync(Org, Project, View, It.Is<ViewExportCreate>(body => body.Format == format)))
+            .ReturnsAsync(Export(ViewExportStatus.Queued));
 
         if (states.Length == 1)
         {
-            _api.Setup(api => api.GetConfigurationExportAsync(Org, Project, View, "job-1")).ReturnsAsync(states[0]);
+            _api.Setup(api => api.GetViewExportAsync(Org, Project, View, "job-1")).ReturnsAsync(states[0]);
             return;
         }
 
-        var reads = _api.SetupSequence(api => api.GetConfigurationExportAsync(Org, Project, View, "job-1"));
+        var reads = _api.SetupSequence(api => api.GetViewExportAsync(Org, Project, View, "job-1"));
 
         foreach (var state in states)
         {
@@ -287,18 +287,18 @@ public class ConfigurationTransferCommandTests
     private void ServesArchive(byte[] zip)
     {
         _api
-            .Setup(api => api.GetConfigurationExportArchiveAsync(Org, Project, View, "job-1"))
+            .Setup(api => api.GetViewExportArchiveAsync(Org, Project, View, "job-1"))
             .ReturnsAsync(() => new FileResponse(200, new Dictionary<string, IEnumerable<string>>(), new MemoryStream(zip), null, null));
     }
 
-    private void StartsImport(bool? force, bool? dryRun, string fileName, Action<Stream> onUpload, params ConfigurationImport[] states)
+    private void StartsImport(bool? force, bool? dryRun, string fileName, Action<Stream> onUpload, params ViewImport[] states)
     {
         _api
-            .Setup(api => api.StartConfigurationImportAsync(Org, Project, View, force, dryRun, fileName, It.IsAny<Stream>()))
-            .Callback<string, string, string, bool?, bool?, string, Stream>((_, _, _, _, _, _, body) => onUpload(body))
-            .ReturnsAsync(Import(ConfigurationImportStatus.Queued));
+            .Setup(api => api.StartViewImportAsync(Org, Project, View, null, null, force, dryRun, fileName, It.IsAny<Stream>()))
+            .Callback<string, string, string, IEnumerable<ViewArchiveContent>, ViewImportExisting?, bool?, bool?, string, Stream>((_, _, _, _, _, _, _, _, body) => onUpload(body))
+            .ReturnsAsync(Import(ViewImportStatus.Queued));
 
-        var reads = _api.SetupSequence(api => api.GetConfigurationImportAsync(Org, Project, View, "job-2"));
+        var reads = _api.SetupSequence(api => api.GetViewImportAsync(Org, Project, View, "job-2"));
 
         foreach (var state in states)
         {

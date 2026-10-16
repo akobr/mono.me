@@ -3,14 +3,19 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.21.3734
  */
+import type { ViewImportSummaryContent } from "./viewImportSummaryContent";
 
-export interface ConfigurationImportSummary {
+export interface ViewImportSummary {
+  /** @nullable */
+  Content?: ViewImportSummaryContent;
   Created?: number;
   Updated?: number;
   Unchanged?: number;
   Skipped?: number;
   Failed?: number;
+  Warnings?: number;
+  ExcludedFiles?: number;
   IgnoredFiles?: number;
 }

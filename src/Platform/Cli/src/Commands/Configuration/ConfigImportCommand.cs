@@ -13,19 +13,19 @@ namespace _42.Platform.Cli.Commands.Configuration;
 [Command(CommandNames.IMPORT, Description = "Import configuration documents into the view from a zip or a folder: every <annotation-key>.json replaces the stored document as a new version unless it is equal.")]
 public class ConfigImportCommand : BaseContextCommand
 {
-    private readonly IConfigurationsApiClient _configurationApi;
+    private readonly ITransfersApiClient _transfersApi;
     private readonly IFileSystem _fileSystem;
     private readonly TransferPolling _polling;
 
     public ConfigImportCommand(
         IExtendedConsole console,
         ICommandContext context,
-        IConfigurationsApiClient configurationApi,
+        ITransfersApiClient transfersApi,
         IFileSystem fileSystem,
         TransferPolling polling)
         : base(console, context)
     {
-        _configurationApi = configurationApi;
+        _transfersApi = transfersApi;
         _fileSystem = fileSystem;
         _polling = polling;
     }
@@ -72,16 +72,18 @@ public class ConfigImportCommand : BaseContextCommand
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
-        ConfigurationImport import;
+        ViewImport import;
 
         await using (archive)
         {
             try
             {
-                import = await _configurationApi.StartConfigurationImportAsync(
+                import = await _transfersApi.StartViewImportAsync(
                     Context.OrganizationName,
                     Context.ProjectName,
                     Context.ViewName,
+                    include: null,
+                    existing: null,
                     IsForced ? true : null,
                     IsDryRun ? true : null,
                     fileName,
@@ -99,8 +101,8 @@ public class ConfigImportCommand : BaseContextCommand
                 .ThemedLowlight(Console.Theme));
 
         var (finished, isDone) = await _polling.WaitAsync(
-            () => _configurationApi.GetConfigurationImportAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, import.Id),
-            job => job.Status is ConfigurationImportStatus.Succeeded or ConfigurationImportStatus.Failed,
+            () => _transfersApi.GetViewImportAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, import.Id),
+            job => job.Status is ViewImportStatus.Succeeded or ViewImportStatus.Failed,
             TimeSpan.FromMinutes(TimeoutMinutes));
 
         if (!isDone)
@@ -109,7 +111,7 @@ public class ConfigImportCommand : BaseContextCommand
             return ExitCodes.WARNING_ABORTED;
         }
 
-        if (finished.Status == ConfigurationImportStatus.Failed)
+        if (finished.Status == ViewImportStatus.Failed)
         {
             // the server writes the whole message, prefix included
             Console.WriteLine((finished.Error ?? "The import failed.").ThemedError(Console.Theme));

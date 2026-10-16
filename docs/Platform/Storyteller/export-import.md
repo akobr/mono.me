@@ -10,7 +10,7 @@ The code is in:
 
 The design and its decisions are in [the spec](specs/2026-10-15%20Export%20and%20Import%20of%20a%20View.md), which extends [the first spec](specs/2026-10-14%20Export%20and%20Import%20of%20Configurations.md) (configurations only).
 
-**State of the delivery.** The backend covers all four kinds (phase 1 of the spec), and the routes are below the view with the include and existing options (phase 2). The committed OpenAPI document and both SDKs, the CLI and the admin UI still call the routes of the first spec until they are regenerated and adapted (phases 2 to 4). See [API](#api), [CLI](#cli) and [Administration UI](#administration-ui).
+**State of the delivery.** The backend covers all four kinds (phase 1 of the spec). The routes are below the view with the include and existing options, and the OpenAPI document and both SDKs are regenerated from them (phase 2). The CLI and the admin UI call the new operations, but keep the commands and dialogs of the first spec, without include or existing, until phases 3 and 4. See [API](#api), [CLI](#cli) and [Administration UI](#administration-ui).
 
 ## What travels
 
@@ -500,7 +500,10 @@ The routes are below `v1/{organization}/{project}/{view}`, with the tag `Transfe
 
 **Upload.** The upload is copied into memory up to `MaxArchiveBytes` (a larger `Content-Length` is refused before reading) and must start with a zip signature. Then the central directory is checked (see [Limits](#limits)).
 
-**OpenAPI.** `include` is published as an array of `ViewArchiveContent` with `style: form` and `explode: false` (comma-separated), and `existing` as the enum `ViewImportExisting` with the default `Overwrite`. The committed `Sdk.NSwag/open.api.v0.9.15.json`, the C# SDK and the TypeScript SDK keep the routes and the `Configuration*` names of the first spec until they are regenerated.
+**OpenAPI.** `include` is published as an array with `style: form` and `explode: false` (comma-separated), and `existing` with the default `Overwrite`. `ViewTransferSchemaDocumentFilter` makes them, and the `Include` lists and `Existing` of the bodies and jobs, reference two shared schemas, `ViewArchiveContent` (without a default: no include means all four kinds) and `ViewImportExisting`. Inline, the generators would name an enum after each list (NSwag: `Include`, `Include2`, `Include3`, `Anonymous`). The document is `open.api.v0.9.21.json`, in `Sdk.NSwag` and `sdk.typescript`:
+
+- The C# SDK has `ITransfersApiClient` (`TransfersApiClient`, registered by `AddStorytellerSdk`): `StartViewExportAsync`, `GetViewExportAsync`, `GetViewExportArchiveAsync` (a `FileResponse`), `StartViewImportAsync(…, IEnumerable<ViewArchiveContent> include, ViewImportExisting? existing, bool? force, bool? dryRun, string fileName, Stream body)` and `GetViewImportAsync`. It sends `include` comma-separated.
+- The TypeScript SDK has the `transfers` tag: `startViewExport`, `getViewExport`, `getViewExportArchive` (a `Blob`), `startViewImport(…, file, { include, existing, force, dryRun, fileName })` and `getViewImport`, with their Vue Query composables, Zod schemas and MSW handlers. `include` goes comma-separated (`include=Annotations%2CTemplates`).
 
 The background half is `Api.Functions/src/Transfers/ViewTransferFunctions.cs`:
 
@@ -523,7 +526,7 @@ sform story config import <zip-or-folder> [--dry-run] [--force] [--timeout <minu
 - `import` takes a zip, or a folder whose `*.json` files (in subfolders too, without `.git`) it packs in memory, for example a clone of an exported repository. The server skips the other hidden paths. It prints the total counts and a table of every file that was not unchanged: outcome, key (the path for a template or a type schema, which have none), version and message. It shows no kinds and no warnings yet. It exits with `2` when a file failed or the server rejected the upload.
 - After `--timeout` (10 minutes) both stop waiting and print the job id; the job continues on the server.
 
-The commands are `Cli/src/Commands/Configuration/ConfigExportCommand.cs` and `ConfigImportCommand.cs`, with `Services/ConfigurationArchives.cs` (packing and unpacking through `IFileSystem`) and `Services/TransferPolling.cs`.
+The commands are `Cli/src/Commands/Configuration/ConfigExportCommand.cs` and `ConfigImportCommand.cs`, with `Services/ConfigurationArchives.cs` (packing and unpacking through `IFileSystem`) and `Services/TransferPolling.cs`. They call `ITransfersApiClient` without include or existing, so they export and import all four kinds and overwrite.
 
 ## Administration UI
 
@@ -532,7 +535,8 @@ Phase 4 of the spec replaces the dialogs with an **Export & Import** page. Until
 - `stores/transfers.ts` starts and polls the jobs (every second, then every 2 and 3 seconds, at most 15 minutes) independently of the page. A succeeded export is fetched with the bearer token and saved under its `FileName` (`utils/download.ts`). Running exports are kept in `sessionStorage` and resumed after a reload.
 - `TransferToaster` (in the default layout) reports the end of an export, and of an import whose dialog is closed. After an import that wrote documents, it refreshes the configuration queries and the catalog only.
 - `ConfigurationExportDialog` picks the format and closes when the download starts. `ConfigurationImportDialog` takes a zip (`UFileUpload`) and the dry run and force options, shows the progress and the result (`ConfigurationImportResult`), and offers **Import now** after a dry run. Opened again, it shows the view's latest import. The result lists the items without their kinds.
-- The mock API (`mock/transfer-handlers.ts`, `mock/zip.ts`) runs both jobs over the mock database in the layout of the first spec (`<key>.json`, `<key>.<version>.json`). Its git export is that layout plus `.git/HEAD`; it writes no repository.
+- The store calls the SDK's `transfers` operations without include or existing.
+- The mock API (`mock/transfer-handlers.ts`, `mock/zip.ts`) serves the routes of the API, and runs both jobs over the mock database in the layout of the first spec (`<key>.json`, `<key>.<version>.json`). Its git export is that layout plus `.git/HEAD`; it writes no repository. It reads `Include`, `include` and `existing` like the API (an unknown kind or mode answers `400`, `InvalidQuery` for the query), stores them resolved on the job, and applies them to configurations, the only kind it knows: without `Configurations`, an export writes none and an import counts their files as excluded, and `Skip` keeps a different stored configuration with `DocumentExists`.
 
 ## Storage
 

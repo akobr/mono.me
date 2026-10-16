@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.21.3734
  */
 
 export * from "./accessPoint";
@@ -71,16 +71,6 @@ export * from "./combinedConfigurationSchema";
 export * from "./combinedConfigurationSchemaMergedContent";
 export * from "./configuration";
 export * from "./configurationContent";
-export * from "./configurationExport";
-export * from "./configurationExportCreate";
-export * from "./configurationExportCreateFormat";
-export * from "./configurationExportFormat";
-export * from "./configurationExportStatus";
-export * from "./configurationImport";
-export * from "./configurationImportItem";
-export * from "./configurationImportItemOutcome";
-export * from "./configurationImportStatus";
-export * from "./configurationImportSummary";
 export * from "./configurationSchema";
 export * from "./configurationSchemaContent";
 export * from "./configurationSchemaSummary";
@@ -224,7 +214,7 @@ export * from "./setDescendantTypeSchemaParams";
 export * from "./setTemplateBody";
 export * from "./sharedCertificate";
 export * from "./sharedCertificateCreate";
-export * from "./startConfigurationImportParams";
+export * from "./startViewImportParams";
 export * from "./subject";
 export * from "./subjectAnnotationType";
 export * from "./unit";
@@ -234,5 +224,20 @@ export * from "./unitOfExecutionAnnotationType";
 export * from "./usage";
 export * from "./usageAnnotationType";
 export * from "./view";
+export * from "./viewArchiveContent";
 export * from "./viewCreate";
+export * from "./viewExport";
+export * from "./viewExportCreate";
+export * from "./viewExportCreateFormat";
+export * from "./viewExportFormat";
+export * from "./viewExportStatus";
+export * from "./viewImport";
+export * from "./viewImportExisting";
+export * from "./viewImportItem";
+export * from "./viewImportItemKind";
+export * from "./viewImportItemOutcome";
+export * from "./viewImportStatus";
+export * from "./viewImportSummary";
+export * from "./viewImportSummaryContent";
+export * from "./viewImportWarning";
 export * from "./viewUpdate";

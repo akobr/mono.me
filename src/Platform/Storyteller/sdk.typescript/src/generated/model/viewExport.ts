@@ -3,16 +3,18 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.21.3734
  */
 import type { AuditActor } from "./auditActor";
-import type { ConfigurationExportFormat } from "./configurationExportFormat";
-import type { ConfigurationExportStatus } from "./configurationExportStatus";
+import type { ViewArchiveContent } from "./viewArchiveContent";
+import type { ViewExportFormat } from "./viewExportFormat";
+import type { ViewExportStatus } from "./viewExportStatus";
 
-export interface ConfigurationExport {
+export interface ViewExport {
   Id?: string;
-  Status?: ConfigurationExportStatus;
-  Format?: ConfigurationExportFormat;
+  Status?: ViewExportStatus;
+  Format?: ViewExportFormat;
+  Include?: ViewArchiveContent[];
   FileName?: string;
   CreatedAt?: string;
   CreatedBy?: AuditActor;
@@ -21,6 +23,12 @@ export interface ConfigurationExport {
   /** @nullable */
   CompletedAt?: string | null;
   ExpiresAt?: string;
+  /** @nullable */
+  AnnotationCount?: number | null;
+  /** @nullable */
+  SchemaCount?: number | null;
+  /** @nullable */
+  TemplateCount?: number | null;
   /** @nullable */
   ConfigurationCount?: number | null;
   /** @nullable */

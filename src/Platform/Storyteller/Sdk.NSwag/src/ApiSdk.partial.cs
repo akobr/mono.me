@@ -101,6 +101,22 @@ public partial class KeyValuesApiClient
         => SdkRequestHelper.ApplyAuthorization(_configuration, request);
 }
 
+public partial class TransfersApiClient
+{
+    private ISdkConfiguration? _configuration;
+
+    [ActivatorUtilitiesConstructor]
+    public TransfersApiClient(HttpClient httpClient, ISdkConfiguration configuration)
+        : this(httpClient)
+    {
+        _configuration = configuration;
+        BaseUrl = configuration.BaseUrl;
+    }
+
+    partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
+        => SdkRequestHelper.ApplyAuthorization(_configuration, request);
+}
+
 internal static class SdkRequestHelper
 {
     internal static void ApplyAuthorization(ISdkConfiguration? configuration, HttpRequestMessage request)
