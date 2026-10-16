@@ -2,42 +2,48 @@ using System.Globalization;
 using System.IO.Compression;
 using System.Text;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Transferring;
 
-// Reads the document files of a zip by their names (ViewArchiveNames), in any folder, so a flat zip, a zipped
-// folder and a repository work alike. Hidden paths (.git, ._*) and __MACOSX are skipped.
-// Transitional: only the current documents of configurations (<key>.conf.json) are read; every other name counts
-// as ignored until the reader takes every kind.
+// Reads the document files of a zip by their names (ViewArchiveNames), in any folder, so a flat zip, the folders of
+// an export and a repository read alike. Hidden paths (.git, .github, .DS_Store, ._*) and __MACOSX are skipped
+// without being counted. A file of a kind the include filter leaves out is counted as excluded and never
+// decompressed; version files, export.json and names that are not documents are counted as ignored.
 public static class ViewArchiveReader
 {
-    // Checks the central directory only, before anything is decompressed.
+    // Checks the central directory only, before anything is decompressed; every kind counts against the limits.
     public static void Validate(Stream archive, ViewTransferOptions options)
     {
         using var zip = Open(archive);
-        _ = Inspect(zip, options);
+        _ = Inspect(zip, options, ViewArchiveInclude.All);
     }
 
-    public static ViewArchiveDocuments Read(Stream archive, ViewTransferOptions options)
+    // The include filter: null or empty means all four kinds.
+    public static ViewArchiveDocuments Read(Stream archive, ViewTransferOptions options, IEnumerable<ViewArchiveContent>? include = null)
     {
         using var zip = Open(archive);
-        var (entries, ignored) = Inspect(zip, options);
-        var files = new List<ViewArchiveFile>(entries.Count);
+        var inspection = Inspect(zip, options, ViewArchiveInclude.Resolve(include));
+        var files = new List<ViewArchiveFile>(inspection.Entries.Count);
         var seen = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var (path, name, entry) in entries)
+        // one document per identity, whatever the folders and the spelling of the key: the first path wins
+        foreach (var (path, name, entry) in inspection.Entries)
         {
             if (seen.TryGetValue(name.Identity, out var first))
             {
-                files.Add(Failed(path, name, ErrorCodes.DuplicateFile, $"The file '{first}' already holds the configuration of {name.AnnotationKey}."));
+                var document = ViewArchiveNames.Describe(name.Kind, name.AnnotationType, name.AnnotationKey?.ToString());
+                files.Add(Failed(path, name, ErrorCodes.DuplicateFile, $"The file '{first}' already holds the {document}."));
                 continue;
             }
 
             seen[name.Identity] = path;
-            files.Add(ReadFile(path, name, entry, options.MaxDocumentBytes));
+            files.Add(name.ErrorCode is not null
+                ? Failed(path, name, name.ErrorCode, name.Message ?? "The file cannot be imported.")
+                : ReadFile(path, name, entry, options.MaxDocumentBytes));
         }
 
-        return new ViewArchiveDocuments(files, ignored);
+        return new ViewArchiveDocuments(files, inspection.Ignored, inspection.Excluded);
     }
 
     private static ZipArchive Open(Stream archive)
@@ -52,8 +58,9 @@ public static class ViewArchiveReader
         }
     }
 
-    // The document files in path order, and the count of ignored files.
-    private static (List<(string Path, ViewArchiveName Name, ZipArchiveEntry Entry)> Entries, int Ignored) Inspect(ZipArchive zip, ViewTransferOptions options)
+    // The document files of the included kinds in path order, and the counts of the other files. The limits apply
+    // to the included files together.
+    private static Inspection Inspect(ZipArchive zip, ViewTransferOptions options, IReadOnlyList<ViewArchiveContent> include)
     {
         if (zip.Entries.Count > options.MaxArchiveEntries)
         {
@@ -64,6 +71,7 @@ public static class ViewArchiveReader
 
         var entries = new List<(string Path, ViewArchiveName Name, ZipArchiveEntry Entry)>();
         var ignored = 0;
+        var excluded = 0;
         var declared = 0L;
 
         foreach (var entry in zip.Entries)
@@ -77,11 +85,16 @@ public static class ViewArchiveReader
 
             var fileName = path[(path.LastIndexOf('/') + 1)..];
 
-            if (!ViewArchiveNames.TryParse(fileName, out var name)
-                || name.Version.HasValue
-                || name.Kind != ViewDocumentKind.Configuration)
+            // an import never replays a history, so version files are ignored whatever their kind
+            if (!ViewArchiveNames.TryParse(fileName, out var name) || name.Version.HasValue)
             {
                 ignored++;
+                continue;
+            }
+
+            if (!include.Contains(name.Content))
+            {
+                excluded++;
                 continue;
             }
 
@@ -98,7 +111,7 @@ public static class ViewArchiveReader
         }
 
         entries.Sort((left, right) => string.CompareOrdinal(left.Path, right.Path));
-        return (entries, ignored);
+        return new Inspection(entries, ignored, excluded);
     }
 
     private static ViewArchiveFile ReadFile(string path, ViewArchiveName name, ZipArchiveEntry entry, int maxBytes)
@@ -138,12 +151,20 @@ public static class ViewArchiveReader
         try
         {
             using var stream = new MemoryStream(bytes, writable: false);
-            return File(path, name) with { Content = ViewDocumentJson.Parse(stream) };
+            return File(path, name) with { Content = Parse(stream, name.Kind) };
         }
         catch (Exception exception) when (exception is JsonException or DecoderFallbackException)
         {
             return Failed(path, name, ErrorCodes.InvalidDocument, $"The file is not a JSON object: {exception.Message}");
         }
+    }
+
+    // Each kind with the date handling of its reads, so an exported document reads back equal (ViewDocumentJson).
+    private static JObject Parse(Stream stream, ViewDocumentKind kind)
+    {
+        return kind == ViewDocumentKind.Annotation
+            ? ViewAnnotationDocument.Parse(stream)
+            : ViewDocumentJson.Parse(stream);
     }
 
     private static ViewArchiveFile TooLarge(string path, ViewArchiveName name, int maxBytes)
@@ -160,4 +181,9 @@ public static class ViewArchiveReader
     {
         return new ViewArchiveFile { Path = path, Kind = name.Kind, AnnotationType = name.AnnotationType, AnnotationKey = name.AnnotationKey };
     }
+
+    private sealed record class Inspection(
+        IReadOnlyList<(string Path, ViewArchiveName Name, ZipArchiveEntry Entry)> Entries,
+        int Ignored,
+        int Excluded);
 }

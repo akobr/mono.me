@@ -2,7 +2,7 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Transferring;
 
-// One version of an annotation's own document.
+// One version of a configuration (an annotation's own document), a template or a schema.
 public sealed record class ConfigurationDocument
 {
     public required ulong Version { get; init; }
