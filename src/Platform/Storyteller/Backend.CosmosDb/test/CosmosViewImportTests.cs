@@ -17,8 +17,8 @@ using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
 
-// The imports of annotation and template files: outcomes, warnings, Existing, dry runs, the overlay and the audit.
-// Every test works in its own project.
+// The imports of annotation, schema, template and configuration files: outcomes, warnings, Existing, Force, dry runs,
+// the overlay and the audit. Every test works in its own project.
 public class CosmosViewImportTests(Startup startup)
     : BaseTestsClass(startup)
 {
@@ -32,6 +32,8 @@ public class CosmosViewImportTests(Startup startup)
     private IConfigurationService Configurations => Context.Services.GetRequiredService<IConfigurationService>();
 
     private IConfigurationTemplateService Templates => Context.Services.GetRequiredService<IConfigurationTemplateService>();
+
+    private IConfigurationSchemaService Schemas => Context.Services.GetRequiredService<IConfigurationSchemaService>();
 
     private Container Container => Context.Services
         .GetRequiredService<IContainerRepositoryProvider>()
@@ -487,9 +489,379 @@ public class CosmosViewImportTests(Startup startup)
         second.Content["retries"]!.Value<int>().Should().Be(5);
     }
 
-    private static ViewImportOptions Options(ViewImportExisting existing = ViewImportExisting.Overwrite, bool dryRun = false)
+    [Fact]
+    public async Task ImportSchema_FailsAnInvalidSchemaEvenWithForceAndSkipsAnEmptyOne()
     {
-        return new ViewImportOptions { Actor = Importer, Existing = existing, DryRun = dryRun };
+        const string project = "import-schema-invalid";
+        var target = TypeSchema(project, AnnotationTypeCodes.Execution);
+
+        var invalid = await Schemas.ImportSchemaAsync(target, InvalidSchema(), Options(), new ViewImportOverlay());
+        var forced = await Schemas.ImportSchemaAsync(target, InvalidSchema(), Options(force: true), new ViewImportOverlay());
+        var empty = await Schemas.ImportSchemaAsync(target, new JObject(), Options(), new ViewImportOverlay());
+
+        invalid.Outcome.Should().Be(ViewImportOutcome.Failed);
+        invalid.ErrorCode.Should().Be(ErrorCodes.InvalidSchema);
+        invalid.Message.Should().StartWith("Invalid JSON Schema: ");
+        forced.Should().Be(invalid);
+        empty.Should().Be(Skipped(ErrorCodes.EmptyDocument, "An empty document is not imported; delete the schema to clear it."));
+        (await Schemas.GetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Execution)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ImportSchema_LeavesAnEqualSchemaUnchangedAndSkipKeepsADifferentOne()
+    {
+        const string project = "import-schema-existing";
+        await CreateAsync(project, "sbt.acme");
+        await Schemas.SetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility, Limit(), Creator, false);
+        await Schemas.SetDescendantTypeSchemaAsync(Organization, project, View, "sbt.acme", AnnotationTypeCodes.Context, Limit(), Creator, false);
+        var reordered = JObject.Parse("""{ "properties": { "limit": { "type": "number" } }, "type": "object" }""");
+        var type = TypeSchema(project, AnnotationTypeCodes.Responsibility);
+        var skip = Options(ViewImportExisting.Skip);
+
+        (await Schemas.ImportSchemaAsync(type, reordered, Options(), new ViewImportOverlay())).Should().Be(new ViewImportResult(ViewImportOutcome.Unchanged, 1));
+        (await Schemas.ImportSchemaAsync(type, reordered, skip, new ViewImportOverlay())).Should().Be(new ViewImportResult(ViewImportOutcome.Unchanged, 1));
+
+        var skipped = await Schemas.ImportSchemaAsync(type, Name(), skip, new ViewImportOverlay());
+        var descendant = await Schemas.ImportSchemaAsync(DescendantSchema(project, "sbt.acme", AnnotationTypeCodes.Context), Name(), skip, new ViewImportOverlay());
+        var created = await Schemas.ImportSchemaAsync(AnnotationSchema(project, "sbt.acme"), Name(), skip, new ViewImportOverlay());
+
+        skipped.Should().Be(Skipped(ErrorCodes.DocumentExists, "The view has a different type schema rst, and Skip keeps it."));
+        descendant.Should().Be(Skipped(ErrorCodes.DocumentExists, "The view has a different cnt schema below sbt.acme, and Skip keeps it."));
+        created.Should().Be(new ViewImportResult(ViewImportOutcome.Created, 1));
+
+        var updated = await Schemas.ImportSchemaAsync(type, Name(), Options(), new ViewImportOverlay());
+
+        updated.Should().Be(new ViewImportResult(ViewImportOutcome.Updated, 2));
+        var stored = await Schemas.GetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility);
+        JToken.DeepEquals(stored!.Content, Name()).Should().BeTrue("an import replaces the schema");
+        stored.Modified.By.Should().Be(Importer);
+    }
+
+    [Fact]
+    public async Task ImportSchema_PassesAViolationThatTheArchiveFixes()
+    {
+        const string project = "import-schema-fixed";
+        string[] keys = ["rst.fix-a", "rst.fix-b", "rst.fix-c"];
+        await CreateAsync(project, keys);
+
+        foreach (var key in keys)
+        {
+            await Configurations.CreateOrUpdateConfigurationAsync(Key(key, project), JObject.Parse("""{ "limit": "high" }"""), Creator);
+        }
+
+        await Annotations.DeleteAnnotationAsync(Key("rst.fix-c", project));
+        var target = TypeSchema(project, AnnotationTypeCodes.Responsibility);
+
+        // the stored documents violate it, the hidden one of the deleted annotation too, as on a save
+        var alone = await Schemas.ImportSchemaAsync(target, Limit(), Options(), new ViewImportOverlay());
+
+        alone.Should().Be(new ViewImportResult(
+            ViewImportOutcome.Failed,
+            ErrorCode: ErrorCodes.SchemaViolation,
+            Message: "The configurations of rst.fix-a, rst.fix-b, rst.fix-c violate this schema."));
+        (await Schemas.GetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility)).Should().BeNull();
+
+        // the archive replaces two of them, one through its directives, and re-creates the deleted annotation, which
+        // empties its configuration
+        var overlay = new ViewImportOverlay();
+        overlay.SetConfiguration(AnnotationKey.Parse("rst.fix-a"), JObject.Parse("""{ "limit": 1 }"""));
+        overlay.SetConfiguration(AnnotationKey.Parse("rst.fix-b"), JObject.Parse("""{ "limit": "high", "owner": "ops", "$remove": ["$.limit"] }"""));
+        overlay.AddActiveAnnotation(AnnotationKey.Parse("rst.fix-c"), isRecreated: true);
+
+        var result = await Schemas.ImportSchemaAsync(target, Limit(), Options(), overlay);
+
+        result.Should().Be(new ViewImportResult(ViewImportOutcome.Created, 1));
+        var stored = await Schemas.GetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility);
+        JToken.DeepEquals(stored!.Content, Limit()).Should().BeTrue();
+        stored.Modified.By.Should().Be(Importer);
+        overlay.Configurations["rst.fix-b"].Should().ContainKey("$remove", "the check works on a copy");
+    }
+
+    [Fact]
+    public async Task ImportSchema_FailsAViolationTheArchiveLeavesAndForceWritesItWithAWarning()
+    {
+        const string project = "import-schema-forced";
+        await CreateAsync(project, "rst.left", "rst.right");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.left", project), JObject.Parse("""{ "limit": "high" }"""), Creator);
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.right", project), JObject.Parse("""{ "limit": "low" }"""), Creator);
+        var overlay = new ViewImportOverlay();
+        overlay.SetConfiguration(AnnotationKey.Parse("rst.right"), JObject.Parse("""{ "limit": 2 }"""));
+        var target = TypeSchema(project, AnnotationTypeCodes.Responsibility);
+        var warning = new ViewImportWarning
+        {
+            Code = ErrorCodes.SchemaViolation,
+            Message = "Force stores this schema although the configuration of rst.left violates it.",
+        };
+
+        var failed = await Schemas.ImportSchemaAsync(target, Limit(), Options(), overlay);
+        var checkedForce = await Schemas.ImportSchemaAsync(target, Limit(), Options(dryRun: true, force: true), overlay);
+
+        failed.Should().Be(new ViewImportResult(
+            ViewImportOutcome.Failed,
+            ErrorCode: ErrorCodes.SchemaViolation,
+            Message: "The configuration of rst.left violates this schema."));
+        checkedForce.Outcome.Should().Be(ViewImportOutcome.Created);
+        checkedForce.Version.Should().BeNull();
+        checkedForce.Warnings.Should().Equal(warning);
+        (await Schemas.GetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility)).Should().BeNull();
+
+        var forced = await Schemas.ImportSchemaAsync(target, Limit(), Options(force: true), overlay);
+
+        forced.Outcome.Should().Be(ViewImportOutcome.Created);
+        forced.Version.Should().Be(1UL);
+        forced.Warnings.Should().Equal(warning);
+        var stored = await Schemas.GetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility);
+        JToken.DeepEquals(stored!.Content, Limit()).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ImportSchema_ChecksTheConfigurationsOfNewAnnotationsInTheOverlay()
+    {
+        const string project = "import-schema-new";
+        var overlay = new ViewImportOverlay();
+
+        foreach (var key in new[] { "rst.fresh", "sbt.acme", "exe.acme.billing.prod", "exe.other.billing.prod" })
+        {
+            overlay.AddActiveAnnotation(AnnotationKey.Parse(key));
+        }
+
+        overlay.SetConfiguration(AnnotationKey.Parse("rst.fresh"), JObject.Parse("""{ "limit": "high" }"""));
+        overlay.SetConfiguration(AnnotationKey.Parse("exe.acme.billing.prod"), JObject.Parse("""{ "limit": "high" }"""));
+        overlay.SetConfiguration(AnnotationKey.Parse("exe.other.billing.prod"), JObject.Parse("""{ "limit": "high" }"""));
+
+        // a dry run: none of the annotations is stored
+        var annotation = await Schemas.ImportSchemaAsync(AnnotationSchema(project, "rst.fresh"), Limit(), Options(dryRun: true), overlay);
+        var descendant = await Schemas.ImportSchemaAsync(DescendantSchema(project, "sbt.acme", AnnotationTypeCodes.Execution), Limit(), Options(dryRun: true), overlay);
+
+        annotation.Should().Be(new ViewImportResult(
+            ViewImportOutcome.Failed,
+            ErrorCode: ErrorCodes.SchemaViolation,
+            Message: "The configuration of rst.fresh violates this schema."));
+        descendant.Should().Be(new ViewImportResult(
+            ViewImportOutcome.Failed,
+            ErrorCode: ErrorCodes.SchemaViolation,
+            Message: "The configuration of exe.acme.billing.prod violates this schema."));
+    }
+
+    [Fact]
+    public async Task ImportSchema_ListsAtMostTwentyNonCompliantKeys()
+    {
+        const string project = "import-schema-many";
+        var overlay = new ViewImportOverlay();
+        var keys = Enumerable.Range(1, 25).Select(index => $"rst.k{index:D2}").ToList();
+
+        foreach (var key in keys)
+        {
+            overlay.AddActiveAnnotation(AnnotationKey.Parse(key));
+            overlay.SetConfiguration(AnnotationKey.Parse(key), JObject.Parse("""{ "limit": "high" }"""));
+        }
+
+        var result = await Schemas.ImportSchemaAsync(TypeSchema(project, AnnotationTypeCodes.Responsibility), Limit(), Options(dryRun: true), overlay);
+
+        result.Outcome.Should().Be(ViewImportOutcome.Failed);
+        result.Message.Should().Be($"The configurations of {string.Join(", ", keys.Take(20))} … and 5 more violate this schema.");
+    }
+
+    [Fact]
+    public async Task ImportSchema_TakesTheOtherLayersFromTheArchive()
+    {
+        const string project = "import-schema-layers";
+        await CreateAsync(project, "rst.layer");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.layer", project), JObject.Parse("""{ "limit": 5 }"""), Creator);
+        await Schemas.SetAnnotationSchemaAsync(Organization, project, View, "rst.layer", Maximum(3), Creator, force: true);
+        var target = TypeSchema(project, AnnotationTypeCodes.Responsibility);
+
+        // the stored schema of the annotation is violated already
+        (await Schemas.ImportSchemaAsync(target, Limit(), Options(), new ViewImportOverlay())).ErrorCode.Should().Be(ErrorCodes.SchemaViolation);
+
+        // an invalid schema of the archive is not written, so the stored one stays
+        var invalid = new ViewImportOverlay();
+        invalid.SetSchema(SchemaKey.ForAnnotation("rst.layer"), InvalidSchema());
+        (await Schemas.ImportSchemaAsync(target, Limit(), Options(), invalid)).ErrorCode.Should().Be(ErrorCodes.SchemaViolation);
+
+        // the archive relaxes it
+        var overlay = new ViewImportOverlay();
+        overlay.SetSchema(SchemaKey.ForAnnotation("rst.layer"), Maximum(10));
+
+        (await Schemas.ImportSchemaAsync(target, Limit(), Options(), overlay)).Should().Be(new ViewImportResult(ViewImportOutcome.Created, 1));
+    }
+
+    [Fact]
+    public async Task ImportSchema_DryRunWritesNothing()
+    {
+        const string project = "import-schema-dry-run";
+        await CreateAsync(project, "rst.dry");
+        await Schemas.SetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Execution, Limit(), Creator, false);
+        var options = Options(dryRun: true);
+
+        var updated = await Schemas.ImportSchemaAsync(TypeSchema(project, AnnotationTypeCodes.Execution), Name(), options, new ViewImportOverlay());
+        var created = await Schemas.ImportSchemaAsync(AnnotationSchema(project, "rst.dry"), Limit(), options, new ViewImportOverlay());
+
+        updated.Should().Be(new ViewImportResult(ViewImportOutcome.Updated));
+        created.Should().Be(new ViewImportResult(ViewImportOutcome.Created));
+        (await Schemas.GetSchemaVersionsAsync(Organization, project, View, AnnotationTypeCodes.Execution)).Select(version => version.Version).Should().Equal(1u);
+        JToken.DeepEquals((await Schemas.GetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Execution))!.Content, Limit()).Should().BeTrue();
+        (await Schemas.GetAnnotationSchemaAsync(Organization, project, View, "rst.dry")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ImportSchema_SkipsTheSchemasOfAnnotationsThatAreNotActive()
+    {
+        const string project = "import-schema-annotations";
+        await CreateAsync(project, "rst.gone");
+        await Annotations.DeleteAnnotationAsync(Key("rst.gone", project));
+        var overlay = new ViewImportOverlay();
+        overlay.AddFailedAnnotation(AnnotationKey.Parse("rst.failed"));
+        overlay.AddActiveAnnotation(AnnotationKey.Parse("sbt.coming"));
+
+        var missing = await Schemas.ImportSchemaAsync(AnnotationSchema(project, "rst.ghost"), Limit(), Options(), overlay);
+        var below = await Schemas.ImportSchemaAsync(DescendantSchema(project, "sbt.ghost", AnnotationTypeCodes.Context), Limit(), Options(), overlay);
+        var deleted = await Schemas.ImportSchemaAsync(AnnotationSchema(project, "rst.gone"), Limit(), Options(), overlay);
+        var failed = await Schemas.ImportSchemaAsync(AnnotationSchema(project, "rst.failed"), Limit(), Options(), overlay);
+        var invalidKey = await Schemas.ImportSchemaAsync(DescendantSchema(project, "rst.gone", AnnotationTypeCodes.Subject), Limit(), Options(), overlay);
+
+        // the overlay's annotation counts as active, which matters in a dry run
+        var coming = await Schemas.ImportSchemaAsync(DescendantSchema(project, "sbt.coming", AnnotationTypeCodes.Context), Limit(), Options(dryRun: true), overlay);
+
+        // a type schema has no annotation
+        var type = await Schemas.ImportSchemaAsync(TypeSchema(project, AnnotationTypeCodes.Context), Limit(), Options(), overlay);
+
+        missing.Should().Be(Skipped(ErrorCodes.AnnotationNotFound, $"The view {View} has no annotation rst.ghost."));
+        below.Should().Be(Skipped(ErrorCodes.AnnotationNotFound, $"The view {View} has no annotation sbt.ghost."));
+        deleted.Should().Be(Skipped(ErrorCodes.AnnotationDeleted, "The annotation rst.gone is deleted; restore it before importing its schemas."));
+        failed.Should().Be(Skipped(ErrorCodes.DependencyFailed, "The annotation rst.failed failed in this import."));
+        invalidKey.Should().Be(new ViewImportResult(
+            ViewImportOutcome.Failed,
+            ErrorCode: ErrorCodes.InvalidKey,
+            Message: "The type sbt cannot descend from rst.gone, so it has no descendant-type schema there."));
+        coming.Should().Be(new ViewImportResult(ViewImportOutcome.Created));
+        type.Should().Be(new ViewImportResult(ViewImportOutcome.Created, 1));
+
+        (await Schemas.ListSchemasAsync(Organization, project, View)).Select(schema => schema.AnnotationType).Should().Equal(AnnotationTypeCodes.Context);
+    }
+
+    [Fact]
+    public async Task ImportConfiguration_SkipKeepsADifferentDocument()
+    {
+        const string project = "import-config-skip";
+        await CreateAsync(project, "rst.kept", "rst.blank");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.kept", project), JObject.Parse("""{ "a": 1 }"""), Creator);
+        var options = Options(ViewImportExisting.Skip);
+
+        var skipped = await Configurations.ImportConfigurationAsync(Key("rst.kept", project), JObject.Parse("""{ "a": 2 }"""), options, new ViewImportOverlay());
+        var unchanged = await Configurations.ImportConfigurationAsync(Key("rst.kept", project), JObject.Parse("""{ "a": 1 }"""), options, new ViewImportOverlay());
+        var created = await Configurations.ImportConfigurationAsync(Key("rst.blank", project), JObject.Parse("""{ "b": 1 }"""), options, new ViewImportOverlay());
+
+        skipped.Should().Be(Skipped(ErrorCodes.DocumentExists, "The view has a different configuration of rst.kept, and Skip keeps it."));
+        unchanged.Should().Be(new ViewImportResult(ViewImportOutcome.Unchanged, 1));
+        created.Should().Be(new ViewImportResult(ViewImportOutcome.Created, 1));
+        (await Configurations.GetConfigurationVersionsAsync(Key("rst.kept", project))).Select(version => version.Version).Should().Equal(1u);
+    }
+
+    [Fact]
+    public async Task ImportConfiguration_CountsTheAnnotationsOfTheOverlayInADryRun()
+    {
+        const string project = "import-config-overlay";
+        await CreateAsync(project, "rst.recreated", "rst.stored");
+        await Configurations.CreateOrUpdateConfigurationAsync(Key("rst.recreated", project), JObject.Parse("""{ "a": 1 }"""), Creator);
+        await Annotations.DeleteAnnotationAsync(Key("rst.recreated", project));
+        var overlay = new ViewImportOverlay();
+        overlay.AddActiveAnnotation(AnnotationKey.Parse("rst.new"));
+        overlay.AddActiveAnnotation(AnnotationKey.Parse("rst.recreated"), isRecreated: true);
+        overlay.AddFailedAnnotation(AnnotationKey.Parse("rst.failed"));
+        overlay.SetSchema(SchemaKey.ForType(AnnotationTypeCodes.Responsibility), JObject.Parse("""{ "type": "object", "properties": { "a": { "type": "number" } } }"""));
+        var dryRun = Options(dryRun: true);
+
+        var created = await Configurations.ImportConfigurationAsync(Key("rst.new", project), JObject.Parse("""{ "a": 1 }"""), dryRun, overlay);
+
+        // equal to the stored document, but the re-create empties it
+        var recreated = await Configurations.ImportConfigurationAsync(Key("rst.recreated", project), JObject.Parse("""{ "a": 1 }"""), dryRun, overlay);
+        var failed = await Configurations.ImportConfigurationAsync(Key("rst.failed", project), JObject.Parse("""{ "a": 1 }"""), dryRun, overlay);
+
+        // a dry run validates against the schemas of the archive, a real run against the stored ones, which it wrote
+        var violating = await Configurations.ImportConfigurationAsync(Key("rst.stored", project), JObject.Parse("""{ "a": "x" }"""), dryRun, overlay);
+        var written = await Configurations.ImportConfigurationAsync(Key("rst.stored", project), JObject.Parse("""{ "a": "x" }"""), Options(), overlay);
+
+        created.Should().Be(new ViewImportResult(ViewImportOutcome.Created));
+        recreated.Should().Be(new ViewImportResult(ViewImportOutcome.Created));
+        failed.Should().Be(Skipped(ErrorCodes.DependencyFailed, "The annotation rst.failed failed in this import."));
+        violating.Outcome.Should().Be(ViewImportOutcome.Failed);
+        violating.ErrorCode.Should().Be(ErrorCodes.SchemaViolation);
+        written.Should().Be(new ViewImportResult(ViewImportOutcome.Created, 1));
+
+        (await Annotations.ExistAnnotationAsync(Key("rst.new", project))).Should().BeFalse();
+        (await Annotations.GetDeletedAnnotationAsync(Key("rst.recreated", project))).Should().NotBeNull();
+        (await Configurations.HasConfigurationContentAsync(Key("rst.new", project))).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ImportConfiguration_ForcedWriteCarriesAWarning()
+    {
+        const string project = "import-config-force";
+        await CreateAsync(project, "rst.forced");
+        await Schemas.SetSchemaAsync(Organization, project, View, AnnotationTypeCodes.Responsibility, Limit(), Creator, false);
+        var key = Key("rst.forced", project);
+
+        var rejected = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{ "limit": "high" }"""), Options(), new ViewImportOverlay());
+        var checkedForce = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{ "limit": "high" }"""), Options(dryRun: true, force: true), new ViewImportOverlay());
+
+        rejected.Outcome.Should().Be(ViewImportOutcome.Failed);
+        rejected.ErrorCode.Should().Be(ErrorCodes.SchemaViolation);
+        checkedForce.Outcome.Should().Be(ViewImportOutcome.Created);
+        checkedForce.Version.Should().BeNull();
+        (await Configurations.HasConfigurationContentAsync(key)).Should().BeFalse();
+
+        var forced = await Configurations.ImportConfigurationAsync(key, JObject.Parse("""{ "limit": "high" }"""), Options(force: true), new ViewImportOverlay());
+
+        forced.Outcome.Should().Be(ViewImportOutcome.Created);
+        forced.Version.Should().Be(1UL);
+        var warning = forced.Warnings.Should().ContainSingle().Subject;
+        warning.Code.Should().Be(ErrorCodes.SchemaViolation);
+        warning.Message.Should().StartWith("Force stores the document although it violates its schema: ");
+        checkedForce.Warnings.Should().Equal(warning);
+        (await Configurations.GetConfigurationVersionContentAsync(key, 1))!.Content["limit"]!.Value<string>().Should().Be("high");
+    }
+
+    private static ViewImportOptions Options(ViewImportExisting existing = ViewImportExisting.Overwrite, bool dryRun = false, bool force = false)
+    {
+        return new ViewImportOptions { Actor = Importer, Existing = existing, DryRun = dryRun, Force = force };
+    }
+
+    private static ViewSchemaTarget TypeSchema(string project, string annotationType)
+    {
+        return new ViewSchemaTarget(Organization, project, View, ViewDocumentKind.TypeSchema, annotationType, null);
+    }
+
+    private static ViewSchemaTarget AnnotationSchema(string project, string annotationKey)
+    {
+        return new ViewSchemaTarget(Organization, project, View, ViewDocumentKind.AnnotationSchema, null, annotationKey);
+    }
+
+    private static ViewSchemaTarget DescendantSchema(string project, string annotationKey, string annotationType)
+    {
+        return new ViewSchemaTarget(Organization, project, View, ViewDocumentKind.DescendantTypeSchema, annotationType, annotationKey);
+    }
+
+    // "limit" is a number
+    private static JObject Limit()
+    {
+        return JObject.Parse("""{ "type": "object", "properties": { "limit": { "type": "number" } } }""");
+    }
+
+    private static JObject Name()
+    {
+        return JObject.Parse("""{ "type": "object", "properties": { "name": { "type": "string" } } }""");
+    }
+
+    private static JObject Maximum(int maximum)
+    {
+        return new JObject { ["properties"] = new JObject { ["limit"] = new JObject { ["maximum"] = maximum } } };
+    }
+
+    // NJsonSchema cannot resolve the reference
+    private static JObject InvalidSchema()
+    {
+        return JObject.Parse("""{ "$ref": "#/definitions/missing" }""");
     }
 
     private static ViewImportResult Skipped(string errorCode, string message)
