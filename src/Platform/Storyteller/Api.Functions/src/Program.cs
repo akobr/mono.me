@@ -94,8 +94,8 @@ var host = new HostBuilder()
         services.AddHostedService<KeyValueUsageFlushService>();
 
         // Export and import of configurations: jobs in Cosmos DB, archives and the queue in AzureWebJobsStorage
-        services.AddConfigurationTransfers(context.Configuration);
-        services.AddAzureStorageConfigurationTransfers(context.Configuration);
+        services.AddViewTransfers(context.Configuration);
+        services.AddAzureStorageViewTransfers(context.Configuration);
 
         // Add authentication by API keys
         services.AddApiKeyMachineAccess();

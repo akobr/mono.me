@@ -19,14 +19,14 @@ namespace _42.Platform.Storyteller.Api.V1;
 // Export and import of the configurations of a view, as jobs processed in the background (configuration-transfer.md).
 public class ConfigurationTransferHttp
 {
-    private readonly IConfigurationTransferService _transfers;
+    private readonly IViewTransferService _transfers;
     private readonly IAccessService _access;
-    private readonly ConfigurationTransferOptions _options;
+    private readonly ViewTransferOptions _options;
 
     public ConfigurationTransferHttp(
-        IConfigurationTransferService transfers,
+        IViewTransferService transfers,
         IAccessService access,
-        IOptions<ConfigurationTransferOptions> options)
+        IOptions<ViewTransferOptions> options)
     {
         _transfers = transfers;
         _access = access;
@@ -40,8 +40,8 @@ public class ConfigurationTransferHttp
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
-    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(ConfigurationExportCreate), Description = "The format of the archive: Folder (default) or Git.")]
-    [OpenApiResponseWithBody(HttpStatusCode.Accepted, Definitions.ContentTypes.Json, typeof(ConfigurationExport), Description = "The queued export; Location points to it.")]
+    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(ViewExportCreate), Description = "The format of the archive: Folder (default) or Git.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Accepted, Definitions.ContentTypes.Json, typeof(ViewExport), Description = "The queued export; Location points to it.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTransferLimit)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -49,7 +49,7 @@ public class ConfigurationTransferHttp
     public async Task<IActionResult> StartConfigurationExport(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Configuration.V1.Exports)]
         HttpRequestData request,
-        [FromBody] ConfigurationExportCreate? model,
+        [FromBody] ViewExportCreate? model,
         string organization,
         string project,
         string view)
@@ -57,7 +57,7 @@ public class ConfigurationTransferHttp
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project);
 
-        var format = model?.Format ?? ConfigurationArchiveFormat.Folder;
+        var format = model?.Format ?? ViewArchiveFormat.Folder;
 
         if (!Enum.IsDefined(format))
         {
@@ -83,7 +83,7 @@ public class ConfigurationTransferHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdExport)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationExport), Description = "The export.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ViewExport), Description = "The export.")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The export doesn't exist in this view, or has expired.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -142,7 +142,7 @@ public class ConfigurationTransferHttp
     [OpenApiParameter(Definitions.Parameters.DryRun, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "When true, validate and compare only; nothing is written.")]
     [OpenApiParameter(Definitions.Parameters.FileName, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "The name of the uploaded file, for display.")]
     [OpenApiRequestBody(Definitions.ContentTypes.Zip, typeof(byte[]), Required = true, Description = "The zip archive.")]
-    [OpenApiResponseWithBody(HttpStatusCode.Accepted, Definitions.ContentTypes.Json, typeof(ConfigurationImport), Description = "The queued import; Location points to it.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Accepted, Definitions.ContentTypes.Json, typeof(ViewImport), Description = "The queued import; Location points to it.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The body is not a zip, or breaks a limit of the archive (InvalidArchive).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTransferLimit)]
     [OpenApiResponseWithBody(HttpStatusCode.RequestEntityTooLarge, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The archive is larger than allowed (ArchiveTooLarge).")]
@@ -204,7 +204,7 @@ public class ConfigurationTransferHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdImport)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationImport), Description = "The import.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ViewImport), Description = "The import.")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The import doesn't exist in this view, or has expired.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]

@@ -63,16 +63,25 @@ public static class ErrorCodes
     public const string PolicyVersionMismatch = "PolicyVersionMismatch";
     public const string InvalidQuery = "InvalidQuery";
     public const string AnnotationInactive = "AnnotationInactive";
-    // Export and import of configurations: errors of the requests.
+
+    // Export and import of a view: errors of the requests.
     public const string TransferNotReady = "TransferNotReady";
     public const string TransferLimit = "TransferLimit";
     public const string InvalidArchive = "InvalidArchive";
     public const string ArchiveTooLarge = "ArchiveTooLarge";
 
-    // Export and import of configurations: outcomes of single files in an import.
+    // Export and import of a view: outcomes of single files in an import (SchemaViolation is a warning on a
+    // forced write).
     public const string AnnotationNotFound = "AnnotationNotFound";
     public const string EmptyDocument = "EmptyDocument";
     public const string InvalidDocument = "InvalidDocument";
     public const string DuplicateFile = "DuplicateFile";
     public const string SchemaViolation = "SchemaViolation";
+    public const string DocumentExists = "DocumentExists";
+    public const string DependencyFailed = "DependencyFailed";
+    public const string InvalidSchema = "InvalidSchema";
+
+    // Export and import of a view: warnings of written documents.
+    public const string AncestorCreated = "AncestorCreated";
+    public const string AnnotationRecreated = "AnnotationRecreated";
 }

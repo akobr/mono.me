@@ -63,7 +63,7 @@ public interface IConfigurationService
 
     // Replaces the annotation's own document with the given one as a new version, unless it is equal (an import).
     // A missing or deleted annotation and an empty document are skipped; a schema violation fails unless forced.
-    Task<ConfigurationImportResult> ImportConfigurationAsync(
+    Task<ViewImportResult> ImportConfigurationAsync(
         FullKey key,
         JObject content,
         AuditActor actor,
