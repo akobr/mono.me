@@ -215,8 +215,15 @@ test('sets up a customer key with the BYOK wizard', async ({ page }) => {
   await expect(page.getByText('Healthy').first()).toBeVisible()
 })
 
-test('filters the audit trail and shows the usage', async ({ page }) => {
-  await openApp(page, '/acme/billing/audit')
+// Usage and Audit are the tabs of the Monitor page (424-35).
+test('shows the usage and filters the audit trail on the Monitor page', async ({ page }) => {
+  await openApp(page, '/acme/billing/monitor')
+  await expect(page.getByRole('tab', { name: 'Usage' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByText('Standard keys (key-months)').first()).toBeVisible()
+  await expect(page.getByText('Estimated charges')).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Audit' }).click()
+  await expect(page).toHaveURL(/[?&]tab=audit/)
   await expect(page.getByText('Reveal').first()).toBeVisible()
   await expect(page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Reveal', exact: true }) })).toContainText('Grace Hopper')
   await expect(page.getByRole('row').filter({ hasText: 'BindingRead' })).toContainText('machine:mach-billing-sync')
@@ -225,7 +232,7 @@ test('filters the audit trail and shows the usage', async ({ page }) => {
   await expect(page.getByRole('row').filter({ hasText: 'Rotate' })).toHaveCount(1)
   await expect(page.getByRole('row').filter({ hasText: 'Reveal' })).toHaveCount(0)
 
-  await goto(page, '/acme/billing/usage')
-  await expect(page.getByText('Standard keys (key-months)').first()).toBeVisible()
+  await page.getByRole('tab', { name: 'Usage' }).click()
+  await expect(page).not.toHaveURL(/tab=/)
   await expect(page.getByText('Estimated charges')).toBeVisible()
 })

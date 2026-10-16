@@ -70,6 +70,8 @@ describe('context paths', () => {
       '/acme/shipping/default/configurations',
     )
     expect(projectTarget('/acme/billing/machines', 'acme', 'shipping')).toBe('/acme/shipping/machines')
+    expect(currentSection('/acme/billing/monitor')).toEqual({ kind: 'project', name: 'monitor' })
+    expect(projectTarget('/acme/billing/monitor', 'acme', 'shipping')).toBe('/acme/shipping/monitor')
     expect(projectTarget('/acme', 'acme', 'shipping')).toBe('/acme/shipping/default/annotations')
     expect(viewTarget('/acme/billing/default/graph/rst.x', 'acme', 'billing', 'staging')).toBe(
       '/acme/billing/staging/graph',

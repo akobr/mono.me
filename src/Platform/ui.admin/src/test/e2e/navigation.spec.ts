@@ -89,6 +89,8 @@ const movedPages: { from: string; to: string; section?: string }[] = [
     section: '#shared-certificates',
   },
   { from: '/acme/billing/secrets', to: '/acme/billing/settings#secrets', section: '#secrets' },
+  { from: '/acme/billing/audit', to: '/acme/billing/monitor?tab=audit' },
+  { from: '/acme/billing/usage', to: '/acme/billing/monitor' },
 ]
 
 for (const moved of movedPages) {
