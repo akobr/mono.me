@@ -309,7 +309,7 @@ async function downloadCa() {
           />
         </UCard>
 
-        <section id="secrets" class="scroll-mt-4 space-y-6">
+        <section id="secrets" tabindex="-1" class="scroll-mt-4 space-y-6 outline-none">
           <div class="space-y-1">
             <h2 class="text-xs font-semibold text-muted uppercase">Secrets</h2>
             <p class="text-sm text-muted">

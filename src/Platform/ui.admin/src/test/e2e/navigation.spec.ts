@@ -132,7 +132,9 @@ for (const moved of movedPages) {
       })
       .toBe(moved.to)
     if (moved.section) {
+      // Keyboard and screen-reader users continue from the section, as after a followed anchor.
       await expect(page.locator(moved.section)).toBeInViewport()
+      await expect(page.locator(moved.section)).toBeFocused()
     }
   })
 }
