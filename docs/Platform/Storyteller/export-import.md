@@ -539,8 +539,8 @@ What the import options do is described under [Import](#import), in [Options](#o
 
 The checks run in this order, and the first failure answers:
 
-- `StartViewExport`: the body (`400`), the scopes (`403`), the role (`403`, or `401` for a machine), the job limit (`409`).
-- `StartViewImport`: `include` and `existing` (`400 InvalidQuery`), the scopes (`403`), the role (`403`, or `401` for a machine), the size (`413`), the zip signature (`400 InvalidArchive`), the job limit (`409`), the central directory (`400 InvalidArchive`).
+- `StartViewExport`: the body (`400`), the credentials (`401`), the scopes (`403`), the role (`403`, or `401` for a machine), the job limit (`409`).
+- `StartViewImport`: `include` and `existing` (`400 InvalidQuery`), the credentials (`401`), the scopes (`403`), the role (`403`, or `401` for a machine), the size (`413`), the zip signature (`400 InvalidArchive`), the job limit (`409`), the central directory (`400 InvalidArchive`).
 - The reads: the role, the job (`404`), and then the scopes of its `Include` (`403`). The download then checks the state (`409 TransferNotReady`) and opens the archive (`404`).
 
 ### Access
@@ -556,7 +556,7 @@ The roles stay as in the first spec: any role on the project to export and to re
 - **Reading a job**, or downloading the archive of an export, needs the scopes of the job's stored `Include`, not of the request: the read scopes for an export, the write scopes for an import. A job without a stored `Include` counts as all four kinds. So polling an import needs the write scopes of its kinds too.
   - The role is checked first. Then the job is read (`404`), and its scopes are checked (`403`).
   - The archive is not opened, and the job's state not told, before the scopes pass.
-- **A missing scope** throws `AccessDeniedException`, which answers `403` with the error code `AccessDenied`. `401` stays for missing or invalid credentials. (In the first spec, a missing scope answered `401`.) The message has one sentence per rule that fails, and names the kinds, the scopes that would allow them, and `include`:
+- **A missing scope** throws `AccessDeniedException`, which answers `403` with the error code `AccessDenied`. `401` stays for missing or invalid credentials: a request without credentials (no claims) gets `401` before its scopes are checked, so it is never told to change `include`, and clients sign in again. (In the first spec, a missing scope answered `401`.) The message has one sentence per rule that fails, and names the kinds, the scopes that would allow them, and `include`:
 
   | Case | Message |
   | --- | --- |
@@ -581,7 +581,7 @@ The document publishes the five operations with the tag `Transfers`, each with i
 The document is `open.api.v0.9.21.json`, in `Sdk.NSwag` and `sdk.typescript`:
 
 - The C# SDK has `ITransfersApiClient` (`TransfersApiClient`, registered by `AddStorytellerSdk`): `StartViewExportAsync`, `GetViewExportAsync`, `GetViewExportArchiveAsync` (a `FileResponse`), `StartViewImportAsync(…, IEnumerable<ViewArchiveContent> include, ViewImportExisting? existing, bool? force, bool? dryRun, string fileName, Stream body)` and `GetViewImportAsync`. It sends `include` comma-separated.
-- The TypeScript SDK has the `transfers` tag: `startViewExport`, `getViewExport`, `getViewExportArchive` (a `Blob`), `startViewImport(…, file, { include, existing, force, dryRun, fileName })` and `getViewImport`, with their Vue Query composables, Zod schemas and MSW handlers. `include` goes comma-separated (`include=Annotations%2CTemplates`).
+- The TypeScript SDK has the `transfers` tag: `startViewExport`, `getViewExport`, `getViewExportArchive` (a `Blob`), `startViewImport(…, file, { include, existing, force, dryRun, fileName })` and `getViewImport`, with their Vue Query composables, Zod schemas and MSW handlers (`getTransfersMock()`, part of `getStorytellerMock()` in the `./msw` entry). `include` goes comma-separated (`include=Annotations%2CTemplates`).
 
 ### Background functions
 

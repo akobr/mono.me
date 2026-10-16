@@ -6,6 +6,7 @@ import { getConfigurationsMock } from './generated/vue-query/configurations/conf
 import { getKeyValuesMock } from './generated/vue-query/key-values/key-values.msw'
 import { getSchemasMock } from './generated/vue-query/schemas/schemas.msw'
 import { getTemplatesMock } from './generated/vue-query/templates/templates.msw'
+import { getTransfersMock } from './generated/vue-query/transfers/transfers.msw'
 
 export * from './generated/vue-query/access/access.msw'
 export * from './generated/vue-query/annotations/annotations.msw'
@@ -13,6 +14,7 @@ export * from './generated/vue-query/configurations/configurations.msw'
 export * from './generated/vue-query/key-values/key-values.msw'
 export * from './generated/vue-query/schemas/schemas.msw'
 export * from './generated/vue-query/templates/templates.msw'
+export * from './generated/vue-query/transfers/transfers.msw'
 
 /** Every generated handler; prepend your own handlers to override single operations. */
 export const getStorytellerMock = () => [
@@ -22,4 +24,5 @@ export const getStorytellerMock = () => [
   ...getKeyValuesMock(),
   ...getSchemasMock(),
   ...getTemplatesMock(),
+  ...getTransfersMock(),
 ]

@@ -16,6 +16,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
@@ -390,6 +391,47 @@ public class ViewTransferHttpTests
         exception.Message.ShouldBe("Missing scope for annotations in the include of this import: reading it needs Annotation.ReadWrite or Default.ReadWrite.");
     }
 
+    // Without credentials there are no scopes to check: 401 (SecurityTokenException), as on every route and as in the
+    // first spec, never a 403 that asks the caller to change include. Clients sign in again only on a 401.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("""{ "Include": [ "Configurations" ] }""")]
+    public async Task StartExport_WithoutCredentials_IsUnauthorized(string? body)
+    {
+        var request = body is null ? Request(isAnonymous: true) : Request(body, isAnonymous: true);
+
+        await Should.ThrowAsync<SecurityTokenException>(() => Http(checksScopes: true).StartViewExport(request, "acme", "web", "default"));
+
+        _transfers.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("include=configurations")]
+    public async Task StartImport_WithoutCredentials_IsUnauthorized(string? query)
+    {
+        var request = Request(EmptyZip(), query: query, isAnonymous: true);
+
+        await Should.ThrowAsync<SecurityTokenException>(() => Http(checksScopes: true).StartViewImport(request, "acme", "web", "default"));
+
+        _transfers.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task GetJobs_WithoutCredentials_AreUnauthorized()
+    {
+        var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, [ViewArchiveContent.Configurations], AuditActor.System);
+        var import = _transfers.AddImport("acme", "web", "default", [ViewArchiveContent.Configurations]);
+        _transfers.Calls.Clear();
+        var http = Http(checksScopes: true);
+
+        await Should.ThrowAsync<SecurityTokenException>(() => http.GetViewExport(Request(isAnonymous: true), "acme", "web", "default", export.Id));
+        await Should.ThrowAsync<SecurityTokenException>(() => http.GetViewExportArchive(Request(isAnonymous: true), "acme", "web", "default", export.Id));
+        await Should.ThrowAsync<SecurityTokenException>(() => http.GetViewImport(Request(isAnonymous: true), "acme", "web", "default", import.Id));
+
+        _transfers.Calls.ShouldBeEmpty("an anonymous download never opens the archive");
+    }
+
     // Debug builds (DEV_AUTH) skip the scope checks like every other route; a Release build enforces them.
     [Fact]
     public async Task Scopes_AreCheckedUnlessDevelopmentAuthentication()
@@ -520,26 +562,33 @@ public class ViewTransferHttpTests
         return stream.ToArray();
     }
 
-    private static TestHttpRequestData Request(string body, string? url = null, string scopes = AllScopes)
+    private static TestHttpRequestData Request(string body, string? url = null, string scopes = AllScopes, bool isAnonymous = false)
     {
-        return Request(Encoding.UTF8.GetBytes(body), url, scopes: scopes);
+        return Request(Encoding.UTF8.GetBytes(body), url, scopes: scopes, isAnonymous: isAnonymous);
     }
 
     // A user with the given scp; a machine carries them as roles, like the machine validators. The query is parsed as
-    // HttpRequestData.Query parses it, so a repeated parameter is joined by commas.
+    // HttpRequestData.Query parses it, so a repeated parameter is joined by commas. An anonymous request has no claims,
+    // as one without credentials leaves the authentication middlewares.
     private static TestHttpRequestData Request(
         byte[]? body = null,
         string? url = null,
         Dictionary<string, string>? headers = null,
         string scopes = AllScopes,
         bool machine = false,
-        string? query = null)
+        string? query = null,
+        bool isAnonymous = false)
     {
         var services = new ServiceCollection().BuildServiceProvider();
         var context = new TestFunctionContext(services);
         var request = new TestHttpRequestData(context, headers, "POST", bodyBytes: body, url: url is null ? null : new Uri(url));
         ((TestInvocationFeatures)context.Features).Set<IHttpRequestDataFeature>(new TestHttpRequestFeature(request));
         request.Query.Add(HttpUtility.ParseQueryString(query ?? string.Empty));
+
+        if (isAnonymous)
+        {
+            return request;
+        }
 
         var claims = new List<Claim> { new("sub", machine ? "machine_01" : "user_01") };
         claims.AddRange(machine
