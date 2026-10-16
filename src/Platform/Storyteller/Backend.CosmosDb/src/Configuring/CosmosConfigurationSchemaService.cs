@@ -20,7 +20,7 @@ using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
 namespace _42.Platform.Storyteller.Configuring;
 
-public class CosmosConfigurationSchemaService : IConfigurationSchemaService
+public partial class CosmosConfigurationSchemaService : IConfigurationSchemaService
 {
     private const string SchemaPartitionSuffix = "schema";
     private const int MaxRetries = 3;
@@ -180,9 +180,12 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         return await ResolveCombinedAsync(repository, partitionKey, view, parsedKey, schemaOverride: null);
     }
 
-    public async Task ValidateContentAsync(string organization, string project, string view, string annotationKey, JObject content)
+    public async Task ValidateContentAsync(string organization, string project, string view, string annotationKey, JObject content, ViewImportOverlay? overlay = null)
     {
-        var combined = await GetCombinedSchemaAsync(organization, project, view, annotationKey);
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var partitionKey = new PartitionKey(GetSchemaPartitionKey(project));
+        var overlayLayers = overlay is null ? null : new OverlaySchemaLayers(overlay.Schemas, AuditStamp.Of(AuditActor.System, _timeProvider.GetUtcNow()));
+        var combined = await ResolveCombinedAsync(repository, partitionKey, view, AnnotationKey.Parse(annotationKey), schemaOverride: null, overlayLayers: overlayLayers);
 
         if (combined is null)
         {
@@ -427,6 +430,8 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         return entity?.ToConfigurationSchema(identity.ModelType, identity.ModelKey);
     }
 
+    // isChecked: the caller (an import) has already validated the schema and checked the compliance of the
+    // configurations, so the write does not repeat it.
     private async Task<ConfigurationSchema> SaveAsync(
         string organization,
         string project,
@@ -434,9 +439,14 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         SchemaIdentity identity,
         JObject schemaContent,
         AuditActor actor,
-        bool force)
+        bool force,
+        bool isChecked = false)
     {
-        await EnsureValidSchemaAsync(schemaContent);
+        if (!isChecked)
+        {
+            await EnsureValidSchemaAsync(schemaContent);
+        }
+
         var modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow());
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
@@ -453,26 +463,16 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
                 return existing.ToConfigurationSchema(identity.ModelType, identity.ModelKey);
             }
 
-            var errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, schemaContent, modified);
-
-            if (errors.Count > 0 && !force)
+            if (!isChecked)
             {
-                throw new SchemaValidationException(errors);
-            }
+                var errors = await CollectComplianceErrorsAsync(repository, partitionKey, project, view, identity, schemaContent, modified);
 
-            if (errors.Count > 0)
-            {
-                foreach (var error in errors)
+                if (errors.Count > 0 && !force)
                 {
-                    _logger.LogWarning(
-                        "Schema compliance bypassed with force for {SchemaId} in {Organization}/{Project}/{View}. {AnnotationKey}: {Errors}",
-                        identity.CurrentId,
-                        organization,
-                        project,
-                        view,
-                        error.AnnotationKey,
-                        string.Join("; ", error.Errors));
+                    throw new SchemaValidationException(errors);
                 }
+
+                LogForcedViolations(organization, project, view, identity, errors);
             }
 
             var version = existing is null
@@ -515,6 +515,22 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         }
 
         throw new SchemaConcurrencyException(project, view, identity.CurrentId, MaxRetries);
+    }
+
+    // A forced write of a schema that configurations violate is logged per configuration.
+    private void LogForcedViolations(string organization, string project, string view, SchemaIdentity identity, IReadOnlyList<SchemaValidationError> errors)
+    {
+        foreach (var error in errors)
+        {
+            _logger.LogWarning(
+                "Schema compliance bypassed with force for {SchemaId} in {Organization}/{Project}/{View}. {AnnotationKey}: {Errors}",
+                identity.CurrentId,
+                organization,
+                project,
+                view,
+                error.AnnotationKey,
+                string.Join("; ", error.Errors));
+        }
     }
 
     private async Task<bool> DeleteAsync(string organization, string project, string view, SchemaIdentity identity)
@@ -617,6 +633,10 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
             toErrorMessage);
     }
 
+    // The stored configurations the schema affects, validated with it in place of the stored one. With an overlay (an
+    // import), they are checked as the import leaves them: an own document of the archive replaces the stored one, the
+    // re-create of an annotation empties its stored one, the archive's documents of keys without a stored one are
+    // checked too, and the other layers are taken from the archive where it brings them.
     private async Task<IReadOnlyList<SchemaValidationError>> CollectComplianceErrorsAsync(
         IContainerRepository repository,
         PartitionKey partitionKey,
@@ -624,9 +644,12 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         string view,
         SchemaIdentity identity,
         JObject schemaContent,
-        AuditStamp modified)
+        AuditStamp modified,
+        ViewImportOverlay? overlay = null)
     {
-        var schemaOverride = new SchemaOverride(identity.Kind, identity.ModelType, identity.Kind == SchemaKind.Type ? null : identity.ModelKey, schemaContent, modified);
+        var schemaOverride = new SchemaOverride(identity, schemaContent, modified);
+        var overlayLayers = overlay is null ? null : new OverlaySchemaLayers(overlay.Schemas, modified);
+        var imported = overlay is null ? [] : await ReadImportedConfigurationsAsync(overlay, identity);
         var errors = new List<SchemaValidationError>();
         var layerCache = new Dictionary<string, ConfigurationSchemaEntity?>();
         var feed = QueryAffectedConfigurations(repository.Container, project, view, identity);
@@ -637,40 +660,60 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
 
             foreach (var configEntity in results)
             {
-                if (!configEntity.Content.HasValues)
-                {
-                    continue;
-                }
-
                 if (identity.Kind == SchemaKind.Descendant
                     && !IsDescendantOf(configEntity.AnnotationKey, identity.ModelKey!, identity.ModelType!))
                 {
                     continue;
                 }
 
-                var configKey = AnnotationKey.Parse(configEntity.AnnotationKey);
-                var combined = await ResolveCombinedAsync(repository, partitionKey, view, configKey, schemaOverride, layerCache);
+                var content = configEntity.Content;
 
-                if (combined is null)
+                if (imported.Remove(configEntity.AnnotationKey, out var document))
+                {
+                    content = document;
+                }
+                else if (overlay?.RecreatedAnnotations.Contains(configEntity.AnnotationKey) == true)
                 {
                     continue;
                 }
 
-                var messages = await ValidateAgainstSchemaAsync(configEntity.Content, combined.MergedContent);
-
-                if (messages.Count > 0)
-                {
-                    errors.Add(new SchemaValidationError
-                    {
-                        AnnotationKey = configEntity.AnnotationKey,
-                        ViewName = configEntity.ViewName,
-                        Errors = messages,
-                    });
-                }
+                await CheckAsync(configEntity.AnnotationKey, configEntity.ViewName, content);
             }
         }
 
+        foreach (var (annotationKey, document) in imported.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            await CheckAsync(annotationKey, view, document);
+        }
+
         return errors;
+
+        async Task CheckAsync(string annotationKey, string viewName, JObject content)
+        {
+            if (!content.HasValues)
+            {
+                return;
+            }
+
+            var combined = await ResolveCombinedAsync(repository, partitionKey, view, AnnotationKey.Parse(annotationKey), schemaOverride, layerCache, overlayLayers);
+
+            if (combined is null)
+            {
+                return;
+            }
+
+            var messages = await ValidateAgainstSchemaAsync(content, combined.MergedContent);
+
+            if (messages.Count > 0)
+            {
+                errors.Add(new SchemaValidationError
+                {
+                    AnnotationKey = annotationKey,
+                    ViewName = viewName,
+                    Errors = messages,
+                });
+            }
+        }
     }
 
     private async Task<CombinedConfigurationSchema?> ResolveCombinedAsync(
@@ -679,60 +722,22 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         string view,
         AnnotationKey key,
         SchemaOverride? schemaOverride,
-        Dictionary<string, ConfigurationSchemaEntity?>? layerCache = null)
+        Dictionary<string, ConfigurationSchemaEntity?>? layerCache = null,
+        OverlaySchemaLayers? overlayLayers = null)
     {
+        // the layers from the most general: the type, the descendant types below the ancestors, the annotation
+        var identities = new List<SchemaIdentity> { SchemaIdentity.ForType(view, key.TypeCode) };
+        identities.AddRange(AnnotationHierarchy.GetAncestorSchemaSources(key)
+            .Select(source => SchemaIdentity.ForDescendant(view, source.Ancestor.ToString(), source.DescendantTypeCode)));
+        identities.Add(SchemaIdentity.ForAnnotation(view, key.ToString()));
+
         var applied = new List<ConfigurationSchema>();
-        var typeIdentity = SchemaIdentity.ForType(view, key.TypeCode);
 
-        if (schemaOverride is { Kind: SchemaKind.Type } && schemaOverride.TypeCode == key.TypeCode)
+        foreach (var identity in identities)
         {
-            applied.Add(Candidate(view, schemaOverride, key.TypeCode, annotationKey: null));
-        }
-        else
-        {
-            var stored = await ReadLayerAsync(repository, partitionKey, typeIdentity, layerCache);
-
-            if (stored is not null)
+            if (await ResolveLayerAsync(repository, partitionKey, identity, schemaOverride, layerCache, overlayLayers) is { } layer)
             {
-                applied.Add(stored.ToConfigurationSchema(typeIdentity.ModelType, typeIdentity.ModelKey));
-            }
-        }
-
-        foreach (var (ancestor, descendantTypeCode) in AnnotationHierarchy.GetAncestorSchemaSources(key))
-        {
-            var ancestorKey = ancestor.ToString();
-            var descendantIdentity = SchemaIdentity.ForDescendant(view, ancestorKey, descendantTypeCode);
-
-            if (schemaOverride is { Kind: SchemaKind.Descendant }
-                && schemaOverride.TypeCode == descendantTypeCode
-                && schemaOverride.AnnotationKey == ancestorKey)
-            {
-                applied.Add(Candidate(view, schemaOverride, descendantTypeCode, ancestorKey));
-            }
-            else
-            {
-                var stored = await ReadLayerAsync(repository, partitionKey, descendantIdentity, layerCache);
-
-                if (stored is not null)
-                {
-                    applied.Add(stored.ToConfigurationSchema(descendantIdentity.ModelType, descendantIdentity.ModelKey));
-                }
-            }
-        }
-
-        var annotationIdentity = SchemaIdentity.ForAnnotation(view, key.ToString());
-
-        if (schemaOverride is { Kind: SchemaKind.Annotation } && schemaOverride.AnnotationKey == key.ToString())
-        {
-            applied.Add(Candidate(view, schemaOverride, annotationType: null, key.ToString()));
-        }
-        else
-        {
-            var stored = await ReadLayerAsync(repository, partitionKey, annotationIdentity, layerCache);
-
-            if (stored is not null)
-            {
-                applied.Add(stored.ToConfigurationSchema(annotationIdentity.ModelType, annotationIdentity.ModelKey));
+                applied.Add(layer);
             }
         }
 
@@ -748,6 +753,29 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
             MergedContent = DeepMergeSchemas(applied),
             AppliedSchemas = applied,
         };
+    }
+
+    // One layer: the schema being saved, else the one an import brings, else the stored one.
+    private async Task<ConfigurationSchema?> ResolveLayerAsync(
+        IContainerRepository repository,
+        PartitionKey partitionKey,
+        SchemaIdentity identity,
+        SchemaOverride? schemaOverride,
+        Dictionary<string, ConfigurationSchemaEntity?>? layerCache,
+        OverlaySchemaLayers? overlayLayers)
+    {
+        if (schemaOverride is not null && schemaOverride.Identity.CurrentId == identity.CurrentId)
+        {
+            return Candidate(identity, schemaOverride.Content, schemaOverride.Modified);
+        }
+
+        if (overlayLayers is not null && await overlayLayers.GetAsync(identity.ToSchemaKey()) is { } imported)
+        {
+            return Candidate(identity, imported, overlayLayers.Modified);
+        }
+
+        var stored = await ReadLayerAsync(repository, partitionKey, identity, layerCache);
+        return stored?.ToConfigurationSchema(identity.ModelType, identity.ModelKey);
     }
 
     private Task<(ConfigurationSchemaEntity? Item, string? ETag)> ReadCurrentWithETagAsync(
@@ -910,20 +938,26 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
 
     private static bool IsDescendantOf(string annotationKey, string ancestorKey, string descendantTypeCode)
     {
-        var ancestors = AnnotationHierarchy.GetAncestorSchemaSources(AnnotationKey.Parse(annotationKey));
+        return IsDescendantOf(AnnotationKey.Parse(annotationKey), ancestorKey, descendantTypeCode);
+    }
+
+    private static bool IsDescendantOf(AnnotationKey annotationKey, string ancestorKey, string descendantTypeCode)
+    {
+        var ancestors = AnnotationHierarchy.GetAncestorSchemaSources(annotationKey);
         return ancestors.Any(ancestor => ancestor.Ancestor == ancestorKey && ancestor.DescendantTypeCode == descendantTypeCode);
     }
 
-    private static ConfigurationSchema Candidate(string view, SchemaOverride schemaOverride, string? annotationType, string? annotationKey)
+    // A layer that is not stored (yet): the schema being saved, or one an import brings.
+    private static ConfigurationSchema Candidate(SchemaIdentity identity, JObject content, AuditStamp modified)
     {
         return new ConfigurationSchema
         {
-            View = view,
-            AnnotationType = annotationType,
-            AnnotationKey = annotationKey,
+            View = identity.View,
+            AnnotationType = identity.ModelType,
+            AnnotationKey = identity.ModelKey,
             Version = 0,
-            Content = schemaOverride.Content,
-            Modified = schemaOverride.Modified,
+            Content = content,
+            Modified = modified,
         };
     }
 
@@ -1050,6 +1084,16 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
 
         public string HistoryId(ulong version) => $"{HistoryPrefix}{version}";
 
+        public SchemaKey ToSchemaKey()
+        {
+            return Kind switch
+            {
+                SchemaKind.Type => SchemaKey.ForType(ModelType!),
+                SchemaKind.Annotation => SchemaKey.ForAnnotation(ModelKey!),
+                _ => SchemaKey.ForDescendantType(ModelKey!, ModelType!),
+            };
+        }
+
         public static SchemaIdentity ForType(string view, string typeCode)
         {
             return new SchemaIdentity(SchemaKind.Type, view, $"t.{typeCode}", typeCode, typeCode, typeCode, null);
@@ -1073,5 +1117,5 @@ public class CosmosConfigurationSchemaService : IConfigurationSchemaService
         }
     }
 
-    private sealed record SchemaOverride(SchemaKind Kind, string? TypeCode, string? AnnotationKey, JObject Content, AuditStamp Modified);
+    private sealed record SchemaOverride(SchemaIdentity Identity, JObject Content, AuditStamp Modified);
 }

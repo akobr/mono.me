@@ -679,23 +679,34 @@ public class CosmosConfigurationService : IConfigurationService
     public async Task<ViewImportResult> ImportConfigurationAsync(
         FullKey key,
         JObject content,
-        AuditActor actor,
-        bool force = false,
-        bool dryRun = false)
+        ViewImportOptions options,
+        ViewImportOverlay overlay)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
 
-        switch (await AnnotationItemStore.ReadStateAsync(repository.Container, key))
+        // an annotation the import makes active counts as active, which matters in a dry run, where it is not written
+        if (!overlay.ActiveAnnotations.Contains(annotationKey))
         {
-            case AnnotationItemState.Missing:
-                return new ViewImportResult(
-                    ViewImportOutcome.Skipped,
-                    ErrorCode: ErrorCodes.AnnotationNotFound,
-                    Message: $"The view {key.ViewName} has no annotation {annotationKey}.");
+            var state = await AnnotationItemStore.ReadStateAsync(repository.Container, key);
 
-            case AnnotationItemState.Deleted:
-                return DeletedImport(annotationKey);
+            if (state != AnnotationItemState.Active)
+            {
+                if (overlay.FailedAnnotations.Contains(annotationKey))
+                {
+                    return new ViewImportResult(
+                        ViewImportOutcome.Skipped,
+                        ErrorCode: ErrorCodes.DependencyFailed,
+                        Message: $"The annotation {annotationKey} failed in this import.");
+                }
+
+                return state == AnnotationItemState.Deleted
+                    ? DeletedImport(annotationKey)
+                    : new ViewImportResult(
+                        ViewImportOutcome.Skipped,
+                        ErrorCode: ErrorCodes.AnnotationNotFound,
+                        Message: $"The view {key.ViewName} has no annotation {annotationKey}.");
+            }
         }
 
         JObject document;
@@ -703,7 +714,7 @@ public class CosmosConfigurationService : IConfigurationService
         try
         {
             // the directives apply to the document alone, as on a create
-            document = await content.RemoveRequested().ApplyPatchRequested();
+            document = await ((JObject)content.DeepClone()).RemoveRequested().ApplyPatchRequested();
         }
         catch (JsonPatchException exception)
         {
@@ -722,41 +733,74 @@ public class CosmosConfigurationService : IConfigurationService
             $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKey}",
             key.GetCosmosPartitionKey(),
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
-        var hasContent = existing?.Content.HasValues == true;
+
+        // the re-create of the annotation empties its configuration (in a dry run, it is still stored), so the file
+        // starts the new lifetime as the next version
+        var hasContent = existing?.Content.HasValues == true && !overlay.RecreatedAnnotations.Contains(annotationKey);
 
         if (hasContent && JToken.DeepEquals(existing!.Content, document))
         {
             return new ViewImportResult(ViewImportOutcome.Unchanged, existing.Version);
         }
 
-        if (!force && _schemaService is not null)
+        if (hasContent && options.Existing == ViewImportExisting.Skip)
+        {
+            return new ViewImportResult(
+                ViewImportOutcome.Skipped,
+                ErrorCode: ErrorCodes.DocumentExists,
+                Message: $"The view has a different configuration of {annotationKey}, and Skip keeps it.");
+        }
+
+        IReadOnlyList<ViewImportWarning>? warnings = null;
+
+        if (_schemaService is not null)
         {
             try
             {
-                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, document);
+                // a real run has written the schemas of the archive already; a dry run takes them from the overlay
+                await _schemaService.ValidateContentAsync(
+                    key.OrganizationName,
+                    key.ProjectName,
+                    key.ViewName,
+                    annotationKey,
+                    document,
+                    options.DryRun ? overlay : null);
             }
             catch (SchemaValidationException exception)
             {
-                var errors = exception.ValidationErrors.SelectMany(error => error.Errors);
-                return new ViewImportResult(
-                    ViewImportOutcome.Failed,
-                    ErrorCode: ErrorCodes.SchemaViolation,
-                    Message: $"The document violates its schema: {string.Join("; ", errors)}");
+                var errors = string.Join("; ", exception.ValidationErrors.SelectMany(error => error.Errors));
+
+                if (!options.Force)
+                {
+                    return new ViewImportResult(
+                        ViewImportOutcome.Failed,
+                        ErrorCode: ErrorCodes.SchemaViolation,
+                        Message: $"The document violates its schema: {errors}");
+                }
+
+                warnings =
+                [
+                    new ViewImportWarning
+                    {
+                        Code = ErrorCodes.SchemaViolation,
+                        Message = $"Force stores the document although it violates its schema: {errors}",
+                    },
+                ];
             }
         }
 
         var outcome = hasContent ? ViewImportOutcome.Updated : ViewImportOutcome.Created;
 
-        if (dryRun)
+        if (options.DryRun)
         {
-            return new ViewImportResult(outcome);
+            return new ViewImportResult(outcome, Warnings: warnings);
         }
 
         try
         {
             // validated above, so the write skips the schema
-            var written = await WriteConfigurationAsync(key, document, actor, force: true, merge: false);
-            return new ViewImportResult(outcome, written.Version);
+            var written = await WriteConfigurationAsync(key, document, options.Actor, force: true, merge: false);
+            return new ViewImportResult(outcome, written.Version, Warnings: warnings);
         }
         catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.AnnotationDeleted)
         {

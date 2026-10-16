@@ -55,11 +55,12 @@ public interface IConfigurationService
         CancellationToken cancellationToken = default);
 
     // Replaces the annotation's own document with the given one as a new version, unless it is equal (an import).
-    // A missing or deleted annotation and an empty document are skipped; a schema violation fails unless forced.
+    // An annotation the overlay makes active counts as active; a missing, deleted or failed one and an empty document
+    // are skipped, and with Skip so is a different own document. A schema violation fails unless forced, and a forced
+    // write carries the warning SchemaViolation. A dry run validates against the schema layers of the overlay.
     Task<ViewImportResult> ImportConfigurationAsync(
         FullKey key,
         JObject content,
-        AuditActor actor,
-        bool force = false,
-        bool dryRun = false);
+        ViewImportOptions options,
+        ViewImportOverlay overlay);
 }

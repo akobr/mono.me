@@ -337,6 +337,17 @@ public sealed class ViewTransferService : IViewTransferService
             return;
         }
 
+        var options = new ViewImportOptions
+        {
+            Actor = import.CreatedBy,
+            Existing = import.Existing,
+            Force = import.IsForced,
+            DryRun = import.IsDryRun,
+        };
+
+        // Transitional: one overlay per job, still empty while only configurations are imported (1.15 fills it).
+        var overlay = new ViewImportOverlay();
+
         foreach (var file in content.Files)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -346,9 +357,8 @@ public sealed class ViewTransferService : IViewTransferService
                 : await _configurations.ImportConfigurationAsync(
                     FullKey.Create(file.AnnotationKey!, record.Organization, record.Project, record.View),
                     file.Content!,
-                    import.CreatedBy,
-                    import.IsForced,
-                    import.IsDryRun);
+                    options,
+                    overlay);
 
             progress.Add(file, result with { Message = Truncate(result.Message) });
 

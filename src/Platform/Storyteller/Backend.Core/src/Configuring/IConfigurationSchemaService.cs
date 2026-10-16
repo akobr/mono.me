@@ -28,7 +28,9 @@ public interface IConfigurationSchemaService
 
     Task<CombinedConfigurationSchema?> GetCombinedSchemaAsync(string organization, string project, string view, string annotationKey);
 
-    Task ValidateContentAsync(string organization, string project, string view, string annotationKey, JObject content);
+    // Validates an own document against the combined schema of the key. With an overlay (the dry run of an import),
+    // the layers the archive brings replace the stored ones.
+    Task ValidateContentAsync(string organization, string project, string view, string annotationKey, JObject content, ViewImportOverlay? overlay = null);
 
     Task<IReadOnlyCollection<ConfigurationVersion>> GetSchemaVersionsAsync(string organization, string project, string view, string annotationType);
 
@@ -62,4 +64,15 @@ public interface IConfigurationSchemaService
         string project,
         string view,
         CancellationToken cancellationToken = default);
+
+    // Replaces the schema with the given document as a new version, unless it is equal (an import). The schema of an
+    // annotation that is not active (neither stored nor in the overlay) is skipped, and so is an empty document; a
+    // document that is not a valid JSON Schema fails, even with Force. The configurations are checked as the import
+    // leaves them (the overlay's documents and schema layers); a violation fails unless forced, and a forced write
+    // carries the warning SchemaViolation.
+    Task<ViewImportResult> ImportSchemaAsync(
+        ViewSchemaTarget target,
+        JObject content,
+        ViewImportOptions options,
+        ViewImportOverlay overlay);
 }
