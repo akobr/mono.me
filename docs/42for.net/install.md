@@ -32,4 +32,6 @@ The simplest way is to create an account and build your annotation-based and sub
 sform account
 ```
 
+In a CI/CD pipeline, `sform` signs in as a machine from environment variables instead, see [sign in from a pipeline](/cli/sform#sign-in-from-a-pipeline).
+
 To integrate it with your application, use our .net SDK, and learn more about it in this documentation.
