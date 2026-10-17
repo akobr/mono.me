@@ -155,4 +155,8 @@ internal sealed class FakeConfigurationService : IConfigurationService
     public Task<DiffResult> GetConfigurationVersionChangesAsync(FullKey key, uint fromVersion, uint toVersion) => throw new NotSupportedException();
 
     public Task<DiffResult> GetConfigurationViewChangesAsync(FullKey sourceKey, string toView) => throw new NotSupportedException();
+
+    public bool HasBindings(Configuration effective) => throw new NotSupportedException();
+
+    public Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false) => throw new NotSupportedException();
 }
