@@ -69,6 +69,64 @@ public class OpenApiExportTests
         diff.GetProperty("responses").GetProperty("200").GetProperty("content").TryGetProperty("text/plain", out _).ShouldBeTrue();
     }
 
+    // The export and import of a view: five operations below the view, the include filter as a comma-separated list of
+    // kinds, and no route of the first spec below configurations/.
+    [Fact]
+    public async Task Document_HasTheViewTransferOperations_UnderTheTransfersTag()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var paths = document.RootElement.GetProperty("paths").EnumerateObject().ToList();
+        var operations = paths
+            .SelectMany(path => path.Value.EnumerateObject().Select(operation => (Path: path.Name, Method: operation.Name, Operation: operation.Value)))
+            .Where(operation => operation.Operation.GetProperty("tags").EnumerateArray().Any(tag => tag.GetString() == Definitions.Tags.Transfers))
+            .ToList();
+
+        operations.Select(operation => $"{operation.Method.ToUpperInvariant()} {operation.Path} {operation.Operation.GetProperty("operationId").GetString()}").ShouldBe(
+            [
+                "POST /v1/{organization}/{project}/{view}/exports StartViewExport",
+                "GET /v1/{organization}/{project}/{view}/exports/{id} GetViewExport",
+                "GET /v1/{organization}/{project}/{view}/exports/{id}/archive GetViewExportArchive",
+                "POST /v1/{organization}/{project}/{view}/imports StartViewImport",
+                "GET /v1/{organization}/{project}/{view}/imports/{id} GetViewImport",
+            ],
+            ignoreOrder: true);
+        paths.Select(path => path.Name).ShouldNotContain(path => path.Contains("/configurations/exports", StringComparison.Ordinal) || path.Contains("/configurations/imports", StringComparison.Ordinal));
+        operations.Where(operation => !operation.Operation.GetProperty("responses").TryGetProperty("403", out _)).ShouldBeEmpty("every operation documents its 403");
+
+        var import = operations.Single(operation => operation.Path.EndsWith("/imports", StringComparison.Ordinal)).Operation;
+        var parameters = import.GetProperty("parameters").EnumerateArray()
+            .Where(parameter => parameter.GetProperty("in").GetString() == "query")
+            .ToDictionary(parameter => parameter.GetProperty("name").GetString()!);
+        parameters.Keys.ShouldBe(["include", "existing", "force", "dryRun", "fileName"], ignoreOrder: true);
+
+        var include = parameters["include"];
+        include.GetProperty("style").GetString().ShouldBe("form");
+        include.GetProperty("explode").GetBoolean().ShouldBeFalse("comma-separated");
+        include.GetProperty("schema").GetProperty("type").GetString().ShouldBe("array");
+        include.GetProperty("schema").GetProperty("items").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ViewArchiveContent");
+        parameters["existing"].GetProperty("schema").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ViewImportExisting");
+
+        // the kinds and the existing option are shared schemas, so both SDKs have one type for each
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        var content = schemas.GetProperty("ViewArchiveContent");
+        content.GetProperty("enum").EnumerateArray().Select(kind => kind.GetString()).ShouldBe(["Annotations", "Schemas", "Templates", "Configurations"]);
+        content.TryGetProperty("default", out _).ShouldBeFalse("no include means all four kinds, not the first");
+        var existing = schemas.GetProperty("ViewImportExisting");
+        existing.GetProperty("enum").EnumerateArray().Select(value => value.GetString()).ShouldBe(["Overwrite", "Skip"]);
+        existing.GetProperty("default").GetString().ShouldBe("Overwrite");
+
+        foreach (var name in new[] { "ViewExportCreate", "ViewExport", "ViewImport" })
+        {
+            schemas.GetProperty(name).GetProperty("properties").GetProperty("Include").GetProperty("items").GetProperty("$ref").GetString()
+                .ShouldBe("#/components/schemas/ViewArchiveContent", name);
+        }
+
+        schemas.GetProperty("ViewImport").GetProperty("properties").GetProperty("Existing").GetProperty("$ref").GetString()
+            .ShouldBe("#/components/schemas/ViewImportExisting");
+    }
+
     internal static async Task<string> RenderAsync()
     {
         // the same context the extension builds for the host, with the API's own options and filters

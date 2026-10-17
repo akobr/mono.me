@@ -135,16 +135,40 @@ The response is a structured diff, or a unified diff when you ask for that forma
 
 ## Writing schemas
 
-Schemas are per project. They are shared by every view, because the shape of a valid document is a property of the product, while the values differ by view.
+Schemas belong to a view, like configuration: each view has its own schemas, with their own versions. A second view can try a schema change while `default` keeps its schemas.
 
 | Layer | Path |
 | --- | --- |
-| Every annotation of a type | `PUT /v1/{org}/{project}/configuration-schema/type/{annotationType}` |
-| One annotation | `PUT /v1/{org}/{project}/configuration-schema/{key}` |
-| Descendants of one annotation | `PUT /v1/{org}/{project}/configuration-schema/{key}/type/{annotationType}` |
-| The merged schema a write will be checked against | `GET /v1/{org}/{project}/configuration-schema/{key}/definition` |
+| Every annotation of a type | `PUT /v1/{org}/{project}/{view}/configuration-schema/type/{annotationType}` |
+| One annotation | `PUT /v1/{org}/{project}/{view}/configuration-schema/{key}` |
+| Descendants of one annotation | `PUT /v1/{org}/{project}/{view}/configuration-schema/{key}/type/{annotationType}` |
+| The merged schema a write will be checked against | `GET /v1/{org}/{project}/{view}/configuration-schema/{key}/definition` |
 
 `annotationType` is the short code: `rst`, `sbt`, `cnt`, `usg`, `exe`, `unt`, `uxe`. The body is a JSON Schema. A write of configuration that fails the combined schema is rejected, and the error names the key.
+
+## Exporting and importing a view
+
+A view can be exported as one zip and imported into any view of any project: its annotations, schemas, templates and configurations, or some of these kinds. [Configuration](configuration#export-and-import) explains what an archive holds. Both run as jobs: the start answers `202` with the job, and you read the job until its `Status` is `Succeeded` or `Failed`.
+
+| You want | Call |
+| --- | --- |
+| Start an export | `POST /v1/{org}/{project}/{view}/exports` with `{ "Format": "Git", "Include": ["Annotations", "Templates"] }` |
+| Its state, then the zip | `GET .../exports/{id}`, then `GET .../exports/{id}/archive` |
+| Start an import | `POST .../imports?include=annotations,templates&existing=skip&dryRun=true` with the zip as the body |
+| Its result | `GET .../imports/{id}` |
+
+- `Format` is `Folder` (the default) or `Git`.
+- `Include`, and the comma-separated `include` of an import, name the kinds: `Annotations`, `Schemas`, `Templates` and `Configurations`. Without them, all four are included.
+- `existing` is `Overwrite` (the default) or `Skip`. `force=true` stores schemas and configurations that break each other, with a warning. `dryRun=true` reports every outcome without writing anything.
+- The result of an import counts the documents per kind and in total, and lists every document that was not unchanged, with its kind, outcome, error code and warnings.
+- Exporting needs any role on the project, and importing `Contributor`. Each included kind also needs its scopes: annotations those of annotations, the other three those of configuration. A machine that may only write configuration imports with `include=schemas,templates,configurations`.
+
+`sform` starts the job, waits for it, and saves or prints the result:
+
+```text
+sform story export -f git -x                          # the view as a checked-out repository
+sform story import ./my-view --existing skip --dry-run
+```
 
 ## A minimal session
 

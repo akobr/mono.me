@@ -639,25 +639,23 @@ public class CosmosConfigurationService : IConfigurationService
             .WithParameter("@currentPrefix", currentPrefix)
             .WithParameter("@historyPrefix", $"{view}.{EntityIdPrefixTypes.ConfigurationVersion}.");
 
-        var documents = new Dictionary<string, (List<ConfigurationDocument> History, ConfigurationDocument? Current)>(StringComparer.Ordinal);
+        var histories = new DocumentHistories<string>(StringComparer.Ordinal);
         using var iterator = container.GetItemQueryStreamIterator(query);
 
         while (iterator.HasMoreResults)
         {
             using var response = await iterator.ReadNextAsync(cancellationToken);
             response.EnsureSuccessStatusCode();
-            var page = response.Content.DeserializeNewtonsoft<QueryPage<ConfigurationArchiveRow>>(_serializerOptions);
+            var page = response.Content.DeserializeNewtonsoft<QueryPage<DocumentArchiveRow>>(_serializerOptions);
 
             foreach (var row in page?.Documents ?? [])
             {
                 if (row.Id is null
                     || row.AnnotationKey is null
-                    || row.Content is null
-                    || !row.Content.HasValues
                     || deletedKeys.Contains(row.AnnotationKey)
                     || !AnnotationKey.TryParse(row.AnnotationKey, out _))
                 {
-                    // an empty document only caches the effective one; a deleted annotation hides its versions
+                    // a deleted annotation hides its versions
                     continue;
                 }
 
@@ -668,72 +666,47 @@ public class CosmosConfigurationService : IConfigurationService
                     continue;
                 }
 
-                var document = new ConfigurationDocument
-                {
-                    Version = row.Version,
-                    Author = row.Modified.By.Name ?? row.Modified.By.Id,
-                    CreatedAt = row.Modified.At,
-                    Content = row.Content,
-                };
-
-                if (!documents.TryGetValue(row.AnnotationKey, out var entry))
-                {
-                    entry = ([], null);
-                }
-
-                if (isCurrent)
-                {
-                    entry.Current = document;
-                }
-                else
-                {
-                    entry.History.Add(document);
-                }
-
-                documents[row.AnnotationKey] = entry;
+                histories.Add(row.AnnotationKey, row, isCurrent);
             }
         }
 
-        return documents
-            .OrderBy(item => item.Key, StringComparer.Ordinal)
-            .Select(item =>
-            {
-                var (history, current) = item.Value;
-                var versions = history
-                    .Where(version => current is null || version.Version < current.Version)
-                    .OrderBy(version => version.Version)
-                    .ToList();
-
-                if (current is not null)
-                {
-                    versions.Add(current);
-                }
-
-                return new ConfigurationHistory { AnnotationKey = item.Key, Versions = versions, Current = current };
-            })
+        return histories.Build()
+            .OrderBy(history => history.Identity, StringComparer.Ordinal)
+            .Select(history => new ConfigurationHistory { AnnotationKey = history.Identity, Versions = history.Versions, Current = history.Current })
             .ToList();
     }
 
-    public async Task<ConfigurationImportResult> ImportConfigurationAsync(
+    public async Task<ViewImportResult> ImportConfigurationAsync(
         FullKey key,
         JObject content,
-        AuditActor actor,
-        bool force = false,
-        bool dryRun = false)
+        ViewImportOptions options,
+        ViewImportOverlay overlay)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
         var annotationKey = key.Annotation.ToString();
 
-        switch (await AnnotationItemStore.ReadStateAsync(repository.Container, key))
+        // an annotation the import makes active counts as active, which matters in a dry run, where it is not written
+        if (!overlay.ActiveAnnotations.Contains(annotationKey))
         {
-            case AnnotationItemState.Missing:
-                return new ConfigurationImportResult(
-                    ConfigurationImportOutcome.Skipped,
-                    ErrorCode: ErrorCodes.AnnotationNotFound,
-                    Message: $"The view {key.ViewName} has no annotation {annotationKey}.");
+            var state = await AnnotationItemStore.ReadStateAsync(repository.Container, key);
 
-            case AnnotationItemState.Deleted:
-                return DeletedImport(annotationKey);
+            if (state != AnnotationItemState.Active)
+            {
+                if (overlay.FailedAnnotations.Contains(annotationKey))
+                {
+                    return new ViewImportResult(
+                        ViewImportOutcome.Skipped,
+                        ErrorCode: ErrorCodes.DependencyFailed,
+                        Message: $"The annotation {annotationKey} failed in this import.");
+                }
+
+                return state == AnnotationItemState.Deleted
+                    ? DeletedImport(annotationKey)
+                    : new ViewImportResult(
+                        ViewImportOutcome.Skipped,
+                        ErrorCode: ErrorCodes.AnnotationNotFound,
+                        Message: $"The view {key.ViewName} has no annotation {annotationKey}.");
+            }
         }
 
         JObject document;
@@ -741,17 +714,17 @@ public class CosmosConfigurationService : IConfigurationService
         try
         {
             // the directives apply to the document alone, as on a create
-            document = await content.RemoveRequested().ApplyPatchRequested();
+            document = await ((JObject)content.DeepClone()).RemoveRequested().ApplyPatchRequested();
         }
         catch (JsonPatchException exception)
         {
-            return new ConfigurationImportResult(ConfigurationImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
+            return new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
         }
 
         if (!document.HasValues)
         {
-            return new ConfigurationImportResult(
-                ConfigurationImportOutcome.Skipped,
+            return new ViewImportResult(
+                ViewImportOutcome.Skipped,
                 ErrorCode: ErrorCodes.EmptyDocument,
                 Message: "An empty document is not imported; delete the configuration to clear it.");
         }
@@ -760,41 +733,74 @@ public class CosmosConfigurationService : IConfigurationService
             $"{key.ViewName}.{EntityIdPrefixTypes.Configuration}.{annotationKey}",
             key.GetCosmosPartitionKey(),
             stream => stream.DeserializeNewtonsoft<ConfigurationEntity>(_serializerOptions));
-        var hasContent = existing?.Content.HasValues == true;
+
+        // the re-create of the annotation empties its configuration (in a dry run, it is still stored), so the file
+        // starts the new lifetime as the next version
+        var hasContent = existing?.Content.HasValues == true && !overlay.RecreatedAnnotations.Contains(annotationKey);
 
         if (hasContent && JToken.DeepEquals(existing!.Content, document))
         {
-            return new ConfigurationImportResult(ConfigurationImportOutcome.Unchanged, existing.Version);
+            return new ViewImportResult(ViewImportOutcome.Unchanged, existing.Version);
         }
 
-        if (!force && _schemaService is not null)
+        if (hasContent && options.Existing == ViewImportExisting.Skip)
+        {
+            return new ViewImportResult(
+                ViewImportOutcome.Skipped,
+                ErrorCode: ErrorCodes.DocumentExists,
+                Message: $"The view has a different configuration of {annotationKey}, and Skip keeps it.");
+        }
+
+        IReadOnlyList<ViewImportWarning>? warnings = null;
+
+        if (_schemaService is not null)
         {
             try
             {
-                await _schemaService.ValidateContentAsync(key.OrganizationName, key.ProjectName, key.ViewName, annotationKey, document);
+                // a real run has written the schemas of the archive already; a dry run takes them from the overlay
+                await _schemaService.ValidateContentAsync(
+                    key.OrganizationName,
+                    key.ProjectName,
+                    key.ViewName,
+                    annotationKey,
+                    document,
+                    options.DryRun ? overlay : null);
             }
             catch (SchemaValidationException exception)
             {
-                var errors = exception.ValidationErrors.SelectMany(error => error.Errors);
-                return new ConfigurationImportResult(
-                    ConfigurationImportOutcome.Failed,
-                    ErrorCode: ErrorCodes.SchemaViolation,
-                    Message: $"The document violates its schema: {string.Join("; ", errors)}");
+                var errors = string.Join("; ", exception.ValidationErrors.SelectMany(error => error.Errors));
+
+                if (!options.Force)
+                {
+                    return new ViewImportResult(
+                        ViewImportOutcome.Failed,
+                        ErrorCode: ErrorCodes.SchemaViolation,
+                        Message: $"The document violates its schema: {errors}");
+                }
+
+                warnings =
+                [
+                    new ViewImportWarning
+                    {
+                        Code = ErrorCodes.SchemaViolation,
+                        Message = $"Force stores the document although it violates its schema: {errors}",
+                    },
+                ];
             }
         }
 
-        var outcome = hasContent ? ConfigurationImportOutcome.Updated : ConfigurationImportOutcome.Created;
+        var outcome = hasContent ? ViewImportOutcome.Updated : ViewImportOutcome.Created;
 
-        if (dryRun)
+        if (options.DryRun)
         {
-            return new ConfigurationImportResult(outcome);
+            return new ViewImportResult(outcome, Warnings: warnings);
         }
 
         try
         {
             // validated above, so the write skips the schema
-            var written = await WriteConfigurationAsync(key, document, actor, force: true, merge: false);
-            return new ConfigurationImportResult(outcome, written.Version);
+            var written = await WriteConfigurationAsync(key, document, options.Actor, force: true, merge: false);
+            return new ViewImportResult(outcome, written.Version, Warnings: warnings);
         }
         catch (ConflictException exception) when (exception.ErrorCode == ErrorCodes.AnnotationDeleted)
         {
@@ -1213,10 +1219,10 @@ public class CosmosConfigurationService : IConfigurationService
         return keys;
     }
 
-    private static ConfigurationImportResult DeletedImport(string annotationKey)
+    private static ViewImportResult DeletedImport(string annotationKey)
     {
-        return new ConfigurationImportResult(
-            ConfigurationImportOutcome.Skipped,
+        return new ViewImportResult(
+            ViewImportOutcome.Skipped,
             ErrorCode: ErrorCodes.AnnotationDeleted,
             Message: $"The annotation {annotationKey} is deleted; restore it before importing its configuration.");
     }

@@ -143,15 +143,6 @@ Saving sends only your changes. Two situations stop a save:
 
 **Versions** lists the history of a configuration, a template or a schema. Any two versions can be compared side by side, or in one column on small screens. **Compare views** shows the same key in two views. When the project has only one other view, it is already selected.
 
-### Export and import
-
-The **Configurations** page exports and imports every configuration of the view at once.
-
-- **Export** builds a zip on the server. Choose **Folder** (each current document as `<key>.json`, earlier versions as `<key>.<version>.json`, and `export.json`) or **Git repository** (the current documents checked out, every version a commit by its author). The browser downloads the zip when it is ready, named with the date and the time in UTC. You can close the dialog in the meantime, even leave the page; the download still starts.
-- **Import** (Contributor or a higher role) takes a zip of `<key>.json` files, for example an edited export or a zipped clone of the repository. Each file replaces the annotation's own document as a new version, unless it is equal. Files for missing or deleted annotations are skipped, and documents that break their schema fail unless you choose to store them anyway. **Only check, write nothing** shows the outcome of every file first; **Import now** then imports the same file. The dialog lists every file that was not unchanged, with a link to the configurations that changed.
-
-Only your own documents travel: templates, schemas and resolved secrets stay out.
-
 **Templates** hold the defaults per annotation type. **Schemas** define the form and the validation, for a type, for an annotation, or for the descendants of an annotation. A schema shows a form preview, and before you save a change it lists the configurations that the change would break.
 
 ## Graph
@@ -165,6 +156,36 @@ Only your own documents travel: templates, schemas and resolved secrets stay out
   - The filter box adds matches to the focus, or dims the rest when the whole view is shown.
 - **Keyboard:** the arrow keys move between connected annotations, and `Enter` opens one.
 - **Toolbar:** Fit, Reheat (runs the layout again), the layered, force and radial layouts, **Export PNG**, and **Open as list**.
+
+## Export and import
+
+**Export & Import**, in the sidebar of the view after **Compare views** (or `G` then `E`), moves the documents of a view as one zip: its annotations, schemas, templates and configurations. The page has an **Export** and an **Import** section, side by side, or one below the other on a phone. Below them is the result of the view's latest import.
+
+**Export** works for every role:
+
+- Pick the kinds, all four by default, and the format:
+  - **Folder of JSON files**: one folder per kind (`annotations/`, `schemas/`, `templates/`, `configurations/`) with the current documents, the earlier versions as version files, and `export.json`.
+  - **Git repository**: the same folders checked out, and every version of a schema, template or configuration a commit by its author.
+- The server builds the zip, and the browser downloads it when it is ready, named after the organization, project and view, with the date and the time in UTC. You can leave the page in the meantime: the download still starts, and a toast confirms it with the counts per kind.
+- Never included: secrets, effective documents, the audit, the version history of annotations, and deleted annotations. The key values have their own **Export** and **Import** in the **Values store**.
+
+**Import** needs the Contributor role or a higher one; a Reader sees a notice instead of the form.
+
+- Drop a zip, for example an edited export or a zipped clone of the repository. Each file's name tells its kind, so folders don't matter: `<key>.json` is an annotation, `<key>.conf.json` a configuration, `<type>.template.json` a template, and a name that ends in `.schema.json` a schema. Version files, `export.json` and hidden folders are ignored.
+- Pick the kinds the import may write, all four by default.
+- **Existing documents:**
+  - **Overwrite** (the default): the archive's document replaces the stored one as a new version, an annotation is updated, and a deleted annotation is re-created with an empty configuration.
+  - **Skip**: what the view has stays as it is, and only new documents are written.
+
+  An equal document is left alone either way.
+- **Store schemas and configurations that break each other** writes them with a warning. Without it, they fail, and the rest is imported.
+- **Check** shows the outcome of every file without writing anything; **Import now** in its result then imports the same file with the same options. **Import** imports at once. Leaving the page doesn't stop an import: a toast reports its end, with a link back to the result.
+
+An import writes the annotations first, ancestors before their descendants, then the schemas, templates and configurations. It checks a schema against the configurations the archive brings, so an archive can change both together. It never deletes what the archive lacks, and it never replays versions: only the current document of each file is imported.
+
+**The result** counts the documents per kind and in total, with the files left out by the kinds and the ignored files. Chips filter the documents by kind, and by **Failed**, **Skipped** and **Warnings**. Every document that was not unchanged is listed with its kind, outcome, version, code, message and warnings, and links to its page when the view has it. On a phone, the table becomes a list. After a reload, the page shows the view's latest import again.
+
+The CLI does the same with `sform story export` and `sform story import` (see [Configuration](configuration#export-and-import)).
 
 ## People, machines and settings
 
@@ -201,7 +222,7 @@ New credentials (API keys, certificates with their password, client secrets) are
 | `Ctrl K` / `⌘ K` | Command palette |
 | `/` | Focus the filter |
 | `[` | Collapse or expand the sidebar |
-| `G` then `A`, `C`, `G`, `T`, `S`, `O` | Annotations, Configurations, Graph, Templates, Schemas, Organizations |
+| `G` then `A`, `C`, `G`, `T`, `S`, `E`, `O` | Annotations, Configurations, Graph, Templates, Schemas, Export & Import, Organizations |
 | `J` / `K`, `Enter`, `Esc` | Next / previous row, open, close the detail |
 | `Ctrl S` / `⌘ S` | Save |
 | `?` | All shortcuts |

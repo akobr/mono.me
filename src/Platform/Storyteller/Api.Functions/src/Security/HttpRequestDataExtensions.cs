@@ -65,17 +65,24 @@ public static class HttpRequestDataExtensions
         return claims;
     }
 
+    // The scopes of the caller: scp, roles and the scope claims, without an App. prefix. Not skipped in Debug builds;
+    // CheckScope and TryCheckScope skip the check itself (DEV_AUTH).
+    public static IReadOnlySet<string> GetScopes(this HttpRequestData @this)
+    {
+        return @this.GetClaims()
+            .Where(c => c.Type is "scp" or "roles" or ClaimTypes.Role || c.Type.EndsWith("/scope"))
+            .SelectMany(c => c.Value.Split(' '))
+            .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
+            .ToHashSet();
+    }
+
     public static void CheckScope(this HttpRequestData @this, params string[] scopes)
     {
 #if DEV_AUTH
         return;
 #endif
         var claims = @this.GetClaims();
-        var allScopes = claims
-            .Where(c => c.Type is "scp" or "roles" or ClaimTypes.Role || c.Type.EndsWith("/scope"))
-            .SelectMany(c => c.Value.Split(' '))
-            .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
-            .ToHashSet();
+        var allScopes = @this.GetScopes();
 
         if (!scopes.Any(scope => allScopes.Contains(scope)))
         {
@@ -94,14 +101,7 @@ public static class HttpRequestDataExtensions
 #if DEV_AUTH
         return true;
 #endif
-        var claims = @this.GetClaims();
-        var allScopes = claims
-            .Where(c => c.Type is "scp" or "roles" or ClaimTypes.Role || c.Type.EndsWith("/scope"))
-            .SelectMany(c => c.Value.Split(' '))
-            .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
-            .ToHashSet();
-
-        return allScopes.Contains(scope);
+        return @this.GetScopes().Contains(scope);
     }
 
     // Who makes the request, for every audit stamp: the machine, or the account (its sub) with a display name from

@@ -1,9 +1,17 @@
 namespace _42.Platform.Storyteller.Transferring.Git;
 
-// Orders tree and index entries like git: by the UTF-8 bytes of the name, which is the order of code points.
+// Orders tree and index entries like git: by the UTF-8 bytes of the name, which is the order of code points. The
+// index lists full paths in this order; a tree compares a subtree as its name followed by '/' (GetTreeEntryName),
+// so both orders agree.
 public sealed class GitPathComparer : IComparer<string>
 {
     public static readonly GitPathComparer Instance = new();
+
+    // The name a tree orders an entry by: "a.json" < "a/" (the subtree a) < "a0".
+    public static string GetTreeEntryName(string name, bool isTree)
+    {
+        return isTree ? $"{name}/" : name;
+    }
 
     public int Compare(string? x, string? y)
     {

@@ -1,3 +1,4 @@
+using System.Globalization;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Transferring;
 using Newtonsoft.Json.Linq;
@@ -11,16 +12,16 @@ internal sealed class ManualTimeProvider(DateTimeOffset now) : TimeProvider
     public override DateTimeOffset GetUtcNow() => Now;
 }
 
-internal sealed class InMemoryTransferStore : IConfigurationTransferStore
+internal sealed class InMemoryTransferStore : IViewTransferStore
 {
-    private readonly Dictionary<string, ConfigurationTransferRecord> _records = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, ViewTransferRecord> _records = new(StringComparer.Ordinal);
     private int _version;
 
-    public List<ConfigurationTransferRecord> Saves { get; } = [];
+    public List<ViewTransferRecord> Saves { get; } = [];
 
     public int ActiveCount { get; set; }
 
-    public Task<ConfigurationTransferRecord> CreateAsync(ConfigurationTransferRecord record, CancellationToken cancellationToken = default)
+    public Task<ViewTransferRecord> CreateAsync(ViewTransferRecord record, CancellationToken cancellationToken = default)
     {
         var saved = record with { ETag = $"\"{++_version}\"" };
         _records.Add(Key(record.Organization, record.Project, record.View, record.Kind, record.Id), saved);
@@ -28,24 +29,24 @@ internal sealed class InMemoryTransferStore : IConfigurationTransferStore
         return Task.FromResult(saved);
     }
 
-    public Task<ConfigurationTransferRecord?> GetAsync(string organization, string project, string view, ConfigurationTransferKind kind, string id, CancellationToken cancellationToken = default)
+    public Task<ViewTransferRecord?> GetAsync(string organization, string project, string view, ViewTransferKind kind, string id, CancellationToken cancellationToken = default)
     {
         return Task.FromResult(_records.GetValueOrDefault(Key(organization, project, view, kind, id)));
     }
 
-    public Task<ConfigurationTransferRecord?> TryReplaceAsync(ConfigurationTransferRecord record, CancellationToken cancellationToken = default)
+    public Task<ViewTransferRecord?> TryReplaceAsync(ViewTransferRecord record, CancellationToken cancellationToken = default)
     {
         var key = Key(record.Organization, record.Project, record.View, record.Kind, record.Id);
 
         if (!_records.TryGetValue(key, out var stored) || stored.ETag != record.ETag)
         {
-            return Task.FromResult<ConfigurationTransferRecord?>(null);
+            return Task.FromResult<ViewTransferRecord?>(null);
         }
 
         var saved = record with { ETag = $"\"{++_version}\"" };
         _records[key] = saved;
         Saves.Add(saved);
-        return Task.FromResult<ConfigurationTransferRecord?>(saved);
+        return Task.FromResult<ViewTransferRecord?>(saved);
     }
 
     public Task<int> CountActiveAsync(string organization, string project, DateTimeOffset changedSince, CancellationToken cancellationToken = default)
@@ -53,10 +54,10 @@ internal sealed class InMemoryTransferStore : IConfigurationTransferStore
         return Task.FromResult(ActiveCount);
     }
 
-    private static string Key(string organization, string project, string view, ConfigurationTransferKind kind, string id) => $"{organization}|{project}|{view}|{kind}|{id}";
+    private static string Key(string organization, string project, string view, ViewTransferKind kind, string id) => $"{organization}|{project}|{view}|{kind}|{id}";
 }
 
-internal sealed class InMemoryArchiveStorage(TimeProvider time) : IConfigurationArchiveStorage
+internal sealed class InMemoryArchiveStorage(TimeProvider time) : IViewArchiveStorage
 {
     public Dictionary<string, (byte[] Content, DateTimeOffset Modified)> Archives { get; } = new(StringComparer.Ordinal);
 
@@ -86,13 +87,13 @@ internal sealed class InMemoryArchiveStorage(TimeProvider time) : IConfiguration
     }
 }
 
-internal sealed class RecordingTransferQueue : IConfigurationTransferQueue
+internal sealed class RecordingTransferQueue : IViewTransferQueue
 {
-    public List<ConfigurationTransferMessage> Messages { get; } = [];
+    public List<ViewTransferMessage> Messages { get; } = [];
 
     public Exception? Failure { get; set; }
 
-    public Task EnqueueAsync(ConfigurationTransferMessage message, CancellationToken cancellationToken = default)
+    public Task EnqueueAsync(ViewTransferMessage message, CancellationToken cancellationToken = default)
     {
         if (Failure is not null)
         {
@@ -104,31 +105,66 @@ internal sealed class RecordingTransferQueue : IConfigurationTransferQueue
     }
 }
 
-// Only the two members an export and an import use.
-internal sealed class FakeConfigurationService : IConfigurationService
+// Only the members an export and an import use.
+internal sealed class FakeConfigurationService(ExportReads? reads = null, ImportLog? imports = null) : IConfigurationService
 {
     public IReadOnlyList<ConfigurationHistory> Histories { get; set; } = [];
 
-    public Func<FullKey, JObject, ConfigurationImportResult> Import { get; set; } = (_, _) => new ConfigurationImportResult(ConfigurationImportOutcome.Created, 1);
+    public Func<FullKey, JObject, ViewImportResult> Import { get; set; } = (_, _) => new ViewImportResult(ViewImportOutcome.Created, 1);
 
-    public List<(FullKey Key, JObject Content, AuditActor Actor, bool Force, bool DryRun)> Imports { get; } = [];
+    public List<(FullKey Key, JObject Content, ViewImportOptions Options, ViewImportOverlay Overlay)> Imports { get; } = [];
+
+    // The stored configurations of the listing: the key and whether its own document has content.
+    public IReadOnlyList<(string Key, bool HasContent)> Listed { get; set; } = [];
+
+    // Configurations per page of the listing.
+    public int PageSize { get; set; } = 1000;
+
+    // The continuation token of each listing request.
+    public List<string?> ListReads { get; } = [];
 
     public Task<IReadOnlyList<ConfigurationHistory>> GetConfigurationHistoriesAsync(string organization, string project, string view, CancellationToken cancellationToken = default)
     {
+        reads?.Add(ViewArchiveContent.Configurations, organization, project, view);
         return Task.FromResult(Histories);
     }
 
-    public Task<ConfigurationImportResult> ImportConfigurationAsync(FullKey key, JObject content, AuditActor actor, bool force = false, bool dryRun = false)
+    public Task<ViewImportResult> ImportConfigurationAsync(FullKey key, JObject content, ViewImportOptions options, ViewImportOverlay overlay)
     {
-        Imports.Add((key, content, actor, force, dryRun));
+        Imports.Add((key, content, options, overlay));
+        imports?.Add(ViewDocumentKind.Configuration, null, key.Annotation.ToString(), options, overlay);
         return Task.FromResult(Import(key, content));
+    }
+
+    public Task<ConfigurationsResponse> ListConfigurationsAsync(string organization, string project, string view, string? annotationType = null, string? keyPrefix = null, string? continuationToken = null)
+    {
+        ListReads.Add(continuationToken);
+        var skip = continuationToken is null ? 0 : int.Parse(continuationToken, CultureInfo.InvariantCulture);
+        var page = Listed
+            .Skip(skip)
+            .Take(PageSize)
+            .Select(listed => new ConfigurationSummary
+            {
+                AnnotationKey = listed.Key,
+                AnnotationType = AnnotationKey.Parse(listed.Key).Type,
+                Version = 1,
+                Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UnixEpoch),
+                HasContent = listed.HasContent,
+            })
+            .ToList();
+        var next = skip + page.Count;
+
+        return Task.FromResult(new ConfigurationsResponse
+        {
+            Configurations = page,
+            ContinuationToken = next < Listed.Count ? next.ToString(CultureInfo.InvariantCulture) : null,
+            Count = page.Count,
+        });
     }
 
     public Task<bool> HasConfigurationContentAsync(FullKey key) => throw new NotSupportedException();
 
     public Task<Configuration?> GetRawConfigurationAsync(FullKey key) => throw new NotSupportedException();
-
-    public Task<ConfigurationsResponse> ListConfigurationsAsync(string organization, string project, string view, string? annotationType = null, string? keyPrefix = null, string? continuationToken = null) => throw new NotSupportedException();
 
     public Task<Configuration?> GetResolvedConfigurationAsync(FullKey key, bool includeSecrets = false) => throw new NotSupportedException();
 

@@ -36,7 +36,10 @@ internal sealed class GitTestReader
 
     public int ObjectCount => _objects.Count;
 
-    public int DeltaCount { get; private set; }
+    public int DeltaCount => DeltaIds.Count;
+
+    // The objects stored as a delta against another object of the pack.
+    public HashSet<string> DeltaIds { get; } = new(StringComparer.Ordinal);
 
     public (string Type, byte[] Content) GetObject(string id) => _objects[id];
 
@@ -59,7 +62,7 @@ internal sealed class GitTestReader
             var author = lines.Single(line => line.StartsWith("author ", StringComparison.Ordinal))[7..];
             var committer = lines.Single(line => line.StartsWith("committer ", StringComparison.Ordinal))[10..];
 
-            commits.Add(new GitTestCommit(id, author, committer, message, ReadTree(tree)));
+            commits.Add(new GitTestCommit(id, author, committer, message, tree, ReadTree(tree)));
             id = parent;
         }
 
@@ -67,29 +70,59 @@ internal sealed class GitTestReader
         return commits;
     }
 
+    // Every file below the tree by its full path, walking the subtrees.
     public Dictionary<string, string> ReadTree(string id)
+    {
+        var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        AddFiles(id, string.Empty, files);
+        return files;
+    }
+
+    // The entries of one tree: files (100644) and subtrees (40000), ordered like git, where a subtree compares as
+    // its name followed by '/'.
+    public IReadOnlyList<GitTestTreeEntry> ReadTreeEntries(string id)
     {
         var (type, content) = _objects[id];
         type.ShouldBe("tree");
-        var files = new Dictionary<string, string>(StringComparer.Ordinal);
-        var names = new List<string>();
+        var entries = new List<GitTestTreeEntry>();
         var position = 0;
 
         while (position < content.Length)
         {
             var space = Array.IndexOf(content, (byte)' ', position);
-            Encoding.ASCII.GetString(content, position, space - position).ShouldBe("100644");
+            var mode = Encoding.ASCII.GetString(content, position, space - position);
+            mode.ShouldBeOneOf("100644", "40000");
             var zero = Array.IndexOf(content, (byte)0, space);
             var name = Encoding.UTF8.GetString(content, space + 1, zero - space - 1);
-            var blob = Convert.ToHexStringLower(content.AsSpan(zero + 1, 20));
-            _objects[blob].Type.ShouldBe("blob");
-            files[name] = Encoding.UTF8.GetString(_objects[blob].Content);
-            names.Add(name);
+            name.ShouldNotBeEmpty();
+            name.ShouldNotContain("/");
+            var entryId = Convert.ToHexStringLower(content.AsSpan(zero + 1, 20));
+            _objects[entryId].Type.ShouldBe(mode == "40000" ? "tree" : "blob");
+            entries.Add(new GitTestTreeEntry(mode, name, entryId));
             position = zero + 21;
         }
 
-        names.ShouldBe(names.OrderBy(name => Encoding.UTF8.GetBytes(name), ByteOrder.Instance).ToList());
-        return files;
+        entries.Select(entry => entry.Name).ShouldBeUnique();
+        var sortNames = entries.Select(entry => entry.IsTree ? $"{entry.Name}/" : entry.Name).ToList();
+        sortNames.ShouldBe(sortNames.OrderBy(name => Encoding.UTF8.GetBytes(name), ByteOrder.Instance).ToList());
+        return entries;
+    }
+
+    private void AddFiles(string id, string prefix, Dictionary<string, string> files)
+    {
+        foreach (var entry in ReadTreeEntries(id))
+        {
+            if (entry.IsTree)
+            {
+                // git never stores an empty directory
+                ReadTreeEntries(entry.Id).ShouldNotBeEmpty();
+                AddFiles(entry.Id, $"{prefix}{entry.Name}/", files);
+            }
+            else
+            {
+                files.Add(prefix + entry.Name, Encoding.UTF8.GetString(_objects[entry.Id].Content));
+            }
+        }
     }
 
     private void ReadPack(byte[] pack, byte[] index, string packName)
@@ -141,6 +174,11 @@ internal sealed class GitTestReader
             var id = Convert.ToHexStringLower(SHA1.HashData([.. Encoding.ASCII.GetBytes($"{type} {content.Length}\0"), .. content]));
             id.ShouldBe(Convert.ToHexStringLower(entry.Id));
             _objects[id] = (type, content);
+
+            if (((pack[entry.Offset] >> 4) & 7) == 6)
+            {
+                DeltaIds.Add(id);
+            }
         }
     }
 
@@ -190,7 +228,6 @@ internal sealed class GitTestReader
 
         if (type == 6)
         {
-            DeltaCount++;
             var @base = Resolve(pack, baseOffset, ends, resolved);
             result = (@base.Type, ApplyDelta(@base.Content, data.ToArray()));
         }
@@ -293,4 +330,5 @@ internal sealed class GitTestReader
     }
 }
 
-internal sealed record class GitTestCommit(string Id, string Author, string Committer, string Message, Dictionary<string, string> Files);
+// Files: every file of the commit's tree by its full path.
+internal sealed record class GitTestCommit(string Id, string Author, string Committer, string Message, string Tree, Dictionary<string, string> Files);

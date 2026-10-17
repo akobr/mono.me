@@ -2,10 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Entities;
 using _42.Platform.Storyteller.Entities.Configurations;
 using _42.Platform.Storyteller.Json;
+using _42.Platform.Storyteller.Transferring;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Cosmos.Linq;
 using Microsoft.Extensions.Options;
@@ -83,77 +85,8 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         JObject value,
         AuditActor actor)
     {
-        annotationType = NormalizeAnnotationType(annotationType);
-        var repository = _repositoryProvider.GetOrganizationContainer(organization);
-        var partitionKeyValue = PartitionKeys.GetTemplate(project);
-        var partitionKey = new PartitionKey(partitionKeyValue);
-        var id = GetTemplateId(view, annotationType);
-
-        for (var attempt = 0; attempt <= MaxRetries; attempt++)
-        {
-            var (existing, etag) = await ReadTemplateAsync(repository, partitionKey, id);
-            var (state, stateEtag) = await ReadStateAsync(repository, partitionKey, view, annotationType);
-
-            // the input is mutated by the requested operations, each attempt works on a fresh copy
-            var input = (JObject)value.DeepClone();
-
-            if (existing is null)
-            {
-                // create a new template if there is nothing yet
-                input = input.RemoveRequested();
-                input = await input.ApplyPatchRequested();
-
-                // the state keeps the last version even after a deletion and an expiration of the history
-                var lastVersion = state?.LastVersion ?? await GetMaxHistoryVersionAsync(repository, partitionKey, view, annotationType);
-                var template = new GenerateTemplateEntity
-                {
-                    PartitionKey = partitionKeyValue,
-                    Id = id,
-                    AnnotationKey = annotationType,
-                    Name = annotationType,
-                    ProjectName = project,
-                    ViewName = view,
-                    Content = input,
-                    Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
-                    Version = lastVersion + 1,
-                };
-
-                // the version allocation and the creation are atomic, guarded by the state etag
-                var createBatch = repository.Container.CreateTransactionalBatch(partitionKey);
-                createBatch.CreateItem(template);
-                AddStateWrite(createBatch, template, state, stateEtag, template.Version);
-                var createdStateEtag = await TryExecuteWriteAsync(createBatch, id);
-                if (createdStateEtag is null)
-                {
-                    continue;
-                }
-
-                await InvalidateAsync(repository, partitionKey, project, view, annotationType, createdStateEtag);
-                return template.ToConfigurationTemplate();
-            }
-
-            var newContent = (JObject)existing.Content.DeepClone();
-            newContent.MergeInto(input);
-            newContent = newContent.RemoveRequested();
-            newContent = await newContent.ApplyPatchRequested();
-
-            if (JToken.DeepEquals(existing.Content, newContent))
-            {
-                // no change after merge, but finish an invalidation of an earlier committed change
-                await CompletePendingInvalidationAsync(repository, partitionKey, project, view, annotationType, state, stateEtag);
-                return existing.ToConfigurationTemplate();
-            }
-
-            var updated = await TryWriteNextVersionAsync(repository, partitionKey, project, existing, etag!, state, stateEtag, newContent, AuditStamp.Of(actor, _timeProvider.GetUtcNow()));
-            if (updated is null)
-            {
-                continue;
-            }
-
-            return updated.ToConfigurationTemplate();
-        }
-
-        throw new TemplateConcurrencyException(project, view, annotationType, MaxRetries);
+        var template = await WriteTemplateAsync(organization, project, view, NormalizeAnnotationType(annotationType), value, actor, merge: true);
+        return template.ToConfigurationTemplate();
     }
 
     public async Task<ConfigurationTemplate> PatchTemplateAsync(
@@ -313,6 +246,127 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
             $"Unknown version {toVersion} of the template for {annotationType} in view {view}.");
     }
 
+    public async Task<IReadOnlyList<TemplateHistory>> GetTemplateHistoriesAsync(
+        string organization,
+        string project,
+        string view,
+        CancellationToken cancellationToken = default)
+    {
+        // one query of the partition: "{view}.gen.{type}" and "{view}.gnv.{type}.{n}", without the state items "gns"
+        var currentPrefix = $"{view}.{EntityIdPrefixTypes.GenerateTemplate}.";
+        var historyPrefix = $"{view}.{EntityIdPrefixTypes.GenerateTemplateVersion}.";
+        var query = new QueryDefinition(
+                "SELECT c.id, c.Version, c.Content, c.Modified FROM c WHERE STARTSWITH(c.id, @currentPrefix) OR STARTSWITH(c.id, @historyPrefix)")
+            .WithParameter("@currentPrefix", currentPrefix)
+            .WithParameter("@historyPrefix", historyPrefix);
+
+        var container = _repositoryProvider.GetOrganizationContainer(organization).Container;
+        var histories = new DocumentHistories<string>(StringComparer.Ordinal);
+        using var iterator = container.GetItemQueryStreamIterator(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = PartitionKeys.GetCosmosTemplate(project) });
+
+        while (iterator.HasMoreResults)
+        {
+            using var response = await iterator.ReadNextAsync(cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var page = response.Content.DeserializeNewtonsoft<QueryPage<DocumentArchiveRow>>(_serializerOptions);
+
+            foreach (var row in page?.Documents ?? [])
+            {
+                var isCurrent = row.Id?.StartsWith(currentPrefix, StringComparison.Ordinal) == true;
+                string? type = null;
+
+                if (isCurrent)
+                {
+                    type = row.Id![currentPrefix.Length..];
+                }
+                else if (row.Id?.StartsWith(historyPrefix, StringComparison.Ordinal) == true)
+                {
+                    // "{type}.{n}"
+                    type = row.Id[historyPrefix.Length..].Split('.')[0];
+                }
+
+                if (type is not null && IsTypeCode(type))
+                {
+                    histories.Add(type, row, isCurrent);
+                }
+            }
+        }
+
+        return histories.Build()
+            .OrderBy(history => history.Identity, StringComparer.Ordinal)
+            .Select(history => new TemplateHistory { AnnotationType = history.Identity, Versions = history.Versions, Current = history.Current })
+            .ToList();
+    }
+
+    public async Task<ViewImportResult> ImportTemplateAsync(
+        string organization,
+        string project,
+        string view,
+        string annotationType,
+        JObject content,
+        ViewImportOptions options)
+    {
+        annotationType = NormalizeAnnotationType(annotationType);
+        JObject document;
+
+        try
+        {
+            // the directives apply to the document alone, as on a create
+            document = await ((JObject)content.DeepClone()).RemoveRequested().ApplyPatchRequested();
+        }
+        catch (JsonPatchException exception)
+        {
+            return new ViewImportResult(ViewImportOutcome.Failed, ErrorCode: exception.ErrorCode, Message: exception.Message);
+        }
+
+        if (!document.HasValues)
+        {
+            return new ViewImportResult(
+                ViewImportOutcome.Skipped,
+                ErrorCode: ErrorCodes.EmptyDocument,
+                Message: "An empty document is not imported; delete the template to clear it.");
+        }
+
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var partitionKey = PartitionKeys.GetCosmosTemplate(project);
+        var (existing, _) = await ReadTemplateAsync(repository, partitionKey, GetTemplateId(view, annotationType));
+
+        // an empty template is no document, as in an export
+        var hasContent = existing?.Content.HasValues == true;
+
+        if (hasContent && JToken.DeepEquals(existing!.Content, document))
+        {
+            if (!options.DryRun)
+            {
+                // finish an invalidation of an earlier committed change, for example of an interrupted import
+                var (state, stateEtag) = await ReadStateAsync(repository, partitionKey, view, annotationType);
+                await CompletePendingInvalidationAsync(repository, partitionKey, project, view, annotationType, state, stateEtag);
+            }
+
+            return new ViewImportResult(ViewImportOutcome.Unchanged, existing.Version);
+        }
+
+        if (hasContent && options.Existing == ViewImportExisting.Skip)
+        {
+            return new ViewImportResult(
+                ViewImportOutcome.Skipped,
+                ErrorCode: ErrorCodes.DocumentExists,
+                Message: $"The view has a different template {annotationType}, and Skip keeps it.");
+        }
+
+        var outcome = hasContent ? ViewImportOutcome.Updated : ViewImportOutcome.Created;
+
+        if (options.DryRun)
+        {
+            return new ViewImportResult(outcome);
+        }
+
+        var written = await WriteTemplateAsync(organization, project, view, annotationType, document, options.Actor, merge: false);
+        return new ViewImportResult(outcome, written.Version);
+    }
+
     internal static string GetTemplateId(string view, string annotationType)
     {
         return $"{view}.{EntityIdPrefixTypes.GenerateTemplate}.{annotationType}";
@@ -342,6 +396,100 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
             GetTemplateStateId(view, annotationType),
             partitionKey,
             stream => stream.DeserializeNewtonsoft<GenerateTemplateStateEntity>(_serializerOptions));
+    }
+
+    // Merges the value into the stored template, or replaces the template with it (an import). The directives apply to
+    // the merged document, or to the value alone on a create or a replacement. An equal result writes nothing. The
+    // type code is normalized.
+    private async Task<GenerateTemplateEntity> WriteTemplateAsync(
+        string organization,
+        string project,
+        string view,
+        string annotationType,
+        JObject value,
+        AuditActor actor,
+        bool merge)
+    {
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var partitionKeyValue = PartitionKeys.GetTemplate(project);
+        var partitionKey = new PartitionKey(partitionKeyValue);
+        var id = GetTemplateId(view, annotationType);
+
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            var (existing, etag) = await ReadTemplateAsync(repository, partitionKey, id);
+            var (state, stateEtag) = await ReadStateAsync(repository, partitionKey, view, annotationType);
+
+            // the input is mutated by the requested operations, each attempt works on a fresh copy
+            var input = (JObject)value.DeepClone();
+
+            if (existing is null)
+            {
+                // create a new template if there is nothing yet
+                input = input.RemoveRequested();
+                input = await input.ApplyPatchRequested();
+
+                // the state keeps the last version even after a deletion and an expiration of the history
+                var lastVersion = state?.LastVersion ?? await GetMaxHistoryVersionAsync(repository, partitionKey, view, annotationType);
+                var template = new GenerateTemplateEntity
+                {
+                    PartitionKey = partitionKeyValue,
+                    Id = id,
+                    AnnotationKey = annotationType,
+                    Name = annotationType,
+                    ProjectName = project,
+                    ViewName = view,
+                    Content = input,
+                    Modified = AuditStamp.Of(actor, _timeProvider.GetUtcNow()),
+                    Version = lastVersion + 1,
+                };
+
+                // the version allocation and the creation are atomic, guarded by the state etag
+                var createBatch = repository.Container.CreateTransactionalBatch(partitionKey);
+                createBatch.CreateItem(template);
+                AddStateWrite(createBatch, template, state, stateEtag, template.Version);
+                var createdStateEtag = await TryExecuteWriteAsync(createBatch, id);
+                if (createdStateEtag is null)
+                {
+                    continue;
+                }
+
+                await InvalidateAsync(repository, partitionKey, project, view, annotationType, createdStateEtag);
+                return template;
+            }
+
+            JObject newContent;
+
+            if (merge)
+            {
+                newContent = (JObject)existing.Content.DeepClone();
+                newContent.MergeInto(input);
+                newContent = newContent.RemoveRequested();
+                newContent = await newContent.ApplyPatchRequested();
+            }
+            else
+            {
+                newContent = input.RemoveRequested();
+                newContent = await newContent.ApplyPatchRequested();
+            }
+
+            if (JToken.DeepEquals(existing.Content, newContent))
+            {
+                // no change, but finish an invalidation of an earlier committed change
+                await CompletePendingInvalidationAsync(repository, partitionKey, project, view, annotationType, state, stateEtag);
+                return existing;
+            }
+
+            var updated = await TryWriteNextVersionAsync(repository, partitionKey, project, existing, etag!, state, stateEtag, newContent, AuditStamp.Of(actor, _timeProvider.GetUtcNow()));
+            if (updated is null)
+            {
+                continue;
+            }
+
+            return updated;
+        }
+
+        throw new TemplateConcurrencyException(project, view, annotationType, MaxRetries);
     }
 
     private static async Task<ulong> GetMaxHistoryVersionAsync(IContainerRepository repository, PartitionKey partitionKey, string view, string annotationType)
@@ -482,5 +630,12 @@ public class CosmosConfigurationTemplateService : IConfigurationTemplateService
         return AnnotationTypeCodes.ValidCodes.ContainsKey(normalized)
             ? normalized
             : throw new ArgumentOutOfRangeException(nameof(annotationType), annotationType, "Unknown annotation type code.");
+    }
+
+    // A type code as the writes store it, lower-case.
+    private static bool IsTypeCode(string annotationType)
+    {
+        return AnnotationTypeCodes.ValidCodes.ContainsKey(annotationType)
+               && string.Equals(annotationType, annotationType.ToLowerInvariant(), StringComparison.Ordinal);
     }
 }

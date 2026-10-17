@@ -90,18 +90,52 @@ public class OpenApiDocumentTests
     }
 
     [Fact]
-    public void ConfigurationTransferSchemas_ArePublished()
+    public void ViewTransferSchemas_ArePublished()
     {
         var helper = new DocumentHelper(new RouteConstraintFilter(), new OpenApiSchemaAcceptor());
-        var methods = typeof(ConfigurationTransferHttp).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly).ToList();
+        var methods = typeof(ViewTransferHttp).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly).ToList();
 
         var schemas = helper.GetOpenApiSchemas(methods, new DefaultNamingStrategy(), VisitorCollection.CreateInstance());
 
-        schemas.Keys.ShouldContain("ConfigurationExportCreate");
-        schemas.Keys.ShouldContain("ConfigurationImportSummary");
-        schemas.Keys.ShouldContain("ConfigurationImportItem");
-        schemas["ConfigurationExport"].Properties.Keys.ShouldContain("FileName");
-        schemas["ConfigurationImport"].Properties.Keys.ShouldContain("Items");
-        schemas["ConfigurationImportItem"].Properties["Outcome"].Enum.Count.ShouldBe(5);
+        schemas.Keys.ShouldContain("ViewImportSummary");
+        schemas.Keys.ShouldContain("ViewImportItem");
+        schemas.Keys.ShouldNotContain(key => key.StartsWith("Configuration", StringComparison.Ordinal) && (key.Contains("Export") || key.Contains("Import")));
+        schemas["ViewExport"].Properties.Keys.ShouldContain("FileName");
+        schemas["ViewImport"].Properties.Keys.ShouldContain("Items");
+        schemas["ViewImportItem"].Properties["Outcome"].Enum.Count.ShouldBe(5);
+
+        // the include filter: a list of kinds, on the export's body and on both jobs
+        ShouldBeAListOfKinds(schemas["ViewExportCreate"].Properties["Include"]);
+        ShouldBeAListOfKinds(schemas["ViewExport"].Properties["Include"]);
+        ShouldBeAListOfKinds(schemas["ViewImport"].Properties["Include"]);
+        schemas["ViewExportCreate"].Properties["Format"].Enum.Select(Name).ShouldBe(["Folder", "Git"]);
+
+        schemas["ViewImport"].Properties["Existing"].Enum.Select(Name).ShouldBe(["Overwrite", "Skip"]);
+        schemas["ViewImport"].Properties["Summaries"].Type.ShouldBe("array");
+        schemas["ViewImport"].Properties["Summaries"].Items.Reference.Id.ShouldBe("ViewImportSummary");
+        schemas["ViewImportSummary"].Properties["Content"].Enum.Select(Name).ShouldBe(["Annotations", "Schemas", "Templates", "Configurations"]);
+        schemas["ViewImportSummary"].Properties.Keys.ShouldContain("Warnings");
+        schemas["ViewImportSummary"].Properties.Keys.ShouldContain("ExcludedFiles");
+
+        schemas["ViewImportItem"].Properties["Kind"].Enum.Select(Name).ShouldBe(["Annotation", "TypeSchema", "DescendantTypeSchema", "AnnotationSchema", "Template", "Configuration"]);
+        schemas["ViewImportItem"].Properties.Keys.ShouldContain("AnnotationType");
+        schemas["ViewImportItem"].Properties["Warnings"].Type.ShouldBe("array");
+        schemas["ViewImportItem"].Properties["Warnings"].Items.Reference.Id.ShouldBe("ViewImportWarning");
+        schemas["ViewImportWarning"].Properties.Keys.ShouldBe(["Code", "Message"], ignoreOrder: true);
+
+        schemas["ViewExport"].Properties.Keys
+            .Where(key => key.EndsWith("Count", StringComparison.Ordinal))
+            .ShouldBe(["AnnotationCount", "SchemaCount", "TemplateCount", "ConfigurationCount", "VersionCount"], ignoreOrder: true);
+    }
+
+    private static void ShouldBeAListOfKinds(OpenApiSchema include)
+    {
+        include.Type.ShouldBe("array");
+        include.Items.Enum.Select(Name).ShouldBe(["Annotations", "Schemas", "Templates", "Configurations"]);
+    }
+
+    private static string Name(Microsoft.OpenApi.Any.IOpenApiAny value)
+    {
+        return ((Microsoft.OpenApi.Any.OpenApiString)value).Value;
     }
 }

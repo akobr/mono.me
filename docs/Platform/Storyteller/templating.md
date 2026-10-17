@@ -82,7 +82,7 @@ Before templates were versioned, a template lived inside the annotation partitio
 
 ## Managing templates
 
-`IConfigurationTemplateService` (`Backend.Core/src/Configuring/`) is implemented by `CosmosConfigurationTemplateService` (`Backend.CosmosDb/src/Configuring/`). Every method takes organization, project, view, and type code. Type codes are case-insensitive; an unknown code throws `ArgumentOutOfRangeException`.
+`IConfigurationTemplateService` (`Backend.Core/src/Configuring/`) is implemented by `CosmosConfigurationTemplateService` (`Backend.CosmosDb/src/Configuring/`). Every method takes organization, project and view, and all but `GetTemplateHistoriesAsync` take a type code. Type codes are case-insensitive; an unknown code throws `ArgumentOutOfRangeException`.
 
 | Method | Behaviour |
 | --- | --- |
@@ -93,6 +93,10 @@ Before templates were versioned, a template lived inside the annotation partitio
 | `GetTemplateVersionsAsync` | Lists the history versions and the current version, oldest first. |
 | `GetTemplateVersionContentAsync` | Returns the content of one version, or `null`. |
 | `GetTemplateVersionChangesAsync` | Diff of `version - 1 → version`, or of any `from → to` pair. Version `0` is an empty object. An unknown version throws `InvalidOperationException`. |
+| `GetTemplateHistoriesAsync` | Every template of the view with its versions still in the history, for an [export](export-import.md), in one query of the partition. An empty document is not a version. A deleted template has versions and no current document. |
+| `ImportTemplateAsync` | Imports the file of a template ([export-import.md](export-import.md#templates)). It **replaces** the template rather than merging into it: `$remove` and `$patch` apply to the file's document alone, as on a create. `{}` is skipped (`EmptyDocument`), an equal template is unchanged, and with `Existing` set to `Skip` a different stored template is kept (`DocumentExists`). A dry run writes nothing. |
+
+`CreateOrUpdateTemplateAsync` and `ImportTemplateAsync` share one write path with a `merge` flag: a set merges, an import replaces. Merging would keep the properties the imported file removed. Both allocate the version from `LastVersion` and invalidate the cache like every template write ([Cache](#cache)).
 
 Every write uses the ETag of the item it read. When another writer changed the template in the meantime, the write is retried on fresh data, up to three times; after that `TemplateConcurrencyException` is thrown. An unexpected storage failure throws `ConfigurationStorageException`.
 
@@ -143,7 +147,7 @@ Versioning follows configuration versioning:
 
 Objects merge property by property. A scalar written by the incoming object replaces the current value. An array is unioned with the current array. Nested objects merge the same way. Merged tokens are copied, so the template item stays unchanged.
 
-`$remove` and `$patch` are write-time instructions. `CreateOrUpdateConfigurationAsync` applies them to stored content through `RemoveRequested` and `ApplyPatchRequested`. Calculation uses `MergeInto` only, so a `$remove` or `$patch` property inside a template is copied into the calculated document as an ordinary property.
+`$remove` and `$patch` are write-time instructions. `CreateOrUpdateConfigurationAsync` applies them to stored content through `RemoveRequested` and `ApplyPatchRequested`. Calculation uses `MergeInto` only, so a `$remove` or `$patch` property inside a template is copied into the calculated document as an ordinary property. A `$remove` entry that is not a valid JSONPath, or that takes the whole document (`$`), is a broken directive, like a broken `$patch`: `JsonPatchException` with `PatchInvalid` (`400` on the routes). A token that one entry matches twice is removed once.
 
 ## Where the template sits
 
@@ -225,7 +229,7 @@ These writes clear cached calculations, which makes the following read load the 
 - `CreateOrUpdateConfigurationAsync`, when the configuration item already exists, sets `CalculatedContent` to null on that item and calls `InvalidateConfigurationsAsync` for affected configurations.
 - `PatchConfigurationAsync` does the same.
 - `ClearConfigurationAsync`, when stored `Content` has values, deletes the item and then invalidates affected configurations. `DeleteAsync` deletes the item and then invalidates.
-- Every template write (`CreateOrUpdateTemplateAsync` with a changed content, `PatchTemplateAsync`, `DeleteTemplateAsync`) invalidates the configurations that merge the template, after the template has been written.
+- Every template write (`CreateOrUpdateTemplateAsync` or `ImportTemplateAsync` with a changed content, `PatchTemplateAsync`, `DeleteTemplateAsync`) invalidates the configurations that merge the template, after the template has been written.
 
 Invalidation (`ConfigurationCacheInvalidator`, `Backend.CosmosDb/src/Configuring/`) sets `CalculatedContent` and `CalculatedContentHash` to null and increments `AffectedCounter`. The patches are sent in transactional batches of at most 100 items per partition, which is the Cosmos DB limit. A failed batch is reported as an error. If an item was deleted in the meantime, its batch falls back to patching items one by one, skipping deleted ones.
 
@@ -249,7 +253,7 @@ A template write invalidates, in the template's view only, all configurations of
 
 This is a cross-partition operation over all annotation partitions of the view. Changing an `rst` or `sbt` template touches almost every configuration in the view. Configurations of other views are never touched.
 
-When the invalidation after a template write fails, the write stays committed and the state record keeps `IsInvalidationPending`. Repeating the request — even one that changes nothing, a patch of a missing template, or a delete of an already deleted template — finishes the invalidation.
+When the invalidation after a template write fails, the write stays committed and the state record keeps `IsInvalidationPending`. Repeating the request — even one that changes nothing, a patch of a missing template, or a delete of an already deleted template — finishes the invalidation. So does an import of an equal template that is not a dry run.
 
 A template item written directly into Cosmos, bypassing the service, leaves existing `CalculatedContent` in place. That template is applied on the next calculation, after one of the writes above has cleared the cached document.
 

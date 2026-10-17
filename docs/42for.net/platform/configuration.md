@@ -170,12 +170,32 @@ The functions and sources depend on the deployment: each Azure Key Vault is a so
 
 ## Export and import
 
-The own documents of a view can leave the platform as one zip and come back the same way, from the Administration UI or with `sform story config export` and `sform story config import`.
+The documents of a view can leave the platform as one zip and come back the same way: from the **Export & Import** page of the [Administration UI](admin-ui#export-and-import), or with `sform story export` and `sform story import`. An archive holds four kinds, all of them by default: the **annotations**, the **schemas**, the **templates** and the **configurations** of the view. `--include` (or the kind checkboxes of the page) narrows either side to some of them.
 
-- As a **folder**, each current document is `<annotation-key>.json` and each earlier version `<annotation-key>.<version>.json`.
-- As a **git repository**, every version is a commit by its author at its time, in the order the versions were written. `git log`, `git blame` and `git diff` then work on the history of a whole view.
+The file name tells the kind of a document, so the folders don't matter to an import:
 
-An import writes each changed document as a new version and leaves equal ones alone, so importing an export changes nothing, and editing a clone of the repository and importing it is a review-friendly way to change many documents. Templates, schemas and secrets are not part of an archive.
+| File | Document |
+| --- | --- |
+| `rst.payments.json` | The annotation `rst.payments`: its title, description, labels, values, validity and time zone |
+| `rst.payments.conf.json` | Its own configuration |
+| `rst.payments.schema.json` | Its schema |
+| `rst.payments.exe.schema.json` | The schema of the executions below it |
+| `exe.schema.json` | The schema of every execution |
+| `exe.template.json` | The template of executions |
+| `rst.payments.conf.3.json` | Version 3 of that configuration; templates and schemas have version files too, annotations have none |
+
+- As a **folder**, the export has `annotations/`, `schemas/`, `templates/` and `configurations/` with the current documents, the earlier versions next to them, and `export.json`. That manifest lists who created and last changed each annotation, and the author of each version.
+- As a **git repository**, the same folders are checked out. Every version of a schema, template or configuration is a commit by its author at its time, and each annotation a commit at its creation. `git log`, `git blame` and `git diff` then work on the history of a whole view, and `git log -- templates/exe.template.json` on one document.
+
+An import reads the current documents only; version files and history are never replayed. It writes the annotations first, ancestors before their descendants, then the schemas, templates and configurations, and it leaves equal documents alone, so importing an export changes nothing. A schema is checked against the configurations the archive brings, so an archive that changes a schema and its configurations together imports as one. A document the view already has is overwritten as a new version by default, or kept with **Skip** (`--existing skip`). Nothing is deleted because the archive lacks it. **Check** (`--dry-run`) reports the outcome of every file without writing anything. Editing a clone of the repository and importing it is a review-friendly way to change many documents.
+
+```text
+sform story export -f git -x                   # the view as a checked-out repository
+sform story import ./export-house-main-default-git-20261017-081500Z --dry-run
+sform story import edited.zip --include configurations --existing skip
+```
+
+Secrets, effective and resolved documents, the audit of annotations, and deleted annotations are never part of an archive. Bindings travel as written, so a secret stays a reference.
 
 ## What you gain
 
