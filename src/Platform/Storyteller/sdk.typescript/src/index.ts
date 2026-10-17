@@ -8,6 +8,7 @@ export {
   type StorytellerConfig,
 } from './lib/fetcher'
 export * from './lib/errors'
+export * from './lib/federation'
 export * from './lib/keys'
 export * from './lib/key-values'
 export * from './lib/paging'
