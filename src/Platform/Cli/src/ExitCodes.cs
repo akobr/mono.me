@@ -11,6 +11,9 @@ public static class ExitCodes
     public const int ERROR_CRASH = 1;
     public const int ERROR_WRONG_INPUT = 2;
 
+    // The identity provider or token endpoint failed; a retry may help.
+    public const int ERROR_SERVICE_FAILURE = 3;
+
     // warnings from 40
     public const int WARNING_ABORTED = 40;
     public const int WARNING_NO_WORK_NEEDED = 42;

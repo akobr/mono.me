@@ -12,6 +12,7 @@ namespace _42.Platform.Cli.UnitTests.Authentication;
 internal sealed class ScriptedHttpHandler : HttpMessageHandler
 {
     private readonly Queue<(HttpStatusCode Status, string Body)> _responses = new();
+    private readonly Queue<Exception> _failures = new();
 
     public List<RecordedRequest> Requests { get; } = [];
 
@@ -21,12 +22,25 @@ internal sealed class ScriptedHttpHandler : HttpMessageHandler
         return this;
     }
 
+    // The next request fails before a response, like an unreachable host.
+    public ScriptedHttpHandler Fail(Exception exception)
+    {
+        _failures.Enqueue(exception);
+        return this;
+    }
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var form = request.Content is null
             ? new Dictionary<string, string>()
             : ParseForm(await request.Content.ReadAsStringAsync(cancellationToken));
-        Requests.Add(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), form));
+        var headers = request.Headers.ToDictionary(header => header.Key, header => string.Join(",", header.Value), StringComparer.OrdinalIgnoreCase);
+        Requests.Add(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), form, headers));
+
+        if (_failures.Count > 0)
+        {
+            throw _failures.Dequeue();
+        }
 
         if (_responses.Count == 0)
         {

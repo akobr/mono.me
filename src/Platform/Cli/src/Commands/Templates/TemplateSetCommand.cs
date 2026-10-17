@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
@@ -77,7 +78,7 @@ public class TemplateSetCommand : BaseContextCommand
                     content);
             }
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             Console.WriteLine($"Error occurred: {e.Message}");
             return ExitCodes.ERROR_CRASH;

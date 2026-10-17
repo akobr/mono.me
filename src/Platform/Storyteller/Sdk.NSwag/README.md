@@ -29,6 +29,14 @@ dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTest
 
 Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (`npm run generate`), then add the new `{controller}ApiClient` to `src/ApiSdk.partial.cs` and `src/ServicesCollectionExtensions.cs`.
 
+## Credentials
+
+`ISdkConfiguration` carries what every request needs:
+
+* `AccessTokenFactory` is called before each request. A value that starts with `ApiKey ` is sent as `Authorization: ApiKey <key>`; any other value as `Authorization: Bearer <token>`; an empty value sends no header.
+* `ClientCertificate` is added to the `HttpClientHandler` of every client for mutual TLS. It needs a private key, and it must be set before the first client is resolved, because the handler is built then.
+* `ClientCertificateHeaderName` is for development only. When it is set together with `ClientCertificate`, every request also carries the certificate (base64 DER) in that header, for a host without TLS. `sform` sets `X-ARR-ClientCert` for an `http` API on `localhost`, which the local Functions host accepts with `MachineAuth:IsCertificateHeaderFromClientAllowed`.
+
 ## Client-side encryption
 
 `src/ClientSideEncryption/KeyValueClientEncryption.cs` encrypts a key/value secret for the recipients of a project (`GET …/key-values/recipients`) and decrypts a returned document with a recipient's private key, on top of the `KeyValues.ClientEncryption` library (JWE General JSON Serialization, A256GCM, RSA-OAEP-256). The TypeScript SDK (`./hyok`) and the CLI produce and read the same format.

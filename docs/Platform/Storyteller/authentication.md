@@ -184,6 +184,88 @@ One `sform` build therefore follows whichever provider the server at `general.ba
 
 Entra ID sign-in still uses MSAL with the cache in `~/.42for.net/msal.cache`.
 
+### Machine sign-in for pipelines
+
+`sform` signs in without a device code when machine credentials are in environment variables, for example in a CI/CD pipeline or a GitHub Action. Setting any credential variable switches `sform` to that machine:
+
+* It never asks anyone to sign in: no device code, no browser.
+* It never uses or changes the stored user session.
+* It stores no credential and no token. Only the AuthKit token URL fallback below caches the discovery answer in `auth.discovery.json`, as a user sign-in does.
+
+Commands keep their own confirmations, for example before overwriting an `-e` export file or deleting without `--yes`; a pipeline should not depend on them.
+
+`sform account machine create` prints the variables for the new machine. The names match the `.env` snippet of the admin UI.
+
+| Variable | Meaning |
+|---|---|
+| `STORYTELLER_API_URL` | API base URL including `/api`. Required for a machine, and replaces `general.baseUrl`. It must be `https`; `http` is allowed only for `localhost`. A user sign-in ignores it, so a stored user session is never sent to another host. |
+| `STORYTELLER_PROJECT` | Target `<organization>.<project>`, the same format as `-p`. |
+| `STORYTELLER_VIEW` | Target view. |
+| `STORYTELLER_API_KEY` | The structured `2s.` API key, sent as `Authorization: ApiKey`. A leading `ApiKey ` is accepted. |
+| `STORYTELLER_CERTIFICATE_FILE` | The machine's PKCS#12 file (`.pfx`) that `machine create` wrote. |
+| `STORYTELLER_CERTIFICATE_PASSWORD` | Its password. |
+| `STORYTELLER_CLIENT_ID` | Client ID of a `ClientCredentials` machine. |
+| `STORYTELLER_CLIENT_SECRET` | Its client secret. |
+| `STORYTELLER_TOKEN_URL` | The token URL `machine create` printed. |
+| `STORYTELLER_TOKEN_SCOPE` | The token scope `machine create` printed; Entra ID needs it. |
+| `STORYTELLER_TOKEN_FILE` | A file holding a bearer token, re-read before every request. |
+
+The credential variables decide the kind. Variables of two kinds at once, for example an API key and a token file, stop `sform` before any call.
+
+| Kind | Variables |
+|---|---|
+| `ApiKey` | `STORYTELLER_API_KEY` |
+| `Certificate` | `STORYTELLER_CERTIFICATE_FILE` and, when the file has one, `STORYTELLER_CERTIFICATE_PASSWORD` |
+| `CertificateAndApiKey` | all three |
+| `ClientCredentials` | `STORYTELLER_CLIENT_ID`, `STORYTELLER_CLIENT_SECRET`, and usually `STORYTELLER_TOKEN_URL` and `STORYTELLER_TOKEN_SCOPE` |
+| token file | `STORYTELLER_TOKEN_FILE` |
+
+**Certificates.**
+
+* The certificate goes in the TLS handshake.
+* For `http://localhost`, which has no handshake, the SDK sends it in `X-ARR-ClientCert`. The local Functions host accepts that header (`MachineAuth:IsCertificateHeaderFromClientAllowed` in `local.settings.json`).
+* A shared certificate signs in only together with its machine's API key.
+* A certificate and an API key of different machines or projects stop `sform` before any call.
+
+**Client credentials.**
+
+* `sform` posts `grant_type=client_credentials`, `client_id`, `client_secret` and, when it is set, `scope` to the token URL. It does not follow redirects.
+* The token is kept in memory for the process and renewed 60 seconds before it expires.
+* Without `STORYTELLER_TOKEN_URL`, only an AuthKit client (`client_…`) uses `{AuthKitDomain}/oauth2/token` from discovery, and only over `https`. This keeps a Keycloak or Entra ID secret from going to WorkOS. Every other client needs the variable.
+
+**Token file.** The file is read before every request, so a token that another process rotates is picked up, for example a Kubernetes projected token. The content is trimmed, and a leading `Bearer ` is removed. Any bearer token the API accepts works.
+
+**Target project.** The first of these that is set wins:
+
+1. `-p` on the command;
+2. `STORYTELLER_PROJECT`;
+3. the project of the API key or the certificate.
+
+`access.default.json` is never used for a machine, because it outlives the job on a self-hosted runner. A command without a project stops. So does a command whose target differs from the project of the key or the certificate. The view comes from `-v`, then `STORYTELLER_VIEW`, then `default`. `STORYTELLER_PROJECT` and `STORYTELLER_VIEW` also apply to a user sign-in, ahead of `access.default.json`.
+
+`sform account` checks the variables without a prompt. For client credentials it also gets the token, and for a token file it refuses a JWT whose `exp` has passed. It then prints the machine, the project and the API URL. `sform account logout` has nothing to do for a machine. Account, access point, machine and shared certificate management need a user sign-in; the API answers `401` to a machine.
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Signed in. |
+| `2` | The variables are missing or invalid, or the target project is wrong. |
+| `3` | The token endpoint failed or could not be reached; a retry may help. |
+| `43` | `sform account` only: no project is set. |
+| `44` | The credentials were rejected: by the token endpoint, as an expired token file, or by the API with `401`. A `403` the command does not handle itself ends the same way. |
+
+```yaml
+# GitHub Actions
+- run: dotnet tool install 42.Platform.Cli --global --prerelease
+- run: sform account
+  env:
+    STORYTELLER_API_URL: https://storyteller.example.com/api
+    STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+- run: sform story config set sbt.northwind -i configuration/northwind.json
+  env:
+    STORYTELLER_API_URL: https://storyteller.example.com/api
+    STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
+```
+
 ## Machine authentication policy
 
 A project enables one or more **machine credential kinds**, and each machine uses one of them. Machines of different kinds can work side by side in one project, for example an API-key service next to an mTLS one.
@@ -194,6 +276,8 @@ A project enables one or more **machine credential kinds**, and each machine use
 | `Certificate` | Its client certificate. |
 | `CertificateAndApiKey` | A certificate (its own, or a shared certificate of the project) and its API key. |
 | `ClientCredentials` | `Authorization: Bearer` with a token of the identity provider, see [Machine access with client credentials](#machine-access-with-client-credentials). |
+
+`sform` signs in as a machine of any of these kinds from environment variables, see [Machine sign-in for pipelines](#machine-sign-in-for-pipelines).
 
 **Shared certificates follow `CertificateAndApiKey`.** A shared certificate is the certificate half of a `CertificateAndApiKey` login, so the policy needs no setting of its own for it:
 
@@ -252,7 +336,7 @@ sform machine machine-auth --credential-kind client-credentials
 sform machine create
 ```
 
-The first command enables only `ClientCredentials`. A project can enable it next to other kinds; `machine create --credential-kind client-credentials` then picks it for one machine. `machine create` prints the client ID (also the machine ID in Storyteller), the client secret (shown once), the token URL and, for Entra ID, the token scope, with a `curl` example. `sform machine reset <id>` replaces the secret and `sform machine delete <id>` removes the provider's client. Both follow the kind the machine was created with, even if the project policy changed since.
+The first command enables only `ClientCredentials`. A project can enable it next to other kinds; `machine create --credential-kind client-credentials` then picks it for one machine. `machine create` prints the client ID (also the machine ID in Storyteller), the client secret (shown once), the token URL and, for Entra ID, the token scope, with a `curl` example and the `STORYTELLER_*` variables of a [pipeline sign-in](#machine-sign-in-for-pipelines). `sform machine reset <id>` replaces the secret and `sform machine delete <id>` removes the provider's client. Both follow the kind the machine was created with, even if the project policy changed since.
 
 Every provider's tokens are checked for the same things:
 

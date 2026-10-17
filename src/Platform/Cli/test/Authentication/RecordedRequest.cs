@@ -4,4 +4,9 @@ using System.Net.Http;
 
 namespace _42.Platform.Cli.UnitTests.Authentication;
 
-internal sealed record RecordedRequest(HttpMethod Method, Uri Uri, string? Authorization, Dictionary<string, string> Form);
+internal sealed record RecordedRequest(
+    HttpMethod Method,
+    Uri Uri,
+    string? Authorization,
+    Dictionary<string, string> Form,
+    IReadOnlyDictionary<string, string>? Headers = null);

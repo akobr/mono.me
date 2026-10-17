@@ -107,6 +107,9 @@ internal static class SdkRequestHelper
     {
         var token = configuration?.AccessTokenFactory?.Invoke();
 
+        // Independent of the token: a certificate-only machine sends no Authorization header.
+        ApplyClientCertificateHeader(configuration, request);
+
         if (string.IsNullOrEmpty(token))
         {
             return;
@@ -116,5 +119,19 @@ internal static class SdkRequestHelper
         request.Headers.Authorization = token.StartsWith(apiKeyPrefix, StringComparison.Ordinal)
             ? new AuthenticationHeaderValue("ApiKey", token[apiKeyPrefix.Length..])
             : new AuthenticationHeaderValue("Bearer", token);
+    }
+
+    private static void ApplyClientCertificateHeader(ISdkConfiguration? configuration, HttpRequestMessage request)
+    {
+        var certificate = configuration?.ClientCertificate;
+        var headerName = configuration?.ClientCertificateHeaderName;
+
+        if (certificate is null || string.IsNullOrEmpty(headerName))
+        {
+            return;
+        }
+
+        request.Headers.Remove(headerName);
+        request.Headers.TryAddWithoutValidation(headerName, Convert.ToBase64String(certificate.RawData));
     }
 }

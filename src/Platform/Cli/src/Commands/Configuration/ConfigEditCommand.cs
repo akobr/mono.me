@@ -1,3 +1,4 @@
+using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
@@ -97,7 +98,7 @@ public class ConfigEditCommand : BaseContextCommand
             Console.WriteImportant($"Configuration for '{AnnotationKey}' has been saved (version {saved.Version}).");
             return ExitCodes.SUCCESS;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             if (SchemaValidationConsole.TryWrite(Console, e))
             {

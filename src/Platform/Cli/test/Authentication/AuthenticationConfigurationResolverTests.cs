@@ -50,7 +50,10 @@ public sealed class AuthenticationConfigurationResolverTests : IDisposable
     {
         var resolver = CreateResolver(new AuthenticationOptions { Provider = provider, ClientId = clientId });
 
-        await Should.ThrowAsync<AuthenticationException>(() => resolver.ResolveAsync());
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => resolver.ResolveAsync());
+
+        // A setting to fix, not a service to retry.
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
     }
 
     [Fact]
