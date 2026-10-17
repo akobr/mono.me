@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Security.Claims;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
@@ -9,6 +10,7 @@ using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.KeyValues;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using Newtonsoft.Json.Linq;
@@ -18,7 +20,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 // A machine restricted to one execution, at the handlers: it reaches the execution and its descendants, and gets
 // 403 AnnotationRestricted before any service is called for an ancestor, a sibling or an operation that spans the
 // project. The machine branch of the access checks runs in every build, so these tests hold in Debug and Release.
-public class MachineRestrictionHttpTests
+// MachineRestrictionHttpTests.Handlers.cs runs every handler of one annotation, and more project-wide ones, from tables.
+public partial class MachineRestrictionHttpTests
 {
     private const string Org = "acme";
     private const string Project = "billing";
@@ -174,6 +177,35 @@ public class MachineRestrictionHttpTests
         call.Arg<IEnumerable<Annotation>>(1).Select(annotation => annotation.AnnotationKey).ShouldBe([Restriction, Descendant]);
     }
 
+    // The service creates the missing ancestors too; the restricted machine gets back only what it may address.
+    [Fact]
+    public async Task SetAnnotations_TheRestriction_LeavesTheCreatedAncestorsOutOfTheAnswer()
+    {
+        var (annotations, recorder) = Recording<IAnnotationService>();
+        recorder.Returns(nameof(IAnnotationService.CreateAnnotationsAsync), CreatedWithTheAncestors());
+        List<Annotation> body = [StoredAnnotation(Descendant)];
+
+        var result = await CreateAnnotationsHttp(annotations).SetAnnotations(MachineRequest("POST"), Org, Project, DefaultView, body);
+
+        var created = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IEnumerable<Annotation>>()!;
+        created.Select(annotation => annotation.AnnotationKey).ShouldBe([Restriction, Descendant]);
+        recorder.Calls.ShouldHaveSingleItem().Method.ShouldBe(nameof(IAnnotationService.CreateAnnotationsAsync));
+    }
+
+    [Fact]
+    public async Task SetAnnotations_ByAnUnrestrictedMachine_AnswersEveryCreatedAnnotation()
+    {
+        var (annotations, recorder) = Recording<IAnnotationService>();
+        recorder.Returns(nameof(IAnnotationService.CreateAnnotationsAsync), CreatedWithTheAncestors());
+        var http = new AnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor), TimeProvider.System, NullLogger<AnnotationsHttp>.Instance);
+        List<Annotation> body = [StoredAnnotation(Descendant)];
+
+        var result = await http.SetAnnotations(MachineRequest("POST"), Org, Project, DefaultView, body);
+
+        var created = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IEnumerable<Annotation>>()!;
+        created.Select(annotation => annotation.AnnotationKey).ShouldBe([Ancestor, Parent, Restriction, Descendant]);
+    }
+
     [Fact]
     public async Task FindDeletedAnnotations_WithAKeyOutsideTheRestriction_IsRefusedBeforeTheService()
     {
@@ -181,6 +213,23 @@ public class MachineRestrictionHttpTests
         var model = new AnnotationKeysRequest { Keys = [Descendant, Sibling] };
 
         await ShouldBeRestrictedAsync(() => http.FindDeletedAnnotations(MachineRequest("POST"), model, Org, Project, DefaultView));
+    }
+
+    [Fact]
+    public async Task FindDeletedAnnotations_TheRestrictionAndADescendant_ReachTheService()
+    {
+        var (annotations, recorder) = Recording<IAnnotationService>();
+        recorder.Returns(nameof(IAnnotationService.FindDeletedAnnotationsAsync), (IReadOnlyList<Annotation>)[StoredAnnotation(Descendant)]);
+        var model = new AnnotationKeysRequest { Keys = [Restriction, Descendant] };
+
+        var result = await CreateAnnotationsHttp(annotations).FindDeletedAnnotations(MachineRequest("POST"), model, Org, Project, DefaultView);
+
+        var deleted = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IReadOnlyList<Annotation>>()!;
+        deleted.ShouldHaveSingleItem().AnnotationKey.ShouldBe(Descendant);
+        var call = recorder.Calls.ShouldHaveSingleItem();
+        call.Method.ShouldBe(nameof(IAnnotationService.FindDeletedAnnotationsAsync));
+        call.Args[..3].ShouldBe([Org, Project, DefaultView]);
+        call.Arg<IReadOnlyCollection<AnnotationKey>>(3).Select(key => key.ToString()).ShouldBe([Restriction, Descendant]);
     }
 
     [Fact]
@@ -309,9 +358,17 @@ public class MachineRestrictionHttpTests
     }
 
     // The scopes pass the scope checks of a Release build; the restriction comes from the machine document.
-    private static TestHttpRequestData MachineRequest(string method = "GET")
+    private static TestHttpRequestData MachineRequest(string method = "GET", string? body = null)
     {
-        return KeyValueRequests.Machine(mtls: false, method: method, roles: [Scopes.Default.Read, Scopes.Default.Write]);
+        var (context, request) = FunctionTestDoubles.CreateRequest(new ServiceCollection().BuildServiceProvider(), method: method, body: body);
+        context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
+        {
+            new("sub", "machine-1"),
+            new("roles", Scopes.Default.Read),
+            new("roles", Scopes.Default.Write),
+        };
+        context.Items[FunctionContextItemKeys.MachineIdentity] = "machine-1";
+        return request;
     }
 
     private static RoleAccess Restricted()
@@ -357,6 +414,12 @@ public class MachineRestrictionHttpTests
             Created = Stamp,
             Modified = Stamp,
         };
+    }
+
+    // What a create below the restriction answers when the ancestors were missing: they come first.
+    private static List<Annotation> CreatedWithTheAncestors()
+    {
+        return [StoredAnnotation(Ancestor), StoredAnnotation(Parent), StoredAnnotation(Restriction), StoredAnnotation(Descendant)];
     }
 
     // The machine must be refused before the service is reached.
