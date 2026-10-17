@@ -103,6 +103,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
+    // New configuration (424-42).
+    test('the new configuration dialog has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/acme/billing/default/configurations')
+      await page.getByRole('button', { name: 'New configuration' }).first().click()
+      await page.getByRole('dialog').waitFor()
+      await expectAccessible(page)
+    })
+
     for (const [name, button, title] of [
       ['federation rules', 'Edit rules', 'Federation rules'],
       ['federated setup', 'Setup', 'Set up mach-release-pipeline'],

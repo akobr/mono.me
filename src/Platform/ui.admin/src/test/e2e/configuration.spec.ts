@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { openApp, replaceEditorText } from './support'
+import { goto, openApp, replaceEditorText } from './support'
 
 const key = 'exe.northwind.invoicing.prod'
 const path = `/acme/billing/default/configurations/${key}`
@@ -57,6 +57,50 @@ test('the breadcrumb opens the configuration of a parent and keeps Lineage at th
   await expect(page).toHaveURL(/\/acme\/billing\/default\/configurations\/cnt\.northwind\.prod\?q=northwind$/)
   await expect(page.getByRole('link', { name: 'Effective' })).toBeVisible()
   await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText('Context prod')
+})
+
+/** Opens the drop-down of the New dialog on Configurations and searches it; the options are teleported to the body. */
+async function searchNewConfiguration(page: Page, term: string) {
+  await page.getByRole('button', { name: 'New configuration' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New configuration' })
+  await dialog.getByRole('button', { name: 'Annotation' }).click()
+  await page.getByPlaceholder('Search keys').fill(term)
+  return dialog
+}
+
+test('New opens the configuration of an annotation without one', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/configurations?q=northwind')
+
+  // usg.northwind.invoicing has a configuration in the seed: it is a row, not an option.
+  await searchNewConfiguration(page, 'northwind.invoicing')
+  await expect(page.getByRole('option', { name: key, exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'usg.northwind.invoicing', exact: true })).toHaveCount(0)
+  await page.getByRole('option', { name: key, exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'New configuration' })
+  await expect(dialog.getByRole('button', { name: 'Annotation' })).toHaveText(key)
+  await dialog.getByRole('button', { name: 'Open editor' }).click()
+
+  await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(
+    /\/acme\/billing\/default\/configurations\/exe\.northwind\.invoicing\.prod\?q=northwind$/,
+  )
+  await expect(page.getByText('No configuration yet')).toBeVisible()
+  await page.getByRole('button', { name: 'Create empty' }).click()
+  await expect(page.getByText('Configuration created', { exact: true })).toBeVisible()
+
+  // Now it is a row of the list and no longer offered.
+  await goto(page, '/acme/billing/default/configurations?q=northwind.invoicing.prod')
+  await expect(page.getByText(key, { exact: true }).first()).toBeVisible()
+  await searchNewConfiguration(page, 'exe.northwind.invoicing')
+  await expect(page.getByRole('option', { name: 'exe.northwind.invoicing.staging', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: key, exact: true })).toHaveCount(0)
+})
+
+test('a reader has no New button on Configurations', async ({ page }) => {
+  await openApp(page, '/northwind/portal/default/configurations')
+
+  await expect(page.getByRole('button', { name: 'Export configurations' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New configuration' })).toHaveCount(0)
 })
 
 test('the JSON editor completes a binding and explains it on hover', async ({ page }) => {
