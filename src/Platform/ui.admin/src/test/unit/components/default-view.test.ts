@@ -26,9 +26,13 @@ describe('default view in the switcher', () => {
   it('shows prod between the name and the chevrons of the default view', async () => {
     const { host, viewButton } = await mountSwitcher('default')
 
-    expect(viewButton.get('[data-slot="label"]').text()).toBe('default')
+    const label = viewButton.get('[data-slot="label"]').element
+    const badge = label.nextElementSibling
+    expect(label.textContent).toBe('default')
+    expect(badge?.textContent).toBe('prod')
+    expect(badge?.nextElementSibling?.getAttribute('data-slot')).toBe('trailingIcon')
+    expect(viewButton.findAll('[data-slot="trailingIcon"]')).toHaveLength(1)
     expect(viewButton.text()).toBe('defaultprod')
-    expect(viewButton.find('[data-slot="trailingIcon"]').exists()).toBe(true)
     host.unmount()
   })
 
@@ -36,7 +40,7 @@ describe('default view in the switcher', () => {
     const { host, viewButton } = await mountSwitcher('staging')
 
     expect(viewButton.text()).toBe('staging')
-    expect(viewButton.find('[data-slot="trailingIcon"]').exists()).toBe(true)
+    expect(viewButton.findAll('[data-slot="trailingIcon"]')).toHaveLength(1)
     host.unmount()
   })
 
@@ -45,7 +49,9 @@ describe('default view in the switcher', () => {
 
     await viewButton.trigger('click')
     await settle()
-    const items = [...document.body.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())
+    const items = [...document.body.querySelectorAll('[role="menu"] [role="menuitem"]')].map((item) =>
+      item.textContent?.trim(),
+    )
     expect(items).toEqual(['defaultprod', 'staging', 'Manage views'])
     host.unmount()
   })
