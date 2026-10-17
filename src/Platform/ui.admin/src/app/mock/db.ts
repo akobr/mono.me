@@ -247,7 +247,7 @@ export function createSeed(scenario: MockScenario): MockDb {
             {
               Issuer: 'github',
               Audience: mockTokenEndpoint('acme', 'billing'),
-              Subject: 'repo:acme/billing:environment:production',
+              Subject: 'repo:acme@65/billing@74:environment:production',
               Claims: { repository_id: ['74'] },
             },
           ],

@@ -172,6 +172,8 @@ configureStoryteller({
 const page = await getAnnotations('acme', 'billing', 'default')
 ```
 
+`getVercelOidcToken({ audience })` needs `@vercel/oidc` 3.7.0 or later. A token with a custom audience always carries the team issuer `https://oidc.vercel.com/<team-slug>`, whatever issuer mode the project uses, so that is the trusted issuer, never the global `https://oidc.vercel.com`.
+
 `getSubjectToken` on other platforms:
 
 | Platform | `getSubjectToken` | `subjectTokenType` |
@@ -179,6 +181,7 @@ const page = await getAnnotations('acme', 'billing', 'default')
 | GitHub Actions (`permissions: id-token: write`) | `() => core.getIDToken(tokenEndpoint)` (`@actions/core`) | default (`…:jwt`) |
 | Kubernetes (a projected `serviceAccountToken` with the rule's audience) | `async () => (await readFile('/var/run/secrets/storyteller/token', 'utf8')).trim()`; read the file for every exchange, the kubelet rotates it | default |
 | Azure managed identity | a token for `resource=api://<appId>` from IMDS or `IDENTITY_ENDPOINT` | `FederatedSubjectTokenType.AccessToken` |
+| AWS (outbound identity federation enabled) | `async () => (await sts.send(new GetWebIdentityTokenCommand({ Audience: [tokenEndpoint], SigningAlgorithm: 'ES384' }))).WebIdentityToken!` with `const sts = new STSClient({ region: 'eu-central-1' })` (`@aws-sdk/client-sts`); a regional client, the global STS endpoint does not offer the operation | default |
 | Google Cloud | the metadata server's `…/identity?audience=…&format=full` | `FederatedSubjectTokenType.IdToken` |
 
 `exchangeFederatedToken` does a single exchange and returns `{ accessToken, expiresAt, scope }` (`expiresAt` in milliseconds, like `Date.now()`), for example to pass the token to another process:

@@ -51,7 +51,7 @@ export function claimRowError(row: ClaimRow): string | undefined {
   return undefined
 }
 
-/** A `<placeholder>` of a template that still has to be replaced, for example `<tenant>`. */
+/** A `<placeholder>` of a template that still has to be replaced, for example `<tenant-id>`. */
 export function placeholderIn(value?: string | null): string | undefined {
   return value?.match(/<[^<>]+>/)?.[0]
 }
@@ -280,22 +280,25 @@ export const issuerTemplates: IssuerTemplate[] = [
     maxTokenLifetimeSeconds: 7200,
     requiredClaims: [{ claim: 'owner_id', value: '' }],
     help:
-      'The team issuer; renaming the team changes it. owner_id is the team id (team_…). Function tokens live 2 hours; ' +
-      'raise the lifetime to 43,200 when development tokens are exchanged too.',
+      'The team issuer, whatever issuer mode the project uses: a token with a custom audience ' +
+      '(getVercelOidcToken({ audience }) of @vercel/oidc 3.7.0 or later) always carries it, never the global ' +
+      'https://oidc.vercel.com. Renaming the team changes it. owner_id is the team id (team_…). Function tokens live 2 ' +
+      'hours; raise the lifetime to 43,200 when development tokens are exchanged too.',
   },
   {
     platform: 'azure',
     label: 'Azure managed identity',
     icon: 'i-lucide-cloud',
     name: 'azure',
-    issuer: 'https://login.microsoftonline.com/<tenant>/v2.0',
+    issuer: 'https://login.microsoftonline.com/<tenant-id>/v2.0',
     keySource: 'Discovery',
     maxTokenLifetimeSeconds: 86_400,
     requiredClaims: [],
     help:
       'For an app registration that stands for Storyteller and requests v2 tokens (requestedAccessTokenVersion 2); with ' +
-      'v1 tokens the issuer is https://sts.windows.net/<tenant>/. Managed identity tokens are cached for 24 hours. In the ' +
-      'rules, the subject is the identity’s object id and the audience the app registration.',
+      'v1 tokens the issuer is https://sts.windows.net/<tenant-id>/. The tenant ID is a GUID, never a domain: tokens ' +
+      'carry the GUID, and discovery under a domain names the GUID issuer. Managed identity tokens are cached for 24 ' +
+      'hours. In the rules, the subject is the identity’s object id and the audience the app registration.',
   },
   {
     platform: 'aws',
@@ -354,9 +357,10 @@ export interface RuleHint {
 export const ruleHints: Record<FederationPlatform, RuleHint> = {
   github: {
     subject:
-      'repo:<owner>/<repo>:environment:<name>, …:ref:refs/heads/<branch> or …:pull_request, or a prefix like ' +
-      'repo:acme/billing:*. Repositories new, renamed or transferred since 2026-07-15 use repo:<owner>@<id>/<repo>@<id>:….',
-    subjectPlaceholder: 'repo:acme/billing:environment:production',
+      'repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:<name>, …:ref:refs/heads/<branch> or …:pull_request, or a ' +
+      'prefix like repo:acme@65/billing@74:*, for repositories created, renamed or transferred after 2026-07-15. Older ' +
+      'repositories use the name-based repo:<owner>/<repo>:… unless they opted in.',
+    subjectPlaceholder: 'repo:acme@65/billing@74:environment:production',
     claims:
       'Pin repository_id, and repository_owner_id unless the trusted issuer requires it: names can be recycled, ids cannot.',
     claimSuggestions: ['repository_id', 'repository_owner_id', 'enterprise_id', 'environment', 'ref'],
