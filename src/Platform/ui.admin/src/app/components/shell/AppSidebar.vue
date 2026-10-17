@@ -6,6 +6,7 @@ import type { NavigationMenuItem } from '@nuxt/ui'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useBootState } from '@/boot/state'
 import { buildNavigation } from '@/utils/navigation'
+import { defaultViewBadge } from '@/utils/views'
 
 const route = useRoute()
 const preferences = usePreferencesStore()
@@ -16,9 +17,20 @@ const boot = useBootState()
 const environment = computed(() => boot.value.config?.environmentName)
 
 // The sections of the remembered view and project stay on the pages of a less specific context (424-17).
+// The default view is the production one: a "prod" badge follows its name, and the lock badges of the entries keep
+// the right edge (424-43).
 const items = computed<NavigationMenuItem[][]>(() =>
   buildNavigation(navigation.value).map((section) => [
-    ...(section.label ? [{ label: section.label, type: 'label' as const }] : []),
+    ...(section.label
+      ? [
+          {
+            label: section.label,
+            type: 'label' as const,
+            badge: section.defaultView ? defaultViewBadge : undefined,
+            ui: { linkTrailing: 'ms-0' },
+          },
+        ]
+      : []),
     ...section.items.map((item) => ({
       label: item.label,
       icon: item.icon,

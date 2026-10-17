@@ -7,6 +7,7 @@ import { useContextStore } from '@/stores/context'
 import { useSessionStore } from '@/stores/session'
 import { groupMemberships } from '@/utils/memberships'
 import { projectTarget, viewTarget } from '@/utils/context-paths'
+import { defaultViewBadge, defaultViewName, isDefaultView } from '@/utils/views'
 
 // Organization / project / view breadcrumb dropdowns (like Vercel). Switching keeps the current section.
 const route = useRoute()
@@ -45,7 +46,7 @@ const projectItems = computed<DropdownMenuItem[][]>(() => [
 
 const viewItems = computed<DropdownMenuItem[][]>(() => {
   const names = (views.data.value ?? []).map((view) => view.Name).filter((name): name is string => !!name)
-  const list = names.length > 0 ? names : ['default']
+  const list = names.length > 0 ? names : [defaultViewName]
 
   return [
     list.map((name) => ({
@@ -53,6 +54,8 @@ const viewItems = computed<DropdownMenuItem[][]>(() => {
       icon: 'i-lucide-eye',
       to: viewTarget(route.path, context.org!, context.project!, name),
       active: name === context.view,
+      // The production view carries its badge in the list too (424-43).
+      slot: isDefaultView(name) ? ('default-view' as const) : undefined,
     })),
     [{ label: 'Manage views', icon: 'i-lucide-settings-2', to: `/${context.org}/${context.project}/views` }],
   ]
@@ -98,7 +101,17 @@ const viewItems = computed<DropdownMenuItem[][]>(() => {
           trailing-icon="i-lucide-chevrons-up-down"
           class="hidden max-w-40 sm:inline-flex"
           :ui="{ label: 'truncate' }"
-        />
+        >
+          <!-- The default view is the production one: "prod" between its name and the chevrons (424-43). -->
+          <template v-if="isDefaultView(context.view)" #trailing>
+            <UBadge v-bind="defaultViewBadge" class="shrink-0 py-0.5" />
+            <UIcon name="i-lucide-chevrons-up-down" data-slot="trailingIcon" class="size-4 shrink-0" />
+          </template>
+        </UButton>
+
+        <template #default-view-trailing>
+          <UBadge v-bind="defaultViewBadge" />
+        </template>
       </UDropdownMenu>
     </template>
   </nav>

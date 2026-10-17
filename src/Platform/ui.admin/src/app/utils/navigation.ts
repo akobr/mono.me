@@ -1,6 +1,7 @@
 import { hasRole, roleRank, type AccountRoleName } from '@42for.net/2splatform.sdk'
 import type { Scope } from '@/stores/context'
 import { hasOrganization } from '@/utils/memberships'
+import { defaultViewName, isDefaultView } from '@/utils/views'
 
 export interface NavigationEntry {
   label: string
@@ -17,6 +18,8 @@ export interface NavigationEntry {
 export interface NavigationSection {
   id: 'view' | 'project' | 'org' | 'global'
   label?: string
+  /** The section of the default view, the main (production) view of the project (424-43). */
+  defaultView?: boolean
   entries: NavigationEntry[]
 }
 
@@ -72,16 +75,17 @@ export function navigationScope(
   accessMap: Record<string, string> | undefined | null,
 ): Partial<Scope> {
   const scope = mergeContext(current, accessibleContext(remembered, accessMap))
-  return scope.project ? { ...scope, view: scope.view ?? 'default' } : scope
+  return scope.project ? { ...scope, view: scope.view ?? defaultViewName } : scope
 }
 
 /**
  * Sidebar sections (spec section 4): view scope, project scope and organization scope, plus global entries.
- * Entries the caller's role cannot use are hidden; read-only ones are marked as locked.
+ * Entries the caller's role cannot use are hidden; read-only ones are marked as locked. The section of the default
+ * view is flagged, so the sidebar can mark it as production (424-43).
  */
 export function buildNavigation(
   context: NavigationContext,
-): { id: NavigationSection['id']; label?: string; items: NavigationItem[] }[] {
+): { id: NavigationSection['id']; label?: string; defaultView: boolean; items: NavigationItem[] }[] {
   const sections: NavigationSection[] = []
   const { org, project, view } = context
 
@@ -90,6 +94,7 @@ export function buildNavigation(
     sections.push({
       id: 'view',
       label: `View · ${view}`,
+      defaultView: isDefaultView(view),
       entries: [
         { label: 'Annotations', icon: 'i-lucide-tags', to: `${base}/annotations`, editRole: 'Contributor' },
         { label: 'Configurations', icon: 'i-lucide-settings-2', to: `${base}/configurations`, editRole: 'Contributor' },
@@ -143,6 +148,7 @@ export function buildNavigation(
       return {
         id: section.id,
         label: section.label,
+        defaultView: section.defaultView ?? false,
         items: section.entries
           .filter((entry) => !entry.minRole || hasRole(role, entry.minRole))
           .map((entry) => ({ ...entry, locked: !!entry.editRole && !hasRole(role, entry.editRole) })),
