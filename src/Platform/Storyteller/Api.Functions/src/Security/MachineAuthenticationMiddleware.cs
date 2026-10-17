@@ -105,7 +105,6 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         string project;
         string machineAccessId;
         MachineAccessScope scope;
-        string? annotationKey = null;
 
         if (certResult is not null && apiKeyResult is not null)
         {
@@ -125,7 +124,6 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
                 project = certResult.Project;
                 machineAccessId = certResult.MachineAccessId!;
                 scope = certResult.Scope;
-                annotationKey = certResult.AnnotationKey;
             }
             else
             {
@@ -158,7 +156,6 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
             project = certResult.Project;
             machineAccessId = certResult.MachineAccessId!;
             scope = certResult.Scope;
-            annotationKey = certResult.AnnotationKey;
         }
         else
         {
@@ -224,11 +221,6 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         foreach (var roleClaim in roleClaims)
         {
             claims.Add(new Claim("roles", roleClaim));
-        }
-
-        if (annotationKey is not null)
-        {
-            claims.Add(new Claim("annotationKey", annotationKey));
         }
 
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;

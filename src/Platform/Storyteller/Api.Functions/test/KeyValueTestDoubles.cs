@@ -63,8 +63,9 @@ internal sealed class FixedKeyValuePolicies(bool requireMtls = true, KeyValuePol
         => Task.FromResult<IReadOnlyList<(string, string, KeyValuePolicy)>>([]);
 }
 
-// Every user has the given role on every access point; every machine has access to every project.
-internal sealed class RoleAccess(AccountRole role) : IAccessService
+// Every user has the given role on every access point; every machine has access to every project, restricted to the
+// given annotation when there is one.
+internal sealed class RoleAccess(AccountRole role, string? machineAnnotationKey = null) : IAccessService
 {
     public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey) => Task.FromResult(role);
 
@@ -94,7 +95,15 @@ internal sealed class RoleAccess(AccountRole role) : IAccessService
 
     public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project) => throw new NotSupportedException();
 
-    public Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id) => throw new NotSupportedException();
+    public Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id)
+        => Task.FromResult<MachineAccess?>(new MachineAccess
+        {
+            Id = id,
+            ObjectId = id,
+            AccessKey = "***",
+            Scope = MachineAccessScope.SecretsReadWrite,
+            AnnotationKey = machineAnnotationKey,
+        });
 
     public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotSupportedException();
 

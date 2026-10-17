@@ -51,7 +51,8 @@ public class ViewsHttp
             EnsureNotMachine(request);
         }
 
-        await request.CheckAccessToProjectAsync(_access, organization, project, discover ? AccountRole.Administrator : AccountRole.Reader);
+        // The views hold no annotation data, so a machine restricted to an annotation lists them too.
+        await request.CheckAccessToProjectMetadataAsync(_access, organization, project, discover ? AccountRole.Administrator : AccountRole.Reader);
 
         var views = await _views.GetViewsAsync(organization, project, discover);
         return new OkObjectResult(views);
