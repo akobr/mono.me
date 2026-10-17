@@ -6,7 +6,9 @@ test('invites a member to the project from its Members page', async ({ page }) =
   await openApp(page, '/acme/billing/members')
   const invitations = page.locator('#invitations')
   await expect(invitations.getByRole('heading', { name: 'Invitations' })).toBeVisible()
-  await invitations.getByRole('button', { name: 'Invite' }).click()
+  // the page's main action, in the top bar (icon-only on a phone, with the same name), not above the table (424-41)
+  await expect(invitations.getByRole('button', { name: 'Invite' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Invite', exact: true }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Invite people' })
   await dialog.getByPlaceholder('ada@example.com').fill('marie@example.com')
@@ -15,6 +17,54 @@ test('invites a member to the project from its Members page', async ({ page }) =
 
   await expect(dialog).toBeHidden()
   await expect(invitations.getByText('marie@example.com').first()).toBeVisible()
+})
+
+test('invites several people typed with spaces and commas, with the same role', async ({ page }) => {
+  await openApp(page, '/acme/billing/members')
+  await page.getByRole('button', { name: 'Invite', exact: true }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Invite people' })
+  const emails = dialog.getByPlaceholder('ada@example.com')
+  // the last address is not followed by a separator: Send takes it too
+  await emails.pressSequentially('Marie@example.com grace.h@example.com,ada.l@example.com')
+  await expect(dialog.getByText('marie@example.com', { exact: true })).toBeVisible()
+  await expect(dialog.getByText('grace.h@example.com', { exact: true })).toBeVisible()
+  await expect(emails).toHaveValue('ada.l@example.com')
+  await dialog.getByRole('combobox', { name: 'Role' }).click()
+  await page.getByRole('option', { name: 'Contributor', exact: true }).click()
+  await dialog.getByRole('button', { name: 'Send invitations' }).click()
+
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText('3 invitations sent', { exact: true })).toBeVisible()
+  const invitations = page.locator('#invitations')
+  for (const email of ['marie@example.com', 'grace.h@example.com', 'ada.l@example.com']) {
+    const row = invitations.getByRole('row').filter({ hasText: email })
+    await expect(row).toBeVisible()
+    await expect(row).toContainText('Contributor')
+  }
+})
+
+test('invites a pasted list to the organization from its Members page', async ({ page }) => {
+  await openApp(page, '/acme/members')
+  await page.getByRole('button', { name: 'Invite', exact: true }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'Invite people' })
+  await expect(dialog).toContainText('To acme.')
+  // a list copied from a mail client: the display names go, the addresses become tags
+  await dialog.getByPlaceholder('ada@example.com').evaluate((input, text) => {
+    const clipboardData = new DataTransfer()
+    clipboardData.setData('text/plain', text)
+    input.dispatchEvent(new ClipboardEvent('paste', { clipboardData, bubbles: true, cancelable: true }))
+  }, 'Marie Curie <marie@example.com>, "Hopper, Grace" <grace.h@example.com>;\nmarie@example.com')
+  await expect(dialog.getByText('marie@example.com', { exact: true })).toHaveCount(1)
+  await expect(dialog.getByText('grace.h@example.com', { exact: true })).toBeVisible()
+  await dialog.getByRole('button', { name: 'Send invitations' }).click()
+
+  await expect(dialog).toBeHidden()
+  await expect(page.getByText('2 invitations sent', { exact: true })).toBeVisible()
+  const invitations = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Invitations' }) })
+  await expect(invitations.getByText('marie@example.com')).toBeVisible()
+  await expect(invitations.getByText('grace.h@example.com')).toBeVisible()
 })
 
 test('creates a machine and downloads its certificate', async ({ page }) => {
