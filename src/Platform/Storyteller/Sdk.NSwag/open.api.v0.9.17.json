@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.15.8260"
+    "version": "0.9.17.17507"
   },
   "servers": [
     {
@@ -9080,6 +9080,605 @@
         ]
       }
     },
+    "/v1/{organization}/{project}/access/issuers": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "description": "The trusted issuers of the project: the OIDC issuers whose tokens its Federated machines exchange for Storyteller tokens. Contributor.",
+        "operationId": "GetFederatedIssuers",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The trusted issuers of the project, ordered by name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FederatedIssuer"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///Annotation.Read",
+              "api:///Annotation.ReadWrite",
+              "api:///Configuration.Read",
+              "api:///Configuration.ReadWrite",
+              "api:///Configuration.Secrets",
+              "api:///Default.Read",
+              "api:///Default.ReadWrite",
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/access/issuers/{name}": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "description": "A trusted issuer of the project. Contributor.",
+        "operationId": "GetFederatedIssuer",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The trusted issuer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederatedIssuer"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The project has no trusted issuer of that name."
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///Annotation.Read",
+              "api:///Annotation.ReadWrite",
+              "api:///Configuration.Read",
+              "api:///Configuration.ReadWrite",
+              "api:///Configuration.Secrets",
+              "api:///Default.Read",
+              "api:///Default.ReadWrite",
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Creates or replaces a trusted issuer of the project. The route name wins over the body; the Issuer of an existing trusted issuer cannot change. Administrator.",
+        "operationId": "SetFederatedIssuer",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The trusted issuer: the exact `iss`, where its keys come from, the longest accepted token lifetime and the claims every token must carry.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FederatedIssuer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The stored trusted issuer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederatedIssuer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The issuer is not valid, its Issuer would change, or the project already has 20 trusted issuers (ErrorCode InvalidFederation).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Federation rules of machines still reference the name of a deleted issuer (ErrorCode FederatedIssuerInUse); the message names up to 10 machines.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///Annotation.Read",
+              "api:///Annotation.ReadWrite",
+              "api:///Configuration.Read",
+              "api:///Configuration.ReadWrite",
+              "api:///Configuration.Secrets",
+              "api:///Default.Read",
+              "api:///Default.ReadWrite",
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Deletes a trusted issuer even while federation rules reference it: the kill switch. Those rules stop matching within a minute; Storyteller tokens already issued stay valid until they expire. Administrator.",
+        "operationId": "DeleteFederatedIssuer",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "path",
+            "description": "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Acknowledge of the deletion."
+          },
+          "404": {
+            "description": "The project has no trusted issuer of that name."
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///Annotation.Read",
+              "api:///Annotation.ReadWrite",
+              "api:///Configuration.Read",
+              "api:///Configuration.ReadWrite",
+              "api:///Configuration.Secrets",
+              "api:///Default.Read",
+              "api:///Default.ReadWrite",
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/access/machines/{id}/federation-rules": {
+      "put": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor.",
+        "operationId": "SetMachineFederationRules",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The id of the machine access.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "1 to 10 rules; a platform token must match one of them.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/FederationRule"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The machine access with its new rules and its token endpoint.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineAccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A rule is not valid (ErrorCode InvalidFederation), or the machine is not Federated (ErrorCode MachineNotFederated).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The machine access doesn't exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The machine was changed concurrently while its rules were replaced (ErrorCode Conflict); reload it and retry.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///Annotation.Read",
+              "api:///Annotation.ReadWrite",
+              "api:///Configuration.Read",
+              "api:///Configuration.ReadWrite",
+              "api:///Configuration.Secrets",
+              "api:///Default.Read",
+              "api:///Default.ReadWrite",
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/access/token": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "description": "Anonymous. The RFC 8693 token exchange of Federated machines: client_id names the machine, subject_token is a token of a trusted issuer of the project, and the response is a short-lived Storyteller token for Authorization: Bearer. Send no Authorization header. Every refused subject token gets the same invalid_request description; the reason is only logged.",
+        "operationId": "ExchangeMachineToken",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "The token request form. audience and resource may repeat; every other parameter appears once, and an empty value counts as absent.",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/MachineTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The Storyteller token (Cache-Control: no-store).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MachineTokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_request (also for every refused subject token), unsupported_grant_type, invalid_target or invalid_scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "temporarily_unavailable: the keys of the trusted issuer or the signing key are not available right now; Retry-After says when to try again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/access/points/{key}/invitations": {
       "get": {
         "tags": [
@@ -16203,6 +16802,66 @@
           }
         ]
       },
+      "FederatedIssuer": {
+        "type": "object",
+        "properties": {
+          "Name": {
+            "type": "string"
+          },
+          "Issuer": {
+            "type": "string"
+          },
+          "KeySource": {
+            "enum": [
+              "Discovery",
+              "JwksUri",
+              "Jwks"
+            ],
+            "type": "string",
+            "default": "Discovery"
+          },
+          "JwksUri": {
+            "type": "string"
+          },
+          "Jwks": {
+            "type": "string"
+          },
+          "MaxTokenLifetimeSeconds": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "RequiredClaims": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/IReadOnlyList_String"
+            }
+          },
+          "Description": {
+            "type": "string"
+          }
+        }
+      },
+      "FederationRule": {
+        "type": "object",
+        "properties": {
+          "Issuer": {
+            "type": "string"
+          },
+          "Audience": {
+            "type": "string"
+          },
+          "Subject": {
+            "type": "string"
+          },
+          "Claims": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/IReadOnlyList_String"
+            }
+          }
+        }
+      },
       "HsmSettings": {
         "type": "object",
         "properties": {
@@ -16311,6 +16970,12 @@
             "format": "int32",
             "nullable": true
           }
+        }
+      },
+      "IReadOnlyList_String": {
+        "type": "array",
+        "items": {
+          "type": "string"
         }
       },
       "KeyValue": {
@@ -16979,7 +17644,8 @@
               "ApiKey",
               "Certificate",
               "CertificateAndApiKey",
-              "ClientCredentials"
+              "ClientCredentials",
+              "Federated"
             ],
             "type": "string",
             "default": "ApiKey"
@@ -17016,6 +17682,12 @@
           },
           "TokenScope": {
             "type": "string"
+          },
+          "FederationRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FederationRule"
+            }
           }
         }
       },
@@ -17050,7 +17722,8 @@
               "ApiKey",
               "Certificate",
               "CertificateAndApiKey",
-              "ClientCredentials"
+              "ClientCredentials",
+              "Federated"
             ],
             "type": "string",
             "nullable": true
@@ -17063,6 +17736,12 @@
           "UseSharedCertificate": {
             "type": "boolean",
             "nullable": true
+          },
+          "FederationRules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FederationRule"
+            }
           }
         }
       },
@@ -17080,7 +17759,8 @@
               "ApiKey",
               "Certificate",
               "CertificateAndApiKey",
-              "ClientCredentials"
+              "ClientCredentials",
+              "Federated"
             ],
             "type": "string",
             "nullable": true
@@ -17089,6 +17769,73 @@
             "type": "integer",
             "format": "int32",
             "nullable": true
+          }
+        }
+      },
+      "MachineTokenRequest": {
+        "required": [
+          "grant_type",
+          "subject_token",
+          "subject_token_type",
+          "client_id"
+        ],
+        "type": "object",
+        "properties": {
+          "grant_type": {
+            "type": "string"
+          },
+          "subject_token": {
+            "type": "string"
+          },
+          "subject_token_type": {
+            "type": "string"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "audience": {
+            "type": "string",
+            "nullable": true
+          },
+          "resource": {
+            "type": "string",
+            "nullable": true
+          },
+          "scope": {
+            "type": "string",
+            "nullable": true
+          },
+          "requested_token_type": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MachineTokenResponse": {
+        "required": [
+          "access_token",
+          "issued_token_type",
+          "token_type",
+          "expires_in",
+          "scope"
+        ],
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "issued_token_type": {
+            "type": "string"
+          },
+          "token_type": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "scope": {
+            "type": "string"
           }
         }
       },
@@ -17106,6 +17853,21 @@
             ],
             "type": "string",
             "default": "None"
+          }
+        }
+      },
+      "OAuthErrorResponse": {
+        "required": [
+          "error"
+        ],
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "error_description": {
+            "type": "string",
+            "nullable": true
           }
         }
       },
@@ -17523,7 +18285,8 @@
           "ApiKey",
           "Certificate",
           "CertificateAndApiKey",
-          "ClientCredentials"
+          "ClientCredentials",
+          "Federated"
         ],
         "type": "string"
       }
