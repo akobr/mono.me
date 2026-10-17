@@ -1,3 +1,4 @@
+using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Configuration;
@@ -89,7 +90,7 @@ public class TemplateEditCommand : BaseContextCommand
             Console.WriteImportant($"Template for '{annotationType}' has been saved (version {saved.Version}).");
             return ExitCodes.SUCCESS;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             Console.WriteLine($"Error occurred: {e.Message}");
             return ExitCodes.ERROR_CRASH;

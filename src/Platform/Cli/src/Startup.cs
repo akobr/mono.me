@@ -1,5 +1,6 @@
 using System;
 using System.IO.Abstractions;
+using System.Net.Http;
 using _42.CLI.Toolkit;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
@@ -11,6 +12,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Serilog;
 using IConfigurationBuilder = Microsoft.Extensions.Configuration.IConfigurationBuilder;
@@ -19,6 +21,8 @@ namespace _42.Platform.Cli
 {
     public class Startup : IStartup
     {
+        private const string ClientCertificateHeaderName = "X-ARR-ClientCert";
+
         public Startup(IHostEnvironment environment)
         {
             Environment = environment;
@@ -46,6 +50,7 @@ namespace _42.Platform.Cli
 
             services.AddSingleton<IExtendedConsole, ExtendedConsole>();
             services.AddHttpClient();
+            ConfigureMachineSignIn(services);
             services.AddSingleton<ITokenStore, ProtectedTokenStore>();
             services.AddSingleton<IAuthenticationConfigurationResolver, AuthenticationConfigurationResolver>();
             services.AddSingleton<IAuthenticationService, AuthenticationServiceSelector>();
@@ -53,7 +58,7 @@ namespace _42.Platform.Cli
             services.AddSingleton<IEditorService, EditorService>();
             services.AddSingleton<TransferPolling>();
 
-            ConfigureStorytellerSdk(services, configuration);
+            ConfigureStorytellerSdk(services);
         }
 
         /// <summary>
@@ -117,31 +122,72 @@ namespace _42.Platform.Cli
             services.Configure<EditorOptions>(configuration.GetSection(ConfigurationSections.EDITOR));
         }
 
-
-        private static void ConfigureStorytellerSdk(IServiceCollection services, IConfiguration configuration)
+        /// <summary>
+        /// Registers the non-interactive sign-in of a machine from the STORYTELLER_* environment variables.
+        /// With machine credentials, STORYTELLER_API_URL replaces general.baseUrl; a user session is never sent to it.
+        /// </summary>
+        /// <param name="services">The service collection to configure.</param>
+        private static void ConfigureMachineSignIn(IServiceCollection services)
         {
-            var generalOptions = configuration.GetSection(ConfigurationSections.GENERAL).Get<GeneralOptions>();
+            services.AddSingleton(MachineSignInSettings.FromEnvironment(System.Environment.GetEnvironmentVariable));
+            services.AddSingleton<MachineAuthenticationService>();
+            services.AddSingleton<IMachineSignIn>(provider => provider.GetRequiredService<MachineAuthenticationService>());
 
+            // A redirect would resend the client secret to another host.
+            services.AddHttpClient(nameof(MachineAuthenticationService))
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
+            services.AddOptions<GeneralOptions>().PostConfigure<MachineSignInSettings>((options, machine) =>
+            {
+                if (machine.IsConfigured && machine.ApiUrl is not null)
+                {
+                    options.BaseUrl = machine.ApiUrl;
+                }
+            });
+        }
+
+        private static void ConfigureStorytellerSdk(IServiceCollection services)
+        {
             // Registered before AddStorytellerSdk, which only adds a configuration when none exists,
             // so the token comes from the same IAuthenticationService the commands use.
-            services.AddSingleton<ISdkConfiguration>(provider => new SdkConfiguration
+            services.AddSingleton<ISdkConfiguration>(provider =>
             {
-                AccessTokenFactory = () =>
+                var baseUrl = provider.GetRequiredService<IOptions<GeneralOptions>>().Value.BaseUrl;
+                var machine = provider.GetRequiredService<IMachineSignIn>();
+
+                return new SdkConfiguration
                 {
-                    try
+                    AccessTokenFactory = () =>
                     {
-                        var authentication = provider.GetRequiredService<IAuthenticationService>();
-                        return authentication.GetAccessTokenAsync().GetAwaiter().GetResult() ?? string.Empty;
-                    }
-                    catch (Exception)
-                    {
-                        return string.Empty;
-                    }
-                },
-                BaseUrl = generalOptions!.BaseUrl,
+                        try
+                        {
+                            var authentication = provider.GetRequiredService<IAuthenticationService>();
+                            return authentication.GetAccessTokenAsync().GetAwaiter().GetResult() ?? string.Empty;
+                        }
+                        catch (Exception exception) when (exception is not AuthenticationException)
+                        {
+                            // A sign-in that cannot work is reported; anything else ends as a 401 from the API.
+                            return string.Empty;
+                        }
+                    },
+                    BaseUrl = baseUrl,
+
+                    // Null when the certificate does not load; the token factory reports why before any request.
+                    ClientCertificate = machine.TryGetCertificate(),
+                    ClientCertificateHeaderName = IsLocalHttp(baseUrl) ? ClientCertificateHeaderName : null,
+                };
             });
 
             services.AddStorytellerSdk();
+        }
+
+        // The local Functions host has no TLS handshake to carry a client certificate, so the
+        // certificate goes in the header it accepts in development (MachineAuth:IsCertificateHeaderFromClientAllowed).
+        private static bool IsLocalHttp(string? baseUrl)
+        {
+            return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
+                && uri.Scheme == Uri.UriSchemeHttp
+                && uri.IsLoopback;
         }
     }
 }

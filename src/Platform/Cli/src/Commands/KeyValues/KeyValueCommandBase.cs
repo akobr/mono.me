@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
@@ -26,7 +27,7 @@ public abstract class KeyValueCommandBase : BaseContextCommand
         {
             return await ExecuteKeyValuesAsync();
         }
-        catch (ApiException exception)
+        catch (ApiException exception) when (exception.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return Console.WriteApiError(exception);
         }
