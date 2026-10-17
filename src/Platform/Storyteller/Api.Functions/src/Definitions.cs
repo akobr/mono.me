@@ -454,7 +454,7 @@ public static class Definitions
         public const string ResponseFailedDependency = "The customer's key (Byok) is not available: disabled, deleted or the role was removed (ErrorCode CustomerKeyUnavailable).";
         public const string ResponseNotImplemented = "The protection level is not configured in this deployment (ErrorCode ProtectionNotConfigured).";
         public const string ResponseServiceUnavailable = "The key-encryption key is not reachable right now (ErrorCode KeyEncryptionUnavailable); Retry-After says when to try again.";
-        public const string ResponseMtlsRequired = "Secret rights are missing (ErrorCode AccessDenied), or the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired).";
+        public const string ResponseMtlsRequired = "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted).";
         public const string NoStore = "Responses with a secret value are Cache-Control: no-store.";
         public const string IncludeInactive = "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.";
         public const string IncludeDeleted = "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.";

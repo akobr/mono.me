@@ -396,7 +396,7 @@ public partial class AnnotationsHttp
         [FromBody] List<Annotation> annotations)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationsAsync(_access, organization, project, annotations.Select(a => a.AnnotationKey), AccountRole.Contributor);
+        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, annotations.Select(a => a.AnnotationKey), AccountRole.Contributor);
 
         var annotationsToProcess = annotations
             .Select(a => a with { ProjectName = project, ViewName = view })
@@ -408,6 +408,13 @@ public partial class AnnotationsHttp
         }
 
         var createdAnnotations = await _annotations.CreateAnnotationsAsync(organization, annotationsToProcess, request.GetAuditActor());
+
+        // The missing ancestors are created too; a machine restricted to an annotation sees only what it may address.
+        if (restriction.IsRestricted)
+        {
+            createdAnnotations = createdAnnotations.Where(annotation => restriction.Allows(annotation.AnnotationKey)).ToList();
+        }
+
         return new OkObjectResult(createdAnnotations);
     }
 
