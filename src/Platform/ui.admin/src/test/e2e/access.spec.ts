@@ -32,7 +32,11 @@ test('invites several people typed with spaces and commas, with the same role', 
   await expect(emails).toHaveValue('ada.l@example.com')
   await dialog.getByRole('combobox', { name: 'Role' }).click()
   await page.getByRole('option', { name: 'Contributor', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Send invitations' }).click()
+  await expect(emails).toHaveValue('ada.l@example.com')
+  // near the top edge: Send does not move between the press and the release (no tag is added on blur)
+  const send = dialog.getByRole('button', { name: 'Send invitations' })
+  const box = (await send.boundingBox())!
+  await send.click({ position: { x: box.width / 2, y: 3 } })
 
   await expect(dialog).toBeHidden()
   await expect(page.getByText('3 invitations sent', { exact: true })).toBeVisible()
