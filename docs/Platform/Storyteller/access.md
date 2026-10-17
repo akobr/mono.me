@@ -48,6 +48,8 @@ A `View` has `Name`, `Description`, `Created` (the [audit stamp](audit-stamps.md
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
 
+Machines have no role; their scope decides. A machine created with an `AnnotationKey` reaches only that annotation and its descendants, and gets `403` `AnnotationRestricted` for other annotations and for operations of the whole project (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)).
+
 Every access point keeps at least one `Owner`. The last owner can't be demoted, removed, or leave (`409`, `LastOwner`).
 
 ## Members
