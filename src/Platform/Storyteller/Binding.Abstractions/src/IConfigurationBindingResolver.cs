@@ -8,4 +8,10 @@ namespace _42.Platform.Storyteller.Binding;
 public interface IConfigurationBindingResolver
 {
     ValueTask ResolveAsync(JObject content, bool includeSecrets, BindingScope scope);
+
+    /// <summary>
+    /// Whether <see cref="ResolveAsync"/> could change the document. False means the resolved document is the stored one,
+    /// so a read can skip the resolver. A resolver that cannot tell returns true and is always run.
+    /// </summary>
+    bool ContainsBindings(JToken content) => true;
 }
