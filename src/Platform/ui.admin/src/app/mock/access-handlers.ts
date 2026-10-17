@@ -2,6 +2,8 @@ import { http, HttpResponse, type HttpHandler } from 'msw'
 import type {
   AccessPointMember,
   AccountRole,
+  FederatedIssuer,
+  FederationRule,
   Invitation,
   InvitationCreate,
   MachineAccess,
@@ -14,10 +16,20 @@ import type {
 } from '@42for.net/2splatform.sdk'
 import { roleRank } from '@42for.net/2splatform.sdk'
 import { mockDirectory, type MockDb } from './db'
+import {
+  issuerError,
+  issuerImmutableMessage,
+  maxIssuersPerProject,
+  resetNotSupportedMessage,
+  rulesError,
+  rulesOnOtherKindMessage,
+  tooManyIssuersMessage,
+} from './federation'
 import { errorResponse, requireRole, roleOf, withDb } from './handlers'
 
-// Members, invitations, machines, shared certificates, the machine policy and the CA of the mock API, with the
-// rules of companion spec E2/E3 (last owner, elevated roles, self changes, pending invitations).
+// Members, invitations, machines, shared certificates, the machine policy, the trusted issuers and federation rules
+// (424-46) and the CA of the mock API, with the rules of companion spec E2/E3 (last owner, elevated roles, self
+// changes, pending invitations).
 
 const api = '*/api/v1'
 const random = (length: number) =>
@@ -52,7 +64,13 @@ const ownerCount = (db: MockDb, key: string) =>
 
 const machineScope = (params: { org: string; project: string }) => `${params.org}.${params.project}`
 
-const credentialKinds: MachineCredentialKind[] = ['ApiKey', 'Certificate', 'CertificateAndApiKey', 'ClientCredentials']
+const credentialKinds: MachineCredentialKind[] = [
+  'ApiKey',
+  'Certificate',
+  'CertificateAndApiKey',
+  'ClientCredentials',
+  'Federated',
+]
 const deploymentLifetime = { min: 1, max: 3650, default: 365 }
 
 /** The policy as the API resolves it (424-14): the enabled kinds in enum order, a default among them, a lifetime. */
@@ -105,6 +123,10 @@ function withCredentials(
   lifetimeDays?: number | null,
   sharedCertificate = false,
 ): MachineAccess {
+  // A Federated machine has no secret: an empty AccessKey, as for a certificate, and nothing to renew.
+  if (kind === 'Federated') {
+    return { ...machine, CredentialKind: kind, AccessKey: '' }
+  }
   // A CertificateAndApiKey machine with a shared certificate gets only its API key.
   const certificate = (kind === 'Certificate' || kind === 'CertificateAndApiKey') && !sharedCertificate
   const lifetime = certificate
@@ -125,6 +147,24 @@ function withCredentials(
     LastRenewalAt: new Date().toISOString(),
   }
 }
+
+/**
+ * The machine as the API returns it: a Federated machine gets the project's token endpoint, built from the request
+ * (the API uses MachineAuth:Federation:PublicBaseUrl, or the request's scheme and host plus /api).
+ */
+function withTokenEndpoint(machine: MachineAccess, request: Request, org: string, project: string): MachineAccess {
+  if (machine.CredentialKind !== 'Federated') {
+    return machine
+  }
+  const base = request.url.slice(0, request.url.indexOf('/v1/'))
+  return { ...machine, TokenEndpoint: `${base}/v1/${org}/${project}/access/token` }
+}
+
+const issuersOf = (db: MockDb, key: string) => db.issuers?.[key] ?? []
+
+/** The trusted issuers in the order of the API (by name). */
+const sortedIssuers = (issuers: FederatedIssuer[]) =>
+  issuers.toSorted((left, right) => (left.Name ?? '').localeCompare(right.Name ?? ''))
 
 /** Secrets are returned once; stored machines keep only the public fields. */
 const stripSecrets = (machine: MachineAccess): MachineAccess => ({
@@ -351,9 +391,16 @@ export const accessManagementHandlers: HttpHandler[] = [
 
   http.get<{ org: string; project: string }>(
     `${api}/:org/:project/access/machines`,
-    withDb((db, { params }) => {
+    withDb((db, { params, request }) => {
       const key = machineScope(params)
-      return requireRole(db, key, 'Contributor') ?? HttpResponse.json((db.machines?.[key] ?? []).map(stripSecrets))
+      return (
+        requireRole(db, key, 'Contributor') ??
+        HttpResponse.json(
+          (db.machines?.[key] ?? []).map((machine) =>
+            withTokenEndpoint(stripSecrets(machine), request, params.org, params.project),
+          ),
+        )
+      )
     }),
   ),
 
@@ -374,30 +421,42 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (body.UseSharedCertificate && kind !== 'CertificateAndApiKey') {
         return errorResponse(400, `Only CertificateAndApiKey machines can use a shared certificate, not ${kind}.`)
       }
+      if (kind !== 'Federated' && body.FederationRules?.length) {
+        return errorResponse(400, rulesOnOtherKindMessage, 'MachineNotFederated')
+      }
+      const invalidRules = kind === 'Federated' ? rulesError(body.FederationRules, issuersOf(db, key)) : undefined
+      if (invalidRules) {
+        return errorResponse(400, invalidRules, 'InvalidFederation')
+      }
+      const id = `mach-${random(6).toLowerCase()}`
       const machine = withCredentials(
         {
-          Id: `mach-${random(6).toLowerCase()}`,
-          ObjectId: `obj_${random(8)}`,
+          Id: id,
+          // A Federated machine exists only in Storyteller, like an API key machine in the API: ObjectId is its id.
+          ObjectId: kind === 'Federated' ? id : `obj_${random(8)}`,
           Scope: body.Scope,
           AnnotationKey: body.AnnotationKey,
+          FederationRules: kind === 'Federated' ? body.FederationRules : undefined,
         },
         kind,
         body.CertificateLifetimeDays ?? policy.CertificateLifetimeDays,
         !!body.UseSharedCertificate,
       )
       ;((db.machines ??= {})[key] ??= []).push(stripSecrets(machine))
-      return HttpResponse.json(machine, { status: 201 })
+      return HttpResponse.json(withTokenEndpoint(machine, request, params.org, params.project), { status: 201 })
     }),
   ),
 
   http.get<{ org: string; project: string; id: string }>(
     `${api}/:org/:project/access/machines/:id`,
-    withDb((db, { params }) => {
+    withDb((db, { params, request }) => {
       const key = machineScope(params)
       const machine = db.machines?.[key]?.find((entry) => entry.Id === params.id)
       return (
         requireRole(db, key, 'Contributor') ??
-        (machine ? HttpResponse.json(machine) : errorResponse(404, 'Not found.', 'NotFound'))
+        (machine
+          ? HttpResponse.json(withTokenEndpoint(machine, request, params.org, params.project))
+          : errorResponse(404, 'Not found.', 'NotFound'))
       )
     }),
   ),
@@ -411,6 +470,9 @@ export const accessManagementHandlers: HttpHandler[] = [
       const index = list.findIndex((entry) => entry.Id === params.id)
       if (denied || index < 0) {
         return denied ?? errorResponse(404, 'Not found.', 'NotFound')
+      }
+      if (list[index]!.CredentialKind === 'Federated') {
+        return errorResponse(400, resetNotSupportedMessage)
       }
       // A reset follows the kind the machine was created with, as the API does.
       const machine = withCredentials(
@@ -434,6 +496,123 @@ export const accessManagementHandlers: HttpHandler[] = [
       }
       ;(db.machines ??= {})[key] = (db.machines[key] ?? []).filter((entry) => entry.Id !== params.id)
       return new HttpResponse(null, { status: 204 })
+    }),
+  ),
+
+  http.put<{ org: string; project: string; id: string }>(
+    `${api}/:org/:project/access/machines/:id/federation-rules`,
+    withDb(async (db, { params, request }) => {
+      const key = machineScope(params)
+      const denied = requireRole(db, key, 'Contributor')
+      if (denied) {
+        return denied
+      }
+      const rules = (await request.json().catch(() => null)) as FederationRule[] | null
+      const invalid = rulesError(rules, issuersOf(db, key))
+      if (invalid) {
+        return errorResponse(400, invalid, 'InvalidFederation')
+      }
+      const machine = db.machines?.[key]?.find((entry) => entry.Id === params.id)
+      if (!machine) {
+        return errorResponse(404, 'Not found.', 'NotFound')
+      }
+      if (machine.CredentialKind !== 'Federated') {
+        return errorResponse(400, rulesOnOtherKindMessage, 'MachineNotFederated')
+      }
+      machine.FederationRules = rules!
+      return HttpResponse.json(withTokenEndpoint(stripSecrets(machine), request, params.org, params.project))
+    }),
+  ),
+
+  http.get<{ org: string; project: string }>(
+    `${api}/:org/:project/access/issuers`,
+    withDb((db, { params }) => {
+      const key = machineScope(params)
+      return requireRole(db, key, 'Contributor') ?? HttpResponse.json(sortedIssuers(issuersOf(db, key)))
+    }),
+  ),
+
+  http.get<{ org: string; project: string; name: string }>(
+    `${api}/:org/:project/access/issuers/:name`,
+    withDb((db, { params }) => {
+      const key = machineScope(params)
+      const issuer = issuersOf(db, key).find((entry) => entry.Name === params.name)
+      // An unknown name is a 404 without a body, as in the API.
+      return (
+        requireRole(db, key, 'Contributor') ??
+        (issuer ? HttpResponse.json(issuer) : new HttpResponse(null, { status: 404 }))
+      )
+    }),
+  ),
+
+  http.put<{ org: string; project: string; name: string }>(
+    `${api}/:org/:project/access/issuers/:name`,
+    withDb(async (db, { params, request }) => {
+      const key = machineScope(params)
+      const denied = requireRole(db, key, 'Administrator')
+      if (denied) {
+        return denied
+      }
+      // The route name wins over the body.
+      const body = ((await request.json().catch(() => null)) ?? {}) as FederatedIssuer
+      const requested: FederatedIssuer = { ...body, Name: params.name, KeySource: body.KeySource ?? 'Discovery' }
+      const invalid = issuerError(requested)
+      if (invalid) {
+        return errorResponse(400, invalid, 'InvalidFederation')
+      }
+      const issuers = issuersOf(db, key)
+      const existing = issuers.find((entry) => entry.Name === params.name)
+      if (existing && existing.Issuer !== requested.Issuer) {
+        return errorResponse(400, issuerImmutableMessage, 'InvalidFederation')
+      }
+      if (!existing) {
+        // Rules left behind by a delete must not revive with another issuer of the same name.
+        const machines = (db.machines?.[key] ?? [])
+          .filter((machine) => machine.FederationRules?.some((rule) => rule.Issuer === params.name))
+          .map((machine) => machine.Id)
+          .slice(0, 10)
+        if (machines.length) {
+          const more = machines.length >= 10 ? ' and maybe more' : ''
+          return errorResponse(
+            409,
+            `Federation rules still reference the trusted issuer '${params.name}' (machines ${machines.join(', ')}${more}); change those rules or delete the machines before creating it again.`,
+            'FederatedIssuerInUse',
+          )
+        }
+        if (issuers.length >= maxIssuersPerProject) {
+          return errorResponse(400, tooManyIssuersMessage, 'InvalidFederation')
+        }
+      }
+      const stored: FederatedIssuer = {
+        Name: requested.Name,
+        Issuer: requested.Issuer,
+        KeySource: requested.KeySource,
+        JwksUri: requested.JwksUri || undefined,
+        Jwks: requested.Jwks || undefined,
+        MaxTokenLifetimeSeconds: requested.MaxTokenLifetimeSeconds ?? undefined,
+        RequiredClaims: Object.keys(requested.RequiredClaims ?? {}).length ? requested.RequiredClaims : undefined,
+        Description: requested.Description || undefined,
+      }
+      ;(db.issuers ??= {})[key] = [...issuers.filter((entry) => entry.Name !== params.name), stored]
+      return HttpResponse.json(stored)
+    }),
+  ),
+
+  http.delete<{ org: string; project: string; name: string }>(
+    `${api}/:org/:project/access/issuers/:name`,
+    withDb((db, { params }) => {
+      const key = machineScope(params)
+      const denied = requireRole(db, key, 'Administrator')
+      if (denied) {
+        return denied
+      }
+      const issuers = issuersOf(db, key)
+      if (!issuers.some((entry) => entry.Name === params.name)) {
+        return new HttpResponse(null, { status: 404 })
+      }
+      // The kill switch: allowed while rules reference the issuer; those rules stop matching.
+      ;(db.issuers ??= {})[key] = issuers.filter((entry) => entry.Name !== params.name)
+      return new HttpResponse(null, { status: 200 })
     }),
   ),
 

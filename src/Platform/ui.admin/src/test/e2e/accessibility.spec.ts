@@ -16,6 +16,7 @@ const screens: [string, string][] = [
   ['export and import of a reader', '/northwind/portal/default/export-import'],
   ['members', '/acme/billing/members'],
   ['machines', '/acme/billing/machines'],
+  ['federated machine detail', '/acme/billing/machines/mach-release-pipeline'],
   ['settings', '/acme/billing/settings'],
   ['key values', '/acme/billing/default/key-values'],
   ['key value detail', '/acme/billing/default/key-values/db.password'],
@@ -58,6 +59,36 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await openApp(page, '/login')
       await expectAccessible(page)
     })
+
+    // Workload identity federation (424-46): the dialogs of trusted issuers and federated machines.
+    test('the trusted issuer dialog has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/acme/billing/machines')
+      await page.getByRole('button', { name: 'Add trusted issuer' }).click()
+      await expect(page.getByRole('dialog', { name: 'Add a trusted issuer' }).getByText('Required claims')).toBeVisible()
+      await expectAccessible(page)
+    })
+
+    test('the new machine dialog with federation rules has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/acme/billing/machines')
+      await page.getByRole('button', { name: 'New machine' }).first().click()
+      const dialog = page.getByRole('dialog', { name: 'New machine access' })
+      await dialog.getByRole('combobox', { name: 'Credential kind' }).click()
+      await page.getByRole('option', { name: 'Federated', exact: true }).click()
+      await expect(dialog.getByRole('group', { name: 'Rule 1' })).toBeVisible()
+      await expectAccessible(page)
+    })
+
+    for (const [name, button, title] of [
+      ['federation rules', 'Edit rules', 'Federation rules'],
+      ['federated setup', 'Setup', 'Set up mach-release-pipeline'],
+    ] as const) {
+      test(`the ${name} dialog has no serious accessibility violations`, async ({ page }) => {
+        await openApp(page, '/acme/billing/machines/mach-release-pipeline')
+        await page.getByRole('button', { name: button, exact: true }).click()
+        await expect(page.getByRole('dialog', { name: title })).toBeVisible()
+        await expectAccessible(page)
+      })
+    }
 
     test('the result of an import has no serious accessibility violations', async ({ page }) => {
       await openApp(page, '/acme/billing/default/export-import')
