@@ -59,7 +59,7 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - a schema violation saved anyway;
 - the conflict dialog;
 - a version comparison;
-- invitations from the top bar of the project and organization Members pages, to addresses typed with spaces and commas or pasted as a list;
+- invitations from the top bar of the project and organization Members pages, to addresses typed with spaces and commas or pasted as a list, and axe on the invite dialog with an invalid address;
 - a machine with a `.pfx` download;
 - a trusted issuer from a template (what the templates fill in), and one deleted: its rules flagged on the machine detail, and New machine's link to the section, which keeps the focus;
 - a federated machine created by a Contributor (its setup instead of a secret, no Reset) and its rules edited on the detail, where an audience other than the token endpoint is flagged and kept by new rules;
@@ -69,7 +69,7 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - the project pages of the menu per role, the redirects of the merged pages to their sections, and the theme in the command palette;
 - the Export & Import page from the sidebar and with `g e`: an export of some kinds, a git export, a check of an edited archive with its result per kind and **Import now**, an import with **Skip** shown again after a reload, and the notice of a Reader;
 - the `prod` badge of the default view in the menu, the switcher and its list of views, and its absence on another view;
-- axe (WCAG 2.1 AA) on the main screens, on Deleted, on the bulk create dialog, on the result of an import, on the dialogs of trusted issuers and federated machines and on the invite dialog.
+- axe (WCAG 2.1 AA) on the main screens, on Deleted, on the bulk create dialog, on the result of an import and on the dialogs of trusted issuers and federated machines.
 
 Each test gets a fresh context, so the mock data starts from the scenario's seed. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of `npx playwright install chromium`.
 
