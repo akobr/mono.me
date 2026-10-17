@@ -19,7 +19,10 @@ export class StorytellerError extends Error {
 
   readonly hint?: string
 
-  /** Stable code from ErrorResponse.ErrorCode, for example AccessDenied, LastOwner or PatchTestFailed. */
+  /**
+   * Stable code from ErrorResponse.ErrorCode, for example AccessDenied, LastOwner or PatchTestFailed;
+   * for the token endpoint the OAuth error (RFC 6749 §5.2), for example invalid_request or invalid_scope.
+   */
   readonly errorCode?: string
 
   /** Present on 409 responses of schema compliance checks. */
@@ -45,7 +48,10 @@ export class StorytellerError extends Error {
   /** Builds the error from a response status and its (possibly empty or non-JSON) body. */
   static fromResponse(status: number, statusText: string, body: unknown): StorytellerError {
     const record = isRecord(body) ? body : undefined
+    // The token endpoint answers with an OAuth error body ({ error, error_description }) instead of ErrorResponse.
+    const oauthError = readString(record, 'error')
     const message = readString(record, 'Message')
+      ?? (oauthError ? readString(record, 'error_description') : undefined)
       ?? (typeof body === 'string' && body.trim().length > 0 ? body.trim() : undefined)
       ?? `Storyteller API returned ${status}${statusText ? ` ${statusText}` : ''}.`
     const errors = record?.Errors
@@ -54,7 +60,7 @@ export class StorytellerError extends Error {
       status,
       message,
       hint: readString(record, 'Hint'),
-      errorCode: readString(record, 'ErrorCode'),
+      errorCode: readString(record, 'ErrorCode') ?? oauthError,
       schemaErrors: Array.isArray(errors) ? (errors as SchemaValidationErrorDetail[]) : undefined,
       body,
     })

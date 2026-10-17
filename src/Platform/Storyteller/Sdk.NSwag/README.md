@@ -37,6 +37,28 @@ Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (
 * `ClientCertificate` is added to the `HttpClientHandler` of every client for mutual TLS. It needs a private key, and it must be set before the first client is resolved, because the handler is built then.
 * `ClientCertificateHeaderName` is for development only. When it is set together with `ClientCertificate`, every request also carries the certificate (base64 DER) in that header, for a host without TLS. `sform` sets `X-ARR-ClientCert` for an `http` API on `localhost`, which the local Functions host accepts with `MachineAuth:IsCertificateHeaderFromClientAllowed`.
 
+## Workload identity federation
+
+`AccessApiClient` manages trusted issuers and federation rules (`GetFederatedIssuersAsync`, `GetFederatedIssuerAsync`, `SetFederatedIssuerAsync`, `DeleteFederatedIssuerAsync`, `SetMachineFederationRulesAsync`) with a user token. The claim pins (`FederatedIssuer.RequiredClaims`, `FederationRule.Claims`) are dictionaries of `IReadOnlyList_String`, a `Collection<string>`: `Claims = new Dictionary<string, IReadOnlyList_String> { ["repository_id"] = new() { "74" } }`.
+
+`ExchangeMachineTokenAsync` posts the RFC 8693 token exchange as `application/x-www-form-urlencoded` and throws `ApiException<OAuthErrorResponse>` for `400` and `503`. The endpoint refuses any `Authorization` header, and the clients of `AddStorytellerSdk` add one whenever `AccessTokenFactory` returns a token, so call it through a client without `ISdkConfiguration`, on an `HttpClient` that does not follow redirects (the subject token is in the body):
+
+```csharp
+using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+var access = new AccessApiClient(http) { BaseUrl = "https://api.2s.42for.net/api" };
+
+var token = await access.ExchangeMachineTokenAsync("acme", "billing", new MachineTokenRequest
+{
+    Grant_type = "urn:ietf:params:oauth:grant-type:token-exchange",
+    Client_id = machineId,
+    Subject_token_type = "urn:ietf:params:oauth:token-type:jwt",
+    Subject_token = platformToken,
+});
+// token.Access_token for Authorization: Bearer, valid for token.Expires_in seconds
+```
+
+The SDK has no exchange helper that caches the token for `AccessTokenFactory`; the TypeScript SDK has one (`createFederatedTokenProvider`).
+
 ## Client-side encryption
 
 `src/ClientSideEncryption/KeyValueClientEncryption.cs` encrypts a key/value secret for the recipients of a project (`GET …/key-values/recipients`) and decrypts a returned document with a recipient's private key, on top of the `KeyValues.ClientEncryption` library (JWE General JSON Serialization, A256GCM, RSA-OAEP-256). The TypeScript SDK (`./hyok`) and the CLI produce and read the same format.
