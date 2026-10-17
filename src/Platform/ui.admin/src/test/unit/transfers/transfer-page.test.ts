@@ -1,8 +1,9 @@
 import 'fake-indexeddb/auto'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import type { VueWrapper } from '@vue/test-utils'
 import { setupServer } from 'msw/node'
-import type { ViewImport } from '@42for.net/2splatform.sdk'
+import { getViewImport, startViewExport, startViewImport, type ViewImport } from '@42for.net/2splatform.sdk'
 import ExportPanel from '@/components/transfer/ExportPanel.vue'
 import ImportPanel from '@/components/transfer/ImportPanel.vue'
 import ImportResult from '@/components/transfer/ImportResult.vue'
@@ -10,13 +11,17 @@ import TransferToaster from '@/components/transfer/TransferToaster.vue'
 import { mockHandlers } from '@/mock/all-handlers'
 import { resetTransfers } from '@/mock/transfer-handlers'
 import { createZip, textFile } from '@/mock/zip'
+import ExportImportPage from '@/pages/[org]/[project]/[view]/export-import.vue'
 import { useTransfersStore } from '@/stores/transfers'
+import { saveBlob } from '@/utils/download'
 import { mountScreen, settle } from '../../helpers'
 
 // The sections of the Export & Import page and the toaster (spec 4.2-4.5 of the Export and Import of a View), against
 // the mock API of the e2e mode.
 
 vi.mock('@/utils/download', () => ({ saveBlob: vi.fn() }))
+// the navbar needs the dashboard shell; the page is tested without it
+vi.mock('@/components/shell/AppNavbar.vue', () => ({ default: { name: 'AppNavbar', render: () => null } }))
 
 const server = setupServer(...mockHandlers)
 beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
@@ -87,14 +92,34 @@ describe('ExportPanel', () => {
     expect(root.textContent).toContain('Pick at least one kind.')
     expect(button('Export', root)!.disabled).toBe(true)
   })
+
+  it('shows an export that the store follows again after a reload', async () => {
+    vi.mocked(saveBlob).mockClear()
+    // before the reload: an export of the view that was still running
+    const { Id: id } = await startViewExport(scope.org, scope.project, scope.view, { Format: 'Folder' })
+    sessionStorage.setItem('2s-admin:pending-exports', JSON.stringify([{ id, scope, startedAt: Date.now() }]))
+
+    // after the reload: the section is set up before TransferToaster resumes the pending exports once it is mounted
+    const view = await mountScreen(ExportPanel, { scope })
+    const root = view.inner().element as HTMLElement
+    expect(button('Export', root)!.disabled).toBe(false)
+    useTransfersStore().resume()
+    await settle()
+
+    expect(root.textContent).toContain('The download starts when it is ready')
+    expect(button('Export', root)!.disabled).toBe(true)
+    await vi.waitFor(() => expect(root.textContent).toContain('was downloaded.'), { timeout: 10_000 })
+    expect(vi.mocked(saveBlob)).toHaveBeenCalledOnce()
+    expect(button('Export', root)!.disabled).toBe(false)
+  })
 })
 
-describe('ImportPanel', () => {
-  const archive = () =>
-    new File([createZip([textFile('annotations/rst.invoicing.json', '{"Title":"Edited"}')])], 'edited.zip', {
-      type: 'application/zip',
-    })
+const archive = () =>
+  new File([createZip([textFile('annotations/rst.invoicing.json', '{"Title":"Edited"}')])], 'edited.zip', {
+    type: 'application/zip',
+  })
 
+describe('ImportPanel', () => {
   async function withFile(view: { inner: () => VueWrapper }) {
     view.inner().findComponent({ name: 'FileUpload' }).vm.$emit('update:modelValue', archive())
     await settle()
@@ -312,5 +337,29 @@ describe('TransferToaster', () => {
 
     expect(document.body.textContent).not.toContain('Checked template.zip')
     release()
+  })
+})
+
+describe('the Export & Import page', () => {
+  it('shows an import that ended during a reload, and the toaster does not report it', async () => {
+    const { org, project, view } = scope
+    // before the reload: a check that the page followed; the mock ends a job on its second read
+    const started = await startViewImport(org, project, view, archive(), { dryRun: true, fileName: 'edited.zip' })
+    await getViewImport(org, project, view, started.Id!)
+    sessionStorage.setItem(
+      '2s-admin:latest-imports',
+      JSON.stringify([{ id: started.Id, scope, startedAt: Date.now(), finished: false }]),
+    )
+
+    // after the reload: the page and the toaster are set up in one patch, and the toaster reads the import again
+    const Reloaded = defineComponent({ setup: () => () => [h(ExportImportPage), h(TransferToaster)] })
+    await mountScreen(Reloaded, {})
+    const transfers = useTransfersStore()
+    await vi.waitFor(() => expect(transfers.latestImport(scope)?.phase).toBe('done'))
+    await settle()
+
+    expect(transfers.watched.has(started.Id!)).toBe(true)
+    expect(document.body.textContent).toContain('Checked: nothing was written')
+    expect(document.body.textContent).not.toContain('Checked edited.zip')
   })
 })

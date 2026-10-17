@@ -680,8 +680,8 @@ Each warning is a row of its own under its document, with `!` in the `Outcome` c
 The **Export & Import** page of a view (`ui.admin/src/app/pages/[org]/[project]/[view]/export-import.vue`) exports and imports the view. It replaced the **Export** and **Import** buttons of the Configurations page and their dialogs (`ConfigurationExportDialog`, `ConfigurationImportDialog`, `ConfigurationImportResult`), which are removed.
 
 - **Navigation.** The sidebar entry **Export & Import** (icon `i-lucide-arrow-down-up`) follows **Compare views** in the view section (`utils/navigation.ts`). It has `editRole: 'Contributor'`, so a Reader sees it with a lock ("Read-only for your role") and can still export. The command palette lists it with the other pages, and `g e` opens it (`components/shell/CommandPalette.vue`; the shortcut help lists it, `composables/useShortcutsHelp.ts`). `export-import` is one of the view sections of `utils/context-paths.ts`, so switching the view stays on the page.
-- **Layout.** The **Export** and **Import** sections sit side by side from the `lg` breakpoint and are stacked below it. Below them, full width, the section **Latest import** shows the result of the view's latest finished import.
-- While the page is open, it marks that import as shown (`showInPage`), so `TransferToaster` does not report its end.
+- **Layout.** The **Export** and **Import** sections sit side by side from the `lg` breakpoint and are stacked below it. Below them, full width, the section **Latest import** shows the result of the view's latest import (`latestImport`) once it has succeeded. While a newer import or check runs, and after one fails, the section is hidden; the Import section shows the progress or the error.
+- While the page is open, it marks that import as shown (`showInPage`), so `TransferToaster` does not report its end. The mark is set synchronously, as soon as the import becomes the latest one: an import restored after a reload that ended meanwhile is tracked and finished in one step, and gets no toast either.
 
 ### The Export section
 
@@ -691,7 +691,7 @@ The **Export & Import** page of a view (`ui.admin/src/app/pages/[org]/[project]/
 - **Format:** radio cards. **Folder of JSON files** has one folder per kind with the current documents, earlier versions as version files, and `export.json`. **Git repository** has the current documents checked out, and every version of a schema, template or configuration is a commit by its author.
 - A line says what is never included: secrets, effective documents, the audit, the version history of annotations, and deleted annotations.
 - **Export** starts the job with the checked kinds in import order. The progress shows in place: "Waiting for the server…", "Building the archive…", then "Downloading the archive…". The store downloads the zip when it is ready, also after you have left the page, and the section then says "`<file name>` was downloaded." A failure shows "The export failed" with the server's error, or with why the client stopped waiting.
-- Back on the page, the section shows the latest export of the view (`latestExport`), running or finished.
+- Back on the page, the section shows the latest export of the view (`latestExport`), running or finished, also one that the store follows again after a reload. It reads it through a computed, as `TransferToaster` resumes the pending exports only after the page is set up.
 
 ### The Import section
 
@@ -743,7 +743,7 @@ The **Export & Import** page of a view (`ui.admin/src/app/pages/[org]/[project]/
 - `latestExport(scope)` and `latestImport(scope)` give the newest job of a view; `showInPage(id)` marks the one a page shows.
 - **After a reload:**
   - Running exports are kept in `sessionStorage` (`2s-admin:pending-exports`) and followed again. One started more than 15 minutes earlier is dropped.
-  - The latest import of each view is kept there too (`2s-admin:latest-imports`) and read again from the server. An import that had finished is shown on the page without a toast. One that was still running is followed and reported; it keeps its original start, so after 15 minutes it ends at once with "The job did not end within 15 minutes; it may still end on the server." One that has expired (the server keeps jobs for 24 hours), cannot be read, or was replaced by a newer import of the view in the meantime is forgotten.
+  - The latest import of each view is kept there too (`2s-admin:latest-imports`) and read again from the server. An import that had finished is shown on the page without a toast. One that was still running is followed, and its end is reported unless the page shows it, also when it ended during the reload; it keeps its original start, so after 15 minutes it ends at once with "The job did not end within 15 minutes; it may still end on the server." One that has expired (the server keeps jobs for 24 hours), cannot be read, or was replaced by a newer import of the view in the meantime is forgotten.
 
 **`components/transfer/TransferToaster.vue`** sits in the default layout. It calls `resume()` when it is mounted and reports the ends of the jobs, wherever the user is by then:
 
@@ -793,7 +793,7 @@ A dry run refreshes nothing.
   - the mock's exports and imports (`mock-transfers.test.ts`);
   - the store's options, polling and restore after a reload (`transfers.test.ts`);
   - the names, links and invalidation of a result (`transfer-utils.test.ts`);
-  - the sections, the result and the toaster (`transfer-page.test.ts`);
+  - the sections, the result and the toaster, and the page after a reload: a resumed export in the Export section, and an import that ended during the reload shown without a toast (`transfer-page.test.ts`);
   - the navigation entry and the shortcut (`test/unit/utils/navigation.test.ts`).
 - **Playwright** (`test/e2e/transfers.spec.ts`), on desktop and mobile:
   - the page from the sidebar and with `g e`, and a Configurations page without transfer buttons;
