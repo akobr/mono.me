@@ -256,6 +256,12 @@ public static class KeyValueConsoleExtensions
 
     private static (string? Message, string? ErrorCode) ReadError(ApiException exception)
     {
+        // A status the operation declares: the client has read the body into an ErrorResponse and kept no text.
+        if (exception is ApiException<ErrorResponse> { Result: { } error })
+        {
+            return (error.Message, error.ErrorCode);
+        }
+
         if (string.IsNullOrWhiteSpace(exception.Response))
         {
             return (null, null);

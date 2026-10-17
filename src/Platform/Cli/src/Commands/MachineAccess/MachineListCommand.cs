@@ -10,7 +10,9 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
     typeof(MachineResetCommand),
     typeof(MachineDeleteCommand),
     typeof(MachineRenewCommand),
-    typeof(MachineAuthSetCommand))]
+    typeof(MachineAuthSetCommand),
+    typeof(MachineRulesCommand),
+    typeof(MachineIssuerCommand))]
 
 [Command(CommandNames.MACHINE, CommandNames.AGENT, Description = "Get and manage machine access to 2S platform.")]
 public class MachineListCommand : BaseContextCommand
@@ -42,9 +44,16 @@ public class MachineListCommand : BaseContextCommand
 
         Console.WriteTable(
             accesses,
-            machine => new[] { machine.Id, $"{machine.Scope:G}", $"{machine.CredentialKind:G}", machine.AccessKey, machine.AnnotationKey },
+            machine => new[] { machine.Id, $"{machine.Scope:G}", $"{machine.CredentialKind:G}", DescribeSecret(machine), machine.AnnotationKey },
             new[] { "Id", "Role", "Kind", "Secret", "RestrictionTo" });
         return ExitCodes.SUCCESS;
     }
-}
 
+    // A federated machine has no secret, nor does a certificate machine (an empty access key).
+    private static string DescribeSecret(_42.Platform.Storyteller.Sdk.MachineAccess machine)
+    {
+        return machine.CredentialKind == MachineAccessCredentialKind.Federated || string.IsNullOrEmpty(machine.AccessKey)
+            ? "–"
+            : machine.AccessKey;
+    }
+}
