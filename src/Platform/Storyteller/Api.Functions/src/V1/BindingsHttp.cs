@@ -42,7 +42,7 @@ public class BindingsHttp
         string project)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectMetadataAsync(_access, organization, project);
 
         return new OkObjectResult(_catalog?.GetCatalog() ?? new BindingCatalog());
     }
