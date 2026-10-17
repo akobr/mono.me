@@ -49,6 +49,16 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
+    test('the invite dialog has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/acme/billing/members')
+      await page.getByRole('button', { name: 'Invite', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: 'Invite people' })
+      // a valid and an invalid tag, and the error of the field
+      await dialog.getByPlaceholder('ada@example.com').pressSequentially('ada@example.com grace.example.com ')
+      await expect(dialog.getByText('Not an email: grace.example.com')).toBeVisible()
+      await expectAccessible(page)
+    })
+
     test('onboarding has no serious accessibility violations', async ({ page }) => {
       await openApp(page, '/onboarding', 'new-user')
       await expectAccessible(page)
