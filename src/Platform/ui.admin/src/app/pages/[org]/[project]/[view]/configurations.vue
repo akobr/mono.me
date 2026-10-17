@@ -68,10 +68,11 @@ useScrollMemory(
   () => rows.value.length > 0,
 )
 
-// Export for every role, import for Contributors (spec 4.1).
+// Export for every role, import (spec 4.1) and New (424-42) for Contributors.
 const canEdit = useCan('edit')
 const exportOpen = ref(false)
 const importOpen = ref(false)
+const creating = ref(false)
 
 const selectedKey = computed(() => (route.params as { key?: string }).key)
 const base = computed(() => `/${context.org}/${context.project}/${context.view}/configurations`)
@@ -141,6 +142,15 @@ const rowClass = (row: { original: Row }) =>
               @click="importOpen = true"
             />
           </UTooltip>
+          <!-- The main action, last and without a tooltip as on the other pages; labelled from 768 px like its
+               neighbours. -->
+          <UButton
+            v-if="canEdit"
+            icon="i-lucide-plus"
+            :label="desktop ? 'New' : undefined"
+            aria-label="New configuration"
+            @click="creating = true"
+          />
         </template>
       </AppNavbar>
       <UDashboardToolbar class="py-2">
@@ -168,8 +178,14 @@ const rowClass = (row: { original: Row }) =>
         v-else-if="rows.length === 0"
         icon="i-lucide-settings-2"
         :title="filter.active.value ? 'No configuration matches the filter' : 'No configurations in this view'"
-        description="Open an annotation and create its configuration in the Configuration tab."
-      />
+        :description="
+          canEdit ? 'Create one with New, or from the configuration link in the header of an annotation.' : undefined
+        "
+      >
+        <template v-if="canEdit" #default>
+          <UButton label="New configuration" icon="i-lucide-plus" @click="creating = true" />
+        </template>
+      </EmptyState>
       <UTable
         v-else-if="desktop"
         ref="table"
@@ -200,6 +216,7 @@ const rowClass = (row: { original: Row }) =>
 
   <ConfigurationExportDialog v-if="context.scope" v-model:open="exportOpen" :scope="context.scope" />
   <ConfigurationImportDialog v-if="context.scope && canEdit" v-model:open="importOpen" :scope="context.scope" />
+  <ConfigurationCreateDialog v-if="canEdit" v-model:open="creating" @picked="open" />
 
   <RouterView />
 </template>
