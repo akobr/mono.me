@@ -61,7 +61,8 @@ test('the breadcrumb opens the configuration of a parent and keeps Lineage at th
 
 /** Opens the drop-down of the New dialog on Configurations and searches it; the options are teleported to the body. */
 async function searchNewConfiguration(page: Page, term: string) {
-  await page.getByRole('button', { name: 'New configuration' }).click()
+  // The one of the top bar: with a filter, the empty state (and its button) shows until the catalog has loaded.
+  await page.getByRole('button', { name: 'New configuration' }).first().click()
   const dialog = page.getByRole('dialog', { name: 'New configuration' })
   await dialog.getByRole('button', { name: 'Annotation' }).click()
   await page.getByPlaceholder('Search keys').fill(term)
