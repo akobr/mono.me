@@ -1,0 +1,82 @@
+using System.Buffers.Binary;
+using System.Buffers.Text;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
+
+using _42.Platform.Storyteller.Api.Security;
+
+using Microsoft.Net.Http.Headers;
+
+using Newtonsoft.Json;
+
+namespace _42.Platform.Storyteller.Api.ConditionalReads;
+
+// Weak entity tags of the configuration reads, W/"<prefix>.<digest>": the first 16 bytes of SHA-256 over the fields of the body,
+// base64url. Every input is length-prefixed, so different inputs never hash alike. The full key ties a tag to its configuration.
+//   e  the effective read: full key, Version, Hash and Content.
+//   r  a resolved read of a document without bindings, which is the effective document: the same plus the secret rights.
+//   b  a resolved read with bindings: the same over the resolved Content, keyed (HMAC-SHA256), because it can carry secrets.
+// Modified is left out: past version 0 it changes only with Version, and a configuration without an item stamps every read.
+public static class ConfigurationEntityTags
+{
+    public const string EffectivePrefix = "e";
+
+    public const string ResolvedPrefix = "r";
+
+    public const string BoundPrefix = "b";
+
+    private const int DigestBytes = 16;
+
+    public static EntityTagHeaderValue ForEffective(FullKey key, Configuration configuration)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        return Create(hash, EffectivePrefix, key, rights: null, configuration);
+    }
+
+    public static EntityTagHeaderValue ForResolved(FullKey key, Configuration configuration, SecretRights rights)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        return Create(hash, ResolvedPrefix, key, rights, configuration);
+    }
+
+    public static EntityTagHeaderValue ForResolvedBindings(FullKey key, Configuration resolved, SecretRights rights, byte[] secret)
+    {
+        using var hash = IncrementalHash.CreateHMAC(HashAlgorithmName.SHA256, secret);
+        return Create(hash, BoundPrefix, key, rights, resolved);
+    }
+
+    // s: the caller may read secrets; w: secrets are withheld from a machine without mTLS; p: neither.
+    // w and p get the same body, but only w gets the withheld header, so they don't share a tag either.
+    private static string RightsCode(SecretRights rights)
+    {
+        return rights.CanReadSecrets ? "s" : rights.IsWithheldByMtls ? "w" : "p";
+    }
+
+    private static EntityTagHeaderValue Create(IncrementalHash hash, string prefix, FullKey key, SecretRights? rights, Configuration configuration)
+    {
+        Append(hash, prefix);
+        Append(hash, key.ToString());
+        Append(hash, rights is null ? null : RightsCode(rights));
+        Append(hash, configuration.Version.ToString(CultureInfo.InvariantCulture));
+        Append(hash, configuration.Hash);
+        Append(hash, configuration.Content.ToString(Formatting.None));
+
+        Span<byte> digest = stackalloc byte[hash.HashLengthInBytes];
+        hash.GetHashAndReset(digest);
+        return new EntityTagHeaderValue($"\"{prefix}.{Base64Url.EncodeToString(digest[..DigestBytes])}\"", isWeak: true);
+    }
+
+    // A length prefix, -1 for null, then the UTF-8 bytes.
+    private static void Append(IncrementalHash hash, string? value)
+    {
+        Span<byte> length = stackalloc byte[sizeof(int)];
+        BinaryPrimitives.WriteInt32LittleEndian(length, value is null ? -1 : Encoding.UTF8.GetByteCount(value));
+        hash.AppendData(length);
+
+        if (value is not null)
+        {
+            hash.AppendData(Encoding.UTF8.GetBytes(value));
+        }
+    }
+}
