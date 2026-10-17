@@ -285,6 +285,7 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(MachineAccessCreate), Description = "An organization or project to create.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAccess), Description = "The created access point (organization or project).")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The annotation key is not valid (ErrorCode InvalidKey), or the credential kind is not supported.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostMachines(
@@ -297,8 +298,14 @@ public class AccessHttp
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
+        // The annotation restriction is stored in its canonical form; blank means the whole project.
+        if (!MachineAnnotationRestriction.TryNormalize(machineModel.AnnotationKey, out var annotationKey))
+        {
+            return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {machineModel.AnnotationKey}") { ErrorCode = ErrorCodes.InvalidKey });
+        }
+
         // TODO: [P1] hide the model from the client
-        machineModel = machineModel with { Organization = organization, Project = project };
+        machineModel = machineModel with { Organization = organization, Project = project, AnnotationKey = annotationKey };
         try
         {
             var machineAccess = await _accessService.CreateMachineAccessAsync(machineModel);
