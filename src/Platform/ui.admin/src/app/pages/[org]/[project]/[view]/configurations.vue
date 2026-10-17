@@ -132,6 +132,7 @@ const rowClass = (row: { original: Row }) =>
               @click="exportOpen = true"
             />
           </UTooltip>
+          <!-- Not below sm, where the navbar has no room for a third button next to New (424-42). -->
           <UTooltip v-if="canEdit" text="Import configuration documents into the view">
             <UButton
               icon="i-lucide-upload"
@@ -139,6 +140,7 @@ const rowClass = (row: { original: Row }) =>
               variant="ghost"
               :label="desktop ? 'Import' : undefined"
               aria-label="Import configurations"
+              class="hidden sm:inline-flex"
               @click="importOpen = true"
             />
           </UTooltip>
