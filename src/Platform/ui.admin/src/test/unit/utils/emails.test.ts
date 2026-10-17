@@ -38,6 +38,39 @@ describe('splitEmails', () => {
     ])
   })
 
+  it("reads Outlook's unquoted and single-quoted Last, First display names", () => {
+    expect(splitEmails('Lovelace, Ada <ada@example.com>; Hopper, Grace <grace@example.com>')).toEqual([
+      'ada@example.com',
+      'grace@example.com',
+    ])
+    expect(splitEmails("O'Brien, Bob <bob@example.com>; Doe, Jane X. <jane@example.com>")).toEqual([
+      'bob@example.com',
+      'jane@example.com',
+    ])
+    expect(splitEmails("'Lovelace, Ada' <ada@example.com>; 'ada@example.com' <ada@example.com>")).toEqual([
+      'ada@example.com',
+    ])
+    expect(splitEmails('alan@example.com, Lovelace, Ada <ada@example.com>')).toEqual([
+      'alan@example.com',
+      'ada@example.com',
+    ])
+  })
+
+  it('reads quoted addresses of a CSV row or a JSON array', () => {
+    expect(splitEmails('"ada@example.com","grace@example.com"')).toEqual(['ada@example.com', 'grace@example.com'])
+    expect(splitEmails('["ada@example.com", "grace@example.com"]')).toEqual(['ada@example.com', 'grace@example.com'])
+    expect(splitEmails("['ada@example.com', 'grace@example.com']")).toEqual(['ada@example.com', 'grace@example.com'])
+    expect(splitEmails('ada@example.com "grace@example.com" alan@example.com')).toEqual([
+      'ada@example.com',
+      'grace@example.com',
+      'alan@example.com',
+    ])
+    // a quoted name without an address in brackets stays visible
+    expect(splitEmails('"Hopper, Grace","grace@example.com"')).toEqual(['hopper', 'grace', 'grace@example.com'])
+    // a single quote inside an address stays
+    expect(splitEmails("o'brien@example.com")).toEqual(["o'brien@example.com"])
+  })
+
   it('removes a mailto: prefix', () => {
     expect(splitEmails('mailto:ada@example.com MAILTO:grace@example.com')).toEqual([
       'ada@example.com',
@@ -49,6 +82,7 @@ describe('splitEmails', () => {
     expect(splitEmails('ada@example.com grace.example.com')).toEqual(['ada@example.com', 'grace.example.com'])
     // the typo is in its own entry, so it is not taken for a display name
     expect(splitEmails('Ada <ada@example.com>, grace.example.com')).toEqual(['ada@example.com', 'grace.example.com'])
+    expect(splitEmails('grace.example.com, Ada <ada@example.com>')).toEqual(['grace.example.com', 'ada@example.com'])
     expect(splitEmails('ada@example.com <grace.example.com>')).toEqual(['ada@example.com', 'grace.example.com'])
   })
 })
