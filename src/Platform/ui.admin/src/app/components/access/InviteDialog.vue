@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef, watch } from 'vue'
+import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { createInvitation, getRole, hasErrorCode } from '@42for.net/2splatform.sdk'
 import { invalidateAccess } from '@/queries/invalidation'
@@ -35,9 +35,10 @@ watch(open, (value) => {
   }
 })
 
-// Every commit of the tags input (a typed address, a pasted list, the text left on blur) goes through
+// Every commit of the tags input (a typed address, a pasted list, the text left when sending) goes through
 // normalizeEmails (424-41): a list becomes one tag per address, and duplicates go, also those in another case. With
-// `duplicate` on, reka accepts every commit and clears the input; this setter drops what is already there.
+// `duplicate` on, reka accepts every commit and clears the input; this setter drops what is already there. There is
+// no commit on blur: the new tag can wrap the field, which moves Send away from under the pointer before the click.
 const emailTags = computed({
   get: () => emails.value,
   set: (value: string[]) => {
@@ -86,31 +87,46 @@ function commitTyped() {
   }
 }
 
+/** Focuses the input, which reads out the field error (aria-describedby); a Send that got disabled drops the focus. */
+async function focusInput() {
+  await nextTick()
+  tagsInput.value?.inputRef?.focus()
+}
+
 async function send() {
+  if (sending.value) {
+    return
+  }
   commitTyped()
-  if (!emails.value.length) {
-    empty.value = true
+  if (!emails.value.length || invalid.value.length) {
+    empty.value = !emails.value.length
+    await focusInput()
     return
   }
-  if (invalid.value.length) {
-    return
-  }
+  // Read once, and the dialog is locked while it sends, so everyone gets the same role and expiry.
+  const list = [...emails.value]
+  const options = { Role: role.value, ExpiresInDays: days.value }
   sending.value = true
   failures.value = []
   let sent = 0
-  for (const email of emails.value) {
-    try {
-      await createInvitation(props.accessPointKey, { Email: email, Role: role.value, ExpiresInDays: days.value })
-      sent++
-    } catch (error) {
-      failures.value.push({
-        email,
-        message: hasErrorCode(error, 'InvitationExists') ? 'A pending invitation already exists.' : errorMessage(error),
-      })
+  try {
+    for (const email of list) {
+      try {
+        await createInvitation(props.accessPointKey, { Email: email, ...options })
+        sent++
+      } catch (error) {
+        failures.value.push({
+          email,
+          message: hasErrorCode(error, 'InvitationExists')
+            ? 'A pending invitation already exists.'
+            : errorMessage(error),
+        })
+      }
     }
+    await invalidateAccess(queryClient, props.accessPointKey)
+  } finally {
+    sending.value = false
   }
-  sending.value = false
-  await invalidateAccess(queryClient, props.accessPointKey)
   if (sent) {
     toast.add({ title: `${sent} invitation${sent === 1 ? '' : 's'} sent`, color: 'success', icon: 'i-lucide-mail' })
   }
@@ -118,6 +134,7 @@ async function send() {
     open.value = false
   } else {
     emails.value = failures.value.map((failure) => failure.email)
+    await focusInput()
   }
 }
 </script>
@@ -127,6 +144,8 @@ async function send() {
     v-model:open="open"
     title="Invite people"
     :description="`To ${accessPointKey}. Everyone gets the same role and expiry; WorkOS sends the emails.`"
+    :dismissible="!sending"
+    :close="!sending"
   >
     <template #body>
       <div class="space-y-4">
@@ -141,23 +160,31 @@ async function send() {
             v-model="emailTags"
             :delimiter="emailDelimiter"
             duplicate
-            add-on-blur
             placeholder="ada@example.com"
             class="w-full"
             autofocus
+            :disabled="sending"
             @paste="onPaste"
           >
+            <!-- struck through in the error color; the default color on the selected tag, where red lacks contrast -->
             <template #item-text="{ item }">
-              <span :class="isEmail(item) ? undefined : 'text-error'">{{ item }}</span>
+              <span
+                :class="
+                  isEmail(item)
+                    ? undefined
+                    : 'text-error line-through decoration-error in-data-[state=active]:text-default'
+                "
+                >{{ item }}</span
+              >
             </template>
           </UInputTags>
         </UFormField>
         <div class="grid gap-4 sm:grid-cols-2">
           <UFormField label="Role">
-            <USelect v-model="role" :items="roles" class="w-full" />
+            <USelect v-model="role" :items="roles" class="w-full" :disabled="sending" />
           </UFormField>
           <UFormField label="Expires after (days)">
-            <UInputNumber v-model="days" :min="1" :max="30" class="w-full" />
+            <UInputNumber v-model="days" :min="1" :max="30" class="w-full" :disabled="sending" />
           </UFormField>
         </div>
         <ul v-if="failures.length" class="space-y-0.5 text-xs text-error" role="alert">
@@ -167,7 +194,7 @@ async function send() {
           </li>
         </ul>
         <div class="flex justify-end gap-2">
-          <UButton label="Cancel" color="neutral" variant="ghost" @click="open = false" />
+          <UButton label="Cancel" color="neutral" variant="ghost" :disabled="sending" @click="open = false" />
           <UButton
             label="Send invitations"
             icon="i-lucide-send"

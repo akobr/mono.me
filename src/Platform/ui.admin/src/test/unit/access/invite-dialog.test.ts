@@ -135,15 +135,20 @@ describe('InviteDialog', () => {
 
   it('asks for an address when the list is empty and blocks Send on an invalid one', async () => {
     const { bodies } = await openDialog()
+    sendButton().focus()
     await send()
 
     expect(text()).toContain('Enter at least one email address.')
     expect(bodies).toEqual([])
+    // the focus goes to the field, which reads its error out
+    expect(document.activeElement).toBe(input())
 
     await type('ada@example.com grace.example.com ')
     expect(text()).not.toContain('Enter at least one email address.')
     expect(text()).toContain('Not an email: grace.example.com')
-    expect(dialog().querySelector('[data-slot="item"]:last-of-type .text-error')?.textContent).toBe('grace.example.com')
+    const invalidTag = dialog().querySelector('[data-slot="item"]:last-of-type .text-error')
+    expect(invalidTag?.textContent).toBe('grace.example.com')
+    expect(invalidTag?.classList).toContain('line-through')
     expect(sendButton().disabled).toBe(true)
 
     // an invalid address left in the input is not sent either
@@ -153,9 +158,56 @@ describe('InviteDialog', () => {
     await settle()
     expect(tags()).toEqual(['ada@example.com'])
     await type('alan.example.com')
+    sendButton().focus()
     await send()
     expect(text()).toContain('Not an email: alan.example.com')
     expect(bodies).toEqual([])
+    expect(document.activeElement).toBe(input())
+  })
+
+  it('leaves the typed text in the input when the field loses the focus', async () => {
+    const { bodies } = await openDialog()
+    await type('ada@example.com')
+    input().dispatchEvent(new FocusEvent('blur'))
+    input().dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    await settle()
+
+    // a tag added on blur could wrap the field and move Send from under the pointer before the click
+    expect(tags()).toEqual([])
+    expect(input().value).toBe('ada@example.com')
+    await send()
+    expect(bodies.map((body) => body.Email)).toEqual(['ada@example.com'])
+  })
+
+  it('locks the dialog while it sends, so every address gets the same role and expiry', async () => {
+    let release!: () => void
+    const held = new Promise<void>((resolve) => (release = resolve))
+    const { bodies, open } = await openDialog()
+    server.use(
+      // holds the first invitation, then lets the mock API answer
+      http.post('*/api/v1/access/points/:key/invitations', async () => {
+        await held
+      }),
+    )
+    await type('ada@example.com grace@example.com ')
+    expect(dialog().querySelector('button[aria-label="Close"]')).not.toBeNull()
+    sendButton().click()
+    await settle()
+
+    const cancel = [...dialog().querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Cancel')!
+    expect(sendButton().disabled).toBe(true)
+    expect(cancel.disabled).toBe(true)
+    expect(input().disabled).toBe(true)
+    expect(dialog().querySelector('input[role="spinbutton"]')).toHaveProperty('disabled', true)
+    expect(dialog().querySelector('button[aria-label="Close"]')).toBeNull()
+
+    release()
+    await settle(12)
+    expect(bodies).toEqual([
+      { Email: 'ada@example.com', Role: 'Reader', ExpiresInDays: 7 },
+      { Email: 'grace@example.com', Role: 'Reader', ExpiresInDays: 7 },
+    ])
+    expect(open.value).toBe(false)
   })
 })
 
