@@ -9,6 +9,9 @@ public static class ErrorCodes
     public const string InvalidName = "InvalidName";
     public const string ViewExists = "ViewExists";
 
+    // A machine restricted to an annotation addressed another annotation, or an operation of the whole project.
+    public const string AnnotationRestricted = "AnnotationRestricted";
+
     public const string AccountExists = "AccountExists";
     public const string AccessPointExists = "AccessPointExists";
     public const string LastOwner = "LastOwner";

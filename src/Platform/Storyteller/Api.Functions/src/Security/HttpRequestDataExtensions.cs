@@ -184,33 +184,10 @@ public static class HttpRequestDataExtensions
         @this.SetResponseHeader("Cache-Control", "no-store");
     }
 
-    public static async Task CheckAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole = AccountRole.Reader)
+    // An operation of the whole access point. A machine restricted to an annotation is refused (403 AnnotationRestricted).
+    public static Task CheckAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole = AccountRole.Reader)
     {
-#if DEV_AUTH
-        return;
-#else
-        if (@this.TryGetApplicationIdentity(out var appId))
-        {
-            var segments = accessPointKey.Split('.', StringSplitOptions.None);
-
-            if (segments.Length < 2)
-            {
-                throw new SecurityTokenException("An application can never access an organization.");
-            }
-
-            if (!await accessService.VerifyAccessForMachineAsync(segments[0], segments[1], appId))
-            {
-                throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
-            }
-
-            await MachineCredentialPolicy.EnsureAllowedAsync(@this.FunctionContext, segments[0], segments[1]);
-            return;
-        }
-
-        var accountId = @this.GetIdentityUniqueId();
-        var accessRole = await accessService.GetAccountRoleAsync(accountId, accessPointKey);
-        EnsureRole(accessRole, minimalRole, accessPointKey);
-#endif
+        return CheckAccessAsync(@this, accessService, accessPointKey, minimalRole, static restriction => restriction.EnsureUnrestricted());
     }
 
     // An authenticated user without the role gets 403, never 401, so clients do not sign in again for nothing.
@@ -231,6 +208,8 @@ public static class HttpRequestDataExtensions
         return CheckAccessToAsync(@this, accessService, organization, minimalRole);
     }
 
+    // An operation of the whole project (lists, key/values, templates, type-level schemas, transfers). A machine
+    // restricted to an annotation is refused.
     public static Task CheckAccessToProjectAsync(
         this HttpRequestData @this,
         IAccessService accessService,
@@ -239,6 +218,44 @@ public static class HttpRequestDataExtensions
         AccountRole minimalRole = AccountRole.Reader)
     {
         return CheckAccessToAsync(@this, accessService, $"{organization}.{project}", minimalRole);
+    }
+
+    // Project metadata without annotation data (the views, the binding catalog): every machine of the project reads it,
+    // also one restricted to an annotation.
+    public static Task CheckAccessToProjectMetadataAsync(
+        this HttpRequestData @this,
+        IAccessService accessService,
+        string organization,
+        string project,
+        AccountRole minimalRole = AccountRole.Reader)
+    {
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, static _ => { });
+    }
+
+    // An operation on one annotation and what lies below it. A machine restricted to an annotation passes for that
+    // annotation and its descendants. The key is the raw text of the request, parsed the way the handler parses it
+    // afterwards; a key that does not parse is outside of every restriction.
+    public static Task CheckAccessToAnnotationAsync(
+        this HttpRequestData @this,
+        IAccessService accessService,
+        string organization,
+        string project,
+        string annotationKey,
+        AccountRole minimalRole = AccountRole.Reader)
+    {
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows([annotationKey]));
+    }
+
+    // An operation on several annotations (the keys of a bulk body): a restricted machine needs every key in its scope.
+    public static Task CheckAccessToAnnotationsAsync(
+        this HttpRequestData @this,
+        IAccessService accessService,
+        string organization,
+        string project,
+        IEnumerable<string?> annotationKeys,
+        AccountRole minimalRole = AccountRole.Reader)
+    {
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows(annotationKeys));
     }
 
     public static string GetIdentityUniqueName(this HttpRequestData @this)
@@ -326,5 +343,39 @@ public static class HttpRequestDataExtensions
         }
 
         throw new SecurityTokenException($"Missing {claimTypes[0]} claim.");
+    }
+
+    // Machines: the machine document of the project (401 without it), the credential policy, and then what the operation
+    // reaches against the annotation restriction of the machine (403). Machine credentials are checked for real in every
+    // build, so this runs in Debug (DEV_AUTH) too; Debug builds skip only the role check of users.
+    private static async Task CheckAccessAsync(
+        HttpRequestData request,
+        IAccessService accessService,
+        string accessPointKey,
+        AccountRole minimalRole,
+        Action<MachineAnnotationRestriction> ensureReach)
+    {
+        if (request.TryGetApplicationIdentity(out var appId))
+        {
+            var segments = accessPointKey.Split('.', StringSplitOptions.None);
+
+            if (segments.Length < 2)
+            {
+                throw new SecurityTokenException("An application can never access an organization.");
+            }
+
+            var machine = await accessService.GetMachineAccessAsync(segments[0], segments[1], appId)
+                ?? throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
+
+            await MachineCredentialPolicy.EnsureAllowedAsync(request.FunctionContext, segments[0], segments[1]);
+            ensureReach(MachineAnnotationRestriction.From(machine.AnnotationKey));
+            return;
+        }
+
+#if !DEV_AUTH
+        var accountId = request.GetIdentityUniqueId();
+        var accessRole = await accessService.GetAccountRoleAsync(accountId, accessPointKey);
+        EnsureRole(accessRole, minimalRole, accessPointKey);
+#endif
     }
 }

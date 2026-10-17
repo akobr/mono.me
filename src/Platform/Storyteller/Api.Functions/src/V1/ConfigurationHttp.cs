@@ -104,7 +104,7 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -147,7 +147,7 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -220,7 +220,7 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -302,7 +302,7 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -385,7 +385,7 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -428,7 +428,7 @@ public class ConfigurationHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -468,7 +468,7 @@ public class ConfigurationHttp
         uint version)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -511,7 +511,7 @@ public class ConfigurationHttp
         uint version)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -552,7 +552,7 @@ public class ConfigurationHttp
         uint versionFrom)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {
@@ -591,7 +591,7 @@ public class ConfigurationHttp
         string viewTo)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {

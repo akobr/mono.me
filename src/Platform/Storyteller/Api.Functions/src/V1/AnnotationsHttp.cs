@@ -125,7 +125,7 @@ public partial class AnnotationsHttp
         [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {
@@ -189,7 +189,7 @@ public partial class AnnotationsHttp
         [FromQuery] bool includeDeleted = false)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {
@@ -312,7 +312,7 @@ public partial class AnnotationsHttp
         string key)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         // The body is read once, into the runtime type of its AnnotationType: the type-specific members
         // (SubjectKey, UnitType, ...) are required there, so a body without them is rejected instead of stored.
@@ -396,7 +396,7 @@ public partial class AnnotationsHttp
         [FromBody] List<Annotation> annotations)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationsAsync(_access, organization, project, (annotations ?? []).Select(a => a.AnnotationKey), AccountRole.Contributor);
 
         var annotationsToProcess = annotations
             .Select(a => a with { ProjectName = project, ViewName = view })
@@ -467,7 +467,7 @@ public partial class AnnotationsHttp
         string key)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {
