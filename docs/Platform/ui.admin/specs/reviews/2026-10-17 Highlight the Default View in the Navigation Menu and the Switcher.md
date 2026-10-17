@@ -98,6 +98,10 @@ The docked sidebar, both slideovers and the project pages (which show the rememb
   - a clash between `prod` and the environment badge in the sidebar footer;
   - truncation at the narrowest sidebar width;
   - a request to show `prod` on the Views page too.
+- **The Views page** (not in the spec, which left it out of scope; asked for after the PR was opened): the badge of the default view on the project's **Views** page (`app/pages/[org]/[project]/views.vue`) says `production` instead of `default`. Its style is unchanged (primary, subtle, sm). The page lists every view, so it has the room for the full word that the sidebar and the switcher shorten to `prod`.
+  - A new e2e test, "marks the default view as production on the Views page", checks the badge on the `default` row and its absence on `staging`. `navigation.spec.ts` then passed 26 of 26 on desktop and mobile (Chrome, `CI=1`). The full e2e run in Results was before this test.
+  - `admin-ui.md` says the Views page marks the default view **production**.
+  - No visual or axe screen shows the Views page, so no baseline changed.
 - **Gaps left as they are** (Out of scope in the spec):
   - the icon rail between lg and xl names no view;
   - phones have no view button in the top bar, so the slideover menu is their only mark;
