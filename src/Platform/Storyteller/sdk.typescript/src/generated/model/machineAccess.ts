@@ -3,8 +3,9 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.17.17507
  */
+import type { FederationRule } from "./federationRule";
 import type { MachineAccessCredentialKind } from "./machineAccessCredentialKind";
 import type { MachineAccessScope } from "./machineAccessScope";
 
@@ -27,4 +28,5 @@ export interface MachineAccess {
   UsesSharedCertificate?: boolean;
   TokenEndpoint?: string;
   TokenScope?: string;
+  FederationRules?: FederationRule[];
 }

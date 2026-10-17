@@ -61,6 +61,9 @@ public static class CommandNames
     public const string CA = "ca";
     public const string AUTH = "auth";
     public const string MACHINE_AUTH = "machine-auth";
+    public const string RULES = "rules";
+    public const string ISSUER = "issuer";
+    public const string ISSUERS = "issuers";
 
     public const string KV = "kv";
     public const string KEY_VALUES = "key-values";

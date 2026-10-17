@@ -17,7 +17,7 @@ dotnet tool install --global NSwag.ConsoleCore
 
 ```powershell
 cd src/Platform/Storyteller/Sdk.NSwag/
-nswag openapi2csclient /input:open.api.v0.9.15.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
+nswag openapi2csclient /input:open.api.v0.9.17.json /className:"{controller}ApiClient" /output:src/ApiSdk.g.cs /namespace:_42.Platform.Storyteller.Sdk /OperationGenerationMode:MultipleClientsFromFirstTagAndOperationId /GenerateClientInterfaces:true
 ```
 
 The OpenAPI document comes from the API test `OpenApiExportTests`: it renders the document with the same engine the Functions host uses, so no running host is needed.
@@ -28,6 +28,28 @@ dotnet test ../Api.Functions/test --filter "FullyQualifiedName~OpenApiExportTest
 ```
 
 Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (`npm run generate`), then add the new `{controller}ApiClient` to `src/ApiSdk.partial.cs` and `src/ServicesCollectionExtensions.cs`.
+
+## Workload identity federation
+
+`AccessApiClient` manages trusted issuers and federation rules (`GetFederatedIssuersAsync`, `GetFederatedIssuerAsync`, `SetFederatedIssuerAsync`, `DeleteFederatedIssuerAsync`, `SetMachineFederationRulesAsync`) with a user token. The claim pins (`FederatedIssuer.RequiredClaims`, `FederationRule.Claims`) are dictionaries of `IReadOnlyList_String`, a `Collection<string>`: `Claims = new Dictionary<string, IReadOnlyList_String> { ["repository_id"] = new() { "74" } }`.
+
+`ExchangeMachineTokenAsync` posts the RFC 8693 token exchange as `application/x-www-form-urlencoded` and throws `ApiException<OAuthErrorResponse>` for `400` and `503`. The endpoint refuses any `Authorization` header, and the clients of `AddStorytellerSdk` add one whenever `AccessTokenFactory` returns a token, so call it through a client without `ISdkConfiguration`, on an `HttpClient` that does not follow redirects (the subject token is in the body):
+
+```csharp
+using var http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false });
+var access = new AccessApiClient(http) { BaseUrl = "https://api.2s.42for.net/api" };
+
+var token = await access.ExchangeMachineTokenAsync("acme", "billing", new MachineTokenRequest
+{
+    Grant_type = "urn:ietf:params:oauth:grant-type:token-exchange",
+    Client_id = machineId,
+    Subject_token_type = "urn:ietf:params:oauth:token-type:jwt",
+    Subject_token = platformToken,
+});
+// token.Access_token for Authorization: Bearer, valid for token.Expires_in seconds
+```
+
+The SDK has no exchange helper that caches the token for `AccessTokenFactory`; the TypeScript SDK has one (`createFederatedTokenProvider`).
 
 ## Client-side encryption
 

@@ -31,10 +31,20 @@ public class MachineResetCommand : BaseContextCommand
             return ExitCodes.ERROR_INPUT_PARSING;
         }
 
-        var machine = await _accessApi.ResetMachineAccessAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            MachineId);
+        _42.Platform.Storyteller.Sdk.MachineAccess machine;
+
+        try
+        {
+            machine = await _accessApi.ResetMachineAccessAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                MachineId);
+        }
+        catch (ApiException exception)
+        {
+            // for example a federated machine, which has no secret to reset
+            return Console.WriteApiError(exception);
+        }
 
         Console.WriteJson(machine);
         Console.WriteLine();
@@ -42,4 +52,3 @@ public class MachineResetCommand : BaseContextCommand
         return ExitCodes.SUCCESS;
     }
 }
-

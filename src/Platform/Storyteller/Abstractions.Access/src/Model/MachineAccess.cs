@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace _42.Platform.Storyteller;
 
@@ -32,10 +33,15 @@ public record class MachineAccess : IMachineAccess
     // CertificateAndApiKey only: the machine has no certificate of its own and presents a shared certificate of the project.
     public bool UsesSharedCertificate { get; init; }
 
-    // ClientCredentials only, returned on create and not stored. Get, list, and reset omit them.
-    // TokenEndpoint is where the machine exchanges Id and AccessKey for a token. TokenScope is
+    // Where the machine gets its tokens. Not stored.
+    // ClientCredentials: returned on create only; the machine exchanges Id and AccessKey there, and TokenScope is
     // the scope parameter that exchange needs.
+    // Federated: the project's token endpoint, returned on create, get and list; the machine exchanges a platform
+    // token there (RFC 8693). TokenScope stays null.
     public string? TokenEndpoint { get; init; }
 
     public string? TokenScope { get; init; }
+
+    // Federated only: the rules a platform token must match. Returned by create, get and list.
+    public IReadOnlyList<FederationRule>? FederationRules { get; init; }
 }

@@ -47,5 +47,6 @@ internal static class AccessMappings
         CertificateLifetimeDays = e.CertificateLifetimeDays,
         CertificateNotAfter = e.NotAfter,
         UsesSharedCertificate = e.UsesSharedCertificate,
+        FederationRules = e.FederationRules,
     };
 }

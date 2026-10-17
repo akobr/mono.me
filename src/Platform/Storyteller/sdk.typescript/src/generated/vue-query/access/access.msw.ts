@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.15.8260
+ * OpenAPI spec version: 0.9.17.17507
  */
 import { faker } from "@faker-js/faker";
 
@@ -17,9 +17,11 @@ import type {
   Account,
   AuthConfiguration,
   CertificateRenewalResult,
+  FederatedIssuer,
   Invitation,
   MachineAccess,
   MachineAuthenticationPolicy,
+  MachineTokenResponse,
   SharedCertificate,
 } from "../../model";
 
@@ -104,6 +106,7 @@ export const getGetAccessPointsResponseMock = (): AccessPoint[] =>
             "Certificate",
             "CertificateAndApiKey",
             "ClientCredentials",
+            "Federated",
           ] as const),
           null,
         ]),
@@ -143,6 +146,7 @@ export const getCreateAccessPointResponseMock = (
           "Certificate",
           "CertificateAndApiKey",
           "ClientCredentials",
+          "Federated",
         ] as const),
         null,
       ]),
@@ -183,6 +187,7 @@ export const getGetAccessPointResponseMock = (
           "Certificate",
           "CertificateAndApiKey",
           "ClientCredentials",
+          "Federated",
         ] as const),
         null,
       ]),
@@ -223,6 +228,7 @@ export const getGrantUserAccessResponseMock = (
           "Certificate",
           "CertificateAndApiKey",
           "ClientCredentials",
+          "Federated",
         ] as const),
         null,
       ]),
@@ -263,6 +269,7 @@ export const getRevokeUserAccessResponseMock = (
           "Certificate",
           "CertificateAndApiKey",
           "ClientCredentials",
+          "Federated",
         ] as const),
         null,
       ]),
@@ -312,6 +319,7 @@ export const getGetMachineAccessesResponseMock = (): MachineAccess[] =>
       "Certificate",
       "CertificateAndApiKey",
       "ClientCredentials",
+      "Federated",
     ] as const),
     CertificateThumbprint: faker.helpers.arrayElement([
       faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -347,6 +355,35 @@ export const getGetMachineAccessesResponseMock = (): MachineAccess[] =>
     ]),
     TokenScope: faker.helpers.arrayElement([
       faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    FederationRules: faker.helpers.arrayElement([
+      Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => ({
+        Issuer: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Audience: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Subject: faker.helpers.arrayElement([
+          faker.string.alpha({ length: { min: 10, max: 20 } }),
+          undefined,
+        ]),
+        Claims: faker.helpers.arrayElement([
+          {
+            [faker.string.alphanumeric(5)]: Array.from(
+              { length: faker.number.int({ min: 1, max: 10 }) },
+              (_, i) => i + 1,
+            ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+          },
+          undefined,
+        ]),
+      })),
       undefined,
     ]),
   }));
@@ -385,6 +422,7 @@ export const getCreateMachineAccessResponseMock = (
     "Certificate",
     "CertificateAndApiKey",
     "ClientCredentials",
+    "Federated",
   ] as const),
   CertificateThumbprint: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -420,6 +458,35 @@ export const getCreateMachineAccessResponseMock = (
   ]),
   TokenScope: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  FederationRules: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Issuer: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Audience: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Subject: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Claims: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        },
+        undefined,
+      ]),
+    })),
     undefined,
   ]),
   ...overrideResponse,
@@ -459,6 +526,7 @@ export const getGetMachineAccessResponseMock = (
     "Certificate",
     "CertificateAndApiKey",
     "ClientCredentials",
+    "Federated",
   ] as const),
   CertificateThumbprint: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -494,6 +562,35 @@ export const getGetMachineAccessResponseMock = (
   ]),
   TokenScope: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  FederationRules: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Issuer: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Audience: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Subject: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Claims: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        },
+        undefined,
+      ]),
+    })),
     undefined,
   ]),
   ...overrideResponse,
@@ -533,6 +630,7 @@ export const getResetMachineAccessResponseMock = (
     "Certificate",
     "CertificateAndApiKey",
     "ClientCredentials",
+    "Federated",
   ] as const),
   CertificateThumbprint: faker.helpers.arrayElement([
     faker.string.alpha({ length: { min: 10, max: 20 } }),
@@ -570,6 +668,35 @@ export const getResetMachineAccessResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
+  FederationRules: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Issuer: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Audience: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Subject: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Claims: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        },
+        undefined,
+      ]),
+    })),
+    undefined,
+  ]),
   ...overrideResponse,
 });
 
@@ -589,6 +716,7 @@ export const getGetMachineAuthenticationResponseMock = (
       "Certificate",
       "CertificateAndApiKey",
       "ClientCredentials",
+      "Federated",
     ] as const),
     null,
   ]),
@@ -612,6 +740,7 @@ export const getSetMachineAuthenticationResponseMock = (
       "Certificate",
       "CertificateAndApiKey",
       "ClientCredentials",
+      "Federated",
     ] as const),
     null,
   ]),
@@ -746,6 +875,254 @@ export const getIssueSharedCertificateResponseMock = (
     faker.string.alpha({ length: { min: 10, max: 20 } }),
     undefined,
   ]),
+  ...overrideResponse,
+});
+
+export const getGetFederatedIssuersResponseMock = (): FederatedIssuer[] =>
+  Array.from(
+    { length: faker.number.int({ min: 1, max: 10 }) },
+    (_, i) => i + 1,
+  ).map(() => ({
+    Name: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    Issuer: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    KeySource: faker.helpers.arrayElement([
+      "Discovery",
+      "JwksUri",
+      "Jwks",
+    ] as const),
+    JwksUri: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    Jwks: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+    MaxTokenLifetimeSeconds: faker.helpers.arrayElement([
+      faker.number.int(),
+      null,
+    ]),
+    RequiredClaims: faker.helpers.arrayElement([
+      {
+        [faker.string.alphanumeric(5)]: Array.from(
+          { length: faker.number.int({ min: 1, max: 10 }) },
+          (_, i) => i + 1,
+        ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+      },
+      undefined,
+    ]),
+    Description: faker.helpers.arrayElement([
+      faker.string.alpha({ length: { min: 10, max: 20 } }),
+      undefined,
+    ]),
+  }));
+
+export const getGetFederatedIssuerResponseMock = (
+  overrideResponse: Partial<Extract<FederatedIssuer, object>> = {},
+): FederatedIssuer => ({
+  Name: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Issuer: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  KeySource: faker.helpers.arrayElement([
+    "Discovery",
+    "JwksUri",
+    "Jwks",
+  ] as const),
+  JwksUri: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Jwks: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  MaxTokenLifetimeSeconds: faker.helpers.arrayElement([
+    faker.number.int(),
+    null,
+  ]),
+  RequiredClaims: faker.helpers.arrayElement([
+    {
+      [faker.string.alphanumeric(5)]: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    },
+    undefined,
+  ]),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getSetFederatedIssuerResponseMock = (
+  overrideResponse: Partial<Extract<FederatedIssuer, object>> = {},
+): FederatedIssuer => ({
+  Name: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Issuer: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  KeySource: faker.helpers.arrayElement([
+    "Discovery",
+    "JwksUri",
+    "Jwks",
+  ] as const),
+  JwksUri: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Jwks: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  MaxTokenLifetimeSeconds: faker.helpers.arrayElement([
+    faker.number.int(),
+    null,
+  ]),
+  RequiredClaims: faker.helpers.arrayElement([
+    {
+      [faker.string.alphanumeric(5)]: Array.from(
+        { length: faker.number.int({ min: 1, max: 10 }) },
+        (_, i) => i + 1,
+      ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+    },
+    undefined,
+  ]),
+  Description: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getSetMachineFederationRulesResponseMock = (
+  overrideResponse: Partial<Extract<MachineAccess, object>> = {},
+): MachineAccess => ({
+  Id: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  ObjectId: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  AccessKey: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Scope: faker.helpers.arrayElement([
+    "AnnotationRead",
+    "ConfigurationRead",
+    "DefaultRead",
+    "AnnotationReadWrite",
+    "ConfigurationReadWrite",
+    "DefaultReadWrite",
+    "SecretsRead",
+    "SecretsReadWrite",
+  ] as const),
+  AnnotationKey: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  CredentialKind: faker.helpers.arrayElement([
+    "ApiKey",
+    "Certificate",
+    "CertificateAndApiKey",
+    "ClientCredentials",
+    "Federated",
+  ] as const),
+  CertificateThumbprint: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Certificate: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  CertificatePassword: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  LastRenewalAt: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
+  CertificateLifetimeDays: faker.helpers.arrayElement([
+    faker.number.int(),
+    null,
+  ]),
+  CertificateNotAfter: faker.helpers.arrayElement([
+    faker.date.past().toISOString().slice(0, 19) + "Z",
+    null,
+  ]),
+  UsesSharedCertificate: faker.helpers.arrayElement([
+    faker.datatype.boolean(),
+    undefined,
+  ]),
+  TokenEndpoint: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  TokenScope: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  FederationRules: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Issuer: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Audience: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Subject: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Claims: faker.helpers.arrayElement([
+        {
+          [faker.string.alphanumeric(5)]: Array.from(
+            { length: faker.number.int({ min: 1, max: 10 }) },
+            (_, i) => i + 1,
+          ).map(() => faker.string.alpha({ length: { min: 10, max: 20 } })),
+        },
+        undefined,
+      ]),
+    })),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getExchangeMachineTokenResponseMock = (
+  overrideResponse: Partial<Extract<MachineTokenResponse, object>> = {},
+): MachineTokenResponse => ({
+  access_token: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  issued_token_type: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  token_type: faker.string.alpha({ length: { min: 10, max: 20 } }),
+  expires_in: faker.number.int(),
+  scope: faker.string.alpha({ length: { min: 10, max: 20 } }),
   ...overrideResponse,
 });
 
@@ -1694,6 +2071,147 @@ export const getRevokeSharedCertificateMockHandler = (
   );
 };
 
+export const getGetFederatedIssuersMockHandler = (
+  overrideResponse?:
+    | FederatedIssuer[]
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<FederatedIssuer[]> | FederatedIssuer[]),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/:organization/:project/access/issuers",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetFederatedIssuersResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getGetFederatedIssuerMockHandler = (
+  overrideResponse?:
+    | FederatedIssuer
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<FederatedIssuer> | FederatedIssuer),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/:organization/:project/access/issuers/:name",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetFederatedIssuerResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getSetFederatedIssuerMockHandler = (
+  overrideResponse?:
+    | FederatedIssuer
+    | ((
+        info: Parameters<Parameters<typeof http.put>[1]>[0],
+      ) => Promise<FederatedIssuer> | FederatedIssuer),
+  options?: RequestHandlerOptions,
+) => {
+  return http.put(
+    "*/api/v1/:organization/:project/access/issuers/:name",
+    async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getSetFederatedIssuerResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getDeleteFederatedIssuerMockHandler = (
+  overrideResponse?:
+    | void
+    | ((
+        info: Parameters<Parameters<typeof http.delete>[1]>[0],
+      ) => Promise<void> | void),
+  options?: RequestHandlerOptions,
+) => {
+  return http.delete(
+    "*/api/v1/:organization/:project/access/issuers/:name",
+    async (info: Parameters<Parameters<typeof http.delete>[1]>[0]) => {
+      if (typeof overrideResponse === "function") {
+        await overrideResponse(info);
+      }
+
+      return new HttpResponse(null, { status: 200 });
+    },
+    options,
+  );
+};
+
+export const getSetMachineFederationRulesMockHandler = (
+  overrideResponse?:
+    | MachineAccess
+    | ((
+        info: Parameters<Parameters<typeof http.put>[1]>[0],
+      ) => Promise<MachineAccess> | MachineAccess),
+  options?: RequestHandlerOptions,
+) => {
+  return http.put(
+    "*/api/v1/:organization/:project/access/machines/:id/federation-rules",
+    async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getSetMachineFederationRulesResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
+export const getExchangeMachineTokenMockHandler = (
+  overrideResponse?:
+    | MachineTokenResponse
+    | ((
+        info: Parameters<Parameters<typeof http.post>[1]>[0],
+      ) => Promise<MachineTokenResponse> | MachineTokenResponse),
+  options?: RequestHandlerOptions,
+) => {
+  return http.post(
+    "*/api/v1/:organization/:project/access/token",
+    async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getExchangeMachineTokenResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGetInvitationsMockHandler = (
   overrideResponse?:
     | Invitation[]
@@ -1951,6 +2469,12 @@ export const getAccessMock = () => [
   getGetSharedCertificatesMockHandler(),
   getIssueSharedCertificateMockHandler(),
   getRevokeSharedCertificateMockHandler(),
+  getGetFederatedIssuersMockHandler(),
+  getGetFederatedIssuerMockHandler(),
+  getSetFederatedIssuerMockHandler(),
+  getDeleteFederatedIssuerMockHandler(),
+  getSetMachineFederationRulesMockHandler(),
+  getExchangeMachineTokenMockHandler(),
   getGetInvitationsMockHandler(),
   getCreateInvitationMockHandler(),
   getResendInvitationMockHandler(),

@@ -6,7 +6,7 @@ namespace _42.Platform.Cli.Commands.MachineAccess;
 // (client-credentials). The SDK has one enum per property, all with the same names.
 internal static class CredentialKinds
 {
-    public const string Names = "ApiKey, Certificate, CertificateAndApiKey, or ClientCredentials";
+    public const string Names = "ApiKey, Certificate, CertificateAndApiKey, ClientCredentials, or Federated";
 
     // Enum.TryParse accepts any number; only the named kinds may reach the server.
     public static bool TryParse<TKind>(string? value, out TKind kind)

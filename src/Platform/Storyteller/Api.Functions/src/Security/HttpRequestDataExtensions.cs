@@ -65,17 +65,23 @@ public static class HttpRequestDataExtensions
         return claims;
     }
 
+    // Every scope the caller's claims grant, as CheckScope reads them.
+    public static HashSet<string> GetScopes(this HttpRequestData @this)
+    {
+        return @this.GetClaims()
+            .Where(c => c.Type is "scp" or "roles" or ClaimTypes.Role || c.Type.EndsWith("/scope"))
+            .SelectMany(c => c.Value.Split(' '))
+            .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
+            .ToHashSet();
+    }
+
     public static void CheckScope(this HttpRequestData @this, params string[] scopes)
     {
 #if DEV_AUTH
         return;
 #endif
         var claims = @this.GetClaims();
-        var allScopes = claims
-            .Where(c => c.Type is "scp" or "roles" or ClaimTypes.Role || c.Type.EndsWith("/scope"))
-            .SelectMany(c => c.Value.Split(' '))
-            .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
-            .ToHashSet();
+        var allScopes = @this.GetScopes();
 
         if (!scopes.Any(scope => allScopes.Contains(scope)))
         {
@@ -94,14 +100,7 @@ public static class HttpRequestDataExtensions
 #if DEV_AUTH
         return true;
 #endif
-        var claims = @this.GetClaims();
-        var allScopes = claims
-            .Where(c => c.Type is "scp" or "roles" or ClaimTypes.Role || c.Type.EndsWith("/scope"))
-            .SelectMany(c => c.Value.Split(' '))
-            .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
-            .ToHashSet();
-
-        return allScopes.Contains(scope);
+        return @this.GetScopes().Contains(scope);
     }
 
     // Who makes the request, for every audit stamp: the machine, or the account (its sub) with a display name from
@@ -198,7 +197,12 @@ public static class HttpRequestDataExtensions
                 throw new SecurityTokenException("An application can never access an organization.");
             }
 
-            if (!await accessService.VerifyAccessForMachineAsync(segments[0], segments[1], appId))
+            if (FederatedMachineAccess.IsFederated(@this.FunctionContext))
+            {
+                // One point read of the machine replaces the existence check: the kind and the scope count too.
+                await FederatedMachineAccess.EnsureAllowedAsync(@this, accessService, segments[0], segments[1], appId);
+            }
+            else if (!await accessService.VerifyAccessForMachineAsync(segments[0], segments[1], appId))
             {
                 throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
             }

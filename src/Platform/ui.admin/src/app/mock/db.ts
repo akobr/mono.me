@@ -4,10 +4,12 @@ import type {
   AccountRole,
   Annotation,
   AnnotationAuditEntry,
+  FederatedIssuer,
   Invitation,
   KeyValueAuditEvent,
   KeyValuePolicy,
   MachineAccess,
+  MachineCredentialKind,
   SharedCertificate,
   View,
 } from '@42for.net/2splatform.sdk'
@@ -51,6 +53,8 @@ export interface MockDb {
   machines?: Record<string, MachineAccess[]>
   /** Shared certificates per project key. */
   certificates?: Record<string, SharedCertificate[]>
+  /** Trusted issuers of Federated machines per project key (424-46). */
+  issuers?: Record<string, FederatedIssuer[]>
   /** Key/value pairs per scope ("org/project/view"), with their versions and the deleted state. */
   keyValues?: Record<string, KeyValueScopeStore>
   /** Key/value policies per project key. */
@@ -76,17 +80,34 @@ export const mockDirectory: Record<string, { name: string; email: string }> = {
 
 const now = () => new Date().toISOString()
 
-function accessPoint(key: string, members: Record<string, AccountRole>): AccessPoint {
+function accessPoint(
+  key: string,
+  members: Record<string, AccountRole>,
+  kinds: MachineCredentialKind[] = ['ApiKey'],
+): AccessPoint {
   return {
     Key: key,
     AccessMap: members,
     MachineAuthentication: {
-      EnabledCredentialKinds: ['ApiKey'],
+      EnabledCredentialKinds: kinds,
       CredentialKind: 'ApiKey',
       CertificateLifetimeDays: 90,
     },
   }
 }
+
+/** The trusted issuer of the GitHub organization acme (id 65), as the docs set it up. */
+const githubIssuer = (): FederatedIssuer => ({
+  Name: 'github',
+  Issuer: 'https://token.actions.githubusercontent.com',
+  KeySource: 'Discovery',
+  RequiredClaims: { repository_owner_id: ['65'] },
+  Description: 'GitHub Actions of the acme organization',
+})
+
+/** The token endpoint of a project on the origin the mock API serves (the API base URL of the e2e build is /api). */
+const mockTokenEndpoint = (org: string, project: string) =>
+  `${typeof location === 'undefined' ? 'https://api.example.com' : location.origin}/api/v1/${org}/${project}/access/token`
 
 /** Seeds of the generated annotation catalogs per scope. */
 export function scopeSeed(scenario: MockScenario, org: string, project: string, view: string): ScopeSeed | undefined {
@@ -149,12 +170,17 @@ export function createSeed(scenario: MockScenario): MockDb {
     account: { Id: id, UserName: mockUser.email, Name: mockUser.name, AccessMap: accessMap },
     accessPoints: {
       acme: accessPoint('acme', { [id]: 'Owner', user_01MOCKGRACE: 'Administrator' }),
-      'acme.billing': accessPoint('acme.billing', {
-        [id]: 'Owner',
-        user_01MOCKGRACE: 'Contributor',
-        user_01MOCKALAN: 'Reader',
-      }),
-      'acme.shipping': accessPoint('acme.shipping', { [id]: 'Contributor', user_01MOCKGRACE: 'Owner' }),
+      // Both acme projects let machines federate with GitHub Actions (424-46); the user administers billing and
+      // contributes to shipping.
+      'acme.billing': accessPoint(
+        'acme.billing',
+        { [id]: 'Owner', user_01MOCKGRACE: 'Contributor', user_01MOCKALAN: 'Reader' },
+        ['ApiKey', 'Federated'],
+      ),
+      'acme.shipping': accessPoint('acme.shipping', { [id]: 'Contributor', user_01MOCKGRACE: 'Owner' }, [
+        'ApiKey',
+        'Federated',
+      ]),
       northwind: accessPoint('northwind', { user_01MOCKALAN: 'Owner' }),
       'northwind.portal': accessPoint('northwind.portal', { [id]: 'Reader', user_01MOCKALAN: 'Owner' }),
     },
@@ -211,7 +237,26 @@ export function createSeed(scenario: MockScenario): MockDb {
           CertificateNotAfter: new Date(Date.now() + 20 * 86_400_000).toISOString(),
           LastRenewalAt: new Date(Date.now() - 70 * 86_400_000).toISOString(),
         },
+        {
+          Id: 'mach-release-pipeline',
+          ObjectId: 'mach-release-pipeline',
+          AccessKey: '',
+          Scope: 'AnnotationReadWrite',
+          CredentialKind: 'Federated',
+          FederationRules: [
+            {
+              Issuer: 'github',
+              Audience: mockTokenEndpoint('acme', 'billing'),
+              Subject: 'repo:acme@65/billing@74:environment:production',
+              Claims: { repository_id: ['74'] },
+            },
+          ],
+        },
       ],
+    },
+    issuers: {
+      'acme.billing': [githubIssuer()],
+      'acme.shipping': [githubIssuer()],
     },
     certificates: {
       'acme.billing': [

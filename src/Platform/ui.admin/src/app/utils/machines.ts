@@ -1,10 +1,20 @@
-import type {
-  MachineAccess,
-  MachineAccessCreateScope,
-  MachineAuthenticationPolicy,
-  MachineCredentialKind,
+import {
+  getStorytellerConfig,
+  type MachineAccess,
+  type MachineAccessCreateScope,
+  type MachineAuthenticationPolicy,
+  type MachineCredentialKind,
 } from '@42for.net/2splatform.sdk'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
+
+/** The API root the app calls (configured at start-up from apiBaseUrl), for URLs and snippets shown to the user. */
+export function apiBaseUrl(): string {
+  try {
+    return getStorytellerConfig().baseUrl
+  } catch {
+    return 'https://<api-host>/api'
+  }
+}
 
 /** What each machine scope allows (spec section 13: "a select with an explanation per scope"). */
 export const scopeDescriptions: Record<MachineAccessCreateScope, string> = {
@@ -24,10 +34,34 @@ export const credentialKindDescriptions: Record<MachineCredentialKind, string> =
   CertificateAndApiKey:
     'A client certificate (its own, or a shared certificate of the project) and an API key; both must be presented.',
   ClientCredentials: 'Client ID and secret of the identity provider, exchanged for a short-lived token.',
+  Federated:
+    'No secret: the workload exchanges a token of a trusted issuer of the project (GitHub Actions, Kubernetes, Vercel, a cloud identity) for a short-lived token.',
 }
 
 /** Every credential kind, in the order of the API. */
 export const credentialKinds = Object.keys(credentialKindDescriptions) as MachineCredentialKind[]
+
+/** Readable names of the kinds for the machine list and detail; the policy and the create dialog keep the API names. */
+export const credentialKindLabels: Record<MachineCredentialKind, string> = {
+  ApiKey: 'API key',
+  Certificate: 'Certificate',
+  CertificateAndApiKey: 'Certificate and API key',
+  ClientCredentials: 'Client credentials',
+  Federated: 'Federated',
+}
+
+/** The label of a stored kind; a machine without one is an API key machine, as the API treats it. */
+export const credentialKindLabel = (kind?: MachineCredentialKind | null) =>
+  credentialKindLabels[kind ?? 'ApiKey'] ?? kind
+
+/**
+ * Whether machines of this kind get credentials that the API shows once and a reset replaces: every kind but Federated,
+ * which has no secret (424-46).
+ */
+export const hasSecret = (kind?: MachineCredentialKind | null) => kind !== 'Federated'
+
+/** Whether machines of this kind exchange a token of a trusted issuer instead of holding a secret (424-46). */
+export const isFederated = (kind?: MachineCredentialKind | null) => kind === 'Federated'
 
 /**
  * Whether the project issues and accepts shared certificates: they are the certificate half of a CertificateAndApiKey

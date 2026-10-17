@@ -17,9 +17,17 @@ internal sealed class RecordingMachineTokenValidator : IMachineTokenValidator
 
     public Exception? Error { get; set; }
 
+    // Owns its issuer, as the Storyteller token validator does.
+    public bool Owns { get; init; }
+
     public bool CanValidate(string issuer)
     {
         return issuer == _issuer;
+    }
+
+    public bool OwnsIssuer(string issuer)
+    {
+        return Owns && issuer == _issuer;
     }
 
     public Task<BearerValidationResult?> ValidateAsync(string rawToken, CancellationToken cancellationToken = default)

@@ -100,6 +100,10 @@ var host = new HostBuilder()
         // Override to Key Vault CA in production (comment out for local dev)
         //services.AddKeyVaultCertificateAuthority(context.Configuration);
 
+        // Federated machines: trusted issuers, the token exchange and Storyteller tokens (after AddCertificateMachineAccess,
+        // whose router sends the Federated kind there; next to any ClientCredentials provider)
+        services.AddFederatedMachineAccess(context.Configuration);
+
         // One user identity provider per deployment. A missing Auth:Provider keeps Entra ID.
         var authProvider = context.Configuration.GetSection(UserAuthenticationOptions.SectionName)["Provider"];
 
