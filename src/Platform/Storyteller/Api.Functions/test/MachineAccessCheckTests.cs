@@ -13,7 +13,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // The access checks of machine requests: the machine document of the project (401 without it), the credential policy,
 // and what the operation reaches against the annotation restriction of the machine (403 AnnotationRestricted). The
-// machine branch runs in every build, so these tests run in Debug (DEV_AUTH) too.
+// machine branch runs in every build, so these tests run in Debug (DEV_AUTH) too. The role check of users (the User_
+// tests) runs in Release only.
 public class MachineAccessCheckTests
 {
     private const string Organization = "acme";
@@ -41,6 +42,18 @@ public class MachineAccessCheckTests
         Reach.Annotations,
         Reach.Metadata,
     };
+
+    // A user role one step below the minimal role of the operation.
+    public static TheoryData<Reach, AccountRole, AccountRole> UserBelowTheMinimalRole => Users(
+        (AccountRole.Reader, AccountRole.Contributor),
+        (AccountRole.Contributor, AccountRole.Administrator));
+
+    public static TheoryData<Reach, AccountRole, AccountRole> UserWithTheMinimalRole => Users(
+        (AccountRole.Contributor, AccountRole.Contributor),
+        (AccountRole.Administrator, AccountRole.Administrator));
+
+    // Debug builds (DEV_AUTH) skip the role check of users.
+    private static bool DevAuth => HttpRequestDataExtensions.IsDevelopmentAuthentication;
 
     [Theory]
     [MemberData(nameof(EveryReach))]
@@ -231,18 +244,55 @@ public class MachineAccessCheckTests
         await ShouldBeRestricted(() => request.CheckAccessToAnnotationAsync(Restricted(), Organization, Project, "usg.S.R"));
     }
 
+    // Users: every entry point hands its minimal role to the role check of Release builds (403 AccessDenied below it).
+    [Theory]
+    [MemberData(nameof(UserBelowTheMinimalRole))]
+    public async Task User_BelowTheMinimalRole_IsDenied(Reach reach, AccountRole role, AccountRole minimalRole)
+    {
+        if (DevAuth)
+        {
+            return;
+        }
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Check(reach, KeyValueRequests.User(), new RoleAccess(role), minimalRole));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+    }
+
+    [Theory]
+    [MemberData(nameof(UserWithTheMinimalRole))]
+    public async Task User_WithTheMinimalRole_Passes(Reach reach, AccountRole role, AccountRole minimalRole)
+    {
+        await Check(reach, KeyValueRequests.User(), new RoleAccess(role), minimalRole);
+    }
+
     // The keys are inside Restriction, so only the project-wide reaches refuse a restricted machine.
-    private static Task Check(Reach reach, TestHttpRequestData request, IAccessService access)
+    private static Task Check(Reach reach, TestHttpRequestData request, IAccessService access, AccountRole minimalRole = AccountRole.Reader)
     {
         return reach switch
         {
-            Reach.Project => request.CheckAccessToProjectAsync(access, Organization, Project),
-            Reach.AccessPoint => request.CheckAccessToAsync(access, $"{Organization}.{Project}"),
-            Reach.Annotation => request.CheckAccessToAnnotationAsync(access, Organization, Project, Restriction),
-            Reach.Annotations => request.CheckAccessToAnnotationsAsync(access, Organization, Project, [Restriction, Descendant]),
-            Reach.Metadata => request.CheckAccessToProjectMetadataAsync(access, Organization, Project),
+            Reach.Project => request.CheckAccessToProjectAsync(access, Organization, Project, minimalRole),
+            Reach.AccessPoint => request.CheckAccessToAsync(access, $"{Organization}.{Project}", minimalRole),
+            Reach.Annotation => request.CheckAccessToAnnotationAsync(access, Organization, Project, Restriction, minimalRole),
+            Reach.Annotations => request.CheckAccessToAnnotationsAsync(access, Organization, Project, [Restriction, Descendant], minimalRole),
+            Reach.Metadata => request.CheckAccessToProjectMetadataAsync(access, Organization, Project, minimalRole),
             _ => throw new ArgumentOutOfRangeException(nameof(reach), reach, null),
         };
+    }
+
+    private static TheoryData<Reach, AccountRole, AccountRole> Users(params (AccountRole Role, AccountRole MinimalRole)[] roles)
+    {
+        var cases = new TheoryData<Reach, AccountRole, AccountRole>();
+
+        foreach (var reach in Enum.GetValues<Reach>())
+        {
+            foreach (var (role, minimalRole) in roles)
+            {
+                cases.Add(reach, role, minimalRole);
+            }
+        }
+
+        return cases;
     }
 
     private static async Task ShouldBeRestricted(Func<Task> check)
