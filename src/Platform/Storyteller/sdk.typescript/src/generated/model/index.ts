@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.29.8872
+ * OpenAPI spec version: 0.9.30.11684
  */
 
 export * from "./accessPoint";
@@ -98,6 +98,11 @@ export * from "./errorResponseDetails";
 export * from "./exceptionWrapper";
 export * from "./execution";
 export * from "./executionAnnotationType";
+export * from "./federatedIssuer";
+export * from "./federatedIssuerKeySource";
+export * from "./federatedIssuerRequiredClaims";
+export * from "./federationRule";
+export * from "./federationRuleClaims";
 export * from "./getAnnotationParams";
 export * from "./getAnnotationSchemaVersionDiffCustomParams";
 export * from "./getAnnotationSchemaVersionDiffParams";
@@ -137,6 +142,7 @@ export * from "./invitationCreate";
 export * from "./invitationCreateRole";
 export * from "./invitationRole";
 export * from "./invitationStatus";
+export * from "./iReadOnlyListString";
 export * from "./jsonPatchOperation";
 export * from "./jsonPatchOperationOp";
 export * from "./keyValue";
@@ -189,8 +195,11 @@ export * from "./machineAccessScope";
 export * from "./machineAuthenticationPolicy";
 export * from "./machineAuthenticationPolicyCredentialKind";
 export * from "./machineCredentialKind";
+export * from "./machineTokenRequest";
+export * from "./machineTokenResponse";
 export * from "./memberRoleUpdate";
 export * from "./memberRoleUpdateRole";
+export * from "./oAuthErrorResponse";
 export * from "./patchConfigurationParams";
 export * from "./permission";
 export * from "./permissionRole";

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.29.8872
+ * OpenAPI spec version: 0.9.30.11684
  */
 import * as zod from "zod";
 
@@ -74,6 +74,7 @@ export const GetAccessPointsResponseItem = zod.object({
             "Certificate",
             "CertificateAndApiKey",
             "ClientCredentials",
+            "Federated",
           ]),
         )
         .optional(),
@@ -83,6 +84,7 @@ export const GetAccessPointsResponseItem = zod.object({
           zod.literal("Certificate"),
           zod.literal("CertificateAndApiKey"),
           zod.literal("ClientCredentials"),
+          zod.literal("Federated"),
           zod.literal(null),
         ])
         .nullish(),
@@ -122,6 +124,7 @@ export const CreateAccessPointResponse = zod.object({
             "Certificate",
             "CertificateAndApiKey",
             "ClientCredentials",
+            "Federated",
           ]),
         )
         .optional(),
@@ -131,6 +134,7 @@ export const CreateAccessPointResponse = zod.object({
           zod.literal("Certificate"),
           zod.literal("CertificateAndApiKey"),
           zod.literal("ClientCredentials"),
+          zod.literal("Federated"),
           zod.literal(null),
         ])
         .nullish(),
@@ -167,6 +171,7 @@ export const GetAccessPointResponse = zod.object({
             "Certificate",
             "CertificateAndApiKey",
             "ClientCredentials",
+            "Federated",
           ]),
         )
         .optional(),
@@ -176,6 +181,7 @@ export const GetAccessPointResponse = zod.object({
           zod.literal("Certificate"),
           zod.literal("CertificateAndApiKey"),
           zod.literal("ClientCredentials"),
+          zod.literal("Federated"),
           zod.literal(null),
         ])
         .nullish(),
@@ -229,6 +235,7 @@ export const GrantUserAccessResponse = zod.object({
             "Certificate",
             "CertificateAndApiKey",
             "ClientCredentials",
+            "Federated",
           ]),
         )
         .optional(),
@@ -238,6 +245,7 @@ export const GrantUserAccessResponse = zod.object({
           zod.literal("Certificate"),
           zod.literal("CertificateAndApiKey"),
           zod.literal("ClientCredentials"),
+          zod.literal("Federated"),
           zod.literal(null),
         ])
         .nullish(),
@@ -291,6 +299,7 @@ export const RevokeUserAccessResponse = zod.object({
             "Certificate",
             "CertificateAndApiKey",
             "ClientCredentials",
+            "Federated",
           ]),
         )
         .optional(),
@@ -300,6 +309,7 @@ export const RevokeUserAccessResponse = zod.object({
           zod.literal("Certificate"),
           zod.literal("CertificateAndApiKey"),
           zod.literal("ClientCredentials"),
+          zod.literal("Federated"),
           zod.literal(null),
         ])
         .nullish(),
@@ -339,6 +349,7 @@ export const GetMachineAccessesResponseItem = zod.object({
       "Certificate",
       "CertificateAndApiKey",
       "ClientCredentials",
+      "Federated",
     ])
     .default(getMachineAccessesResponseCredentialKindDefault),
   CertificateThumbprint: zod.string().optional(),
@@ -350,6 +361,16 @@ export const GetMachineAccessesResponseItem = zod.object({
   UsesSharedCertificate: zod.boolean().optional(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
+  FederationRules: zod
+    .array(
+      zod.object({
+        Issuer: zod.string().optional(),
+        Audience: zod.string().optional(),
+        Subject: zod.string().optional(),
+        Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+      }),
+    )
+    .optional(),
 });
 export const GetMachineAccessesResponse = zod.array(
   GetMachineAccessesResponseItem,
@@ -384,11 +405,22 @@ export const CreateMachineAccessBody = zod.object({
       zod.literal("Certificate"),
       zod.literal("CertificateAndApiKey"),
       zod.literal("ClientCredentials"),
+      zod.literal("Federated"),
       zod.literal(null),
     ])
     .nullish(),
   CertificateLifetimeDays: zod.int().nullish(),
   UseSharedCertificate: zod.boolean().nullish(),
+  FederationRules: zod
+    .array(
+      zod.object({
+        Issuer: zod.string().optional(),
+        Audience: zod.string().optional(),
+        Subject: zod.string().optional(),
+        Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const createMachineAccessResponseScopeDefault = `AnnotationRead`;
@@ -417,6 +449,7 @@ export const CreateMachineAccessResponse = zod.object({
       "Certificate",
       "CertificateAndApiKey",
       "ClientCredentials",
+      "Federated",
     ])
     .default(createMachineAccessResponseCredentialKindDefault),
   CertificateThumbprint: zod.string().optional(),
@@ -428,6 +461,16 @@ export const CreateMachineAccessResponse = zod.object({
   UsesSharedCertificate: zod.boolean().optional(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
+  FederationRules: zod
+    .array(
+      zod.object({
+        Issuer: zod.string().optional(),
+        Audience: zod.string().optional(),
+        Subject: zod.string().optional(),
+        Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const GetMachineAccessParams = zod.object({
@@ -462,6 +505,7 @@ export const GetMachineAccessResponse = zod.object({
       "Certificate",
       "CertificateAndApiKey",
       "ClientCredentials",
+      "Federated",
     ])
     .default(getMachineAccessResponseCredentialKindDefault),
   CertificateThumbprint: zod.string().optional(),
@@ -473,6 +517,16 @@ export const GetMachineAccessResponse = zod.object({
   UsesSharedCertificate: zod.boolean().optional(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
+  FederationRules: zod
+    .array(
+      zod.object({
+        Issuer: zod.string().optional(),
+        Audience: zod.string().optional(),
+        Subject: zod.string().optional(),
+        Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const ResetMachineAccessParams = zod.object({
@@ -507,6 +561,7 @@ export const ResetMachineAccessResponse = zod.object({
       "Certificate",
       "CertificateAndApiKey",
       "ClientCredentials",
+      "Federated",
     ])
     .default(resetMachineAccessResponseCredentialKindDefault),
   CertificateThumbprint: zod.string().optional(),
@@ -518,6 +573,16 @@ export const ResetMachineAccessResponse = zod.object({
   UsesSharedCertificate: zod.boolean().optional(),
   TokenEndpoint: zod.string().optional(),
   TokenScope: zod.string().optional(),
+  FederationRules: zod
+    .array(
+      zod.object({
+        Issuer: zod.string().optional(),
+        Audience: zod.string().optional(),
+        Subject: zod.string().optional(),
+        Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+      }),
+    )
+    .optional(),
 });
 
 export const DeleteMachineAccessParams = zod.object({
@@ -547,6 +612,7 @@ export const GetMachineAuthenticationResponse = zod.object({
         "Certificate",
         "CertificateAndApiKey",
         "ClientCredentials",
+        "Federated",
       ]),
     )
     .optional(),
@@ -556,6 +622,7 @@ export const GetMachineAuthenticationResponse = zod.object({
       zod.literal("Certificate"),
       zod.literal("CertificateAndApiKey"),
       zod.literal("ClientCredentials"),
+      zod.literal("Federated"),
       zod.literal(null),
     ])
     .nullish(),
@@ -576,6 +643,7 @@ export const SetMachineAuthenticationBody = zod.object({
         "Certificate",
         "CertificateAndApiKey",
         "ClientCredentials",
+        "Federated",
       ]),
     )
     .optional(),
@@ -585,6 +653,7 @@ export const SetMachineAuthenticationBody = zod.object({
       zod.literal("Certificate"),
       zod.literal("CertificateAndApiKey"),
       zod.literal("ClientCredentials"),
+      zod.literal("Federated"),
       zod.literal(null),
     ])
     .nullish(),
@@ -599,6 +668,7 @@ export const SetMachineAuthenticationResponse = zod.object({
         "Certificate",
         "CertificateAndApiKey",
         "ClientCredentials",
+        "Federated",
       ]),
     )
     .optional(),
@@ -608,6 +678,7 @@ export const SetMachineAuthenticationResponse = zod.object({
       zod.literal("Certificate"),
       zod.literal("CertificateAndApiKey"),
       zod.literal("ClientCredentials"),
+      zod.literal("Federated"),
       zod.literal(null),
     ])
     .nullish(),
@@ -691,6 +762,214 @@ export const RevokeSharedCertificateParams = zod.object({
 });
 
 export const RevokeSharedCertificateResponse = zod.unknown();
+
+/**
+ * The trusted issuers of the project: the OIDC issuers whose tokens its Federated machines exchange for Storyteller tokens. Contributor.
+ */
+export const GetFederatedIssuersParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+});
+
+export const getFederatedIssuersResponseKeySourceDefault = `Discovery`;
+
+export const GetFederatedIssuersResponseItem = zod.object({
+  Name: zod.string().optional(),
+  Issuer: zod.string().optional(),
+  KeySource: zod
+    .enum(["Discovery", "JwksUri", "Jwks"])
+    .default(getFederatedIssuersResponseKeySourceDefault),
+  JwksUri: zod.string().optional(),
+  Jwks: zod.string().optional(),
+  MaxTokenLifetimeSeconds: zod.int().nullish(),
+  RequiredClaims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+  Description: zod.string().optional(),
+});
+export const GetFederatedIssuersResponse = zod.array(
+  GetFederatedIssuersResponseItem,
+);
+
+/**
+ * A trusted issuer of the project. Contributor.
+ */
+export const GetFederatedIssuerParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  name: zod
+    .string()
+    .describe(
+      "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.",
+    ),
+});
+
+export const getFederatedIssuerResponseKeySourceDefault = `Discovery`;
+
+export const GetFederatedIssuerResponse = zod.object({
+  Name: zod.string().optional(),
+  Issuer: zod.string().optional(),
+  KeySource: zod
+    .enum(["Discovery", "JwksUri", "Jwks"])
+    .default(getFederatedIssuerResponseKeySourceDefault),
+  JwksUri: zod.string().optional(),
+  Jwks: zod.string().optional(),
+  MaxTokenLifetimeSeconds: zod.int().nullish(),
+  RequiredClaims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+  Description: zod.string().optional(),
+});
+
+/**
+ * Creates or replaces a trusted issuer of the project. The route name wins over the body; the Issuer of an existing trusted issuer cannot change. Administrator.
+ */
+export const SetFederatedIssuerParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  name: zod
+    .string()
+    .describe(
+      "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.",
+    ),
+});
+
+export const setFederatedIssuerBodyKeySourceDefault = `Discovery`;
+
+export const SetFederatedIssuerBody = zod.object({
+  Name: zod.string().optional(),
+  Issuer: zod.string().optional(),
+  KeySource: zod
+    .enum(["Discovery", "JwksUri", "Jwks"])
+    .default(setFederatedIssuerBodyKeySourceDefault),
+  JwksUri: zod.string().optional(),
+  Jwks: zod.string().optional(),
+  MaxTokenLifetimeSeconds: zod.int().nullish(),
+  RequiredClaims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+  Description: zod.string().optional(),
+});
+
+export const setFederatedIssuerResponseKeySourceDefault = `Discovery`;
+
+export const SetFederatedIssuerResponse = zod.object({
+  Name: zod.string().optional(),
+  Issuer: zod.string().optional(),
+  KeySource: zod
+    .enum(["Discovery", "JwksUri", "Jwks"])
+    .default(setFederatedIssuerResponseKeySourceDefault),
+  JwksUri: zod.string().optional(),
+  Jwks: zod.string().optional(),
+  MaxTokenLifetimeSeconds: zod.int().nullish(),
+  RequiredClaims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+  Description: zod.string().optional(),
+});
+
+/**
+ * Deletes a trusted issuer even while federation rules reference it: the kill switch. Those rules stop matching within a minute; Storyteller tokens already issued stay valid until they expire. Administrator.
+ */
+export const DeleteFederatedIssuerParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  name: zod
+    .string()
+    .describe(
+      "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.",
+    ),
+});
+
+export const DeleteFederatedIssuerResponse = zod.unknown();
+
+/**
+ * Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor.
+ */
+export const SetMachineFederationRulesParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  id: zod.string().describe("The id of the machine access."),
+});
+
+export const SetMachineFederationRulesBodyItem = zod.object({
+  Issuer: zod.string().optional(),
+  Audience: zod.string().optional(),
+  Subject: zod.string().optional(),
+  Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+});
+export const SetMachineFederationRulesBody = zod.array(
+  SetMachineFederationRulesBodyItem,
+);
+
+export const setMachineFederationRulesResponseScopeDefault = `AnnotationRead`;
+export const setMachineFederationRulesResponseCredentialKindDefault = `ApiKey`;
+
+export const SetMachineFederationRulesResponse = zod.object({
+  Id: zod.string().optional(),
+  ObjectId: zod.string().optional(),
+  AccessKey: zod.string().optional(),
+  Scope: zod
+    .enum([
+      "AnnotationRead",
+      "ConfigurationRead",
+      "DefaultRead",
+      "AnnotationReadWrite",
+      "ConfigurationReadWrite",
+      "DefaultReadWrite",
+      "SecretsRead",
+      "SecretsReadWrite",
+    ])
+    .default(setMachineFederationRulesResponseScopeDefault),
+  AnnotationKey: zod.string().optional(),
+  CredentialKind: zod
+    .enum([
+      "ApiKey",
+      "Certificate",
+      "CertificateAndApiKey",
+      "ClientCredentials",
+      "Federated",
+    ])
+    .default(setMachineFederationRulesResponseCredentialKindDefault),
+  CertificateThumbprint: zod.string().optional(),
+  Certificate: zod.string().optional(),
+  CertificatePassword: zod.string().optional(),
+  LastRenewalAt: zod.iso.datetime({ offset: true }).nullish(),
+  CertificateLifetimeDays: zod.int().nullish(),
+  CertificateNotAfter: zod.iso.datetime({ offset: true }).nullish(),
+  UsesSharedCertificate: zod.boolean().optional(),
+  TokenEndpoint: zod.string().optional(),
+  TokenScope: zod.string().optional(),
+  FederationRules: zod
+    .array(
+      zod.object({
+        Issuer: zod.string().optional(),
+        Audience: zod.string().optional(),
+        Subject: zod.string().optional(),
+        Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * Anonymous. The RFC 8693 token exchange of Federated machines: client_id names the machine, subject_token is a token of a trusted issuer of the project, and the response is a short-lived Storyteller token for Authorization: Bearer. Send no Authorization header. Every refused subject token gets the same invalid_request description; the reason is only logged.
+ */
+export const ExchangeMachineTokenParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+});
+
+export const ExchangeMachineTokenBody = zod.object({
+  grant_type: zod.string(),
+  subject_token: zod.string(),
+  subject_token_type: zod.string(),
+  client_id: zod.string(),
+  audience: zod.string().nullish(),
+  resource: zod.string().nullish(),
+  scope: zod.string().nullish(),
+  requested_token_type: zod.string().nullish(),
+});
+
+export const ExchangeMachineTokenResponse = zod.object({
+  access_token: zod.string(),
+  issued_token_type: zod.string(),
+  token_type: zod.string(),
+  expires_in: zod.int(),
+  scope: zod.string(),
+});
 
 /**
  * Invitations to the organization or project, newest first. Needs Administrator.

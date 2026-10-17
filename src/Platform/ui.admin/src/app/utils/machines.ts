@@ -24,6 +24,8 @@ export const credentialKindDescriptions: Record<MachineCredentialKind, string> =
   CertificateAndApiKey:
     'A client certificate (its own, or a shared certificate of the project) and an API key; both must be presented.',
   ClientCredentials: 'Client ID and secret of the identity provider, exchanged for a short-lived token.',
+  Federated:
+    'No secret: a token of a trusted issuer (GitHub Actions, Kubernetes, a cloud identity) is exchanged for a short-lived token.',
 }
 
 /** Every credential kind, in the order of the API. */

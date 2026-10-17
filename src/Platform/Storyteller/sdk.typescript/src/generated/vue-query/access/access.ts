@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.29.8872
+ * OpenAPI spec version: 0.9.30.11684
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -30,12 +30,17 @@ import type {
   AuthConfiguration,
   CertificateRenewalResult,
   ErrorResponse,
+  FederatedIssuer,
+  FederationRule,
   Invitation,
   InvitationCreate,
   MachineAccess,
   MachineAccessCreate,
   MachineAuthenticationPolicy,
+  MachineTokenRequest,
+  MachineTokenResponse,
   MemberRoleUpdate,
+  OAuthErrorResponse,
   Permission,
   SharedCertificate,
   SharedCertificateCreate,
@@ -2166,6 +2171,807 @@ export const useRevokeSharedCertificate = <
 > => {
   return useMutation(
     getRevokeSharedCertificateMutationOptions(options),
+    queryClient,
+  );
+};
+export const getGetFederatedIssuersUrl = (
+  organization: string,
+  project: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/issuers`;
+};
+
+/**
+ * The trusted issuers of the project: the OIDC issuers whose tokens its Federated machines exchange for Storyteller tokens. Contributor.
+ */
+export const getFederatedIssuers = async (
+  organization: string,
+  project: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<FederatedIssuer[]> => {
+  return storytellerFetch<FederatedIssuer[]>(
+    getGetFederatedIssuersUrl(organization, project),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetFederatedIssuersQueryKey = (
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+) => {
+  return ["v1", organization, project, "access", "issuers"] as const;
+};
+
+export const getGetFederatedIssuersQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFederatedIssuers>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFederatedIssuers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetFederatedIssuersQueryKey(organization, project);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getFederatedIssuers>>
+  > = ({ signal }) =>
+    getFederatedIssuers(toValue(organization), toValue(project), {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(organization) !== null &&
+        toValue(organization) !== undefined &&
+        toValue(project) !== null &&
+        toValue(project) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFederatedIssuers>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetFederatedIssuersQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFederatedIssuers>>
+>;
+export type GetFederatedIssuersQueryError = ErrorType<void | ErrorResponse>;
+
+export function useGetFederatedIssuers<
+  TData = Awaited<ReturnType<typeof getFederatedIssuers>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFederatedIssuers>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetFederatedIssuersQueryOptions(
+    organization,
+    project,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getGetFederatedIssuerUrl = (
+  organization: string,
+  project: string,
+  name: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/issuers/${encodeURIComponent(String(name))}`;
+};
+
+/**
+ * A trusted issuer of the project. Contributor.
+ */
+export const getFederatedIssuer = async (
+  organization: string,
+  project: string,
+  name: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<FederatedIssuer> => {
+  return storytellerFetch<FederatedIssuer>(
+    getGetFederatedIssuerUrl(organization, project, name),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetFederatedIssuerQueryKey = (
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  name: MaybeRefOrGetter<string>,
+) => {
+  return ["v1", organization, project, "access", "issuers", name] as const;
+};
+
+export const getGetFederatedIssuerQueryOptions = <
+  TData = Awaited<ReturnType<typeof getFederatedIssuer>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  name: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFederatedIssuer>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetFederatedIssuerQueryKey(organization, project, name);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getFederatedIssuer>>
+  > = ({ signal }) =>
+    getFederatedIssuer(toValue(organization), toValue(project), toValue(name), {
+      signal,
+      ...requestOptions,
+    });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(organization) !== null &&
+        toValue(organization) !== undefined &&
+        toValue(project) !== null &&
+        toValue(project) !== undefined &&
+        toValue(name) !== null &&
+        toValue(name) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getFederatedIssuer>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetFederatedIssuerQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getFederatedIssuer>>
+>;
+export type GetFederatedIssuerQueryError = ErrorType<void | ErrorResponse>;
+
+export function useGetFederatedIssuer<
+  TData = Awaited<ReturnType<typeof getFederatedIssuer>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  name: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getFederatedIssuer>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetFederatedIssuerQueryOptions(
+    organization,
+    project,
+    name,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getSetFederatedIssuerUrl = (
+  organization: string,
+  project: string,
+  name: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/issuers/${encodeURIComponent(String(name))}`;
+};
+
+/**
+ * Creates or replaces a trusted issuer of the project. The route name wins over the body; the Issuer of an existing trusted issuer cannot change. Administrator.
+ */
+export const setFederatedIssuer = async (
+  organization: string,
+  project: string,
+  name: string,
+  federatedIssuer?: FederatedIssuer,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<FederatedIssuer> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<FederatedIssuer>(
+    getSetFederatedIssuerUrl(organization, project, name),
+    {
+      ...options,
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(federatedIssuer),
+    },
+  );
+};
+
+export const getSetFederatedIssuerMutationKey = () =>
+  ["setFederatedIssuer"] as const;
+
+export const getSetFederatedIssuerMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setFederatedIssuer>>,
+    TError,
+    SetFederatedIssuerMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setFederatedIssuer>>,
+  TError,
+  SetFederatedIssuerMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetFederatedIssuerMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setFederatedIssuer>>,
+    SetFederatedIssuerMutationVariables
+  > = (props) => {
+    const { organization, project, name, data } = props ?? {};
+
+    return setFederatedIssuer(
+      organization,
+      project,
+      name,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetFederatedIssuerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setFederatedIssuer>>
+>;
+export type SetFederatedIssuerMutationBody =
+  BodyType<FederatedIssuer> | undefined;
+export type SetFederatedIssuerMutationError = ErrorType<ErrorResponse | void>;
+export type SetFederatedIssuerMutationVariables = {
+  organization: string;
+  project: string;
+  name: string;
+  data?: BodyType<FederatedIssuer>;
+};
+
+export const useSetFederatedIssuer = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setFederatedIssuer>>,
+      TError,
+      SetFederatedIssuerMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof setFederatedIssuer>>,
+  TError,
+  SetFederatedIssuerMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getSetFederatedIssuerMutationOptions(options),
+    queryClient,
+  );
+};
+export const getDeleteFederatedIssuerUrl = (
+  organization: string,
+  project: string,
+  name: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/issuers/${encodeURIComponent(String(name))}`;
+};
+
+/**
+ * Deletes a trusted issuer even while federation rules reference it: the kill switch. Those rules stop matching within a minute; Storyteller tokens already issued stay valid until they expire. Administrator.
+ */
+export const deleteFederatedIssuer = async (
+  organization: string,
+  project: string,
+  name: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<void> => {
+  return storytellerFetch<void>(
+    getDeleteFederatedIssuerUrl(organization, project, name),
+    {
+      ...options,
+      method: "DELETE",
+    },
+  );
+};
+
+export const getDeleteFederatedIssuerMutationKey = () =>
+  ["deleteFederatedIssuer"] as const;
+
+export const getDeleteFederatedIssuerMutationOptions = <
+  TError = ErrorType<void | ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteFederatedIssuer>>,
+    TError,
+    DeleteFederatedIssuerMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteFederatedIssuer>>,
+  TError,
+  DeleteFederatedIssuerMutationVariables,
+  TContext
+> => {
+  const mutationKey = getDeleteFederatedIssuerMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteFederatedIssuer>>,
+    DeleteFederatedIssuerMutationVariables
+  > = (props) => {
+    const { organization, project, name } = props ?? {};
+
+    return deleteFederatedIssuer(organization, project, name, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteFederatedIssuerMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteFederatedIssuer>>
+>;
+
+export type DeleteFederatedIssuerMutationError =
+  ErrorType<void | ErrorResponse>;
+export type DeleteFederatedIssuerMutationVariables = {
+  organization: string;
+  project: string;
+  name: string;
+};
+
+export const useDeleteFederatedIssuer = <
+  TError = ErrorType<void | ErrorResponse>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof deleteFederatedIssuer>>,
+      TError,
+      DeleteFederatedIssuerMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof deleteFederatedIssuer>>,
+  TError,
+  DeleteFederatedIssuerMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getDeleteFederatedIssuerMutationOptions(options),
+    queryClient,
+  );
+};
+export const getSetMachineFederationRulesUrl = (
+  organization: string,
+  project: string,
+  id: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/machines/${encodeURIComponent(String(id))}/federation-rules`;
+};
+
+/**
+ * Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor.
+ */
+export const setMachineFederationRules = async (
+  organization: string,
+  project: string,
+  id: string,
+  federationRule?: FederationRule[],
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<MachineAccess> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<MachineAccess>(
+    getSetMachineFederationRulesUrl(organization, project, id),
+    {
+      ...options,
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...getHeaders(options?.headers),
+      },
+      body: JSON.stringify(federationRule),
+    },
+  );
+};
+
+export const getSetMachineFederationRulesMutationKey = () =>
+  ["setMachineFederationRules"] as const;
+
+export const getSetMachineFederationRulesMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof setMachineFederationRules>>,
+    TError,
+    SetMachineFederationRulesMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof setMachineFederationRules>>,
+  TError,
+  SetMachineFederationRulesMutationVariables,
+  TContext
+> => {
+  const mutationKey = getSetMachineFederationRulesMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof setMachineFederationRules>>,
+    SetMachineFederationRulesMutationVariables
+  > = (props) => {
+    const { organization, project, id, data } = props ?? {};
+
+    return setMachineFederationRules(
+      organization,
+      project,
+      id,
+      data,
+      requestOptions,
+    );
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SetMachineFederationRulesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof setMachineFederationRules>>
+>;
+export type SetMachineFederationRulesMutationBody =
+  BodyType<FederationRule[]> | undefined;
+export type SetMachineFederationRulesMutationError =
+  ErrorType<ErrorResponse | void>;
+export type SetMachineFederationRulesMutationVariables = {
+  organization: string;
+  project: string;
+  id: string;
+  data?: BodyType<FederationRule[]>;
+};
+
+export const useSetMachineFederationRules = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof setMachineFederationRules>>,
+      TError,
+      SetMachineFederationRulesMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof setMachineFederationRules>>,
+  TError,
+  SetMachineFederationRulesMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getSetMachineFederationRulesMutationOptions(options),
+    queryClient,
+  );
+};
+export const getExchangeMachineTokenUrl = (
+  organization: string,
+  project: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/access/token`;
+};
+
+/**
+ * Anonymous. The RFC 8693 token exchange of Federated machines: client_id names the machine, subject_token is a token of a trusted issuer of the project, and the response is a short-lived Storyteller token for Authorization: Bearer. Send no Authorization header. Every refused subject token gets the same invalid_request description; the reason is only logged.
+ */
+export const exchangeMachineToken = async (
+  organization: string,
+  project: string,
+  machineTokenRequest: MachineTokenRequest,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<MachineTokenResponse> => {
+  const formUrlEncoded = new URLSearchParams();
+  formUrlEncoded.append(`grant_type`, machineTokenRequest.grant_type);
+  formUrlEncoded.append(`subject_token`, machineTokenRequest.subject_token);
+  formUrlEncoded.append(
+    `subject_token_type`,
+    machineTokenRequest.subject_token_type,
+  );
+  formUrlEncoded.append(`client_id`, machineTokenRequest.client_id);
+  if (
+    machineTokenRequest.audience !== undefined &&
+    machineTokenRequest.audience !== null
+  ) {
+    formUrlEncoded.append(`audience`, machineTokenRequest.audience);
+  }
+  if (
+    machineTokenRequest.resource !== undefined &&
+    machineTokenRequest.resource !== null
+  ) {
+    formUrlEncoded.append(`resource`, machineTokenRequest.resource);
+  }
+  if (
+    machineTokenRequest.scope !== undefined &&
+    machineTokenRequest.scope !== null
+  ) {
+    formUrlEncoded.append(`scope`, machineTokenRequest.scope);
+  }
+  if (
+    machineTokenRequest.requested_token_type !== undefined &&
+    machineTokenRequest.requested_token_type !== null
+  ) {
+    formUrlEncoded.append(
+      `requested_token_type`,
+      machineTokenRequest.requested_token_type,
+    );
+  }
+
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<MachineTokenResponse>(
+    getExchangeMachineTokenUrl(organization, project),
+    {
+      ...options,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        ...getHeaders(options?.headers),
+      },
+      body: formUrlEncoded,
+    },
+  );
+};
+
+export const getExchangeMachineTokenMutationKey = () =>
+  ["exchangeMachineToken"] as const;
+
+export const getExchangeMachineTokenMutationOptions = <
+  TError = ErrorType<OAuthErrorResponse | ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof exchangeMachineToken>>,
+    TError,
+    ExchangeMachineTokenMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof exchangeMachineToken>>,
+  TError,
+  ExchangeMachineTokenMutationVariables,
+  TContext
+> => {
+  const mutationKey = getExchangeMachineTokenMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof exchangeMachineToken>>,
+    ExchangeMachineTokenMutationVariables
+  > = (props) => {
+    const { organization, project, data } = props ?? {};
+
+    return exchangeMachineToken(organization, project, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ExchangeMachineTokenMutationResult = NonNullable<
+  Awaited<ReturnType<typeof exchangeMachineToken>>
+>;
+export type ExchangeMachineTokenMutationBody = BodyType<MachineTokenRequest>;
+export type ExchangeMachineTokenMutationError = ErrorType<
+  OAuthErrorResponse | ErrorResponse
+>;
+export type ExchangeMachineTokenMutationVariables = {
+  organization: string;
+  project: string;
+  data: BodyType<MachineTokenRequest>;
+};
+
+export const useExchangeMachineToken = <
+  TError = ErrorType<OAuthErrorResponse | ErrorResponse>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof exchangeMachineToken>>,
+      TError,
+      ExchangeMachineTokenMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof exchangeMachineToken>>,
+  TError,
+  ExchangeMachineTokenMutationVariables,
+  TContext
+> => {
+  return useMutation(
+    getExchangeMachineTokenMutationOptions(options),
     queryClient,
   );
 };
