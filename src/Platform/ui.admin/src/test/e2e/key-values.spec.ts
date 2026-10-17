@@ -65,7 +65,7 @@ test('filters the list by level, clears the filter, and the app survives leaving
   await (await menu(page, testInfo)).getByRole('link', { name: 'Annotations', exact: true }).click()
   await expect(page).toHaveURL(/\/annotations/)
   await expect(page.getByText('rst.invoicing').first()).toBeVisible()
-  await (await menu(page, testInfo)).getByRole('link', { name: 'Key values', exact: true }).click()
+  await (await menu(page, testInfo)).getByRole('link', { name: 'Values store', exact: true }).click()
   await expect(page.getByText('db.password').first()).toBeVisible()
 })
 
@@ -87,9 +87,13 @@ test('a reader cannot reveal, create or change the policy', async ({ page }, tes
   await openApp(page, '/northwind/portal/default/key-values')
   await expect(page.getByRole('button', { name: 'New key' })).toHaveCount(0)
 
-  await goto(page, '/northwind/portal/secrets')
-  await expect(page.getByText('Administrator', { exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Save policy' })).toHaveCount(0)
+  // The secrets settings are the Secrets section of the project's Settings (424-35).
+  await goto(page, '/northwind/portal/settings#secrets')
+  const secrets = page.locator('#secrets')
+  await expect(secrets).toBeInViewport()
+  await expect(secrets.getByText('Administrator', { exact: true }).first()).toBeVisible()
+  await expect(secrets.getByRole('switch', { name: 'Allow Standard' })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Save secrets policy' })).toHaveCount(0)
   expect(testInfo.project.name).toBeTruthy()
 })
 
@@ -195,7 +199,7 @@ test('exports the view as an .env file', async ({ page }) => {
 })
 
 test('sets up a customer key with the BYOK wizard', async ({ page }) => {
-  await openApp(page, '/acme/billing/secrets')
+  await openApp(page, '/acme/billing/settings#secrets')
   await page.getByRole('button', { name: 'Show the setup' }).click()
   await expect(page.getByText('Key Vault Crypto Service Encryption User').first()).toBeVisible()
 
@@ -211,8 +215,15 @@ test('sets up a customer key with the BYOK wizard', async ({ page }) => {
   await expect(page.getByText('Healthy').first()).toBeVisible()
 })
 
-test('filters the audit trail and shows the usage', async ({ page }) => {
-  await openApp(page, '/acme/billing/audit')
+// Usage and Audit are the tabs of the Monitor page (424-35).
+test('shows the usage and filters the audit trail on the Monitor page', async ({ page }) => {
+  await openApp(page, '/acme/billing/monitor')
+  await expect(page.getByRole('tab', { name: 'Usage' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByText('Standard keys (key-months)').first()).toBeVisible()
+  await expect(page.getByText('Estimated charges')).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Audit' }).click()
+  await expect(page).toHaveURL(/[?&]tab=audit/)
   await expect(page.getByText('Reveal').first()).toBeVisible()
   await expect(page.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Reveal', exact: true }) })).toContainText('Grace Hopper')
   await expect(page.getByRole('row').filter({ hasText: 'BindingRead' })).toContainText('machine:mach-billing-sync')
@@ -221,7 +232,7 @@ test('filters the audit trail and shows the usage', async ({ page }) => {
   await expect(page.getByRole('row').filter({ hasText: 'Rotate' })).toHaveCount(1)
   await expect(page.getByRole('row').filter({ hasText: 'Reveal' })).toHaveCount(0)
 
-  await goto(page, '/acme/billing/usage')
-  await expect(page.getByText('Standard keys (key-months)').first()).toBeVisible()
+  await page.getByRole('tab', { name: 'Usage' }).click()
+  await expect(page).not.toHaveURL(/tab=/)
   await expect(page.getByText('Estimated charges')).toBeVisible()
 })

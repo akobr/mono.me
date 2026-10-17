@@ -211,7 +211,7 @@ const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...lev
 <template>
   <UDashboardPanel id="key-values" :ui="{ body: 'p-0 sm:p-0 gap-0 overflow-hidden' }">
     <template #header>
-      <AppNavbar title="Key values">
+      <AppNavbar title="Values store">
         <template #right>
           <KeyValueExportMenu />
           <!-- icon-only below sm, or the left side of the navbar (menu button, context) collapses on a phone -->
@@ -252,7 +252,7 @@ const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...lev
       <ErrorState v-else-if="list.isError.value" :error="list.error.value" @retry="list.refetch()" />
       <EmptyState
         v-else-if="rows.length === 0"
-        icon="i-lucide-key-round"
+        icon="i-lucide-vault"
         :title="search ? 'No key matches the search' : state === 'Deleted' ? 'No deleted keys' : 'No key values in this view'"
         :description="state === 'Deleted' ? 'Deleted keys can be restored here for 90 days.' : 'Key values are the configuration values and secrets that bindings (@key) insert into configurations.'"
       >

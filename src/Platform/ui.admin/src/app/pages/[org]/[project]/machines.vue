@@ -12,11 +12,13 @@ import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
 // Machine access of the project (spec section 13). Create and Reset return credentials once; they go straight
 // to OneTimeSecretDialog and are never cached. The project policy (readable by Contributors) gives the kinds and the
-// default certificate lifetime of new machines (424-14).
+// default certificate lifetime of new machines (424-14). Administrators also see the shared certificates below the
+// machines (424-35); Contributors don't, the API answers 403 to them.
 const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const canManage = useCan('machines')
+const canAdmin = useCan('manageAccess')
 const boot = useBootState()
 const detail = useDetailPanel()
 
@@ -73,6 +75,9 @@ async function remove() {
 }
 
 const daysLeft = (machine: MachineAccess) => certificateDaysLeft(machine, policy.data.value?.CertificateLifetimeDays)
+
+// #shared-certificates (the old Certificates page redirects here) scrolls once the machines above it are listed.
+useHashScroll(() => !machines.isPending.value)
 </script>
 
 <template>
@@ -85,82 +90,93 @@ const daysLeft = (machine: MachineAccess) => certificateDaysLeft(machine, policy
       </AppNavbar>
     </template>
     <template #body>
-      <LoadingState v-if="machines.isPending.value" />
-      <ErrorState v-else-if="machines.isError.value" :error="machines.error.value" @retry="machines.refetch()" />
-      <EmptyState
-        v-else-if="!machines.data.value?.length"
-        icon="i-lucide-computer"
-        title="No machine access"
-        description="Machines (services, pipelines) read and write the project's annotations and configurations with their own credentials."
-      >
-        <UButton v-if="canManage" label="New machine" icon="i-lucide-plus" @click="creating = true" />
-      </EmptyState>
-      <div v-else class="overflow-x-auto rounded-md border border-default">
-        <table class="w-full text-sm">
-          <thead class="bg-elevated/50 text-xs text-muted">
-            <tr>
-              <th class="px-3 py-2 text-start font-medium">Id</th>
-              <th class="px-3 py-2 text-start font-medium">Scope</th>
-              <th class="px-3 py-2 text-start font-medium">Annotation</th>
-              <th class="px-3 py-2 text-start font-medium">Credentials</th>
-              <th class="px-3 py-2 text-start font-medium">Certificate</th>
-              <th class="px-3 py-2 text-start font-medium">Renewed</th>
-              <th class="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-default">
-            <tr v-for="machine in machines.data.value" :key="machine.Id">
-              <td class="px-3 py-2">
-                <RouterLink
-                  :to="`/${context.org}/${context.project}/machines/${machine.Id}`"
-                  class="font-mono text-xs text-primary hover:underline"
-                >
-                  {{ machine.Id }}
-                </RouterLink>
-              </td>
-              <td class="px-3 py-2"><UBadge :label="machine.Scope" color="neutral" variant="outline" size="sm" /></td>
-              <td class="px-3 py-2 font-mono text-xs">{{ machine.AnnotationKey ?? 'any' }}</td>
-              <td class="px-3 py-2 text-xs">{{ machine.CredentialKind }}</td>
-              <td class="px-3 py-2">
-                <span v-if="machine.CertificateThumbprint" class="flex items-center gap-1">
-                  <code class="font-mono text-xs" :title="machine.CertificateThumbprint"
-                    >{{ machine.CertificateThumbprint.slice(0, 12) }}…</code
-                  >
-                  <UBadge
-                    v-if="daysLeft(machine) !== undefined"
-                    :label="daysLeft(machine)! < 0 ? 'expired' : `${daysLeft(machine)} d`"
-                    :color="daysLeft(machine)! < 0 ? 'error' : daysLeft(machine)! <= 30 ? 'warning' : 'neutral'"
-                    variant="subtle"
-                    size="sm"
-                  />
-                </span>
-                <UBadge
-                  v-else-if="machine.UsesSharedCertificate"
-                  label="shared"
-                  icon="i-lucide-shield-check"
-                  color="neutral"
-                  variant="subtle"
-                  size="sm"
-                />
-                <span v-else class="text-dimmed">–</span>
-              </td>
-              <td class="px-3 py-2"><RelativeTime :value="machine.LastRenewalAt" /></td>
-              <td class="px-3 py-2 text-end">
-                <span v-if="canManage" class="flex justify-end gap-1">
-                  <UButton label="Reset" size="xs" color="neutral" variant="ghost" @click="resetting = machine" />
-                  <UButton
-                    icon="i-lucide-trash-2"
-                    size="xs"
-                    color="neutral"
-                    variant="ghost"
-                    :aria-label="`Delete ${machine.Id}`"
-                    @click="deleting = machine"
-                  />
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <div class="space-y-6">
+        <section class="space-y-2">
+          <h2 class="text-xs font-semibold text-muted uppercase">Machine access</h2>
+          <LoadingState v-if="machines.isPending.value" />
+          <ErrorState v-else-if="machines.isError.value" :error="machines.error.value" @retry="machines.refetch()" />
+          <EmptyState
+            v-else-if="!machines.data.value?.length"
+            icon="i-lucide-computer"
+            title="No machine access"
+            description="Machines (services, pipelines) read and write the project's annotations and configurations with their own credentials."
+          >
+            <UButton v-if="canManage" label="New machine" icon="i-lucide-plus" @click="creating = true" />
+          </EmptyState>
+          <div v-else class="overflow-x-auto rounded-md border border-default">
+            <table class="w-full text-sm">
+              <thead class="bg-elevated/50 text-xs text-muted">
+                <tr>
+                  <th class="px-3 py-2 text-start font-medium">Id</th>
+                  <th class="px-3 py-2 text-start font-medium">Scope</th>
+                  <th class="px-3 py-2 text-start font-medium">Annotation</th>
+                  <th class="px-3 py-2 text-start font-medium">Credentials</th>
+                  <th class="px-3 py-2 text-start font-medium">Certificate</th>
+                  <th class="px-3 py-2 text-start font-medium">Renewed</th>
+                  <th class="px-3 py-2" />
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-default">
+                <tr v-for="machine in machines.data.value" :key="machine.Id">
+                  <td class="px-3 py-2">
+                    <RouterLink
+                      :to="`/${context.org}/${context.project}/machines/${machine.Id}`"
+                      class="font-mono text-xs text-primary hover:underline"
+                    >
+                      {{ machine.Id }}
+                    </RouterLink>
+                  </td>
+                  <td class="px-3 py-2">
+                    <UBadge :label="machine.Scope" color="neutral" variant="outline" size="sm" />
+                  </td>
+                  <td class="px-3 py-2 font-mono text-xs">{{ machine.AnnotationKey ?? 'any' }}</td>
+                  <td class="px-3 py-2 text-xs">{{ machine.CredentialKind }}</td>
+                  <td class="px-3 py-2">
+                    <span v-if="machine.CertificateThumbprint" class="flex items-center gap-1">
+                      <code class="font-mono text-xs" :title="machine.CertificateThumbprint"
+                        >{{ machine.CertificateThumbprint.slice(0, 12) }}…</code
+                      >
+                      <UBadge
+                        v-if="daysLeft(machine) !== undefined"
+                        :label="daysLeft(machine)! < 0 ? 'expired' : `${daysLeft(machine)} d`"
+                        :color="daysLeft(machine)! < 0 ? 'error' : daysLeft(machine)! <= 30 ? 'warning' : 'neutral'"
+                        variant="subtle"
+                        size="sm"
+                      />
+                    </span>
+                    <UBadge
+                      v-else-if="machine.UsesSharedCertificate"
+                      label="shared"
+                      icon="i-lucide-shield-check"
+                      color="neutral"
+                      variant="subtle"
+                      size="sm"
+                    />
+                    <span v-else class="text-dimmed">–</span>
+                  </td>
+                  <td class="px-3 py-2"><RelativeTime :value="machine.LastRenewalAt" /></td>
+                  <td class="px-3 py-2 text-end">
+                    <span v-if="canManage" class="flex justify-end gap-1">
+                      <UButton label="Reset" size="xs" color="neutral" variant="ghost" @click="resetting = machine" />
+                      <UButton
+                        icon="i-lucide-trash-2"
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        :aria-label="`Delete ${machine.Id}`"
+                        @click="deleting = machine"
+                      />
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section v-if="canAdmin" id="shared-certificates" tabindex="-1" class="scroll-mt-4 space-y-2 outline-none">
+          <h2 class="text-xs font-semibold text-muted uppercase">Shared certificates</h2>
+          <SharedCertificatesTable />
+        </section>
       </div>
 
       <MachineCreateDialog v-model:open="creating" :policy="policy.data.value" @created="created" />

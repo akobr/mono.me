@@ -63,3 +63,78 @@ test('shows the 42 logo at the top of the navigation menu', async ({ page }, tes
   await expect(logo).toBeVisible()
   await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(128)
 })
+
+// The project section after 424-35: Invitations, Certificates, Secrets, Audit and Usage are parts of other pages.
+test('lists the project pages each role can open, with Monitor and the values store', async ({ page }, testInfo) => {
+  const pages = ['views', 'members', 'machines', 'settings', 'monitor']
+  const moved = ['invitations', 'certificates', 'secrets', 'audit', 'usage']
+
+  for (const [project, role] of [
+    ['/acme/billing', ['views', 'members', 'machines', 'settings', 'monitor']],
+    ['/acme/shipping', ['views', 'machines', 'settings']],
+    ['/northwind/portal', ['views', 'settings']],
+  ] as const) {
+    await openApp(page, `${project}/views`)
+    const navigation = await menu(page, testInfo)
+    await expect(navigation.getByRole('link', { name: 'Values store', exact: true })).toHaveAttribute(
+      'href',
+      `${project}/default/key-values`,
+    )
+    for (const section of [...pages, ...moved]) {
+      await expect(navigation.locator(`a[href="${project}/${section}"]`)).toHaveCount(
+        (role as readonly string[]).includes(section) ? 1 : 0,
+      )
+    }
+    if (isMobile(testInfo)) {
+      await page.keyboard.press('Escape')
+    }
+  }
+})
+
+// The top bar has no theme button (424-35); the command palette and the account page keep the theme.
+test('changes the theme in the command palette, not in the top bar', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/annotations')
+  await expect(page.getByRole('button', { name: 'Color mode' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Search…' }).click()
+  for (const mode of ['Light', 'Dark', 'System']) {
+    await expect(page.getByRole('option', { name: mode, exact: true })).toBeVisible()
+  }
+  await page.getByRole('option', { name: 'Dark', exact: true }).click()
+  await expect(page.locator('html')).toHaveClass(/\bdark\b/)
+
+  await goto(page, '/account')
+  await expect(page.getByRole('tab', { name: 'Dark' })).toHaveAttribute('aria-selected', 'true')
+})
+
+// The pages merged into others (424-35) redirect, so saved links keep working; the anchor shows the moved section.
+// The redirects keep the query of the old URL, here the mock scenario of openApp.
+const movedPages: { from: string; to: string; section?: string }[] = [
+  { from: '/acme/billing/invitations', to: '/acme/billing/members#invitations', section: '#invitations' },
+  {
+    from: '/acme/billing/certificates',
+    to: '/acme/billing/machines#shared-certificates',
+    section: '#shared-certificates',
+  },
+  { from: '/acme/billing/secrets', to: '/acme/billing/settings#secrets', section: '#secrets' },
+  { from: '/acme/billing/audit', to: '/acme/billing/monitor?tab=audit' },
+  { from: '/acme/billing/usage', to: '/acme/billing/monitor' },
+]
+
+for (const moved of movedPages) {
+  test(`opens ${moved.from} on the page that took it over`, async ({ page }) => {
+    await openApp(page, moved.from)
+    await expect
+      .poll(() => {
+        const url = new URL(page.url())
+        url.searchParams.delete('mock-scenario')
+        return `${url.pathname}${url.search}${url.hash}`
+      })
+      .toBe(moved.to)
+    if (moved.section) {
+      // Keyboard and screen-reader users continue from the section, as after a followed anchor.
+      await expect(page.locator(moved.section)).toBeInViewport()
+      await expect(page.locator(moved.section)).toBeFocused()
+    }
+  })
+}

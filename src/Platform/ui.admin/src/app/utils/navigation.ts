@@ -93,7 +93,7 @@ export function buildNavigation(
       entries: [
         { label: 'Annotations', icon: 'i-lucide-tags', to: `${base}/annotations`, editRole: 'Contributor' },
         { label: 'Configurations', icon: 'i-lucide-settings-2', to: `${base}/configurations`, editRole: 'Contributor' },
-        { label: 'Key values', icon: 'i-lucide-key-round', to: `${base}/key-values`, editRole: 'Contributor' },
+        { label: 'Values store', icon: 'i-lucide-vault', to: `${base}/key-values`, editRole: 'Contributor' },
         { label: 'Graph', icon: 'i-lucide-waypoints', to: `${base}/graph` },
         { label: 'Templates', icon: 'i-lucide-layout-template', to: `${base}/templates`, editRole: 'Contributor' },
         { label: 'Schemas', icon: 'i-lucide-braces', to: `${base}/schemas`, editRole: 'Contributor' },
@@ -117,13 +117,9 @@ export function buildNavigation(
       entries: [
         { label: 'Views', icon: 'i-lucide-eye', to: `${base}/views` },
         { label: 'Members', icon: 'i-lucide-users', to: `${base}/members`, minRole: 'Administrator' },
-        { label: 'Invitations', icon: 'i-lucide-mail', to: `${base}/invitations`, minRole: 'Administrator' },
         { label: 'Machines', icon: 'i-lucide-computer', to: `${base}/machines`, minRole: 'Contributor' },
-        { label: 'Certificates', icon: 'i-lucide-shield-check', to: `${base}/certificates`, minRole: 'Administrator' },
         { label: 'Settings', icon: 'i-lucide-settings', to: `${base}/settings` },
-        { label: 'Secrets', icon: 'i-lucide-shield', to: `${base}/secrets`, editRole: 'Administrator' },
-        { label: 'Audit', icon: 'i-lucide-scroll-text', to: `${base}/audit`, minRole: 'Administrator' },
-        { label: 'Usage', icon: 'i-lucide-gauge', to: `${base}/usage`, minRole: 'Administrator' },
+        { label: 'Monitor', icon: 'i-lucide-activity', to: `${base}/monitor`, minRole: 'Administrator' },
       ],
     })
   }

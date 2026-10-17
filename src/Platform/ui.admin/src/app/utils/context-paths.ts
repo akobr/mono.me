@@ -12,7 +12,7 @@ export const viewSections = [
 ] as const
 
 /** Sections that live under /{org}/{project}/… */
-export const projectSections = ['views', 'members', 'invitations', 'machines', 'certificates', 'settings'] as const
+export const projectSections = ['views', 'members', 'machines', 'settings', 'monitor'] as const
 
 export type ViewSection = (typeof viewSections)[number]
 export type ProjectSection = (typeof projectSections)[number]
@@ -31,6 +31,12 @@ const isViewSection = (value: string | undefined): value is ViewSection =>
 const isProjectSection = (value: string | undefined): value is ProjectSection =>
   (projectSections as readonly string[]).includes(value ?? '')
 
+/**
+ * The project sections with pages below them (`machines/{id}`). The others are single pages: `monitor` is not a
+ * reserved view name (424-35), so /{org}/{project}/monitor/graph is the graph of a view named monitor.
+ */
+const nestedProjectSections: readonly ProjectSection[] = ['machines']
+
 /** Which section a path shows, so the context switcher can keep it when the organization, project or view changes. */
 export function currentSection(path: string): CurrentSection {
   const segments = path.split('?')[0]!.split('/').filter(Boolean)
@@ -39,7 +45,7 @@ export function currentSection(path: string): CurrentSection {
     return { kind: 'none' }
   }
 
-  if (isProjectSection(segments[2])) {
+  if (isProjectSection(segments[2]) && (segments.length === 3 || nestedProjectSections.includes(segments[2]))) {
     return { kind: 'project', name: segments[2] }
   }
 

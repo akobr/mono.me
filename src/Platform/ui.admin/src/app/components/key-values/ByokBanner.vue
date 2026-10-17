@@ -4,7 +4,7 @@ import { useKeyValuePolicy } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { formatDateTime } from '@/utils/dates'
 
-/** "Customer key unavailable since …" across the key values section (spec 29.2), linked to the Secrets settings. */
+/** "Customer key unavailable since …" across the values store (spec 29.2), linked to the secrets in Settings. */
 const context = useContextStore()
 const policy = useKeyValuePolicy()
 
@@ -21,7 +21,7 @@ const since = computed(() => (byok.value?.LastCheckedAt ? formatDateTime(new Dat
     icon="i-lucide-key-square"
     title="Customer key unavailable"
     :description="`Your key could not be used since ${since}${byok?.LastError ? `: ${byok.LastError}` : ''}. BYOK values cannot be read or written until the key is enabled again.`"
-    :actions="[{ label: 'Secrets settings', to: `/${context.org}/${context.project}/secrets`, color: 'error', variant: 'outline' }]"
+    :actions="[{ label: 'Secrets settings', to: { path: `/${context.org}/${context.project}/settings`, hash: '#secrets' }, color: 'error', variant: 'outline' }]"
     class="rounded-none border-x-0 border-t-0"
   />
 </template>

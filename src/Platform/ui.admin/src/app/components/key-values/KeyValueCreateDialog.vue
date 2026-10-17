@@ -70,7 +70,7 @@ const onSubmit = handleSubmit(async (form) => {
   }
 
   if (isClientEncrypted(form.protection) && hyokRecipients.value.length === 0) {
-    setFieldError('protection', 'The project has no enabled recipient; add one in the Secrets settings.')
+    setFieldError('protection', 'The project has no enabled recipient; add one in the Secrets section of Settings.')
     return
   }
 
@@ -93,7 +93,7 @@ const onSubmit = handleSubmit(async (form) => {
     if (hasErrorCode(error, 'KeyValueVersionMismatch')) {
       setFieldError('key', 'This key exists already; open it to change its value.')
     } else if (hasErrorCode(error, 'ProtectionNotAllowed')) {
-      setFieldError('protection', `${error.message} Allow it in the Secrets settings.`)
+      setFieldError('protection', `${error.message} Allow it in the Secrets section of Settings.`)
     } else if (hasErrorCode(error, 'InvalidContentType')) {
       setFieldError('contentType', error.message)
     } else if (hasErrorCode(error, 'InvalidSecretReference') || hasErrorCode(error, 'InvalidKey') || hasErrorCode(error, 'ValueRequired') || hasErrorCode(error, 'ValueTooLarge')) {

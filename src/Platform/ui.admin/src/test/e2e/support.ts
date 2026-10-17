@@ -5,10 +5,12 @@ export type MockScenario = 'default' | 'new-user' | 'invited' | 'large'
 
 /**
  * Opens a path of the app with a fresh mock data set. Every test has its own browser context, so the
- * sessionStorage-backed mock API starts from the scenario's seed.
+ * sessionStorage-backed mock API starts from the scenario's seed. The scenario goes before the hash of a path with an
+ * anchor (`/settings#secrets`).
  */
 export async function openApp(page: Page, path: string, scenario: MockScenario = 'default'): Promise<void> {
-  await page.goto(`${path}${path.includes('?') ? '&' : '?'}mock-scenario=${scenario}`)
+  const [location, hash] = path.split('#')
+  await page.goto(`${location}${location!.includes('?') ? '&' : '?'}mock-scenario=${scenario}${hash ? `#${hash}` : ''}`)
   await page.waitForLoadState('networkidle')
 }
 

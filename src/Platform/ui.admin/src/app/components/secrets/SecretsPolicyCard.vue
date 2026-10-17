@@ -102,7 +102,7 @@ async function save() {
   <UCard>
     <template #header>
       <div class="flex items-center justify-between">
-        <h2 class="font-semibold">Allowed levels</h2>
+        <h3 class="font-semibold">Allowed levels</h3>
         <UBadge v-if="!editable" label="Administrator" icon="i-lucide-lock" color="neutral" variant="subtle" size="sm" />
       </div>
     </template>
@@ -158,7 +158,7 @@ async function save() {
       <UAlert v-if="failure" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="failure" />
 
       <div v-if="editable" class="flex justify-end">
-        <UButton label="Save policy" :disabled="!dirty" :loading="saving" @click="save" />
+        <UButton label="Save secrets policy" :disabled="!dirty" :loading="saving" @click="save" />
       </div>
     </div>
   </UCard>
