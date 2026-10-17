@@ -11,6 +11,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
+// BearerValidationMode.DecodeWithoutValidation is static: the classes that switch it never run in parallel.
+[Collection(nameof(BearerValidationMode))]
 public class BearerAuthenticationMiddlewareTests
 {
     private readonly RecordingMiddleware _middleware = new();

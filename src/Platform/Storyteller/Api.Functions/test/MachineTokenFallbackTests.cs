@@ -14,6 +14,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // The machine provider may differ from the user provider: BearerAuthenticationMiddleware asks the
 // machine validators only after the user validator rejected the token.
+// BearerValidationMode.DecodeWithoutValidation is static: the classes that switch it never run in parallel.
+[Collection(nameof(BearerValidationMode))]
 public class MachineTokenFallbackTests
 {
     private const string MachineIssuer = "https://keycloak.example/realms/storyteller";
