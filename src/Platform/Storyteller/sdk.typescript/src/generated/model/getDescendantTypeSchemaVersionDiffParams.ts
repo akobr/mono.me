@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.29.8872
+ * OpenAPI spec version: 0.9.30.11684
  */
 
 export type GetDescendantTypeSchemaVersionDiffParams = {
