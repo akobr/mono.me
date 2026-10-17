@@ -67,7 +67,8 @@ internal sealed class RecordingConsole
 
     public IReadOnlyList<RecordedTable> Tables => _tables;
 
-    private static string ToText(object? element)
+    // The plain text of an element: also of the cells of a table.
+    internal static string ToText(object? element)
     {
         switch (element)
         {
