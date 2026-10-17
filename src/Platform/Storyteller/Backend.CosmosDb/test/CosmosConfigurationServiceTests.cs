@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
 using FluentAssertions;
+using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -15,6 +16,9 @@ public class CosmosConfigurationServiceTests(Startup startup)
     : BaseTestsClass(startup)
 {
     private const string Project = "config-tests";
+
+    // a project without templates, so a read caches no item for an ancestor without a document
+    private const string FirstWriteProject = "config-first-write";
 
     [Fact]
     public async Task NonExistingConfiguration()
@@ -302,6 +306,113 @@ public class CosmosConfigurationServiceTests(Startup startup)
         executionConfigBeforeDelete.Content.Should().NotBeEmpty();
         executionConfigBeforeDelete.Content.Should().ContainKey("reason");
         executionConfigAfterDelete.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(AnnotationType.Responsibility)]
+    [InlineData(AnnotationType.Unit)]
+    [InlineData(AnnotationType.Subject)]
+    [InlineData(AnnotationType.Usage)]
+    [InlineData(AnnotationType.Context)]
+    [InlineData(AnnotationType.Execution)]
+    public async Task FirstWrite_OfAnAncestor_InvalidatesTheCachedDescendant(AnnotationType ancestorType)
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        // every case has its own tree, the unit of execution is a descendant of every other type
+        var name = $"fw-{ancestorType.ToString().ToLowerInvariant()}";
+        var uoeAnnotationKey = AnnotationKey.CreateUnitOfExecution($"{name}-s", $"{name}-r", $"{name}-c", $"{name}-u");
+        await annotations.CreateAnnotationsFromStringAsync(
+            TestConstants.Organization,
+            FirstWriteProject,
+            Constants.DefaultViewName,
+            [uoeAnnotationKey.ToString()],
+            AnnotationServiceTestExtensions.TestActor);
+
+        var uoeKey = FullKey.Create(uoeAnnotationKey, TestConstants.Organization, FirstWriteProject, Constants.DefaultViewName);
+        var ancestorKey = FullKey.Create(GetAncestorKey(uoeAnnotationKey, ancestorType), uoeKey);
+
+        await configs.CreateOrUpdateConfigurationAsync(uoeKey, JObject.Parse("""{ "own": "unit-of-execution" }"""), AuditActor.System);
+        var before = await configs.GetRawConfigurationAsync(uoeKey);
+
+        before!.Content.Should().NotContainKey("ancestor");
+        (await HasCachedCalculationAsync(uoeKey)).Should().BeTrue();
+        (await HasConfigurationItemAsync(ancestorKey)).Should().BeFalse("the write to the ancestor has to be its first one");
+
+        await configs.CreateOrUpdateConfigurationAsync(ancestorKey, JObject.Parse("""{ "ancestor": "first" }"""), AuditActor.System);
+
+        (await HasCachedCalculationAsync(uoeKey)).Should().BeFalse();
+        var after = await configs.GetRawConfigurationAsync(uoeKey);
+        after!.Content["ancestor"]!.Value<string>().Should().Be("first");
+        after.Content["own"]!.Value<string>().Should().Be("unit-of-execution");
+    }
+
+    [Fact]
+    public async Task FirstWrite_OfAnAncestor_InvalidatesACachedInheritedDocument()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var usageAnnotationKey = AnnotationKey.CreateUsage("fw-inherited-s", "fw-inherited-r");
+        await annotations.CreateAnnotationsFromStringAsync(
+            TestConstants.Organization,
+            FirstWriteProject,
+            Constants.DefaultViewName,
+            [usageAnnotationKey.ToString()],
+            AnnotationServiceTestExtensions.TestActor);
+
+        var usageKey = FullKey.Create(usageAnnotationKey, TestConstants.Organization, FirstWriteProject, Constants.DefaultViewName);
+        var subjectKey = FullKey.Create(usageAnnotationKey.GetSubjectKey(), usageKey);
+        var responsibilityKey = FullKey.Create(usageAnnotationKey.GetResponsibilityKey(), usageKey);
+
+        // the usage has no document of its own; reading it caches the inherited one in an empty item
+        await configs.CreateOrUpdateConfigurationAsync(subjectKey, JObject.Parse("""{ "subject": 1 }"""), AuditActor.System);
+        var before = await configs.GetRawConfigurationAsync(usageKey);
+
+        before!.Content.Should().NotContainKey("responsibility");
+        (await HasCachedCalculationAsync(usageKey)).Should().BeTrue();
+        (await HasConfigurationItemAsync(responsibilityKey)).Should().BeFalse("the write to the responsibility has to be its first one");
+
+        await configs.CreateOrUpdateConfigurationAsync(responsibilityKey, JObject.Parse("""{ "responsibility": 1 }"""), AuditActor.System);
+
+        (await HasCachedCalculationAsync(usageKey)).Should().BeFalse();
+        var after = await configs.GetRawConfigurationAsync(usageKey);
+        after!.Content["responsibility"]!.Value<int>().Should().Be(1);
+        after.Content["subject"]!.Value<int>().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Import_CreatingAnAncestorsDocument_InvalidatesTheCachedDescendant()
+    {
+        var annotations = Context.Services.GetRequiredService<IAnnotationService>();
+        var configs = Context.Services.GetRequiredService<IConfigurationService>();
+
+        var contextAnnotationKey = AnnotationKey.CreateContext("fw-import-s", "fw-import-c");
+        await annotations.CreateAnnotationsFromStringAsync(
+            TestConstants.Organization,
+            FirstWriteProject,
+            Constants.DefaultViewName,
+            [contextAnnotationKey.ToString()],
+            AnnotationServiceTestExtensions.TestActor);
+
+        var contextKey = FullKey.Create(contextAnnotationKey, TestConstants.Organization, FirstWriteProject, Constants.DefaultViewName);
+        var subjectKey = FullKey.Create(contextAnnotationKey.GetSubjectKey(), contextKey);
+
+        await configs.CreateOrUpdateConfigurationAsync(contextKey, JObject.Parse("""{ "own": "context" }"""), AuditActor.System);
+        var before = await configs.GetRawConfigurationAsync(contextKey);
+
+        before!.Content.Should().NotContainKey("imported");
+        (await HasCachedCalculationAsync(contextKey)).Should().BeTrue();
+        (await HasConfigurationItemAsync(subjectKey)).Should().BeFalse("the import has to create the subject's first item");
+
+        var result = await configs.ImportConfigurationAsync(subjectKey, JObject.Parse("""{ "imported": true }"""), AuditActor.System);
+
+        result.Outcome.Should().Be(ConfigurationImportOutcome.Created);
+        (await HasCachedCalculationAsync(contextKey)).Should().BeFalse();
+        var after = await configs.GetRawConfigurationAsync(contextKey);
+        after!.Content["imported"]!.Value<bool>().Should().BeTrue();
+        after.Content["own"]!.Value<string>().Should().Be("context");
     }
 
     [Fact]
@@ -1163,5 +1274,45 @@ public class CosmosConfigurationServiceTests(Startup startup)
 
         var revealed = await configs.GetResolvedConfigurationAsync(key, includeSecrets: true);
         revealed!.Content["label"]!.Value<string>().Should().Be(DecliningSecretSource.SecretValue);
+    }
+
+    private static AnnotationKey GetAncestorKey(AnnotationKey unitOfExecutionKey, AnnotationType ancestorType)
+    {
+        return ancestorType switch
+        {
+            AnnotationType.Responsibility => unitOfExecutionKey.GetResponsibilityKey(),
+            AnnotationType.Unit => unitOfExecutionKey.GetUnitKey(),
+            AnnotationType.Subject => unitOfExecutionKey.GetSubjectKey(),
+            AnnotationType.Usage => unitOfExecutionKey.GetUsageKey(),
+            AnnotationType.Context => unitOfExecutionKey.GetContextKey(),
+            AnnotationType.Execution => unitOfExecutionKey.GetExecutionKey(),
+            _ => throw new ArgumentOutOfRangeException(nameof(ancestorType), ancestorType, "Not an ancestor of a unit of execution."),
+        };
+    }
+
+    private Container GetContainer()
+    {
+        return Context.Services
+            .GetRequiredService<IContainerRepositoryProvider>()
+            .GetOrganizationContainer(TestConstants.Organization)
+            .Container;
+    }
+
+    private async Task<bool> HasConfigurationItemAsync(FullKey key)
+    {
+        using var response = await GetContainer().ReadItemStreamAsync(
+            $"{key.ViewName}.cnf.{key.Annotation}",
+            new PartitionKey(key.GetPartitionKey()));
+
+        return response.IsSuccessStatusCode;
+    }
+
+    private async Task<bool> HasCachedCalculationAsync(FullKey key)
+    {
+        var item = await GetContainer().ReadItemAsync<JObject>(
+            $"{key.ViewName}.cnf.{key.Annotation}",
+            new PartitionKey(key.GetPartitionKey()));
+
+        return item.Resource["CalculatedContent"]?.Type == JTokenType.Object;
     }
 }

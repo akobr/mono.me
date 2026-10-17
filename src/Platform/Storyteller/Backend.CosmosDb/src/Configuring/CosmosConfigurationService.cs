@@ -380,6 +380,10 @@ public class CosmosConfigurationService : IConfigurationService
             };
 
             await repository.Container.CreateItemAsync(configuration, partitionKey);
+
+            // invalidate the cached calculations of all descendants once the document exists, so a calculation
+            // that read it as missing is either cleared here or fails to cache on the changed ETag
+            await InvalidateConfigurationsAsync(key, repository);
             await AuditConfigurationAsync(key, repository, actor, AnnotationAuditAction.ConfigurationChanged, configuration.Version);
             return configuration.ToConfiguration();
         }
@@ -447,7 +451,7 @@ public class CosmosConfigurationService : IConfigurationService
             ? existingConfiguration.Version
             : Math.Max(existingConfiguration.Version, await GetHighestArchivedVersionAsync(key, repository));
 
-        // invalidate all ancestor configurations
+        // invalidate the cached calculations of all descendants
         await InvalidateConfigurationsAsync(key, repository);
 
         // save a new version of the configuration
