@@ -44,6 +44,7 @@ declare module 'vue' {
     CombinatorRenderer: typeof import('./components/configuration/renderers/CombinatorRenderer.vue')['default']
     CombinedSchemaView: typeof import('./components/configuration/CombinedSchemaView.vue')['default']
     CommandPalette: typeof import('./components/shell/CommandPalette.vue')['default']
+    ConfigurationCreateDialog: typeof import('./components/configuration/ConfigurationCreateDialog.vue')['default']
     ConfigurationEditor: typeof import('./components/configuration/ConfigurationEditor.vue')['default']
     ConfigurationEffective: typeof import('./components/configuration/ConfigurationEffective.vue')['default']
     ConfigurationLink: typeof import('./components/annotations/ConfigurationLink.vue')['default']
