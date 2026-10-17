@@ -198,6 +198,31 @@ public class CosmosConfigurationService : IConfigurationService
         return GetResolvedConfigurationInternalAsync(key, false);
     }
 
+    public bool HasBindings(Configuration effective)
+    {
+        ArgumentNullException.ThrowIfNull(effective);
+        return _bindingResolver?.ContainsBindings(effective.Content) ?? false;
+    }
+
+    public async Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false)
+    {
+        ArgumentNullException.ThrowIfNull(effective);
+
+        if (_bindingResolver is null)
+        {
+            return effective;
+        }
+
+        var scope = new BindingScope
+        {
+            Document = effective.Content.DeepClone(),
+            Context = new ConfigurationBindingContext(key),
+        };
+
+        await _bindingResolver.ResolveAsync(effective.Content, includeSecrets, scope);
+        return effective;
+    }
+
     public async Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(key.OrganizationName);
@@ -812,19 +837,7 @@ public class CosmosConfigurationService : IConfigurationService
             return null;
         }
 
-        if (_bindingResolver is null)
-        {
-            return config;
-        }
-
-        var scope = new BindingScope
-        {
-            Document = config.Content.DeepClone(),
-            Context = new ConfigurationBindingContext(key),
-        };
-
-        await _bindingResolver.ResolveAsync(config.Content, includeSecrets, scope);
-        return config;
+        return await ResolveConfigurationAsync(key, config, includeSecrets);
     }
 
     private async Task TryAutogeneratePropertiesAsync(

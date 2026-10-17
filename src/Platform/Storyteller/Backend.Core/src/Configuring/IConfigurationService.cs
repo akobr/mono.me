@@ -25,6 +25,13 @@ public interface IConfigurationService
 
     Task<Configuration?> GetResolvedConfigurationWithoutSecretsAsync(FullKey key);
 
+    // Whether resolving would change a configuration from GetRawConfigurationAsync; false means the resolved read is that same document.
+    bool HasBindings(Configuration effective);
+
+    // Evaluates the bindings of a configuration from GetRawConfigurationAsync in place and returns it.
+    // Version, Modified and Hash stay the effective ones.
+    Task<Configuration> ResolveConfigurationAsync(FullKey key, Configuration effective, bool includeSecrets = false);
+
     Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key);
 
     // The actor stamps the new version and is recorded in the annotation's audit (best effort, after the write).
