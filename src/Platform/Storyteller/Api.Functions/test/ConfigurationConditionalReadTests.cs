@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Net.Http.Headers;
@@ -196,6 +197,39 @@ public class ConfigurationConditionalReadTests
     }
 
     [Fact]
+    public async Task GetConfigurationResolved_WithBindings_ResolvesWithTheSecretRightsOfTheCaller()
+    {
+        var (http, configurations) = Create(() => Stored(), Resolve("db-1"));
+
+        await http.GetConfigurationResolved(Machine(mtls: true), Org, Project, View, Key);
+        await http.GetConfigurationResolved(Machine(mtls: false), Org, Project, View, Key);
+
+        configurations.IncludeSecrets.ShouldBe([true, false]);
+    }
+
+    [Fact]
+    public async Task GetConfigurationResolved_NoSecretRights_IsPrivateWithoutTheWithheldHeader()
+    {
+        // a DEV_AUTH build gives every caller the secrets scope, so only Release has a caller without secret rights
+        if (HttpRequestDataExtensions.IsDevelopmentAuthentication)
+        {
+            return;
+        }
+
+        var (http, _) = Create(() => Stored(), Resolve("db-1"));
+        var reading = Machine(mtls: true);
+        var neither = WithHttpContext(KeyValueRequests.Machine(mtls: false, roles: [Scopes.Configuration.Read]), ifNoneMatch: null);
+
+        await http.GetConfigurationResolved(reading, Org, Project, View, Key);
+        var result = await http.GetConfigurationResolved(neither, Org, Project, View, Key);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        Headers(neither).CacheControl.ToString().ShouldBe("private, no-cache");
+        Headers(neither).ContainsKey(SecretRights.WithheldHeader).ShouldBeFalse();
+        Headers(neither).ETag.ToString().ShouldNotBe(Headers(reading).ETag.ToString());
+    }
+
+    [Fact]
     public async Task GetConfigurationResolved_WithBindings_TagsTheResolvedBody()
     {
         var value = "db-1";
@@ -321,6 +355,19 @@ public class ConfigurationConditionalReadTests
         }
     }
 
+    [Fact]
+    public async Task AddConditionalReads_AnInvalidKey_StopsTheStart()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConditionalReads:EntityTagKey"] = "AQIDBAUGBwgJCgsMDQ4PEA==" })
+            .Build();
+        using var host = new HostBuilder().ConfigureServices(services => services.AddConditionalReads(configuration)).Build();
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
+
+        exception.Message.ShouldContain("ConditionalReads:EntityTagKey");
+    }
+
     [Theory]
     [InlineData(Definitions.RouteIds.Configuration.GetConfiguration)]
     [InlineData(Definitions.RouteIds.Configuration.GetResolvedConfiguration)]
@@ -442,6 +489,9 @@ public class ConfigurationConditionalReadTests
     {
         public List<string> Calls { get; } = [];
 
+        // includeSecrets of every resolve
+        public List<bool> IncludeSecrets { get; } = [];
+
         public Func<Configuration?> Stored { get; set; } = () => null;
 
         // null: the document has no bindings
@@ -463,6 +513,8 @@ public class ConfigurationConditionalReadTests
 
         private Task<Configuration> ResolveAsync(Configuration effective, bool includeSecrets)
         {
+            IncludeSecrets.Add(includeSecrets);
+
             try
             {
                 return Task.FromResult(Resolve!(effective, includeSecrets));
