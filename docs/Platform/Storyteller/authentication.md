@@ -188,9 +188,11 @@ Entra ID sign-in still uses MSAL with the cache in `~/.42for.net/msal.cache`.
 
 `sform` signs in without a device code when machine credentials are in environment variables, for example in a CI/CD pipeline or a GitHub Action. Setting any credential variable switches `sform` to that machine:
 
-* It never prompts.
+* It never asks anyone to sign in: no device code, no browser.
 * It never uses or changes the stored user session.
-* It stores nothing on disk.
+* It stores no credential and no token. Only the AuthKit token URL fallback below caches the discovery answer in `auth.discovery.json`, as a user sign-in does.
+
+Commands keep their own confirmations, for example before overwriting an `-e` export file or deleting without `--yes`; a pipeline should not depend on them.
 
 `sform account machine create` prints the variables for the new machine. The names match the `.env` snippet of the admin UI.
 
@@ -241,7 +243,7 @@ The credential variables decide the kind. Variables of two kinds at once, for ex
 
 `access.default.json` is never used for a machine, because it outlives the job on a self-hosted runner. A command without a project stops. So does a command whose target differs from the project of the key or the certificate. The view comes from `-v`, then `STORYTELLER_VIEW`, then `default`. `STORYTELLER_PROJECT` and `STORYTELLER_VIEW` also apply to a user sign-in, ahead of `access.default.json`.
 
-`sform account` checks the variables without a prompt. For client credentials and token files, it also gets the token. It then prints the machine, the project and the API URL. `sform account logout` has nothing to do for a machine. Account, access point, machine and shared certificate management need a user sign-in; the API answers `401` to a machine.
+`sform account` checks the variables without a prompt. For client credentials it also gets the token, and for a token file it refuses a JWT whose `exp` has passed. It then prints the machine, the project and the API URL. `sform account logout` has nothing to do for a machine. Account, access point, machine and shared certificate management need a user sign-in; the API answers `401` to a machine.
 
 | Exit code | Meaning |
 |---|---|
@@ -249,7 +251,7 @@ The credential variables decide the kind. Variables of two kinds at once, for ex
 | `2` | The variables are missing or invalid, or the target project is wrong. |
 | `3` | The token endpoint failed or could not be reached; a retry may help. |
 | `43` | `sform account` only: no project is set. |
-| `44` | The credentials were rejected, by the token endpoint or by the API (`401` or `403`). |
+| `44` | The credentials were rejected: by the token endpoint, as an expired token file, or by the API with `401`. A `403` the command does not handle itself ends the same way. |
 
 ```yaml
 # GitHub Actions
@@ -258,7 +260,7 @@ The credential variables decide the kind. Variables of two kinds at once, for ex
   env:
     STORYTELLER_API_URL: https://storyteller.example.com/api
     STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
-- run: sform story config my.service -r -e appsettings.storyteller.json
+- run: sform story config set sbt.northwind -i configuration/northwind.json
   env:
     STORYTELLER_API_URL: https://storyteller.example.com/api
     STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
