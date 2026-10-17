@@ -188,7 +188,7 @@ Responsibility `{ "address": { "city": "Oslo", "zip": "0001" } }` and execution 
 
 A later read of an item whose `CalculatedContent` is present returns that object and skips the walk. `ConfigurationEntity.IsCachingDisabled` is stored on the item and is unread by this path, so the flag leaves caching on.
 
-These writes clear the target item's `CalculatedContent` and `CalculatedContentHash`, and then clear the same fields on the descendants whose effective document includes this annotation. The patch also increments `AffectedCounter`.
+These writes clear the target item's `CalculatedContent` and `CalculatedContentHash`, and clear the same fields on the descendants whose effective document includes this annotation. The patch also increments `AffectedCounter`.
 
 | Written annotation | Descendants whose cache is cleared |
 | --- | --- |
@@ -200,11 +200,18 @@ These writes clear the target item's `CalculatedContent` and `CalculatedContentH
 | Execution | Unit-of-execution items in that partition and view under that subject, responsibility, and context |
 | Unit of execution | None |
 
-`CreateOrUpdateConfigurationAsync` on an item that already exists, and `PatchConfigurationAsync`, null the target cache in the same write as the new `Content`. `ClearConfigurationAsync` and `DeleteAsync` remove the item when it has stored content, or delete a system cache row directly, and then invalidate descendants.
+`CreateOrUpdateConfigurationAsync` on an item that already exists, and `PatchConfigurationAsync`, first invalidate descendants and then null the target cache in the same write as the new `Content`. `ClearConfigurationAsync` and `DeleteAsync` remove the item when it has stored content, or delete a system cache row directly, and then invalidate descendants.
 
-The first insert, when no configuration item exists yet, creates the item with `Content` and no cache, and then invalidates descendants. An import that creates a document (`ImportConfigurationAsync` with the outcome `Created`) takes the same path.
+The first insert, when no configuration item exists yet, creates the item with `Content` and no cache, and then invalidates descendants. An import of a key without a configuration item takes the same path. A system cache row counts as an existing item. A first document written over one, by `CreateOrUpdateConfigurationAsync` or by an import that reports `Created`, takes the existing-item path, which invalidates before it writes.
 
-The first insert invalidates after the item is created, not before. A calculation caches its result on an existing item only while the item still has the ETag that was read before the walk, and the invalidation patch changes that ETag. A descendant calculation that read the ancestor as missing is therefore either cached before the invalidation, which clears it, or fails to cache after it. A descendant item that a calculation creates after the invalidation has queried the items is not reached, on this path or on any other write.
+The first insert invalidates after the item is created, not before. A calculation caches its result on an existing item only while the item still has the ETag that was read before the walk, and the invalidation patch changes that ETag. A descendant calculation that read the ancestor as missing is therefore either cached before the invalidation, which clears it, or fails to cache after it.
+
+This holds for each item, not for the invalidation as a whole:
+
+- The patches go out in transactional batches of at most 100 items per partition, several at a time and in no fixed order. A descendant cleared in an earlier batch can be calculated again from an intermediate descendant whose stale cache is still in a later batch, and cached with the old document. For example, an execution can be recalculated from its usage before the usage is cleared.
+- A descendant item that a calculation creates after the invalidation has queried the items is not reached.
+
+Both gaps apply to every write that invalidates, not only to the first insert.
 
 A type-template write through the service invalidates every configuration that merges the template. A template item written directly into Cosmos leaves existing `CalculatedContent` in place. [templating.md](templating.md#cache) covers both cases.
 
