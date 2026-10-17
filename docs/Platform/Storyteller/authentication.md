@@ -867,7 +867,7 @@ az functionapp cors add --name <function-app> --resource-group <group> --allowed
 
 * User tokens issued by the AuthKit domain (Swagger UI sign-in) are not accepted alongside device-flow tokens. M2M tokens from the AuthKit domain are. See [OpenAPI and Swagger UI](#openapi-and-swagger-ui).
 * A combination of an mTLS certificate and client credentials (`CertificateAndClientCredentials`) is not available.
-* `sform`, the admin UI and the SDKs do not manage trusted issuers, federation rules or `Federated` machines yet; use the API. Signing in to `sform` as a federated machine is not available either.
+* `sform` and the admin UI do not manage trusted issuers, federation rules or `Federated` machines yet; use the API or the SDKs, whose generated clients have every federation operation. The TypeScript SDK also exchanges and caches the Storyteller token (`createFederatedTokenProvider`); the C# SDK has no such helper. Signing in to `sform` as a federated machine is not available either.
 * The Storyteller signing key cannot be rotated except by the [emergency procedure](#security-notes), and it cannot live in Key Vault. Storyteller publishes no JWKS or RFC 8414 metadata for its tokens.
 * The token endpoint has no replay protection and no rate limit. Rules know only exact values and a separator-anchored subject prefix; there are no glob, regex or CEL conditions.
 * 401 responses carry no `WWW-Authenticate` header.
