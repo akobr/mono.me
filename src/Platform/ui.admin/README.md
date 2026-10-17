@@ -66,10 +66,11 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - a graph node opened by mouse and by keyboard;
 - delete and Undo, restore from Deleted (with and without descendants), create over a deleted key, permanent delete for Administrators only, the history and the configuration link;
 - bulk create from a list of keys, with the missing ancestors, and its absence for a Reader;
+- a new configuration from **New** on Configurations, which offers only the annotations without one, and its absence for a Reader;
 - the project pages of the menu per role, the redirects of the merged pages to their sections, and the theme in the command palette;
 - the Export & Import page from the sidebar and with `g e`: an export of some kinds, a git export, a check of an edited archive with its result per kind and **Import now**, an import with **Skip** shown again after a reload, and the notice of a Reader;
 - the `prod` badge of the default view in the menu, the switcher and its list of views, and its absence on another view;
-- axe (WCAG 2.1 AA) on the main screens, on Deleted, on the bulk create dialog, on the result of an import and on the dialogs of trusted issuers and federated machines.
+- axe (WCAG 2.1 AA) on the main screens, on Deleted, on the bulk create dialog, on the result of an import, on the new configuration dialog and on the dialogs of trusted issuers and federated machines.
 
 Each test gets a fresh context, so the mock data starts from the scenario's seed. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of `npx playwright install chromium`.
 
