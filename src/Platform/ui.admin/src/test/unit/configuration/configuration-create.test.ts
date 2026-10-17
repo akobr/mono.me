@@ -9,6 +9,7 @@ import { mockHandlers } from '@/mock/all-handlers'
 import { ownContent } from '@/mock/configuration-handlers'
 import { annotationsOf, loadDb } from '@/mock/db'
 import { useCatalogStore } from '@/stores/catalog'
+import { useContextStore } from '@/stores/context'
 import { keysWithoutConfiguration } from '@/utils/configuration-origin'
 import { mountScreen, settle } from '../../helpers'
 
@@ -89,7 +90,8 @@ describe('ConfigurationCreateDialog', () => {
   const text = () => dialog().textContent!.replace(/\s+/g, ' ')
   const button = (label: string) =>
     [...document.body.querySelectorAll('button')].find((candidate) => candidate.textContent?.trim() === label)
-  const offered = (select: VueWrapper) => (select.props('items') as { value: string }[]).map((item) => item.value)
+  const prop = (select: VueWrapper, name: string) => (select.props() as Record<string, unknown>)[name]
+  const offered = (select: VueWrapper) => (prop(select, 'items') as { value: string }[]).map((item) => item.value)
 
   /** The keys of the seed without own content, read from the mock database rather than from the catalog. */
   function unconfiguredKeys(): string[] {
@@ -108,7 +110,7 @@ describe('ConfigurationCreateDialog', () => {
     expect(keys).toEqual(unconfiguredKeys())
     expect(keys).toContain('exe.northwind.invoicing.prod')
     expect(keys).not.toContain('usg.northwind.invoicing')
-    expect(select().props('disabled')).toBe(false)
+    expect(prop(select(), 'disabled')).toBe(false)
   })
 
   it('hands the picked key to the page and closes', async () => {
@@ -118,6 +120,8 @@ describe('ConfigurationCreateDialog', () => {
     select().vm.$emit('update:modelValue', 'exe.northwind.invoicing.prod')
     await settle()
     expect(button('Open editor')!.disabled).toBe(false)
+    // so that Enter opens it
+    expect(document.activeElement).toBe(button('Open editor'))
 
     const form = dialog().querySelector('form')!
     form.dispatchEvent(new Event('submit', { cancelable: true }))
@@ -136,9 +140,41 @@ describe('ConfigurationCreateDialog', () => {
 
     const { select } = await openDialog({ load: false })
 
-    expect(text()).toContain('Every annotation of the view has a configuration.')
+    expect(text()).toContain('Every annotation of the view has its own configuration.')
     expect(select().exists()).toBe(false)
     expect(button('Open editor')!.disabled).toBe(true)
+  })
+
+  it('forgets the pick when the view changes', async () => {
+    const { picked, select } = await openDialog()
+    select().vm.$emit('update:modelValue', 'exe.northwind.invoicing.prod')
+    await settle()
+
+    useContextStore().set({ ...scope, view: 'staging' })
+    await settle()
+
+    expect(button('Open editor')!.disabled).toBe(true)
+    const form = dialog().querySelector('form')!
+    form.dispatchEvent(new Event('submit', { cancelable: true }))
+    await settle()
+    expect(picked).toEqual([])
+  })
+
+  it('says so when the catalog could not be loaded and retries', async () => {
+    const catalog = useCatalogStore()
+    await catalog.load(scope)
+    catalog.error = new Error('The API is not available.')
+
+    const { select } = await openDialog({ load: false })
+
+    expect(text()).toContain('The catalog could not be loaded')
+    expect(select().exists()).toBe(false)
+    button('Retry')!.click()
+    await settle(10)
+
+    expect(catalog.error).toBeUndefined()
+    expect(text()).not.toContain('The catalog could not be loaded')
+    expect(offered(select())).toContain('exe.northwind.invoicing.prod')
   })
 
   it('waits for the catalog before it lists anything', async () => {
@@ -150,8 +186,8 @@ describe('ConfigurationCreateDialog', () => {
     const { select } = await openDialog({ load: false })
 
     expect(catalog.configurations).toBeNull()
-    expect(select().props('disabled')).toBe(true)
-    expect(select().props('placeholder')).toBe('Loading the catalog…')
+    expect(prop(select(), 'disabled')).toBe(true)
+    expect(prop(select(), 'placeholder')).toBe('Loading the catalog…')
     expect(offered(select())).toEqual([])
   })
 })
