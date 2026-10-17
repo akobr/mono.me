@@ -93,6 +93,8 @@ public class MachineSignInSettingsTests
     [InlineData("https://storyteller.example.com/api", true)]
     [InlineData("http://localhost:7071/api", true)]
     [InlineData("http://127.0.0.1:7071/api", true)]
+    [InlineData("http://[::1]:7071/api", true)]
+    [InlineData("http://LOCALHOST:7071/api", true)]
     public void GetKind_ApiUrl_MustBeHttpsOrLocal(string apiUrl, bool isValid)
     {
         var settings = Read(new() { [StorytellerVariables.API_URL] = apiUrl, [StorytellerVariables.API_KEY] = "2s.a.b" });

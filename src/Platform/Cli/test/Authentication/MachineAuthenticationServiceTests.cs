@@ -219,8 +219,9 @@ public class MachineAuthenticationServiceTests
 
     [Theory]
     [InlineData(""", "expires_in":"120" """, 2)]
+    [InlineData(""", "expires_in":9223372036854775807 """, 24 * 60)]
     [InlineData("", 5)]
-    public async Task ClientCredentials_WithoutANumericLifetime_FallBack(string lifetime, int minutes)
+    public async Task ClientCredentials_WithoutAUsableLifetime_FallBack(string lifetime, int minutes)
     {
         UseClientCredentials("client_01");
         _http.Respond(HttpStatusCode.OK, $$"""{"access_token":"cc-1"{{lifetime}}}""");
@@ -350,6 +351,19 @@ public class MachineAuthenticationServiceTests
         identity.Kind.ShouldBe(MachineSignInKind.TokenFile);
         identity.MachineId.ShouldBeNull();
         identity.TokenExpiresAt.ShouldBe(Start.AddMinutes(10));
+    }
+
+    [Fact]
+    public async Task TokenFile_ThatHasExpired_FailsTheSignIn()
+    {
+        var path = P(@"C:\ci\token");
+        _environment[StorytellerVariables.TOKEN_FILE] = path;
+        _fileSystem.AddFile(path, new MockFileData(TestTokens.AccessToken(Start.AddMinutes(-1))));
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => CreateService().SignInAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Expired);
+        exception.Message.ShouldBe("The token in STORYTELLER_TOKEN_FILE expired at 2026-10-17T11:59:00.0000000+00:00.");
     }
 
     [Theory]
