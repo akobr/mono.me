@@ -365,8 +365,11 @@ public static class HttpRequestDataExtensions
                 throw new SecurityTokenException("An application can never access an organization.");
             }
 
-            var machine = await accessService.GetMachineAccessAsync(segments[0], segments[1], appId)
-                ?? throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
+            // A federated machine: one point read checks the kind and the scopes of its token too.
+            var machine = FederatedMachineAccess.IsFederated(request.FunctionContext)
+                ? await FederatedMachineAccess.EnsureAllowedAsync(request, accessService, segments[0], segments[1], appId)
+                : await accessService.GetMachineAccessAsync(segments[0], segments[1], appId)
+                    ?? throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
 
             await MachineCredentialPolicy.EnsureAllowedAsync(request.FunctionContext, segments[0], segments[1]);
             var restriction = MachineAnnotationRestriction.From(machine.AnnotationKey);

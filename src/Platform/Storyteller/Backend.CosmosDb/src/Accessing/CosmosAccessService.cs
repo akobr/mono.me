@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
+using _42.Platform.Storyteller.Accessing.Federation;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Entities.Access;
 using Microsoft.Azure.Cosmos;
@@ -455,6 +456,7 @@ public class CosmosAccessService : IAccessService
             CertificateLifetimeDays = machineAccess.CertificateLifetimeDays,
             NotAfter = machineAccess.CertificateNotAfter,
             UsesSharedCertificate = machineAccess.UsesSharedCertificate,
+            FederationRules = machineAccess.FederationRules?.ToList(),
             HashedSecret = existing?.HashedSecret,
         };
 
@@ -559,6 +561,87 @@ public class CosmosAccessService : IAccessService
             new PartitionKey($"{project}.access"),
             stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
         return machineAccess is not null;
+    }
+
+    public async Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, IReadOnlyList<FederationRule> rules)
+    {
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var partitionKey = new PartitionKey($"{project}.access");
+
+        // A concurrent write to the machine (a reset, a certificate renewal) only moves the ETag, so one retry suffices.
+        for (var attempt = 1; ; attempt++)
+        {
+            var entity = await repository.Container.TryReadItemAsync(
+                id,
+                partitionKey,
+                stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
+
+            if (entity is null)
+            {
+                throw new NotFoundException($"The machine access {id} has not been found.");
+            }
+
+            if (entity.CredentialKind != MachineCredentialKind.Federated)
+            {
+                throw new InvalidInputException(FederationValidation.RulesOnOtherKindMessage, ErrorCodes.MachineNotFederated);
+            }
+
+            var updated = entity with { FederationRules = rules.ToList() };
+
+            try
+            {
+                await repository.Container.ReplaceItemAsync(
+                    updated,
+                    updated.Id,
+                    partitionKey,
+                    new ItemRequestOptions { IfMatchEtag = entity.ETag });
+                return updated.ToMachineAccess();
+            }
+            catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.PreconditionFailed)
+            {
+                if (attempt > 1)
+                {
+                    throw new ConflictException($"The machine access {id} was changed concurrently; reload and retry.");
+                }
+            }
+        }
+    }
+
+    public async Task<IReadOnlyList<string>> FindMachinesUsingIssuerAsync(string organization, string project, string issuerName, int max)
+    {
+        if (max < 1)
+        {
+            return [];
+        }
+
+        var repository = _repositoryProvider.GetOrganizationContainer(organization);
+        var query = new QueryDefinition(
+                "SELECT TOP @max VALUE ma.id FROM ma WHERE EXISTS(SELECT VALUE r FROM r IN ma.FederationRules WHERE r.Issuer = @issuer)")
+            .WithParameter("@max", max)
+            .WithParameter("@issuer", issuerName);
+        var ids = new List<string>();
+
+        try
+        {
+            using var iterator = repository.Container.GetItemQueryIterator<string>(
+                query,
+                requestOptions: new QueryRequestOptions
+                {
+                    PartitionKey = new PartitionKey($"{project}.access"),
+                });
+
+            while (iterator.HasMoreResults && ids.Count < max)
+            {
+                ids.AddRange(await iterator.ReadNextAsync());
+            }
+        }
+        catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            // No organization container: no machines.
+            return [];
+        }
+
+        return ids.Take(max).ToList();
     }
 
     // Managing a role needs Administrator on the access point; only an Owner may grant or revoke Owner.

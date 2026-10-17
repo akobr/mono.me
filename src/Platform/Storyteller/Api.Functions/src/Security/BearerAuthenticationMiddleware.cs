@@ -47,7 +47,14 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
             return;
         }
 
-        if (BearerValidationMode.DecodeWithoutValidation)
+        var machineValidators = context.InstanceServices.GetServices<IMachineTokenValidator>().ToList();
+        var issuer = machineValidators.Count > 0 ? TryReadIssuer(rawToken) : null;
+
+        // A validator that owns the issuer runs alone (Storyteller tokens never pay a user provider attempt),
+        // also under DEV_AUTH, so Federated machines behave locally as in production.
+        var owner = issuer is null ? null : machineValidators.FirstOrDefault(candidate => candidate.OwnsIssuer(issuer));
+
+        if (owner is null && BearerValidationMode.DecodeWithoutValidation)
         {
             var claims = TryReadUnvalidatedClaims(rawToken);
 
@@ -64,14 +71,21 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
             return;
         }
 
-        var validator = context.InstanceServices.GetRequiredService<IBearerTokenValidator>();
         BearerValidationResult? result;
 
         try
         {
-            // Machines may come from a different provider than users (IMachineTokenValidator).
-            result = await validator.ValidateAsync(rawToken, context.CancellationToken)
-                ?? await ValidateMachineTokenAsync(context, rawToken);
+            if (owner is not null)
+            {
+                result = AsMachine(await owner.ValidateAsync(rawToken, context.CancellationToken));
+            }
+            else
+            {
+                // Machines may come from a different provider than users (IMachineTokenValidator).
+                var validator = context.InstanceServices.GetRequiredService<IBearerTokenValidator>();
+                result = await validator.ValidateAsync(rawToken, context.CancellationToken)
+                    ?? await ValidateMachineTokenAsync(machineValidators, issuer, rawToken, context.CancellationToken);
+            }
         }
         catch (BearerKeyRetrievalException exception)
         {
@@ -122,26 +136,31 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
     }
 
     // Only validators that claim the token's issuer are asked, and only machine results count.
-    private static async Task<BearerValidationResult?> ValidateMachineTokenAsync(FunctionContext context, string rawToken)
+    private static async Task<BearerValidationResult?> ValidateMachineTokenAsync(
+        IReadOnlyList<IMachineTokenValidator> validators,
+        string? issuer,
+        string rawToken,
+        CancellationToken cancellationToken)
     {
-        var validators = context.InstanceServices.GetServices<IMachineTokenValidator>().ToList();
-
-        if (validators.Count == 0 || TryReadIssuer(rawToken) is not { } issuer)
+        if (issuer is null)
         {
             return null;
         }
 
         foreach (var validator in validators.Where(candidate => candidate.CanValidate(issuer)))
         {
-            var result = await validator.ValidateAsync(rawToken, context.CancellationToken);
-
-            if (result is { IsMachine: true, MachineId.Length: > 0 })
+            if (AsMachine(await validator.ValidateAsync(rawToken, cancellationToken)) is { } result)
             {
                 return result;
             }
         }
 
         return null;
+    }
+
+    private static BearerValidationResult? AsMachine(BearerValidationResult? result)
+    {
+        return result is { IsMachine: true, MachineId.Length: > 0 } ? result : null;
     }
 
     private static string? TryReadIssuer(string rawToken)
@@ -194,8 +213,19 @@ public class BearerAuthenticationMiddleware : IFunctionsWorkerMiddleware
         {
             context.Items[FunctionContextItemKeys.MachineIdentity] = result.MachineId;
 
-            // A machine bearer token is an identity provider client-credentials token.
-            context.Items[FunctionContextItemKeys.MachineCredentialKind] = MachineCredentialKind.ClientCredentials;
+            // A machine bearer token is an identity provider client-credentials token, unless its validator says
+            // otherwise (Storyteller tokens of Federated machines, which also name their project).
+            context.Items[FunctionContextItemKeys.MachineCredentialKind] = result.CredentialKind ?? MachineCredentialKind.ClientCredentials;
+
+            if (!string.IsNullOrEmpty(result.Organization))
+            {
+                context.Items[FunctionContextItemKeys.MachineOrganization] = result.Organization;
+            }
+
+            if (!string.IsNullOrEmpty(result.Project))
+            {
+                context.Items[FunctionContextItemKeys.MachineProject] = result.Project;
+            }
         }
     }
 

@@ -127,6 +127,58 @@ public class OpenApiExportTests
             .ShouldBe("#/components/schemas/ViewImportExisting");
     }
 
+    // The token endpoint speaks OAuth: a form body and snake_case JSON, named the same in the document and on the wire.
+    [Fact]
+    public async Task Document_TokenExchange_UsesTheOAuthFormAndSnakeCaseModels()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+
+        PropertyNames(schemas, "MachineTokenRequest").ShouldBe(
+            ["grant_type", "subject_token", "subject_token_type", "client_id", "audience", "resource", "scope", "requested_token_type"],
+            ignoreOrder: true);
+        RequiredNames(schemas, "MachineTokenRequest").ShouldBe(["grant_type", "subject_token", "subject_token_type", "client_id"], ignoreOrder: true);
+        PropertyNames(schemas, "MachineTokenResponse").ShouldBe(["access_token", "issued_token_type", "token_type", "expires_in", "scope"], ignoreOrder: true);
+        PropertyNames(schemas, "OAuthErrorResponse").ShouldBe(["error", "error_description"], ignoreOrder: true);
+
+        var exchange = Operation(document, Definitions.RouteIds.Access.ExchangeMachineToken);
+        exchange.GetProperty("requestBody").GetProperty("content").EnumerateObject().Select(content => content.Name)
+            .ShouldBe([Definitions.ContentTypes.FormUrlEncoded]);
+        exchange.GetProperty("responses").GetProperty("400").GetProperty("content").GetProperty(Definitions.ContentTypes.Json)
+            .GetProperty("schema").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/OAuthErrorResponse");
+        exchange.GetProperty("responses").TryGetProperty("503", out _).ShouldBeTrue();
+
+        // Anonymous: no security requirement and no 403; the management operations have both.
+        (exchange.TryGetProperty("security", out var security) && security.GetArrayLength() > 0).ShouldBeFalse();
+        exchange.GetProperty("responses").TryGetProperty("403", out _).ShouldBeFalse();
+
+        foreach (var routeId in new[]
+                 {
+                     Definitions.RouteIds.Access.GetFederatedIssuers,
+                     Definitions.RouteIds.Access.GetFederatedIssuer,
+                     Definitions.RouteIds.Access.SetFederatedIssuer,
+                     Definitions.RouteIds.Access.DeleteFederatedIssuer,
+                     Definitions.RouteIds.Access.SetMachineFederationRules,
+                 })
+        {
+            var operation = Operation(document, routeId);
+            operation.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Access]);
+            operation.GetProperty("security").GetArrayLength().ShouldBeGreaterThan(0);
+            operation.GetProperty("responses").TryGetProperty("403", out _).ShouldBeTrue();
+        }
+
+        // Both PUTs can answer 409 (a re-created issuer name in use, a machine changed concurrently), so the SDKs model it.
+        foreach (var routeId in new[] { Definitions.RouteIds.Access.SetFederatedIssuer, Definitions.RouteIds.Access.SetMachineFederationRules })
+        {
+            Operation(document, routeId).GetProperty("responses").GetProperty("409").GetProperty("content").GetProperty(Definitions.ContentTypes.Json)
+                .GetProperty("schema").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ErrorResponse");
+        }
+
+        PropertyNames(schemas, "FederatedIssuer").ShouldContain("RequiredClaims");
+        PropertyNames(schemas, "MachineAccess").ShouldContain("FederationRules");
+    }
+
     internal static async Task<string> RenderAsync()
     {
         // the same context the extension builds for the host, with the API's own options and filters
@@ -143,6 +195,24 @@ public class OpenApiExportTests
             .ApplyDocumentFilters(context.GetDocumentFilterCollection());
 
         return await document.RenderAsync(OpenApiSpecVersion.OpenApi3_0, OpenApiFormat.Json);
+    }
+
+    private static List<string> PropertyNames(JsonElement schemas, string schema)
+    {
+        return schemas.GetProperty(schema).GetProperty("properties").EnumerateObject().Select(property => property.Name).ToList();
+    }
+
+    private static List<string?> RequiredNames(JsonElement schemas, string schema)
+    {
+        return schemas.GetProperty(schema).GetProperty("required").EnumerateArray().Select(name => name.GetString()).ToList();
+    }
+
+    private static JsonElement Operation(JsonDocument document, string operationId)
+    {
+        return document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject())
+            .Select(operation => operation.Value)
+            .Single(operation => operation.GetProperty("operationId").GetString() == operationId);
     }
 
     // The extension looks for functions in every assembly next to the one it renders, as the host does in its bin folder.

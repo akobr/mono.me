@@ -44,4 +44,13 @@ public interface IAccessService
     Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId);
 
     Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId);
+
+    // Replaces the federation rules of a Federated machine; the caller validates them against the project's issuers.
+    // NotFoundException when the machine doesn't exist, InvalidInputException when it is not Federated.
+    Task<MachineAccess> SetMachineFederationRulesAsync(string organization, string project, string id, IReadOnlyList<FederationRule> rules)
+        => throw new NotSupportedException("This access service does not support federation rules.");
+
+    // The ids of at most max machines whose federation rules reference the trusted issuer name.
+    Task<IReadOnlyList<string>> FindMachinesUsingIssuerAsync(string organization, string project, string issuerName, int max)
+        => throw new NotSupportedException("This access service does not support federation rules.");
 }

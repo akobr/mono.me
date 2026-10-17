@@ -76,6 +76,9 @@ public class CosmosFixture : IAsyncLifetime
         services.AddSingleton<RecordingIdentityProviderMachineAccessService>();
         services.AddSingleton<IIdentityProviderMachineAccessService>(p => p.GetRequiredService<RecordingIdentityProviderMachineAccessService>());
 
+        // Federated machines next to it, with the Cosmos DB issuer and signing key stores.
+        services.AddFederatedMachineAccess(Configuration);
+
         services.AddSingleton<CoreDbStructureBuilder>();
 
         Services = services.BuildServiceProvider();

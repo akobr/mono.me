@@ -7,5 +7,9 @@ public class FunctionContextItemKeys
 
     // The MachineCredentialKind a machine identity was proven with, when it came from a bearer token.
     public const string MachineCredentialKind = nameof(MachineCredentialKind);
+
+    // The organization and project a machine bearer token names (Storyteller tokens of Federated machines).
+    public const string MachineOrganization = nameof(MachineOrganization);
+    public const string MachineProject = nameof(MachineProject);
     public const string PresentingCertificateThumbprint = nameof(PresentingCertificateThumbprint);
 }

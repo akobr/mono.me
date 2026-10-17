@@ -166,6 +166,7 @@ public class MachineAuthenticationPoliciesTests
     [InlineData(MachineCredentialKind.Certificate, true)]
     [InlineData(MachineCredentialKind.CertificateAndApiKey, false)]
     [InlineData(MachineCredentialKind.ClientCredentials, false)]
+    [InlineData(MachineCredentialKind.Federated, false)]
     public void IsEnabled_ChecksTheEnabledKinds(MachineCredentialKind kind, bool expected)
     {
         var policy = new MachineAuthenticationPolicy { EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate] };
@@ -182,6 +183,10 @@ public class MachineAuthenticationPoliciesTests
     [InlineData(MachineCredentialKind.CertificateAndApiKey, false, true, false)]
     [InlineData(MachineCredentialKind.CertificateAndApiKey, true, false, false)]
     [InlineData(MachineCredentialKind.ClientCredentials, true, true, false)]
+    [InlineData(MachineCredentialKind.Federated, true, true, false)]
+    [InlineData(MachineCredentialKind.Federated, true, false, false)]
+    [InlineData(MachineCredentialKind.Federated, false, true, false)]
+    [InlineData(MachineCredentialKind.Federated, false, false, false)]
     public void IsSatisfiedBy_RequiresWhatTheKindNeeds(MachineCredentialKind kind, bool hasCertificate, bool hasApiKey, bool expected)
     {
         kind.IsSatisfiedBy(hasCertificate, hasApiKey).ShouldBe(expected);
@@ -192,6 +197,7 @@ public class MachineAuthenticationPoliciesTests
     [InlineData(new[] { MachineCredentialKind.ApiKey, MachineCredentialKind.CertificateAndApiKey }, true)]
     [InlineData(new[] { MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate }, false)]
     [InlineData(new[] { MachineCredentialKind.ClientCredentials }, false)]
+    [InlineData(new[] { MachineCredentialKind.Federated }, false)]
     public void AllowsSharedCertificates_FollowsCertificateAndApiKey(MachineCredentialKind[] kinds, bool expected)
     {
         new MachineAuthenticationPolicy { EnabledCredentialKinds = kinds }.AllowsSharedCertificates().ShouldBe(expected);
@@ -209,8 +215,53 @@ public class MachineAuthenticationPoliciesTests
     [InlineData(MachineCredentialKind.Certificate, true)]
     [InlineData(MachineCredentialKind.CertificateAndApiKey, true)]
     [InlineData(MachineCredentialKind.ClientCredentials, false)]
+    [InlineData(MachineCredentialKind.Federated, false)]
     public void IssuesCertificate_ForTheCertificateKinds(MachineCredentialKind kind, bool expected)
     {
         kind.IssuesCertificate().ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Resolve_Federated_IsEnabledLastInEnumOrder()
+    {
+        var stored = new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.Federated, MachineCredentialKind.ApiKey],
+        };
+
+        var policy = MachineAuthenticationPolicies.Resolve(stored, _options);
+
+        policy.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.ApiKey, MachineCredentialKind.Federated]);
+        policy.CredentialKind.ShouldBe(MachineCredentialKind.Federated);
+        policy.IsEnabled(MachineCredentialKind.Federated).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Resolve_WithoutFederated_DoesNotEnableIt()
+    {
+        var policy = MachineAuthenticationPolicies.Resolve(new MachineAuthenticationPolicy { EnabledCredentialKinds = [MachineCredentialKind.ApiKey, MachineCredentialKind.ClientCredentials] }, _options);
+
+        policy.IsEnabled(MachineCredentialKind.Federated).ShouldBeFalse();
+        MachineAuthenticationPolicies.Resolve(null, _options).IsEnabled(MachineCredentialKind.Federated).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Validate_AcceptsFederatedAsAnEnabledAndDefaultKind()
+    {
+        var policy = new MachineAuthenticationPolicy
+        {
+            EnabledCredentialKinds = [MachineCredentialKind.Certificate, MachineCredentialKind.Federated],
+            CredentialKind = MachineCredentialKind.Federated,
+        };
+
+        MachineAuthenticationPolicies.Validate(policy, _options).ShouldBeNull();
+        MachineAuthenticationPolicies.Validate(new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.Federated }, _options).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Federated_KeepsItsStoredValue()
+    {
+        ((int)MachineCredentialKind.Federated).ShouldBe(4);
+        Enum.GetNames<MachineCredentialKind>().ShouldBe(["ApiKey", "Certificate", "CertificateAndApiKey", "ClientCredentials", "Federated"]);
     }
 }
