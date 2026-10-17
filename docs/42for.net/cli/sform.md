@@ -18,7 +18,7 @@ Every other command uses the stored session and refreshes it silently. `sform ac
 
 ## Sign in from a pipeline
 
-In a CI/CD pipeline or a GitHub Action nobody can type a code, so `sform` signs in as a machine instead. Create the machine once, then give the job the variables that `sform account machine create` prints. With any of them set, `sform` never prompts and stores nothing.
+In a CI/CD pipeline or a GitHub Action nobody can type a code, so `sform` signs in as a machine instead. Create the machine once, then give the job the variables that `sform account machine create` prints. With any of them set, `sform` never asks anyone to sign in, and it stores no credential or token.
 
 | Machine | Variables |
 |---|---|
@@ -33,13 +33,17 @@ Every machine also needs `STORYTELLER_API_URL`, the address of the API. An API k
 ``` yaml
 # GitHub Actions
 - run: dotnet tool install 42.Platform.Cli --global --prerelease
-- run: sform story config my.service -r -e appsettings.storyteller.json
+- run: sform story config set sbt.northwind -i configuration/northwind.json
   env:
     STORYTELLER_API_URL: https://storyteller.example.com/api
     STORYTELLER_API_KEY: ${{ secrets.STORYTELLER_API_KEY }}
 ```
 
 `sform account` checks the variables without calling the account API, which is a good first step of a job. A wrong setting stops the job with exit code `2`, rejected credentials with `44`.
+
+::: warning
+Commands print what they read or write. A step that reads a resolved configuration with secrets puts those values into the job log, so prefer steps that write configuration, or keep such output out of the log.
+:::
 
 ::: tip
 The details, such as the token URL rules, the certificate header for a local API, and every exit code, are in [the technical documentation](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#machine-sign-in-for-pipelines).
