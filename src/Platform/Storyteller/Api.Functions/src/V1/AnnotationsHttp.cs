@@ -396,7 +396,7 @@ public partial class AnnotationsHttp
         [FromBody] List<Annotation> annotations)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationsAsync(_access, organization, project, (annotations ?? []).Select(a => a.AnnotationKey), AccountRole.Contributor);
+        await request.CheckAccessToAnnotationsAsync(_access, organization, project, annotations.Select(a => a.AnnotationKey), AccountRole.Contributor);
 
         var annotationsToProcess = annotations
             .Select(a => a with { ProjectName = project, ViewName = view })
