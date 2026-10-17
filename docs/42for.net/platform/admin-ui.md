@@ -119,7 +119,7 @@ The command palette (`Ctrl K` / `⌘ K`) finds annotations, pages, projects and 
 
 ## Configuration
 
-**New** on the **Configurations** page (Contributor or a higher role) starts a configuration. It lists the annotations of the view that have no configuration yet; pick one, and **Open editor** opens its configuration. There, **Create empty** creates it from an empty document and **Start from template** from the template of its type, as from the **No configuration** link of the annotation.
+**New** on the **Configurations** page (Contributor or a higher role) starts a configuration. It lists the annotations of the view without their own configuration, so without a row on the page; pick one, and **Open editor** opens its configuration. There, **Create empty** creates it from an empty document and **Start from template** from the template of its type, as from the configuration link in the header of the annotation.
 
 A configuration is edited:
 
