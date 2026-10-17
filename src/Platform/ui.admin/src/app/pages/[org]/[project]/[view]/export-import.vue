@@ -21,6 +21,7 @@ const result = computed(() => (latest.value?.phase === 'done' ? latest.value.sta
 const canImportNow = computed(() => canEdit.value && !!result.value?.IsDryRun && !!latest.value?.file)
 
 // The page shows the end of its latest import, so the toaster does not report it; once the page is left, it does.
+// The mark is synchronous: an import restored after a reload that ended meanwhile is tracked and finished in one step.
 let release: (() => void) | undefined
 
 watch(
@@ -29,7 +30,7 @@ watch(
     release?.()
     release = id ? transfers.showInPage(id) : undefined
   },
-  { immediate: true },
+  { immediate: true, flush: 'sync' },
 )
 
 onBeforeUnmount(() => release?.())

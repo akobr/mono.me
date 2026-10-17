@@ -160,7 +160,7 @@ Writing a key that is deleted creates it again with an empty configuration. `sfo
 
 ## Export and import
 
-The annotations of a view travel in its [export](configuration#export-and-import), next to its schemas, templates and configurations. Each annotation is a file named by its key, such as `exe.northwind.invoicing.production.json`. The file holds what you can edit: title, description, documentation link, labels, values, the disabled flag, the validity window and the time zone. The key gives the type and the parents, so they are not in the file. The audit and the deleted annotations stay with the platform.
+The annotations of a view travel in its [export](configuration#export-and-import), next to its schemas, templates and configurations. Each annotation is a file named by its key, such as `exe.northwind.invoicing.production.json`. The file holds what you can edit: title, description, documentation link, labels, values, the disabled flag, the validity window and the time zone, and for a [unit](#unit) its unit type and definition. An import replaces the content, so a field left out of the file is cleared; a unit without its type or definition gets the defaults of a new unit (`event`, `unknown`). The key gives the type and the parents, so they are not in the file. The audit and the deleted annotations stay with the platform.
 
 ```text
 sform story export --include annotations     # only the catalog
