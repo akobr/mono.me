@@ -95,6 +95,18 @@ test('does not mark another view, and marks the default one in the list of views
   await expect(viewLabel(await menu(page, testInfo), 'default').getByText('prod', { exact: true })).toBeVisible()
 })
 
+// The Views page lists every view, so it has the room to name the default one in full.
+test('marks the default view as production on the Views page', async ({ page }) => {
+  await openApp(page, '/acme/billing/views')
+
+  const row = (view: string) =>
+    page.getByRole('listitem').filter({ has: page.getByRole('link', { name: view, exact: true }) })
+  await expect(row('default').getByText('production', { exact: true })).toBeVisible()
+  // Only the link names the view; the badge no longer says "default".
+  await expect(row('default').getByText('default', { exact: true })).toHaveCount(1)
+  await expect(row('staging').getByText('production', { exact: true })).toHaveCount(0)
+})
+
 // The unit tests compare the src of the logo only; this checks that the browser loads the 128 px 42 logo (424-32).
 test('shows the 42 logo at the top of the navigation menu', async ({ page }, testInfo) => {
   await openApp(page, '/acme/billing/default/annotations')

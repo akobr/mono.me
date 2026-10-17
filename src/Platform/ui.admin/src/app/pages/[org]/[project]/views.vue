@@ -102,7 +102,7 @@ function edit(view: View) {
             class="font-medium hover:underline"
             >{{ view.Name }}</RouterLink
           >
-          <UBadge v-if="view.IsDefault" label="default" color="primary" variant="subtle" size="sm" />
+          <UBadge v-if="view.IsDefault" label="production" color="primary" variant="subtle" size="sm" />
           <UBadge v-if="!view.IsRegistered" label="discovered" color="warning" variant="subtle" size="sm" />
           <span class="min-w-0 flex-1 truncate text-sm text-muted">{{ view.Description }}</span>
           <RelativeTime v-if="view.Created" :value="view.Created.At" class="text-xs text-dimmed" />

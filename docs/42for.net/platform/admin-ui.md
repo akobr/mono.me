@@ -15,7 +15,7 @@ After that, the address bar always names the context, like GitHub:
 /{organization}/{project}/{view}/annotations
 ```
 
-The switcher at the top changes the organization, project or view and keeps the screen you are on. A link to an annotation or configuration opens the same screen for anyone with access to that project. The sidebar lists the screens of the view under **View · {view}**, so it always names the selected view, `default` included. The `default` view is the main view of the project, the one that serves production, so a purple **prod** badge follows its name in the sidebar, in the switcher and in the switcher's list of views.
+The switcher at the top changes the organization, project or view and keeps the screen you are on. A link to an annotation or configuration opens the same screen for anyone with access to that project. The sidebar lists the screens of the view under **View · {view}**, so it always names the selected view, `default` included. The `default` view is the main view of the project, the one that serves production, so a purple **prod** badge follows its name in the sidebar, in the switcher and in the switcher's list of views. The project's **Views** page marks it **production**.
 
 The sidebar always lists the pages of the view, project and organization you last worked in. They stay there on project pages (Settings, Members, …), on the organization overview, and on Organizations and Account. Opening a page of another view, project or organization updates the sidebar. A project you have not opened a view of yet shows its `default` view.
 
