@@ -202,11 +202,11 @@ These writes clear the target item's `CalculatedContent` and `CalculatedContentH
 
 `CreateOrUpdateConfigurationAsync` on an item that already exists, and `PatchConfigurationAsync`, null the target cache in the same write as the new `Content`. `ClearConfigurationAsync` and `DeleteAsync` remove the item when it has stored content, or delete a system cache row directly, and then invalidate descendants.
 
-The first insert, when no configuration item exists yet, saves `Content` and leaves descendant caches as they are. A descendant that was calculated before that insert keeps the old effective document until one of the writes above clears it.
+The first insert, when no configuration item exists yet, creates the item with `Content` and no cache, and then invalidates descendants. An import that creates a document (`ImportConfigurationAsync` with the outcome `Created`) takes the same path.
 
-Replacing a type-template item also leaves existing `CalculatedContent` in place. The new template is applied on the next calculation. [templating.md](templating.md) covers that case.
+The first insert invalidates after the item is created, not before. A calculation caches its result on an existing item only while the item still has the ETag that was read before the walk, and the invalidation patch changes that ETag. A descendant calculation that read the ancestor as missing is therefore either cached before the invalidation, which clears it, or fails to cache after it. A descendant item that a calculation creates after the invalidation has queried the items is not reached, on this path or on any other write.
 
-The call site comments this invalidation as ancestors. The queries select descendants: the items that merged this document in.
+A type-template write through the service invalidates every configuration that merges the template. A template item written directly into Cosmos leaves existing `CalculatedContent` in place. [templating.md](templating.md#cache) covers both cases.
 
 The invalidation skips configuration items of soft-deleted annotations (`AnnotationDeletionId` set), so it never rewrites them and never pushes back their expiry. A restore clears `CalculatedContent` and `CalculatedContentHash` of every configuration it brings back, because templates or ancestors may have changed while the annotation was deleted.
 
