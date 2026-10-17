@@ -170,7 +170,7 @@ Only your own documents travel: templates, schemas and resolved secrets stay out
 
 | Screen | Who | What |
 | --- | --- | --- |
-| Members | Administrator | Roles of the organization and of each project. Organization and project roles are independent. Only Owners grant Owner, and the last Owner stays. Below the members, **Invitations**: invite by email with a role and an expiry; resend, revoke or copy the link. |
+| Members | Administrator | Roles of the organization and of each project. Organization and project roles are independent. Only Owners grant Owner, and the last Owner stays. **Invite** in the top bar invites several people at once: type their addresses with spaces or commas between them, or paste a list (also one copied from a mail client). Everyone gets the same role and expiry. Below the members, **Invitations**: resend, revoke or copy the link. |
 | Machines | Contributor (shared certificates: Administrator) | Credentials for services: scope, an optional annotation restriction, the credential kind and certificate lifetime, reset and delete. Below the machines, **Shared certificates**: issue, revoke, expiry warnings. |
 | Settings | Everyone (policies: Administrator, time zone, date format and types: Contributor) | The default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy, the CA certificate download and, in the **Secrets** section, how the key values of the project are protected. |
 | Monitor | Administrator | The **Usage** of the key values (totals, estimated charges, a daily chart) and the **Audit** trail of secrets, one tab each. |

@@ -7,7 +7,10 @@ import { useGetInvitations } from '@42for.net/2splatform.sdk/vue-query'
 import { invalidateAccess } from '@/queries/invalidation'
 import { errorMessage } from '@/utils/errors'
 
-/** Invitations of an access point: email, role, status, invited by and expiry, with Resend, Revoke and Copy link. */
+/**
+ * Invitations of an access point: email, role, status, invited by and expiry, with Resend, Revoke and Copy link.
+ * **Invite** is in the top bar of the Members pages (424-41).
+ */
 const props = defineProps<{ accessPointKey: string }>()
 
 const queryClient = useQueryClient()
@@ -15,7 +18,6 @@ const toast = useToast()
 const { copy } = useClipboard({ legacy: true })
 
 const invitations = useGetInvitations(() => props.accessPointKey, { query: { meta: { silent: true } } })
-const inviting = ref(false)
 const revoking = ref<Invitation>()
 
 const statusColor = (status?: string) =>
@@ -39,11 +41,6 @@ async function copyLink(invitation: Invitation) {
 
 <template>
   <div class="space-y-2">
-    <div class="flex justify-end">
-      <RoleGate capability="manageAccess" :scope="accessPointKey.includes('.') ? 'project' : 'org'">
-        <UButton label="Invite" icon="i-lucide-user-plus" @click="inviting = true" />
-      </RoleGate>
-    </div>
     <LoadingState v-if="invitations.isPending.value" />
     <ErrorState v-else-if="invitations.isError.value" :error="invitations.error.value" @retry="invitations.refetch()" />
     <div v-else class="overflow-x-auto rounded-md border border-default">
@@ -109,7 +106,6 @@ async function copyLink(invitation: Invitation) {
       </table>
     </div>
 
-    <InviteDialog v-model:open="inviting" :access-point-key="accessPointKey" />
     <ConfirmDialog
       :open="!!revoking"
       :title="`Revoke the invitation of ${revoking?.Email}?`"

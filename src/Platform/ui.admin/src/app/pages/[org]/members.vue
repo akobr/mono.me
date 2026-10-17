@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useContextStore } from '@/stores/context'
 
 const context = useContextStore()
+// Invite is the page's main action, in the top bar (424-41); it needs Administrator on the organization itself.
+const canInvite = useCan('manageAccess', 'org')
+const inviting = ref(false)
 </script>
 
 <template>
@@ -10,6 +14,15 @@ const context = useContextStore()
       <AppNavbar title="Members">
         <template #right>
           <RoleLegend />
+          <!-- icon-only below sm, with the same name, like the main actions of the other pages -->
+          <UButton
+            v-if="canInvite"
+            label="Invite"
+            aria-label="Invite"
+            icon="i-lucide-user-plus"
+            :ui="{ label: 'hidden sm:inline' }"
+            @click="inviting = true"
+          />
         </template>
       </AppNavbar>
     </template>
@@ -27,6 +40,8 @@ const context = useContextStore()
           <InvitationsTable :access-point-key="context.org" />
         </section>
       </div>
+
+      <InviteDialog v-if="context.org" v-model:open="inviting" :access-point-key="context.org" />
     </template>
   </UDashboardPanel>
 </template>

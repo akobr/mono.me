@@ -45,6 +45,31 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
+    test('the invite dialog has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/acme/billing/members')
+      await page.getByRole('button', { name: 'Invite', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: 'Invite people' })
+      // a valid and an invalid tag, and the error of the field
+      const emails = dialog.getByPlaceholder('ada@example.com')
+      await emails.pressSequentially('ada@example.com grace.example.com ')
+      await expect(dialog.getByText('Not an email: grace.example.com')).toBeVisible()
+      await expectAccessible(page)
+
+      // The selected invalid tag (ArrowLeft, as before removing it) keeps its line-through but takes the tag's own
+      // text color: the error color lacks contrast on the selected background in the dark theme.
+      await emails.press('ArrowLeft')
+      const tag = dialog.locator('[data-slot="item"]').filter({ hasText: 'grace.example.com' })
+      await expect(tag).toHaveAttribute('data-state', 'active')
+      const style = await tag.locator('span.line-through').evaluate((text) => ({
+        decoration: getComputedStyle(text).textDecorationLine,
+        color: getComputedStyle(text).color,
+        tagColor: getComputedStyle(text.closest('[data-slot="item"]')!).color,
+      }))
+      expect(style.decoration).toBe('line-through')
+      expect(style.color).toBe(style.tagColor)
+      await expectAccessible(page)
+    })
+
     test('onboarding has no serious accessibility violations', async ({ page }) => {
       await openApp(page, '/onboarding', 'new-user')
       await expectAccessible(page)

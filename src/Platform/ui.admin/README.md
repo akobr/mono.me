@@ -59,7 +59,7 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - a schema violation saved anyway;
 - the conflict dialog;
 - a version comparison;
-- an invitation;
+- invitations from the top bar of the project and organization Members pages, to addresses typed with spaces and commas or pasted as a list, and axe on the invite dialog with an invalid address;
 - a machine with a `.pfx` download;
 - a graph node opened by mouse and by keyboard;
 - delete and Undo, restore from Deleted (with and without descendants), create over a deleted key, permanent delete for Administrators only, the history and the configuration link;
