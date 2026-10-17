@@ -8,17 +8,11 @@ The code is in:
 - `Backend.CosmosDb/src/`: the reads and imports of each kind (`Annotating/CosmosAnnotationService.Import.cs`, `Configuring/CosmosConfigurationSchemaService.Import.cs`, `CosmosConfigurationTemplateService.cs`, `CosmosConfigurationService.cs`) and the jobs (`Transferring/`);
 - `Backend.AzureStorage/src/`: the archives and the queue;
 - `Api.Functions/src/`: the routes (`V1/ViewTransferHttp.cs`, `V1/ViewTransferRequests.cs`), the scopes (`Security/ViewTransferScopes.cs`), and the queue and timer functions (`Transfers/ViewTransferFunctions.cs`);
-- `Sdk.NSwag/` and `sdk.typescript/`: the clients generated from the OpenAPI document.
+- `Sdk.NSwag/` and `sdk.typescript/`: the clients generated from the OpenAPI document;
+- `src/Platform/Cli/src/`: `sform story export` and `sform story import` (see [CLI](#cli));
+- `src/Platform/ui.admin/src/app/`: the **Export & Import** page of a view, its store and the mock API (see [Administration UI](#administration-ui)).
 
 The design and its decisions are in [the spec](specs/2026-10-15%20Export%20and%20Import%20of%20a%20View.md), which extends [the first spec](specs/2026-10-14%20Export%20and%20Import%20of%20Configurations.md) (configurations only).
-
-**State of the delivery.** Phases 1 and 2 of the spec are done:
-
-- the backend covers all four kinds (phase 1);
-- the routes are below the view, take the include and existing options, and check the scopes of each included kind (phase 2);
-- the OpenAPI document, the C# SDK and the TypeScript SDK are generated from them (phase 2).
-
-The CLI (phase 3) and the admin UI's **Export & Import** page (phase 4) still follow. Until then, `sform story config export` and `import` and the dialogs of the Configurations page call the new operations without include or existing, so they cover all four kinds and overwrite. See [API](#api), [CLI](#cli) and [Administration UI](#administration-ui).
 
 ## What travels
 
@@ -595,28 +589,221 @@ Locally, the Aspire host (`Aspire.Host/src/AppHost.cs`) runs Azurite on the defa
 
 ## CLI
 
-Phase 3 of the spec moves the commands to `sform story export` and `sform story import`, with the kinds. Until then, two subcommands of `sform story config` work on the context's organization, project and view (`-p`, `-v` as everywhere):
+Two subcommands of `sform story` export and import the view of the context: the current organization, project and view, or the ones of `-p|--projectKey <organization>.<project>` and `-v|--view`, as for every `sform story` command ([annotation-lifecycle.md](annotation-lifecycle.md#cli)).
 
 ```
-sform story config export [-f|--format folder|git] [-o|--output <path>] [-x|--extract] [--timeout <minutes>]
-sform story config import <zip-or-folder> [--dry-run] [--force] [--timeout <minutes>]
+sform story export [-f|--format folder|git] [-i|--include <kinds>] [-o|--output <path>] [-x|--extract] [--timeout <minutes>]
+sform story import <zip-or-folder> [-i|--include <kinds>] [-e|--existing overwrite|skip] [--dry-run] [--force] [--timeout <minutes>]
 ```
 
-- `export` waits for the job (every second, then every 2 and 3 seconds) and saves the zip under the server's file name: in the current folder, in the folder `--output` names, or as the file it names. `--extract` unpacks into a new or empty folder instead (by default the file name without `.zip`), so `sform story config export -f git -x` leaves a checked-out repository with the folders of every kind. Entries outside the folder are refused.
-- `import` takes a zip, or a folder whose `*.json` files (in subfolders too, without `.git`) it packs in memory, for example a clone of an exported repository. The server skips the other hidden paths. It prints the total counts and a table of every file that was not unchanged: outcome, key (the path for a template or a type schema, which have none), version and message. It shows no kinds and no warnings yet. It exits with `2` when a file failed or the server rejected the upload.
-- After `--timeout` (10 minutes) both stop waiting and print the job id; the job continues on the server.
+The code is in `src/Platform/Cli/src/`:
 
-The commands are `Cli/src/Commands/Configuration/ConfigExportCommand.cs` and `ConfigImportCommand.cs`, with `Services/ConfigurationArchives.cs` (packing and unpacking through `IFileSystem`) and `Services/TransferPolling.cs`. They call `ITransfersApiClient` without include or existing, so they export and import all four kinds and overwrite.
+- `Commands/Storyteller/StorytellerExportCommand.cs` and `StorytellerImportCommand.cs`, subcommands of `StorytellerListCommand` (`sform story`);
+- `Commands/Storyteller/ViewTransferArguments.cs`: the checks of the options;
+- `Services/ViewArchives.cs`: packing a folder and unpacking an export, through `IFileSystem`;
+- `Services/TransferPolling.cs`: waiting for a job;
+- `Output/TransferConsoleExtensions.cs`: the tables and the export summary.
+
+The commands call `ITransfersApiClient`. The `sform story config export` and `sform story config import` of the first spec are removed; they were never released.
+
+### Command options
+
+| Option | Command | Values | Default |
+| --- | --- | --- | --- |
+| `-f\|--format` | export | `folder` or `git` | `folder` |
+| `-i\|--include` | both | `annotations`, `schemas`, `templates` and `configurations`, comma-separated (`-i annotations,templates`) or repeated (`-i annotations -i templates`) | all four |
+| `-o\|--output` | export | The file of the zip, or a folder for it. With `--extract`, the folder to unpack into. | the server's file name in the current folder |
+| `-x\|--extract` | export | | off |
+| `-e\|--existing` | import | `overwrite` or `skip` | `overwrite` |
+| `--dry-run` | import | | off |
+| `--force` | import | | off |
+| `--timeout` | both | minutes | 10 |
+
+What the import options do is described in [Options](#options). `ViewTransferArguments` checks the values before anything is read from disk or sent:
+
+- Names match in any case, as in the API. A number is not a name.
+- A kind named twice counts once. The kinds are sent in import order, whatever their order on the command line.
+- An unknown format, kind or mode prints an error and exits with `2`, for example `Unknown kind 'secrets' in --include; use annotations, schemas, templates or configurations, comma-separated.`
+- **An `--include` that names no kind** (`-i ""`, `-i ","`) is refused the same way, although the API takes an empty include as all four kinds. On a command line, an empty value is more likely an empty shell variable than a request for everything. Leave the option out for all four.
+- A missing `--include` or `--existing` is not sent, and neither are `--force` and `--dry-run` when they are not given. The server then applies its defaults: all four kinds, `Overwrite`, no force, a real run.
+
+### sform story export
+
+1. The command always sends a `ViewExportCreate` body with the format and the include. The C# SDK would send `null` for a missing body, which the API answers with `400`.
+2. It prints `Exporting the annotations and templates of acme.billing.default (git)…` and waits for the job. It reads the job every second, then every 2 and 3 seconds (`TransferPolling`).
+3. It downloads the archive and saves it under the server's file name: in the current folder, or in the folder `--output` names (an existing folder, or a path that ends with a separator). Any other `--output` is the file itself. Missing folders are created.
+4. `--extract` unpacks the archive into a new or empty folder instead: the one `--output` names, or by default the file name without `.zip`. So `sform story export -f git -x` leaves a checked-out repository with the folders of every kind. A file in place of the folder, a folder that is not empty, and an entry that would land outside the folder are refused with `2`.
+5. It ends with the counts of the exported kinds, without the kinds left out, then the versions and the size: `Exported 4 annotations and 2 templates (9 versions, 2 KB) to export-acme-billing-default-git-20261017-081500Z.zip.` With `--extract`, it says `into` the folder. The versions are not mentioned when only annotations were exported, since annotations have none.
+
+### sform story import
+
+1. **The archive.** A file is sent as it is. A folder is packed in memory (`ViewArchives.PackFolder`):
+   - It takes every `*.json` file below the folder, with the extension in any case, and names each entry by its path relative to the folder.
+   - It leaves out what the server would skip, by the same rule (`ViewArchives.IsSkippedPath`, a copy of `ViewArchiveNames.IsSkippedPath`): any path segment that starts with `.` (`.git`, `.github`, `.vscode`, `._*`), and a first folder `__MACOSX`. It does not walk into such folders at all, so a large `.git` costs nothing.
+   - The upload is named `<folder>.zip`.
+
+   So a clone of an exported repository, or an extracted and edited export, imports as it is. A folder without such files, and a path that does not exist, exit with `2`.
+2. It prints `Importing acme.zip into acme.billing.default (annotations and templates, skip existing, forced, dry run)…`. The brackets list only the options that differ from the defaults. Then it waits for the job, as the export does.
+3. At the end, under the header `Import of <file>`, it writes:
+   - a table of the documents the job lists, every outcome except `Unchanged` (none when every document was unchanged);
+   - when the job cut that list (`AreItemsTruncated`): `Only the first N files are listed; the counts include all.`;
+   - a summary table: one row per entry of `Summaries`, named by its kind (`Annotations`, `Schemas`, `Templates`, `Configurations`, in import order), then `Total`. The columns are `Kind`, `Created`, `Updated`, `Unchanged`, `Skipped`, `Failed` and `Warnings` (the documents with a warning). After a dry run, `Created` and `Updated` read `Would create` and `Would update`;
+   - `N files excluded, M other files ignored.`: the files of kinds left out by `--include`, then the version files, `export.json` and other names;
+   - after a dry run, `Nothing was written (dry run).`
+
+The table of documents has five columns:
+
+| Column | Holds |
+| --- | --- |
+| `Kind` | `Annotation`, `Type schema`, `Descendant-type schema`, `Annotation schema`, `Template` or `Configuration` |
+| `Document` | The key of an annotation, a configuration or an annotation schema; the type code of a template or a type schema; `exe below sbt.northwind` for a descendant-type schema. The path when the item names neither. |
+| `Outcome` | `Created`, `Updated`, `Skipped` or `Failed` |
+| `Code` | The error code, for example `DocumentExists` or `SchemaViolation` |
+| `Message` | The message of the outcome |
+
+Each warning is a row of its own under its document, with `!` in the `Outcome` column and the warning's code and message, for example `AncestorCreated` and `The missing ancestors … are created with defaults.` The table shows no versions.
+
+### Exit codes
+
+| Code | When |
+| --- | --- |
+| `0` | The job succeeded and no file failed. Warnings don't change it. |
+| `1` | The job failed on the server; its error is printed. Any other error of the API, for example while waiting, goes to the general error handler of `sform`, which exits with `1` too. |
+| `2` | An option, the path or the folder to extract into is wrong. Or the server refused the start with `400` (for example `InvalidArchive`), `409` (`TransferLimit`) or `413` (`ArchiveTooLarge`); its message is printed. Or a file of the import failed, also in a dry run. |
+| `40` | `--timeout` ran out. The command prints the job id and its status, with the processed files of an import. The job continues on the server. |
+| `44` | The start answered `401` or `403`, for example for a missing scope of an included kind. The server's message is printed; for a scope, it names `include` (see [Access](#access)). |
+
+**Tests.** `Cli/test` covers the options and their defaults (`ViewTransferArgumentsTests`), the requests, the files, the output and the exit codes of both commands (`StorytellerTransferCommandTests`), the packing and unpacking (`ViewArchivesTests`), and the tables (`TransferConsoleExtensionsTests`). `RecordingConsole` records each table as the text of its cells (`RecordedTable`).
 
 ## Administration UI
 
-Phase 4 of the spec replaces the dialogs with an **Export & Import** page. Until then, the Configurations page has **Export** (every role) and **Import** (Contributor) in its header (`ui.admin/src/app/pages/[org]/[project]/[view]/configurations.vue`). Both now start jobs over all four kinds.
+The **Export & Import** page of a view (`ui.admin/src/app/pages/[org]/[project]/[view]/export-import.vue`) exports and imports the view. It replaced the **Export** and **Import** buttons of the Configurations page and their dialogs (`ConfigurationExportDialog`, `ConfigurationImportDialog`, `ConfigurationImportResult`), which are removed.
 
-- `stores/transfers.ts` starts and polls the jobs (every second, then every 2 and 3 seconds, at most 15 minutes) independently of the page. A succeeded export is fetched with the bearer token and saved under its `FileName` (`utils/download.ts`). Running exports are kept in `sessionStorage` and resumed after a reload.
-- `TransferToaster` (in the default layout) reports the end of an export, and of an import whose dialog is closed. After an import that wrote documents, it refreshes the configuration queries and the catalog only.
-- `ConfigurationExportDialog` picks the format and closes when the download starts. `ConfigurationImportDialog` takes a zip (`UFileUpload`) and the dry run and force options, shows the progress and the result (`ConfigurationImportResult`), and offers **Import now** after a dry run. Opened again, it shows the view's latest import. The result lists the items without their kinds.
-- The store calls the SDK's `transfers` operations without include or existing.
-- The mock API (`mock/transfer-handlers.ts`, `mock/zip.ts`) serves the routes of the API, and runs both jobs over the mock database in the layout of the first spec (`<key>.json`, `<key>.<version>.json`). Its git export is that layout plus `.git/HEAD`; it writes no repository. It reads `Include`, `include` and `existing` like the API (an unknown kind or mode answers `400`, `InvalidQuery` for the query), stores them resolved on the job, and applies them to configurations, the only kind it knows: without `Configurations`, an export writes none and an import counts their files as excluded, and `Skip` keeps a different stored configuration with `DocumentExists`.
+- **Navigation.** The sidebar entry **Export & Import** (icon `i-lucide-arrow-down-up`) follows **Compare views** in the view section (`utils/navigation.ts`). It has `editRole: 'Contributor'`, so a Reader sees it with a lock ("Read-only for your role") and can still export. The command palette lists it with the other pages, and `g e` opens it (`components/shell/CommandPalette.vue`; the shortcut help lists it, `composables/useShortcutsHelp.ts`). `export-import` is one of the view sections of `utils/context-paths.ts`, so switching the view stays on the page.
+- **Layout.** The **Export** and **Import** sections sit side by side from the `lg` breakpoint and are stacked below it. Below them, full width, the section **Latest import** shows the result of the view's latest finished import.
+- While the page is open, it marks that import as shown (`showInPage`), so `TransferToaster` does not report its end.
+
+### The Export section
+
+`components/transfer/ExportPanel.vue`:
+
+- **Kinds:** four checkboxes, **Annotations**, **Schemas**, **Templates** and **Configurations**, all checked, each with a line on what it holds. With none checked, the field says "Pick at least one kind." and **Export** is disabled.
+- **Format:** radio cards. **Folder of JSON files** has one folder per kind with the current documents, earlier versions as version files, and `export.json`. **Git repository** has the current documents checked out, and every version of a schema, template or configuration is a commit by its author.
+- A line says what is never included: secrets, effective documents, the audit, the version history of annotations, and deleted annotations.
+- **Export** starts the job with the checked kinds in import order. The progress shows in place: "Waiting for the server…", "Building the archive…", then "Downloading the archive…". The store downloads the zip when it is ready, also after you have left the page, and the section then says "`<file name>` was downloaded." A failure shows "The export failed" with the server's error, or with why the client stopped waiting.
+- Back on the page, the section shows the latest export of the view (`latestExport`), running or finished.
+
+### The Import section
+
+`components/transfer/ImportPanel.vue`:
+
+- **Who.** Below `Contributor`, the section shows "Importing needs the Contributor role" instead of the form.
+- **The file:** `UFileUpload` takes a zip. Its hint: "Folders don't matter: files are recognized by their names. Version files, export.json and hidden folders are ignored."
+- **Kinds:** the same four checkboxes, all checked. They say what the import may write; at least one is needed.
+- **Existing documents:** radio cards.
+  - **Overwrite** (the default): "The archive's content replaces them as a new version. Annotations are updated, and deleted ones are re-created with an empty configuration."
+  - **Skip**: "They stay as they are; only new documents are written."
+- **Force:** the checkbox "Store schemas and configurations that break each other", described as "Without it, they fail and the rest is imported."
+- **Check** starts a dry run and **Import** a real one, with the checked kinds in import order, the mode and force.
+- The progress shows in place: "N of M files checked…" or "… imported…" once the job counts its files. A failure shows "The import failed". Leaving the page doesn't stop the job, and `TransferToaster` reports its end.
+- **Import now.** After a check, the banner of the result offers **Import now**. It runs the checked file again for real, with the check's `Include`, `Existing` and `IsForced`. The page calls `importNow()` of the section, so the progress and the errors show in the Import section. An import restored after a reload has no file, so it offers no **Import now**: pick the zip again.
+
+### Result of an import
+
+`components/transfer/ImportResult.vue`:
+
+- **Banner:** "Checked: nothing was written" after a dry run, or "Imported", with the file name and the counts. It is a warning when a file failed.
+- **Summary:** a table with one row per entry of `Summaries` and a **Total** row. The columns are Created, Updated, Unchanged, Skipped, Failed and Warnings, and on the total also Excluded files and Ignored files. After a dry run, the headers and the badges say To create, To update, To skip and Fails. Phones get a list of lines instead.
+- **Filters:** chips by kind (Annotations, Schemas, Templates, Configurations) and by outcome (Failed, Skipped, Warnings), each with its count. Only the chips that match documents are shown. Chips of one group combine with *or*, and the two groups with *and*. **Clear the filter** removes them.
+- **Documents:** the items of the job, every outcome except `Unchanged`, in pass order.
+  - Desktop has a table: the kind badge, the document (its name, with the path below it), the outcome, the version, the code and the message. The warnings are listed under the message.
+  - Phones get a list with the same content.
+  - The first 200 documents are rendered, and **Show all N** renders the rest. When the job cut the list, a note says so.
+- **Names:** the key, the type code, or `<type> below <key>` for a descendant-type schema; the path when the item names neither.
+- **Links** go to the document when the view has it: written by a real run (`Created`, `Updated`), kept by `Skip` (`DocumentExists`), or about to be updated by a dry run. A failed document, one skipped for another reason, and one that a dry run would create have no link.
+
+  | Document | Link |
+  | --- | --- |
+  | Annotation | `…/annotations/{key}` |
+  | Configuration | `…/configurations/{key}` |
+  | Template | `…/templates/{type}` |
+  | Type schema | `…/schemas/type/{type}` |
+  | Annotation schema | `…/schemas/annotation/{key}` |
+  | Descendant-type schema | `…/schemas/annotation/{key}/type/{type}` |
+
+- Without items, the result says that every document equals the stored one, or that the archive holds no document of the included kinds.
+
+### Store, toaster and caches
+
+**`stores/transfers.ts`** starts and follows the jobs, independently of the page:
+
+- `startExport(scope, { format, include })` and `startImport(scope, file, { include, existing, force, dryRun })` call `startViewExport` and `startViewImport` of the TypeScript SDK. Options that are left out are not sent, so the API's defaults apply. An empty include means all four kinds.
+- It reads a job every second, then every 2 and 3 seconds, for at most 15 minutes. A `404` ends the job as expired, and so do three failed reads in a row, with their error.
+- A succeeded export is fetched with the bearer token and saved under its `FileName` (`utils/download.ts`).
+- `latestExport(scope)` and `latestImport(scope)` give the newest job of a view; `showInPage(id)` marks the one a page shows.
+- **After a reload:**
+  - Running exports are kept in `sessionStorage` (`2s-admin:pending-exports`) and followed again. One started more than 15 minutes earlier is dropped.
+  - The latest import of each view is kept there too (`2s-admin:latest-imports`) and read again from the server. An import that had finished is shown on the page without a toast. One that was still running is followed and reported; it keeps its original start, so after 15 minutes it ends at once with "The job did not end within 15 minutes; it may still end on the server." One that has expired (the server keeps jobs for 24 hours), cannot be read, or was replaced by a newer import of the view in the meantime is forgotten.
+
+**`components/transfer/TransferToaster.vue`** sits in the default layout. It calls `resume()` when it is mounted and reports the ends of the jobs, wherever the user is by then:
+
+- an export: "Exported 12 annotations and 2 templates", the counts of the included kinds, with the file name; or "The export failed";
+- an import that no page shows: "Imported `<file>`" or "Checked `<file>`" with the counts, in the warning color when a file failed; or "The import failed". Both have **Show the result**, which opens the page of the import's view.
+
+**Caches.** After a real import that wrote documents, the toaster calls `invalidateImport` (`queries/invalidation.ts`). It refreshes the queries of the kinds the import wrote, as the summaries per kind and the items tell:
+
+| Written | Refreshed |
+| --- | --- |
+| Annotations | Every annotation query of the view (`invalidateAnnotations`), histories and deleted annotations included. The catalog is reloaded when it shows that view, which refreshes its configurations too. |
+| Schemas | Every schema query, the combined schemas included (`invalidateSchemas`), and every configuration query of the view, since validation changes |
+| Templates | Every template query (`invalidateTemplates`), and every configuration query, which holds the effective documents |
+| Configurations | The written keys, as after a save (`invalidateConfiguration`). Every configuration query when the job cut its items, or when annotations were re-created (`AnnotationRecreated`), which empties their configurations. The catalog refreshes its configurations when it shows that view. |
+
+A dry run refreshes nothing.
+
+### Mock API
+
+`npm run dev:mock` and the tests serve the five routes from `mock/transfer-handlers.ts`, over the mock database: annotations, the `template:` and `schema:` documents, and configurations.
+
+- **File names** come from `mock/archive-names.ts`, a TypeScript port of `ViewArchiveNames`: the names of every kind and version, the reserved second segment, the parser, the descendant-type check, the identities that find duplicates, hidden paths and the zip name. `test/unit/transfers/archive-names.test.ts` runs the cases of `ViewArchiveNamesTests`.
+- **Jobs.** A job is `Running` on its first read and ends on the second, so the UI shows its progress.
+  - An export needs any role on the project, and an import `Contributor`. The scopes and the job limit are not checked.
+  - The options are read like the API's: an unknown kind or mode answers `400` (`InvalidQuery` for the query).
+  - The last ten finished imports are kept in `sessionStorage` (`2s-admin:mock-finished-imports`), so the page shows a result again after a reload, as the API keeps its jobs.
+- **Export.**
+  - The folder format writes one folder per included kind, version files next to their current file with the time of their version, and `export.json` version 2.
+  - The git format writes the same folders with the current documents and `.git/HEAD`, without `export.json`. It writes no repository.
+  - The job has the counts of the included kinds and `VersionCount`. The counts of the others are left out, as the API's JSON leaves out nulls.
+- **Import.**
+  - Files are recognized by their names, in any folder. Hidden paths and `__MACOSX` are skipped without being counted. Version files, `export.json` and other names count as ignored, and the kinds left out by `include` as excluded. Duplicates fail with `DuplicateFile`. Comments and trailing commas are allowed.
+  - The passes, the overlay, the outcomes, codes, messages and warnings, and the summaries per kind and in total are the API's. So a dry run predicts the real run.
+  - Annotation files take the editable members and ignore the server-owned ones. An unknown member or a different `AnnotationKey` fails with `InvalidDocument`, and a broken annotation rule with `InvalidAnnotation`.
+  - Only the seeded annotations have a generated configuration, so an annotation that an import creates starts without one, as on the server.
+- **Simplifications:**
+  - `$remove` and `$patch` of templates and configurations are not applied, and duplicate JSON properties are not detected (the last one wins).
+  - The archive and document limits are not enforced, and the items are never cut.
+  - The mock drops the versions of a deleted document. So its exports never list a deleted schema, template or configuration, and its git export has no remove step. The configuration of a re-created annotation starts again at version 1.
+  - The message of `InvalidSchema` comes from the client-side meta-schema check, and the message of a member of a wrong type is the mock's own.
+  - `?mock-scenario=` and `window.storytellerMock.reset()` reset the data, but not the saved imports (`2s-admin:mock-finished-imports`, `2s-admin:latest-imports`). So the page can show a result from before the reset. The e2e tests are not affected: each gets a fresh browser context.
+
+### Tests of the page
+
+- **Vitest** (`test/unit/transfers/`):
+  - the archive names;
+  - the mock's exports and imports (`mock-transfers.test.ts`);
+  - the store's options, polling and restore after a reload (`transfers.test.ts`);
+  - the names, links and invalidation of a result (`transfer-utils.test.ts`);
+  - the sections, the result and the toaster (`transfer-page.test.ts`);
+  - the navigation entry and the shortcut (`test/unit/utils/navigation.test.ts`).
+- **Playwright** (`test/e2e/transfers.spec.ts`), on desktop and mobile:
+  - the page from the sidebar and with `g e`, and a Configurations page without transfer buttons;
+  - an export of annotations and templates, a git export, and the need for one kind;
+  - a check of an edited archive per kind, with a warning, then **Import now** (desktop only);
+  - an import with **Skip** that reports `DocumentExists` and shows again after a reload;
+  - the notice of a reader;
+  - a file that is not a zip (desktop only).
+- **axe** (`accessibility.spec.ts`) runs on the page for a Contributor and for a reader, and on the result of a check.
+- **Visual baselines** (`visual.spec.ts`) capture the page as it opens, in both themes, on desktop and mobile.
 
 ## Storage
 
