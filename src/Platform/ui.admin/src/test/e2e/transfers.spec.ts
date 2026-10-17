@@ -18,10 +18,13 @@ async function menu(page: Page, testInfo: TestInfo): Promise<Locator> {
   return page.locator('nav').filter({ has: page.getByRole('link', { name: 'Organizations' }) })
 }
 
-/** Exports the view with the given kinds and format, and returns the downloaded zip. */
+/**
+ * Exports the view with the given kinds and format, and returns the downloaded zip. The toast that confirms the
+ * download is checked before the file is read: it shows for five seconds, and reading the file can take longer.
+ */
 async function exportView(
   page: Page,
-  options: { leaveOut?: string[]; format?: 'Folder of JSON files' | 'Git repository' } = {},
+  options: { leaveOut?: string[]; format?: 'Folder of JSON files' | 'Git repository'; toast?: RegExp } = {},
 ) {
   const panel = section(page, 'Export')
   for (const kind of options.leaveOut ?? []) {
@@ -34,6 +37,9 @@ async function exportView(
   const download = await downloading
 
   await expect(panel.getByText(/was downloaded\.$/)).toBeVisible()
+  if (options.toast) {
+    await expect(page.getByText(options.toast)).toBeVisible()
+  }
   const files = await readZip(new Uint8Array(await readFile((await download.path())!)))
   return { name: download.suggestedFilename(), files }
 }
@@ -75,7 +81,10 @@ test('opens the page from the sidebar and with g e; the configurations page has 
 test('exports only the annotations and templates', async ({ page }) => {
   await openApp(page, path)
 
-  const { name, files } = await exportView(page, { leaveOut: ['Schemas', 'Configurations'] })
+  const { name, files } = await exportView(page, {
+    leaveOut: ['Schemas', 'Configurations'],
+    toast: /^Exported \d+ annotations and \d+ templates$/,
+  })
 
   expect(name).toMatch(/^export-acme-billing-default-\d{8}-\d{6}Z\.zip$/)
   const names = files.map((file) => file.name)
@@ -89,7 +98,6 @@ test('exports only the annotations and templates', async ({ page }) => {
     'Annotations',
     'Templates',
   ])
-  await expect(page.getByText(/^Exported \d+ annotations and \d+ templates$/)).toBeVisible()
 })
 
 test('exports the view as a git repository', async ({ page }) => {

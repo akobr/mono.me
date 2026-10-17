@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { ViewArchiveContent, ViewExportCreateFormat } from '@42for.net/2splatform.sdk'
 import type { Scope } from '@/stores/context'
-import { useTransfersStore, type ExportJob } from '@/stores/transfers'
+import { useTransfersStore } from '@/stores/transfers'
 import { errorMessage } from '@/utils/errors'
 import { archiveContents, contentItems, neverExported } from '@/utils/transfers'
 
@@ -16,8 +16,6 @@ const props = defineProps<{ scope: Scope }>()
 const transfers = useTransfersStore()
 const include = ref<ViewArchiveContent[]>([...archiveContents])
 const format = ref<ViewExportCreateFormat>('Folder')
-// the export of the view that runs or ran last, also one started before the user left the page
-const jobId = ref(transfers.latestExport(props.scope)?.id)
 const starting = ref(false)
 const error = ref<string>()
 
@@ -35,7 +33,9 @@ const formats = [
   },
 ]
 
-const job = computed(() => transfers.find(jobId.value) as ExportJob | undefined)
+// the export of the view that runs or ran last: also one started before the user left the page, and one that the store
+// follows again after a reload, which may be tracked only after this section is set up
+const job = computed(() => transfers.latestExport(props.scope))
 const running = computed(() => job.value?.phase === 'running' || job.value?.phase === 'downloading')
 const busy = computed(() => starting.value || running.value)
 const status = computed(() => {
@@ -65,7 +65,8 @@ async function start() {
   try {
     // the kinds in import order, as the API lists them
     const kinds = archiveContents.filter((content) => include.value.includes(content))
-    jobId.value = (await transfers.startExport(props.scope, { format: format.value, include: kinds })).id
+    // the new export becomes the latest of the view, so the section shows it
+    await transfers.startExport(props.scope, { format: format.value, include: kinds })
   } catch (caught) {
     error.value = errorMessage(caught)
   } finally {
