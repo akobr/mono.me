@@ -2,18 +2,25 @@
 import { ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { deleteMachineAccess, resetMachineAccess, type MachineAccess } from '@42for.net/2splatform.sdk'
-import { useGetMachineAccesses, useGetMachineAuthentication } from '@42for.net/2splatform.sdk/vue-query'
+import {
+  useGetFederatedIssuers,
+  useGetMachineAccesses,
+  useGetMachineAuthentication,
+  useGetSharedCertificates,
+} from '@42for.net/2splatform.sdk/vue-query'
 import { useBootState } from '@/boot/state'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
-import { certificateDaysLeft, machineSecret } from '@/utils/machines'
+import { certificateDaysLeft, credentialKindLabel, hasSecret, isFederated, machineSecret } from '@/utils/machines'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
 // Machine access of the project (spec section 13). Create and Reset return credentials once; they go straight
 // to OneTimeSecretDialog and are never cached. The project policy (readable by Contributors) gives the kinds and the
-// default certificate lifetime of new machines (424-14). Administrators also see the shared certificates below the
-// machines (424-35); Contributors don't, the API answers 403 to them.
+// default certificate lifetime of new machines (424-14). Administrators also see the shared certificates (424-35) and
+// the trusted issuers of Federated machines (424-46) below the machines; Contributors don't, the API answers 403 to the
+// certificates and only Administrators change issuers. A Federated machine has no secret: creating one shows how a
+// workload exchanges its platform token (FederatedSetupDialog), and it has no Reset.
 const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
@@ -35,6 +42,7 @@ const creating = ref(false)
 const resetting = ref<MachineAccess>()
 const deleting = ref<MachineAccess>()
 const secret = ref<OneTimeSecret>()
+const setup = ref<MachineAccess>()
 const busy = ref(false)
 
 async function refresh() {
@@ -42,7 +50,11 @@ async function refresh() {
 }
 
 function created(machine: MachineAccess) {
-  secret.value = machineSecret(machine, 'Machine access created', boot.value.config?.apiBaseUrl)
+  if (isFederated(machine.CredentialKind)) {
+    setup.value = machine
+  } else {
+    secret.value = machineSecret(machine, 'Machine access created', boot.value.config?.apiBaseUrl)
+  }
   void refresh()
 }
 
@@ -76,8 +88,24 @@ async function remove() {
 
 const daysLeft = (machine: MachineAccess) => certificateDaysLeft(machine, policy.data.value?.CertificateLifetimeDays)
 
-// #shared-certificates (the old Certificates page redirects here) scrolls once the machines above it are listed.
-useHashScroll(() => !machines.isPending.value)
+// The sections of Administrators, read here as well (the same queries as their tables) to know when they are listed.
+const adminQuery = { enabled: () => !!context.project && canAdmin.value, meta: { silent: true } }
+const certificates = useGetSharedCertificates(
+  () => context.org ?? '',
+  () => context.project ?? '',
+  { query: adminQuery },
+)
+const issuers = useGetFederatedIssuers(
+  () => context.org ?? '',
+  () => context.project ?? '',
+  { query: adminQuery },
+)
+
+// #shared-certificates (the old Certificates page redirects here) and #trusted-issuers (linked from New machine)
+// scroll once the sections above them are listed.
+useHashScroll(
+  () => !machines.isPending.value && !(canAdmin.value && (certificates.isPending.value || issuers.isPending.value)),
+)
 </script>
 
 <template>
@@ -130,7 +158,7 @@ useHashScroll(() => !machines.isPending.value)
                     <UBadge :label="machine.Scope" color="neutral" variant="outline" size="sm" />
                   </td>
                   <td class="px-3 py-2 font-mono text-xs">{{ machine.AnnotationKey ?? 'any' }}</td>
-                  <td class="px-3 py-2 text-xs">{{ machine.CredentialKind }}</td>
+                  <td class="px-3 py-2 text-xs">{{ credentialKindLabel(machine.CredentialKind) }}</td>
                   <td class="px-3 py-2">
                     <span v-if="machine.CertificateThumbprint" class="flex items-center gap-1">
                       <code class="font-mono text-xs" :title="machine.CertificateThumbprint"
@@ -157,7 +185,15 @@ useHashScroll(() => !machines.isPending.value)
                   <td class="px-3 py-2"><RelativeTime :value="machine.LastRenewalAt" /></td>
                   <td class="px-3 py-2 text-end">
                     <span v-if="canManage" class="flex justify-end gap-1">
-                      <UButton label="Reset" size="xs" color="neutral" variant="ghost" @click="resetting = machine" />
+                      <!-- A Federated machine has no secret to reset; its rules change on its detail. -->
+                      <UButton
+                        v-if="hasSecret(machine.CredentialKind)"
+                        label="Reset"
+                        size="xs"
+                        color="neutral"
+                        variant="ghost"
+                        @click="resetting = machine"
+                      />
                       <UButton
                         icon="i-lucide-trash-2"
                         size="xs"
@@ -176,6 +212,10 @@ useHashScroll(() => !machines.isPending.value)
         <section v-if="canAdmin" id="shared-certificates" tabindex="-1" class="scroll-mt-4 space-y-2 outline-none">
           <h2 class="text-xs font-semibold text-muted uppercase">Shared certificates</h2>
           <SharedCertificatesTable />
+        </section>
+        <section v-if="canAdmin" id="trusted-issuers" tabindex="-1" class="scroll-mt-4 space-y-2 outline-none">
+          <h2 class="text-xs font-semibold text-muted uppercase">Trusted issuers</h2>
+          <TrustedIssuersTable />
         </section>
       </div>
 
@@ -200,6 +240,7 @@ useHashScroll(() => !machines.isPending.value)
         @confirm="remove"
       />
       <OneTimeSecretDialog :secret="secret" @close="secret = undefined" />
+      <FederatedSetupDialog :machine="setup" @close="setup = undefined" />
     </template>
   </UDashboardPanel>
 

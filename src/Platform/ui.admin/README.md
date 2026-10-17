@@ -1,6 +1,6 @@
 # 2S Admin UI
 
-Single-page administration application of the 2S Platform: organizations, projects and views, annotations, configurations, templates and schemas, the values store, members and invitations, machines and shared certificates, settings and monitoring.
+Single-page administration application of the 2S Platform: organizations, projects and views, annotations, configurations, templates and schemas, the values store, members and invitations, machines, shared certificates and trusted issuers, settings and monitoring.
 
 - **Stack:** Vue 3.5 + TypeScript, Vite, Vue Router 5 (file-based, typed routes), Nuxt UI 4 (through its Vite plugin, no Nuxt), Pinia, TanStack Query for Vue, VeeValidate + Zod 4.
 - **API client:** the generated SDK [`@42for.net/2splatform.sdk`](../Storyteller/sdk.typescript/README.md) (fetch functions, Vue Query composables, Zod schemas, MSW mocks).
@@ -61,12 +61,14 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - a version comparison;
 - an invitation;
 - a machine with a `.pfx` download;
+- a trusted issuer from a template (what the templates fill in), and one deleted: its rules flagged on the machine detail, and New machine's link to the section, which keeps the focus;
+- a federated machine created by a Contributor (its setup instead of a secret, no Reset) and its rules edited on the detail, where an audience other than the token endpoint is flagged and kept by new rules;
 - a graph node opened by mouse and by keyboard;
 - delete and Undo, restore from Deleted (with and without descendants), create over a deleted key, permanent delete for Administrators only, the history and the configuration link;
 - bulk create from a list of keys, with the missing ancestors, and its absence for a Reader;
 - the project pages of the menu per role, the redirects of the merged pages to their sections, and the theme in the command palette;
 - the `prod` badge of the default view in the menu, the switcher and its list of views, and its absence on another view;
-- axe (WCAG 2.1 AA) on the main screens, on Deleted and on the bulk create dialog.
+- axe (WCAG 2.1 AA) on the main screens, on Deleted, on the bulk create dialog and on the dialogs of trusted issuers and federated machines.
 
 Each test gets a fresh context, so the mock data starts from the scenario's seed. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of `npx playwright install chromium`.
 
