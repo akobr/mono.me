@@ -587,8 +587,8 @@ describe('FederationRulesDialog', () => {
   it('replaces the rules of the machine', async () => {
     const screen = await openDialog(FederationRulesDialog, { machine: machine() })
 
-    expect(control('Subject').value).toBe('repo:acme/billing:environment:production')
-    await type(control('Subject'), 'repo:acme/billing:environment:staging')
+    expect(control('Subject').value).toBe('repo:acme@65/billing@74:environment:production')
+    await type(control('Subject'), 'repo:acme@65/billing@74:environment:staging')
     button('Add rule').click()
     await settle(6)
     expect(text()).toContain('Rule 2')
@@ -602,7 +602,7 @@ describe('FederationRulesDialog', () => {
       {
         Issuer: 'github',
         Audience: machine().FederationRules![0]!.Audience,
-        Subject: 'repo:acme/billing:environment:staging',
+        Subject: 'repo:acme@65/billing@74:environment:staging',
         Claims: { repository_id: ['74'] },
       },
     ])

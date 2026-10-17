@@ -113,7 +113,7 @@ test('an Administrator adds a trusted issuer from a template', async ({ page }) 
   await expect(dialog.getByRole('textbox', { name: 'Name' })).toHaveValue('vercel')
   await dialog.getByRole('combobox', { name: 'Template' }).click()
   await page.getByRole('option', { name: 'Azure managed identity' }).click()
-  await expect(issuer).toHaveValue('https://login.microsoftonline.com/<tenant>/v2.0')
+  await expect(issuer).toHaveValue('https://login.microsoftonline.com/<tenant-id>/v2.0')
   await expect(lifetime).toHaveValue(/^86,?400$/)
   await expect(dialog.getByRole('textbox', { name: 'Claim 1' })).toHaveCount(0)
   await expect(dialog.getByRole('button', { name: 'Add issuer' })).toBeDisabled()
@@ -193,15 +193,15 @@ test('the federation rules of a machine are edited on its detail', async ({ page
 
   await federated.getByRole('link', { name: 'mach-release-pipeline' }).click()
   const rules = page.getByRole('region', { name: 'Federation rules' })
-  await expect(rules).toContainText('repo:acme/billing:environment:production')
+  await expect(rules).toContainText('repo:acme@65/billing@74:environment:production')
   await expect(rules).toContainText('repository_id')
 
   await rules.getByRole('button', { name: 'Edit rules' }).click()
   const dialog = page.getByRole('dialog', { name: 'Federation rules' })
-  await dialog.getByRole('textbox', { name: 'Subject' }).fill('repo:acme/billing:environment:staging')
+  await dialog.getByRole('textbox', { name: 'Subject' }).fill('repo:acme@65/billing@74:environment:staging')
   await dialog.getByRole('button', { name: 'Save rules' }).click()
   await expect(dialog).toBeHidden()
-  await expect(rules).toContainText('repo:acme/billing:environment:staging')
+  await expect(rules).toContainText('repo:acme@65/billing@74:environment:staging')
   await expect(rules.getByText('Not the token endpoint')).toHaveCount(0)
 
   // An audience other than the token endpoint the API names (New machine behind a proxy) is flagged, and a rule added
