@@ -42,6 +42,8 @@ Both reads return an `ETag`. A service that polls sends it back in `If-None-Matc
 
 The service does not merge customer files, environment files, and default files itself. The execution key is the merge.
 
+Give each execution its own machine, restricted to its key (`sform machine create -a exe.northwind.invoicing.production`, or the annotation key on **New machine** in the admin UI). Such a machine reads and writes that execution and its units of execution, and nothing else in the project: other annotations, lists, templates, and key values answer `403 AnnotationRestricted`. The ancestors still reach it through the effective configuration. A machine that only reads gets a read scope.
+
 ## What a person browses
 
 The catalog is queryable by type. These reads are how you answer the operational questions the model was built for.
