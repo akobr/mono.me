@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Output;
@@ -109,7 +110,7 @@ public class ConfigSetCommand : BaseContextCommand
                     AnnotationKey);
             }
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             if (SchemaValidationConsole.TryWrite(Console, e))
             {

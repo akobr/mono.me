@@ -80,7 +80,7 @@ public class ConfigPatchCommand : BaseContextCommand
                 Context.ViewName,
                 AnnotationKey);
         }
-        catch (ApiException exception)
+        catch (ApiException exception) when (exception.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WritePatchError(exception);
         }
@@ -171,7 +171,7 @@ public class ConfigPatchCommand : BaseContextCommand
             Console.WriteJson(saved);
             return ExitCodes.SUCCESS;
         }
-        catch (ApiException exception)
+        catch (ApiException exception) when (exception.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WritePatchError(exception);
         }

@@ -40,7 +40,7 @@ internal static class SchemaOperations
                 : $"The schema for {subject} has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WriteApiError(console, e);
         }
@@ -64,7 +64,7 @@ internal static class SchemaOperations
             console.WriteJson(saved);
             WriteForced(console, saved.Version, force, includeVersionLine: true);
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WriteApiError(console, e);
         }
@@ -95,7 +95,7 @@ internal static class SchemaOperations
             console.WriteLine($"The schema for {subject} has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WriteApiError(console, e);
         }
@@ -119,7 +119,7 @@ internal static class SchemaOperations
             WriteForced(console, saved.Version, force, includeVersionLine: false);
             return ExitCodes.SUCCESS;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WriteApiError(console, e);
         }
@@ -144,7 +144,7 @@ internal static class SchemaOperations
             console.WriteLine($"The schema for {subject} has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WriteApiError(console, e);
         }
@@ -173,7 +173,7 @@ internal static class SchemaOperations
             console.WriteLine($"The schema for {subject} has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WriteApiError(console, e);
         }
@@ -248,7 +248,7 @@ internal static class SchemaOperations
             console.WriteLine($"The schema for {subject} or the requested version has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WriteApiError(console, e);
         }
@@ -277,7 +277,7 @@ internal static class SchemaOperations
             console.WriteLine($"The combined schema for '{annotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
-        catch (ApiException e)
+        catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             return WriteApiError(console, e);
         }

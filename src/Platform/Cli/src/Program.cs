@@ -1,11 +1,13 @@
 using System;
 using System.Drawing;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -22,6 +24,9 @@ public class Program
     private static IHost? _host;
     private static ILogger<Program>? _logger;
     private static LoggingOptions? _loggingOptions;
+
+    // Captured before the run: the host is disposed before a command's exception reaches Main.
+    private static MachineSignInSettings? _machineSignIn;
 
     public static IHost Host => _host ?? throw new InvalidOperationException("The host app is not initialized.");
 
@@ -69,6 +74,30 @@ public class Program
 
             Console.Write("! ", Color.Magenta);
             Console.WriteLine(exception.Message);
+            return exception.Reason switch
+            {
+                AuthenticationFailureReason.Configuration => ExitCodes.ERROR_WRONG_INPUT,
+                AuthenticationFailureReason.ServiceError => ExitCodes.ERROR_SERVICE_FAILURE,
+                _ => ExitCodes.WARNING_UNAUTHORIZED_ACCESS,
+            };
+        }
+        catch (ApiException exception) when (exception.StatusCode is (int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden)
+        {
+            await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
+                "The API refused the request with {statusCode}; Arguments: {args}",
+                exception.StatusCode,
+                args)));
+
+            Console.Write("! ", Color.Magenta);
+            Console.WriteLine("You are not authorized to execute the command or you don't have access to requested resources.");
+
+            if (_machineSignIn is { IsConfigured: true })
+            {
+                Console.WriteLine(
+                    $"  sform signed in as a machine with {string.Join(", ", _machineSignIn.CredentialVariables)}. Check the credentials and the project; account, access point and machine management need a user sign-in.",
+                    Color.DarkGray);
+            }
+
             return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
         }
         catch (Exception exception)
@@ -107,6 +136,7 @@ public class Program
             _host = CreateHostBuilder(args).Build();
             _logger = _host.Services.GetRequiredService<ILogger<Program>>();
             _loggingOptions = Host.Services.GetService<IOptions<LoggingOptions>>()?.Value;
+            _machineSignIn = Host.Services.GetService<MachineSignInSettings>();
             return true;
         }
         catch (Exception exception)
