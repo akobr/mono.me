@@ -32,6 +32,7 @@ const screens: {
   { name: 'deleted', path: '/acme/billing/default/deleted', prepare: deleted('sbt.contoso') },
   { name: 'template', path: '/acme/billing/default/templates/exe' },
   { name: 'schemas', path: '/acme/billing/default/schemas' },
+  { name: 'export-import', path: '/acme/billing/default/export-import' },
   { name: 'members', path: '/acme/billing/members' },
   { name: 'machines', path: '/acme/billing/machines' },
   { name: 'key-values', path: '/acme/billing/default/key-values' },
