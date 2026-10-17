@@ -55,6 +55,38 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         }
     }
 
+    // A string that starts with '@' or an object with a string $binding; the walk below changes nothing else.
+    // A $binding without a known kind and $definition stays as stored, but it counts, so the check errs towards resolving.
+    public bool ContainsBindings(JToken content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        switch (content)
+        {
+            case JValue value when value.Type == JTokenType.String:
+                return IsBindingString(value.Value<string>());
+
+            case JArray array:
+                return array.Any(ContainsBindings);
+
+            case JObject obj:
+                return HasBindingProperty(obj) || obj.Properties().Any(property => ContainsBindings(property.Value));
+
+            default:
+                return false;
+        }
+    }
+
+    private static bool IsBindingString(string? raw)
+    {
+        return !string.IsNullOrEmpty(raw) && raw[0] == '@';
+    }
+
+    private static bool HasBindingProperty(JObject obj)
+    {
+        return obj.Property(BindingProperty)?.Value.Type == JTokenType.String;
+    }
+
     private async ValueTask<JToken> ResolveTokenAsync(
         JToken token,
         bool includeSecrets,
@@ -216,8 +248,7 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
 
     private async ValueTask<JToken> BindStringAsync(JValue value, bool includeSecrets, BindingScope scope)
     {
-        var raw = value.Value<string>();
-        if (string.IsNullOrEmpty(raw) || raw[0] != '@')
+        if (!IsBindingString(value.Value<string>()))
         {
             return value;
         }
@@ -275,13 +306,12 @@ public sealed class ConfigurationBindingResolver : IConfigurationBindingResolver
         context = null;
         error = null;
 
-        var binding = obj.Property(BindingProperty);
-        if (binding is null || binding.Value.Type != JTokenType.String)
+        if (!HasBindingProperty(obj))
         {
             return false;
         }
 
-        kind = binding.Value.Value<string>();
+        kind = obj.Property(BindingProperty)!.Value.Value<string>();
         var definitionProperty = obj.Property(DefinitionProperty);
         var known = kind is ObjectBindingEngine.JsonLogicKind or ObjectBindingEngine.JsonEKind;
         if (!known && definitionProperty is null)
