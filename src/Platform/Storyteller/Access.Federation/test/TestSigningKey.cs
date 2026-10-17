@@ -32,6 +32,9 @@ internal sealed class TestSigningKey : IDisposable
 
     public static TestSigningKey EllipticCurve(string kid) => new(kid, null, ECDsa.Create(ECCurve.NamedCurves.nistP256));
 
+    // A P-384 key, which signs ES384 (as AWS STS does).
+    public static TestSigningKey EllipticCurveP384(string kid) => new(kid, null, ECDsa.Create(ECCurve.NamedCurves.nistP384));
+
     // A JSON Web Key Set with the public halves of the keys.
     public static string Jwks(params TestSigningKey[] keys)
     {
@@ -45,7 +48,9 @@ internal sealed class TestSigningKey : IDisposable
         SecurityKey key = _rsa is not null
             ? new RsaSecurityKey(_rsa) { KeyId = keyId }
             : new ECDsaSecurityKey(_ecdsa!) { KeyId = keyId };
-        algorithm ??= _rsa is not null ? SecurityAlgorithms.RsaSha256 : SecurityAlgorithms.EcdsaSha256;
+        algorithm ??= _rsa is not null
+            ? SecurityAlgorithms.RsaSha256
+            : _ecdsa!.KeySize == 384 ? SecurityAlgorithms.EcdsaSha384 : SecurityAlgorithms.EcdsaSha256;
 
         return Handler.CreateToken(JsonSerializer.Serialize(payload), new SigningCredentials(key, algorithm));
     }
@@ -88,7 +93,7 @@ internal sealed class TestSigningKey : IDisposable
             ["kty"] = "EC",
             ["use"] = "sig",
             ["kid"] = Kid,
-            ["crv"] = "P-256",
+            ["crv"] = _ecdsa.KeySize == 384 ? "P-384" : "P-256",
             ["x"] = Base64UrlEncoder.Encode(point.X!),
             ["y"] = Base64UrlEncoder.Encode(point.Y!),
         };

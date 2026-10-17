@@ -56,6 +56,25 @@ public sealed class SubjectTokenVerifierTests : IDisposable
     }
 
     [Theory]
+    [InlineData("123456789012", true)]
+    [InlineData("210987654321", false)]
+    public async Task Es384TokenOfAwsSts_MatchesItsNestedAccountByPointer(string pinnedAccount, bool matches)
+    {
+        // AWS STS signs with ES384 on P-384 and nests its claims in the object "https://sts.amazonaws.com/".
+        const string role = "arn:aws:iam::123456789012:role/billing-sync";
+        using var aws = TestSigningKey.EllipticCurveP384("aws-1");
+        var payload = Payload(role);
+        payload["https://sts.amazonaws.com/"] = new Dictionary<string, object> { ["aws_account"] = "123456789012" };
+        var token = aws.Sign(payload);
+        var rule = Rule() with { Subject = role, Claims = Pins("/https:~1~1sts.amazonaws.com~1/aws_account", pinnedAccount) };
+
+        new JsonWebToken(token).Alg.ShouldBe(SecurityAlgorithms.EcdsaSha384);
+        var match = await VerifyAsync(token, Machine(rule), Issuer(keys: [aws]));
+
+        (match is not null).ShouldBe(matches);
+    }
+
+    [Theory]
     [InlineData("https://cluster.example/", IssuerUrl)]
     [InlineData(IssuerUrl, "https://cluster.example/")]
     [InlineData("https://CLUSTER.example", IssuerUrl)]
