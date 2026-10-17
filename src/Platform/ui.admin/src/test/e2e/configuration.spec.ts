@@ -78,7 +78,9 @@ test('New opens the configuration of an annotation without one', async ({ page }
   await page.getByRole('option', { name: key, exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'New configuration' })
   await expect(dialog.getByRole('button', { name: 'Annotation' })).toHaveText(key)
-  await dialog.getByRole('button', { name: 'Open editor' }).click()
+  // The pick moves the focus to Open editor, so Enter opens it.
+  await expect(dialog.getByRole('button', { name: 'Open editor' })).toBeFocused()
+  await page.keyboard.press('Enter')
 
   await expect(dialog).toBeHidden()
   await expect(page).toHaveURL(
@@ -96,10 +98,22 @@ test('New opens the configuration of an annotation without one', async ({ page }
   await expect(page.getByRole('option', { name: key, exact: true })).toHaveCount(0)
 })
 
+test('the empty list of a filter offers New configuration', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/configurations?q=no-such-annotation')
+
+  await expect(page.getByRole('heading', { name: 'No configuration matches the filter' })).toBeVisible()
+  // the top bar and the empty state
+  const buttons = page.getByRole('button', { name: 'New configuration' })
+  await expect(buttons).toHaveCount(2)
+  await buttons.nth(1).click()
+  await expect(page.getByRole('dialog', { name: 'New configuration' })).toBeVisible()
+})
+
 test('a reader has no New button on Configurations', async ({ page }) => {
   await openApp(page, '/northwind/portal/default/configurations')
 
-  await expect(page.getByRole('button', { name: 'Export configurations' })).toBeVisible()
+  // The top bar is there, without New.
+  await expect(page.getByRole('button', { name: 'Search…' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'New configuration' })).toHaveCount(0)
 })
 
