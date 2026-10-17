@@ -13,6 +13,9 @@ public class CommandContext : ICommandContext
 {
     private readonly IMachineSignIn _machine;
 
+    // The project whose view came from access.default.json; that view belongs to it only.
+    private readonly string? _fileViewProjectKey;
+
     public CommandContext(IOptions<AccessDefaultOptions> accessDefaultOptions, IMachineSignIn machine)
     {
         _machine = machine;
@@ -43,6 +46,9 @@ public class CommandContext : ICommandContext
         }
 
         // A view of the file belongs to the project of the file.
+        _fileViewProjectKey = settings.View is null && projectFromFile && access.ViewName is not null
+            ? $"{OrganizationName}.{ProjectName}"
+            : null;
         ViewName = settings.View
             ?? (projectFromFile ? access.ViewName : null)
             ?? Platform.Storyteller.Constants.DefaultViewName;
@@ -68,6 +74,11 @@ public class CommandContext : ICommandContext
             OrganizationName = projectKey[..separatorIndex];
             ProjectName = projectKey[(separatorIndex + 1)..];
             IsProjectKnown = true;
+
+            if (_fileViewProjectKey is not null && !string.Equals(_fileViewProjectKey, projectKey, StringComparison.OrdinalIgnoreCase))
+            {
+                ViewName = Platform.Storyteller.Constants.DefaultViewName;
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(viewName))

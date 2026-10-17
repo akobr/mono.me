@@ -26,6 +26,12 @@ public class CaDownloadCommand : BaseContextCommand
     [Option("-o|--output", CommandOptionType.SingleValue, Description = "Output file path for the CA certificate (.pem).")]
     public string? OutputPath { get; set; }
 
+    // The certificate authority is anonymous and belongs to no project, so a machine without one may call it too.
+    protected override Task<int?> ExecutePreconditionsAsync()
+    {
+        return Task.FromResult<int?>(null);
+    }
+
     protected override async Task<int> ExecuteAsync()
     {
         var pem = await _accessApi.GetCertificateAuthorityAsync();

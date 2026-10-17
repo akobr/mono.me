@@ -186,8 +186,7 @@ namespace _42.Platform.Cli
         private static bool IsLocalHttp(string? baseUrl)
         {
             return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri)
-                && uri.Scheme == Uri.UriSchemeHttp
-                && uri.IsLoopback;
+                && MachineSignInSettings.IsLocalHttp(uri);
         }
     }
 }

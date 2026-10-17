@@ -26,6 +26,9 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     private static readonly TimeSpan RefreshMargin = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan FallbackTokenLifetime = TimeSpan.FromMinutes(5);
 
+    // Longer lifetimes are cut: the process ends long before, and a huge value would overflow.
+    private static readonly long MaxTokenLifetimeSeconds = (long)TimeSpan.FromDays(1).TotalSeconds;
+
     private readonly IFileSystem _fileSystem;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IAuthenticationConfigurationResolver _resolver;
@@ -84,7 +87,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         return credential.Kind switch
         {
             MachineSignInKind.ClientCredentials => credential.Identity with { TokenExpiresAt = (await GetClientTokenAsync(cancellationToken)).ExpiresAt },
-            MachineSignInKind.TokenFile => credential.Identity with { TokenExpiresAt = JwtExpiry.Read(ReadTokenFile()) },
+            MachineSignInKind.TokenFile => credential.Identity with { TokenExpiresAt = ReadTokenFileExpiry() },
             _ => credential.Identity,
         };
     }
@@ -333,6 +336,18 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
             : throw Invalid($"The token file {path} in {StorytellerVariables.TOKEN_FILE} is empty.");
     }
 
+    // A token that has visibly expired fails the sign-in here instead of with a 401 on the next call.
+    private DateTimeOffset? ReadTokenFileExpiry()
+    {
+        var expiresAt = JwtExpiry.Read(ReadTokenFile());
+
+        return expiresAt is null || expiresAt > _time.GetUtcNow()
+            ? expiresAt
+            : throw new AuthenticationException(
+                AuthenticationFailureReason.Expired,
+                $"The token in {StorytellerVariables.TOKEN_FILE} expired at {expiresAt:O}.");
+    }
+
     private async Task<ClientToken> GetClientTokenAsync(CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -421,7 +436,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 var now = _time.GetUtcNow();
                 var lifetime = ReadLifetime(root);
                 var expiresAt = lifetime > 0
-                    ? now.AddSeconds(lifetime.Value)
+                    ? now.AddSeconds(Math.Min(lifetime.Value, MaxTokenLifetimeSeconds))
                     : JwtExpiry.Read(accessToken) ?? now + FallbackTokenLifetime;
                 return new ClientToken(accessToken, expiresAt);
             }
