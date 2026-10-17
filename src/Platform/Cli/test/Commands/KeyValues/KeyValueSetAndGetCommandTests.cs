@@ -1,5 +1,6 @@
 using System.IO.Abstractions;
 using System.Linq;
+using System.Net;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Commands.KeyValues;
 using _42.Platform.Storyteller.KeyValues.ClientEncryption;
@@ -147,6 +148,21 @@ public class KeyValueSetAndGetCommandTests
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         _console.Lines.ShouldContain(line => line.Contains("does not exist"));
         _console.Lines.ShouldContain(line => line.Contains("KeyValueNotFound"));
+    }
+
+    [Fact]
+    public async Task Get_Unauthorized_ReachesTheHostAndForbiddenStaysHere()
+    {
+        _api.Setup(api => api.GetKeyValueAsync("org1", "proj1", "default", "db.host", null, null)).ThrowsAsync(KeyValueTestContext.Error(HttpStatusCode.Unauthorized, string.Empty, null));
+        _api.Setup(api => api.GetKeyValueAsync("org1", "proj1", "default", "db.password", null, null)).ThrowsAsync(KeyValueTestContext.Error(HttpStatusCode.Forbidden, "Secrets need mTLS.", "MtlsRequired"));
+
+        // Program.Main reports a 401 with the hint for a machine sign-in.
+        var unauthorized = await Should.ThrowAsync<ApiException>(() => new KeyValueGetCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Key = "db.host" }.OnExecuteAsync());
+        var forbidden = await new KeyValueGetCommand(_console.Object, KeyValueTestContext.Create().Object, _api.Object, Mock.Of<IFileSystem>()) { Key = "db.password" }.OnExecuteAsync();
+
+        unauthorized.StatusCode.ShouldBe(401);
+        forbidden.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _console.Lines.ShouldContain(line => line.Contains("mTLS"));
     }
 
     private static Task<int> Set(KeyValueSetCommand command) => command.OnExecuteAsync();

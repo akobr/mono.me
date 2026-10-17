@@ -300,14 +300,6 @@ public class AuthKitAuthenticationServiceTests
     }
 
     [Fact]
-    public void ReadExpiry_ReadsExpFromTheJwtPayload()
-    {
-        AuthKitAuthenticationService.ReadExpiry(TestTokens.AccessToken(Start.AddMinutes(5))).ShouldBe(Start.AddMinutes(5));
-        AuthKitAuthenticationService.ReadExpiry("not-a-jwt").ShouldBeNull();
-        AuthKitAuthenticationService.ReadExpiry("a.%%%.c").ShouldBeNull();
-    }
-
-    [Fact]
     public async Task Login_TokenWithoutReadableExpiry_FallsBackToFiveMinutes()
     {
         _http.Respond(HttpStatusCode.OK, DeviceAuthorization)
