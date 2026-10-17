@@ -222,8 +222,8 @@ The next read of an item whose `CalculatedContent` is present returns that objec
 
 These writes clear cached calculations, which makes the following read load the template again:
 
-- `CreateOrUpdateConfigurationAsync`, when the configuration item already exists, sets `CalculatedContent` to null on that item and calls `InvalidateConfigurationsAsync` for affected configurations.
-- `PatchConfigurationAsync` does the same.
+- `CreateOrUpdateConfigurationAsync`, when the configuration item already exists, sets `CalculatedContent` to null on that item and calls `InvalidateConfigurationsAsync` for affected configurations. When no item exists yet, it creates the item without a cache and then calls `InvalidateConfigurationsAsync`.
+- `PatchConfigurationAsync` does the same for an existing item. `ImportConfigurationAsync` writes through the same two paths.
 - `ClearConfigurationAsync`, when stored `Content` has values, deletes the item and then invalidates affected configurations. `DeleteAsync` deletes the item and then invalidates.
 - Every template write (`CreateOrUpdateTemplateAsync` with a changed content, `PatchTemplateAsync`, `DeleteTemplateAsync`) invalidates the configurations that merge the template, after the template has been written.
 
@@ -233,7 +233,7 @@ A configuration update invalidates descendants:
 
 - A responsibility update invalidates every configuration in that responsibility partition and view.
 - Other types invalidate the descendants listed in `CosmosConfigurationService.InvalidateConfigurationsAsync`.
-- The first insert of a configuration item, when none exists yet, returns after `CreateItemAsync` and leaves descendant caches as they are.
+- The first insert of a configuration item, when none exists yet, invalidates the same descendants after `CreateItemAsync`. [inheritance.md](inheritance.md#cache-and-descendant-freshness) explains why the invalidation follows the insert.
 
 A template write invalidates, in the template's view only, all configurations of the template's type and of every type that inherits from it:
 
