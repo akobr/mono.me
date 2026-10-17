@@ -59,6 +59,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     for (const [name, button] of [
       ['export', 'Export configurations'],
       ['import', 'Import configurations'],
+      ['new configuration', 'New configuration'],
     ] as const) {
       test(`the ${name} dialog has no serious accessibility violations`, async ({ page }) => {
         await openApp(page, '/acme/billing/default/configurations')
