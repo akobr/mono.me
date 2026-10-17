@@ -20,9 +20,10 @@ public class JwtExpiryTests
     [InlineData("a.%%%.c")]
     [InlineData("a.W10.c")]
     [InlineData("a.e30.c")]
+    [InlineData("a.eyJleHAiOiIxIn0.c")]
     public void Read_WithoutAReadableExp_IsNull(string token)
     {
-        // W10 is [] and e30 is {}.
+        // W10 is [], e30 is {} and eyJleHAiOiIxIn0 is {"exp":"1"}.
         JwtExpiry.Read(token).ShouldBeNull();
     }
 }

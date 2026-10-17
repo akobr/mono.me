@@ -66,6 +66,18 @@ public class CommandContextTests
         (context.OrganizationName, context.ProjectName, context.ViewName).ShouldBe(("acme", "web", "release"));
     }
 
+    [Theory]
+    [InlineData("acme.web", "default")]
+    [InlineData("HOUSE.stored", "staging")]
+    public void ExplicitProject_KeepsTheFileViewOnlyForTheFileProject(string projectKey, string view)
+    {
+        var context = CreateContext();
+
+        context.TrySetExplicitTarget(projectKey, null);
+
+        context.ViewName.ShouldBe(view);
+    }
+
     [Fact]
     public void MalformedEnvironmentProject_IsReportedUnlessAProjectIsPassed()
     {

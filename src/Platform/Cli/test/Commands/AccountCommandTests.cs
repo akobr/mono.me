@@ -82,6 +82,20 @@ public class AccountCommandTests
     }
 
     [Fact]
+    public async Task Machine_WithAnExpiredTokenFile_IsRejected()
+    {
+        var fileSystem = new MockFileSystem();
+        fileSystem.AddFile(MockUnixSupport.Path(@"C:\ci\token"), new MockFileData(TestTokens.AccessToken(Start.AddHours(-1))));
+        _environment[StorytellerVariables.TOKEN_FILE] = MockUnixSupport.Path(@"C:\ci\token");
+        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+
+        var exitCode = await Execute(fileSystem: fileSystem);
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _console.Lines.ShouldBe(["! The token in STORYTELLER_TOKEN_FILE expired at 2026-10-17T11:00:00.0000000+00:00."]);
+    }
+
+    [Fact]
     public async Task Machine_WithoutAProject_AsksForOne()
     {
         UseClientCredentials();
