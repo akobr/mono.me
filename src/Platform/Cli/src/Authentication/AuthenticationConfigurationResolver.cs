@@ -100,10 +100,11 @@ public sealed class AuthenticationConfigurationResolver : IAuthenticationConfigu
 
     private static AuthenticationProvider ParseProvider(string value, string source)
     {
+        // A value of app.config.json is a setting to fix; one from the server is a service problem.
         return Enum.TryParse<AuthenticationProvider>(value.Trim(), ignoreCase: true, out var provider) && Enum.IsDefined(provider)
             ? provider
             : throw new AuthenticationException(
-                AuthenticationFailureReason.ServiceError,
+                source == DiscoveryPath ? AuthenticationFailureReason.ServiceError : AuthenticationFailureReason.Configuration,
                 $"Unknown sign-in provider '{value}' in {source}. Use EntraId or AuthKit.");
     }
 
@@ -112,7 +113,7 @@ public sealed class AuthenticationConfigurationResolver : IAuthenticationConfigu
         if (string.IsNullOrWhiteSpace(_options.ClientId))
         {
             throw new AuthenticationException(
-                AuthenticationFailureReason.ServiceError,
+                AuthenticationFailureReason.Configuration,
                 $"authentication.clientId is missing in {Constants.APPLICATION_CONFIG_JSON}.");
         }
 

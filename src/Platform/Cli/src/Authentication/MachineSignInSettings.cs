@@ -92,8 +92,16 @@ public sealed class MachineSignInSettings
     // https anywhere, http only to the local host: credentials never cross a network in clear text.
     public static bool IsSecureOrLocal(Uri uri)
     {
-        return uri.Scheme == Uri.UriSchemeHttps
-            || (uri.Scheme == Uri.UriSchemeHttp && uri.IsLoopback);
+        return uri.Scheme == Uri.UriSchemeHttps || IsLocalHttp(uri);
+    }
+
+    // http to localhost or a loopback address literal, never to a name that DNS resolves.
+    public static bool IsLocalHttp(Uri uri)
+    {
+        return uri.Scheme == Uri.UriSchemeHttp
+            && uri.IsLoopback
+            && (uri.HostNameType is UriHostNameType.IPv4 or UriHostNameType.IPv6
+                || string.Equals(uri.IdnHost, "localhost", StringComparison.OrdinalIgnoreCase));
     }
 
     public MachineSignInKind GetKind()

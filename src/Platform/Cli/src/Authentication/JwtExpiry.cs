@@ -20,6 +20,7 @@ internal static class JwtExpiry
             using var payload = JsonDocument.Parse(DecodeBase64Url(parts[1]));
             return payload.RootElement.ValueKind == JsonValueKind.Object
                 && payload.RootElement.TryGetProperty("exp", out var exp)
+                && exp.ValueKind == JsonValueKind.Number
                 && exp.TryGetInt64(out var seconds)
                 ? DateTimeOffset.FromUnixTimeSeconds(seconds)
                 : null;
