@@ -33,17 +33,23 @@ public class AccountCommand : BaseCommand
     private readonly IAccessApiClient _accessApi;
     private readonly IAuthenticationService _authentication;
     private readonly AccessDefaultOptions _accessDefault;
+    private readonly IMachineSignIn _machine;
+    private readonly ICommandContext _context;
 
     public AccountCommand(
         IExtendedConsole console,
         IAccessApiClient accessApi,
         IAuthenticationService authentication,
-        IOptions<AccessDefaultOptions> accessDefaultOptions)
+        IOptions<AccessDefaultOptions> accessDefaultOptions,
+        IMachineSignIn machine,
+        ICommandContext context)
         : base(console)
     {
         _accessApi = accessApi;
         _authentication = authentication;
         _accessDefault = accessDefaultOptions.Value;
+        _machine = machine;
+        _context = context;
     }
 
     [Option("-b|--browser", CommandOptionType.NoValue, Description = "Open the sign-in page in the default browser.")]
@@ -51,6 +57,11 @@ public class AccountCommand : BaseCommand
 
     public override async Task<int> OnExecuteAsync()
     {
+        if (_machine.IsConfigured)
+        {
+            return await SignInMachineAsync();
+        }
+
         try
         {
             var user = await _authentication.GetSignedInUserAsync();
@@ -108,6 +119,79 @@ public class AccountCommand : BaseCommand
             " view.");
         Console.WriteLine("You can change it by command sform account set.".ThemedLowlight(Console.Theme));
         return ExitCodes.SUCCESS;
+    }
+
+    private static string DescribeKind(MachineSignInKind kind)
+    {
+        return kind switch
+        {
+            MachineSignInKind.ApiKey => "an API key",
+            MachineSignInKind.Certificate => "a certificate",
+            MachineSignInKind.CertificateAndApiKey => "a certificate and an API key",
+            MachineSignInKind.ClientCredentials => "client credentials",
+            _ => "a token file",
+        };
+    }
+
+    // Non-interactive: no device code, no prompt and no account call, which machines are not allowed.
+    private async Task<int> SignInMachineAsync()
+    {
+        MachineIdentity identity;
+
+        try
+        {
+            identity = await _machine.SignInAsync();
+        }
+        catch (AuthenticationException exception)
+        {
+            Console.WriteImportant(exception.Message);
+            return ToExitCode(exception);
+        }
+
+        Console.WriteHeader("Machine sign-in");
+        Console.WriteLine(
+            "Signed in as ",
+            (identity.MachineId is null ? "a machine" : $"machine {identity.MachineId}").ThemedHighlight(Console.Theme),
+            $" with {DescribeKind(identity.Kind)} ({string.Join(", ", identity.Variables)}).");
+
+        if (!_context.IsProjectKnown)
+        {
+            Console.WriteImportant($"No project is set: set {StorytellerVariables.PROJECT}=<organization>.<project> or pass -p to each command.");
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
+        }
+
+        try
+        {
+            // The checks every command runs: e.g. STORYTELLER_PROJECT names another project than the key.
+            _context.TrySetExplicitTarget(null, null);
+        }
+        catch (AuthenticationException exception)
+        {
+            Console.WriteImportant(exception.Message);
+            return ToExitCode(exception);
+        }
+
+        Console.WriteLine(
+            "Project ",
+            $"{_context.OrganizationName}.{_context.ProjectName}".ThemedHighlight(Console.Theme),
+            " with ",
+            _context.ViewName.ThemedHighlight(Console.Theme),
+            " view.");
+        Console.WriteLine("API ", (_machine.Settings.ApiUrl ?? string.Empty).ThemedHighlight(Console.Theme));
+        Console.WriteLine(identity.TokenExpiresAt is { } expiresAt
+            ? $"Token valid until {expiresAt:O}.".ThemedLowlight(Console.Theme)
+            : "The API checks the credentials on the first call.".ThemedLowlight(Console.Theme));
+        return ExitCodes.SUCCESS;
+    }
+
+    private static int ToExitCode(AuthenticationException exception)
+    {
+        return exception.Reason switch
+        {
+            AuthenticationFailureReason.Configuration => ExitCodes.ERROR_WRONG_INPUT,
+            AuthenticationFailureReason.ServiceError => ExitCodes.ERROR_SERVICE_FAILURE,
+            _ => ExitCodes.WARNING_UNAUTHORIZED_ACCESS,
+        };
     }
 
     private Task ShowSignInPromptAsync(DeviceCodePrompt prompt)

@@ -1,11 +1,14 @@
 using System;
+using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
+using _42.Platform.Cli.Configuration;
 using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.Options;
 
 namespace _42.Platform.Cli.Commands.MachineAccess;
 
@@ -15,18 +18,21 @@ public class MachineCreateCommand : BaseContextCommand
     private readonly IAccessApiClient _accessApi;
     private readonly IFileSystem _fileSystem;
     private readonly IAuthenticationConfigurationResolver _authenticationConfiguration;
+    private readonly GeneralOptions _general;
 
     public MachineCreateCommand(
         IExtendedConsole console,
         ICommandContext context,
         IAccessApiClient accessApi,
         IFileSystem fileSystem,
-        IAuthenticationConfigurationResolver authenticationConfiguration)
+        IAuthenticationConfigurationResolver authenticationConfiguration,
+        IOptions<GeneralOptions> generalOptions)
         : base(console, context)
     {
         _accessApi = accessApi;
         _fileSystem = fileSystem;
         _authenticationConfiguration = authenticationConfiguration;
+        _general = generalOptions.Value;
     }
 
     [Option("-a|--annotation", CommandOptionType.SingleValue, Description = "An annotation key where the access is restricted.")]
@@ -123,11 +129,15 @@ public class MachineCreateCommand : BaseContextCommand
         });
         Console.WriteLine();
 
+        string? certificatePath = null;
+        string? tokenUrl = null;
+
         if (!string.IsNullOrEmpty(machine.Certificate))
         {
             var pkcs12Bytes = Convert.FromBase64String(machine.Certificate);
             var filePath = OutputPath ?? $"{machine.Id}.pfx";
             _fileSystem.File.WriteAllBytes(filePath, pkcs12Bytes);
+            certificatePath = _fileSystem.Path.GetFullPath(filePath) ?? filePath;
 
             Console.WriteImportant($"Certificate written to {filePath}");
 
@@ -139,7 +149,7 @@ public class MachineCreateCommand : BaseContextCommand
         }
         else if (machine.CredentialKind == MachineAccessCredentialKind.ClientCredentials)
         {
-            await WriteClientCredentialsAsync(machine);
+            tokenUrl = await WriteClientCredentialsAsync(machine);
         }
         else
         {
@@ -151,17 +161,77 @@ public class MachineCreateCommand : BaseContextCommand
             Console.WriteLine("The machine has no certificate of its own: it presents a shared certificate of the project with its API key (sform account shared-cert).");
         }
 
+        WritePipelineVariables(machine, certificatePath, tokenUrl);
         return ExitCodes.SUCCESS;
     }
 
+    // The STORYTELLER_* variables of a non-interactive sform sign-in as this machine. Secrets point at the
+    // value printed above instead of being printed twice.
+    private void WritePipelineVariables(_42.Platform.Storyteller.Sdk.MachineAccess machine, string? certificatePath, string? tokenUrl)
+    {
+        var variables = new List<string> { $"{StorytellerVariables.API_URL}={_general.BaseUrl}" };
+        var kind = machine.CredentialKind;
+
+        if (kind == MachineAccessCredentialKind.ClientCredentials)
+        {
+            variables.Add($"{StorytellerVariables.PROJECT}={Context.OrganizationName}.{Context.ProjectName}");
+            variables.Add($"{StorytellerVariables.CLIENT_ID}={machine.Id}");
+            variables.Add($"{StorytellerVariables.CLIENT_SECRET}=<client secret above>");
+
+            if (tokenUrl is not null)
+            {
+                variables.Add($"{StorytellerVariables.TOKEN_URL}={tokenUrl}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(machine.TokenScope))
+            {
+                variables.Add($"{StorytellerVariables.TOKEN_SCOPE}={machine.TokenScope}");
+            }
+        }
+
+        if (kind is MachineAccessCredentialKind.ApiKey or MachineAccessCredentialKind.CertificateAndApiKey)
+        {
+            variables.Add($"{StorytellerVariables.API_KEY}=<access key above>");
+        }
+
+        if (kind is MachineAccessCredentialKind.Certificate or MachineAccessCredentialKind.CertificateAndApiKey)
+        {
+            if (machine.UsesSharedCertificate)
+            {
+                variables.Add($"{StorytellerVariables.CERTIFICATE_FILE}=<shared certificate .pfx>");
+                variables.Add($"{StorytellerVariables.CERTIFICATE_PASSWORD}=<its password>");
+            }
+            else
+            {
+                variables.Add($"{StorytellerVariables.CERTIFICATE_FILE}={certificatePath ?? "<certificate .pfx>"}");
+
+                if (!string.IsNullOrEmpty(machine.CertificatePassword))
+                {
+                    variables.Add($"{StorytellerVariables.CERTIFICATE_PASSWORD}=<certificate password above>");
+                }
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("To sign in sform in a pipeline, set:");
+
+        foreach (var variable in variables)
+        {
+            Console.WriteLine($"  {variable}");
+        }
+    }
+
     // An identity provider client (AuthKit M2M application, Entra ID app registration or Keycloak
-    // client): the machine exchanges its client ID and secret for a token.
-    private async Task WriteClientCredentialsAsync(_42.Platform.Storyteller.Sdk.MachineAccess machine)
+    // client): the machine exchanges its client ID and secret for a token. Returns the token URL
+    // when it is known.
+    private async Task<string?> WriteClientCredentialsAsync(_42.Platform.Storyteller.Sdk.MachineAccess machine)
     {
         // The server names the endpoint; older servers only had AuthKit, found through discovery.
-        var tokenUrl = string.IsNullOrWhiteSpace(machine.TokenEndpoint)
-            ? $"{await GetAuthKitDomainAsync() ?? "https://<your AuthKit domain>"}/oauth2/token"
+        var domain = string.IsNullOrWhiteSpace(machine.TokenEndpoint) ? await GetAuthKitDomainAsync() : null;
+        var knownTokenUrl = string.IsNullOrWhiteSpace(machine.TokenEndpoint)
+            ? domain is null ? null : $"{domain}/oauth2/token"
             : machine.TokenEndpoint;
+        var tokenUrl = knownTokenUrl ?? "https://<your AuthKit domain>/oauth2/token";
         var scopeArgument = string.IsNullOrWhiteSpace(machine.TokenScope) ? string.Empty : $" -d scope={machine.TokenScope}";
 
         Console.WriteLine("Client ID:     ", machine.Id.ThemedHighlight(Console.Theme));
@@ -178,6 +248,7 @@ public class MachineCreateCommand : BaseContextCommand
         Console.WriteLine($"  curl -s -X POST {tokenUrl} -d grant_type=client_credentials -d client_id={machine.Id} -d client_secret=$CLIENT_SECRET{scopeArgument}".ThemedLowlight(Console.Theme));
         Console.WriteLine();
         Console.WriteImportant("Make sure to copy the client secret, it is not stored anywhere.");
+        return knownTokenUrl;
     }
 
     private async Task<string?> GetAuthKitDomainAsync()
