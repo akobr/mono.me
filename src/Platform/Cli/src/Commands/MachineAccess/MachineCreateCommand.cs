@@ -56,6 +56,21 @@ public class MachineCreateCommand : BaseContextCommand
     [Option("-s|--shared-certificate", CommandOptionType.NoValue, Description = "A certificate-and-api-key machine without a certificate of its own: it signs in with a shared certificate of the project and its API key.")]
     public bool UseSharedCertificate { get; set; }
 
+    [Option("--issuer", CommandOptionType.SingleValue, Description = "Federated: the name of the trusted issuer of the machine's rule (sform account machine issuer). A rule implies -k federated.")]
+    public string? FederationIssuer { get; set; }
+
+    [Option("--audience", CommandOptionType.SingleValue, Description = "Federated: the aud the platform token must have: the project's token endpoint URL, <API base URL>/v1/<organization>/<project>/access/token. " + FederationRuleOptions.AzureAudienceHelp)]
+    public string? FederationAudience { get; set; }
+
+    [Option("--subject", CommandOptionType.SingleValue, Description = "Federated: the sub the platform token must have; a trailing :* or /* matches a prefix.")]
+    public string? FederationSubject { get; set; }
+
+    [Option("--claim", CommandOptionType.MultipleValue, Description = "Federated: a further claim the token must carry: key=value, the key a claim name or a JSON pointer (/kubernetes.io/namespace). Repeat it; values of one key are alternatives.")]
+    public string[]? FederationClaims { get; set; }
+
+    [Option("--rules-file", CommandOptionType.SingleValue, Description = "Federated: a JSON file with an array of rules ({ Issuer, Audience, Subject, Claims }) instead of --issuer, --audience and --subject.")]
+    public string? RulesFile { get; set; }
+
     protected override async Task<int> ExecuteAsync()
     {
         if (!string.IsNullOrWhiteSpace(AnnotationKey))
@@ -76,6 +91,32 @@ public class MachineCreateCommand : BaseContextCommand
             credentialKind = kind;
         }
 
+        var ruleOptions = new FederationRuleOptions(FederationIssuer, FederationAudience, FederationSubject, FederationClaims, RulesFile);
+        List<FederationRule>? federationRules = null;
+
+        // Rules make a federated machine, and a federated machine needs them.
+        if (ruleOptions.IsGiven || credentialKind == MachineAccessCreateCredentialKind.Federated)
+        {
+            if (credentialKind is not null and not MachineAccessCreateCredentialKind.Federated)
+            {
+                Console.WriteImportant($"Federation rules (--issuer, --audience, --subject, --claim, --rules-file) are only for federated machines, not {credentialKind}.");
+                return ExitCodes.ERROR_INPUT_PARSING;
+            }
+
+            if (!ruleOptions.TryRead(_fileSystem, out federationRules, out var error))
+            {
+                Console.WriteImportant(error);
+                return ExitCodes.ERROR_INPUT_PARSING;
+            }
+
+            credentialKind = MachineAccessCreateCredentialKind.Federated;
+
+            if (!UseSharedCertificate && (LifetimeDays is not null || OutputPath is not null))
+            {
+                Console.WriteLine("A federated machine gets no certificate, so --lifetime-days and --output are ignored.");
+            }
+        }
+
         if (UseSharedCertificate)
         {
             // A shared certificate is the certificate half of a CertificateAndApiKey login.
@@ -93,23 +134,34 @@ public class MachineCreateCommand : BaseContextCommand
             }
         }
 
-        var machine = await _accessApi.CreateMachineAccessAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            new MachineAccessCreate
-            {
-                Organization = Context.OrganizationName,
-                Project = Context.ProjectName,
-                AnnotationKey = AnnotationKey,
-                Scope = IsScopeReadWrite
-                    ? MachineAccessCreateScope.DefaultReadWrite
-                    : MachineAccessCreateScope.DefaultRead,
+        _42.Platform.Storyteller.Sdk.MachineAccess machine;
 
-                // Null: the project's default kind and lifetime.
-                CredentialKind = credentialKind,
-                CertificateLifetimeDays = UseSharedCertificate ? null : LifetimeDays,
-                UseSharedCertificate = UseSharedCertificate ? true : null,
-            });
+        try
+        {
+            machine = await _accessApi.CreateMachineAccessAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                new MachineAccessCreate
+                {
+                    Organization = Context.OrganizationName,
+                    Project = Context.ProjectName,
+                    AnnotationKey = AnnotationKey,
+                    Scope = IsScopeReadWrite
+                        ? MachineAccessCreateScope.DefaultReadWrite
+                        : MachineAccessCreateScope.DefaultRead,
+
+                    // Null: the project's default kind and lifetime.
+                    CredentialKind = credentialKind,
+                    CertificateLifetimeDays = UseSharedCertificate || federationRules is not null ? null : LifetimeDays,
+                    UseSharedCertificate = UseSharedCertificate ? true : null,
+                    FederationRules = federationRules,
+                });
+        }
+        catch (ApiException exception)
+        {
+            // for example a kind the project does not enable, or a federation rule the server refuses
+            return Console.WriteApiError(exception);
+        }
 
         Console.WriteJson(new
         {
@@ -151,6 +203,10 @@ public class MachineCreateCommand : BaseContextCommand
         {
             tokenUrl = await WriteClientCredentialsAsync(machine);
         }
+        else if (machine.CredentialKind == MachineAccessCredentialKind.Federated)
+        {
+            WriteFederated(machine);
+        }
         else
         {
             Console.WriteImportant("Make sure to copy the access key (secret), it is not stored anywhere.");
@@ -161,7 +217,12 @@ public class MachineCreateCommand : BaseContextCommand
             Console.WriteLine("The machine has no certificate of its own: it presents a shared certificate of the project with its API key (sform account shared-cert).");
         }
 
-        WritePipelineVariables(machine, certificatePath, tokenUrl);
+        // sform does not sign in as a federated machine yet: it has no variables to print.
+        if (machine.CredentialKind != MachineAccessCredentialKind.Federated)
+        {
+            WritePipelineVariables(machine, certificatePath, tokenUrl);
+        }
+
         return ExitCodes.SUCCESS;
     }
 
@@ -219,6 +280,18 @@ public class MachineCreateCommand : BaseContextCommand
         {
             Console.WriteLine($"  {variable}");
         }
+    }
+
+    // No secret: the workload exchanges a token of its own platform for a Storyteller token.
+    private void WriteFederated(_42.Platform.Storyteller.Sdk.MachineAccess machine)
+    {
+        var tokenEndpoint = FederationConsoleExtensions.GetTokenEndpoint(machine, Context.OrganizationName, Context.ProjectName);
+
+        Console.WriteFederatedMachine(machine, tokenEndpoint);
+        Console.WriteLine();
+        Console.WriteTokenExchange(tokenEndpoint, machine.Id);
+        Console.WriteLine();
+        Console.WriteImportant("The machine has no secret: its workload signs in with a token of its platform that matches a rule.");
     }
 
     // An identity provider client (AuthKit M2M application, Entra ID app registration or Keycloak

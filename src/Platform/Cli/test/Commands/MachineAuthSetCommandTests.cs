@@ -48,6 +48,27 @@ public class MachineAuthSetCommandTests
         _sent!.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.CertificateAndApiKey]);
     }
 
+    [Theory]
+    [InlineData("federated")]
+    [InlineData("Federated")]
+    [InlineData("FEDERATED")]
+    public async Task FederatedSpellings_EnableTheFederatedKind(string value)
+    {
+        var exitCode = await Execute(["api-key", value], defaultKind: "api-key");
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _sent!.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.ApiKey, MachineCredentialKind.Federated]);
+        _sent.CredentialKind.ShouldBe(MachineAuthenticationPolicyCredentialKind.ApiKey);
+    }
+
+    [Fact]
+    public async Task UnknownKind_NamesEveryKindInTheMessage()
+    {
+        await Execute(["oauth"]);
+
+        _console.Lines.ShouldContain("! Unknown credential kind 'oauth'. Use ApiKey, Certificate, CertificateAndApiKey, ClientCredentials, or Federated.");
+    }
+
     [Fact]
     public async Task SeveralKinds_AreEnabledAndTheFirstIsTheDefault()
     {

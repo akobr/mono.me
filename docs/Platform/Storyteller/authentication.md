@@ -495,6 +495,19 @@ POST v1/acme/billing/access/machines
                          "Claims": { "repository_id": [ "74" ] } } ] }
 ```
 
+The same with `sform` (the machine commands live under `sform account machine`, alias `agent`; `-p <organization>.<project>` picks another project):
+
+```
+sform account machine machine-auth -k api-key -k federated -d api-key
+sform account machine issuer set github --issuer https://token.actions.githubusercontent.com --require-claim repository_owner_id=65 --description "GitHub Actions of the acme organization"
+sform account machine create --issuer github --audience https://api.example.com/api/v1/acme/billing/access/token --subject repo:acme/billing:environment:production --claim repository_id=74
+```
+
+* `machine create` with `--issuer` (a trusted issuer's name), `--audience`, `--subject` and any `--claim key=value` creates a `Federated` machine with one rule; the rule options imply `-k federated`. `--audience` is the machine's `TokenEndpoint`, except for Azure, where it is the `aud` of the Storyteller app registration's tokens: `<appId>` with `requestedAccessTokenVersion` 2, `api://<appId>` with 1 (see [Azure managed identity](#azure-managed-identity)). `--rules-file <path>` takes a JSON array of rules instead, the body of the [rules `PUT`](#federation-rules); its strings are sent as written. A repeated `--claim` key adds an accepted value, and the key may be a JSON pointer (`--claim /kubernetes.io/namespace=billing`). `-k federated` without rules, rule options with another kind, both a file and rule options, an incomplete rule, or a rules file with a property other than `Issuer`, `Audience`, `Subject` and `Claims` (a misspelled `Claim`) or with a value that is not a JSON string (`[ true ]` as a claim value) fail before any request; the server validates the rules themselves and its `400` message is printed. The output shows the machine id (the `client_id` of an exchange), its `TokenEndpoint`, the rules and a `curl` exchange, and no secret.
+* `machine rules <id>` shows the machine's rules. With the same rule options or `--rules-file` it replaces them.
+* `machine issuer` (or `machine issuer list`, alias `issuers`) lists the trusted issuers. `machine issuer set <name> --issuer <iss>` creates or replaces one and, like the issuer `PUT`, clears what it does not set. Its keys come from discovery, from `--jwks-uri <url>` (`JwksUri`), or from `--jwks-file <path>`, whose content is stored as `Jwks` (for example the output of `kubectl get --raw /openid/v1/jwks`). `--max-lifetime <seconds>`, a repeatable `--require-claim key=value` and `--description <text>` set the rest. `machine issuer delete <name>` deletes one.
+* `machine reset <id>` of a `Federated` machine prints the server's `400` message. `machine list` shows `–` instead of a secret for federated machines, and for certificate machines, which have none either.
+
 | Method and route | Role | Body and response |
 |---|---|---|
 | `GET v1/{organization}/{project}/access/issuers` | `Contributor` | `FederatedIssuer[]` |
@@ -975,7 +988,7 @@ az functionapp cors add --name <function-app> --resource-group <group> --allowed
 
 * User tokens issued by the AuthKit domain (Swagger UI sign-in) are not accepted alongside device-flow tokens. M2M tokens from the AuthKit domain are. See [OpenAPI and Swagger UI](#openapi-and-swagger-ui).
 * A combination of an mTLS certificate and client credentials (`CertificateAndClientCredentials`) is not available.
-* `sform` and the admin UI do not manage trusted issuers, federation rules or `Federated` machines yet; use the API or the SDKs, whose generated clients have every federation operation. The TypeScript SDK also exchanges and caches the Storyteller token (`createFederatedTokenProvider`); the C# SDK has no such helper. Signing in to `sform` as a federated machine is not available either.
+* The C# SDK has no helper that exchanges and caches the Storyteller token (the TypeScript SDK has `createFederatedTokenProvider`), and signing in to `sform` as a federated machine is not available yet. Trusted issuers, federation rules and `Federated` machines are managed in the admin UI, with `sform` (see [Machine access with workload identity federation](#machine-access-with-workload-identity-federation)), the API or the SDKs.
 * The Storyteller signing key cannot be rotated except by the [emergency procedure](#security-notes), and it cannot live in Key Vault. Storyteller publishes no JWKS or RFC 8414 metadata for its tokens.
 * The token endpoint has no replay protection and no rate limit. Rules know only exact values and a separator-anchored subject prefix; there are no glob, regex or CEL conditions.
 * 401 responses carry no `WWW-Authenticate` header.
