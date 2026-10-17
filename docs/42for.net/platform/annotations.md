@@ -158,6 +158,17 @@ Every change is recorded with the account or machine that made it: creates, upda
 
 Writing a key that is deleted creates it again with an empty configuration. `sform story set` asks first and can restore the old record instead, so its configuration and history come back.
 
+## Export and import
+
+The annotations of a view travel in its [export](configuration#export-and-import), next to its schemas, templates and configurations. Each annotation is a file named by its key, such as `exe.northwind.invoicing.production.json`. The file holds what you can edit: title, description, documentation link, labels, values, the disabled flag, the validity window and the time zone. The key gives the type and the parents, so they are not in the file. The audit and the deleted annotations stay with the platform.
+
+```text
+sform story export --include annotations     # only the catalog
+sform story import catalog.zip --dry-run     # what an import would change, without writing
+```
+
+An import creates the missing annotations, ancestors before their descendants, and updates the ones that differ. With `--existing skip`, it keeps the ones the view has. A deleted annotation in the archive is created again, as any write of a deleted key does: its old configuration does not come back, only the one the archive holds. With `skip`, it stays deleted. Every write is recorded with the account or machine that ran the import. In the Administration UI, the **Export & Import** page of the view does the same.
+
 ## Why this stays small
 
 The model refuses a new entity type for every new business idea. A legal entity, a datacenter, a trim level, and a software version are all contexts. An add-on, a microservice, and a physical subsystem are all responsibilities. The platform stays fast at a large number of these records, including a subject per end customer, because the key shape does not change as the catalog grows.
