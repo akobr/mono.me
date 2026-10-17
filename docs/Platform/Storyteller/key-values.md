@@ -101,7 +101,7 @@ A secret value is delivered by a reveal, a secret version or diff, an export wit
 | --- | --- |
 | User | The role is `ContributorWithSecrets` or higher on the project, or the token has the scope `Configuration.Secrets`. HTTPS with the bearer token |
 | Machine with an mTLS certificate (`PresentingCertificateThumbprint`) | The scope `Configuration.Secrets` |
-| Machine with an API key or a bearer token only | The scope, and the project policy has `RequireMtlsForSecretDelivery = false` |
+| Machine with an API key or a bearer token only: client credentials, or the Storyteller token of a [federated machine](authentication.md#machine-access-with-workload-identity-federation), which never presents a certificate | The scope, and the project policy has `RequireMtlsForSecretDelivery = false` |
 
 Machines get the scope through the machine access scopes `SecretsRead` (`Configuration.Read` and `Configuration.Secrets`) and `SecretsReadWrite` (plus `Configuration.ReadWrite`); see [authentication.md](authentication.md#the-machineaccess-object). A withheld resolved configuration leaves the secrets unbound and carries the header `X-2S-Secrets-Withheld: mtls-required`. Explicit requests (a reveal, a secret version or diff, an export with secrets, a write of a secret) answer `403 MtlsRequired`. Responses with a secret value are `Cache-Control: no-store`. The result is also the request's ambient caller (`KeyValueCallerContext`), which the audit trail and the usage meters use for binding reads.
 

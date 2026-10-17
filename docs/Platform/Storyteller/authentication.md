@@ -2,7 +2,7 @@
 
 Storyteller accepts user bearer tokens from one identity provider per deployment: **Microsoft Entra ID** or **WorkOS AuthKit**. The provider only proves who the caller is and which coarse scopes they hold. Access to organizations and projects is still decided by Storyteller's own account roles in Cosmos.
 
-Machine credentials (structured `2s.` API keys and mTLS certificates) do not depend on the user provider. They work the same under either one. Which kinds a project's machines may use is set by its [machine authentication policy](#machine-authentication-policy).
+Machine credentials (structured `2s.` API keys, mTLS certificates and [workload identity federation](#machine-access-with-workload-identity-federation)) do not depend on the user provider. They work the same under either one. A federated machine has no secret: it exchanges a token of its own platform (GitHub Actions, Kubernetes, Vercel, Azure managed identity, AWS, Google Cloud) for a short-lived Storyteller token. Which kinds a project's machines may use is set by its [machine authentication policy](#machine-authentication-policy).
 
 ## Selecting the provider
 
@@ -64,7 +64,7 @@ Example `local.settings.json` values:
 
 An invalid token gets **401**. If the JWKS cannot be fetched, the response is **503** with `Retry-After: 5`, so clients keep their token and retry.
 
-Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization.
+Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens) of federated machines are the exception: their signature, issuer, audience and lifetime are always checked. The scope and project checks (`CheckScope`, `CheckAccessToAsync`), including the per-call checks of federated machines, are skipped in Debug builds as for every caller.
 
 ## Claims seen by the API
 
@@ -281,6 +281,7 @@ A project enables one or more **machine credential kinds**, and each machine use
 | `Certificate` | Its client certificate. |
 | `CertificateAndApiKey` | A certificate (its own, or a shared certificate of the project) and its API key. |
 | `ClientCredentials` | `Authorization: Bearer` with a token of the identity provider, see [Machine access with client credentials](#machine-access-with-client-credentials). |
+| `Federated` | `Authorization: Bearer` with a short-lived Storyteller token, exchanged for a token of its own platform. It has no secret. See [Machine access with workload identity federation](#machine-access-with-workload-identity-federation). |
 
 `sform` signs in as a machine of any of these kinds from environment variables, see [Machine sign-in for pipelines](#machine-sign-in-for-pipelines).
 
@@ -298,7 +299,7 @@ The policy (`MachineAuthenticationPolicy`) is stored on the project's access poi
 | `CredentialKind` | The default kind: preselected for a new machine, and used when a create request names none. One of the enabled kinds. |
 | `CertificateLifetimeDays` | The default certificate lifetime of new machines, in days. When it is not set, `MachineAuth:CertificateLifetimeDays` (365) applies. |
 
-Without a stored policy a project enables only `MachineAuth:DefaultCredentialKind` (`ApiKey`). A policy stored before projects could enable several kinds has only `CredentialKind`; it enables that one kind.
+Without a stored policy a project enables only `MachineAuth:DefaultCredentialKind` (`ApiKey`). A policy stored before projects could enable several kinds has only `CredentialKind`; it enables that one kind. `Federated` machines also need a deployment that registers [federation](#configuration) and the project's [trusted issuers](#trusted-issuers). The issuers are kept apart from the policy, so a policy `PUT` never touches them.
 
 `GET v1/access/points/{organization}.{project}/machine-authentication` returns the policy with every property filled, so a client does not have to know the deployment defaults. It needs `Contributor`, because Contributors create machines. `PUT` on the same route sets it, needs `Administrator`, and returns the filled policy too. The body may leave out `CredentialKind` (the first listed kind becomes the default) and `CertificateLifetimeDays` (the project then follows the deployment default). A body with only `CredentialKind` enables that one kind, as older clients send it. `PUT` returns `400` when:
 
@@ -321,9 +322,9 @@ sform machine create -k api-key            # without -k: the project default
 sform machine create -s                    # CertificateAndApiKey with a shared certificate, no certificate of its own
 ```
 
-**Creating a machine.** `MachineAccessCreate.CredentialKind` picks the kind; without it the project default is used. A kind the project does not enable fails with `400`. `MachineAccessCreate.UseSharedCertificate` creates a `CertificateAndApiKey` machine with no certificate of its own: it gets only its API key, `UsesSharedCertificate` is set, and it signs in with one of the project's shared certificates and that key. Any other kind with `UseSharedCertificate` fails with `400`. A machine with a certificate of its own gets `MachineAccessCreate.CertificateLifetimeDays`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. The machine keeps its kind and its lifetime: reset and delete follow the kind, and a certificate renewal issues the new certificate with the same lifetime. Machines created before the lifetime was stored renew with `MachineAuth:CertificateLifetimeDays`.
+**Creating a machine.** `MachineAccessCreate.CredentialKind` picks the kind; without it the project default is used. A kind the project does not enable fails with `400`. `MachineAccessCreate.UseSharedCertificate` creates a `CertificateAndApiKey` machine with no certificate of its own: it gets only its API key, `UsesSharedCertificate` is set, and it signs in with one of the project's shared certificates and that key. Any other kind with `UseSharedCertificate` fails with `400`. `MachineAccessCreate.FederationRules` is required for a `Federated` machine and fails with `400` on any other kind (see [Federation rules](#federation-rules)). A machine with a certificate of its own gets `MachineAccessCreate.CertificateLifetimeDays`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. The machine keeps its kind and its lifetime: reset and delete follow the kind, and a certificate renewal issues the new certificate with the same lifetime. Machines created before the lifetime was stored renew with `MachineAuth:CertificateLifetimeDays`.
 
-**Every machine call** is accepted only when the machine presents what its own kind requires, and the project still enables that kind. A `CertificateAndApiKey` machine that sends only its API key is rejected, even if the project also enables `ApiKey`. Likewise one that sends only its certificate is rejected, even if the project also enables `Certificate`: a machine certificate carries its machine's kind (`mcert.` documents stored before the kind was kept take it from the machine access document), and a machine certificate whose kind is unknown is refused. Disabling a kind stops every machine of that kind at once (up to the 60-second cache of the policy); enable it again and they work again. To move a machine to another kind, create a new machine and delete the old one.
+**Every machine call** is accepted only when the machine presents what its own kind requires, and the project still enables that kind. A `CertificateAndApiKey` machine that sends only its API key is rejected, even if the project also enables `ApiKey`. Likewise one that sends only its certificate is rejected, even if the project also enables `Certificate`: a machine certificate carries its machine's kind (`mcert.` documents stored before the kind was kept take it from the machine access document), and a machine certificate whose kind is unknown is refused. A `Federated` machine sends a Storyteller token, and each call reads the machine to compare its stored kind and scope with the token (see [Storyteller tokens](#storyteller-tokens)). Disabling a kind stops every machine of that kind at once (up to the 60-second cache of the policy); enable it again and they work again. To move a machine to another kind, create a new machine and delete the old one.
 
 ## Machine access with client credentials
 
@@ -353,18 +354,18 @@ A token that fails any of these gets 401. API keys and certificates are accepted
 
 ### The `MachineAccess` object
 
-Create, get, list and reset return a `MachineAccess`. Property names are PascalCase. `Scope` and `CredentialKind` are the enum names as strings. A null property is left out of the JSON.
+Create, get, list, reset and the federation rules `PUT` return a `MachineAccess`. Property names are PascalCase. `Scope` and `CredentialKind` are the enum names as strings. A null property is left out of the JSON.
 
-Create returns the secret once. Get and list read the stored record: the secret is masked, and the one-time fields are absent. Reset returns that stored record with the new secret in `AccessKey`.
+Create returns the secret once. Get and list read the stored record: the secret is masked, and the one-time fields are absent. Reset returns that stored record with the new secret in `AccessKey`. A `Federated` machine has no secret and cannot be reset (`400`); its `FederationRules` and `TokenEndpoint` come with create, get, list and the rules `PUT`.
 
 | Property | Type | Description |
 |---|---|---|
-| `Id` | string | Machine id, and the `sub` / `azp` the API expects from that machine. An API key or a certificate uses a GUID. Client credentials use the identity provider's client id: the WorkOS application client id, the Entra appId, or the Keycloak client id `42.sform.{organization}.{project}.{guid}`. |
-| `ObjectId` | string | Id used to reset and delete the credential at its source. Same value as `Id` for an API key or a certificate. AuthKit uses the WorkOS application id, Entra ID the application object id, and Keycloak the client's internal id. |
-| `AccessKey` | string | Secret. Create and reset return it in full: the structured `2s.` API key, or the client secret for client credentials. A certificate-only machine returns an empty string. Stored copies keep the first three characters and then `***`, or `***` when the value is shorter. |
+| `Id` | string | Machine id, and the `sub` / `azp` the API expects from that machine. An API key, a certificate or a federated machine uses a GUID; a federated machine sends it as `client_id` to the token endpoint. Client credentials use the identity provider's client id: the WorkOS application client id, the Entra appId, or the Keycloak client id `42.sform.{organization}.{project}.{guid}`. |
+| `ObjectId` | string | Id used to reset and delete the credential at its source. Same value as `Id` for an API key, a certificate or a federated machine. AuthKit uses the WorkOS application id, Entra ID the application object id, and Keycloak the client's internal id. |
+| `AccessKey` | string | Secret. Create and reset return it in full: the structured `2s.` API key, or the client secret for client credentials. A certificate-only or federated machine returns an empty string. Stored copies keep the first three characters and then `***`, or `***` when the value is shorter. |
 | `Scope` | `MachineAccessScope` | What the machine may call. `AnnotationRead` grants `Annotation.Read`. `AnnotationReadWrite` grants `Annotation.Read` and `Annotation.ReadWrite`. `ConfigurationRead` grants `Configuration.Read`. `ConfigurationReadWrite` grants `Configuration.Read` and `Configuration.ReadWrite`. `DefaultRead` grants `Default.Read`, `Annotation.Read` and `Configuration.Read`. `DefaultReadWrite` grants those three plus `Default.ReadWrite`, `Annotation.ReadWrite` and `Configuration.ReadWrite`. `SecretsRead` grants `Configuration.Read` and `Configuration.Secrets`, `SecretsReadWrite` adds `Configuration.ReadWrite`; such a machine receives [key/value secrets](key-values.md#secret-delivery) under the project's mTLS rule. Entra ID stores `DefaultReadWrite` for any `…ReadWrite` request and `DefaultRead` otherwise, and keeps the two secrets scopes as they are. |
 | `AnnotationKey` | string | Optional [annotation restriction](#annotation-restriction-of-machines): the machine reaches this annotation and its descendants only. Create stores it in canonical form (type code in lower case, empty segments dropped), turns a blank value into null, and answers `400` `InvalidKey` for a key that does not parse. Null means the whole project. |
-| `CredentialKind` | `MachineCredentialKind` | `ApiKey`, `Certificate`, `CertificateAndApiKey` or `ClientCredentials`. Chosen at creation from the kinds the project enables (the project default when the request names none) and kept when the policy later changes. |
+| `CredentialKind` | `MachineCredentialKind` | `ApiKey`, `Certificate`, `CertificateAndApiKey`, `ClientCredentials` or `Federated`. Chosen at creation from the kinds the project enables (the project default when the request names none) and kept when the policy later changes. |
 | `CertificateThumbprint` | string | Thumbprint of the machine's current certificate. Present for `Certificate` and `CertificateAndApiKey`, except a machine that uses a shared certificate, and updated when the certificate is renewed. |
 | `Certificate` | string | Base64 PKCS#12 of a newly issued machine certificate. Returned on create. Cosmos keeps no copy, so get, list and reset omit it. |
 | `CertificatePassword` | string | Password for that PKCS#12. Returned on create. Cosmos keeps no copy, so get, list and reset omit it. |
@@ -372,8 +373,9 @@ Create returns the secret once. Get and list read the stored record: the secret 
 | `CertificateLifetimeDays` | integer | Lifetime of the machine's certificates in days, chosen at creation. Renewals keep it. Present for `Certificate` and `CertificateAndApiKey` machines created since it is stored. |
 | `CertificateNotAfter` | date-time | When the current certificate expires. Present for machines created since it is stored, and updated by renewal. |
 | `UsesSharedCertificate` | boolean | `true` for a `CertificateAndApiKey` machine created with `UseSharedCertificate`: it has no certificate, thumbprint, lifetime or expiry of its own, and presents a shared certificate of the project with its API key. Reset renews the API key; there is nothing to renew for the certificate. |
-| `TokenEndpoint` | string | Token URL for client credentials, returned on create. AuthKit uses `{AuthKitDomain}/oauth2/token`. Entra ID uses `https://login.microsoftonline.com/{MachineAuth:AzureAd:TenantId}/oauth2/v2.0/token`. Keycloak uses `{ServerUrl}/realms/{Realm}/protocol/openid-connect/token`. Cosmos keeps no copy, so get, list and reset omit it. |
-| `TokenScope` | string | `scope` form field for the token request. Entra ID sets `api://{Auth:ClientId}/.default` on create. AuthKit and Keycloak leave it empty; their tokens carry the machine's scopes without this parameter. Cosmos keeps no copy, so get, list and reset omit it. |
+| `TokenEndpoint` | string | Token URL. For client credentials it is returned on create: AuthKit uses `{AuthKitDomain}/oauth2/token`, Entra ID `https://login.microsoftonline.com/{MachineAuth:AzureAd:TenantId}/oauth2/v2.0/token`, Keycloak `{ServerUrl}/realms/{Realm}/protocol/openid-connect/token`; Cosmos keeps no copy, so get, list and reset omit it. For `Federated` it is the project's [token endpoint](#the-token-endpoint), `{MachineAuth:Federation:PublicBaseUrl}/v1/{organization}/{project}/access/token` (without `PublicBaseUrl`, the scheme and host of the request plus `/api`), built on create, get, list and the rules `PUT`. |
+| `TokenScope` | string | `scope` form field for the token request. Entra ID sets `api://{Auth:ClientId}/.default` on create. AuthKit and Keycloak leave it empty; their tokens carry the machine's scopes without this parameter. Cosmos keeps no copy, so get, list and reset omit it. Always empty for `Federated`. |
+| `FederationRules` | `FederationRule[]` | `Federated` only: the rules a platform token must match, see [Federation rules](#federation-rules). Stored with the machine. |
 
 ### AuthKit M2M applications
 
@@ -449,13 +451,433 @@ The ancestors of K, and the other parents of its descendants (the unit `unt.invo
 
 The restriction is read from the machine's document in the same point read that checks its membership, so it holds for every credential kind and costs nothing extra. Tokens and certificates carry no annotation claim. A stored key that does not parse (machines created before the key was validated) restricts the machine to nothing. A restricted machine that has a configuration write scope can still bind any key/value of the view into the configuration of K; give machines that only read a read scope (`ConfigurationRead` or `SecretsRead`).
 
+## Machine access with workload identity federation
+
+A `Federated` machine has no secret. A workload that already holds a token of its platform (a GitHub Actions or Vercel OIDC token, a Kubernetes service account token, an Azure managed identity token, an AWS or Google Cloud identity token) exchanges it at the project's **token endpoint** ([RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)) for a short-lived **Storyteller token**, and calls the API with `Authorization: Bearer <storyteller token>` until it expires.
+
+```
+workload ──(1) platform token (GitHub, K8s, Vercel, Entra, AWS, Google)──▶ POST v1/{organization}/{project}/access/token
+                                                                              │ client_id = machine id
+                                                                              │ verify with the trusted issuer's keys
+                                                                              │ match one of the machine's federation rules
+workload ◀─(2) Storyteller token (at+jwt, 15 min, machine scopes)────────────┘
+workload ──(3) Authorization: Bearer <storyteller token>──▶ any machine-accessible API
+```
+
+Trust is split in two:
+
+* **Trusted issuers** belong to the project and are managed by its Administrators. Each names an OIDC issuer, where its keys come from, and claims every token of that issuer must carry (for example the id of the company's GitHub organization).
+* **Federation rules** belong to the machine and are managed by Contributors, like the machine itself. A rule picks a trusted issuer and pins the token's `aud`, `sub` and further claims.
+
+The platform token never reaches the regular API. Discovery, key retrieval and rule matching run once per exchange, not on every call. The request names its project and machine, so an issuer the project does not trust never causes a fetch. Azure managed identity tokens are Entra tokens; sent to the API directly, the Entra validator would take them for `ClientCredentials` machines, so they go through the exchange like every other platform token. Every call with a Storyteller token still reads the machine, so deleting the machine cuts it off at once.
+
+Setting up a federated machine:
+
+1. An Administrator enables `Federated` in the [machine authentication policy](#machine-authentication-policy), next to other kinds if needed.
+2. An Administrator adds a [trusted issuer](#trusted-issuers).
+3. A Contributor creates the machine with `CredentialKind` `Federated` and its [federation rules](#federation-rules). The response carries the machine id and the `TokenEndpoint`, and no secret.
+4. The workload gets a platform token with the rule's audience, [exchanges it](#the-token-endpoint) with `client_id` = the machine id, and calls the API with the Storyteller token. [Setting up a platform](#setting-up-a-platform) shows each platform.
+
+```json
+PUT v1/access/points/acme.billing/machine-authentication
+{ "EnabledCredentialKinds": [ "ApiKey", "Federated" ], "CredentialKind": "ApiKey" }
+
+PUT v1/acme/billing/access/issuers/github
+{ "Issuer": "https://token.actions.githubusercontent.com",
+  "RequiredClaims": { "repository_owner_id": [ "65" ] },
+  "Description": "GitHub Actions of the acme organization" }
+
+POST v1/acme/billing/access/machines
+{ "Organization": "acme", "Project": "billing", "Scope": "AnnotationRead", "CredentialKind": "Federated",
+  "FederationRules": [ { "Issuer": "github",
+                         "Audience": "https://api.example.com/api/v1/acme/billing/access/token",
+                         "Subject": "repo:acme/billing:environment:production",
+                         "Claims": { "repository_id": [ "74" ] } } ] }
+```
+
+| Method and route | Role | Body and response |
+|---|---|---|
+| `GET v1/{organization}/{project}/access/issuers` | `Contributor` | `FederatedIssuer[]` |
+| `GET v1/{organization}/{project}/access/issuers/{name}` | `Contributor` | `FederatedIssuer`; `404` |
+| `PUT v1/{organization}/{project}/access/issuers/{name}` | `Administrator` | `FederatedIssuer` (the route name wins over `Name`) → `200 FederatedIssuer`; `400`, `409` |
+| `DELETE v1/{organization}/{project}/access/issuers/{name}` | `Administrator` | `200`; `404` |
+| `PUT v1/{organization}/{project}/access/machines/{id}/federation-rules` | `Contributor` | `FederationRule[]` → `200 MachineAccess`; `400`, `404`, `409` (the machine changed concurrently twice) |
+| `POST v1/{organization}/{project}/access/token` | anonymous | [The token endpoint](#the-token-endpoint) |
+
+The management routes need `User.Impersonation` and the role on `{organization}.{project}`, like the machine routes; machine credentials get 401 or 403 there. Contributors read issuers to write rules, but only Administrators decide which issuers the project trusts.
+
+Both `PUT`s take a JSON body. An empty body or `null` is validated as an issuer without `Issuer` (`"The issuer is required."`) or as no rules (`"A Federated machine needs at least one federation rule."`), and a body that is not an issuer or a list of rules answers `400` `InvalidFederation` as well.
+
+`GET` and `DELETE` of a trusted issuer that does not exist answer `404` with no body, like `GET` and `DELETE` of a machine.
+
+### Trusted issuers
+
+| Property | Type | Description |
+|---|---|---|
+| `Name` | string | Project-unique name: 1 to 63 lower-case letters, digits or hyphens, starting and ending with a letter or a digit. The route segment, and what rules reference. |
+| `Issuer` | string | The exact `iss` of the platform's tokens, 1 to 512 characters, compared ordinally: case and a trailing `/` matter. Cannot change once created. |
+| `KeySource` | `FederatedIssuerKeySource` | Where the public keys come from. `Discovery` (default): `{Issuer}/.well-known/openid-configuration`, then its `jwks_uri`. `JwksUri`: the key set at `JwksUri`, for an issuer whose keys are public but whose discovery document is not (a Kubernetes cluster with `--service-account-jwks-uri`). `Jwks`: the stored `Jwks`; nothing is fetched (self-managed Kubernetes). |
+| `JwksUri` | string | Required for `JwksUri`, refused otherwise. |
+| `Jwks` | string | Required for `Jwks`, refused otherwise. The JSON Web Key Set as JSON text, at most 16 KiB, with 1 to 10 public RSA or EC keys, each with its own `kid`. Private members (`d`, `p`, `q`, `dp`, `dq`, `qi`, `k`) are refused. |
+| `MaxTokenLifetimeSeconds` | integer | The longest accepted `exp - iat` of a platform token, 60 to 86,400. Null: 3,600. |
+| `RequiredClaims` | object | Claim pins ANDed into every rule of this issuer, with the shape and matching of a rule's `Claims`. The Administrator's bound on what Contributors' rules can admit, for example `repository_owner_id` of the company's GitHub organization. |
+| `Description` | string | At most 256 characters. |
+
+* A project has at most 20 trusted issuers.
+* With `Discovery`, `Issuer` is an absolute `https` URL without query or fragment. With `JwksUri` or `Jwks` it is any string, because it is never fetched.
+* Every URL Storyteller fetches (a discovered `Issuer`, a `JwksUri`, and the `jwks_uri` of a discovery document) uses `https` on port 443, a DNS host (no IP literal in any notation, such as `https://2130706433/` or `https://0x7f.1/`) written in ASCII (punycode for international names), and no user info. `MachineAuth:Federation:AllowPrivateNetworks` lifts `https`, the port and the DNS host; user info, non-ASCII hosts and fragments stay refused.
+* A discovery document must name exactly `Issuer` as its `issuer`, and its `jwks_uri` must pass the URL rules. Otherwise the issuer is misconfigured: it is logged at `Warning`, its tokens are refused like a rule mismatch, and its discovery is tried again after a minute.
+* `PUT` on an existing name may change everything but `Issuer` (`400`, `"The issuer of a trusted issuer cannot change; create a new one."`), because its rules were written for that issuer.
+* Creating a name that rules of machines still reference (left behind by a delete) answers `409`, naming up to 10 of those machines, so a re-created name never silently revives rules written for another issuer.
+* Deleting a trusted issuer is allowed while rules reference it: it is the kill switch. Those rules stop matching within the 60-second cache of the issuer list.
+* Keys are cached per issuer and its settings, so an edited issuer starts with fresh keys. They are fetched again after `MetadataRefreshMinutes` (60). A token naming an unknown `kid` makes Storyteller fetch again at once when the keys are older than a minute; within that minute, or when the `kid` is still unknown right after the fetch, the exchange answers 503, because the issuer may still be publishing a rotated key. With `Jwks` there is nothing to fetch, and an unknown `kid` is refused. A token without a `kid` is refused with every key source, without a fetch. Concurrent requests share one fetch, and a failed fetch answers the next requests with 503 for 5 seconds.
+
+Storyteller keeps the issuers in the organization container, partition `{project}.federation`, one document per issuer with the name as id. The list is cached for 60 seconds per instance and dropped on a write by the same instance.
+
+### Federation rules
+
+| Property | Type | Description |
+|---|---|---|
+| `Issuer` | string | `Name` of a trusted issuer of the project. |
+| `Audience` | string | Required, 1 to 512 characters. The token's `aud` must be this string, or a one-element array holding it. Use the machine's `TokenEndpoint` URL, except for Azure (see [Azure managed identity](#azure-managed-identity)). |
+| `Subject` | string | Required, 1 to 512 characters. The token's `sub` exactly, or as a prefix when the value ends with `:*` or `/*`. |
+| `Claims` | object | Optional further pins. Key: a top-level claim name (`repository`, `environment`, `repository_owner_id`) or an [RFC 6901](https://www.rfc-editor.org/rfc/rfc6901) JSON pointer for a nested claim (`/kubernetes.io/namespace`). Value: the accepted values. |
+
+A machine has 1 to 10 rules. Create sets them with `MachineAccessCreate.FederationRules`; `PUT …/machines/{id}/federation-rules` replaces them and returns the machine. Rules on a machine of another kind answer `400` (`MachineNotFederated`). Rule changes affect new exchanges only.
+
+```json
+PUT v1/acme/billing/access/machines/3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07/federation-rules
+[ { "Issuer": "aks-prod", "Audience": "https://api.example.com/api/v1/acme/billing/access/token",
+    "Subject": "system:serviceaccount:billing:*", "Claims": { "/kubernetes.io/namespace": [ "billing" ] } },
+  { "Issuer": "github", "Audience": "https://api.example.com/api/v1/acme/billing/access/token",
+    "Subject": "repo:acme/billing:environment:production", "Claims": { "repository_id": [ "74" ] } } ]
+```
+
+**Matching.** An exchange verifies the platform token against the machine's rules:
+
+1. Only rules whose trusted issuer has exactly the token's `iss` are candidates. Without one the token is refused, and nothing is fetched.
+2. The candidates are grouped by trusted issuer, in rule order. Each group verifies the token with **that** issuer's keys and only its rules' audiences:
+   * a signature with RS256, RS384, RS512, PS256, PS384, PS512, ES256, ES384 or ES512 (never `none` or HS*), with a `kid` that names one of the keys;
+   * `exp` required, `nbf` when present, both with `ClockSkewSeconds`;
+   * `iat` present and not in the future, and `exp - iat` at most the issuer's `MaxTokenLifetimeSeconds`;
+   * `aud` a string or a one-element array: a token minted for several relying parties is refused;
+   * `sub` a non-empty string.
+3. Each rule of the group is checked again against the current trusted issuer. A rule that an issuer change made unsafe is skipped and logged.
+4. A rule matches when the audience, the subject, every key of its `Claims` and every key of the issuer's `RequiredClaims` match. A claim matches when it is a string equal to an accepted value, a number or boolean whose JSON text equals one, or an array with any such element. Objects, null and missing claims never match. The values of a key are alternatives; all keys must match. Comparisons are ordinal and case-sensitive.
+5. The first matching rule wins. A rule never matches a token verified by another trusted issuer, even one with the same `Issuer` string, so two clusters with the same issuer string are told apart by their keys.
+
+**Validation.** Create and the rules `PUT` check each rule against its trusted issuer. A failure answers `400` with `ErrorCode` `InvalidFederation` and a message that names the rule and the field, for example `"Rule 2: the audience sts.amazonaws.com belongs to another service."`.
+
+| Field | Rule |
+|---|---|
+| `Issuer` | Names a trusted issuer of the project. |
+| `Audience` | Refused when it belongs to another relying party, so a token minted for that party cannot be replayed here: `sts.amazonaws.com`, `pods.eks.amazonaws.com`, `api://AzureADTokenExchange`, `https://kubernetes.default.svc`, `https://kubernetes.default.svc.cluster.local`; anything starting with `//iam.googleapis.com/`, `https://iam.googleapis.com/`, `https://github.com/` or `https://vercel.com/` (the GitHub and Vercel defaults); the Azure resources `https://management.azure.com`, `https://management.core.windows.net`, `https://graph.microsoft.com`, `https://vault.azure.net`, `https://storage.azure.com`, `https://database.windows.net`; and the trusted issuer's own `Issuer` (the default Kubernetes `--api-audiences`). Case and one trailing `/` are ignored. |
+| `Subject` | `*` may appear once, as the last character, right after `:` or `/`: `system:serviceaccount:prod:*`, `repo:acme/app:*`, `arn:aws:iam::123456789012:role/ci/*`. |
+| `Claims` | At most 10 keys, 1 to 10 values per key, each value 1 to 512 characters. A claim name matches `^[A-Za-z0-9_.:-]{1,128}$`. A pointer is `/` and 1 to 256 characters, with `~1` for `/` and `~0` for `~`; any other `~` sequence is refused. `iss`, `sub`, `aud`, `exp`, `nbf`, `iat` and `jti` cannot be pinned, bare or as `/name`; use `Subject` and `Audience`. `RequiredClaims` follow the same rules. |
+| GitHub Actions issuers | Host `token.actions.githubusercontent.com` (any path, so enterprise issuers too) or `token.actions.<subdomain>.ghe.com`, whatever the `KeySource`: the rule or the issuer's `RequiredClaims` must pin `repository_owner_id`, `repository_id` or `enterprise_id`. |
+| Vercel issuers | Host `oidc.vercel.com` (global and team issuers): the rule or the issuer's `RequiredClaims` must pin `owner_id`. |
+| Google and Entra issuers | `https://accounts.google.com`, `accounts.google.com`, `https://login.microsoftonline.com/…` and `https://sts.windows.net/…`: no subject wildcard. `sub` is the identity's immutable id, so a wildcard would admit every identity of the tenant or of Google. |
+| Other issuers | A subject wildcard needs at least one pin in `Claims` or `RequiredClaims`. |
+
+### The token endpoint
+
+`POST v1/{organization}/{project}/access/token` is anonymous: the platform token is the credential. Send the request without `Authorization`: a bearer header is checked before any endpoint runs, and a request with any `Authorization` header is refused with `invalid_request`. The body is `application/x-www-form-urlencoded` (a `charset` parameter is allowed), at most 32 KiB.
+
+| Parameter | Rule |
+|---|---|
+| `grant_type` | Required: `urn:ietf:params:oauth:grant-type:token-exchange`. Anything else answers `unsupported_grant_type`. |
+| `subject_token` | Required: the platform token, a JWT of at most `MaxSubjectTokenBytes` (16 KiB). |
+| `subject_token_type` | Required: `urn:ietf:params:oauth:token-type:jwt`, `…:id_token` or `…:access_token` (Azure managed identity tokens are access tokens). The token must be a JWT either way. |
+| `client_id` | Required: the machine id. |
+| `audience`, `resource` | Optional and repeatable. Every value must equal `MachineAuth:Federation:Audience`, otherwise `invalid_target`. They name the Storyteller token's audience, not the platform token's; leave them out. |
+| `scope` | Optional: Storyteller scopes separated by spaces. It must be a subset of the machine's scopes (`invalid_scope` otherwise), and the token gets only that subset, for example `Annotation.Read` for a job that only reads. Without it, the token gets every scope of the machine. |
+| `requested_token_type` | Optional: `urn:ietf:params:oauth:token-type:access_token` (default) or `…:jwt`; anything else answers `invalid_request`. `issued_token_type` echoes it. |
+| `actor_token`, `actor_token_type` | Not supported (`invalid_request`). |
+
+Any other parameter given twice answers `invalid_request`. A parameter with an empty value counts as absent.
+
+The checks run cheapest first, so the anonymous endpoint reads nothing for unknown projects and untrusted issuers:
+
+1. The request: body size, content type and parameters.
+2. The subject token's size, its JWS form and its `iss`, not yet verified.
+3. The project's access point must exist, and its policy must enable `Federated`. Nothing in the organization container is read before this.
+4. A trusted issuer of the project must have exactly that `Issuer`; otherwise the machine is not read.
+5. The machine must exist with kind `Federated`.
+6. The platform token must [match one of its rules](#federation-rules); then `scope` must be a subset of the machine's scopes.
+7. A [Storyteller token](#storyteller-tokens) is issued. An exchange writes nothing.
+
+Every failure in steps 2 to 6, except the `scope` subset, answers the same `400 invalid_request` with `"The subject token is not accepted for this machine."`, so unknown projects, unknown machines, disabled kinds and mismatched rules look alike. The reason is logged with the machine id and the trusted issuer name, never with the token: an untrusted issuer at `Debug`, the rest at `Information`.
+
+The one exception is the `503` of step 6. It comes when the keys of a `Discovery` or `JwksUri` issuer cannot be fetched, or when the token names a `kid` the issuer has not published (see [Trusted issuers](#trusted-issuers)). Step 6 runs only after steps 3 to 5 have passed and only for the machine's rules of the token's issuer, and the `kid` is looked up only after the token's `aud` has matched the audience of one of those rules. So a `503` tells the caller that the project enables `Federated`, trusts the token's issuer, and has a `Federated` machine with that id and a rule for that issuer; for an unpublished `kid`, also that the rule has the token's audience. The token itself needs no valid signature to learn this. With a `Jwks` issuer, step 6 never answers `503`.
+
+Responses carry `Content-Type: application/json; charset=utf-8`, `Cache-Control: no-store` and `Pragma: no-cache`. Property names are the snake_case names of OAuth, not the API's PascalCase, and errors are OAuth error bodies, not `ErrorResponse`.
+
+```json
+200 { "access_token": "eyJ…", "issued_token_type": "urn:ietf:params:oauth:token-type:access_token",
+      "token_type": "Bearer", "expires_in": 900, "scope": "Default.Read Annotation.Read Configuration.Read" }
+400 { "error": "invalid_request", "error_description": "The parameter subject_token is missing." }
+503 { "error": "temporarily_unavailable", "error_description": "The keys of the trusted issuer could not be retrieved." }
+```
+
+| Status | `error` | When |
+|---|---|---|
+| `400` | `invalid_request` | A malformed request (a missing, repeated or unsupported parameter, a wrong content type, a body over 32 KiB, an `Authorization` header, an actor token), or any refused subject token, as above. |
+| `400` | `unsupported_grant_type` | `grant_type` is not the token exchange. |
+| `400` | `invalid_target` | An `audience` or `resource` other than `MachineAuth:Federation:Audience`. |
+| `400` | `invalid_scope` | `scope` is not a list of scope names separated by single spaces ([RFC 6749 §3.3](https://www.rfc-editor.org/rfc/rfc6749#section-3.3)), checked before the token; or the token matched, but `scope` asks for more than the machine has. |
+| `503` | `temporarily_unavailable` | The keys of the trusted issuer could not be retrieved, the token names a `kid` the issuer has not published yet, or no signing key is available. Only after the project, issuer and machine checks, as above. With `Retry-After: 5`; retry with the same platform token. |
+
+`temporarily_unavailable` on a token endpoint is an extension of [RFC 6749 §5.2](https://www.rfc-editor.org/rfc/rfc6749#section-5.2); clients should key on the 503.
+
+```bash
+API=https://api.example.com/api
+TOKEN_ENDPOINT=$API/v1/acme/billing/access/token
+
+STORYTELLER_TOKEN=$(curl -sf "$TOKEN_ENDPOINT" \
+  -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+  -d client_id=3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07 \
+  -d subject_token_type=urn:ietf:params:oauth:token-type:jwt \
+  --data-urlencode "subject_token=$PLATFORM_TOKEN" \
+  -d scope=Annotation.Read | jq -r .access_token)
+
+curl "$API/v1/acme/billing/default/annotations" -H "Authorization: Bearer $STORYTELLER_TOKEN"
+```
+
+Reuse the Storyteller token until shortly before `expires_in` runs out, then exchange a fresh platform token.
+
+### Storyteller tokens
+
+A Storyteller token is an [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068) access token signed by Storyteller:
+
+| Part | Value |
+|---|---|
+| Header | `alg` `RS256`, `kid` of the signing key, `typ` `at+jwt`. |
+| `iss` | `MachineAuth:Federation:Issuer`. |
+| `aud` | `MachineAuth:Federation:Audience`. |
+| `sub`, `client_id` | The machine id. |
+| `iat`, `nbf`, `exp` | The time of the exchange, and `TokenLifetimeMinutes` (15) later. |
+| `jti` | A GUID. |
+| `scope` | The granted Storyteller scopes, separated by spaces. |
+| `organization`, `project` | The project of the exchange. |
+| `annotation_key` | The machine's `AnnotationKey`, when it has one. |
+| `federation_issuer`, `federation_subject` | The trusted issuer name and the platform `sub`, for audit and logs. |
+
+`BearerAuthenticationMiddleware` reads the unverified `iss` first. A Storyteller token goes only to the Storyteller validator, never to the user provider, and `DEV_AUTH` does not skip it. The validator requires `typ` `at+jwt` or `application/at+jwt`, RS256, the `kid` of the stored signing key, the exact issuer and audience, and a valid lifetime within `ClockSkewSeconds`. The API then sees `sub` and `azp` (the machine id), one `roles` claim per scope and `annotationKey`, as for an API key. `CheckAccessToAsync` point-reads the machine instead of only checking that it exists, and requires:
+
+* the machine in the route's project, with the stored kind `Federated`;
+* every scope of the token within the machine's stored `Scope`;
+* the token's `organization` and `project` equal to the route's (case-insensitive);
+* the project still enabling `Federated`.
+
+So a Storyteller token cannot act as an API key machine, outlive its machine, or exceed its machine's scope, even when it was signed with a stolen key. Any failure is 401 with an empty body. No `WWW-Authenticate` header is sent, as for every other token.
+
+The deployment signs with one RSA 2048 key, stored in the core container, partition `signing-keys`, id `tsk.1`, its `kid` being the RFC 7638 thumbprint. With `SigningKeyAutoBootstrap` the first exchange creates it; concurrent instances settle on one key through a create conflict. An instance signs with the stored key for 10 minutes before it reads the store again. If the store then has no key and `SigningKeyAutoBootstrap` is off, or holds a key that is not RS256, the exchange answers 503 instead of signing with the old key, and the next exchange reads the store again. A store that cannot be read keeps the loaded key in use. Validation never creates a key. A validating instance reads the store again after 10 minutes too, and at most once per 30 seconds for an unknown `kid` or while no key is stored; in between, such tokens are refused without I/O.
+
+### Revocation timing
+
+| Change | Takes effect |
+|---|---|
+| Deleting the machine | At once: every call reads the machine. |
+| Disabling `Federated` in the policy | New exchanges at once (they read the access point). Calls with issued tokens within 60 seconds (the policy cache). |
+| Deleting or editing a trusted issuer | New exchanges, within the 60-second cache of the issuer list on the other instances. |
+| Replacing the rules | New exchanges. |
+
+Storyteller tokens already issued stay valid until they expire (`TokenLifetimeMinutes` plus `ClockSkewSeconds`), unless the machine is deleted or `Federated` is disabled. There is no revocation list and no replay store.
+
+### Configuration
+
+`Program.cs` registers federation with `services.AddFederatedMachineAccess(context.Configuration)` after `AddCertificateMachineAccess`. It works next to the one `ClientCredentials` provider of the deployment. Without it, creating a `Federated` machine answers `400` `"Federated machine access is not configured for this deployment."`. With Cosmos (`AddCosmosDbAnnotations`) the trusted issuers and the signing key are stored as described above; otherwise in-memory stores are used (tests).
+
+The settings live under `MachineAuth:Federation` and are validated at startup:
+
+| Key | Default | Notes |
+|---|---|---|
+| `Issuer` | `urn:storyteller:{MachineAuth:TrustDomain}` | `iss` of Storyteller tokens. Changing it rejects the tokens already issued. |
+| `Audience` | `urn:storyteller:{MachineAuth:TrustDomain}:api` | `aud` of Storyteller tokens, and the only accepted `audience` or `resource` of an exchange. |
+| `PublicBaseUrl` | none | The public base URL of the API (`https://host/api`), absolute http(s) without query or fragment. `TokenEndpoint` is built from it. Without it, from the scheme and host of the request URL, never from `X-Forwarded-Host`. Set it when the API is reached through another host name. |
+| `TokenLifetimeMinutes` | `15` | Lifetime of a Storyteller token, 5 to 60. |
+| `ClockSkewSeconds` | `30` | Skew for platform and Storyteller tokens, 0 to 120. |
+| `MaxSubjectTokenBytes` | `16384` | Larger platform tokens are refused before parsing. 1,024 to 32,768. |
+| `MetadataRefreshMinutes` | `60` | Age after which discovery documents and key sets are fetched again, 1 to 1,440. |
+| `SigningKeyAutoBootstrap` | `true` | Create the signing key on the first exchange when none is stored. When `false` and no key is stored, exchanges answer 503. |
+| `AllowPrivateNetworks` | `false` | Lifts the `https`, port 443, DNS host and public address limits of issuer URLs. Development and tests only. |
+
+### Security notes
+
+* **Name-derived issuers and immutable ids.** GitHub organization and repository names and Vercel team and project slugs can be renamed and taken by someone else, and the tokens of every GitHub or Vercel tenant are signed with the same keys. Only the ids tell tenants apart, so rules of these issuers must pin one (see the validation table), best in the issuer's `RequiredClaims`. For Google and Entra, `sub` is the identity's immutable id: pin it exactly. Never identify a Google service account by `email`: a deleted and re-created account keeps its email and gets a new id.
+* **Foreign and default audiences.** A rule's audience must be specific to Storyteller. Each platform's default audience (`https://github.com/<owner>`, `https://vercel.com/<team>`, the Kubernetes issuer) goes to every relying party that asks for no audience of its own, and the audiences of AWS, Azure, Google and Kubernetes services belong to them. Rules refuse all of these, so a token handed to another service cannot be replayed here.
+* **Multi-audience tokens.** A token whose `aud` lists several relying parties is refused: any of them could replay it.
+* **Opaque refusals.** Every refused exchange looks the same to the caller (`400 invalid_request`), so it does not reveal projects, machines, scopes or rules. The `503` of a `Discovery` or `JwksUri` issuer is the exception. A key fetch failure answers `503` only once the project, its policy, the trusted issuer, a `Federated` machine with that id and a rule for that issuer have all matched, and a `kid` the issuer has not published only once the rule's audience has matched too. A caller who knows a machine id can therefore send tokens with a made-up `kid` and no valid signature, and learn whether the project trusts an issuer and which audience a rule uses. Such probes also make Storyteller fetch the issuer's keys again, at most once a minute per trusted issuer. A `Jwks` issuer has no such `503`. Machine ids are not secret: they appear in workflow files as `client_id`.
+* **Private networks.** Storyteller fetches discovery documents and key sets from URLs an Administrator enters. The fetch uses no proxy, follows no redirect, times out after 10 seconds (for the whole response, body included) and reads at most 512 KiB. It resolves the host and connects only to an address that the IANA special-purpose address registries mark globally reachable, so no loopback, private, CGNAT (`100.64.0.0/10`), link-local (including `169.254.169.254`), multicast, `fc00::/7` or `fe80::/10` address. IPv4 embedded in IPv6 (mapped, compatible, NAT64, 6to4, Teredo) is checked as IPv4, and other IPv6 addresses must be global unicast (`2000::/3`). It connects to the address it checked, so DNS rebinding cannot redirect it. `AllowPrivateNetworks` lifts all of this; never set it in production.
+* **The signing key in Cosmos.** The key is stored unprotected in the core container, like the machine CA. Whoever can read that container can mint Storyteller tokens. The per-call checks keep such tokens within existing `Federated` machines of projects that enable the kind, and within those machines' scopes; they cannot act as an API key, certificate or client-credentials machine. **Emergency rotation:** delete the document `tsk.1` (partition `signing-keys`) from the core container. Within about 10 minutes every instance stops signing with and accepting the old key, and the next exchange creates a new one (with `SigningKeyAutoBootstrap`; without it, exchanges answer 503 until a new key is stored); restarting the Function App makes it immediate. Workloads exchange again after their next 401.
+* **Long-lived managed identity tokens.** An Azure managed identity token is cached by the platform for about 24 hours, so its issuer needs `MaxTokenLifetimeSeconds` 86,400, and a leaked token can be exchanged for that long. There is no replay store: managed identity, Vercel and Kubernetes tokens are reused by design, and single use would break them. Keep the subject exact and the machine's scope small.
+* **Secret delivery.** A federated machine never presents a certificate, so [secret delivery](key-values.md#secret-delivery) treats it as a token caller: under `RequireMtlsForSecretDelivery` (the default) it gets no secret values, whatever its scope.
+* **Who writes rules.** Contributors create machines of any scope, so they also write the rules of federated machines. Administrators bound what those rules can admit with the issuers they trust and their `RequiredClaims`.
+
+### Setting up a platform
+
+Each platform below names the trusted issuer, the rule's audience and subject, the issuer's `MaxTokenLifetimeSeconds`, the `subject_token_type`, and how the workload gets its token. `$AUD` is the rule's audience: the machine's `TokenEndpoint`, for example `https://api.example.com/api/v1/acme/billing/access/token`, everywhere except Azure. The exchange is the [curl request above](#the-token-endpoint).
+
+#### GitHub Actions
+
+* **Issuer:** `https://token.actions.githubusercontent.com`, `Discovery`. An enterprise with a unique issuer (`include_enterprise_slug`) uses `https://token.actions.githubusercontent.com/<enterprise>`; GHE.com uses `https://token.actions.<subdomain>.ghe.com`, optionally with `/<enterprise>`.
+* **Audience:** `$AUD`, requested by the workflow. The default `https://github.com/<owner>` is refused.
+* **Subject:** `repo:<owner>/<repo>:environment:<name>`, `repo:<owner>/<repo>:ref:refs/heads/<branch>`, `repo:<owner>/<repo>:pull_request`, or a prefix such as `repo:acme/billing:*`.
+* **Pins:** `repository_owner_id` in the issuer's `RequiredClaims`, `repository_id` in the rule. One of `repository_owner_id`, `repository_id` or `enterprise_id` is required.
+* **Lifetime:** the default. A token is valid for a single job, and GitHub's documented example lives 5 minutes.
+* **`subject_token_type`:** `urn:ietf:params:oauth:token-type:jwt`.
+
+GitHub's immutable subject, `repo:OWNER@OWNER_ID/REPO@REPO_ID:…` (for example `repo:acme@65/billing@74:ref:refs/heads/main`), is the default for repositories created, renamed or transferred after 2026-07-15. Older repositories keep the name-based format unless they opt in, and GitHub Enterprise Server does not offer it. Write the subject in the format the repository uses: a name-based subject stops matching once the repository is renamed or transferred. The id pins exist because a recycled name produces the same name-based `sub`.
+
+The job needs `permissions: id-token: write`. A JavaScript action calls `core.getIDToken('<aud>')`; a shell step asks the runner:
+
+```yaml
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Get a Storyteller token
+        env:
+          TOKEN_ENDPOINT: https://api.example.com/api/v1/acme/billing/access/token   # also the rule's audience
+          MACHINE_ID: 3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07
+        run: |
+          PLATFORM_TOKEN=$(curl -sf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$(jq -rn --arg a "$TOKEN_ENDPOINT" '$a|@uri')" | jq -r .value)
+          STORYTELLER_TOKEN=$(curl -sf "$TOKEN_ENDPOINT" \
+            -d grant_type=urn:ietf:params:oauth:grant-type:token-exchange \
+            -d client_id=$MACHINE_ID \
+            -d subject_token_type=urn:ietf:params:oauth:token-type:jwt \
+            --data-urlencode "subject_token=$PLATFORM_TOKEN" | jq -r .access_token)
+          echo "::add-mask::$STORYTELLER_TOKEN"
+          echo "STORYTELLER_TOKEN=$STORYTELLER_TOKEN" >> "$GITHUB_ENV"
+```
+
+#### Kubernetes
+
+* **Issuer:** the cluster's service account issuer, the `iss` of its tokens.
+  * AKS: `oidcIssuerProfile.issuerUrl` (`az aks show -n <cluster> -g <group> --query oidcIssuerProfile.issuerUrl -o tsv`), `https://<region>.oic.prod-aks.azure.com/<tenant>/<id>/`, `Discovery`. Copy it verbatim: it ends with `/`.
+  * EKS: `aws eks describe-cluster --name <cluster> --query cluster.identity.oidc.issuer --output text`, `https://oidc.eks.<region>.amazonaws.com/id/<id>`, `Discovery`.
+  * GKE: `https://container.googleapis.com/v1/projects/<project>/locations/<location>/clusters/<cluster>`, with its discovery document under that URL. That it can be read without credentials is reported only by third parties; when discovery fails, use `Jwks`.
+  * Self-managed: the discovery endpoints of a cluster are not anonymous by default. Use `KeySource` `Jwks` with the output of `kubectl get --raw /openid/v1/jwks`, or `JwksUri` when `--service-account-jwks-uri` points to a public copy. A stored set never refreshes: paste it again after every key rotation of the cluster. Clusters may share an issuer string; give each its own trusted issuer, and their keys tell them apart.
+* **Audience:** `$AUD`, in a dedicated projected token. The default token of the `kube-api-access` volume is refused: its audience belongs to the API server. Tokens of AKS workload identity (`api://AzureADTokenExchange`), EKS IRSA (`sts.amazonaws.com`) and EKS Pod Identity (`pods.eks.amazonaws.com`) are refused too; project a separate token for Storyteller next to them.
+* **Subject:** `system:serviceaccount:<namespace>:<name>`, or `system:serviceaccount:<namespace>:*` with a pin.
+* **Pins:** `/kubernetes.io/namespace`; `/kubernetes.io/serviceaccount/uid` binds the rule to one service account object rather than its name.
+* **Lifetime:** the default, which matches the default `expirationSeconds` of 3,600. Raise it to `expirationSeconds` when that is larger (AKS allows up to 24 hours).
+* **`subject_token_type`:** `urn:ietf:params:oauth:token-type:jwt`.
+
+```yaml
+spec:
+  serviceAccountName: billing-sync
+  containers:
+    - name: app
+      volumeMounts:
+        - name: storyteller-token
+          mountPath: /var/run/secrets/storyteller
+          readOnly: true
+  volumes:
+    - name: storyteller-token
+      projected:
+        sources:
+          - serviceAccountToken:
+              path: token
+              audience: https://api.example.com/api/v1/acme/billing/access/token
+              expirationSeconds: 3600
+```
+
+The kubelet replaces the token once it is older than 80 % of its lifetime or 24 hours. Read `/var/run/secrets/storyteller/token` again before each exchange; never keep its content.
+
+#### Vercel
+
+* **Issuer:** the team issuer `https://oidc.vercel.com/<team-slug>` (recommended) or the global `https://oidc.vercel.com`, `Discovery`. Renaming the team changes the issuer, and `Issuer` cannot change: add a new trusted issuer and move the rules to it.
+* **Audience:** `$AUD`. A build gets its token in `VERCEL_OIDC_TOKEN` and a function in the `x-vercel-oidc-token` request header, both with the default audience `https://vercel.com/<team-slug>`, which is refused. `getVercelOidcToken({ audience })` of Vercel's SDK returns one with the rule's audience.
+* **Subject:** `owner:<team-slug>:project:<project-name>:environment:<environment>`, where the environment is `development`, `preview`, `production` or a custom environment.
+* **Pins:** `owner_id` (`team_…`, required), best in `RequiredClaims`; `project_id` (`prj_…`) in the rule. The slugs in `sub` change when a team or project is renamed; the ids do not.
+* **Lifetime:** 7,200. Function tokens live 2 hours (Vercel reuses one for up to 90 minutes) and build tokens 1 hour. 43,200 when development tokens (12 hours) are exchanged too.
+* **`subject_token_type`:** `urn:ietf:params:oauth:token-type:jwt`.
+
+```ts
+const subjectToken = await getVercelOidcToken({ audience: tokenEndpoint });
+const response = await fetch(tokenEndpoint, {
+  method: 'POST',
+  body: new URLSearchParams({
+    grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+    client_id: machineId,
+    subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
+    subject_token: subjectToken,
+  }),
+});
+const { access_token, expires_in } = await response.json();
+```
+
+#### Azure managed identity
+
+* **Audience:** the `aud` of tokens for an app registration in your own tenant that stands for Storyteller and nothing else, with the identifier URI `api://<appId>`; the workload asks for `resource=api://<appId>`. The registration's `requestedAccessTokenVersion` decides the token version, whatever endpoint the workload calls: with `2`, `aud` is `<appId>`; with null or `1`, it is `api://<appId>`. A token for an Azure resource (management, Graph, Key Vault, Storage, SQL) is refused.
+* **Issuer:** with version 2, `https://login.microsoftonline.com/<tenant>/v2.0`; with version 1, `https://sts.windows.net/<tenant>/` (with the trailing `/`). `Discovery` works for both. A token of the other version is refused.
+* **Subject:** the managed identity's object (principal) id; for a managed identity, `sub` equals `oid`. Every identity of the tenant can get a token for the audience, so the subject is the only thing that picks yours, and a wildcard is refused.
+* **Lifetime:** 86,400. The managed identity endpoint caches a token per resource for about 24 hours and cannot be made to refresh it.
+* **`subject_token_type`:** `urn:ietf:params:oauth:token-type:access_token`.
+
+```bash
+# once: the app registration that stands for Storyteller
+az ad app create --display-name "Storyteller acme.billing"
+az ad app update --id <appId> --identifier-uris api://<appId>
+az ad sp create --id <appId>
+# then set "requestedAccessTokenVersion": 2 under "api" in its manifest
+
+# VM or VM scale set (IMDS); add client_id=<id> to pick a user-assigned identity
+curl -s -H "Metadata: true" \
+  "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=api://<appId>" | jq -r .access_token
+
+# App Service and Functions
+curl -s -H "X-IDENTITY-HEADER: $IDENTITY_HEADER" \
+  "$IDENTITY_ENDPOINT?api-version=2019-08-01&resource=api://<appId>" | jq -r .access_token
+```
+
+On AKS, use the [Kubernetes](#kubernetes) path instead of workload identity.
+
+#### AWS
+
+* **Issuer:** turn on outbound identity federation for the account once with `aws iam enable-outbound-web-identity-federation`, then read the account's issuer, `https://<id>.tokens.sts.global.api.aws`, from `aws iam get-outbound-web-identity-federation-info`. `Discovery`.
+* **Audience:** `$AUD`, as the only audience of the token; a token with several audiences is refused.
+* **Subject:** the ARN of the IAM principal, for example `arn:aws:iam::123456789012:role/billing-sync`, or a prefix such as `arn:aws:iam::123456789012:role/ci/*` with a pin.
+* **Pins:** the STS claims sit in the object `https://sts.amazonaws.com/`, so their pointers escape the slashes: `/https:~1~1sts.amazonaws.com~1/aws_account`, `/https:~1~1sts.amazonaws.com~1/org_id`, `/https:~1~1sts.amazonaws.com~1/source_region`. Never pin `request_tags`: the caller chooses them.
+* **Lifetime:** the default. `DurationSeconds` is 60 to 3,600 (300 when not given).
+* **`subject_token_type`:** `urn:ietf:params:oauth:token-type:jwt`. Both signing algorithms, `ES384` and `RS256`, are accepted.
+
+```bash
+aws sts get-web-identity-token --audience "$AUD" --signing-algorithm ES384 --region eu-central-1
+```
+
+Call a regional STS endpoint: the global one does not offer the operation. The response carries the token.
+
+#### Google Cloud
+
+* **Issuer:** `https://accounts.google.com`, `Discovery`.
+* **Audience:** `$AUD`.
+* **Subject:** the service account's numeric unique id (`gcloud iam service-accounts describe <email> --format='value(uniqueId)'`), never its email. No wildcard.
+* **Pins:** with `format=full`, the Compute Engine claims under `google`, for example `/google/compute_engine/project_id`.
+* **Lifetime:** the default; the tokens expire within an hour.
+* **`subject_token_type`:** `urn:ietf:params:oauth:token-type:id_token`.
+
+```bash
+curl -sG -H "Metadata-Flavor: Google" --data-urlencode "audience=$AUD" -d format=full \
+  "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity"
+```
+
+Compute Engine and Cloud Run serve this endpoint, and it returns the token. On GKE, use the [Kubernetes](#kubernetes) path: whether the GKE metadata server serves it to a workload without an IAM service account is not confirmed.
+
 ## Caveats and scale of machine access
 
-A deployment has four machine credential kinds. `ClientCredentials` with AuthKit creates one WorkOS Connect M2M application per machine, and every one of those applications sits in the single organization `Auth:AuthKit:MachineOrganizationId`. `ApiKey`, `Certificate` and `CertificateAndApiKey` keep the credential inside Storyteller. The notes below are how that behaves at a few hundred thousand machines.
+A deployment has five machine credential kinds. `ClientCredentials` with AuthKit creates one WorkOS Connect M2M application per machine, and every one of those applications sits in the single organization `Auth:AuthKit:MachineOrganizationId`. `ApiKey`, `Certificate` and `CertificateAndApiKey` keep the credential inside Storyteller. `Federated` keeps no credential at all: trust comes from the platforms' issuers, and Storyteller signs its own short-lived tokens. The notes below are how that behaves at a few hundred thousand machines.
 
 ### What each call does
 
-A machine call that names a project goes through one of the `CheckAccessTo*Async` checks of `HttpRequestDataExtensions` (the project, one annotation, the annotations of a bulk body, or the project metadata), which share one core. That point-reads the `MachineAccessEntity` whose id is the machine id, in partition `{project}.access`, in the organization container. A missing document (or a missing container) is rejected with `401`, and the document's `AnnotationKey` decides the [annotation restriction](#annotation-restriction-of-machines). Every machine call also reads the project policy (`IMachineAuthenticationPolicyStore`, cached for 60 seconds): an API key or certificate call checks that the machine's own kind is enabled, and a client-credentials call that `ClientCredentials` is enabled.
+A machine call that names a project goes through one of the `CheckAccessTo*Async` checks of `HttpRequestDataExtensions` (the project, one annotation, the annotations of a bulk body, or the project metadata), which share one core. That point-reads the `MachineAccessEntity` whose id is the machine id, in partition `{project}.access`, in the organization container. A missing document (or a missing container) is rejected with `401`, and the document's `AnnotationKey` decides the [annotation restriction](#annotation-restriction-of-machines); for a `Federated` machine the same read also compares the stored kind and scope with the token. Every machine call also reads the project policy (`IMachineAuthenticationPolicyStore`, cached for 60 seconds): an API key or certificate call checks that the machine's own kind is enabled, and a bearer call that its kind (`ClientCredentials` or `Federated`) is enabled.
 
 | Kind | Sent on each call | Work beside the membership read |
 |---|---|---|
@@ -463,6 +885,7 @@ A machine call that names a project goes through one of the `CheckAccessTo*Async
 | `Certificate` | The client certificate | The chain is built against the configured CA. Revocation checking is off. The thumbprint is then checked in `IClientCertificateStore`. |
 | `CertificateAndApiKey` | The certificate and the API key | Both checks have to succeed, and the organization, project and machine id have to match. With a shared certificate, the certificate has to be a stored, unrevoked shared certificate of the same organization and project, and the machine id comes from the API key. |
 | `ClientCredentials` | `Authorization: Bearer` and a JWT | RS256 against the provider's JWKS, which is cached. AuthKit also requires `sub` equal to `client_id`, `aud` equal to `Auth:AuthKit:ClientId`, and `org_id` equal to `MachineOrganizationId`. Scopes come only from `PermissionMap`. |
+| `Federated` | `Authorization: Bearer` and a Storyteller token | RS256 against the one Storyteller signing key, held in memory; no user provider is asked. The machine read checks the kind, the scopes, and the token's organization and project against the route. |
 
 The membership read stays a point read as the catalogue grows, as long as the machines are spread across projects. Every machine of one project shares the logical partition `{project}.access`. Cosmos serves a logical partition from one physical partition, and a physical partition is capped at 10,000 RU/s. A point read of this small document is about 1 RU, so one project cannot carry tens of thousands of machine calls per second.
 
@@ -490,7 +913,7 @@ When the Cosmos write after a successful create fails, Storyteller asks WorkOS t
 
 `GET v1/{organization}/{project}/access/machines/{id}` point-reads `{project}.access`, the same partition reset and delete use.
 
-`MachineIds` accepts a GUID, a WorkOS `client_…` id, or a Keycloak client id `42.sform.{organization}.{project}.{32 hex}`. An Entra appId is a GUID, so it passes. Organization and project in the Keycloak id are one segment each (`A-Za-z0-9_-`).
+`MachineIds` accepts a GUID, a WorkOS `client_…` id, or a Keycloak client id `42.sform.{organization}.{project}.{32 hex}`. An Entra appId and a federated machine id are GUIDs, so they pass. Organization and project in the Keycloak id are one segment each (`A-Za-z0-9_-`).
 
 ### The other kinds at the same size
 
@@ -500,7 +923,9 @@ When the Cosmos write after a successful create fails, Storyteller asks WorkOS t
 
 `CertificateAndApiKey` does both. Both halves are durable in Cosmos, so the pair works on every instance.
 
-The thumbprint of a validated certificate is kept in the invocation (`PresentingCertificateThumbprint`), and the [key/value secret delivery](key-values.md#secret-delivery) uses it: a project whose policy has `RequireMtlsForSecretDelivery` (the default) hands secret values to a machine only when it authenticated with a certificate, whatever scopes its token or API key carries.
+`Federated` creates nothing outside Storyteller. Create checks the rules against the project's trusted issuers (cached) and upserts one Cosmos document. A call costs what an API key call costs: a signature check in memory and the point read of the machine. The work moves to the exchange, once per Storyteller token: a point read of the access point in the core container, the cached issuer list, a point read of the machine, the issuer's keys (cached per issuer, fetched again after `MetadataRefreshMinutes`, one fetch shared by concurrent requests), the signature and rule checks, and one RSA signature. An exchange writes nothing. A workload that keeps its token until it expires exchanges about four times an hour with the default 15 minutes, so 100,000 such machines make about 110 exchanges a second and 500,000 about 560. Storyteller sends the platforms nothing but key fetches; workloads get their platform tokens themselves. The signing key is one Cosmos document, read every 10 minutes per instance, and at most once per 30 seconds more for tokens with an unknown `kid`.
+
+The thumbprint of a validated certificate is kept in the invocation (`PresentingCertificateThumbprint`), and the [key/value secret delivery](key-values.md#secret-delivery) uses it: a project whose policy has `RequireMtlsForSecretDelivery` (the default) hands secret values to a machine only when it authenticated with a certificate, whatever scopes its token or API key carries. A federated machine never presents one.
 
 Entra ID and Keycloak `ClientCredentials` follow the same Storyteller shape as AuthKit: one external object per machine, a JWT checked locally, and the Cosmos document as the allow list. Entra provisioning is Microsoft Graph (application, service principal, and app-role assignment) in one tenant, so the tenant's directory-object quota and Graph throttling are the figures to confirm before a large rollout. Keycloak provisioning is the admin API of one realm; how many clients that realm can hold is a property of that Keycloak deployment.
 
@@ -510,23 +935,29 @@ The two status codes mean different things, so a client knows whether signing in
 
 | Status | Meaning | Body |
 | --- | --- | --- |
-| `401` | The credentials are missing, invalid or expired, or the token lacks the required scope. Machine credentials that fail their checks also get 401. | none |
+| `401` | The credentials are missing, invalid or expired, or the token lacks the required scope. Machine credentials that fail their checks also get 401, among them a Storyteller token whose machine is gone or no longer `Federated`, whose scopes exceed the machine's, or whose project is not the route's. | none |
 | `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 | `403` | A machine restricted to an annotation addressed another annotation, or an operation of the whole project (see [Annotation restriction of machines](#annotation-restriction-of-machines)). | `ErrorResponse` with `ErrorCode` `AnnotationRestricted` |
 
-A user role check runs on every project endpoint (`CheckAccessToProjectAsync`, `CheckAccessToAnnotationAsync`, `CheckAccessToAnnotationsAsync` and `CheckAccessToProjectMetadataAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`, and so does reading the machine authentication policy. Shared certificates, access points and setting the machine authentication policy need `Administrator`. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check of users. The checks of machines (their document, the credential policy and the annotation restriction) run in every build.
+A user role check runs on every project endpoint (`CheckAccessToProjectAsync`, `CheckAccessToAnnotationAsync`, `CheckAccessToAnnotationsAsync` and `CheckAccessToProjectMetadataAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`, and so do reading the machine authentication policy, reading trusted issuers and replacing federation rules. Shared certificates, access points, setting the machine authentication policy and writing trusted issuers need `Administrator`. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check of users. The checks of machines (their document, the credential policy and the annotation restriction) run in every build.
 
 Other access-management errors use the same `ErrorResponse` shape, without exception details:
 
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
 | `400` | none | Grant or revoke with a missing account, a missing access point key, or the role `None`. |
-| `404` | `NotFound` | The target account, the access point, or the machine access does not exist. |
+| `400` | none | A machine of a kind the project does not enable or the deployment does not configure, or a reset of a `Federated` machine. |
+| `400` | `InvalidFederation` | A trusted issuer or a federation rule fails [validation](#federation-rules), or a `PUT` changes the `Issuer` of a trusted issuer. |
+| `400` | `MachineNotFederated` | Federation rules for a machine of another kind. |
+| `404` | `NotFound` | The target account, the access point or the machine access does not exist. `GET` and `DELETE` of a machine or a trusted issuer that does not exist answer `404` without a body. |
 | `409` | `AccountExists`, `AccessPointExists` | The account or project already exists. |
+| `409` | `FederatedIssuerInUse` | Creating a trusted issuer whose name rules of machines still reference. |
 | `409` | `ElevatedRole` | Revoke names a lower role than the member holds. Revoke the stored role instead. |
 | `409` | `LastOwner` | The revoke would leave the access point without an `Owner`. |
 
 Grant only raises a role. To lower one, revoke the current role and grant the new one, or set the exact role through the members endpoint. Members and invitations, with their own error codes, are described in [Members and invitations](access.md).
+
+The token endpoint of federated machines is anonymous and answers OAuth errors (`400` and `503`) instead of `ErrorResponse`; see [The token endpoint](#the-token-endpoint).
 
 ## CORS for browser clients
 
@@ -544,3 +975,7 @@ az functionapp cors add --name <function-app> --resource-group <group> --allowed
 
 * User tokens issued by the AuthKit domain (Swagger UI sign-in) are not accepted alongside device-flow tokens. M2M tokens from the AuthKit domain are. See [OpenAPI and Swagger UI](#openapi-and-swagger-ui).
 * A combination of an mTLS certificate and client credentials (`CertificateAndClientCredentials`) is not available.
+* `sform`, the admin UI and the SDKs do not manage trusted issuers, federation rules or `Federated` machines yet; use the API. Signing in to `sform` as a federated machine is not available either.
+* The Storyteller signing key cannot be rotated except by the [emergency procedure](#security-notes), and it cannot live in Key Vault. Storyteller publishes no JWKS or RFC 8414 metadata for its tokens.
+* The token endpoint has no replay protection and no rate limit. Rules know only exact values and a separator-anchored subject prefix; there are no glob, regex or CEL conditions.
+* 401 responses carry no `WWW-Authenticate` header.
