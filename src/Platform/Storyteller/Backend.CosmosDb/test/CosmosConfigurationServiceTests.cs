@@ -404,6 +404,7 @@ public class CosmosConfigurationServiceTests(Startup startup)
 
         before!.Content.Should().NotContainKey("imported");
         (await HasCachedCalculationAsync(contextKey)).Should().BeTrue();
+        (await HasConfigurationItemAsync(subjectKey)).Should().BeFalse("the import has to create the subject's first item");
 
         var result = await configs.ImportConfigurationAsync(subjectKey, JObject.Parse("""{ "imported": true }"""), AuditActor.System);
 
