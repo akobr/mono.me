@@ -32,6 +32,12 @@ public static class Definitions
                 public const string MachineAuthentication = $"v1/access/points/{{{Parameters.Key}}}/machine-authentication";
 
                 public const string MachineCertificateRenew = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}/certificate/renew";
+                public const string MachineFederationRules = $"{Machine}/federation-rules";
+
+                // Workload identity federation: the project's trusted issuers and its RFC 8693 token endpoint.
+                public const string FederatedIssuers = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/issuers";
+                public const string FederatedIssuer = $"{FederatedIssuers}/{{{Parameters.Name}}}";
+                public const string MachineToken = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/token";
                 public const string SharedCertificates = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/certificates";
                 public const string SharedCertificate = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/certificates/{{{Parameters.Thumbprint}}}";
             }
@@ -233,6 +239,13 @@ public static class Definitions
             public const string IssueSharedCertificate = nameof(IssueSharedCertificate);
             public const string RevokeSharedCertificate = nameof(RevokeSharedCertificate);
 
+            public const string GetFederatedIssuers = nameof(GetFederatedIssuers);
+            public const string GetFederatedIssuer = nameof(GetFederatedIssuer);
+            public const string SetFederatedIssuer = nameof(SetFederatedIssuer);
+            public const string DeleteFederatedIssuer = nameof(DeleteFederatedIssuer);
+            public const string SetMachineFederationRules = nameof(SetMachineFederationRules);
+            public const string ExchangeMachineToken = nameof(ExchangeMachineToken);
+
             public const string GetAuthConfiguration = nameof(GetAuthConfiguration);
         }
 
@@ -419,6 +432,7 @@ public static class Definitions
         public const string FileName = "fileName";
         public const string Include = "include";
         public const string Existing = "existing";
+        public const string Name = "name";
     }
 
     public static class Tags
@@ -478,6 +492,7 @@ public static class Definitions
         public const string ResponseTransferForbiddenImport = "The role on the project is below Contributor, or a scope of an included kind is missing (AccessDenied). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing scope.";
         public const string TransferInclude = "The kinds to import, comma-separated and case-insensitive: Annotations, Schemas, Templates, Configurations. Empty means all four. The files of the other kinds are counted as excluded.";
         public const string TransferExisting = "What happens to a document the view already has: Overwrite (default) writes the file as a new version, updates an annotation and re-creates a deleted one; Skip keeps the stored document. An equal document is Unchanged either way.";
+        public const string FederatedIssuerName = "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.";
     }
 
     public static class Errors
@@ -499,6 +514,7 @@ public static class Definitions
         public const string Json = "application/json";
         public const string PlainText = "text/plain";
         public const string Zip = "application/zip";
+        public const string FormUrlEncoded = "application/x-www-form-urlencoded";
     }
 
     public static class SecuritySchemas

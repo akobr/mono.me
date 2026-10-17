@@ -26,6 +26,7 @@ public class AccessHttp
     private readonly IMachineAuthenticationPolicyStore? _policyStore;
     private readonly IUserProfileResolver? _profileResolver;
     private readonly MachineAuthenticationOptions _machineOptions;
+    private readonly FederationOptions _federationOptions;
     private readonly ILogger<AccessHttp> _logger;
 
     public AccessHttp(
@@ -34,7 +35,8 @@ public class AccessHttp
         ICertificateAuthorityProvider? caProvider = null,
         IMachineAuthenticationPolicyStore? policyStore = null,
         IUserProfileResolver? profileResolver = null,
-        IOptions<MachineAuthenticationOptions>? machineOptions = null)
+        IOptions<MachineAuthenticationOptions>? machineOptions = null,
+        IOptions<FederationOptions>? federationOptions = null)
     {
         _accessService = accessService;
         _logger = logger;
@@ -42,6 +44,7 @@ public class AccessHttp
         _policyStore = policyStore;
         _profileResolver = profileResolver;
         _machineOptions = machineOptions?.Value ?? new MachineAuthenticationOptions();
+        _federationOptions = federationOptions?.Value ?? new FederationOptions();
     }
 
     [Function(nameof(GetAccount))]
@@ -242,7 +245,9 @@ public class AccessHttp
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         var machineAccesses = await _accessService.GetMachineAccessesAsync(organization, project);
-        return new OkObjectResult(machineAccesses);
+        return new OkObjectResult(machineAccesses
+            .Select(machineAccess => FederationHttp.WithTokenEndpoint(machineAccess, request, _federationOptions, organization, project))
+            .ToList());
     }
 
     [Function(nameof(GetMachine))]
@@ -274,7 +279,7 @@ public class AccessHttp
 
         return machineAccess is null
             ? new NotFoundResult()
-            : new OkObjectResult(machineAccess);
+            : new OkObjectResult(FederationHttp.WithTokenEndpoint(machineAccess, request, _federationOptions, organization, project));
     }
 
     [Function(nameof(PostMachines))]
@@ -309,7 +314,7 @@ public class AccessHttp
         try
         {
             var machineAccess = await _accessService.CreateMachineAccessAsync(machineModel);
-            return new OkObjectResult(machineAccess);
+            return new OkObjectResult(FederationHttp.WithTokenEndpoint(machineAccess, request, _federationOptions, organization, project));
         }
         catch (MachineAccessNotSupportedException exception)
         {

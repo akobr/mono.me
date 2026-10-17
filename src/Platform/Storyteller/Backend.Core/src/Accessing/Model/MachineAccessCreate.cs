@@ -18,4 +18,7 @@ public record class MachineAccessCreate
 
     // CertificateAndApiKey only: no certificate is issued for the machine, it presents a shared certificate of the project.
     public bool? UseSharedCertificate { get; init; }
+
+    // Federated only, and required for it: the rules a platform token must match.
+    public IReadOnlyList<FederationRule>? FederationRules { get; init; }
 }

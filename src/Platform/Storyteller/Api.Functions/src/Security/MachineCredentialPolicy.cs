@@ -7,16 +7,15 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.Security;
 
-// A bearer token does not name its project, so the project policy is checked once the request
-// resolves one (CheckAccessToAsync): an identity provider machine token is accepted only by a
-// project that enables ClientCredentials. API key and certificate machines are checked by
-// MachineAuthenticationMiddleware.
+// A bearer token is checked against the policy of the project the request resolves (CheckAccessToAsync): an
+// identity provider machine token only where ClientCredentials is enabled, a Storyteller token only where Federated
+// is. API key and certificate machines are checked by MachineAuthenticationMiddleware.
 public static class MachineCredentialPolicy
 {
     public static async Task EnsureAllowedAsync(FunctionContext context, string organization, string project)
     {
         if (!context.Items.TryGetValue(FunctionContextItemKeys.MachineCredentialKind, out var value)
-            || value is not MachineCredentialKind.ClientCredentials)
+            || value is not MachineCredentialKind kind)
         {
             return;
         }
@@ -26,10 +25,20 @@ public static class MachineCredentialPolicy
         var stored = policyStore is null ? null : await policyStore.GetAsync(organization, project);
         var policy = MachineAuthenticationPolicies.Resolve(stored, options);
 
-        if (!policy.IsEnabled(MachineCredentialKind.ClientCredentials))
+        if (!policy.IsEnabled(kind))
         {
             throw new SecurityTokenException(
-                $"The project {organization}.{project} does not enable client credentials for machines ({string.Join(", ", policy.EnabledCredentialKinds!)}).");
+                $"The project {organization}.{project} does not enable {Describe(kind)} for machines ({string.Join(", ", policy.EnabledCredentialKinds!)}).");
         }
+    }
+
+    private static string Describe(MachineCredentialKind kind)
+    {
+        return kind switch
+        {
+            MachineCredentialKind.ClientCredentials => "client credentials",
+            MachineCredentialKind.Federated => "workload identity federation",
+            _ => kind.ToString("G"),
+        };
     }
 }

@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\src\Access.Certificates.csproj" />
+    <ProjectReference Include="..\..\Access.Federation\src\Access.Federation.csproj" />
     <ProjectReference Include="..\..\Backend.CosmosDb\src\Backend.CosmosDb.csproj" />
     <ProjectReference Include="..\..\DbCreator\src\DbCreator.csproj" />
   </ItemGroup>

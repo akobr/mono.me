@@ -25,6 +25,11 @@ public static class ErrorCodes
     public const string EmailNotVerified = "EmailNotVerified";
     public const string EmailMismatch = "EmailMismatch";
 
+    // Workload identity federation: trusted issuers of a project and federation rules of its machines.
+    public const string InvalidFederation = "InvalidFederation";
+    public const string MachineNotFederated = "MachineNotFederated";
+    public const string FederatedIssuerInUse = "FederatedIssuerInUse";
+
     public const string PatchInvalid = "PatchInvalid";
     public const string PatchTestFailed = "PatchTestFailed";
 

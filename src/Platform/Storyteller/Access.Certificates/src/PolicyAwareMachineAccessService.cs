@@ -1,4 +1,5 @@
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Accessing.Federation;
 using _42.Platform.Storyteller.Accessing.Model;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -13,6 +14,7 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
     private readonly IOptions<MachineAuthenticationOptions> _options;
     private readonly ILogger<PolicyAwareMachineAccessService> _logger;
     private readonly IIdentityProviderMachineAccessService? _identityProviderService;
+    private readonly IFederatedMachineAccessService? _federatedService;
 
     public PolicyAwareMachineAccessService(
         ApiKeyMachineAccessService apiKeyService,
@@ -20,7 +22,8 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
         IMachineAuthenticationPolicyStore policyStore,
         IOptions<MachineAuthenticationOptions> options,
         ILogger<PolicyAwareMachineAccessService> logger,
-        IIdentityProviderMachineAccessService? identityProviderService = null)
+        IIdentityProviderMachineAccessService? identityProviderService = null,
+        IFederatedMachineAccessService? federatedService = null)
     {
         _apiKeyService = apiKeyService;
         _certificateService = certificateService;
@@ -28,11 +31,13 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
         _options = options;
         _logger = logger;
         _identityProviderService = identityProviderService;
+        _federatedService = federatedService;
     }
 
     // The machine picks one of the kinds its project enables (the project default when it names none).
     // A certificate gets the requested lifetime, else the project default. A CertificateAndApiKey machine
     // that uses a shared certificate gets no certificate of its own, so no lifetime either.
+    // Only a Federated machine has federation rules.
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
         var policy = await _policyStore.GetEffectiveAsync(model.Organization, model.Project, _options.Value);
@@ -52,6 +57,11 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
                 $"Only {MachineCredentialKind.CertificateAndApiKey} machines can use a shared certificate, not {credentialKind}.");
         }
 
+        if (credentialKind != MachineCredentialKind.Federated && model.FederationRules is { Count: > 0 })
+        {
+            throw new InvalidInputException(FederationValidation.RulesOnOtherKindMessage, ErrorCodes.MachineNotFederated);
+        }
+
         model = model with
         {
             CredentialKind = credentialKind,
@@ -59,6 +69,7 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
                 ? model.CertificateLifetimeDays ?? policy.CertificateLifetimeDays
                 : null,
             UseSharedCertificate = usesSharedCertificate,
+            FederationRules = credentialKind == MachineCredentialKind.Federated ? model.FederationRules : null,
         };
 
         return credentialKind switch
@@ -67,6 +78,7 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
             MachineCredentialKind.Certificate => await CreateCertificateOnlyAsync(model),
             MachineCredentialKind.CertificateAndApiKey => await CreateCertificateAndApiKeyAsync(model),
             MachineCredentialKind.ClientCredentials => await CreateClientCredentialsAsync(model),
+            MachineCredentialKind.Federated => await CreateFederatedAsync(model),
             _ => throw new InvalidOperationException($"Unknown credential kind: {credentialKind}"),
         };
     }
@@ -100,24 +112,45 @@ public class PolicyAwareMachineAccessService : IMachineAccessService
     }
 
     // Routed by the kind the access was created with: the project policy may have changed since.
+    // A Federated machine never reaches the API key or certificate services.
     public async Task<string?> ResetMachineAccessAsync(MachineAccess existingAccess, string organization, string project)
     {
-        return existingAccess.CredentialKind == MachineCredentialKind.ClientCredentials
-            ? await RequireIdentityProviderService().ResetMachineAccessAsync(existingAccess, organization, project)
-            : await ResetMachineAccessAsync(existingAccess.Id, organization, project);
+        return existingAccess.CredentialKind switch
+        {
+            MachineCredentialKind.ClientCredentials => await RequireIdentityProviderService().ResetMachineAccessAsync(existingAccess, organization, project),
+            MachineCredentialKind.Federated => await RequireFederatedService().ResetMachineAccessAsync(existingAccess, organization, project),
+            _ => await ResetMachineAccessAsync(existingAccess.Id, organization, project),
+        };
     }
 
+    // A Federated machine has nothing outside its document, so it can be deleted even after federation was switched off.
     public async Task<bool> DeleteMachineAccessAsync(MachineAccess existingAccess, string organization, string project)
     {
-        return existingAccess.CredentialKind == MachineCredentialKind.ClientCredentials
-            ? await RequireIdentityProviderService().DeleteMachineAccessAsync(existingAccess, organization, project)
-            : await DeleteMachineAccessAsync(existingAccess.ObjectId, organization, project);
+        return existingAccess.CredentialKind switch
+        {
+            MachineCredentialKind.ClientCredentials => await RequireIdentityProviderService().DeleteMachineAccessAsync(existingAccess, organization, project),
+            MachineCredentialKind.Federated => _federatedService is null
+                || await _federatedService.DeleteMachineAccessAsync(existingAccess, organization, project),
+            _ => await DeleteMachineAccessAsync(existingAccess.ObjectId, organization, project),
+        };
     }
 
     private IIdentityProviderMachineAccessService RequireIdentityProviderService()
     {
         return _identityProviderService
             ?? throw new MachineAccessNotSupportedException("ClientCredentials machine access is not configured for this deployment.");
+    }
+
+    private IFederatedMachineAccessService RequireFederatedService()
+    {
+        return _federatedService
+            ?? throw new MachineAccessNotSupportedException("Federated machine access is not configured for this deployment.");
+    }
+
+    private async Task<MachineAccess> CreateFederatedAsync(MachineAccessCreate model)
+    {
+        var result = await RequireFederatedService().CreateMachineAccessAsync(model);
+        return result with { CredentialKind = MachineCredentialKind.Federated };
     }
 
     private async Task<MachineAccess> CreateClientCredentialsAsync(MachineAccessCreate model)

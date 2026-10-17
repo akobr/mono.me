@@ -40,7 +40,7 @@ public class MachineCredentialKindDocumentFilterTests
         var schemas = document.Components.Schemas;
         schemas["MachineAuthenticationPolicy"].Properties["EnabledCredentialKinds"].Items.Reference.Id.ShouldBe("MachineCredentialKind");
         schemas["MachineCredentialKind"].Enum.Cast<OpenApiString>().Select(value => value.Value)
-            .ShouldBe(["ApiKey", "Certificate", "CertificateAndApiKey", "ClientCredentials"]);
+            .ShouldBe(["ApiKey", "Certificate", "CertificateAndApiKey", "ClientCredentials", "Federated"]);
     }
 
     private static OpenApiDocument Document()

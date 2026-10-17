@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using Newtonsoft.Json;
 
@@ -44,6 +45,9 @@ public record class MachineAccessEntity
     public bool UsesSharedCertificate { get; init; }
 
     public DateTimeOffset? LastRenewalAt { get; init; }
+
+    // Federated only: the rules a platform token must match.
+    public List<FederationRule>? FederationRules { get; init; }
 
     [JsonProperty("_etag")]
     [JsonPropertyName("_etag")]
