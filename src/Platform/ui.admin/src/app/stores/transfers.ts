@@ -108,6 +108,8 @@ export const useTransfersStore = defineStore('transfers', () => {
   const listeners = new Set<(job: TransferJob) => void>()
   /** Saved imports that are being read again after a reload, by id. */
   const restoring = new Map<string, SavedImport>()
+  /** Saved imports that could not be read for another reason than a 404: kept for a later reload. */
+  const unreadable = new Map<string, SavedImport>()
   let resumed = false
 
   function find(id: string | undefined): TransferJob | undefined {
@@ -225,7 +227,14 @@ export const useTransfersStore = defineStore('transfers', () => {
     let state: ViewImport | undefined
     try {
       state = await getViewImport(saved.scope.org, saved.scope.project, saved.scope.view, saved.id)
-    } catch {
+    } catch (error) {
+      if (!isStorytellerError(error) || error.status !== 404) {
+        // a network or server failure: keep the record, a later reload reads it again
+        restoring.delete(saved.id)
+        unreadable.set(saved.id, saved)
+        return
+      }
+
       state = undefined
     }
 
@@ -366,7 +375,7 @@ export const useTransfersStore = defineStore('transfers', () => {
   function saveImports(): void {
     const latest = new Map<string, SavedImport>()
 
-    for (const saved of restoring.values()) {
+    for (const saved of [...unreadable.values(), ...restoring.values()]) {
       latest.set(scopeKey(saved.scope), saved)
     }
 

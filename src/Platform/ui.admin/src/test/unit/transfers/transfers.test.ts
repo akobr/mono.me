@@ -327,6 +327,25 @@ describe('transfers store', () => {
       expect.objectContaining({ id: newer.id }),
     ])
   })
+
+  it('keeps a saved import that could not be read for another reason than a 404', async () => {
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/imports/:id', () =>
+        HttpResponse.json({ Message: 'down', ErrorCode: 'Unavailable' }, { status: 503 }),
+      ),
+    )
+    const saved = JSON.stringify([{ id: 'busy', scope, startedAt: Date.now(), finished: true }])
+
+    const { transfers } = await reload(saved)
+    const other = { ...scope, view: 'staging' }
+    await vi.waitFor(() => expect(transfers.latestImport(scope)).toBeUndefined())
+    server.resetHandlers()
+    await settle(await transfers.startImport(other, file(), { dryRun: true }))
+
+    expect(JSON.parse(sessionStorage.getItem('2s-admin:latest-imports')!)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'busy' })]),
+    )
+  })
 })
 
 describe('mock transfer options', () => {

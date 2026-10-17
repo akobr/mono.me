@@ -82,7 +82,8 @@ public static class JsonExtensions
 
             foreach (var path in removePaths
                          .Where(prop => prop.Type == JTokenType.String)
-                         .Select(prop => prop.ToString()))
+                         .Select(prop => prop.ToString())
+                         .ToArray())
             {
                 JToken[] tokens;
 
