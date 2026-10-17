@@ -105,6 +105,7 @@ describe('navigation', () => {
 
     expect(sections.map((section) => section.id)).toEqual(['view', 'project', 'org', 'global'])
     expect(sections.map((section) => section.label)).toEqual(['View · default', 'Project', 'Organization', undefined])
+    expect(sections.map((section) => section.defaultView)).toEqual([true, false, false, false])
     expect(sections[0]!.items[0]).toMatchObject({
       label: 'Annotations',
       to: '/acme/billing/default/annotations',
@@ -112,7 +113,7 @@ describe('navigation', () => {
     })
   })
 
-  it('names the selected view, the same for every view', () => {
+  it('names the selected view and marks only the default one', () => {
     const [section] = buildNavigation({
       org: 'acme',
       project: 'billing',
@@ -121,8 +122,15 @@ describe('navigation', () => {
       orgRole: 'None',
     })
 
-    expect(section).toMatchObject({ id: 'view', label: 'View · staging' })
+    expect(section).toMatchObject({ id: 'view', label: 'View · staging', defaultView: false })
     expect(section!.items[0]).toMatchObject({ to: '/acme/billing/staging/annotations', locked: false })
+  })
+
+  it('marks the default view on a project page without a remembered view', () => {
+    const scope = navigationScope({ org: 'acme', project: 'shipping' }, undefined, { 'acme.shipping': 'Contributor' })
+    const [section] = buildNavigation({ ...scope, projectRole: 'Contributor', orgRole: 'None' })
+
+    expect(section).toMatchObject({ id: 'view', label: 'View · default', defaultView: true })
   })
 
   it('shows only the global entries outside an organization', () => {
