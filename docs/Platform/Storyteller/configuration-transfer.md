@@ -18,7 +18,7 @@ All routes are below `v1/{organization}/{project}/{view}/configurations`, with t
 
 - **Export** needs the scope `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read` or `Default.ReadWrite` and any role on the project, like reading one configuration. The archive holds only own documents, which every reader can read.
 - **Import**, and reading an import, needs `Configuration.ReadWrite` or `Default.ReadWrite` and `Contributor`, like writing a configuration.
-- Machines are allowed with the same scopes. The caller's author string becomes the `Author` of imported versions, and its audit actor the job's `CreatedBy` and the actor of each audit entry.
+- Machines are allowed with the same scopes, except a machine restricted to an annotation: export and import span the whole view, so it gets `403 AnnotationRestricted` (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)). The caller's author string becomes the `Author` of imported versions, and its audit actor the job's `CreatedBy` and the actor of each audit entry.
 - The upload is copied into memory up to `MaxArchiveBytes` (a larger `Content-Length` is refused before reading) and must start with a zip signature; then the central directory is checked (see [Limits](#limits)).
 
 The background half is `Api.Functions/src/Transfers/ConfigurationTransferFunctions.cs`:

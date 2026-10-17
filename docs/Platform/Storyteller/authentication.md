@@ -274,7 +274,7 @@ Create returns the secret once. Get and list read the stored record: the secret 
 | `ObjectId` | string | Id used to reset and delete the credential at its source. Same value as `Id` for an API key or a certificate. AuthKit uses the WorkOS application id, Entra ID the application object id, and Keycloak the client's internal id. |
 | `AccessKey` | string | Secret. Create and reset return it in full: the structured `2s.` API key, or the client secret for client credentials. A certificate-only machine returns an empty string. Stored copies keep the first three characters and then `***`, or `***` when the value is shorter. |
 | `Scope` | `MachineAccessScope` | What the machine may call. `AnnotationRead` grants `Annotation.Read`. `AnnotationReadWrite` grants `Annotation.Read` and `Annotation.ReadWrite`. `ConfigurationRead` grants `Configuration.Read`. `ConfigurationReadWrite` grants `Configuration.Read` and `Configuration.ReadWrite`. `DefaultRead` grants `Default.Read`, `Annotation.Read` and `Configuration.Read`. `DefaultReadWrite` grants those three plus `Default.ReadWrite`, `Annotation.ReadWrite` and `Configuration.ReadWrite`. `SecretsRead` grants `Configuration.Read` and `Configuration.Secrets`, `SecretsReadWrite` adds `Configuration.ReadWrite`; such a machine receives [key/value secrets](key-values.md#secret-delivery) under the project's mTLS rule. Entra ID stores `DefaultReadWrite` for any `…ReadWrite` request and `DefaultRead` otherwise, and keeps the two secrets scopes as they are. |
-| `AnnotationKey` | string | Annotation key supplied at creation, stored and returned with the machine. A machine certificate also copies it onto the `annotationKey` claim. |
+| `AnnotationKey` | string | Optional [annotation restriction](#annotation-restriction-of-machines): the machine reaches this annotation and its descendants only. Create stores it in canonical form (type code in lower case, empty segments dropped), turns a blank value into null, and answers `400` `InvalidKey` for a key that does not parse. Null means the whole project. |
 | `CredentialKind` | `MachineCredentialKind` | `ApiKey`, `Certificate`, `CertificateAndApiKey` or `ClientCredentials`. Chosen at creation from the kinds the project enables (the project default when the request names none) and kept when the policy later changes. |
 | `CertificateThumbprint` | string | Thumbprint of the machine's current certificate. Present for `Certificate` and `CertificateAndApiKey`, except a machine that uses a shared certificate, and updated when the certificate is renewed. |
 | `Certificate` | string | Base64 PKCS#12 of a newly issued machine certificate. Returned on create. Cosmos keeps no copy, so get, list and reset omit it. |
@@ -342,13 +342,31 @@ The machine ID is the `clientId` (`42.sform.…`). Tokens come from `{ServerUrl}
 
 Reset regenerates the client secret.
 
+## Annotation restriction of machines
+
+A machine created with an `AnnotationKey` K is restricted to K. It reaches K and the descendants of K, in every view of its project, with what its `Scope` allows. The rule is the one of the [inheritance graph](inheritance.md): a machine restricted to the execution `exe.northwind.invoicing.prod` reaches that execution and its units of execution `uxe.northwind.invoicing.prod.*`, and a machine restricted to the subject `sbt.northwind` reaches its contexts, usages, executions and units of execution.
+
+| Operation | Restricted machine |
+| --- | --- |
+| Annotations (with their history and descendants), configurations (raw, resolved, versions, diffs, the diff to another view), annotation schemas, descendant-type schemas and the combined schema definition of K or a descendant | Allowed |
+| The same for an ancestor, a sibling or another branch of K | `403` |
+| Bulk create (`POST …/annotations`), lookup and restore of deleted annotations | Allowed when every key of the body is K or a descendant, otherwise `403` |
+| Lists of annotations, deleted annotations, configurations and schemas, compact bulk create (`…/annotations/simple`), type-level schemas, templates, export and import of configurations, key/values, the key/value policy and recipients | `403`: the operation spans the whole project |
+| The views of the project (`GET …/views`) and the binding catalog | Allowed: they hold no annotation data |
+
+A refusal is `403` with `ErrorCode` `AnnotationRestricted`. It comes before any read, so it does not tell whether the annotation exists. A key that does not parse is outside of the restriction.
+
+The ancestors of K, and the other parents of its descendants (the unit `unt.invoicing.export` of the unit of execution `uxe.northwind.invoicing.prod.export`, for example), still reach the machine through the effective and resolved configurations, and the resolved configuration is the only way a restricted machine gets key/values. Creating or restoring an annotation inside K also creates or restores its missing ancestors, as for every caller; the answer of a restore leaves the restored annotations outside K out.
+
+The restriction is read from the machine's document in the same point read that checks its membership, so it holds for every credential kind and costs nothing extra. Tokens and certificates carry no annotation claim. A stored key that does not parse (machines created before the key was validated) restricts the machine to nothing. A restricted machine that has a configuration write scope can still bind any key/value of the view into the configuration of K; give machines that only read a read scope (`ConfigurationRead` or `SecretsRead`).
+
 ## Caveats and scale of machine access
 
 A deployment has four machine credential kinds. `ClientCredentials` with AuthKit creates one WorkOS Connect M2M application per machine, and every one of those applications sits in the single organization `Auth:AuthKit:MachineOrganizationId`. `ApiKey`, `Certificate` and `CertificateAndApiKey` keep the credential inside Storyteller. The notes below are how that behaves at a few hundred thousand machines.
 
 ### What each call does
 
-A machine call that names a project goes through `CheckAccessToAsync`. That reads the organization container and then point-reads the `MachineAccessEntity` whose id is the machine id, in partition `{project}.access`. A missing document is rejected. Every machine call also reads the project policy (`IMachineAuthenticationPolicyStore`, cached for 60 seconds): an API key or certificate call checks that the machine's own kind is enabled, and a client-credentials call that `ClientCredentials` is enabled.
+A machine call that names a project goes through `CheckAccessToAsync`. That point-reads the `MachineAccessEntity` whose id is the machine id, in partition `{project}.access`, in the organization container. A missing document (or a missing container) is rejected with `401`, and the document's `AnnotationKey` decides the [annotation restriction](#annotation-restriction-of-machines). Every machine call also reads the project policy (`IMachineAuthenticationPolicyStore`, cached for 60 seconds): an API key or certificate call checks that the machine's own kind is enabled, and a client-credentials call that `ClientCredentials` is enabled.
 
 | Kind | Sent on each call | Work beside the membership read |
 |---|---|---|
@@ -357,7 +375,7 @@ A machine call that names a project goes through `CheckAccessToAsync`. That read
 | `CertificateAndApiKey` | The certificate and the API key | Both checks have to succeed, and the organization, project and machine id have to match. With a shared certificate, the certificate has to be a stored, unrevoked shared certificate of the same organization and project, and the machine id comes from the API key. |
 | `ClientCredentials` | `Authorization: Bearer` and a JWT | RS256 against the provider's JWKS, which is cached. AuthKit also requires `sub` equal to `client_id`, `aud` equal to `Auth:AuthKit:ClientId`, and `org_id` equal to `MachineOrganizationId`. Scopes come only from `PermissionMap`. |
 
-The membership read stays a point read as the catalogue grows, as long as the machines are spread across projects. Every machine of one project shares the logical partition `{project}.access`. Cosmos serves a logical partition from one physical partition, and a physical partition is capped at 10,000 RU/s. A point read of this small document is about 1 RU, so one project cannot carry tens of thousands of machine calls per second. The container read in front of it adds a second round trip to every such call, for every kind.
+The membership read stays a point read as the catalogue grows, as long as the machines are spread across projects. Every machine of one project shares the logical partition `{project}.access`. Cosmos serves a logical partition from one physical partition, and a physical partition is capped at 10,000 RU/s. A point read of this small document is about 1 RU, so one project cannot carry tens of thousands of machine calls per second.
 
 ### AuthKit at a few hundred thousand applications
 
@@ -371,7 +389,7 @@ Reset lists the secrets, mints a new one, and revokes the previous ones. At five
 
 Machines call the token endpoint with their own client id and secret, so those calls do not spend the management key's 6,000 requests. The client-credentials example in the WorkOS token reference expires 300 seconds after it is issued. Storyteller does not choose that lifetime. If tokens in the environment match the example, 100,000 machines refreshing as each token expires send about 330 token requests a second to the AuthKit domain, and 500,000 send about 1,700, before any of them calls Storyteller. Read `expires_in` on a token from the environment before planning that load. Storyteller keeps no revocation list. A token that has already been issued stays valid until `exp`, and the Cosmos membership read still accepts it while the document exists.
 
-`PermissionMap` is copied onto the application at create. A later edit of the map leaves existing applications as they were. A map that only partly covers the requested `Scope` still creates the application and writes a warning; the stored `Scope` then describes more access than the token carries. `AnnotationKey` is stored on the document and is absent from the token.
+`PermissionMap` is copied onto the application at create. A later edit of the map leaves existing applications as they were. A map that only partly covers the requested `Scope` still creates the application and writes a warning; the stored `Scope` then describes more access than the token carries. `AnnotationKey` is stored on the document and is absent from the token; the [annotation restriction](#annotation-restriction-of-machines) is read from the document.
 
 Every application shares one WorkOS organization and one audience, `Auth:AuthKit:ClientId`. `org_id` is that organization for every Storyteller organization and project. The project in the request URL is what the Cosmos read checks, so a token minted for one project fails in another project where that client id has no document. An application created in the WorkOS dashboard, rather than through Storyteller, receives a token that passes the signature checks and then fails the Cosmos read.
 
@@ -405,8 +423,9 @@ The two status codes mean different things, so a client knows whether signing in
 | --- | --- | --- |
 | `401` | The credentials are missing, invalid or expired, or the token lacks the required scope. Machine credentials that fail their checks also get 401. | none |
 | `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
+| `403` | A machine restricted to an annotation addressed another annotation, or an operation of the whole project (see [Annotation restriction of machines](#annotation-restriction-of-machines)). | `ErrorResponse` with `ErrorCode` `AnnotationRestricted` |
 
-A user role check runs on every project endpoint (`CheckAccessToProjectAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`, and so does reading the machine authentication policy. Shared certificates, access points and setting the machine authentication policy need `Administrator`. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check.
+A user role check runs on every project endpoint (`CheckAccessToProjectAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`, and so does reading the machine authentication policy. Shared certificates, access points and setting the machine authentication policy need `Administrator`. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check of users. The checks of machines (their document, the credential policy and the annotation restriction) run in every build.
 
 Other access-management errors use the same `ErrorResponse` shape, without exception details:
 
