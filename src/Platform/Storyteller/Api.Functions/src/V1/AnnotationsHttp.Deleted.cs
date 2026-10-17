@@ -69,7 +69,7 @@ public partial class AnnotationsHttp
         string key)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {
@@ -101,7 +101,7 @@ public partial class AnnotationsHttp
         string view)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? []);
 
         if (!TryParseKeys(model?.Keys, out var keys, out var badRequest))
         {
@@ -133,7 +133,7 @@ public partial class AnnotationsHttp
         string view)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Contributor);
 
         if (!TryParseKeys(model?.Keys, out var keys, out var badRequest))
         {
@@ -207,7 +207,7 @@ public partial class AnnotationsHttp
         string key)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {

@@ -197,7 +197,7 @@ public partial class ConfigurationSchemaHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {
@@ -238,7 +238,7 @@ public partial class ConfigurationSchemaHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {
@@ -300,7 +300,7 @@ public partial class ConfigurationSchemaHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {
@@ -342,7 +342,7 @@ public partial class ConfigurationSchemaHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {
@@ -390,7 +390,7 @@ public partial class ConfigurationSchemaHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {
@@ -459,7 +459,7 @@ public partial class ConfigurationSchemaHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {
@@ -504,7 +504,7 @@ public partial class ConfigurationSchemaHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {

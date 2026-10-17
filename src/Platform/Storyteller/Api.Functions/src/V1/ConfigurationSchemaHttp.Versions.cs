@@ -397,7 +397,16 @@ public partial class ConfigurationSchemaHttp
         string? annotationKey)
     {
         request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+
+        // A type-level schema spans the project; the schemas of an annotation belong to it.
+        if (annotationKey is null)
+        {
+            await request.CheckAccessToProjectAsync(_access, organization, project);
+        }
+        else
+        {
+            await request.CheckAccessToAnnotationAsync(_access, organization, project, annotationKey);
+        }
 
         if (annotationType is not null && !TryValidateAnnotationType(annotationType, out var rejected))
         {

@@ -425,7 +425,7 @@ public static class Definitions
         public const string ResponseAccount = "Details about the log in account, contains all accessible access points.";
         public const string ResponseBadRequest = "The request is not well formed.";
         public const string ResponseUnauthorized = "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): ";
-        public const string ResponseForbidden = "The caller is authenticated, but its role on the organization or project does not allow the operation.";
+        public const string ResponseForbidden = "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).";
         public const string ResponseConfigurationNotFound = "The configuration doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).";
         public const string ResponseConcurrentChange = "The annotations changed concurrently three times in a row (Conflict); try again.";
         public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";
