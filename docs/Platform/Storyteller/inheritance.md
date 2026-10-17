@@ -221,3 +221,74 @@ The invalidation skips configuration items of soft-deleted annotations (`Annotat
 | `GetConfigurationViewChangesAsync` | A diff of the effective document of one annotation in two views. |
 
 `GetConfigurationHierarchyViewAsync` is the per-level breakdown. `GetRawConfigurationAsync` is the single merged object.
+
+## Conditional reads
+
+The effective read (`GET .../configuration/{key}`) and the resolved read (`.../resolved`) answer with a weak `ETag`. A client sends it back in `If-None-Match`. When the configuration is the same, the API answers `304 Not Modified` without a body. `If-None-Match: *` matches any configuration that exists, and a header that is not a valid list of entity tags is ignored. The code is in `Api.Functions/src/ConditionalReads` and `ConfigurationHttp`.
+
+### The tags
+
+A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, over these inputs: the full key (organization, project, view, annotation key), `Version`, `Hash` and the JSON of `Content`. Each input is length-prefixed.
+
+| Kind | Read | Also hashed |
+| --- | --- | --- |
+| `e` | Effective | – |
+| `r` | Resolved, document without bindings | The secret rights |
+| `b` | Resolved, document with bindings | The secret rights; `Content` is the resolved one, and the digest is HMAC-SHA256 |
+
+- **`Hash`.** `Hash` (`CalculatedContentHash`) is part of every tag, but it is not the tag:
+  - it is null for an empty document;
+  - after a lost cache race it can come from another write than `Content`;
+  - it has 32 bits;
+  - it stays the same when an own write bumps `Version` without changing the merge.
+
+  With `Version`, `Hash` and `Content` hashed together, the tag follows every field of the body that can change.
+- **`Modified`.** Not hashed. Past version 0 it changes only with `Version`. A configuration without an item gets `Modified` set to the time of the read, which would defeat every revalidation.
+- **The full key.** The same document under another key gets another tag, so nobody can make the server compute someone else's tag in their own configuration.
+- **The secret rights.** There are three values:
+  - the caller may read secrets;
+  - secrets are withheld from a machine without mTLS, which also gets `X-2S-Secrets-Withheld`;
+  - neither.
+
+  Callers with different rights never share a resolved tag.
+
+### The resolved read
+
+`IConfigurationService.HasBindings` asks the registered binding resolver whether resolving could change the effective document. `ConfigurationBindingResolver.ContainsBindings` looks for a string that starts with `@` and for an object with a string `$binding`. A resolver that does not override the check is always run.
+
+| Document | What the read does | What a 304 saves |
+| --- | --- | --- |
+| No bindings | The effective document is the resolved one. It is tagged `r` and answered without calling the resolver. | Everything but the configuration point read and the access checks |
+| Bindings | `ResolveConfigurationAsync` evaluates it, and the resolved body is tagged `b`. | The transfer only |
+
+For a document with bindings, every conditional read still evaluates the bindings:
+- key/value lookups with their usage counters and audit entries;
+- Key Vault calls;
+- `@annotation` reads;
+- JSON-e.
+
+A document that reads the clock (JSON-e `now`, `$fromNow`) gets a new tag on every read.
+
+The `b` tags are keyed because a resolved body can carry secret values, and a plain hash in a header could be brute-forced for a weak secret. The key comes from `ConditionalReads:EntityTagKey`: base64 of at least 32 bytes, validated on start.
+- Set it as an app setting or a Key Vault reference, never in a committed settings file.
+- Without it, each process draws a random key. Tags stay correct but differ between instances, so a poller that lands on another instance gets a 200.
+
+The `e` and `r` tags are not keyed. They hash the stored document, which every reader of the project gets from the effective read anyway. Secrets belong in key/value pairs or Key Vault.
+
+### Headers
+
+The headers are the same on a 200 and a 304, and are never sent on a 400, 404 or 422. The scope check, the access check and the `404` run before the tag is compared, so a caller without access learns nothing from it.
+
+| Header | Value |
+| --- | --- |
+| `ETag` | The tag |
+| `Cache-Control` | `no-store` when the caller may read secrets (resolved read). Otherwise `private, no-cache`: shared caches do not store the response, and a browser revalidates its copy before each use. |
+| `X-2S-Secrets-Withheld` | `mtls-required` when secrets were withheld |
+
+The admin UI calls the API cross-origin. It cannot read the `ETag`, but the browser revalidates on its own and turns a 304 back into the stored 200.
+
+### Limits
+
+- **Writes ignore `If-Match`.** The tags are weak, and `If-Match` needs a strong tag. A JSON Patch `test` operation guards a write instead.
+- **The tag follows the effective cache.** A descendant whose `CalculatedContent` is stale (see "Cache and descendant freshness") keeps its tag until the cache is cleared.
+- **Not covered:** `HEAD`, `If-Modified-Since` and the listings.

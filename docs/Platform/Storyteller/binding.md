@@ -8,6 +8,8 @@ The data binding system lets configuration values, stored as JSON, reference ext
 
 Resolution runs on the resolved read (`GetResolvedConfigurationAsync` and the with-secrets / without-secrets variants). Writes, `GetRawConfigurationAsync`, the hierarchy view, and version content keep the stored JSON, including any object-binding envelope.
 
+The resolved read of the API asks `IConfigurationBindingResolver.ContainsBindings` first. A document without bindings is answered without the resolver. A document with bindings is resolved for every read, even when `If-None-Match` ends in a 304 ([conditional reads](inheritance.md#conditional-reads)).
+
 The system is split into five binding projects, plus built-in functions contributed by `Backend.Core`:
 - **Binding.Abstractions**: Core interfaces and data structures (`IBindingExecutor`, `IConfigurationBindingResolver`, `IBindingRegistry`, `IBindingCatalog`, `IBindingSource`, `IBindingFunction`, `IDescribedBinding`, `BindingScope`).
 - **Binding.Language**: The `@` string interpreter (tokenizer, parser, evaluator), the `IBindingExecutor` entry point, the `JsonQuery` structured-query helper, and the built-in `@config` function.

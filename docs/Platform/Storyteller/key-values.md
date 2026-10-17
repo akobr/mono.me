@@ -446,7 +446,7 @@ The native store is the **default binding source** of resolved configurations, a
 - A public pair always binds. A secret binds only when the caller may receive secrets (`ContributorWithSecrets`, or the scope `Configuration.Secrets`); otherwise the string stays as stored, like any unresolved binding.
 - `public` declines secrets, and `secret` declines public pairs.
 - A missing or deleted key declines. At the top level the string stays as stored; inside an interpolation or a math expression the read fails with a binding error (`422`).
-- Each key is looked up once per resolved read, and a changed pair takes effect on the next read. Nothing is cached across reads.
+- Each key is looked up once per resolved read, and a changed pair takes effect on the next read. Nothing is cached across reads. A conditional read (`If-None-Match`) of a document with bindings looks the keys up too: its 304 saves the transfer, not the lookups ([conditional reads](inheritance.md#conditional-reads)).
 - A vault that keeps throttling fails the read with `503`; a secret is never silently left unbound.
 
 A vault entry of `AzureKeyVaults` named `default`, `public` or `secret` is still a vault, but no longer a raw binding source. Give such a vault another name to read it by its native secret names, for example `@(db.password, shared)`.

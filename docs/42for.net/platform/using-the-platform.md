@@ -38,6 +38,8 @@ GET /v1/house/main/default/configuration/exe.northwind.invoicing.production/reso
 
 The body is the same document with expressions evaluated. Secret sources are included only when the caller has the `Configuration.Secrets` scope. A caller without that scope can still read secrets when it has both the `User.Impersonation` scope and a project role of `ContributorWithSecrets` or higher. Everyone else receives the document with those secret expressions left unresolved.
 
+Both reads return an `ETag`. A service that polls sends it back in `If-None-Match`, and gets `304 Not Modified` without a body while nothing has changed. A document without bindings (no `@` expressions and no object bindings) is answered cheaply. A document with bindings is still evaluated on every poll, so the 304 saves only the transfer.
+
 The service does not merge customer files, environment files, and default files itself. The execution key is the merge.
 
 ## What a person browses
