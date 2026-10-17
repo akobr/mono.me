@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Api.ConditionalReads;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
@@ -81,6 +82,9 @@ var host = new HostBuilder()
 
         // Add persistant and logic layer
         services.AddCosmosDbAnnotations(context.Configuration, "cosmos");
+
+        // ETag and If-None-Match on the configuration reads; ConditionalReads:EntityTagKey shares the tags over resolved bindings between instances.
+        services.AddConditionalReads(context.Configuration);
 
         // Key/value secrets: the Standard level wraps its data keys in the vault AzureKeyVaults:{KeyValues:Protection:Standard:VaultName};
         // without that vault only public pairs can be written.

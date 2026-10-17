@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
+using _42.Platform.Storyteller.Api.ConditionalReads;
 using _42.Platform.Storyteller.Api.ErrorHandling;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
@@ -14,6 +15,7 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
+using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -80,14 +82,15 @@ public class ConfigurationHttp
     }
 
     [Function(nameof(GetConfiguration))]
-    [OpenApiOperation(Definitions.RouteIds.Configuration.GetConfiguration, Definitions.Tags.Configurations)]
+    [OpenApiOperation(Definitions.RouteIds.Configuration.GetConfiguration, Definitions.Tags.Configurations, Description = Definitions.Descriptions.ConditionalRead)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The configuration model.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), CustomHeaderType = typeof(EntityTagResponseHeader), Description = "The configuration model.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotModified, CustomHeaderType = typeof(EntityTagResponseHeader), Description = Definitions.Descriptions.ResponseNotModified)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConfigurationNotFound)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -116,18 +119,20 @@ public class ConfigurationHttp
             return await NotFoundAsync(fullKey);
         }
 
-        return new OkObjectResult(configurationModel);
+        request.MarkNoCache();
+        return request.OkOrNotModified(configurationModel, ConfigurationEntityTags.ForEffective(fullKey, configurationModel));
     }
 
     [Function(nameof(GetConfigurationResolved))]
-    [OpenApiOperation(Definitions.RouteIds.Configuration.GetResolvedConfiguration, Definitions.Tags.Configurations)]
+    [OpenApiOperation(Definitions.RouteIds.Configuration.GetResolvedConfiguration, Definitions.Tags.Configurations, Description = Definitions.Descriptions.ConditionalRead + " " + Definitions.Descriptions.ConditionalResolvedRead)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Key)]
-    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), Description = "The configuration model with resolved substitutions.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Configuration), CustomHeaderType = typeof(EntityTagResponseHeader), Description = "The configuration model with resolved substitutions.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.NotModified, CustomHeaderType = typeof(EntityTagResponseHeader), Description = Definitions.Descriptions.ResponseNotModified)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.UnprocessableEntity, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A binding in the configuration cannot be evaluated or exceeds an evaluation limit. ErrorCode is binding.evaluation or binding.limit.<kind>.")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConfigurationNotFound)]
@@ -152,11 +157,25 @@ public class ConfigurationHttp
         // secrets go to machines only over mTLS when the project says so; a withheld read says why in a header
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
-        var configurationModel = await _configuration.GetResolvedConfigurationAsync(fullKey, rights.CanReadSecrets);
+        var configurationModel = await _configuration.GetRawConfigurationAsync(fullKey);
 
         if (configurationModel is null)
         {
             return await NotFoundAsync(fullKey);
+        }
+
+        EntityTagHeaderValue entityTag;
+
+        if (_configuration.HasBindings(configurationModel))
+        {
+            // a 304 saves the transfer here, the bindings are evaluated for every read
+            configurationModel = await _configuration.ResolveConfigurationAsync(fullKey, configurationModel, rights.CanReadSecrets);
+            entityTag = ConfigurationEntityTags.ForResolvedBindings(fullKey, configurationModel, rights, request.GetEntityTagKey());
+        }
+        else
+        {
+            // nothing to bind: the effective document is the resolved one, and it is answered without evaluating
+            entityTag = ConfigurationEntityTags.ForResolved(fullKey, configurationModel, rights);
         }
 
         if (rights.IsWithheldByMtls)
@@ -168,8 +187,12 @@ public class ConfigurationHttp
         {
             request.MarkNoStore();
         }
+        else
+        {
+            request.MarkNoCache();
+        }
 
-        return new OkObjectResult(configurationModel);
+        return request.OkOrNotModified(configurationModel, entityTag);
     }
 
     [Function(nameof(SetConfiguration))]

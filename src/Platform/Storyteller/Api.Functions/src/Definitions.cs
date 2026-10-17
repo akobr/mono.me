@@ -442,6 +442,10 @@ public static class Definitions
         public const string AccountId = "The id of the account (the identity provider's subject).";
         public const string InvitationId = "The id of the invitation.";
         public const string Key = "The key of the requested annotation.";
+        public const string ConditionalRead = "The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.";
+        public const string ConditionalResolvedRead = "A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.";
+        public const string ResponseNotModified = "The configuration is unchanged since the ETag sent in If-None-Match.";
+        public const string EntityTag = "Weak entity tag of the configuration, for If-None-Match.";
         public const string AnnotationType = "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).";
         public const string DiffFormat = "Response format: 'json' (default) for structured hunk model, 'unified' for raw unified diff text.";
         public const string KeyValueKey = "The key of the pair: dot-separated segments of letters, digits and underscores, case-insensitive, at most 128 characters.";
