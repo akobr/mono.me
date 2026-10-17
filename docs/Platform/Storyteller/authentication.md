@@ -491,7 +491,7 @@ POST v1/acme/billing/access/machines
 { "Organization": "acme", "Project": "billing", "Scope": "AnnotationRead", "CredentialKind": "Federated",
   "FederationRules": [ { "Issuer": "github",
                          "Audience": "https://api.example.com/api/v1/acme/billing/access/token",
-                         "Subject": "repo:acme/billing:environment:production",
+                         "Subject": "repo:acme@65/billing@74:environment:production",
                          "Claims": { "repository_id": [ "74" ] } } ] }
 ```
 
@@ -500,7 +500,7 @@ The same with `sform` (the machine commands live under `sform account machine`, 
 ```
 sform account machine machine-auth -k api-key -k federated -d api-key
 sform account machine issuer set github --issuer https://token.actions.githubusercontent.com --require-claim repository_owner_id=65 --description "GitHub Actions of the acme organization"
-sform account machine create --issuer github --audience https://api.example.com/api/v1/acme/billing/access/token --subject repo:acme/billing:environment:production --claim repository_id=74
+sform account machine create --issuer github --audience https://api.example.com/api/v1/acme/billing/access/token --subject repo:acme@65/billing@74:environment:production --claim repository_id=74
 ```
 
 * `machine create` with `--issuer` (a trusted issuer's name), `--audience`, `--subject` and any `--claim key=value` creates a `Federated` machine with one rule; the rule options imply `-k federated`. `--audience` is the machine's `TokenEndpoint`, except for Azure, where it is the `aud` of the Storyteller app registration's tokens: `<appId>` with `requestedAccessTokenVersion` 2, `api://<appId>` with 1 (see [Azure managed identity](#azure-managed-identity)). `--rules-file <path>` takes a JSON array of rules instead, the body of the [rules `PUT`](#federation-rules); its strings are sent as written. A repeated `--claim` key adds an accepted value, and the key may be a JSON pointer (`--claim /kubernetes.io/namespace=billing`). `-k federated` without rules, rule options with another kind, both a file and rule options, an incomplete rule, or a rules file with a property other than `Issuer`, `Audience`, `Subject` and `Claims` (a misspelled `Claim`) or with a value that is not a JSON string (`[ true ]` as a claim value) fail before any request; the server validates the rules themselves and its `400` message is printed. The output shows the machine id (the `client_id` of an exchange), its `TokenEndpoint`, the rules and a `curl` exchange, and no secret.
@@ -563,7 +563,7 @@ PUT v1/acme/billing/access/machines/3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07/federat
 [ { "Issuer": "aks-prod", "Audience": "https://api.example.com/api/v1/acme/billing/access/token",
     "Subject": "system:serviceaccount:billing:*", "Claims": { "/kubernetes.io/namespace": [ "billing" ] } },
   { "Issuer": "github", "Audience": "https://api.example.com/api/v1/acme/billing/access/token",
-    "Subject": "repo:acme/billing:environment:production", "Claims": { "repository_id": [ "74" ] } } ]
+    "Subject": "repo:acme@65/billing@74:environment:production", "Claims": { "repository_id": [ "74" ] } } ]
 ```
 
 **Matching.** An exchange verifies the platform token against the machine's rules:
@@ -585,7 +585,7 @@ PUT v1/acme/billing/access/machines/3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07/federat
 |---|---|
 | `Issuer` | Names a trusted issuer of the project. |
 | `Audience` | Refused when it belongs to another relying party, so a token minted for that party cannot be replayed here: `sts.amazonaws.com`, `pods.eks.amazonaws.com`, `api://AzureADTokenExchange`, `https://kubernetes.default.svc`, `https://kubernetes.default.svc.cluster.local`; anything starting with `//iam.googleapis.com/`, `https://iam.googleapis.com/`, `https://github.com/` or `https://vercel.com/` (the GitHub and Vercel defaults); the Azure resources `https://management.azure.com`, `https://management.core.windows.net`, `https://graph.microsoft.com`, `https://vault.azure.net`, `https://storage.azure.com`, `https://database.windows.net`; and the trusted issuer's own `Issuer` (the default Kubernetes `--api-audiences`). Case and one trailing `/` are ignored. |
-| `Subject` | `*` may appear once, as the last character, right after `:` or `/`: `system:serviceaccount:prod:*`, `repo:acme/app:*`, `arn:aws:iam::123456789012:role/ci/*`. |
+| `Subject` | `*` may appear once, as the last character, right after `:` or `/`: `system:serviceaccount:prod:*`, `repo:acme@65/billing@74:*`, `arn:aws:iam::123456789012:role/ci/*`. |
 | `Claims` | At most 10 keys, 1 to 10 values per key, each value 1 to 512 characters. A claim name matches `^[A-Za-z0-9_.:-]{1,128}$`. A pointer is `/` and 1 to 256 characters, with `~1` for `/` and `~0` for `~`; any other `~` sequence is refused. `iss`, `sub`, `aud`, `exp`, `nbf`, `iat` and `jti` cannot be pinned, bare or as `/name`; use `Subject` and `Audience`. `RequiredClaims` follow the same rules. |
 | GitHub Actions issuers | Host `token.actions.githubusercontent.com` (any path, so enterprise issuers too) or `token.actions.<subdomain>.ghe.com`, whatever the `KeySource`: the rule or the issuer's `RequiredClaims` must pin `repository_owner_id`, `repository_id` or `enterprise_id`. |
 | Vercel issuers | Host `oidc.vercel.com` (global and team issuers): the rule or the issuer's `RequiredClaims` must pin `owner_id`. |
@@ -735,12 +735,12 @@ Each platform below names the trusted issuer, the rule's audience and subject, t
 
 * **Issuer:** `https://token.actions.githubusercontent.com`, `Discovery`. An enterprise with a unique issuer (`include_enterprise_slug`) uses `https://token.actions.githubusercontent.com/<enterprise>`; GHE.com uses `https://token.actions.<subdomain>.ghe.com`, optionally with `/<enterprise>`.
 * **Audience:** `$AUD`, requested by the workflow. The default `https://github.com/<owner>` is refused.
-* **Subject:** `repo:<owner>/<repo>:environment:<name>`, `repo:<owner>/<repo>:ref:refs/heads/<branch>`, `repo:<owner>/<repo>:pull_request`, or a prefix such as `repo:acme/billing:*`.
+* **Subject:** `repo:<owner>@<owner-id>/<repo>@<repo-id>:environment:<name>`, `…:ref:refs/heads/<branch>`, `…:pull_request`, or a prefix such as `repo:acme@65/billing@74:*`. Older repositories use the name-based `repo:<owner>/<repo>:…` (see below).
 * **Pins:** `repository_owner_id` in the issuer's `RequiredClaims`, `repository_id` in the rule. One of `repository_owner_id`, `repository_id` or `enterprise_id` is required.
 * **Lifetime:** the default. A token is valid for a single job, and GitHub's documented example lives 5 minutes.
 * **`subject_token_type`:** `urn:ietf:params:oauth:token-type:jwt`.
 
-GitHub's immutable subject, `repo:OWNER@OWNER_ID/REPO@REPO_ID:…` (for example `repo:acme@65/billing@74:ref:refs/heads/main`), is the default for repositories created, renamed or transferred after 2026-07-15. Older repositories keep the name-based format unless they opt in, and GitHub Enterprise Server does not offer it. Write the subject in the format the repository uses: a name-based subject stops matching once the repository is renamed or transferred. The id pins exist because a recycled name produces the same name-based `sub`.
+GitHub's immutable subject, `repo:OWNER@OWNER_ID/REPO@REPO_ID:…` (for example `repo:acme@65/billing@74:ref:refs/heads/main`), is the default for repositories created, renamed or transferred after 2026-07-15. Older repositories keep the name-based `repo:OWNER/REPO:…` (`repo:acme/billing:environment:production`) unless the organization or repository opts in, and GitHub Enterprise Server offers only the name-based format. Write the subject in the format the repository uses: a name-based subject stops matching once the repository is renamed or transferred. The id pins exist because a recycled name produces the same name-based `sub`.
 
 The job needs `permissions: id-token: write`. A JavaScript action calls `core.getIDToken('<aud>')`; a shell step asks the runner:
 
@@ -806,14 +806,16 @@ The kubelet replaces the token once it is older than 80 % of its lifetime or 24 
 
 #### Vercel
 
-* **Issuer:** the team issuer `https://oidc.vercel.com/<team-slug>` (recommended) or the global `https://oidc.vercel.com`, `Discovery`. Renaming the team changes the issuer, and `Issuer` cannot change: add a new trusted issuer and move the rules to it.
-* **Audience:** `$AUD`. A build gets its token in `VERCEL_OIDC_TOKEN` and a function in the `x-vercel-oidc-token` request header, both with the default audience `https://vercel.com/<team-slug>`, which is refused. `getVercelOidcToken({ audience })` of Vercel's SDK returns one with the rule's audience.
+* **Issuer:** the team issuer `https://oidc.vercel.com/<team-slug>`, `Discovery`. A token with a custom audience always carries it, whatever issuer mode the project uses, so the global `https://oidc.vercel.com` never fits. Renaming the team changes the issuer, and `Issuer` cannot change: add a new trusted issuer and move the rules to it.
+* **Audience:** `$AUD`. A build gets its token in `VERCEL_OIDC_TOKEN` and a function in the `x-vercel-oidc-token` request header, both with the default audience `https://vercel.com/<team-slug>`, which is refused. `getVercelOidcToken({ audience })` of `@vercel/oidc` 3.7.0 or later exchanges it at Vercel for a token with the rule's audience and the team issuer.
 * **Subject:** `owner:<team-slug>:project:<project-name>:environment:<environment>`, where the environment is `development`, `preview`, `production` or a custom environment.
 * **Pins:** `owner_id` (`team_…`, required), best in `RequiredClaims`; `project_id` (`prj_…`) in the rule. The slugs in `sub` change when a team or project is renamed; the ids do not.
 * **Lifetime:** 7,200. Function tokens live 2 hours (Vercel reuses one for up to 90 minutes) and build tokens 1 hour. 43,200 when development tokens (12 hours) are exchanged too.
 * **`subject_token_type`:** `urn:ietf:params:oauth:token-type:jwt`.
 
 ```ts
+import { getVercelOidcToken } from '@vercel/oidc';
+
 const subjectToken = await getVercelOidcToken({ audience: tokenEndpoint });
 const response = await fetch(tokenEndpoint, {
   method: 'POST',
@@ -830,7 +832,7 @@ const { access_token, expires_in } = await response.json();
 #### Azure managed identity
 
 * **Audience:** the `aud` of tokens for an app registration in your own tenant that stands for Storyteller and nothing else, with the identifier URI `api://<appId>`; the workload asks for `resource=api://<appId>`. The registration's `requestedAccessTokenVersion` decides the token version, whatever endpoint the workload calls: with `2`, `aud` is `<appId>`; with null or `1`, it is `api://<appId>`. A token for an Azure resource (management, Graph, Key Vault, Storage, SQL) is refused.
-* **Issuer:** with version 2, `https://login.microsoftonline.com/<tenant>/v2.0`; with version 1, `https://sts.windows.net/<tenant>/` (with the trailing `/`). `Discovery` works for both. A token of the other version is refused.
+* **Issuer:** with version 2, `https://login.microsoftonline.com/<tenant-id>/v2.0`; with version 1, `https://sts.windows.net/<tenant-id>/` (with the trailing `/`). `<tenant-id>` is the tenant ID, a GUID (`az account show --query tenantId -o tsv`), never a domain such as `contoso.onmicrosoft.com`: tokens carry the GUID, and discovery under a domain answers with the GUID issuer, which does not equal `Issuer`. `Discovery` works for both versions. A token of the other version is refused.
 * **Subject:** the managed identity's object (principal) id; for a managed identity, `sub` equals `oid`. Every identity of the tenant can get a token for the audience, so the subject is the only thing that picks yours, and a wildcard is refused.
 * **Lifetime:** 86,400. The managed identity endpoint caches a token per resource for about 24 hours and cannot be made to refresh it.
 * **`subject_token_type`:** `urn:ietf:params:oauth:token-type:access_token`.
@@ -863,10 +865,11 @@ On AKS, use the [Kubernetes](#kubernetes) path instead of workload identity.
 * **`subject_token_type`:** `urn:ietf:params:oauth:token-type:jwt`. Both signing algorithms, `ES384` and `RS256`, are accepted.
 
 ```bash
-aws sts get-web-identity-token --audience "$AUD" --signing-algorithm ES384 --region eu-central-1
+aws sts get-web-identity-token --audience "$AUD" --signing-algorithm ES384 --region eu-central-1 \
+  --query WebIdentityToken --output text
 ```
 
-Call a regional STS endpoint: the global one does not offer the operation. The response carries the token.
+Call a regional STS endpoint: the global one does not offer the operation. The response is JSON with `WebIdentityToken` and `Expiration`; `--query WebIdentityToken --output text` prints the token alone.
 
 #### Google Cloud
 
