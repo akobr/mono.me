@@ -54,6 +54,47 @@ test('updates the sections when another view is opened', async ({ page }, testIn
   )
 })
 
+/** The section label of the view in the navigation menu ("View · default"). */
+const viewLabel = (navigation: Locator, view: string) =>
+  navigation.locator('[data-slot="label"]').filter({ hasText: `View · ${view}` })
+
+/** The view button of the switcher in the top bar (hidden on a phone). */
+const viewButton = (page: Page) => page.getByRole('navigation', { name: 'Context' }).getByRole('button').nth(2)
+
+// The default view is the production one: a "prod" badge marks it in the menu and in the switcher (424-43).
+test('marks the default view as production in the menu and the switcher', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/default/annotations')
+
+  const label = viewLabel(await menu(page, testInfo), 'default')
+  await expect(label).toBeVisible()
+  await expect(label.getByText('prod', { exact: true })).toBeVisible()
+
+  if (!isMobile(testInfo)) {
+    await expect(viewButton(page)).toHaveAccessibleName(/^default\s*prod$/)
+    await expect(viewButton(page).getByText('prod', { exact: true })).toBeVisible()
+  }
+})
+
+test('does not mark another view, and marks the default one in the list of views', async ({ page }, testInfo) => {
+  await openApp(page, '/acme/billing/staging/annotations')
+
+  const label = viewLabel(await menu(page, testInfo), 'staging')
+  await expect(label).toBeVisible()
+  await expect(label.getByText('prod', { exact: true })).toHaveCount(0)
+  if (isMobile(testInfo)) {
+    return
+  }
+
+  await expect(viewButton(page)).toHaveAccessibleName('staging')
+  await viewButton(page).click()
+  await expect(page.getByRole('menuitem', { name: /^staging$/ })).toBeVisible()
+  await page.getByRole('menuitem', { name: /^default\s*prod$/ }).click()
+
+  await expect(page).toHaveURL('/acme/billing/default/annotations')
+  await expect(viewButton(page)).toHaveAccessibleName(/^default\s*prod$/)
+  await expect(viewLabel(await menu(page, testInfo), 'default').getByText('prod', { exact: true })).toBeVisible()
+})
+
 // The unit tests compare the src of the logo only; this checks that the browser loads the 128 px 42 logo (424-32).
 test('shows the 42 logo at the top of the navigation menu', async ({ page }, testInfo) => {
   await openApp(page, '/acme/billing/default/annotations')
