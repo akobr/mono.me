@@ -105,6 +105,14 @@ public class JsonPatchTests
     }
 
     [Fact]
+    public void RemoveRequested_PathMatchingTheDirective_RemovesItWithoutBreakingTheLoop()
+    {
+        var document = JObject.Parse("""{ "a": 1, "$remove": ["$['$remove'][0]", "$.a"] }""");
+
+        document.RemoveRequested().Should().BeEquivalentTo(new JObject());
+    }
+
+    [Fact]
     public async Task ApplyPatchRequested_FailedTest_ThrowsTestFailed()
     {
         var document = JObject.Parse("""{ "retries": 3, "$patch": [{ "op": "test", "path": "/retries", "value": 1 }] }""");
