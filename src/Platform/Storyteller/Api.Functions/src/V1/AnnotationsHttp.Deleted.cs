@@ -133,7 +133,7 @@ public partial class AnnotationsHttp
         string view)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Contributor);
+        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Contributor);
 
         if (!TryParseKeys(model?.Keys, out var keys, out var badRequest))
         {
@@ -141,6 +141,17 @@ public partial class AnnotationsHttp
         }
 
         var result = await _annotations.RestoreAnnotationsAsync(organization, project, view, keys, request.GetAuditActor(), model!.Descendants);
+
+        // The deleted ancestors come back too; a machine restricted to an annotation sees only what it may address.
+        if (restriction.IsRestricted)
+        {
+            result = result with
+            {
+                Annotations = result.Annotations.Where(annotation => restriction.Allows(annotation.AnnotationKey)).ToList(),
+                CreatedKeys = result.CreatedKeys.Where(restriction.Allows).ToList(),
+            };
+        }
+
         return new OkObjectResult(result);
     }
 

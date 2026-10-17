@@ -247,7 +247,8 @@ public static class HttpRequestDataExtensions
     }
 
     // An operation on several annotations (the keys of a bulk body): a restricted machine needs every key in its scope.
-    public static Task CheckAccessToAnnotationsAsync(
+    // Returns the restriction (None for users) for handlers that also filter what the operation answers.
+    public static Task<MachineAnnotationRestriction> CheckAccessToAnnotationsAsync(
         this HttpRequestData @this,
         IAccessService accessService,
         string organization,
@@ -348,7 +349,7 @@ public static class HttpRequestDataExtensions
     // Machines: the machine document of the project (401 without it), the credential policy, and then what the operation
     // reaches against the annotation restriction of the machine (403). Machine credentials are checked for real in every
     // build, so this runs in Debug (DEV_AUTH) too; Debug builds skip only the role check of users.
-    private static async Task CheckAccessAsync(
+    private static async Task<MachineAnnotationRestriction> CheckAccessAsync(
         HttpRequestData request,
         IAccessService accessService,
         string accessPointKey,
@@ -368,8 +369,9 @@ public static class HttpRequestDataExtensions
                 ?? throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
 
             await MachineCredentialPolicy.EnsureAllowedAsync(request.FunctionContext, segments[0], segments[1]);
-            ensureReach(MachineAnnotationRestriction.From(machine.AnnotationKey));
-            return;
+            var restriction = MachineAnnotationRestriction.From(machine.AnnotationKey);
+            ensureReach(restriction);
+            return restriction;
         }
 
 #if !DEV_AUTH
@@ -377,5 +379,6 @@ public static class HttpRequestDataExtensions
         var accessRole = await accessService.GetAccountRoleAsync(accountId, accessPointKey);
         EnsureRole(accessRole, minimalRole, accessPointKey);
 #endif
+        return MachineAnnotationRestriction.None;
     }
 }
