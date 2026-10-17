@@ -169,7 +169,8 @@ export const viewHandlers: HttpHandler[] = [
       if (!namePattern.test(body.Name ?? '')) {
         return errorResponse(400, `The view name '${body.Name}' is not valid.`, 'InvalidName')
       }
-      if (viewsOf(db, key).some((view) => view.Name === body.Name && view.IsRegistered)) {
+      // The default view always exists, registered or not.
+      if (body.Name === 'default' || viewsOf(db, key).some((view) => view.Name === body.Name && view.IsRegistered)) {
         return errorResponse(409, `The view ${body.Name} already exists.`, 'ViewExists')
       }
 
