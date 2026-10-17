@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { openApp, replaceEditorText } from './support'
+import { goto, openApp, replaceEditorText } from './support'
 
 const key = 'exe.northwind.invoicing.prod'
 const path = `/acme/billing/default/configurations/${key}`
@@ -57,6 +57,65 @@ test('the breadcrumb opens the configuration of a parent and keeps Lineage at th
   await expect(page).toHaveURL(/\/acme\/billing\/default\/configurations\/cnt\.northwind\.prod\?q=northwind$/)
   await expect(page.getByRole('link', { name: 'Effective' })).toBeVisible()
   await expect(breadcrumb.locator('[aria-current="page"]')).toHaveText('Context prod')
+})
+
+/** Opens the drop-down of the New dialog on Configurations and searches it; the options are teleported to the body. */
+async function searchNewConfiguration(page: Page, term: string) {
+  // The one of the top bar: with a filter, the empty state (and its button) shows until the catalog has loaded.
+  await page.getByRole('button', { name: 'New configuration' }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'New configuration' })
+  await dialog.getByRole('button', { name: 'Annotation' }).click()
+  await page.getByPlaceholder('Search keys').fill(term)
+  return dialog
+}
+
+test('New opens the configuration of an annotation without one', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/configurations?q=northwind')
+
+  // usg.northwind.invoicing has a configuration in the seed: it is a row, not an option.
+  await searchNewConfiguration(page, 'northwind.invoicing')
+  await expect(page.getByRole('option', { name: key, exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: 'usg.northwind.invoicing', exact: true })).toHaveCount(0)
+  await page.getByRole('option', { name: key, exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'New configuration' })
+  await expect(dialog.getByRole('button', { name: 'Annotation' })).toHaveText(key)
+  // The pick moves the focus to Open editor, so Enter opens it.
+  await expect(dialog.getByRole('button', { name: 'Open editor' })).toBeFocused()
+  await page.keyboard.press('Enter')
+
+  await expect(dialog).toBeHidden()
+  await expect(page).toHaveURL(
+    /\/acme\/billing\/default\/configurations\/exe\.northwind\.invoicing\.prod\?q=northwind$/,
+  )
+  await expect(page.getByText('No configuration yet')).toBeVisible()
+  await page.getByRole('button', { name: 'Create empty' }).click()
+  await expect(page.getByText('Configuration created', { exact: true })).toBeVisible()
+
+  // Now it is a row of the list and no longer offered.
+  await goto(page, '/acme/billing/default/configurations?q=northwind.invoicing.prod')
+  await expect(page.getByText(key, { exact: true }).first()).toBeVisible()
+  await searchNewConfiguration(page, 'exe.northwind.invoicing')
+  await expect(page.getByRole('option', { name: 'exe.northwind.invoicing.staging', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: key, exact: true })).toHaveCount(0)
+})
+
+test('the empty list of a filter offers New configuration', async ({ page }) => {
+  await openApp(page, '/acme/billing/default/configurations?q=no-such-annotation')
+
+  await expect(page.getByRole('heading', { name: 'No configuration matches the filter' })).toBeVisible()
+  // the top bar and the empty state
+  const buttons = page.getByRole('button', { name: 'New configuration' })
+  await expect(buttons).toHaveCount(2)
+  await buttons.nth(1).click()
+  await expect(page.getByRole('dialog', { name: 'New configuration' })).toBeVisible()
+})
+
+test('a reader has no New button on Configurations', async ({ page }) => {
+  await openApp(page, '/northwind/portal/default/configurations')
+
+  // The top bar is there (Export and Import are planned to leave it, 424-40), without New.
+  await expect(page.getByRole('button', { name: 'Search…' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'New configuration' })).toHaveCount(0)
 })
 
 test('the JSON editor completes a binding and explains it on hover', async ({ page }) => {

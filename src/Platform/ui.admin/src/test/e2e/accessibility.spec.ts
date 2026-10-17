@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectAccessible, openApp, openBulkCreate, signedOut } from './support'
+import { expectAccessible, isMobile, openApp, openBulkCreate, signedOut } from './support'
 
 // Accessibility of the main screens (spec section 15): no serious or critical axe violations (WCAG 2.1 AA), in the
 // light and the dark theme.
@@ -59,8 +59,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
     for (const [name, button] of [
       ['export', 'Export configurations'],
       ['import', 'Import configurations'],
+      ['new configuration', 'New configuration'],
     ] as const) {
-      test(`the ${name} dialog has no serious accessibility violations`, async ({ page }) => {
+      test(`the ${name} dialog has no serious accessibility violations`, async ({ page }, testInfo) => {
+        test.skip(name === 'import' && isMobile(testInfo), 'A phone has no Import in the top bar (424-42).')
         await openApp(page, '/acme/billing/default/configurations')
         await page.getByRole('button', { name: button }).click()
         await page.getByRole('dialog').waitFor()

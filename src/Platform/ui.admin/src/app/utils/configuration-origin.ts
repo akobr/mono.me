@@ -1,4 +1,4 @@
-import type { ConfigurationSummary } from '@42for.net/2splatform.sdk'
+import type { Annotation, ConfigurationSummary } from '@42for.net/2splatform.sdk'
 import { codeOfKey, getAllAncestors, typeMeta, type AnnotationTypeCode } from './annotation-key'
 
 /**
@@ -46,4 +46,26 @@ export function describeInheritance(origin: Extract<ConfigurationOrigin, { inher
     return parts.join('')
   }
   return `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}`
+}
+
+/**
+ * The keys a new configuration can be started for (424-42): the annotations of the catalog that are not deleted and
+ * have no summary yet, so no row on Configurations. A summary of an empty document counts as a configuration, or the
+ * key would come back once the summaries reload after Create empty. Sorted; null while the summaries are unknown.
+ */
+export function keysWithoutConfiguration(
+  annotations: Iterable<Annotation>,
+  configurations: ReadonlyMap<string, ConfigurationSummary> | null,
+): string[] | null {
+  if (!configurations) {
+    return null
+  }
+
+  const keys: string[] = []
+  for (const annotation of annotations) {
+    if (!annotation.Deletion && !configurations.has(annotation.AnnotationKey)) {
+      keys.push(annotation.AnnotationKey)
+    }
+  }
+  return keys.toSorted((a, b) => a.localeCompare(b))
 }
