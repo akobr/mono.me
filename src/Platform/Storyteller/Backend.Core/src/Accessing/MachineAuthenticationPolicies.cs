@@ -108,7 +108,8 @@ public static class MachineAuthenticationPolicies
     }
 
     // Whether the presented credentials are what a machine of this kind has to send.
-    // ClientCredentials machines send identity provider tokens, never an API key or a certificate.
+    // ClientCredentials machines send identity provider tokens and Federated machines Storyteller tokens,
+    // never an API key or a certificate.
     public static bool IsSatisfiedBy(this MachineCredentialKind kind, bool hasCertificate, bool hasApiKey)
     {
         return kind switch
@@ -116,6 +117,7 @@ public static class MachineAuthenticationPolicies
             MachineCredentialKind.ApiKey => hasApiKey,
             MachineCredentialKind.Certificate => hasCertificate,
             MachineCredentialKind.CertificateAndApiKey => hasCertificate && hasApiKey,
+            MachineCredentialKind.Federated => false,
             _ => false,
         };
     }

@@ -32,6 +32,12 @@ public static class Definitions
                 public const string MachineAuthentication = $"v1/access/points/{{{Parameters.Key}}}/machine-authentication";
 
                 public const string MachineCertificateRenew = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/machines/{{{Parameters.Id}}}/certificate/renew";
+                public const string MachineFederationRules = $"{Machine}/federation-rules";
+
+                // Workload identity federation: the project's trusted issuers and its RFC 8693 token endpoint.
+                public const string FederatedIssuers = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/issuers";
+                public const string FederatedIssuer = $"{FederatedIssuers}/{{{Parameters.Name}}}";
+                public const string MachineToken = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/token";
                 public const string SharedCertificates = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/certificates";
                 public const string SharedCertificate = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/access/certificates/{{{Parameters.Thumbprint}}}";
             }
@@ -227,6 +233,13 @@ public static class Definitions
             public const string IssueSharedCertificate = nameof(IssueSharedCertificate);
             public const string RevokeSharedCertificate = nameof(RevokeSharedCertificate);
 
+            public const string GetFederatedIssuers = nameof(GetFederatedIssuers);
+            public const string GetFederatedIssuer = nameof(GetFederatedIssuer);
+            public const string SetFederatedIssuer = nameof(SetFederatedIssuer);
+            public const string DeleteFederatedIssuer = nameof(DeleteFederatedIssuer);
+            public const string SetMachineFederationRules = nameof(SetMachineFederationRules);
+            public const string ExchangeMachineToken = nameof(ExchangeMachineToken);
+
             public const string GetAuthConfiguration = nameof(GetAuthConfiguration);
         }
 
@@ -408,6 +421,7 @@ public static class Definitions
         public const string To = "to";
         public const string IncludeInactive = "includeInactive";
         public const string FileName = "fileName";
+        public const string Name = "name";
     }
 
     public static class Tags
@@ -457,6 +471,7 @@ public static class Definitions
         public const string IdExport = "The id of the export.";
         public const string IdImport = "The id of the import.";
         public const string ResponseTransferLimit = "The project already has the maximum of exports and imports in progress (TransferLimit).";
+        public const string FederatedIssuerName = "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.";
     }
 
     public static class Errors
@@ -478,6 +493,7 @@ public static class Definitions
         public const string Json = "application/json";
         public const string PlainText = "text/plain";
         public const string Zip = "application/zip";
+        public const string FormUrlEncoded = "application/x-www-form-urlencoded";
     }
 
     public static class SecuritySchemas

@@ -110,6 +110,36 @@ public partial class RouteTableTests
         routes.ShouldContain(expected);
     }
 
+    [Theory]
+    [InlineData("GET v1/{}/{}/access/issuers")]
+    [InlineData("GET v1/{}/{}/access/issuers/{}")]
+    [InlineData("PUT v1/{}/{}/access/issuers/{}")]
+    [InlineData("DELETE v1/{}/{}/access/issuers/{}")]
+    [InlineData("PUT v1/{}/{}/access/machines/{}/federation-rules")]
+    [InlineData("POST v1/{}/{}/access/token")]
+    public void FederationRoutes_AreRegistered(string expected)
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"));
+
+        routes.ShouldContain(expected);
+    }
+
+    // The token endpoint is anonymous: it authorizes nothing itself and publishes no security scheme.
+    [Fact]
+    public void TokenEndpoint_IsAnonymousAndPublishesNoSecurity()
+    {
+        var method = typeof(FederationHttp).GetMethod(nameof(FederationHttp.PostMachineToken))!;
+
+        method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()).OfType<HttpTriggerAttribute>()
+            .ShouldHaveSingleItem().AuthLevel.ShouldBe(AuthorizationLevel.Anonymous);
+        method.GetCustomAttributes<Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes.OpenApiSecurityAttribute>().ShouldBeEmpty();
+    }
+
     // The literal segments of the new routes can never be an annotation key, so they never shadow a key route.
     [Theory]
     [InlineData("deleted")]

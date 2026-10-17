@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace _42.Platform.Storyteller;
 
@@ -33,4 +34,6 @@ public interface IMachineAccess
     string? TokenEndpoint { get; }
 
     string? TokenScope { get; }
+
+    IReadOnlyList<FederationRule>? FederationRules { get; }
 }

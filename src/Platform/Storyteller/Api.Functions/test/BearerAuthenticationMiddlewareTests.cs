@@ -11,6 +11,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
+// Shares a collection with MachineTokenFallbackTests: both switch the static BearerValidationMode.
+[Collection(nameof(BearerValidationMode))]
 public class BearerAuthenticationMiddlewareTests
 {
     private readonly RecordingMiddleware _middleware = new();
@@ -156,6 +158,30 @@ public class BearerAuthenticationMiddlewareTests
             context.Items[FunctionContextItemKeys.MachineIdentity].ShouldBe("machine-app");
             context.Items[FunctionContextItemKeys.MachineCredentialKind].ShouldBe(MachineCredentialKind.ClientCredentials);
             context.Items[FunctionContextItemKeys.CachedClaims].ShouldBeSameAs(claims);
+            context.Items.ContainsKey(FunctionContextItemKeys.MachineOrganization).ShouldBeFalse();
+            context.Items.ContainsKey(FunctionContextItemKeys.MachineProject).ShouldBeFalse();
+        });
+    }
+
+    [Fact]
+    public async Task Invoke_MachineResultNamingItsKindAndProject_StoresThem()
+    {
+        await WithValidationAsync(async () =>
+        {
+            var claims = new List<Claim> { new("azp", "machine-app"), new("sub", "machine-app") };
+            var validator = new RecordingBearerTokenValidator
+            {
+                Result = new BearerValidationResult(claims, true, "machine-app", MachineCredentialKind.Federated, "org1", "proj1"),
+            };
+            using var services = FunctionTestDoubles.CreateServices(validator);
+            var (context, _) = FunctionTestDoubles.CreateRequest(services, Bearer("machine-token"));
+
+            var called = await InvokeAsync(context);
+
+            called.ShouldBeTrue();
+            context.Items[FunctionContextItemKeys.MachineCredentialKind].ShouldBe(MachineCredentialKind.Federated);
+            context.Items[FunctionContextItemKeys.MachineOrganization].ShouldBe("org1");
+            context.Items[FunctionContextItemKeys.MachineProject].ShouldBe("proj1");
         });
     }
 

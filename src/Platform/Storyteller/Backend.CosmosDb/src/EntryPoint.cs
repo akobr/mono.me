@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Accessing.Federation;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Json;
@@ -100,6 +101,10 @@ public static class EntryPoint
         services.AddSingleton<IMachineAuthenticationPolicyStore, CosmosMachineAuthenticationPolicyStore>();
         services.AddSingleton<ICertificateRenewalService, CosmosCertificateRenewalService>();
         services.AddSingleton<ISharedCertificateStore, CosmosSharedCertificateStore>();
+
+        // Workload identity federation (AddFederatedMachineAccess keeps these and adds in-memory ones only without them).
+        services.AddSingleton<IFederatedIssuerStore, CosmosFederatedIssuerStore>();
+        services.AddSingleton<ITokenSigningKeyStore, CosmosTokenSigningKeyStore>();
 
         // Annotations: soft-deleted ones expire after the retention, every change is audited within a size limit.
         services.AddOptions<AnnotationOptions>()
