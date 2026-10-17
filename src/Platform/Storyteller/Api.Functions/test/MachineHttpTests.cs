@@ -124,6 +124,79 @@ public class MachineHttpTests
         (await http.PutMachineAuthentication(ContributorRequest(), policy, "org1")).ShouldBeOfType<BadRequestObjectResult>();
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task PostMachines_BlankAnnotationKey_CreatesAMachineOfTheWholeProject(string? annotationKey)
+    {
+        var access = new RecordingAccess(Machine());
+        var http = CreateHttp(access);
+
+        var result = await http.PostMachines(ContributorRequest(), MachineCreate(annotationKey), "org1", "proj1");
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>().AnnotationKey.ShouldBeNull();
+        access.Created.ShouldNotBeNull();
+        access.Created.AnnotationKey.ShouldBeNull();
+        access.Created.Organization.ShouldBe("org1");
+        access.Created.Project.ShouldBe("proj1");
+    }
+
+    [Theory]
+    [InlineData("EXE..northwind.invoicing.prod", "exe.northwind.invoicing.prod")]
+    [InlineData("Rst.Billing", "rst.Billing")]
+    [InlineData("uxe.Northwind.Invoicing.Prod..Worker", "uxe.Northwind.Invoicing.Prod.Worker")]
+    public async Task PostMachines_AnnotationKey_IsPassedInItsCanonicalForm(string annotationKey, string expected)
+    {
+        var access = new RecordingAccess(Machine());
+        var http = CreateHttp(access);
+
+        var result = await http.PostMachines(ContributorRequest(), MachineCreate(annotationKey), "org1", "proj1");
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>().AnnotationKey.ShouldBe(expected);
+        access.Created.ShouldNotBeNull();
+        access.Created.AnnotationKey.ShouldBe(expected);
+        access.Created.Scope.ShouldBe(MachineAccessScope.ConfigurationRead);
+    }
+
+    [Theory]
+    [InlineData("rst.Billing")]
+    [InlineData("sbt.Northwind")]
+    [InlineData("unt.Billing.Invoices")]
+    [InlineData("usg.Northwind.Billing")]
+    [InlineData("cnt.Northwind.Prod")]
+    [InlineData("exe.northwind.invoicing.prod")]
+    [InlineData("uxe.Northwind.Invoicing.Prod.Worker")]
+    public async Task PostMachines_CanonicalAnnotationKey_IsPassedUnchanged(string annotationKey)
+    {
+        var access = new RecordingAccess(Machine());
+        var http = CreateHttp(access);
+
+        var result = await http.PostMachines(ContributorRequest(), MachineCreate(annotationKey), "org1", "proj1");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Created.ShouldNotBeNull();
+        access.Created.AnnotationKey.ShouldBe(annotationKey);
+    }
+
+    // A wrong segment count ('sbt.a.b') or an unknown type code is refused before the service is asked.
+    [Theory]
+    [InlineData("my-annotation-key")]
+    [InlineData("sbt.a.b")]
+    [InlineData("xyz.a")]
+    public async Task PostMachines_InvalidAnnotationKey_IsBadRequestAndNoMachineIsCreated(string annotationKey)
+    {
+        var access = new RecordingAccess(Machine());
+        var http = CreateHttp(access);
+
+        var result = await http.PostMachines(ContributorRequest(), MachineCreate(annotationKey), "org1", "proj1");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<Models.ErrorResponse>();
+        error.ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
+        error.Message.ShouldContain(annotationKey);
+        access.Created.ShouldBeNull();
+    }
+
     private static AccessHttp CreateHttp(RecordingAccess access, IMachineAuthenticationPolicyStore? policyStore = null)
     {
         var options = Options.Create(new MachineAuthenticationOptions
@@ -159,6 +232,18 @@ public class MachineHttpTests
         };
     }
 
+    // The route decides the organization and project; the body ones are left empty.
+    private static MachineAccessCreate MachineCreate(string? annotationKey)
+    {
+        return new MachineAccessCreate
+        {
+            Organization = string.Empty,
+            Project = string.Empty,
+            Scope = MachineAccessScope.ConfigurationRead,
+            AnnotationKey = annotationKey,
+        };
+    }
+
     private sealed class PolicyStore : IMachineAuthenticationPolicyStore
     {
         public MachineAuthenticationPolicy? Stored { get; set; }
@@ -181,6 +266,9 @@ public class MachineHttpTests
     private sealed class RecordingAccess(MachineAccess machine) : IAccessService
     {
         public List<string> Calls { get; } = [];
+
+        // The model the handler passed to CreateMachineAccessAsync; null while no machine was created.
+        public MachineAccessCreate? Created { get; private set; }
 
         public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey)
         {
@@ -222,7 +310,12 @@ public class MachineHttpTests
 
         public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project) => throw new NotImplementedException();
 
-        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotImplementedException();
+        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
+        {
+            Calls.Add($"create:{model.Organization}/{model.Project}");
+            Created = model;
+            return Task.FromResult(machine with { Scope = model.Scope, AnnotationKey = model.AnnotationKey });
+        }
 
         public Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId) => throw new NotImplementedException();
 
