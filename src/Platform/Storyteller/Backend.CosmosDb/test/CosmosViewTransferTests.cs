@@ -548,18 +548,22 @@ public class CosmosViewTransferTests(Startup startup)
         (await store.GetAsync(TestConstants.Organization, "transfer-store", "other", ViewTransferKind.Export, id)).Should().BeNull();
         (await store.GetAsync(TestConstants.Organization, "transfer-store", View, ViewTransferKind.Import, id)).Should().BeNull();
 
-        (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(-5))).Should().Be(1);
-        (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(5))).Should().Be(0);
+        (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(-5), now.AddMinutes(-5))).Should().Be(1);
+        (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(5), now.AddMinutes(-5))).Should().Be(0);
 
         var running = await store.TryReplaceAsync(read with { Export = read.Export! with { Status = ViewTransferStatus.Running } });
         running.Should().NotBeNull();
+
+        // a running job has its own window: one that has not saved progress since it is not counted
+        (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(-5), now.AddMinutes(-5))).Should().Be(1);
+        (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(-5), now.AddMinutes(5))).Should().Be(0);
 
         // the first read's ETag is stale now
         (await store.TryReplaceAsync(read with { Export = read.Export! with { Status = ViewTransferStatus.Failed } })).Should().BeNull();
 
         var succeeded = await store.TryReplaceAsync(running! with { Export = running.Export! with { Status = ViewTransferStatus.Succeeded } });
         succeeded.Should().NotBeNull();
-        (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(-5))).Should().Be(0);
+        (await store.CountActiveAsync(TestConstants.Organization, "transfer-store", now.AddMinutes(-5), now.AddMinutes(-5))).Should().Be(0);
     }
 
     [Fact]

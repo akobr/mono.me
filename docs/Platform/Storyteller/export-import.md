@@ -424,7 +424,7 @@ A written document can carry warnings (`ViewImportItem.Warnings`, each a `Code` 
 
 - **Cost.** Each annotation takes several requests: reads of the key and its ancestors, and the writes of a create or an update. Each schema runs the compliance query of a save: one query over the configurations it affects and one validation per configuration. With `Skip`, the existence reads list the view's schemas and configurations once. An archive with thousands of annotations, or with many type schemas over many configurations, takes much longer than one with configurations only.
 - **Timeout.** A job is one invocation of the queue function, bound by the Functions timeout of the hosting plan (`host.json` sets no `functionTimeout`).
-- **Retries.** An import is idempotent. When an invocation is cut off, the queue delivers the message again, and the whole job runs again. The documents the first run wrote are then `Unchanged`. After three deliveries (`maxDequeueCount`), the message goes to the poison queue, and the job stays `Running` until its `ttl` runs out. Resuming where a run stopped is not supported.
+- **Retries.** An import is idempotent. When an invocation is cut off, the queue delivers the message again, and the whole job runs again. The documents the first run wrote are then `Unchanged`. After three deliveries (`maxDequeueCount`), the message goes to the poison queue `configuration-transfers-poison`, where `AbandonViewTransfer` fails the job ("stopped on every attempt, for example because its worker ran out of memory"), so it no longer takes a slot of the project. A job that ended before stays as it is. Resuming where a run stopped is not supported.
 - **Failures of single files.** Concurrent changes that outlast the retries of a write fail that file with `Conflict`, not the whole job. A `$remove` entry that is not a valid JSONPath, or that takes the whole document (`$`), fails its file with `PatchInvalid`.
 
 ## Jobs
@@ -445,7 +445,7 @@ stateDiagram-v2
 
 - Every write restarts the item's `ttl` (`RetentionHours`), and `ExpiresAt` tells the client when it ends.
 - Writes use the item's ETag. A worker that loses a race stops. A repeated message of a finished job does nothing. A worker that crashed leaves the job `Running` until the queue delivers the message again.
-- A project can have at most `MaxActiveTransfers` jobs queued or running, counting those changed within the last hour, so an abandoned job does not block it. One more is refused with `409 TransferLimit`.
+- A project can have at most `MaxActiveTransfers` jobs queued or running. A queued job counts for an hour after its last change; a running one, which saves its progress every few seconds, for 15 minutes. So an abandoned job does not block the project, even before the poison queue fails it. One more is refused with `409 TransferLimit`.
 - An export writes the zip into memory and uploads it as `{organization}/{project}/{view}/exports/{id}.zip`. An import reads its upload `…/imports/{id}.zip` into memory, and deletes it when it succeeds. `PurgeExpiredAsync` deletes archives an hour after the retention.
 
 `ViewExport` reports:
@@ -583,6 +583,7 @@ The document is `open.api.v0.9.21.json`, in `Sdk.NSwag` and `sdk.typescript`:
 The background half is `Api.Functions/src/Transfers/ViewTransferFunctions.cs`:
 
 - `ProcessViewTransfer` is triggered by the queue `configuration-transfers` on `AzureWebJobsStorage`. `host.json` sets `batchSize` 1, so a worker runs one job at a time, and `maxDequeueCount` 3. A message that is not a valid job is logged and dropped. Any other failure fails the invocation (`ExceptionHandlingMiddleware` rethrows for invocations without an HTTP request), so the runtime delivers the message again.
+- `AbandonViewTransfer` is triggered by the poison queue `configuration-transfers-poison`, where the runtime moves a message after its last failed delivery. A crashed worker, for example out of memory, never ran the job's failure handling, so this function fails the job and deletes the partial archive of an export. A job that already ended is left alone.
 - `PurgeViewTransfers` runs every hour at minute 17 and deletes archives older than the retention plus one hour.
 - Both functions had the names of the first spec (`ProcessConfigurationTransfer`, `PurgeConfigurationTransfers`). The queue, the container, the partition and the options section keep theirs (see [Storage](#storage)).
 

@@ -17,6 +17,11 @@ public interface IViewTransferStore
     // Replaces the job when its ETag still matches; null when another writer changed or removed it.
     Task<ViewTransferRecord?> TryReplaceAsync(ViewTransferRecord record, CancellationToken cancellationToken = default);
 
-    // Queued and running jobs of the project, in every view, changed since the given time.
-    Task<int> CountActiveAsync(string organization, string project, DateTimeOffset changedSince, CancellationToken cancellationToken = default);
+    // Queued jobs changed since queuedSince and running jobs changed since runningSince, of the project in every view.
+    Task<int> CountActiveAsync(
+        string organization,
+        string project,
+        DateTimeOffset queuedSince,
+        DateTimeOffset runningSince,
+        CancellationToken cancellationToken = default);
 }

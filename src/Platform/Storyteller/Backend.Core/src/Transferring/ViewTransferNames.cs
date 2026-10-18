@@ -7,6 +7,9 @@ public static class ViewTransferNames
     public const string Queue = "configuration-transfers";
     public const string Container = "configuration-transfers";
 
+    // Where the Functions runtime moves a message after its last failed delivery (maxDequeueCount of host.json).
+    public const string PoisonQueue = Queue + "-poison";
+
     public static string GetArchiveName(ViewTransferMessage message)
     {
         return GetArchiveName(message.Organization, message.Project, message.View, message.Kind, message.Id);
