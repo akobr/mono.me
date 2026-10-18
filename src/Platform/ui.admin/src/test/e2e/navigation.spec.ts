@@ -271,6 +271,33 @@ test('opens the tabs of Modeling with a click, and Back returns to the previous 
   await expect(modelingTab(page, 'Compare views')).toHaveAttribute('aria-selected', 'true')
 })
 
+test('opens the tabs of Modeling from the keyboard, and the opened tab keeps the focus in view', async ({ page }) => {
+  await openApp(page, `${modeling}/schemas`)
+  await modelingTab(page, 'Schemas').focus()
+
+  // The arrow keys only move the focus; Enter opens the tab. Its page brings a new header, which takes the focus.
+  await page.keyboard.press('ArrowRight')
+  await expect(modelingTab(page, 'Templates')).toBeFocused()
+  await expect.poll(() => new URL(page.url()).pathname).toBe(`${modeling}/schemas`)
+  await page.keyboard.press('Enter')
+  await expect.poll(() => new URL(page.url()).pathname).toBe(`${modeling}/templates`)
+  await expect(modelingTab(page, 'Templates')).toHaveAttribute('aria-selected', 'true')
+  await expect(modelingTab(page, 'Templates')).toBeFocused()
+
+  for (const [name, path] of [
+    ['Export & Import', 'export-import'],
+    ['Deleted', 'deleted'],
+    ['Compare views', 'compare'],
+  ] as const) {
+    await page.keyboard.press('ArrowRight')
+    await page.keyboard.press('Enter')
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`${modeling}/${path}`)
+    await expect(modelingTab(page, name)).toBeFocused()
+    // On a phone the tabs scroll sideways, and the new header shows the open one.
+    await expect(modelingTab(page, name)).toBeInViewport({ ratio: 1 })
+  }
+})
+
 test('a link opens its tab of Modeling, and a detail link opens the tab and the detail', async ({ page }, testInfo) => {
   await openApp(page, `${modeling}/deleted?cascaded=1`)
   await expect(modelingTab(page, 'Deleted')).toHaveAttribute('aria-selected', 'true')
