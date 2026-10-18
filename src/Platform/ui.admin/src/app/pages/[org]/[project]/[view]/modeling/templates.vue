@@ -6,6 +6,7 @@ import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { metaOf, typeCodes, typeMeta } from '@/utils/annotation-key'
 import { actorName } from '@/utils/audit'
+import { modelingPath } from '@/utils/modeling'
 
 // The seven annotation types with their template (companion spec E8): presence, version, author, and how many
 // configurations of the view use it. The detail is a nested route.
@@ -43,7 +44,7 @@ const selected = computed(() => (route.params as { type?: string }).type)
 <template>
   <UDashboardPanel id="templates" :class="{ hidden: detail.covers.value }">
     <template #header>
-      <AppNavbar title="Templates" />
+      <ModelingHeader />
     </template>
     <template #body>
       <LoadingState v-if="templates.isPending.value" />
@@ -51,7 +52,7 @@ const selected = computed(() => (route.params as { type?: string }).type)
       <ul v-else class="divide-y divide-default rounded-md border border-default">
         <li v-for="row in rows" :key="row.code">
           <RouterLink
-            :to="`/${context.org}/${context.project}/${context.view}/templates/${row.code}`"
+            :to="`${modelingPath(context.scope!, 'templates')}/${row.code}`"
             class="flex flex-wrap items-center gap-3 px-4 py-3 hover:bg-elevated/50"
             :class="selected === row.code ? 'bg-primary/4' : ''"
           >

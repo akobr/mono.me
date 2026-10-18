@@ -24,6 +24,7 @@ import {
 import type { VersionSource } from '@/components/versions/version-source'
 import type { Scope } from '@/stores/context'
 import { metaOf, type AnnotationTypeCode } from './annotation-key'
+import { modelingPath } from './modeling'
 
 /** The three schema kinds (spec section 14), identified like the API: a type code and/or an annotation key. */
 export type SchemaTarget =
@@ -140,9 +141,9 @@ export function schemaApi(scope: Scope, target: SchemaTarget): SchemaApi {
   }
 }
 
-/** The route of a schema in the schemas section. */
+/** The route of a schema on the Schemas tab of Modeling. */
 export function schemaRoute(scope: Scope, target: SchemaTarget): string {
-  const base = `/${scope.org}/${scope.project}/${scope.view}/schemas`
+  const base = modelingPath(scope, 'schemas')
   switch (target.kind) {
     case 'type':
       return `${base}/type/${target.type}`

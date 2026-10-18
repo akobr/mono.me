@@ -17,6 +17,8 @@ const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
 const canAdmin = useCan('manageAccess')
+// Compare views is a tab of Modeling, which is locked below Contributor (424-38).
+const canCompare = useCan('edit')
 
 const views = useGetViews(
   () => context.org ?? '',
@@ -108,7 +110,8 @@ function edit(view: View) {
           <RelativeTime v-if="view.Created" :value="view.Created.At" class="text-xs text-dimmed" />
           <span class="flex gap-1">
             <UButton
-              :to="`/${context.org}/${context.project}/${context.view ?? 'default'}/compare?to=${view.Name}`"
+              v-if="canCompare"
+              :to="`/${context.org}/${context.project}/${context.view ?? 'default'}/modeling/compare?to=${view.Name}`"
               label="Compare"
               size="xs"
               color="neutral"

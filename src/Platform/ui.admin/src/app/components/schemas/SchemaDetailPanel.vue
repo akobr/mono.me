@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useContextStore } from '@/stores/context'
+import { modelingPath } from '@/utils/modeling'
 import { schemaApi, type SchemaTarget } from '@/utils/schema-targets'
 
 /** The schema editor in a detail panel beside the schema list. */
@@ -13,7 +14,9 @@ const title = computed(() => (context.scope ? schemaApi(context.scope, props.tar
 const key = computed(() => (props.target.kind === 'type' ? undefined : props.target.key))
 
 function close() {
-  void router.push(`/${context.org}/${context.project}/${context.view}/schemas`)
+  if (context.scope) {
+    void router.push(modelingPath(context.scope, 'schemas'))
+  }
 }
 </script>
 

@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useContextStore } from '@/stores/context'
 import { metaOf, type AnnotationTypeCode } from '@/utils/annotation-key'
+import { modelingPath } from '@/utils/modeling'
 
 const route = useRoute()
 const router = useRouter()
@@ -13,7 +14,9 @@ const type = computed(
 )
 
 function close() {
-  void router.push(`/${context.org}/${context.project}/${context.view}/templates`)
+  if (context.scope) {
+    void router.push(modelingPath(context.scope, 'templates'))
+  }
 }
 </script>
 
