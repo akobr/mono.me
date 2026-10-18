@@ -406,6 +406,7 @@ Each file of an included kind gets one outcome:
 | | Not a valid JSON Schema | `InvalidSchema` |
 | | A broken `$patch` or `$remove` directive of a template or configuration | `PatchInvalid`, `PatchTestFailed` |
 | | Without `force`: the configuration violates its schema, or configurations violate the schema | `SchemaViolation` |
+| | The document kept changing concurrently: its write ran out of retries. The rest of the import goes on, and for an annotation the documents that depend on it are skipped with `DependencyFailed`; importing the file again writes it. | `Conflict` |
 
 A written document can carry warnings (`ViewImportItem.Warnings`, each a `Code` and a `Message`):
 
@@ -424,7 +425,7 @@ A written document can carry warnings (`ViewImportItem.Warnings`, each a `Code` 
 - **Cost.** Each annotation takes several requests: reads of the key and its ancestors, and the writes of a create or an update. Each schema runs the compliance query of a save: one query over the configurations it affects and one validation per configuration. With `Skip`, the existence reads list the view's schemas and configurations once. An archive with thousands of annotations, or with many type schemas over many configurations, takes much longer than one with configurations only.
 - **Timeout.** A job is one invocation of the queue function, bound by the Functions timeout of the hosting plan (`host.json` sets no `functionTimeout`).
 - **Retries.** An import is idempotent. When an invocation is cut off, the queue delivers the message again, and the whole job runs again. The documents the first run wrote are then `Unchanged`. After three deliveries (`maxDequeueCount`), the message goes to the poison queue, and the job stays `Running` until its `ttl` runs out. Resuming where a run stopped is not supported.
-- **Failures of the whole job.** Concurrent changes that outlast the retries of a write, for example of an annotation or a schema, still fail the whole job, with the exception's message, instead of the file. A `$remove` entry that is not a valid JSONPath, or that takes the whole document (`$`), fails its file with `PatchInvalid`.
+- **Failures of single files.** Concurrent changes that outlast the retries of a write fail that file with `Conflict`, not the whole job. A `$remove` entry that is not a valid JSONPath, or that takes the whole document (`$`), fails its file with `PatchInvalid`.
 
 ## Jobs
 
