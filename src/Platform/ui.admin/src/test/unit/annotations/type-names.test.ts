@@ -76,6 +76,6 @@ describe('type names instead of codes', () => {
       }
     }
 
-    expect(chips).toEqual(['app/pages/[org]/[project]/[view]/schemas.vue'])
+    expect(chips).toEqual(['app/pages/[org]/[project]/[view]/modeling/schemas.vue'])
   })
 })

@@ -200,7 +200,7 @@ test('saves a change and compares it with the previous version', async ({ page }
 
 test('compare views preselects the only other view', async ({ page }) => {
   // The seeded project has the views default and staging.
-  await openApp(page, `/acme/billing/default/compare?key=${key}`)
+  await openApp(page, `/acme/billing/default/modeling/compare?key=${key}`)
 
   await expect(page).toHaveURL(/[?&]to=staging(&|$)/)
   await expect(page.getByRole('combobox', { name: 'Compare default with' })).toHaveText('staging')

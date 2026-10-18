@@ -1,37 +1,64 @@
 import { describe, expect, it } from 'vitest'
 import { buildNavigation, type NavigationContext } from '@/utils/navigation'
 import { typeMeta } from '@/utils/annotation-key'
-import { currentSection, viewTarget } from '@/utils/context-paths'
 import { shortcutGroups } from '@/composables/useShortcutsHelp'
 
-describe('Export & Import entry', () => {
-  const viewItems = (projectRole: NavigationContext['projectRole']) =>
-    buildNavigation({ org: 'acme', project: 'billing', view: 'staging', projectRole, orgRole: 'None' })[0]!.items
+// Templates, Schemas, Export & Import, Deleted and Compare views are the tabs of one Modeling entry (424-38).
+describe('Modeling entry', () => {
+  const sections = (projectRole: NavigationContext['projectRole']) =>
+    buildNavigation({ org: 'acme', project: 'billing', view: 'staging', projectRole, orgRole: 'None' })
+  const viewItems = (projectRole: NavigationContext['projectRole']) => sections(projectRole)[0]!.items
+  const modeling = (projectRole: NavigationContext['projectRole']) =>
+    viewItems(projectRole).find((item) => item.label === 'Modeling')
 
-  it('follows Compare views in the view section, with its own icon', () => {
-    const items = viewItems('Contributor')
-    const index = items.findIndex((item) => item.label === 'Export & Import')
+  it.each(['Owner', 'Contributor', 'Reader'] as const)('ends the view section of %s with Modeling', (role) => {
+    expect(viewItems(role).map((item) => item.label)).toEqual([
+      'Annotations',
+      'Configurations',
+      'Values store',
+      'Graph',
+      'Modeling',
+    ])
+  })
 
-    expect(items[index - 1]?.label).toBe('Compare views')
-    expect(items[index]).toEqual({
-      label: 'Export & Import',
-      icon: 'i-lucide-arrow-down-up',
-      to: '/acme/billing/staging/export-import',
+  it('opens the Modeling page with the puzzle icon and lists its five tabs in order', () => {
+    const base = '/acme/billing/staging/modeling'
+
+    expect(modeling('Contributor')).toEqual({
+      label: 'Modeling',
+      icon: 'i-lucide-puzzle',
+      to: base,
       editRole: 'Contributor',
+      lockedHint: 'Contributors only',
+      tabs: [
+        { label: 'Schemas', icon: 'i-lucide-braces', to: `${base}/schemas` },
+        { label: 'Templates', icon: 'i-lucide-layout-template', to: `${base}/templates` },
+        { label: 'Export & Import', icon: 'i-lucide-arrow-down-up', to: `${base}/export-import` },
+        { label: 'Deleted', icon: 'i-lucide-archive-restore', to: `${base}/deleted` },
+        { label: 'Compare views', icon: 'i-lucide-git-compare', to: `${base}/compare` },
+      ],
       locked: false,
     })
   })
 
-  it('is shown to a reader, locked, because a reader can still export', () => {
-    expect(viewItems('Reader').find((item) => item.label === 'Export & Import')).toMatchObject({ locked: true })
+  it('is shown to a reader, locked, because the whole page is closed below Contributor', () => {
+    expect(modeling('Reader')).toMatchObject({ locked: true, lockedHint: 'Contributors only' })
+    expect(modeling('Owner')).toMatchObject({ locked: false })
   })
 
-  it('is a section of the view, kept when the view changes, and listed with its shortcut', () => {
-    expect(currentSection('/acme/billing/default/export-import')).toEqual({ kind: 'view', name: 'export-import' })
-    expect(viewTarget('/acme/billing/default/export-import', 'acme', 'billing', 'staging')).toBe(
-      '/acme/billing/staging/export-import',
-    )
+  it.each(['Owner', 'Contributor', 'Reader'] as const)('has no entry for a page that became a tab, for %s', (role) => {
+    const paths = sections(role).flatMap((section) => section.items.map((item) => item.to))
+
+    for (const moved of ['templates', 'schemas', 'compare', 'export-import', 'deleted']) {
+      expect(paths.filter((path) => path.startsWith(`/acme/billing/staging/${moved}`))).toEqual([])
+    }
+  })
+
+  it('keeps the shortcuts of the tabs, with unique keys', () => {
     const goTo = shortcutGroups.find((group) => group.title === 'Go to')!.shortcuts
+    // g t, g s and g e open the tabs, which keep the names of the pages
+    expect(goTo).toContainEqual({ keys: ['G', 'T'], description: 'Templates' })
+    expect(goTo).toContainEqual({ keys: ['G', 'S'], description: 'Schemas' })
     expect(goTo).toContainEqual({ keys: ['G', 'E'], description: 'Export & Import' })
     // no other shortcut uses the same keys
     const keys = shortcutGroups.flatMap((group) => group.shortcuts.map((shortcut) => shortcut.keys.join('+')))

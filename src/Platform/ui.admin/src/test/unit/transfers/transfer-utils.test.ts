@@ -50,12 +50,14 @@ describe('documents of an import', () => {
 
     expect(documentPath(scope, items.annotation!)).toBe(`${base}/annotations/rst.payments`)
     expect(documentPath(scope, items.configuration!)).toBe(`${base}/configurations/rst.payments`)
-    expect(documentPath(scope, items.template!)).toBe(`${base}/templates/exe`)
-    expect(documentPath(scope, items.typeSchema!)).toBe(`${base}/schemas/type/exe`)
-    expect(documentPath(scope, items.annotationSchema!)).toBe(`${base}/schemas/annotation/rst.payments`)
-    expect(documentPath(scope, items.descendantSchema!)).toBe(`${base}/schemas/annotation/sbt.northwind/type/exe`)
+    expect(documentPath(scope, items.template!)).toBe(`${base}/modeling/templates/exe`)
+    expect(documentPath(scope, items.typeSchema!)).toBe(`${base}/modeling/schemas/type/exe`)
+    expect(documentPath(scope, items.annotationSchema!)).toBe(`${base}/modeling/schemas/annotation/rst.payments`)
+    expect(documentPath(scope, items.descendantSchema!)).toBe(
+      `${base}/modeling/schemas/annotation/sbt.northwind/type/exe`,
+    )
     expect(documentPath(scope, { Kind: 'Template' })).toBeUndefined()
-    expect(exportImportPath(scope)).toBe(`${base}/export-import`)
+    expect(exportImportPath(scope)).toBe(`${base}/modeling/export-import`)
   })
 
   it('links a document only when the view has it', () => {

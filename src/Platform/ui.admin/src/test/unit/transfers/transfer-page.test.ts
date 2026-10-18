@@ -11,7 +11,7 @@ import TransferToaster from '@/components/transfer/TransferToaster.vue'
 import { mockHandlers } from '@/mock/all-handlers'
 import { resetTransfers } from '@/mock/transfer-handlers'
 import { createZip, textFile } from '@/mock/zip'
-import ExportImportPage from '@/pages/[org]/[project]/[view]/export-import.vue'
+import ExportImportPage from '@/pages/[org]/[project]/[view]/modeling/export-import.vue'
 import { useTransfersStore } from '@/stores/transfers'
 import { saveBlob } from '@/utils/download'
 import { mountScreen, settle } from '../../helpers'
@@ -268,7 +268,7 @@ describe('ImportResult', () => {
     expect([...root.querySelectorAll('table:not([aria-label]) a')].map((link) => link.getAttribute('href'))).toEqual([
       '/acme/billing/default/annotations/exe.newco.billing.prod',
       '/acme/billing/default/annotations/rst.invoicing',
-      '/acme/billing/default/templates/exe',
+      '/acme/billing/default/modeling/templates/exe',
       // kept by Skip, so the view has it
       '/acme/billing/default/configurations/rst.invoicing',
     ])
@@ -319,7 +319,7 @@ describe('TransferToaster', () => {
     const link = [...document.body.querySelectorAll('a')].find((anchor) =>
       anchor.textContent?.includes('Show the result'),
     )
-    expect(link?.getAttribute('href')).toBe('/acme/billing/default/export-import')
+    expect(link?.getAttribute('href')).toBe('/acme/billing/default/modeling/export-import')
     const keys = invalidated.mock.calls.map(([filters]) =>
       (filters as { queryKey: string[] }).queryKey.slice(4).join('/'),
     )

@@ -9,11 +9,11 @@ const screens: [string, string][] = [
   ['annotations', '/acme/billing/default/annotations'],
   ['annotation detail', '/acme/billing/default/annotations/exe.northwind.invoicing.prod'],
   ['configuration', '/acme/billing/default/configurations/exe.northwind.invoicing.prod'],
-  ['templates', '/acme/billing/default/templates/exe'],
-  ['schemas', '/acme/billing/default/schemas'],
+  ['templates', '/acme/billing/default/modeling/templates/exe'],
+  ['schemas', '/acme/billing/default/modeling/schemas'],
   ['graph', '/acme/billing/default/graph'],
-  ['export and import', '/acme/billing/default/export-import'],
-  ['export and import of a reader', '/northwind/portal/default/export-import'],
+  ['export and import', '/acme/billing/default/modeling/export-import'],
+  ['compare views', '/acme/billing/default/modeling/compare'],
   ['members', '/acme/billing/members'],
   ['machines', '/acme/billing/machines'],
   ['federated machine detail', '/acme/billing/machines/mach-release-pipeline'],
@@ -74,6 +74,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
+    // A Reader gets the lock of Modeling instead of its tabs (424-38); the lock is checked, not a loading state.
+    test('the locked Modeling page of a reader has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/northwind/portal/default/modeling/export-import')
+      await expect(page.getByRole('heading', { name: 'Contributors only' })).toBeVisible()
+      await expect(page.getByRole('tab')).toHaveCount(0)
+      await expectAccessible(page)
+    })
+
     test('onboarding has no serious accessibility violations', async ({ page }) => {
       await openApp(page, '/onboarding', 'new-user')
       await expectAccessible(page)
@@ -124,7 +132,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     }
 
     test('the result of an import has no serious accessibility violations', async ({ page }) => {
-      await openApp(page, '/acme/billing/default/export-import')
+      await openApp(page, '/acme/billing/default/modeling/export-import')
       // an update, a create with a warning, a skip and an ignored file
       const archive = createZip([
         textFile('annotations/rst.invoicing.json', '{"Title":"Edited"}'),
