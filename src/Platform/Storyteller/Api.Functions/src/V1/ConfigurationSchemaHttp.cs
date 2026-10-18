@@ -376,7 +376,7 @@ public partial class ConfigurationSchemaHttp
     [OpenApiParameter(Definitions.Parameters.Force, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "When true, save the schema even if stored configurations in the view do not comply.")]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(JObject), Description = "The JSON Schema to apply to descendant configurations of this type.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ConfigurationSchema), Description = "The created or updated descendant-type schema.")]
-    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequestDescendantType)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -417,6 +417,8 @@ public partial class ConfigurationSchemaHttp
 
         try
         {
+            // a type that cannot descend from the key throws InvalidInputException, which is no ArgumentException:
+            // ExceptionHandlingMiddleware answers it with 400 and the ErrorCode InvalidKey
             var schema = await _schemaService.SetDescendantTypeSchemaAsync(organization, project, view, key, annotationType, inputModel, request.GetAuditActor(), IsForce(request));
             return new OkObjectResult(schema);
         }
