@@ -173,7 +173,7 @@ public class FederationHttp
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
         var cancellationToken = request.FunctionContext.CancellationToken;
-        var (issuer, invalidBody) = await ReadJsonBodyAsync<FederatedIssuer>(request, "a trusted issuer", cancellationToken);
+        var (issuer, invalidBody) = await request.ReadJsonBodyAsync<FederatedIssuer>(_bodyJsonOptions, "a trusted issuer", ErrorCodes.InvalidFederation);
 
         if (invalidBody is not null)
         {
@@ -278,7 +278,7 @@ public class FederationHttp
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
 
-        var (rules, invalidBody) = await ReadJsonBodyAsync<List<FederationRule>>(request, "a list of federation rules", cancellationToken);
+        var (rules, invalidBody) = await request.ReadJsonBodyAsync<List<FederationRule>>(_bodyJsonOptions, "a list of federation rules", ErrorCodes.InvalidFederation);
 
         if (invalidBody is not null)
         {
@@ -579,30 +579,5 @@ public class FederationHttp
     private static BadRequestObjectResult InvalidFederation(string message)
     {
         return new BadRequestObjectResult(new ErrorResponse(message) { ErrorCode = ErrorCodes.InvalidFederation });
-    }
-
-    // The JSON body of the issuer and rules PUT, read here rather than through [FromBody]: the worker's FromBody binding
-    // fails an empty body, a JSON null or a missing content type with an exception before the function runs (500).
-    // Here an empty body or null is no value, for the validation to name (400), and JSON that does not fit is a 400 too.
-    private async Task<(T? Value, IActionResult? Error)> ReadJsonBodyAsync<T>(HttpRequestData request, string description, CancellationToken cancellationToken)
-        where T : class
-    {
-        using var reader = new StreamReader(request.Body);
-        var body = await reader.ReadToEndAsync(cancellationToken);
-
-        if (string.IsNullOrWhiteSpace(body))
-        {
-            return (null, null);
-        }
-
-        try
-        {
-            return (JsonSerializer.Deserialize<T>(body, _bodyJsonOptions), null);
-        }
-        catch (JsonException exception)
-        {
-            var at = string.IsNullOrEmpty(exception.Path) ? string.Empty : $" (at {exception.Path})";
-            return (null, InvalidFederation($"The request body is not {description}{at}."));
-        }
     }
 }
