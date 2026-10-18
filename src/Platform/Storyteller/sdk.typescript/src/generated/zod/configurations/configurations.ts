@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.21.3734
+ * OpenAPI spec version: 0.9.29.8872
  */
 import * as zod from "zod";
 
@@ -136,6 +136,9 @@ export const GetConfigurationsResponse = zod.object({
   Count: zod.int().optional(),
 });
 
+/**
+ * The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
+ */
 export const GetConfigurationParams = zod.object({
   organization: zod.string().describe("Target organization name."),
   project: zod.string().describe("Target project name."),
@@ -281,6 +284,9 @@ export const DeleteConfigurationParams = zod.object({
 
 export const DeleteConfigurationResponse = zod.unknown();
 
+/**
+ * The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.
+ */
 export const GetResolvedConfigurationParams = zod.object({
   organization: zod.string().describe("Target organization name."),
   project: zod.string().describe("Target project name."),

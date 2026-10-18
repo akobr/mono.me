@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.21.3734
+ * OpenAPI spec version: 0.9.29.8872
  */
 import type {
   BindingCatalog,
@@ -96,6 +96,9 @@ export const getGetConfigurationUrl = (
   return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}`;
 };
 
+/**
+ * The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
+ */
 export const getConfiguration = async (
   organization: string,
   project: string,
@@ -278,6 +281,9 @@ export const getGetResolvedConfigurationUrl = (
   return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/resolved`;
 };
 
+/**
+ * The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.
+ */
 export const getResolvedConfiguration = async (
   organization: string,
   project: string,
