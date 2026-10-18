@@ -30,7 +30,7 @@ public class SchemaDescendantEditCommand : SchemaApiCommand
     [Argument(0, Description = "The ancestor annotation key.")]
     public string AnnotationKey { get; set; } = string.Empty;
 
-    [Argument(1, Description = "The descendant annotation type code (rst, unt, sbt, usg, cnt, exe, uxe).")]
+    [Argument(1, Description = "The descendant annotation type code. It has to descend from the ancestor key: unt, usg, exe or uxe below rst; cnt, usg, exe or uxe below sbt; exe or uxe below usg or cnt; uxe below unt or exe. The API rejects any other type (InvalidKey).")]
     public string AnnotationType { get; set; } = string.Empty;
 
     [Option("-f|--force", CommandOptionType.NoValue, Description = "Store the schema even when existing configurations in the view do not comply.")]
