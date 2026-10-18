@@ -97,6 +97,7 @@ declare module 'vue' {
     MapControl: typeof import('./components/configuration/renderers/MapControl.vue')['default']
     MarkdownText: typeof import('./components/common/MarkdownText.vue')['default']
     MembersTable: typeof import('./components/access/MembersTable.vue')['default']
+    ModelingHeader: typeof import('./components/modeling/ModelingHeader.vue')['default']
     NonCompliantTable: typeof import('./components/schemas/NonCompliantTable.vue')['default']
     NumberControl: typeof import('./components/configuration/renderers/NumberControl.vue')['default']
     ObjectRenderer: typeof import('./components/configuration/renderers/ObjectRenderer.vue')['default']
