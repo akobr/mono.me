@@ -1,5 +1,11 @@
 import type { ViewArchiveContent, ViewExportFormat, ViewImportItemKind } from '@42for.net/2splatform.sdk'
-import { getAllAncestors, getAnnotationTypeInfo, typeCodes, type AnnotationTypeCode } from '@/utils/annotation-key'
+import {
+  canDescend,
+  cannotDescendMessage,
+  getAnnotationTypeInfo,
+  typeCodes,
+  type AnnotationTypeCode,
+} from '@/utils/annotation-key'
 
 // File names of the documents in an archive, a port of ViewArchiveNames (Backend.Core, export-import.md). The name
 // tells the kind, so folders play no part:
@@ -13,7 +19,8 @@ import { getAllAncestors, getAnnotationTypeInfo, typeCodes, type AnnotationTypeC
 //
 // <n> is an earlier version. Each segment of a key percent-encodes the characters that file systems reject; names
 // never contain '.', so the dots stay separators. A key whose second segment is "template" or "schema" (in any
-// case) gets the first character of that segment encoded, so it never reads as a file of its type.
+// case) gets the first character of that segment encoded, so it never reads as a file of its type. Which types
+// descend from a key comes from annotation-key.ts, as ViewArchiveNames takes it from DescendantTypeRules.
 
 /** One document of an archive (ViewDocumentKind of the API). */
 export type ViewDocumentKind = ViewImportItemKind
@@ -51,19 +58,8 @@ const isWord = (segment: string, word: string) => segment.toLowerCase() === word
 const codeOf = (segment: string) =>
   typeCodes.find((code) => code === segment.toLowerCase()) as AnnotationTypeCode | undefined
 
-/** The pairs (ancestor type, descendant type) of AnnotationHierarchy, read from one sample key of every type. */
-const descendantTypes = new Set(
-  typeCodes.flatMap((code) => {
-    const sample = [code, ...Array.from({ length: getAnnotationTypeInfo(code)!.segments - 1 }, () => 'x')].join('.')
-    return getAllAncestors(sample).map((ancestor) => `${ancestor.slice(0, ancestor.indexOf('.'))}>${code}`)
-  }),
-)
-
-/** Whether annotations of the descendant type can descend from the ancestor key (AnnotationHierarchy). */
-export function canDescend(ancestorKey: string, descendantType: string): boolean {
-  const ancestorType = ancestorKey.slice(0, ancestorKey.indexOf('.')).toLowerCase()
-  return descendantTypes.has(`${ancestorType}>${descendantType.toLowerCase()}`)
-}
+// re-exported, so the importers of the port keep finding it here
+export { canDescend }
 
 const reserved = new Set(['%', '<', '>', ':', '"', '/', '\\', '|', '?', '*'])
 
@@ -250,13 +246,7 @@ function decodeSegment(segment: string): string | undefined {
 function descendant(key: string, type: AnnotationTypeCode, version: number | undefined): ArchiveName {
   const name: ArchiveName = { kind: 'DescendantTypeSchema', type, key, version }
   // still a document, so a misplaced schema is reported instead of silently ignored
-  return canDescend(key, type)
-    ? name
-    : {
-        ...name,
-        errorCode: 'InvalidKey',
-        message: `The type ${type} cannot descend from ${key}, so it has no descendant-type schema there.`,
-      }
+  return canDescend(key, type) ? name : { ...name, errorCode: 'InvalidKey', message: cannotDescendMessage(key, type) }
 }
 
 /** The document a file name (without folders) stands for, or undefined when it is not a document. */

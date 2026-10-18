@@ -1,8 +1,15 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import type { VueWrapper } from '@vue/test-utils'
 import { setupServer } from 'msw/node'
+import {
+  getDescendantTypeSchema,
+  getDescendantTypeSchemaVersions,
+  setDescendantTypeSchema,
+} from '@42for.net/2splatform.sdk'
 import { getAllAncestors } from '@/utils/annotation-key'
 import { schemaApi, schemaRoute, summaryTarget } from '@/utils/schema-targets'
 import { validateSchemaDocument } from '@/utils/schema-validation'
+import SchemaCreateDialog from '@/components/schemas/SchemaCreateDialog.vue'
 import SchemaDetail from '@/components/schemas/SchemaDetail.vue'
 import TemplateDetail from '@/components/templates/TemplateDetail.vue'
 import { mockHandlers } from '@/mock/all-handlers'
@@ -109,6 +116,130 @@ describe('SchemaDetail', () => {
         .attributes('disabled'),
     ).toBeDefined()
     view.host.unmount()
+  })
+})
+
+describe('SchemaCreateDialog', () => {
+  // A failed test must not leave its teleported dialog in the body for the next one.
+  let unmount: (() => void) | undefined
+  afterEach(() => {
+    unmount?.()
+    unmount = undefined
+  })
+
+  type Field = 'RadioGroup' | 'Select' | 'InputMenu'
+  type SelectProps = { items: { value: string }[]; modelValue?: string; disabled?: boolean }
+
+  /** Opens the dialog on a descendant-type schema; `choose` picks a value in a field as the user would. */
+  async function openDialog() {
+    const screen = await mountScreen(SchemaCreateDialog, { open: true })
+    unmount = () => screen.host.unmount()
+    await settle(6)
+    const field = (name: Field) => screen.inner().findComponent({ name }) as VueWrapper
+    const choose = async (name: Field, value: string) => {
+      field(name).vm.$emit('update:modelValue', value)
+      await settle()
+    }
+    const select = () => field('Select').props() as SelectProps
+    await choose('RadioGroup', 'descendant')
+    return { screen, choose, select }
+  }
+
+  // The modal is teleported to the body.
+  const text = () => document.body.querySelector<HTMLElement>('[role="dialog"]')!.textContent!.replace(/\s+/g, ' ')
+  const openEditor = () =>
+    [...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Open editor')!
+  const offered = (select: SelectProps) => select.items.map((item) => item.value)
+
+  it('offers only the types that can descend from the key', async () => {
+    const { choose, select } = await openDialog()
+    // no key yet, so any type
+    expect(offered(select())).toEqual(['rst', 'unt', 'sbt', 'usg', 'cnt', 'exe', 'uxe'])
+
+    await choose('InputMenu', 'rst.payments')
+    expect(offered(select())).toEqual(['unt', 'usg', 'exe', 'uxe'])
+    expect(text()).not.toContain('No annotation type descends')
+
+    await choose('InputMenu', 'exe.northwind.invoicing.prod')
+    expect(offered(select())).toEqual(['uxe'])
+
+    await choose('InputMenu', 'uxe.northwind.invoicing.prod.worker')
+    expect(offered(select())).toEqual([])
+    expect(select().disabled).toBe(true)
+    expect(text()).toContain('No annotation type descends from uxe.northwind.invoicing.prod.worker.')
+  })
+
+  it('selects the first type that can descend when the key changes', async () => {
+    const { choose, select, screen } = await openDialog()
+    await choose('InputMenu', 'rst.payments')
+    expect(select().modelValue).toBe('exe')
+
+    await choose('Select', 'unt')
+    await choose('InputMenu', 'sbt.northwind')
+    expect(select().modelValue).toBe('usg')
+
+    await choose('InputMenu', 'cnt.northwind.prod')
+    expect(select().modelValue).toBe('exe')
+
+    await choose('InputMenu', 'unt.invoicing.worker')
+    expect(select().modelValue).toBe('uxe')
+
+    // a type that still descends stays selected
+    await choose('InputMenu', 'rst.payments')
+    expect(select().modelValue).toBe('uxe')
+
+    openEditor().click()
+    await settle()
+    expect(screen.router.currentRoute.value.path).toBe('/acme/billing/default/schemas/annotation/rst.payments/type/uxe')
+  })
+
+  it('keeps Open editor disabled for a unit of execution key', async () => {
+    const { choose, select } = await openDialog()
+    await choose('InputMenu', 'uxe.northwind.invoicing.prod.worker')
+    expect(openEditor().disabled).toBe(true)
+
+    // its annotation schema still exists
+    await choose('RadioGroup', 'annotation')
+    expect(openEditor().disabled).toBe(false)
+
+    // and a type schema takes any type again
+    await choose('RadioGroup', 'type')
+    expect(offered(select())).toHaveLength(7)
+    expect(select().modelValue).toBe('rst')
+    expect(openEditor().disabled).toBe(false)
+  })
+})
+
+describe('descendant-type schemas of the mock API', () => {
+  const schema = { type: 'object' }
+  const message =
+    'The type rst cannot descend from exe.northwind.invoicing.prod, so it has no descendant-type schema there.'
+
+  it('rejects a type that cannot descend from the key, also with force, and stores nothing', async () => {
+    const key = 'exe.northwind.invoicing.prod'
+    for (const [type, params] of [
+      ['rst', undefined],
+      ['rst', { force: true }],
+      ['RST', { force: true }],
+    ] as const) {
+      await expect(
+        setDescendantTypeSchema(scope.org, scope.project, scope.view, key, type, schema, params),
+      ).rejects.toMatchObject({ status: 400, errorCode: 'InvalidKey', message })
+    }
+
+    await expect(getDescendantTypeSchema(scope.org, scope.project, scope.view, key, 'rst')).rejects.toMatchObject({
+      status: 404,
+    })
+    expect(await getDescendantTypeSchemaVersions(scope.org, scope.project, scope.view, key, 'rst')).toEqual([])
+    expect(getDocument(loadDb(), scope, `schema:descendant:${key}:rst`)).toBeUndefined()
+  })
+
+  it('stores a type that descends from the key', async () => {
+    const saved = await setDescendantTypeSchema(scope.org, scope.project, scope.view, 'rst.payments', 'exe', schema)
+
+    expect(saved).toMatchObject({ AnnotationKey: 'rst.payments', AnnotationType: 'exe', Content: schema })
+    const read = await getDescendantTypeSchema(scope.org, scope.project, scope.view, 'rst.payments', 'exe')
+    expect(read.Content).toEqual(schema)
   })
 })
 

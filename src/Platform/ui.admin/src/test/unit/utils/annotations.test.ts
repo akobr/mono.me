@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import type { Annotation } from '@42for.net/2splatform.sdk'
 import { annotationStatus } from '@/utils/annotation-status'
 import { expandableIds, keySelectionOf, projectTree, rowSelectionOf, type TreeNode } from '@/utils/tree-projection'
-import { codeOfKey, deletedWith, metaOf } from '@/utils/annotation-key'
+import {
+  canDescend,
+  codeOfKey,
+  deletedWith,
+  descendantTypeCodes,
+  metaOf,
+  typeCodes,
+  type AnnotationTypeCode,
+} from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
 import { labelColor, normalizeLabels } from '@/utils/labels'
 
@@ -201,6 +209,49 @@ describe('deletedWith', () => {
     )
     expect(deletedWith('exe.northwind.invoicing.prod', keys)).toEqual(['uxe.northwind.invoicing.prod.worker'])
     expect(deletedWith('uxe.northwind.invoicing.prod.worker', keys)).toEqual([])
+  })
+})
+
+describe('descendant types', () => {
+  // The table of DescendantTypeRulesTests (Backend.Core), in typeCodes order, so the UI and the service agree.
+  const below: Record<AnnotationTypeCode, AnnotationTypeCode[]> = {
+    rst: ['unt', 'usg', 'exe', 'uxe'],
+    unt: ['uxe'],
+    sbt: ['usg', 'cnt', 'exe', 'uxe'],
+    usg: ['exe', 'uxe'],
+    cnt: ['exe', 'uxe'],
+    exe: ['uxe'],
+    uxe: [],
+  }
+  const sample: Record<AnnotationTypeCode, string> = {
+    rst: 'rst.invoicing',
+    unt: 'unt.invoicing.worker',
+    sbt: 'sbt.northwind',
+    usg: 'usg.northwind.invoicing',
+    cnt: 'cnt.northwind.prod',
+    exe: 'exe.northwind.invoicing.prod',
+    uxe: 'uxe.northwind.invoicing.prod.worker',
+  }
+  const matrix = typeCodes.flatMap((ancestor) =>
+    typeCodes.map((descendant) => [ancestor, descendant, below[ancestor].includes(descendant)] as const),
+  )
+
+  it.each(matrix)('canDescend %s → %s is %s, in any case', (ancestor, descendant, expected) => {
+    const upperKey = `${ancestor.toUpperCase()}${sample[ancestor].slice(ancestor.length)}`
+
+    expect(canDescend(sample[ancestor], descendant)).toBe(expected)
+    expect(canDescend(upperKey, descendant.toUpperCase())).toBe(expected)
+  })
+
+  it.each(typeCodes)('lists the types below a key of type %s in typeCodes order', (ancestor) => {
+    expect(descendantTypeCodes(sample[ancestor])).toEqual(below[ancestor])
+  })
+
+  it('reads the type code of the key in any case and lists none for an invalid key', () => {
+    expect(descendantTypeCodes('RST.invoicing')).toEqual(below.rst)
+    for (const key of ['', 'rst', 'rst.', 'rst.a.b', 'exe.northwind.invoicing', 'xyz.a']) {
+      expect(descendantTypeCodes(key), key).toEqual([])
+    }
   })
 })
 
