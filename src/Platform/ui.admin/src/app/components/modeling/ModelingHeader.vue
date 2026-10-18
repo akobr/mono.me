@@ -1,5 +1,10 @@
+<script lang="ts">
+// Set when a tab is opened while the tabs have the focus; the header of the opened page takes the focus over.
+let refocus = false
+</script>
+
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, useTemplateRef, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGetViews } from '@42for.net/2splatform.sdk/vue-query'
 import { useContextStore } from '@/stores/context'
@@ -29,6 +34,9 @@ const items = computed(() =>
   })),
 )
 
+const tabs = useTemplateRef<ComponentPublicInstance>('tabs')
+const tabList = () => tabs.value?.$el as HTMLElement | undefined
+
 // A tab change opens the tab's page without the query of the previous one. When a dirty editor keeps the page, the
 // route does not change and the getter keeps the current tab selected.
 const tab = computed({
@@ -36,9 +44,29 @@ const tab = computed({
   set: (value: string | number) => {
     const next = modelingTabs.find((item) => item.value === value)?.value
     if (next && context.scope) {
-      void router.push(modelingPath(context.scope, next))
+      refocus = !!tabList()?.contains(document.activeElement)
+      // a navigation that does not happen (Keep editing) keeps this header, and the focus where it is
+      void router.push(modelingPath(context.scope, next)).then(
+        (failure) => {
+          if (failure) {
+            refocus = false
+          }
+        },
+        () => (refocus = false),
+      )
     }
   },
+})
+
+// The opened page brings its own header, and the one that had the focus is gone with the previous page. The new
+// header shows its tab where the tabs scroll (on phones), and takes the focus after a change from the tabs.
+onMounted(() => {
+  const selected = tabList()?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
+  selected?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  if (refocus) {
+    refocus = false
+    selected?.focus()
+  }
 })
 </script>
 
@@ -50,6 +78,6 @@ const tab = computed({
   </AppNavbar>
   <UDashboardToolbar>
     <!-- every activation is a navigation, so the arrow keys only move the focus -->
-    <UTabs v-model="tab" :items="items" :content="false" variant="link" size="sm" activation-mode="manual" />
+    <UTabs ref="tabs" v-model="tab" :items="items" :content="false" variant="link" size="sm" activation-mode="manual" />
   </UDashboardToolbar>
 </template>

@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, type SetupContext } from 'vue'
-import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
+import { createMemoryHistory, createRouter, RouterView, useRoute } from 'vue-router'
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { routes } from 'vue-router/auto-routes'
@@ -158,6 +158,67 @@ describe('ModelingHeader', () => {
 
     expect(view.router.currentRoute.value.fullPath).toBe('/acme/billing/default/modeling/deleted')
     expect(selected()?.textContent?.trim()).toBe('Deleted')
+  })
+
+  describe('focus', () => {
+    // Each tab is a page with its own header, so the header is mounted again for every tab.
+    const Page = {
+      setup: () => {
+        const route = useRoute()
+        return () => h(ModelingHeader, { key: route.path })
+      },
+    }
+    const press = (target: HTMLElement, key: string) =>
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
+
+    it('moves to the tab of the opened page after a change from the tabs', async () => {
+      const view = await mountScreen(Page, {}, { path: '/acme/billing/default/modeling/schemas' })
+      await settle()
+      const before = tab('Templates')
+
+      before.focus()
+      press(before, 'Enter')
+      await settle()
+
+      expect(view.router.currentRoute.value.path).toBe('/acme/billing/default/modeling/templates')
+      expect(before.isConnected).toBe(false)
+      expect(document.activeElement).toBe(tab('Templates'))
+      expect(selected()).toBe(tab('Templates'))
+    })
+
+    it('stays on the tabs of the page when the navigation is cancelled', async () => {
+      const view = await mountScreen(Page, {}, { path: '/acme/billing/default/modeling/schemas' })
+      await settle()
+      // what Keep editing does when a dirty editor asks before it is left
+      const keepEditing = view.router.beforeEach(() => false)
+      const templates = tab('Templates')
+
+      templates.focus()
+      press(templates, 'Enter')
+      await settle()
+
+      expect(view.router.currentRoute.value.path).toBe('/acme/billing/default/modeling/schemas')
+      expect(templates.isConnected).toBe(true)
+      expect(document.activeElement).toBe(templates)
+
+      // a later page, opened from elsewhere, does not take the focus
+      keepEditing()
+      await view.router.push('/acme/billing/default/modeling/deleted')
+      await settle()
+      expect(selected()).toBe(tab('Deleted'))
+      expect(document.activeElement).not.toBe(tab('Deleted'))
+    })
+
+    it('leaves the focus alone when the tab changes from elsewhere', async () => {
+      const view = await mountScreen(Page, {}, { path: '/acme/billing/default/modeling/schemas' })
+      await settle()
+
+      await view.router.push('/acme/billing/default/modeling/compare')
+      await settle()
+
+      expect(selected()).toBe(tab('Compare views'))
+      expect(document.activeElement).not.toBe(tab('Compare views'))
+    })
   })
 
   it('shows what the page puts on the right of the navbar', async () => {
