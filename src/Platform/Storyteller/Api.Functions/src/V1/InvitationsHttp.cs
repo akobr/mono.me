@@ -1,5 +1,6 @@
 using System.Net;
 using System.Security.Claims;
+using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
@@ -13,8 +14,6 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 
-using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
-
 namespace _42.Platform.Storyteller.Api.V1;
 
 // Invitations of email addresses to organizations and projects. Administrators manage them per access point;
@@ -27,15 +26,18 @@ public class InvitationsHttp
 
     private readonly IInvitationService _invitations;
     private readonly UserAuthenticationOptions _authOptions;
+    private readonly JsonSerializerOptions _bodyJsonOptions;
     private readonly IUserProfileResolver? _profileResolver;
 
     public InvitationsHttp(
         IInvitationService invitations,
         IOptions<UserAuthenticationOptions> authOptions,
+        IOptions<JsonOptions> jsonOptions,
         IUserProfileResolver? profileResolver = null)
     {
         _invitations = invitations;
         _authOptions = authOptions.Value;
+        _bodyJsonOptions = jsonOptions.Value.JsonSerializerOptions;
         _profileResolver = profileResolver;
     }
 
@@ -73,10 +75,15 @@ public class InvitationsHttp
     public async Task<IActionResult> CreateInvitation(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.PointInvitations)]
         HttpRequestData request,
-        [FromBody] InvitationCreate? model,
         string key)
     {
         request.CheckScope(Scopes.User.Impersonation);
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<InvitationCreate>(_bodyJsonOptions, "an invitation");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (model is null)
         {

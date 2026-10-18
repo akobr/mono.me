@@ -339,7 +339,7 @@ public partial class MachineRestrictionHttpTests
         var (views, recorder) = Recording<IViewService>();
         recorder.Returns(nameof(IViewService.GetViewsAsync), (IReadOnlyList<View>)[new View { Name = DefaultView, IsDefault = true }]);
 
-        var result = await new ViewsHttp(views, Restricted()).GetViews(MachineRequest(), Org, Project, discover: false);
+        var result = await new ViewsHttp(views, Restricted(), FunctionTestDoubles.ApiJsonOptions).GetViews(MachineRequest(), Org, Project, discover: false);
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IReadOnlyList<View>>()!.ShouldHaveSingleItem().Name.ShouldBe(DefaultView);
         var call = recorder.Calls.ShouldHaveSingleItem();

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Api.Models;
@@ -9,9 +10,8 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-
-using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace _42.Platform.Storyteller.Api.V1;
 
@@ -20,11 +20,13 @@ public class ViewsHttp
 {
     private readonly IViewService _views;
     private readonly IAccessService _access;
+    private readonly JsonSerializerOptions _bodyJsonOptions;
 
-    public ViewsHttp(IViewService views, IAccessService access)
+    public ViewsHttp(IViewService views, IAccessService access, IOptions<JsonOptions> jsonOptions)
     {
         _views = views;
         _access = access;
+        _bodyJsonOptions = jsonOptions.Value.JsonSerializerOptions;
     }
 
     [Function(nameof(GetViews))]
@@ -73,13 +75,18 @@ public class ViewsHttp
     public async Task<IActionResult> CreateView(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Views.V1.Views)]
         HttpRequestData request,
-        [FromBody] ViewCreate? model,
         string organization,
         string project)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         EnsureNotMachine(request);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<ViewCreate>(_bodyJsonOptions, "a view");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (model is null)
         {
@@ -105,7 +112,6 @@ public class ViewsHttp
     public async Task<IActionResult> UpdateView(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Views.V1.View)]
         HttpRequestData request,
-        [FromBody] ViewUpdate? model,
         string organization,
         string project,
         string view)
@@ -113,7 +119,14 @@ public class ViewsHttp
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         EnsureNotMachine(request);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<ViewUpdate>(_bodyJsonOptions, "a view update");
 
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
+        // Without a body, the description is cleared.
         var updated = await _views.UpdateViewAsync(organization, project, view, model ?? new ViewUpdate(), request.GetAuditActor());
         return new OkObjectResult(updated);
     }

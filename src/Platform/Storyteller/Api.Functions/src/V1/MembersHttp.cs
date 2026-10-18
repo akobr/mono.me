@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
@@ -8,9 +9,8 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-
-using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace _42.Platform.Storyteller.Api.V1;
 
@@ -19,10 +19,12 @@ namespace _42.Platform.Storyteller.Api.V1;
 public class MembersHttp
 {
     private readonly IAccessService _accessService;
+    private readonly JsonSerializerOptions _bodyJsonOptions;
 
-    public MembersHttp(IAccessService accessService)
+    public MembersHttp(IAccessService accessService, IOptions<JsonOptions> jsonOptions)
     {
         _accessService = accessService;
+        _bodyJsonOptions = jsonOptions.Value.JsonSerializerOptions;
     }
 
     [Function(nameof(GetMembers))]
@@ -60,11 +62,16 @@ public class MembersHttp
     public async Task<IActionResult> SetMemberRole(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.Member)]
         HttpRequestData request,
-        [FromBody] MemberRoleUpdate? update,
         string key,
         string accountId)
     {
         request.CheckScope(Scopes.User.Impersonation);
+        var (update, invalidBody) = await request.ReadJsonBodyAsync<MemberRoleUpdate>(_bodyJsonOptions, "a member role");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (update is null || update.Role == AccountRole.None || !Enum.IsDefined(update.Role))
         {
