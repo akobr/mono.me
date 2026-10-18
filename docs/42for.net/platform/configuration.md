@@ -133,7 +133,7 @@ Later layers win. Object schemas merge. `required` arrays are unioned, so a requ
 | Execution | The responsibility, the subject, the usage, then the context |
 | Unit of execution | The responsibility, the subject, the usage, the context, the execution, then the unit |
 
-A type code on that descendant-type schema uses the short code: `unt`, `cnt`, `usg`, `exe`, `uxe`.
+A type code on that descendant-type schema uses the short code: `unt`, `cnt`, `usg`, `exe`, `uxe`. Only the pairs of the table exist: a schema for a type that cannot descend from the annotation, such as a responsibility below an execution, is rejected with `InvalidKey`.
 
 ## Views
 

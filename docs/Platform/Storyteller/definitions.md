@@ -40,6 +40,8 @@ A descendant-type schema sits on an ancestor and names the type of configuration
 
 Responsibility and subject configurations have no ancestors, so only a type schema and an annotation schema can apply to them.
 
+A descendant-type schema can be written only for these pairs (`DescendantTypeRules`). The `PUT` of any other pair, such as `rst` below `exe.s.r.c`, is rejected with `400` and `InvalidKey` before anything is read or stored, also with force; such a layer would never apply to anything. An import fails such a file with the same code and message. The reads, the versions, the diffs and the `DELETE` take any pair, so a document stored before this check can still be read and deleted.
+
 ### How the layers combine
 
 Combination is a deep merge of the schema documents, from the type schema through the ancestor schemas to the annotation schema. A later layer wins where both documents set the same keyword. Two exceptions keep the merge additive:
@@ -159,7 +161,7 @@ PUT accepts a query parameter `force`. It defaults to false. See [Force](#force)
 
 - Reads require one of `Configuration.Read`, `Configuration.Write`, `Default.Read`, `Default.Write`, plus access to the project.
 - Writes require `Configuration.Write` or `Default.Write` and the `Contributor` role on the project.
-- `400` means the body is not JSON or is not a schema NJsonSchema can parse, or the type code or annotation key is unknown.
+- `400` means the body is not JSON or is not a schema NJsonSchema can parse, or the type code or annotation key is unknown. On the descendant-type `PUT` it also means that the type cannot descend from `{key}`; that response carries `ErrorCode` `InvalidKey`.
 - `404` means the requested schema, version, or (for a patch of configuration) the configuration is absent.
 - `409` with `SchemaValidationErrorResponse` means a compliance check failed and force was not set. Each entry carries `AnnotationKey`, `ViewName`, and the list of messages. A message is the JSON path and the NJsonSchema error kind, for example `#/currency: NotInEnumeration`.
 - `409` with `ErrorResponse` means a concurrent writer won the race after the retries. That body is a different type from the compliance failure.
@@ -232,7 +234,7 @@ Force breaks one side of that deadlock for a single call. The caller passes it e
 
 On the HTTP API the parameter is the query `force=true`. On the CLI it is `-f` or `--force` on `schema type|annotation|descendant set|edit` and on `config set`, `config edit`, and `config patch`. Force is not remembered. The next call defaults to rejection again. Force is not a separate permission: a caller who can write the project can pass it. The author recorded on the new version is the audit of who published the break.
 
-Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, an unknown type code or annotation key, a patch of a missing configuration, and a lost concurrency race still fail.
+Force does not change the other failure modes. A body that is not JSON, a body that is not a schema, an unknown type code or annotation key, a descendant type that cannot descend from its key, a patch of a missing configuration, and a lost concurrency race still fail.
 
 Two sequences both work.
 

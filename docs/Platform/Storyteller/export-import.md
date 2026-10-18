@@ -29,7 +29,7 @@ The design and its decisions are in [the spec](specs/2026-10-15%20Export%20and%2
 - Versions expire after 365 days; an export contains what is left.
 - Each version has the time and the actor of its `Modified` stamp. `Author` in `export.json` is the actor's display name, or its id without one.
 - A template or schema stored under an id that no file name can hold (a type code that is not lower-case, a key that is not in its canonical form) is left out. The writes never produce such ids.
-- The schema routes accept a descendant-type schema for a type that cannot descend from its key. Such a schema is exported, and an import fails it with `InvalidKey`.
+- The schema routes reject a descendant-type schema for a type that cannot descend from its key (`400`, `InvalidKey`, see [definitions.md](definitions.md#ancestor-descendant-type-schemas)), so a view gets no such schema any more. One stored before that check is still exported, and an import fails it with `InvalidKey`. Once it is deleted, an export lists it only as a deleted schema with its earlier versions, which an import ignores.
 
 **Reads.** `ViewTransferService` reads the included kinds only, each with one call:
 
@@ -71,7 +71,7 @@ The file name tells the kind of a document, so the folders of a path play no par
 
    Suffixes and type codes match in any case. Every suffix except none may end with a numeric version.
 4. Any other name is not a document.
-5. A descendant type that cannot descend from the key (`AnnotationHierarchy.GetAncestorSchemaSources`) is still a document, so the mistake is reported. It fails with `InvalidKey`.
+5. A descendant type that cannot descend from the key (`DescendantTypeRules`, read from `AnnotationHierarchy.GetAncestorSchemaSources`) is still a document, so the mistake is reported. It fails with `InvalidKey`. The schema routes no longer store such a schema, so the file comes from a document stored before that check, which an export still carries, or from a hand-made archive.
 
 | File | Document |
 | --- | --- |
@@ -351,7 +351,7 @@ The outcome and the warnings come from the states read before the write, so a dr
 
 `IConfigurationSchemaService.ImportSchemaAsync` checks, in this order:
 
-1. A descendant-type schema whose type cannot descend from its key fails with `InvalidKey`.
+1. A descendant-type schema whose type cannot descend from its key fails with `InvalidKey`, with the message of the schema routes (`DescendantTypeRules`). The import reports it instead of throwing, so the other files of the archive still import.
 2. An annotation or descendant-type schema needs an active annotation, stored or in the overlay. Otherwise it is `Skipped`:
    - with `DependencyFailed` when the annotation failed in this import;
    - with `AnnotationDeleted` when it is deleted;
@@ -768,7 +768,7 @@ A dry run refreshes nothing.
 
 `npm run dev:mock` and the tests serve the five routes from `mock/transfer-handlers.ts`, over the mock database: annotations, the `template:` and `schema:` documents, and configurations.
 
-- **File names** come from `mock/archive-names.ts`, a TypeScript port of `ViewArchiveNames`: the names of every kind and version, the reserved second segment, the parser, the descendant-type check, the identities that find duplicates, hidden paths and the zip name. `test/unit/transfers/archive-names.test.ts` runs the cases of `ViewArchiveNamesTests`.
+- **File names** come from `mock/archive-names.ts`, a TypeScript port of `ViewArchiveNames`: the names of every kind and version, the reserved second segment, the parser, the descendant-type check (`canDescend`, which lives in `utils/annotation-key.ts` and serves the **New schema** dialog too), the identities that find duplicates, hidden paths and the zip name. `test/unit/transfers/archive-names.test.ts` runs the cases of `ViewArchiveNamesTests`, and `test/unit/utils/annotations.test.ts` the pairs of `DescendantTypeRulesTests`.
 - **Jobs.** A job is `Running` on its first read and ends on the second, so the UI shows its progress.
   - An export needs any role on the project, and an import `Contributor`. The scopes and the job limit are not checked.
   - The options are read like the API's: an unknown kind or mode answers `400` (`InvalidQuery` for the query).
