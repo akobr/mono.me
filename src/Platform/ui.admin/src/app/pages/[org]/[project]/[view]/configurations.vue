@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, useTemplateRef, watch } from 'vue'
+import { computed, h, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
 import type { TableColumn } from '@nuxt/ui'
