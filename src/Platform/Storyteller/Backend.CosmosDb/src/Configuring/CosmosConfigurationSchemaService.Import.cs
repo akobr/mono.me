@@ -61,7 +61,8 @@ public partial class CosmosConfigurationSchemaService
         var identity = GetIdentity(target);
         var (organization, project, view) = (target.Organization, target.Project, target.View);
 
-        // the schema routes reject such a pair; an older or hand-made archive can still bring one
+        // the schema routes reject such a pair; a document stored before that check (exported until it is deleted) or a
+        // hand-made archive can still bring one
         if (identity.Kind == SchemaKind.Descendant
             && !DescendantTypeRules.CanDescend(AnnotationKey.Parse(identity.ModelKey!), identity.ModelType!))
         {
