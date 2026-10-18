@@ -156,7 +156,17 @@ public class TokenSigningKeyProvider
         }
 
         var rsa = RSA.Create();
-        rsa.ImportPkcs8PrivateKey(stored.PrivateKeyPkcs8, out _);
+
+        try
+        {
+            rsa.ImportPkcs8PrivateKey(stored.PrivateKeyPkcs8, out _);
+        }
+        catch (CryptographicException)
+        {
+            // A corrupt key is unusable, like one of another algorithm.
+            rsa.Dispose();
+            return null;
+        }
 
         return new LoadedSigningKey(
             stored.Kid,

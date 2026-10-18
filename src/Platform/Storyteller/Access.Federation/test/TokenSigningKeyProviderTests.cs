@@ -111,6 +111,17 @@ public class TokenSigningKeyProviderTests
     }
 
     [Fact]
+    public async Task Issuing_WhenTheStoredKeyIsCorrupt_IsUnavailable()
+    {
+        var stored = CreateKey();
+        _store.Key = stored with { PrivateKeyPkcs8 = [0x30, 0x03, 0x02, 0x01, 0x00] };
+        var provider = CreateProvider();
+
+        await Should.ThrowAsync<TokenSigningKeyUnavailableException>(() => provider.GetSigningCredentialsAsync());
+        (await provider.GetValidationKeyAsync(stored.Kid)).ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Issuing_WithBootstrapDisabled_UsesAKeyStoredLater_OnTheNextExchange()
     {
         _options.SigningKeyAutoBootstrap = false;
