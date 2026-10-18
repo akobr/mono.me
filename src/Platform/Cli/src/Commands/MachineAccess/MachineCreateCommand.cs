@@ -217,12 +217,7 @@ public class MachineCreateCommand : BaseContextCommand
             Console.WriteLine("The machine has no certificate of its own: it presents a shared certificate of the project with its API key (sform account shared-cert).");
         }
 
-        // sform does not sign in as a federated machine yet: it has no variables to print.
-        if (machine.CredentialKind != MachineAccessCredentialKind.Federated)
-        {
-            WritePipelineVariables(machine, certificatePath, tokenUrl);
-        }
-
+        WritePipelineVariables(machine, certificatePath, tokenUrl);
         return ExitCodes.SUCCESS;
     }
 
@@ -230,8 +225,17 @@ public class MachineCreateCommand : BaseContextCommand
     // value printed above instead of being printed twice.
     private void WritePipelineVariables(_42.Platform.Storyteller.Sdk.MachineAccess machine, string? certificatePath, string? tokenUrl)
     {
-        var variables = new List<string> { $"{StorytellerVariables.API_URL}={_general.BaseUrl}" };
         var kind = machine.CredentialKind;
+        var federatedApiUrl = kind == MachineAccessCredentialKind.Federated ? GetFederatedApiUrl(machine) : null;
+        var apiUrl = federatedApiUrl ?? _general.BaseUrl;
+        var variables = new List<string> { $"{StorytellerVariables.API_URL}={apiUrl}" };
+
+        if (kind == MachineAccessCredentialKind.Federated)
+        {
+            variables.Add($"{StorytellerVariables.PROJECT}={Context.OrganizationName}.{Context.ProjectName}");
+            variables.Add($"{StorytellerVariables.CLIENT_ID}={machine.Id}");
+            variables.Add($"{StorytellerVariables.SUBJECT_TOKEN_FILE}=<file with the platform token>");
+        }
 
         if (kind == MachineAccessCredentialKind.ClientCredentials)
         {
@@ -280,6 +284,40 @@ public class MachineCreateCommand : BaseContextCommand
         {
             Console.WriteLine($"  {variable}");
         }
+
+        if (kind != MachineAccessCredentialKind.Federated)
+        {
+            return;
+        }
+
+        if (federatedApiUrl is null)
+        {
+            Console.WriteLine(
+                $"{StorytellerVariables.API_URL} could not be derived from the token endpoint; the rule's audience must then equal {apiUrl?.TrimEnd('/')}{GetTokenEndpointPath()}."
+                    .ThemedLowlight(Console.Theme));
+        }
+
+        Console.WriteLine($"In a GitHub Actions job with permissions: id-token: write, leave out {StorytellerVariables.SUBJECT_TOKEN_FILE}: sform asks the runner for a token for the token endpoint above.");
+        Console.WriteLine(
+            $"Optional: {StorytellerVariables.SUBJECT_TOKEN_TYPE}=jwt (access_token for Azure managed identity, id_token for Google Cloud) and {StorytellerVariables.TOKEN_SCOPE}=<a subset of the machine's scopes>.");
+    }
+
+    // The base of the server's token endpoint: the endpoint sform builds from it, and the audience it asks GitHub
+    // for, then equal the endpoint byte for byte, also when the server's public URL is another host than general.baseUrl.
+    private string? GetFederatedApiUrl(_42.Platform.Storyteller.Sdk.MachineAccess machine)
+    {
+        var path = GetTokenEndpointPath();
+        var endpoint = machine.TokenEndpoint;
+
+        return endpoint is not null && endpoint.Length > path.Length && endpoint.EndsWith(path, StringComparison.Ordinal)
+            ? endpoint[..^path.Length]
+            : null;
+    }
+
+    // As MachineAuthenticationService builds it, with the organization and project in the case of the context.
+    private string GetTokenEndpointPath()
+    {
+        return $"/v1/{Uri.EscapeDataString(Context.OrganizationName)}/{Uri.EscapeDataString(Context.ProjectName)}/access/token";
     }
 
     // No secret: the workload exchanges a token of its own platform for a Storyteller token.

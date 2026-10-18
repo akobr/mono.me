@@ -64,6 +64,7 @@ public class CommandContext : ICommandContext
 
     // Throws AuthenticationException (Configuration) when the target cannot be right: a malformed
     // STORYTELLER_PROJECT, or a machine without a project or with another project than its credential.
+    // A machine is then bound to the target.
     public void TrySetExplicitTarget(string? projectKey, string? viewName)
     {
         var isExplicitProject = !string.IsNullOrWhiteSpace(projectKey) && projectKey.Contains('.');
@@ -113,6 +114,9 @@ public class CommandContext : ICommandContext
             throw Invalid(
                 $"The machine credentials in {string.Join(", ", identity.Variables)} belong to {identity.Organization}.{identity.Project}, not {OrganizationName}.{ProjectName}.");
         }
+
+        // Only after every check: a federated machine exchanges at the token endpoint of this project.
+        _machine.BindTarget(OrganizationName, ProjectName);
     }
 
     private static AuthenticationException Invalid(string message)

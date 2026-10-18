@@ -37,6 +37,15 @@ Copy the same file into `../sdk.typescript/` and regenerate the TypeScript SDK (
 * `ClientCertificate` is added to the `HttpClientHandler` of every client for mutual TLS. It needs a private key, and it must be set before the first client is resolved, because the handler is built then.
 * `ClientCertificateHeaderName` is for development only. When it is set together with `ClientCertificate`, every request also carries the certificate (base64 DER) in that header, for a host without TLS. `sform` sets `X-ARR-ClientCert` for an `http` API on `localhost`, which the local Functions host accepts with `MachineAuth:IsCertificateHeaderFromClientAllowed`.
 
+`AddStorytellerSdk(configurationFactory, configureHttpClient)` calls `configureHttpClient` with the `IHttpClientBuilder` of each of the seven typed clients, after their primary handler (the one that carries `ClientCertificate`) is set, for example to add a `DelegatingHandler`. `sform` adds one that sends a request once more after a `401`, with the token of a new exchange for a federated machine:
+
+```csharp
+services.AddStorytellerSdk(null, builder => builder.AddHttpMessageHandler(
+    provider => new MachineTokenRenewalHandler(provider.GetRequiredService<IMachineSignIn>())));
+```
+
+A `DelegatingHandler` wraps the primary handler, which follows redirects: a handler that sends a request again has to check that `RequestUri` and `Authorization` are still the ones it sent, as a redirect changes both on the same message. The overload with one parameter adds no handler.
+
 ## Workload identity federation
 
 `AccessApiClient` manages trusted issuers and federation rules (`GetFederatedIssuersAsync`, `GetFederatedIssuerAsync`, `SetFederatedIssuerAsync`, `DeleteFederatedIssuerAsync`, `SetMachineFederationRulesAsync`) with a user token. The claim pins (`FederatedIssuer.RequiredClaims`, `FederationRule.Claims`) are dictionaries of `IReadOnlyList_String`, a `Collection<string>`: `Claims = new Dictionary<string, IReadOnlyList_String> { ["repository_id"] = new() { "74" } }`.
