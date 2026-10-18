@@ -88,8 +88,8 @@ public class KeyValuesHttpTests
     {
         var (http, _) = Create(AccountRole.ContributorWithSecrets);
 
-        var secret = await http.SetKeyValue(KeyValueRequests.User("PUT", secretsScope: true), new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s3cret" }, Org, Project, View, "db.password");
-        var @public = await http.SetKeyValue(KeyValueRequests.User("PUT"), new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "plain" }, Org, Project, View, "db.host");
+        var secret = await http.SetKeyValue(KeyValueRequests.User("PUT", secretsScope: true, body: FunctionTestDoubles.ToJsonBody(new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s3cret" })), Org, Project, View, "db.password");
+        var @public = await http.SetKeyValue(KeyValueRequests.User("PUT", body: FunctionTestDoubles.ToJsonBody(new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "plain" })), Org, Project, View, "db.host");
 
         secret.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBeNull();
         @public.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBe("plain");
@@ -100,7 +100,7 @@ public class KeyValuesHttpTests
     {
         var (http, service) = Create(AccountRole.Contributor);
 
-        var result = await http.SetKeyValue(KeyValueRequests.User("PUT"), null, Org, Project, View, "k");
+        var result = await http.SetKeyValue(KeyValueRequests.User("PUT"), Org, Project, View, "k");
 
         result.ShouldBeOfType<BadRequestObjectResult>();
         service.Calls.ShouldBeEmpty();
@@ -111,7 +111,7 @@ public class KeyValuesHttpTests
     {
         var (http, _) = Create(AccountRole.None, requireMtls: true);
 
-        var act = () => http.SetKeyValue(KeyValueRequests.Machine(mtls: false, "PUT"), new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s" }, Org, Project, View, "db.password");
+        var act = () => http.SetKeyValue(KeyValueRequests.Machine(mtls: false, "PUT", body: FunctionTestDoubles.ToJsonBody(new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s" })), Org, Project, View, "db.password");
 
         (await act.ShouldThrowAsync<AccessDeniedException>()).ErrorCode.ShouldBe(ErrorCodes.MtlsRequired);
     }
@@ -126,7 +126,7 @@ public class KeyValuesHttpTests
 
         var (http, _) = Create(AccountRole.None, requireMtls: false);
 
-        var act = () => http.SetKeyValue(KeyValueRequests.Machine(mtls: true, "PUT", roles: [Scopes.Configuration.Write]), new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s" }, Org, Project, View, "db.password");
+        var act = () => http.SetKeyValue(KeyValueRequests.Machine(mtls: true, "PUT", body: FunctionTestDoubles.ToJsonBody(new KeyValueWrite { Protection = KeyValueProtection.Standard, Value = "s" }), roles: [Scopes.Configuration.Write]), Org, Project, View, "db.password");
 
         (await act.ShouldThrowAsync<AccessDeniedException>()).ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
     }
@@ -179,10 +179,10 @@ public class KeyValuesHttpTests
     {
         var (http, service) = Create(AccountRole.ContributorWithSecrets);
 
-        var noKeys = await http.RestoreKeyValues(KeyValueRequests.User("POST"), new KeyValueBulkRequest(), Org, Project, View);
-        var noLevel = await http.ProtectKeyValues(KeyValueRequests.User("POST", secretsScope: true), new KeyValueBulkRequest { Keys = ["a"] }, Org, Project, View);
-        var restored = await http.RestoreKeyValues(KeyValueRequests.User("POST"), new KeyValueBulkRequest { KeyPrefix = "db." }, Org, Project, View);
-        var protectedResult = await http.ProtectKeyValues(KeyValueRequests.User("POST", secretsScope: true), new KeyValueBulkRequest { Keys = ["a", "b"], Protection = KeyValueProtection.Hsm }, Org, Project, View);
+        var noKeys = await http.RestoreKeyValues(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest())), Org, Project, View);
+        var noLevel = await http.ProtectKeyValues(KeyValueRequests.User("POST", secretsScope: true, body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["a"] })), Org, Project, View);
+        var restored = await http.RestoreKeyValues(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { KeyPrefix = "db." })), Org, Project, View);
+        var protectedResult = await http.ProtectKeyValues(KeyValueRequests.User("POST", secretsScope: true, body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["a", "b"], Protection = KeyValueProtection.Hsm })), Org, Project, View);
 
         noKeys.ShouldBeOfType<BadRequestObjectResult>();
         noLevel.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.ProtectionRequired);
@@ -196,7 +196,7 @@ public class KeyValuesHttpTests
     {
         var (http, _) = Create(AccountRole.None, requireMtls: true);
 
-        var act = () => http.ProtectKeyValues(KeyValueRequests.Machine(mtls: false, "POST"), new KeyValueBulkRequest { Keys = ["a"], Protection = KeyValueProtection.Hsm }, Org, Project, View);
+        var act = () => http.ProtectKeyValues(KeyValueRequests.Machine(mtls: false, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["a"], Protection = KeyValueProtection.Hsm })), Org, Project, View);
 
         (await act.ShouldThrowAsync<AccessDeniedException>()).ErrorCode.ShouldBe(ErrorCodes.MtlsRequired);
     }
@@ -206,7 +206,7 @@ public class KeyValuesHttpTests
     {
         var (http, service) = Create(AccountRole.None);
 
-        var act = () => http.PurgeKeyValues(KeyValueRequests.Machine(mtls: true, "POST"), new KeyValueBulkRequest { Keys = ["a"] }, Org, Project, View);
+        var act = () => http.PurgeKeyValues(KeyValueRequests.Machine(mtls: true, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["a"] })), Org, Project, View);
 
         await act.ShouldThrowAsync<AccessDeniedException>();
         service.Calls.ShouldBeEmpty();
@@ -217,9 +217,9 @@ public class KeyValuesHttpTests
     {
         var (http, service) = Create(AccountRole.None, requireMtls: true);
 
-        var withoutSecrets = await http.ExportKeyValues(KeyValueRequests.Machine(mtls: false, "POST"), null, Org, Project, View);
-        var withMtls = await http.ExportKeyValues(KeyValueRequests.Machine(mtls: true, "POST"), new KeyValueExportRequest { IncludeSecrets = true }, Org, Project, View);
-        var act = () => http.ExportKeyValues(KeyValueRequests.Machine(mtls: false, "POST"), new KeyValueExportRequest { IncludeSecrets = true }, Org, Project, View);
+        var withoutSecrets = await http.ExportKeyValues(KeyValueRequests.Machine(mtls: false, "POST"), Org, Project, View);
+        var withMtls = await http.ExportKeyValues(KeyValueRequests.Machine(mtls: true, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true })), Org, Project, View);
+        var act = () => http.ExportKeyValues(KeyValueRequests.Machine(mtls: false, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true })), Org, Project, View);
 
         withoutSecrets.ShouldBeOfType<OkObjectResult>();
         withMtls.ShouldBeOfType<OkObjectResult>();
@@ -238,7 +238,7 @@ public class KeyValuesHttpTests
 
         var (http, _) = Create(AccountRole.Reader);
 
-        var act = () => http.ExportKeyValues(KeyValueRequests.User("POST"), new KeyValueExportRequest { IncludeSecrets = true }, Org, Project, View);
+        var act = () => http.ExportKeyValues(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true })), Org, Project, View);
 
         (await act.ShouldThrowAsync<AccessDeniedException>()).ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
     }
@@ -249,12 +249,132 @@ public class KeyValuesHttpTests
         var (http, service) = Create(AccountRole.Contributor);
         var document = new KeyValueDocument { Items = [new KeyValueDocumentItem { Key = "a", Protection = KeyValueProtection.Public, Value = "1" }] };
 
-        var result = await http.ImportKeyValues(KeyValueRequests.User("POST", query: q => { q["mode"] = "replace"; q["dryRun"] = "true"; q["keyPrefix"] = "db."; }), document, Org, Project, View);
-        var noBody = await http.ImportKeyValues(KeyValueRequests.User("POST"), null, Org, Project, View);
+        var result = await http.ImportKeyValues(KeyValueRequests.User("POST", query: q => { q["mode"] = "replace"; q["dryRun"] = "true"; q["keyPrefix"] = "db."; }, body: FunctionTestDoubles.ToJsonBody(document)), Org, Project, View);
+        var noBody = await http.ImportKeyValues(KeyValueRequests.User("POST"), Org, Project, View);
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValueImportResult>().IsDryRun.ShouldBeTrue();
         service.LastImport.ShouldBe(new KeyValueImportOptions { Mode = KeyValueImportMode.Replace, DryRun = true, KeyPrefix = "db." });
         noBody.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.ImportInvalid);
+    }
+
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran. The value is required,
+    // so {} is not a write either.
+    [Theory]
+    [InlineData("", "A body with Value is required.")]
+    [InlineData("null", "A body with Value is required.")]
+    [InlineData("[1, 2]", "The request body is not a key/value write (at $).")]
+    [InlineData("{}", "The request body is not a key/value write (at $).")]
+    public async Task SetKeyValue_MissingOrInvalidBody_IsBadRequest(string body, string message)
+    {
+        var (http, service) = Create(AccountRole.Contributor);
+
+        var result = await http.SetKeyValue(KeyValueRequests.User("PUT", body: body), Org, Project, View, "k");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        service.Calls.ShouldBeEmpty();
+    }
+
+    // The worker's [FromBody] binding refused a body without a content type; the handler reads it.
+    [Fact]
+    public async Task SetKeyValue_BodyWithoutAContentType_IsRead()
+    {
+        var (http, service) = Create(AccountRole.Contributor);
+        var request = KeyValueRequests.User("PUT", body: FunctionTestDoubles.ToJsonBody(new KeyValueWrite { Protection = KeyValueProtection.Public, Value = "plain" }));
+        request.Headers.Remove("Content-Type").ShouldBeTrue();
+
+        var result = await http.SetKeyValue(request, Org, Project, View, "db.host");
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>().Value.ShouldBe("plain");
+        service.Calls.ShouldBe(["set:db.host"]);
+    }
+
+    [Fact]
+    public async Task SetKeyValue_PropertyAndEnumNamesInAnyCase_AreRead()
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+        const string body = """{ "value": "s3cret", "PROTECTION": "standard", }""";
+
+        var result = await http.SetKeyValue(KeyValueRequests.User("PUT", secretsScope: true, body: body), Org, Project, View, "db.password");
+
+        var pair = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValue>();
+        pair.Protection.ShouldBe(KeyValueProtection.Standard);
+        pair.Value.ShouldBeNull();
+        service.Calls.ShouldBe(["set:db.password"]);
+    }
+
+    // {} is a bulk request without keys. Protect checks the secret rights after the body, so a contributor without
+    // them gets the 400 too.
+    [Theory]
+    [InlineData("", "A body with Keys or a KeyPrefix is required.")]
+    [InlineData("null", "A body with Keys or a KeyPrefix is required.")]
+    [InlineData("{}", "A body with Keys or a KeyPrefix is required.")]
+    [InlineData("[1, 2]", "The request body is not a key/value bulk request (at $).")]
+    public async Task Bulk_MissingOrInvalidBody_IsBadRequest(string body, string message)
+    {
+        var (http, service) = Create(AccountRole.Contributor);
+        var (administratorHttp, administratorService) = Create(AccountRole.Administrator);
+
+        var restored = await http.RestoreKeyValues(KeyValueRequests.User("POST", body: body), Org, Project, View);
+        var protectedResult = await http.ProtectKeyValues(KeyValueRequests.User("POST", body: body), Org, Project, View);
+        var purged = await administratorHttp.PurgeKeyValues(KeyValueRequests.User("POST", body: body), Org, Project, View);
+
+        foreach (var result in new[] { restored, protectedResult, purged })
+        {
+            var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+            error.Message.ShouldBe(message);
+            error.ErrorCode.ShouldBeNull();
+        }
+
+        service.Calls.ShouldBeEmpty();
+        administratorService.Calls.ShouldBeEmpty();
+    }
+
+    // The body of an export is optional: without one, the whole view exports without secret values.
+    [Theory]
+    [InlineData("")]
+    [InlineData("null")]
+    public async Task Export_WithoutABody_ExportsWithoutSecrets(string body)
+    {
+        var (http, service) = Create(AccountRole.Reader);
+
+        var result = await http.ExportKeyValues(KeyValueRequests.User("POST", body: body), Org, Project, View);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        service.LastExport.ShouldBe(new KeyValueExportRequest());
+        service.Calls.ShouldBe(["export"]);
+    }
+
+    [Fact]
+    public async Task Export_InvalidBody_IsBadRequest()
+    {
+        var (http, service) = Create(AccountRole.Reader);
+
+        var result = await http.ExportKeyValues(KeyValueRequests.User("POST", body: "[1, 2]"), Org, Project, View);
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe("The request body is not a key/value export request (at $).");
+        error.ErrorCode.ShouldBeNull();
+        service.Calls.ShouldBeEmpty();
+    }
+
+    // The items are required, so {} is not a document either.
+    [Theory]
+    [InlineData("", "A document with Items is required.")]
+    [InlineData("null", "A document with Items is required.")]
+    [InlineData("[1, 2]", "The request body is not a key/value document (at $).")]
+    [InlineData("{}", "The request body is not a key/value document (at $).")]
+    public async Task Import_MissingOrInvalidBody_IsImportInvalid(string body, string message)
+    {
+        var (http, service) = Create(AccountRole.Contributor);
+
+        var result = await http.ImportKeyValues(KeyValueRequests.User("POST", body: body), Org, Project, View);
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBe(ErrorCodes.ImportInvalid);
+        service.Calls.ShouldBeEmpty();
     }
 
     [Fact]
@@ -349,13 +469,13 @@ public class KeyValuesHttpTests
     public async Task Policy_ReadersAndMachinesRead_OnlyUsersChange()
     {
         var policies = new RecordingPolicyService();
-        var http = new KeyValuePolicyHttp(policies, new FixedKeyValuePolicies(), new RoleAccess(AccountRole.Administrator));
+        var http = new KeyValuePolicyHttp(policies, new FixedKeyValuePolicies(), new RoleAccess(AccountRole.Administrator), FunctionTestDoubles.ApiJsonOptions);
 
         var byMachine = await http.GetKeyValuePolicy(KeyValueRequests.Machine(mtls: false, roles: [Scopes.Configuration.Read]), Org, Project);
         var recipients = await http.GetRecipients(KeyValueRequests.User(), Org, Project);
-        var updated = await http.SetKeyValuePolicy(KeyValueRequests.User("PUT"), new KeyValuePolicyUpdate { RequireMtlsForSecretDelivery = false }, Org, Project);
+        var updated = await http.SetKeyValuePolicy(KeyValueRequests.User("PUT", body: FunctionTestDoubles.ToJsonBody(new KeyValuePolicyUpdate { RequireMtlsForSecretDelivery = false })), Org, Project);
         var setup = await http.GetByokSetup(KeyValueRequests.User(), Org, Project);
-        var act = () => http.SetKeyValuePolicy(KeyValueRequests.Machine(mtls: true, "PUT"), new KeyValuePolicyUpdate(), Org, Project);
+        var act = () => http.SetKeyValuePolicy(KeyValueRequests.Machine(mtls: true, "PUT", body: FunctionTestDoubles.ToJsonBody(new KeyValuePolicyUpdate())), Org, Project);
 
         byMachine.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<KeyValuePolicy>();
         recipients.ShouldBeOfType<OkObjectResult>();
@@ -370,15 +490,15 @@ public class KeyValuesHttpTests
     public async Task Policy_RotateVerifyAndRecipients()
     {
         var policies = new RecordingPolicyService();
-        var http = new KeyValuePolicyHttp(policies, new FixedKeyValuePolicies(), new RoleAccess(AccountRole.Administrator));
+        var http = new KeyValuePolicyHttp(policies, new FixedKeyValuePolicies(), new RoleAccess(AccountRole.Administrator), FunctionTestDoubles.ApiJsonOptions);
 
-        var rotated = await http.RotateKeyValueKey(KeyValueRequests.User("POST"), new KeyValueRotateRequest { Protection = KeyValueProtection.Hsm }, Org, Project);
-        var badRotate = await http.RotateKeyValueKey(KeyValueRequests.User("POST"), null, Org, Project);
+        var rotated = await http.RotateKeyValueKey(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueRotateRequest { Protection = KeyValueProtection.Hsm })), Org, Project);
+        var badRotate = await http.RotateKeyValueKey(KeyValueRequests.User("POST"), Org, Project);
         var verified = await http.VerifyByok(KeyValueRequests.User("POST"), Org, Project);
-        var added = await http.AddRecipient(KeyValueRequests.User("POST"), new ClientEncryptionRecipientCreate { Name = "api", PublicKey = "-----BEGIN PUBLIC KEY-----" }, Org, Project);
-        var badAdd = await http.AddRecipient(KeyValueRequests.User("POST"), new ClientEncryptionRecipientCreate { Name = string.Empty, PublicKey = "x" }, Org, Project);
-        var renamed = await http.UpdateRecipient(KeyValueRequests.User("PATCH"), new ClientEncryptionRecipientUpdate { Name = "api2" }, Org, Project, "r1");
-        var badUpdate = await http.UpdateRecipient(KeyValueRequests.User("PATCH"), new ClientEncryptionRecipientUpdate(), Org, Project, "r1");
+        var added = await http.AddRecipient(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new ClientEncryptionRecipientCreate { Name = "api", PublicKey = "-----BEGIN PUBLIC KEY-----" })), Org, Project);
+        var badAdd = await http.AddRecipient(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new ClientEncryptionRecipientCreate { Name = string.Empty, PublicKey = "x" })), Org, Project);
+        var renamed = await http.UpdateRecipient(KeyValueRequests.User("PATCH", body: FunctionTestDoubles.ToJsonBody(new ClientEncryptionRecipientUpdate { Name = "api2" })), Org, Project, "r1");
+        var badUpdate = await http.UpdateRecipient(KeyValueRequests.User("PATCH", body: FunctionTestDoubles.ToJsonBody(new ClientEncryptionRecipientUpdate())), Org, Project, "r1");
         var removed = await http.RemoveRecipient(KeyValueRequests.User("DELETE"), Org, Project, "r1");
 
         rotated.ShouldBeOfType<OkObjectResult>();
@@ -400,11 +520,97 @@ public class KeyValuesHttpTests
             return;
         }
 
-        var http = new KeyValuePolicyHttp(new RecordingPolicyService(), new FixedKeyValuePolicies(), new RoleAccess(AccountRole.ContributorWithSecrets));
+        var http = new KeyValuePolicyHttp(new RecordingPolicyService(), new FixedKeyValuePolicies(), new RoleAccess(AccountRole.ContributorWithSecrets), FunctionTestDoubles.ApiJsonOptions);
 
-        var act = () => http.SetKeyValuePolicy(KeyValueRequests.User("PUT"), new KeyValuePolicyUpdate(), Org, Project);
+        var act = () => http.SetKeyValuePolicy(KeyValueRequests.User("PUT", body: FunctionTestDoubles.ToJsonBody(new KeyValuePolicyUpdate())), Org, Project);
 
         await act.ShouldThrowAsync<AccessDeniedException>();
+    }
+
+    // {} is a policy update that changes nothing.
+    [Theory]
+    [InlineData("", "A body with the policy members to change is required.")]
+    [InlineData("null", "A body with the policy members to change is required.")]
+    [InlineData("[1, 2]", "The request body is not a key/value policy update (at $).")]
+    public async Task SetKeyValuePolicy_MissingOrInvalidBody_IsBadRequest(string body, string message)
+    {
+        var policies = new RecordingPolicyService();
+        var http = CreatePolicy(policies);
+
+        var result = await http.SetKeyValuePolicy(KeyValueRequests.User("PUT", body: body), Org, Project);
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        policies.Calls.ShouldBeEmpty();
+    }
+
+    // The protection is required, so {} is not a rotation request either.
+    [Theory]
+    [InlineData("", "A body with the Protection to rotate is required.")]
+    [InlineData("null", "A body with the Protection to rotate is required.")]
+    [InlineData("[1, 2]", "The request body is not a key rotation request (at $).")]
+    [InlineData("{}", "The request body is not a key rotation request (at $).")]
+    public async Task RotateKeyValueKey_MissingOrInvalidBody_IsBadRequest(string body, string message)
+    {
+        var policies = new RecordingPolicyService();
+        var http = CreatePolicy(policies);
+
+        var result = await http.RotateKeyValueKey(KeyValueRequests.User("POST", body: body), Org, Project);
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        policies.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task RotateKeyValueKey_EnumNameInAnyCase_IsRead()
+    {
+        var policies = new RecordingPolicyService();
+        var http = CreatePolicy(policies);
+
+        var result = await http.RotateKeyValueKey(KeyValueRequests.User("POST", body: """{ "protection": "hsm" }"""), Org, Project);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        policies.Calls.ShouldBe(["rotate:Hsm"]);
+    }
+
+    // The name and the public key are required, so {} is not a recipient either.
+    [Theory]
+    [InlineData("", "A body with Name and PublicKey is required.")]
+    [InlineData("null", "A body with Name and PublicKey is required.")]
+    [InlineData("[1, 2]", "The request body is not a client encryption recipient (at $).")]
+    [InlineData("{}", "The request body is not a client encryption recipient (at $).")]
+    public async Task AddRecipient_MissingOrInvalidBody_IsRecipientInvalid(string body, string message)
+    {
+        var policies = new RecordingPolicyService();
+        var http = CreatePolicy(policies);
+
+        var result = await http.AddRecipient(KeyValueRequests.User("POST", body: body), Org, Project);
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBe(ErrorCodes.RecipientInvalid);
+        policies.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("", "A body with Name or IsEnabled is required.")]
+    [InlineData("null", "A body with Name or IsEnabled is required.")]
+    [InlineData("{}", "A body with Name or IsEnabled is required.")]
+    [InlineData("[1, 2]", "The request body is not a client encryption recipient update (at $).")]
+    public async Task UpdateRecipient_MissingOrInvalidBody_IsBadRequest(string body, string message)
+    {
+        var policies = new RecordingPolicyService();
+        var http = CreatePolicy(policies);
+
+        var result = await http.UpdateRecipient(KeyValueRequests.User("PATCH", body: body), Org, Project, "r1");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        policies.Calls.ShouldBeEmpty();
     }
 
     [Fact]
@@ -461,7 +667,12 @@ public class KeyValuesHttpTests
     private static (KeyValuesHttp Http, RecordingKeyValueService Service) Create(AccountRole role, bool requireMtls = true)
     {
         var service = new RecordingKeyValueService();
-        var http = new KeyValuesHttp(service, new RoleAccess(role), new FixedKeyValuePolicies(requireMtls), NullLogger<KeyValuesHttp>.Instance);
+        var http = new KeyValuesHttp(service, new RoleAccess(role), new FixedKeyValuePolicies(requireMtls), FunctionTestDoubles.ApiJsonOptions, NullLogger<KeyValuesHttp>.Instance);
         return (http, service);
+    }
+
+    private static KeyValuePolicyHttp CreatePolicy(RecordingPolicyService policies)
+    {
+        return new KeyValuePolicyHttp(policies, new FixedKeyValuePolicies(), new RoleAccess(AccountRole.Administrator), FunctionTestDoubles.ApiJsonOptions);
     }
 }

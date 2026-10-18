@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
@@ -11,9 +12,8 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-
-using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace _42.Platform.Storyteller.Api.V1;
 
@@ -25,17 +25,20 @@ public class KeyValuesHttp
     private readonly IKeyValueService _keyValues;
     private readonly IAccessService _access;
     private readonly IKeyValuePolicyStore _policies;
+    private readonly JsonSerializerOptions _bodyJsonOptions;
     private readonly ILogger<KeyValuesHttp> _logger;
 
     public KeyValuesHttp(
         IKeyValueService keyValues,
         IAccessService access,
         IKeyValuePolicyStore policies,
+        IOptions<JsonOptions> jsonOptions,
         ILogger<KeyValuesHttp> logger)
     {
         _keyValues = keyValues;
         _access = access;
         _policies = policies;
+        _bodyJsonOptions = jsonOptions.Value.JsonSerializerOptions;
         _logger = logger;
     }
 
@@ -152,7 +155,6 @@ public class KeyValuesHttp
     public async Task<IActionResult> SetKeyValue(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.KeyValues.V1.KeyValue)]
         HttpRequestData request,
-        [FromBody] KeyValueWrite? write,
         string organization,
         string project,
         string view,
@@ -160,6 +162,12 @@ public class KeyValuesHttp
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        var (write, invalidBody) = await request.ReadJsonBodyAsync<KeyValueWrite>(_bodyJsonOptions, "a key/value write");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (write is null || write.Value is null)
         {
@@ -240,13 +248,18 @@ public class KeyValuesHttp
     public async Task<IActionResult> RestoreKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Restore)]
         HttpRequestData request,
-        [FromBody] KeyValueBulkRequest? bulk,
         string organization,
         string project,
         string view)
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (!TryValidateBulk(bulk, out var badRequest))
         {
@@ -273,12 +286,17 @@ public class KeyValuesHttp
     public async Task<IActionResult> PurgeKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Purge)]
         HttpRequestData request,
-        [FromBody] KeyValueBulkRequest? bulk,
         string organization,
         string project,
         string view)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
+        var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (!TryValidateBulk(bulk, out var badRequest))
         {
@@ -310,13 +328,18 @@ public class KeyValuesHttp
     public async Task<IActionResult> ProtectKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Protect)]
         HttpRequestData request,
-        [FromBody] KeyValueBulkRequest? bulk,
         string organization,
         string project,
         string view)
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (!TryValidateBulk(bulk, out var badRequest))
         {
@@ -488,14 +511,20 @@ public class KeyValuesHttp
     public async Task<IActionResult> ExportKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Export)]
         HttpRequestData request,
-        [FromBody] KeyValueExportRequest? export,
         string organization,
         string project,
         string view)
     {
         request.CheckScope(KeyValueAuthorization.ReadScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project);
+        var (export, invalidBody) = await request.ReadJsonBodyAsync<KeyValueExportRequest>(_bodyJsonOptions, "a key/value export request");
 
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
+        // Without a body, the whole view exports, secrets without their values.
         export ??= new KeyValueExportRequest();
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
 
@@ -532,13 +561,18 @@ public class KeyValuesHttp
     public async Task<IActionResult> ImportKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Import)]
         HttpRequestData request,
-        [FromBody] KeyValueDocument? document,
         string organization,
         string project,
         string view)
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        var (document, invalidBody) = await request.ReadJsonBodyAsync<KeyValueDocument>(_bodyJsonOptions, "a key/value document", ErrorCodes.ImportInvalid);
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (document?.Items is null)
         {
