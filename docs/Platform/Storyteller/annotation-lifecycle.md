@@ -154,15 +154,15 @@ All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Func
 | Method | Route | Role | Result |
 | --- | --- | --- | --- |
 | PUT, POST | `…/{key}` | Contributor | Creates, updates, or re-creates; `200` with the stored annotation, so the client receives the stamps. `400 InvalidAnnotation` or `InvalidKey`; `409` after three concurrent changes. |
-| POST | `…` and `…/simple` | Contributor | Bulk create (at most 100); deleted keys and deleted ancestors are re-created. |
+| POST | `…` and `…/simple` | Contributor | Bulk create (at most 100); deleted keys and deleted ancestors are re-created. `400` for a missing list (an empty body or `null`), and on `…` for a `null` entry; an empty list answers `200 []`. |
 | DELETE | `…/{key}` | Contributor | Soft delete with the descendants; `200 AnnotationDeletionResult`. A repeated delete returns the existing deletion. `404` when missing. |
 | GET | `…` and the per-type lists | Reader | `AnnotationsResponse` of active annotations; `?includeInactive=true` and `?includeDeleted=true` add the others ([Active annotations](#active-annotations)); `?continuationToken=`. |
 | GET | `…/{key}` | Reader | The annotation; `404` when missing or deleted, `404 AnnotationInactive` when it is not active. `?includeInactive=true` and `?includeDeleted=true` return those too. |
 | GET | `…/{key}/{descendants}` | Reader | The descendants of the key that are active; the same two flags. |
 | GET | `…/deleted` | Reader | `AnnotationsResponse` with `Deletion` on each item, newest deletion first. `?roots=true` (default) lists only the roots, `?roots=false` everything; `?deletionId=` what one delete removed; `?continuationToken=`. |
 | GET | `…/deleted/{key}` | Reader | The deleted annotation with `Deletion`; `404` when it is not deleted. |
-| POST | `…/deleted/lookup` | Reader | `AnnotationKeysRequest` (at most 100 keys) → the deleted annotations among them; active and unknown keys are left out. `400 InvalidKey` for an invalid key, no keys, or too many. |
-| POST | `…/deleted/restore` | Contributor | `AnnotationRestoreRequest` (`Keys`, at most 100, and `Descendants`, default `true`) → `200 AnnotationRestoreResult`; a partial success lists the failed keys in `Failed`. |
+| POST | `…/deleted/lookup` | Reader | `AnnotationKeysRequest` (at most 100 keys) → the deleted annotations among them; active and unknown keys are left out. `400 InvalidKey` for an invalid key, no keys, too many, or a body that is not an object with `Keys`. |
+| POST | `…/deleted/restore` | Contributor | `AnnotationRestoreRequest` (`Keys`, at most 100, and `Descendants`, default `true`) → `200 AnnotationRestoreResult`; a partial success lists the failed keys in `Failed`. `400 InvalidKey` as for the lookup. |
 | DELETE | `…/deleted/{key}` | Administrator, users only | Permanent delete; `200 AnnotationPurgeResult`. `409 AnnotationNotDeleted` for an active key, `404` when missing. |
 | GET | `…/{key}/history` | Reader | `AnnotationHistory`, for active and deleted keys; `404` for a purged or unknown key. |
 
@@ -208,7 +208,7 @@ A violation answers `InvalidInputException` with `ErrorCode` `InvalidAnnotation`
 | Code | Meaning |
 | --- | --- |
 | `InvalidAnnotation` | The content breaks a rule above. |
-| `InvalidKey` | A key in the route or the body can't be parsed, or a lookup or restore has no keys or more than 100. |
+| `InvalidKey` | A key in the route or the body can't be parsed, or a lookup or restore has no keys, more than 100, or a body that is not an object with `Keys`. |
 | `AnnotationDeleted` | A configuration write for a deleted annotation. |
 | `AnnotationNotDeleted` | A permanent delete of an active annotation. |
 | `AnnotationInactive` | `GET …/annotations/{key}` of a disabled, scheduled or expired annotation without `includeInactive=true` (`404`). |

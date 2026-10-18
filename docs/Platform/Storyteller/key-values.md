@@ -260,7 +260,7 @@ Base `K` = `v1/{organization}/{project}/{view}/key-values`.
 | `GET` | `K/{key}/versions` | | → `KeyValueVersion[]`, oldest first | 404 |
 | `GET` | `K/{key}/versions/{version}` | `reveal` | → `KeyValue` | 403, 404, 424, 503 |
 | `GET` | `K/{key}/versions/{version}/diff`, `…/diff/{versionFrom}` | `format=unified` | → `DiffResult`, or `text/plain`; version 0 is the empty text | 400, 403, 404, 424 |
-| `POST` | `K/export` | | `KeyValueExportRequest` (`KeyPrefix`, `Protections`, `IncludeSecrets`) → `KeyValueDocument` | 403, 424, 503 |
+| `POST` | `K/export` | | `KeyValueExportRequest` (`KeyPrefix`, `Protections`, `IncludeSecrets`; an empty body or `null` exports the whole view, secrets without their values) → `KeyValueDocument` | 400, 403, 424, 503 |
 | `POST` | `K/import` | `mode` (`Merge`, `Replace`), `dryRun`, `keyPrefix` | `KeyValueDocument` → `KeyValueImportResult` | 400, 403, 409, 424, 501, 503 |
 
 ### Policy, recipients, audit and usage of a project

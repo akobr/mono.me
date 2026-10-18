@@ -25,7 +25,7 @@ Views are implicit: the first write to a view creates it, and a write is never b
 | POST | `v1/{organization}/{project}/views` | Administrator | `{ "Name", "Description" }` → `View`; `409 ViewExists` when registered, or for `default` |
 | PUT | `v1/{organization}/{project}/views/{view}` | Administrator | `{ "Description" }` → `View`; registers the view when needed, including `default` |
 
-Administrator operations (POST, PUT and `?discover=true`) need a user; machine credentials get `403`. PUT keeps the name as given: a legacy name that breaks the name rules (for example `Prod`) returns `400 InvalidName` instead of registering a different id.
+Administrator operations (POST, PUT and `?discover=true`) need a user; machine credentials get `403`. PUT keeps the name as given: a legacy name that breaks the name rules (for example `Prod`) returns `400 InvalidName` instead of registering a different id. POST without a body (empty or `null`) returns `400`; PUT without one clears the description.
 
 A `View` has `Name`, `Description`, `Created` (the [audit stamp](audit-stamps.md) of its registration, null for a view that is not registered), `IsDefault`, and `IsRegistered`. `default` is always listed, also when it is not registered. Registrations live in the organization container, partition `{project}.meta`, id `view.{name}`.
 
@@ -61,7 +61,7 @@ Every access point keeps at least one `Owner`. The last owner can't be demoted, 
 | PUT | `v1/access/points/{key}/members/{accountId}` | `{ "Role": "Contributor" }` | `AccessPointMember` with the new role |
 | DELETE | `v1/access/points/{key}/members/{accountId}` | | `204` |
 
-* PUT sets the exact role, up or down. The account must already be a member (`404`, `MemberNotFound`); new members join through an invitation or through grant. Nobody can change their own role (`409`, `SelfRoleChange`); leave and get invited again instead. `None` is rejected with `400`.
+* PUT sets the exact role, up or down. The account must already be a member (`404`, `MemberNotFound`); new members join through an invitation or through grant. Nobody can change their own role (`409`, `SelfRoleChange`); leave and get invited again instead. `None` and a missing body are rejected with `400`.
 * DELETE removes a member. With the caller's own account ID it means "leave".
 * The older `POST v1/access/grant` and `POST v1/access/revoke` stay for `sform`. Grant only raises a role, and revoke must name the role the member holds.
 
@@ -94,11 +94,13 @@ Accepting the same invitation twice returns the account without changes.
 
 ## Accounts
 
-`POST v1/access/account` creates the caller's account. With `Organization` and `Project` it also creates them and makes the caller their owner. Without both, it creates an account with no memberships, for a user who joins through invitations. Giving only one of them is rejected with `400`.
+`POST v1/access/account` creates the caller's account. With `Organization` and `Project` it also creates them and makes the caller their owner. Without both (`{}`, or both `null`), it creates an account with no memberships, for a user who joins through invitations. Giving only one of them is rejected with `400`. The body is required: an empty body or `null` is rejected with `400` too (`The account is missing.`).
 
 ## Error codes
 
-All errors use `ErrorResponse` with a stable `ErrorCode` and without exception details. See also [401 and 403](authentication.md#401-and-403).
+All errors use `ErrorResponse` without exception details, and the errors below carry a stable `ErrorCode`. See also [401 and 403](authentication.md#401-and-403).
+
+A route that takes a JSON body does not require a `Content-Type`, and answers `400` for an empty body, `null` or JSON that does not fit the documented type, unless it documents a default for a missing body. On the routes of this page, these `400`s name the problem in `Message` and have no `ErrorCode`.
 
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
