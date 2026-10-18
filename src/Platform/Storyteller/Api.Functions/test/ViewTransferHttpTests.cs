@@ -321,6 +321,20 @@ public class ViewTransferHttpTests
     }
 
     [Fact]
+    public async Task Start_ByAMachineRestrictedToAnAnnotation_IsRefused()
+    {
+        var http = Http(checksScopes: true, machineAnnotationKey: "rst.payments");
+
+        // an export or an import spans the whole view, so a machine restricted to one annotation reaches neither
+        var export = await Should.ThrowAsync<AccessDeniedException>(() => http.StartViewExport(Request(Encoding.UTF8.GetBytes("{}"), scopes: Scopes.Default.Write, machine: true), "acme", "web", "default"));
+        var import = await Should.ThrowAsync<AccessDeniedException>(() => http.StartViewImport(Request(EmptyZip(), scopes: Scopes.Default.Write, machine: true), "acme", "web", "default"));
+
+        export.ErrorCode.ShouldBe(ErrorCodes.AnnotationRestricted);
+        import.ErrorCode.ShouldBe(ErrorCodes.AnnotationRestricted);
+        _transfers.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task StartExport_WithAnIncludedKindWithoutItsScope_NamesTheScopeAndInclude()
     {
         var act = () => Http(checksScopes: true).StartViewExport(Request("""{ "Include": [ "Annotations", "Templates" ] }""", scopes: Scopes.Annotation.Read), "acme", "web", "default");
@@ -628,9 +642,9 @@ public class ViewTransferHttpTests
     }
 
     // Without checksScopes, the class default: no scope checks in a Debug build.
-    private ViewTransferHttp Http(ViewTransferOptions? options = null, bool? checksScopes = null)
+    private ViewTransferHttp Http(ViewTransferOptions? options = null, bool? checksScopes = null, string? machineAnnotationKey = null)
     {
-        var access = OwnerAccess.Create();
+        var access = OwnerAccess.Create(machineAnnotationKey);
         var resolved = Options.Create(options ?? new ViewTransferOptions());
         return checksScopes is { } checks
             ? new ViewTransferHttp(_transfers, access, resolved) { ChecksScopes = checks }
@@ -740,11 +754,18 @@ public class ViewTransferHttpTests
         }
     }
 
-    // The caller is an Owner of every project, and a machine has access to it; the role checks themselves are the
-    // shared helpers' (skipped in a Debug build).
+    // The caller is an Owner of every project, and a machine has access to it, restricted to an annotation when one is
+    // given; the role checks themselves are the shared helpers' (skipped in a Debug build).
     public class OwnerAccess : DispatchProxy
     {
-        public static IAccessService Create() => Create<IAccessService, OwnerAccess>();
+        private string? _machineAnnotationKey;
+
+        public static IAccessService Create(string? machineAnnotationKey = null)
+        {
+            var access = Create<IAccessService, OwnerAccess>();
+            ((OwnerAccess)(object)access)._machineAnnotationKey = machineAnnotationKey;
+            return access;
+        }
 
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
@@ -752,6 +773,14 @@ public class ViewTransferHttpTests
             {
                 nameof(IAccessService.GetAccountRoleAsync) => Task.FromResult(AccountRole.Owner),
                 nameof(IAccessService.VerifyAccessForMachineAsync) => Task.FromResult(true),
+                nameof(IAccessService.GetMachineAccessAsync) => Task.FromResult<MachineAccess?>(new MachineAccess
+                {
+                    Id = (string)args![2]!,
+                    ObjectId = (string)args[2]!,
+                    AccessKey = "***",
+                    Scope = MachineAccessScope.DefaultReadWrite,
+                    AnnotationKey = _machineAnnotationKey,
+                }),
                 _ => throw new NotSupportedException(targetMethod?.Name),
             };
         }

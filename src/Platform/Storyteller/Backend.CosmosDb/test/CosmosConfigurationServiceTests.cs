@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Annotating;
 using _42.Platform.Storyteller.Configuring;
+using _42.Platform.Storyteller.Transferring;
 using FluentAssertions;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
@@ -406,9 +407,13 @@ public class CosmosConfigurationServiceTests(Startup startup)
         (await HasCachedCalculationAsync(contextKey)).Should().BeTrue();
         (await HasConfigurationItemAsync(subjectKey)).Should().BeFalse("the import has to create the subject's first item");
 
-        var result = await configs.ImportConfigurationAsync(subjectKey, JObject.Parse("""{ "imported": true }"""), AuditActor.System);
+        var result = await configs.ImportConfigurationAsync(
+            subjectKey,
+            JObject.Parse("""{ "imported": true }"""),
+            new ViewImportOptions { Actor = AuditActor.System },
+            new ViewImportOverlay());
 
-        result.Outcome.Should().Be(ConfigurationImportOutcome.Created);
+        result.Outcome.Should().Be(ViewImportOutcome.Created);
         (await HasCachedCalculationAsync(contextKey)).Should().BeFalse();
         var after = await configs.GetRawConfigurationAsync(contextKey);
         after!.Content["imported"]!.Value<bool>().Should().BeTrue();

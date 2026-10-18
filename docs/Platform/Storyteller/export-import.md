@@ -527,6 +527,7 @@ What the import options do is described under [Import](#import), in [Options](#o
 | `400` | `InvalidArchive` | `StartViewImport` | The body is not a zip, or its central directory breaks a limit: more than `MaxArchiveEntries` entries, or document files declared larger than `MaxExtractedBytes` together (see [Limits](#limits)) |
 | `401` | | every route | Missing or invalid credentials, or a machine without access to the project |
 | `403` | `AccessDenied` | every route | A scope of an included kind is missing, or the caller's role is below the one the route needs (see [Access](#access)) |
+| `403` | `AnnotationRestricted` | every route | The caller is a machine restricted to an annotation; an export or import spans the whole view |
 | `404` | `NotFound` | the three reads | The job doesn't exist in this view, or has expired. For the archive, also an expired archive. |
 | `409` | `TransferLimit` | both starts | The project already has `MaxActiveTransfers` jobs queued or running |
 | `409` | `TransferNotReady` | `GetViewExportArchive` | The export is queued, running or failed. The message of a failed one holds its error. |
@@ -561,7 +562,7 @@ The roles stay as in the first spec: any role on the project to export and to re
 
   Kinds with the same rule share a sentence: `Missing scope for schemas, templates and configurations: exporting them needs …`.
 - So a machine with only `Configuration.ReadWrite` (the machine access scope `ConfigurationReadWrite`, see [authentication.md](authentication.md#the-machineaccess-object)) imports with `include=schemas,templates,configurations`, and exports with `"Include": [ "Schemas", "Templates", "Configurations" ]`.
-- Machines are allowed with the same scopes. The caller's audit actor becomes the job's `CreatedBy`, and the actor of written versions and audit entries.
+- Machines are allowed with the same scopes, except a machine restricted to an annotation: export and import span the whole view, so it gets `403 AnnotationRestricted` (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)). The caller's audit actor becomes the job's `CreatedBy`, and the actor of written versions and audit entries.
 - **Debug builds** (`DEV_AUTH`) skip the scope and role checks, as on every route. The handler's internal `ChecksScopes` follows that by default. `ViewTransferHttpTests` turn it on, so the rules per kind and their wiring are tested in Debug too.
 - The granted scopes come from `HttpRequestDataExtensions.GetScopes()`: the `scp`, `roles` and scope claims, without an `App.` prefix. `CheckScope` and `TryCheckScope` use it as well.
 
