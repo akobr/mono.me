@@ -85,15 +85,21 @@ public class CosmosViewTransferStore : IViewTransferStore
         }
     }
 
-    public async Task<int> CountActiveAsync(string organization, string project, DateTimeOffset changedSince, CancellationToken cancellationToken = default)
+    public async Task<int> CountActiveAsync(
+        string organization,
+        string project,
+        DateTimeOffset queuedSince,
+        DateTimeOffset runningSince,
+        CancellationToken cancellationToken = default)
     {
         var query = new QueryDefinition(
                 "SELECT VALUE COUNT(1) FROM c WHERE c.PartitionKey = @partition "
-                + "AND (c.Status = @queued OR c.Status = @running) AND c._ts >= @since")
+                + "AND ((c.Status = @queued AND c._ts >= @queuedSince) OR (c.Status = @running AND c._ts >= @runningSince))")
             .WithParameter("@partition", PartitionKeys.GetTransfer(project))
             .WithParameter("@queued", nameof(ViewTransferStatus.Queued))
             .WithParameter("@running", nameof(ViewTransferStatus.Running))
-            .WithParameter("@since", changedSince.ToUnixTimeSeconds());
+            .WithParameter("@queuedSince", queuedSince.ToUnixTimeSeconds())
+            .WithParameter("@runningSince", runningSince.ToUnixTimeSeconds());
 
         using var iterator = GetContainer(organization).GetItemQueryIterator<int>(
             query,

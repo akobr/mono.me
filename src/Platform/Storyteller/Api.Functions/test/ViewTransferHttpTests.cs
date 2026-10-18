@@ -529,6 +529,29 @@ public class ViewTransferHttpTests
     }
 
     [Fact]
+    public async Task PoisonFunction_AbandonsTheJob()
+    {
+        var functions = new ViewTransferFunctions(_transfers, NullLogger<ViewTransferFunctions>.Instance);
+        var message = new ViewTransferMessage("acme", "web", "default", ViewTransferKind.Import, "0123");
+
+        await functions.AbandonViewTransfer(message.ToJson(), CancellationToken.None);
+        await functions.AbandonViewTransfer("{", CancellationToken.None);
+
+        _transfers.Calls.ShouldBe(["abandon Import 0123"]);
+    }
+
+    [Fact]
+    public void PoisonFunction_ListensToThePoisonQueueOfTheJobs()
+    {
+        var trigger = typeof(ViewTransferFunctions).GetMethod(nameof(ViewTransferFunctions.AbandonViewTransfer))!
+            .GetParameters()
+            .Select(parameter => parameter.GetCustomAttribute<QueueTriggerAttribute>())
+            .Single(attribute => attribute is not null)!;
+
+        trigger.QueueName.ShouldBe("configuration-transfers-poison");
+    }
+
+    [Fact]
     public async Task TimerFunction_Purges()
     {
         var functions = new ViewTransferFunctions(_transfers, NullLogger<ViewTransferFunctions>.Instance);
@@ -696,6 +719,12 @@ public class ViewTransferHttpTests
         public Task ProcessAsync(ViewTransferMessage message, CancellationToken cancellationToken = default)
         {
             Calls.Add($"process {message.Kind} {message.Id}");
+            return Task.CompletedTask;
+        }
+
+        public Task AbandonAsync(ViewTransferMessage message, CancellationToken cancellationToken = default)
+        {
+            Calls.Add($"abandon {message.Kind} {message.Id}");
             return Task.CompletedTask;
         }
 

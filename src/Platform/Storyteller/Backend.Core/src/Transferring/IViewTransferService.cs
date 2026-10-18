@@ -44,6 +44,10 @@ public interface IViewTransferService
     // Runs one job; a repeated message of a finished job does nothing.
     Task ProcessAsync(ViewTransferMessage message, CancellationToken cancellationToken = default);
 
+    // Fails a job whose message the queue gave up on, for example after its worker crashed on every delivery; a
+    // finished job stays as it is.
+    Task AbandonAsync(ViewTransferMessage message, CancellationToken cancellationToken = default);
+
     // Removes archives older than the retention and returns how many.
     Task<int> PurgeExpiredAsync(CancellationToken cancellationToken = default);
 }

@@ -49,8 +49,16 @@ internal sealed class InMemoryTransferStore : IViewTransferStore
         return Task.FromResult<ViewTransferRecord?>(saved);
     }
 
-    public Task<int> CountActiveAsync(string organization, string project, DateTimeOffset changedSince, CancellationToken cancellationToken = default)
+    public (DateTimeOffset QueuedSince, DateTimeOffset RunningSince)? CountedSince { get; private set; }
+
+    public Task<int> CountActiveAsync(
+        string organization,
+        string project,
+        DateTimeOffset queuedSince,
+        DateTimeOffset runningSince,
+        CancellationToken cancellationToken = default)
     {
+        CountedSince = (queuedSince, runningSince);
         return Task.FromResult(ActiveCount);
     }
 

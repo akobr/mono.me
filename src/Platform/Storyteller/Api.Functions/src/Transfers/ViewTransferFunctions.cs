@@ -33,6 +33,22 @@ public class ViewTransferFunctions
         await _transfers.ProcessAsync(transfer, cancellationToken);
     }
 
+    // The runtime moves a message here after its last failed delivery. A worker that crashed, for example out of
+    // memory, never ran the failure handling of the job, so the job is failed here and stops taking a slot.
+    [Function(nameof(AbandonViewTransfer))]
+    public async Task AbandonViewTransfer(
+        [QueueTrigger(ViewTransferNames.PoisonQueue)] string message,
+        CancellationToken cancellationToken)
+    {
+        if (!ViewTransferMessage.TryParse(message, out var transfer))
+        {
+            _logger.LogError("A poisoned view transfer message is not valid and was dropped: {Message}", message);
+            return;
+        }
+
+        await _transfers.AbandonAsync(transfer, cancellationToken);
+    }
+
     [Function(nameof(PurgeViewTransfers))]
     public async Task PurgeViewTransfers(
         [TimerTrigger("0 17 * * * *")] TimerInfo timer,

@@ -94,6 +94,9 @@ public class ViewTransferServiceTests
 
         exception.ErrorCode.ShouldBe(ErrorCodes.TransferLimit);
         _queue.Messages.ShouldBeEmpty();
+
+        // a queued job may wait for the worker for an hour, a running one saves its progress every few seconds
+        _store.CountedSince.ShouldBe((Start.AddHours(-1), Start.AddMinutes(-15)));
     }
 
     [Fact]
@@ -731,6 +734,49 @@ public class ViewTransferServiceTests
         import.Summary.ShouldBe(new ViewImportSummary { Unchanged = 2 });
         import.Items.ShouldBeEmpty();
         _storage.Archives.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Abandon_FailsARunningJobAndFreesItsSlot()
+    {
+        using var zip = Zip(("rst.a.json", "{}"));
+        var started = await _service.StartImportAsync("acme", "main", "default", zip, null, null, ViewImportExisting.Overwrite, false, false, Actor);
+        var message = _queue.Messages.Single();
+
+        // the worker crashed on every delivery: the job stayed running, and the queue moved the message to its poison queue
+        var record = (await _store.GetAsync("acme", "main", "default", ViewTransferKind.Import, started.Id))!;
+        await _store.TryReplaceAsync(record with { Import = record.Import! with { Status = ViewTransferStatus.Running, StartedAt = Start } });
+
+        await _service.AbandonAsync(message);
+
+        var import = (await _service.GetImportAsync("acme", "main", "default", started.Id))!;
+        import.Status.ShouldBe(ViewTransferStatus.Failed);
+        import.Error!.ShouldContain("stopped on every attempt");
+        import.CompletedAt.ShouldBe(Start);
+    }
+
+    [Fact]
+    public async Task Abandon_KeepsAFinishedJobAndDeletesTheArchiveOfAnExport()
+    {
+        var export = await _service.StartExportAsync("acme", "main", "default", ViewArchiveFormat.Folder, null, Actor);
+        var message = _queue.Messages.Single();
+        await _service.ProcessAsync(message);
+        var archive = ViewTransferNames.GetArchiveName(message);
+        _storage.Archives.Keys.ShouldContain(archive);
+
+        await _service.AbandonAsync(message);
+
+        // a message the queue gave up on after the job ended (a late failure of the invocation) changes nothing: the
+        // job stays succeeded and its archive downloadable
+        (await _service.GetExportAsync("acme", "main", "default", export.Id))!.Status.ShouldBe(ViewTransferStatus.Succeeded);
+        _storage.Archives.Keys.ShouldContain(archive);
+
+        var other = await _service.StartExportAsync("acme", "main", "other", ViewArchiveFormat.Folder, null, Actor);
+        var otherMessage = _queue.Messages[^1];
+        await _service.AbandonAsync(otherMessage);
+
+        (await _service.GetExportAsync("acme", "main", "other", other.Id))!.Status.ShouldBe(ViewTransferStatus.Failed);
+        _storage.Archives.Keys.ShouldNotContain(ViewTransferNames.GetArchiveName(otherMessage));
     }
 
     [Fact]

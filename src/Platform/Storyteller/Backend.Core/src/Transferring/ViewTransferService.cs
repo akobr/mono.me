@@ -13,8 +13,11 @@ public sealed class ViewTransferService : IViewTransferService
 
     private static readonly TimeSpan ProgressInterval = TimeSpan.FromSeconds(2);
 
-    // A job unchanged for this long counts as abandoned, so a crashed worker cannot block the project's limit.
-    private static readonly TimeSpan ActiveWindow = TimeSpan.FromHours(1);
+    // A queued job unchanged for this long counts as abandoned, so a lost message cannot block the project's limit.
+    private static readonly TimeSpan QueuedWindow = TimeSpan.FromHours(1);
+
+    // A running job saves its progress every few seconds, so one unchanged for this long has lost its worker.
+    private static readonly TimeSpan RunningWindow = TimeSpan.FromMinutes(15);
 
     // Archives are purged a little after their jobs expire.
     private static readonly TimeSpan PurgeDelay = TimeSpan.FromHours(1);
@@ -239,6 +242,21 @@ public sealed class ViewTransferService : IViewTransferService
             {
                 await TryDeleteArchiveAsync(ViewTransferNames.GetArchiveName(message), cancellationToken);
             }
+        }
+    }
+
+    public async Task AbandonAsync(ViewTransferMessage message, CancellationToken cancellationToken = default)
+    {
+        _logger.LogError("The queue gave up on the {Kind} job {Id} of {Organization}.{Project}.{View}.", message.Kind, message.Id, message.Organization, message.Project, message.View);
+        var failed = await FailAsync(
+            message,
+            $"The {message.Kind.ToString().ToLowerInvariant()} stopped on every attempt, for example because its worker ran out of memory; try again with a smaller archive or fewer kinds.",
+            cancellationToken);
+
+        // the archive of an export that ended before stays downloadable
+        if (failed && message.Kind == ViewTransferKind.Export)
+        {
+            await TryDeleteArchiveAsync(ViewTransferNames.GetArchiveName(message), cancellationToken);
         }
     }
 
@@ -516,7 +534,8 @@ public sealed class ViewTransferService : IViewTransferService
         return saved;
     }
 
-    private async Task FailAsync(ViewTransferMessage message, string error, CancellationToken cancellationToken)
+    // True when this call failed the job; a missing or finished job stays as it is.
+    private async Task<bool> FailAsync(ViewTransferMessage message, string error, CancellationToken cancellationToken)
     {
         try
         {
@@ -524,20 +543,21 @@ public sealed class ViewTransferService : IViewTransferService
 
             if (latest is null || latest.Status is ViewTransferStatus.Succeeded or ViewTransferStatus.Failed)
             {
-                return;
+                return false;
             }
 
             var now = _time.GetUtcNow();
-            await _store.TryReplaceAsync(
+            return await _store.TryReplaceAsync(
                 Update(
                     latest,
                     export => export with { Status = ViewTransferStatus.Failed, Error = Truncate(error), CompletedAt = now, ExpiresAt = now + _options.Retention },
                     import => import with { Status = ViewTransferStatus.Failed, Error = Truncate(error), CompletedAt = now, ExpiresAt = now + _options.Retention }),
-                cancellationToken);
+                cancellationToken) is not null;
         }
         catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
         {
             _logger.LogError(exception, "The failure of the {Kind} job {Id} was not saved.", message.Kind, message.Id);
+            return false;
         }
     }
 
@@ -557,7 +577,8 @@ public sealed class ViewTransferService : IViewTransferService
 
     private async Task EnsureCapacityAsync(string organization, string project, CancellationToken cancellationToken)
     {
-        var active = await _store.CountActiveAsync(organization, project, _time.GetUtcNow() - ActiveWindow, cancellationToken);
+        var now = _time.GetUtcNow();
+        var active = await _store.CountActiveAsync(organization, project, now - QueuedWindow, now - RunningWindow, cancellationToken);
 
         if (active >= _options.MaxActiveTransfers)
         {
