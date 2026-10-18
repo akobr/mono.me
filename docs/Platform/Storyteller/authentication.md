@@ -964,9 +964,9 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | --- | --- | --- |
 | `400` | none | Grant or revoke with a missing account, a missing access point key, or the role `None`. |
 | `400` | none | An empty body or `null` where an account, an access point, a machine, a permission, a machine authentication policy or a shared certificate is required: `The account is missing.`, `The permission is missing.` and so on. |
-| `400` | none | A body that does not fit its type: invalid JSON, another shape, or a required member left out. The message names the expected body and the JSON path, for example `The request body is not a shared certificate (at $).` |
+| `400` | none | An account, access point, machine, permission, machine authentication policy or shared certificate body that does not fit its type: invalid JSON, another shape, or a required member left out. The message names the expected body and the JSON path, for example `The request body is not a shared certificate (at $).` |
 | `400` | none | A machine of a kind the project does not enable or the deployment does not configure, or a reset of a `Federated` machine. |
-| `400` | `InvalidFederation` | A trusted issuer or a federation rule fails [validation](#federation-rules), or a `PUT` changes the `Issuer` of a trusted issuer. |
+| `400` | `InvalidFederation` | A trusted issuer or a federation rule fails [validation](#federation-rules), a `PUT` changes the `Issuer` of a trusted issuer, or the body of a federation `PUT` is not a trusted issuer or a list of federation rules. |
 | `400` | `MachineNotFederated` | Federation rules for a machine of another kind. |
 | `404` | `NotFound` | The target account, the access point or the machine access does not exist. `GET` and `DELETE` of a machine or a trusted issuer that does not exist answer `404` without a body. |
 | `409` | `AccountExists`, `AccessPointExists` | The account or project already exists. |
