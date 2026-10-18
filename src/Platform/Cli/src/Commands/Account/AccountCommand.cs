@@ -129,7 +129,9 @@ public class AccountCommand : BaseCommand
             MachineSignInKind.Certificate => "a certificate",
             MachineSignInKind.CertificateAndApiKey => "a certificate and an API key",
             MachineSignInKind.ClientCredentials => "client credentials",
-            _ => "a token file",
+            MachineSignInKind.TokenFile => "a token file",
+            MachineSignInKind.Federated => "workload identity federation",
+            _ => kind.ToString(),
         };
     }
 

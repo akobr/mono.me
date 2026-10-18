@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Authentication;
 using _42.Platform.Storyteller.Sdk;
 
 namespace _42.Platform.Cli.Output;
@@ -10,8 +11,8 @@ namespace _42.Platform.Cli.Output;
 // and the trusted issuers of a project.
 public static class FederationConsoleExtensions
 {
-    public const string TokenExchangeGrantType = "urn:ietf:params:oauth:grant-type:token-exchange";
-    public const string JwtTokenType = "urn:ietf:params:oauth:token-type:jwt";
+    public const string TokenExchangeGrantType = TokenExchange.GrantType;
+    public const string JwtTokenType = TokenExchange.JwtTokenType;
 
     // The server sets TokenEndpoint on every Federated machine; the placeholder only keeps the output readable.
     public static string GetTokenEndpoint(MachineAccess machine, string organization, string project)

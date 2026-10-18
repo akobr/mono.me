@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Abstractions;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Threading;
@@ -12,8 +13,9 @@ using System.Threading.Tasks;
 namespace _42.Platform.Cli.Authentication;
 
 // Non-interactive sign-in of a machine with the credentials in STORYTELLER_* environment variables:
-// an API key, a client certificate, both, client credentials, or a token file. Nothing is stored on
-// disk; a client-credentials token lives in memory for the process.
+// an API key, a client certificate, both, client credentials, a token file, or the platform token a
+// federated machine exchanges. Nothing is stored on disk; a client-credentials or exchanged token lives
+// in memory for the process.
 public sealed class MachineAuthenticationService : IAuthenticationService, IMachineSignIn, IDisposable
 {
     private const string ApiKeyScheme = "ApiKey ";
@@ -36,6 +38,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     private readonly Lazy<LoadedCredential> _credential;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private ClientToken? _token;
+    private volatile ExchangeTarget? _target;
 
     public MachineAuthenticationService(
         MachineSignInSettings settings,
@@ -86,8 +89,9 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
 
         return credential.Kind switch
         {
-            MachineSignInKind.ClientCredentials => credential.Identity with { TokenExpiresAt = (await GetClientTokenAsync(cancellationToken)).ExpiresAt },
+            MachineSignInKind.ClientCredentials => credential.Identity with { TokenExpiresAt = (await GetTokenAsync(null, null, cancellationToken)).ExpiresAt },
             MachineSignInKind.TokenFile => credential.Identity with { TokenExpiresAt = ReadTokenFileExpiry() },
+            MachineSignInKind.Federated => await SignInFederatedAsync(credential.Identity, cancellationToken),
             _ => credential.Identity,
         };
     }
@@ -121,10 +125,30 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
 
             // The certificate goes in the TLS handshake (or the development header); no Authorization header.
             MachineSignInKind.Certificate => null,
-            MachineSignInKind.ClientCredentials => (await GetClientTokenAsync(cancellationToken)).AccessToken,
+            MachineSignInKind.ClientCredentials => (await GetTokenAsync(null, null, cancellationToken)).AccessToken,
             MachineSignInKind.TokenFile => ReadTokenFile(),
+
+            // Only for the target a command bound: sform account ca and the user-only commands must not
+            // exchange, nor ask GitHub for a token, just because STORYTELLER_PROJECT is set.
+            MachineSignInKind.Federated when _target is { } target => (await GetTokenAsync(target, null, cancellationToken)).AccessToken,
             _ => null,
         };
+    }
+
+    // Kinds other than Federated never read it.
+    public void BindTarget(string organization, string project)
+    {
+        _target = new ExchangeTarget(organization, project);
+    }
+
+    public async Task<string?> RenewAccessTokenAsync(string rejectedToken, CancellationToken cancellationToken = default)
+    {
+        if (!IsConfigured || GetCredential().Kind != MachineSignInKind.Federated || _target is not { } target)
+        {
+            return null;
+        }
+
+        return (await GetTokenAsync(target, rejectedToken, cancellationToken)).AccessToken;
     }
 
     public Task<SignedInUser> LoginWithDeviceCodeAsync(
@@ -194,6 +218,20 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
             : null;
     }
 
+    // { "count": ..., "value": "<JWT>" }
+    private static string? ReadGitHubToken(string body)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(body);
+            return document.RootElement.ValueKind == JsonValueKind.Object ? ReadString(document.RootElement, "value") : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private static long? ReadLifetime(JsonElement root)
     {
         if (!root.TryGetProperty("expires_in", out var value))
@@ -233,7 +271,11 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         try
         {
             var kind = Settings.GetKind();
-            var variables = Settings.CredentialVariables;
+
+            // Messages say where a platform token from GitHub Actions came from; names only, never values.
+            IReadOnlyList<string> variables = kind == MachineSignInKind.Federated && Settings.GetFederatedTokenSource() == FederatedTokenSource.GitHubActions
+                ? [.. Settings.CredentialVariables, GitHubActionsVariables.ID_TOKEN_REQUEST_URL, GitHubActionsVariables.ID_TOKEN_REQUEST_TOKEN]
+                : Settings.CredentialVariables;
             var key = kind is MachineSignInKind.ApiKey or MachineSignInKind.CertificateAndApiKey
                 ? MachineApiKey.TryParse(Settings.ApiKey)
                 : null;
@@ -260,7 +302,9 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                     key?.MachineId,
                     key?.Organization ?? certificateIdentity?.Organization,
                     key?.Project ?? certificateIdentity?.Project),
-                MachineSignInKind.ClientCredentials => new MachineIdentity(kind, variables, Settings.ClientId, null, null),
+
+                // The credential names no project; a federated machine gets its project from the command.
+                MachineSignInKind.ClientCredentials or MachineSignInKind.Federated => new MachineIdentity(kind, variables, Settings.ClientId, null, null),
                 _ => new MachineIdentity(kind, variables, null, null, null),
             };
 
@@ -305,24 +349,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
     private string ReadTokenFile()
     {
         var path = Settings.TokenFile!;
-        string content;
-
-        try
-        {
-            if (!_fileSystem.File.Exists(path))
-            {
-                throw Invalid($"The token file {path} in {StorytellerVariables.TOKEN_FILE} does not exist.");
-            }
-
-            content = _fileSystem.File.ReadAllText(path).Trim();
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
-        {
-            throw new AuthenticationException(
-                AuthenticationFailureReason.Configuration,
-                $"The token file {path} in {StorytellerVariables.TOKEN_FILE} could not be read.",
-                exception);
-        }
+        var content = ReadFile(path, StorytellerVariables.TOKEN_FILE, "token file");
 
         // "Bearer <token>" as an Authorization header value works too.
         if (content.StartsWith(BearerScheme, StringComparison.OrdinalIgnoreCase)
@@ -334,6 +361,38 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         return content.Length > 0
             ? content
             : throw Invalid($"The token file {path} in {StorytellerVariables.TOKEN_FILE} is empty.");
+    }
+
+    // The platform token of a federated machine, sent as it is: a projected Kubernetes token has no scheme.
+    private string ReadSubjectTokenFile()
+    {
+        var path = Settings.SubjectTokenFile!;
+        var content = ReadFile(path, StorytellerVariables.SUBJECT_TOKEN_FILE, "platform token file");
+
+        return content.Length > 0
+            ? content
+            : throw Invalid($"The platform token file {path} in {StorytellerVariables.SUBJECT_TOKEN_FILE} is empty.");
+    }
+
+    // Read before every use, never cached: the file may be renewed while sform runs.
+    private string ReadFile(string path, string variable, string description)
+    {
+        try
+        {
+            if (!_fileSystem.File.Exists(path))
+            {
+                throw Invalid($"The {description} {path} in {variable} does not exist.");
+            }
+
+            return _fileSystem.File.ReadAllText(path).Trim();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+            throw new AuthenticationException(
+                AuthenticationFailureReason.Configuration,
+                $"The {description} {path} in {variable} could not be read.",
+                exception);
+        }
     }
 
     // A token that has visibly expired fails the sign-in here instead of with a 401 on the next call.
@@ -348,15 +407,36 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 $"The token in {StorytellerVariables.TOKEN_FILE} expired at {expiresAt:O}.");
     }
 
-    private async Task<ClientToken> GetClientTokenAsync(CancellationToken cancellationToken)
+    // A command binds its target; without one, STORYTELLER_PROJECT names the project to sign in to.
+    private async Task<MachineIdentity> SignInFederatedAsync(MachineIdentity identity, CancellationToken cancellationToken)
+    {
+        var target = _target
+            ?? (MachineSignInSettings.TrySplitProject(Settings.Project, out var organization, out var project) ? new ExchangeTarget(organization, project) : null)
+            ?? throw Invalid($"No project is set for the machine: set {StorytellerVariables.PROJECT}=<organization>.<project> or pass -p.");
+        var token = await GetTokenAsync(target, null, cancellationToken);
+
+        return identity with { Organization = target.Organization, Project = target.Project, TokenExpiresAt = token.ExpiresAt };
+    }
+
+    // The one token of the process: of client credentials (no target) or of the exchange for a target.
+    // It is replaced only by a successful request. A token the API refused is dropped first, unless a newer
+    // one replaced it already, so a burst of 401s exchanges once.
+    private async Task<ClientToken> GetTokenAsync(ExchangeTarget? target, string? rejectedToken, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
 
         try
         {
-            if (_token is null || _token.ExpiresAt - RefreshMargin <= _time.GetUtcNow())
+            if (rejectedToken is not null && string.Equals(_token?.AccessToken, rejectedToken, StringComparison.Ordinal))
             {
-                _token = await RequestClientTokenAsync(cancellationToken);
+                _token = null;
+            }
+
+            if (_token is null || _token.ExpiresAt - RefreshMargin <= _time.GetUtcNow() || _token.Target != target?.Key)
+            {
+                _token = target is null
+                    ? await RequestClientTokenAsync(cancellationToken)
+                    : await ExchangeTokenAsync(target, cancellationToken);
             }
 
             return _token;
@@ -382,6 +462,91 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
             form["scope"] = Settings.TokenScope;
         }
 
+        return await PostTokenRequestAsync(tokenUrl, form, null, null, cancellationToken);
+    }
+
+    // RFC 8693 at the token endpoint of the target's project, with a platform token got again for every exchange.
+    private async Task<ClientToken> ExchangeTokenAsync(ExchangeTarget target, CancellationToken cancellationToken)
+    {
+        // Built like the server builds it, as the audience a rule names must equal it byte for byte.
+        var endpoint = $"{Settings.ApiUrl!.TrimEnd('/')}/v1/{Uri.EscapeDataString(target.Organization)}/{Uri.EscapeDataString(target.Project)}/access/token";
+        var isGitHub = Settings.GetFederatedTokenSource() == FederatedTokenSource.GitHubActions;
+        var form = new Dictionary<string, string>
+        {
+            ["grant_type"] = TokenExchange.GrantType,
+            ["client_id"] = Settings.ClientId!,
+            ["subject_token"] = isGitHub ? await RequestGitHubTokenAsync(endpoint, cancellationToken) : ReadSubjectTokenFile(),
+
+            // Validated by MachineSignInSettings.GetKind.
+            ["subject_token_type"] = MachineSignInSettings.NormalizeSubjectTokenType(Settings.SubjectTokenType)!,
+        };
+
+        if (Settings.TokenScope is not null)
+        {
+            form["scope"] = Settings.TokenScope;
+        }
+
+        // A refused GitHub token most likely has an audience no rule names, or the job meant client credentials.
+        var deniedHint = isGitHub
+            ? $"; the GitHub Actions token of this job was requested for the audience {endpoint}, which a rule of the machine must name exactly. For client credentials, set {StorytellerVariables.CLIENT_SECRET} instead"
+            : null;
+
+        return await PostTokenRequestAsync(new Uri(endpoint, UriKind.Absolute), form, target.Key, deniedHint, cancellationToken);
+    }
+
+    // The job's ID token for the audience. It lives about 5 minutes, so it is requested for every exchange.
+    private async Task<string> RequestGitHubTokenAsync(string audience, CancellationToken cancellationToken)
+    {
+        // Validated by MachineSignInSettings.GetKind; the runner's URL has a query already (api-version=2.0).
+        var requestUrl = Settings.GitHubTokenRequestUrl!;
+        var separator = new Uri(requestUrl, UriKind.Absolute).Query.Length > 0 ? "&" : "?";
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri($"{requestUrl}{separator}audience={Uri.EscapeDataString(audience)}", UriKind.Absolute));
+
+        // On this request only, never on the client: the request token must not reach the token endpoint.
+        request.Headers.Authorization = new AuthenticationHeaderValue(BearerScheme, Settings.GitHubTokenRequestToken);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        // The client follows no redirect, so the request token never goes to another host.
+        using var httpClient = _httpClientFactory.CreateClient(nameof(MachineAuthenticationService));
+        HttpResponseMessage response;
+
+        try
+        {
+            response = await httpClient.SendAsync(request, cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException
+            || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            throw new AuthenticationException(
+                AuthenticationFailureReason.ServiceError,
+                "The GitHub Actions ID token could not be requested.",
+                exception);
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new AuthenticationException(
+                    AuthenticationFailureReason.ServiceError,
+                    $"The GitHub Actions ID token request failed with {(int)response.StatusCode}.");
+            }
+
+            return ReadGitHubToken(await response.Content.ReadAsStringAsync(cancellationToken))
+                ?? throw new AuthenticationException(
+                    AuthenticationFailureReason.ServiceError,
+                    "The GitHub Actions ID token request returned no token.");
+        }
+    }
+
+    // A form without Authorization, on the client that follows no redirect: a redirect would resend it to another host.
+    private async Task<ClientToken> PostTokenRequestAsync(
+        Uri tokenUrl,
+        Dictionary<string, string> form,
+        string? target,
+        string? deniedHint,
+        CancellationToken cancellationToken)
+    {
         using var httpClient = _httpClientFactory.CreateClient(nameof(MachineAuthenticationService));
         HttpResponseMessage response;
 
@@ -408,7 +573,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 var detail = DescribeTokenError(body);
                 throw new AuthenticationException(
                     AuthenticationFailureReason.Denied,
-                    $"The token request to {tokenUrl} was rejected{(detail.Length > 0 ? $": {detail}" : string.Empty)}.");
+                    $"The token request to {tokenUrl} was rejected{(detail.Length > 0 ? $": {detail}" : string.Empty)}{deniedHint}.");
             }
 
             if (!response.IsSuccessStatusCode)
@@ -418,11 +583,11 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                     $"The token request to {tokenUrl} failed with {(int)response.StatusCode}.");
             }
 
-            return ReadToken(body, tokenUrl);
+            return ReadToken(body, tokenUrl, target);
         }
     }
 
-    private ClientToken ReadToken(string body, Uri tokenUrl)
+    private ClientToken ReadToken(string body, Uri tokenUrl, string? target)
     {
         try
         {
@@ -438,7 +603,7 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
                 var expiresAt = lifetime > 0
                     ? now.AddSeconds(Math.Min(lifetime.Value, MaxTokenLifetimeSeconds))
                     : JwtExpiry.Read(accessToken) ?? now + FallbackTokenLifetime;
-                return new ClientToken(accessToken, expiresAt);
+                return new ClientToken(accessToken, expiresAt, target);
             }
         }
         catch (JsonException)
@@ -483,13 +648,20 @@ public sealed class MachineAuthenticationService : IAuthenticationService, IMach
         throw Invalid($"Set {StorytellerVariables.TOKEN_URL} to the token URL that sform account machine create printed.");
     }
 
-    private sealed record ClientToken(string AccessToken, DateTimeOffset ExpiresAt)
+    // Target is the organization.project of a federated token, null for client credentials.
+    private sealed record ClientToken(string AccessToken, DateTimeOffset ExpiresAt, string? Target)
     {
         // A record prints its members; the token must never reach a log.
         public override string ToString()
         {
-            return $"{nameof(ClientToken)} {{ ExpiresAt = {ExpiresAt:O} }}";
+            return $"{nameof(ClientToken)} {{ ExpiresAt = {ExpiresAt:O}, Target = {Target} }}";
         }
+    }
+
+    // The project of a federated exchange; its token endpoint belongs to that project.
+    private sealed record ExchangeTarget(string Organization, string Project)
+    {
+        public string Key => $"{Organization}.{Project}";
     }
 
     private sealed record LoadedCredential(

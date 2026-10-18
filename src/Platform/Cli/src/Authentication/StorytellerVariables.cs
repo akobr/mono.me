@@ -17,5 +17,8 @@ public static class StorytellerVariables
     public const string TOKEN_URL = "STORYTELLER_TOKEN_URL";
     public const string TOKEN_SCOPE = "STORYTELLER_TOKEN_SCOPE";
 
+    public const string SUBJECT_TOKEN_FILE = "STORYTELLER_SUBJECT_TOKEN_FILE";
+    public const string SUBJECT_TOKEN_TYPE = "STORYTELLER_SUBJECT_TOKEN_TYPE";
+
     public const string TOKEN_FILE = "STORYTELLER_TOKEN_FILE";
 }

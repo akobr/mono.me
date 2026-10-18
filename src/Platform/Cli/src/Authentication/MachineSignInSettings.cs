@@ -4,12 +4,15 @@ using System.Linq;
 
 namespace _42.Platform.Cli.Authentication;
 
-// The STORYTELLER_* variables of a non-interactive sign-in, read once per process. Values are
-// trimmed and an empty value counts as unset. A class, not a record: a generated ToString would
-// print the secrets.
+// The STORYTELLER_* variables of a non-interactive sign-in, and the GitHub Actions ones a federated
+// machine can use, read once per process. Values are trimmed and an empty value counts as unset.
+// A class, not a record: a generated ToString would print the secrets.
 public sealed class MachineSignInSettings
 {
     private const string ApiKeyScheme = "ApiKey ";
+    private const string TokenTypePrefix = "urn:ietf:params:oauth:token-type:";
+
+    private static readonly string[] SubjectTokenTypes = [TokenExchange.JwtTokenType, TokenExchange.IdTokenType, TokenExchange.AccessTokenType];
 
     public string? ApiUrl { get; init; }
 
@@ -33,7 +36,19 @@ public sealed class MachineSignInSettings
 
     public string? TokenFile { get; init; }
 
+    public string? SubjectTokenFile { get; init; }
+
+    public string? SubjectTokenType { get; init; }
+
+    public string? GitHubTokenRequestUrl { get; init; }
+
+    public string? GitHubTokenRequestToken { get; init; }
+
+    // Both GitHub Actions variables are set; on its own this never configures a machine.
+    public bool HasGitHubTokenSource => GitHubTokenRequestUrl is not null && GitHubTokenRequestToken is not null;
+
     // Any credential variable is set: sform signs in as that machine and never as the stored user.
+    // The GitHub Actions variables are not among them: a job with id-token: write may run sform as a user.
     public bool IsConfigured => CredentialVariables.Count > 0;
 
     // The names of the credential variables that are set, never their values.
@@ -69,6 +84,10 @@ public sealed class MachineSignInSettings
             TokenUrl = Read(StorytellerVariables.TOKEN_URL),
             TokenScope = Read(StorytellerVariables.TOKEN_SCOPE),
             TokenFile = Read(StorytellerVariables.TOKEN_FILE),
+            SubjectTokenFile = Read(StorytellerVariables.SUBJECT_TOKEN_FILE),
+            SubjectTokenType = Read(StorytellerVariables.SUBJECT_TOKEN_TYPE),
+            GitHubTokenRequestUrl = Read(GitHubActionsVariables.ID_TOKEN_REQUEST_URL),
+            GitHubTokenRequestToken = Read(GitHubActionsVariables.ID_TOKEN_REQUEST_TOKEN),
         };
     }
 
@@ -104,12 +123,35 @@ public sealed class MachineSignInSettings
                 || string.Equals(uri.IdnHost, "localhost", StringComparison.OrdinalIgnoreCase));
     }
 
+    // jwt, id_token or access_token (any case), or one of the three URNs; null when the value is none of them.
+    public static string? NormalizeSubjectTokenType(string? value)
+    {
+        if (value is null)
+        {
+            return TokenExchange.JwtTokenType;
+        }
+
+        return SubjectTokenTypes.FirstOrDefault(type =>
+            string.Equals(value, type, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, type[TokenTypePrefix.Length..], StringComparison.OrdinalIgnoreCase));
+    }
+
+    // The source GetKind chose for a Federated machine; never a token value.
+    public FederatedTokenSource GetFederatedTokenSource()
+    {
+        return SubjectTokenFile is null ? FederatedTokenSource.GitHubActions : FederatedTokenSource.File;
+    }
+
     public MachineSignInKind GetKind()
     {
         var keyOrCertificate = ApiKey is not null || CertificateFile is not null || CertificatePassword is not null;
-        var clientCredentials = ClientId is not null || ClientSecret is not null || TokenUrl is not null || TokenScope is not null;
+        var clientCredentials = ClientSecret is not null || TokenUrl is not null;
+        var federation = SubjectTokenFile is not null || SubjectTokenType is not null;
         var tokenFile = TokenFile is not null;
-        var kinds = new[] { keyOrCertificate, clientCredentials, tokenFile }.Count(isSet => isSet);
+
+        // CLIENT_ID and TOKEN_SCOPE belong to client credentials or federation, whichever is set; alone they are one more kind.
+        var sharedOnly = (ClientId is not null || TokenScope is not null) && !clientCredentials && !federation;
+        var kinds = new[] { keyOrCertificate, clientCredentials, federation, tokenFile, sharedOnly }.Count(isSet => isSet);
 
         if (kinds == 0)
         {
@@ -133,7 +175,21 @@ public sealed class MachineSignInSettings
             return MachineSignInKind.TokenFile;
         }
 
-        if (clientCredentials)
+        // The GitHub Actions variables are in every job with id-token: write, so alone they only make a machine federated
+        // whose id is a GUID. Every federated machine id is one, AuthKit and Keycloak client ids are not: a client-credentials
+        // job with a missing secret must not turn into an exchange.
+        if (federation || (sharedOnly && Guid.TryParse(ClientId, out _) && HasGitHubTokenSource))
+        {
+            return GetFederatedKind();
+        }
+
+        if (sharedOnly && ClientId is not null)
+        {
+            throw Invalid(
+                $"{StorytellerVariables.CLIENT_ID} needs {StorytellerVariables.CLIENT_SECRET} for client credentials, or a platform token for a federated machine: {StorytellerVariables.SUBJECT_TOKEN_FILE}, or a GitHub Actions job with permissions: id-token: write.");
+        }
+
+        if (clientCredentials || sharedOnly)
         {
             var missing = new (string? Value, string Name)[] { (ClientId, StorytellerVariables.CLIENT_ID), (ClientSecret, StorytellerVariables.CLIENT_SECRET) }
                 .Where(variable => variable.Value is null)
@@ -182,6 +238,31 @@ public sealed class MachineSignInSettings
         return new AuthenticationException(AuthenticationFailureReason.Configuration, message);
     }
 
+    private MachineSignInKind GetFederatedKind()
+    {
+        if (ClientId is null)
+        {
+            throw Invalid($"A federated machine needs {StorytellerVariables.CLIENT_ID}, the machine id.");
+        }
+
+        if (SubjectTokenFile is null)
+        {
+            if (!HasGitHubTokenSource)
+            {
+                throw Invalid(
+                    $"A federated machine needs a platform token: set {StorytellerVariables.SUBJECT_TOKEN_FILE}, or run in a GitHub Actions job with permissions: id-token: write.");
+            }
+
+            // The request token goes to this URL.
+            RequireSecureUrl(GitHubTokenRequestUrl, GitHubActionsVariables.ID_TOKEN_REQUEST_URL, null);
+        }
+
+        return NormalizeSubjectTokenType(SubjectTokenType) is not null
+            ? MachineSignInKind.Federated
+            : throw Invalid(
+                $"{StorytellerVariables.SUBJECT_TOKEN_TYPE} must be jwt, id_token or access_token, or the full {TokenTypePrefix} URN.");
+    }
+
     private IEnumerable<string> GetCredentialVariables()
     {
         var variables = new (string? Value, string Name)[]
@@ -193,6 +274,8 @@ public sealed class MachineSignInSettings
             (ClientSecret, StorytellerVariables.CLIENT_SECRET),
             (TokenUrl, StorytellerVariables.TOKEN_URL),
             (TokenScope, StorytellerVariables.TOKEN_SCOPE),
+            (SubjectTokenFile, StorytellerVariables.SUBJECT_TOKEN_FILE),
+            (SubjectTokenType, StorytellerVariables.SUBJECT_TOKEN_TYPE),
             (TokenFile, StorytellerVariables.TOKEN_FILE),
         };
 

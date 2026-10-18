@@ -8,4 +8,5 @@ public enum MachineSignInKind
     CertificateAndApiKey,
     ClientCredentials,
     TokenFile,
+    Federated,
 }
