@@ -1,10 +1,10 @@
 <script lang="ts">
-// Set when a tab is opened while the tabs have the focus; the header of the opened page takes the focus over.
-let refocus = false
+// The path of a tab opened while the tabs have the focus; the header of that page takes the focus over.
+let refocus: string | undefined
 </script>
 
 <script setup lang="ts">
-import { computed, onMounted, useTemplateRef, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onMounted, useTemplateRef, type ComponentPublicInstance } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useGetViews } from '@42for.net/2splatform.sdk/vue-query'
 import { useContextStore } from '@/stores/context'
@@ -44,16 +44,16 @@ const tab = computed({
   set: (value: string | number) => {
     const next = modelingTabs.find((item) => item.value === value)?.value
     if (next && context.scope) {
-      refocus = !!tabList()?.contains(document.activeElement)
-      // a navigation that does not happen (Keep editing) keeps this header, and the focus where it is
-      void router.push(modelingPath(context.scope, next)).then(
-        (failure) => {
-          if (failure) {
-            refocus = false
-          }
-        },
-        () => (refocus = false),
-      )
+      const target = modelingPath(context.scope, next)
+      refocus = tabList()?.contains(document.activeElement) ? target : undefined
+      // By the next tick the opened page has mounted its header. A navigation that did not happen (Keep editing, or
+      // another tab opened meanwhile) or that kept this page (from a detail back to its list) leaves the focus alone.
+      void router.push(target).finally(async () => {
+        await nextTick()
+        if (refocus === target) {
+          refocus = undefined
+        }
+      })
     }
   },
 })
@@ -62,9 +62,12 @@ const tab = computed({
 // header shows its tab where the tabs scroll (on phones), and takes the focus after a change from the tabs.
 onMounted(() => {
   const selected = tabList()?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')
-  selected?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
-  if (refocus) {
-    refocus = false
+  const reveal = () => selected?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+  reveal()
+  // on the first load the labels widen once the web font is in
+  void document.fonts?.ready.then(reveal)
+  if (refocus === route.path) {
+    refocus = undefined
     selected?.focus()
   }
 })
