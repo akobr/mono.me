@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.OpenApi;
@@ -9,9 +10,8 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-
-using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace _42.Platform.Storyteller.Api.V1;
 
@@ -22,12 +22,14 @@ public class KeyValuePolicyHttp
     private readonly IKeyValuePolicyService _policies;
     private readonly IKeyValuePolicyStore _policyStore;
     private readonly IAccessService _access;
+    private readonly JsonSerializerOptions _bodyJsonOptions;
 
-    public KeyValuePolicyHttp(IKeyValuePolicyService policies, IKeyValuePolicyStore policyStore, IAccessService access)
+    public KeyValuePolicyHttp(IKeyValuePolicyService policies, IKeyValuePolicyStore policyStore, IAccessService access, IOptions<JsonOptions> jsonOptions)
     {
         _policies = policies;
         _policyStore = policyStore;
         _access = access;
+        _bodyJsonOptions = jsonOptions.Value.JsonSerializerOptions;
     }
 
     [Function(nameof(GetKeyValuePolicy))]
@@ -71,11 +73,16 @@ public class KeyValuePolicyHttp
     public async Task<IActionResult> SetKeyValuePolicy(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.KeyValues.V1.Policy)]
         HttpRequestData request,
-        [FromBody] KeyValuePolicyUpdate? update,
         string organization,
         string project)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
+        var (update, invalidBody) = await request.ReadJsonBodyAsync<KeyValuePolicyUpdate>(_bodyJsonOptions, "a key/value policy update");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (update is null)
         {
@@ -148,11 +155,16 @@ public class KeyValuePolicyHttp
     public async Task<IActionResult> RotateKeyValueKey(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Rotate)]
         HttpRequestData request,
-        [FromBody] KeyValueRotateRequest? rotate,
         string organization,
         string project)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
+        var (rotate, invalidBody) = await request.ReadJsonBodyAsync<KeyValueRotateRequest>(_bodyJsonOptions, "a key rotation request");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (rotate is null || !Enum.IsDefined(rotate.Protection))
         {
@@ -201,11 +213,16 @@ public class KeyValuePolicyHttp
     public async Task<IActionResult> AddRecipient(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Recipients)]
         HttpRequestData request,
-        [FromBody] ClientEncryptionRecipientCreate? create,
         string organization,
         string project)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
+        var (create, invalidBody) = await request.ReadJsonBodyAsync<ClientEncryptionRecipientCreate>(_bodyJsonOptions, "a client encryption recipient", ErrorCodes.RecipientInvalid);
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (create is null || string.IsNullOrWhiteSpace(create.Name) || string.IsNullOrWhiteSpace(create.PublicKey))
         {
@@ -234,12 +251,17 @@ public class KeyValuePolicyHttp
     public async Task<IActionResult> UpdateRecipient(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Patch, Route = Definitions.Routes.KeyValues.V1.Recipient)]
         HttpRequestData request,
-        [FromBody] ClientEncryptionRecipientUpdate? update,
         string organization,
         string project,
         string id)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
+        var (update, invalidBody) = await request.ReadJsonBodyAsync<ClientEncryptionRecipientUpdate>(_bodyJsonOptions, "a client encryption recipient update");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (update is null || (update.Name is null && update.IsEnabled is null))
         {

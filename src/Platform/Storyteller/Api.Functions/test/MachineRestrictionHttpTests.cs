@@ -327,7 +327,7 @@ public partial class MachineRestrictionHttpTests
     [Fact]
     public async Task GetKeyValues_ByTheRestrictedMachine_IsRefusedBeforeTheService()
     {
-        var http = new KeyValuesHttp(Untouched<IKeyValueService>(), Restricted(), new FixedKeyValuePolicies(), NullLogger<KeyValuesHttp>.Instance);
+        var http = new KeyValuesHttp(Untouched<IKeyValueService>(), Restricted(), new FixedKeyValuePolicies(), FunctionTestDoubles.ApiJsonOptions, NullLogger<KeyValuesHttp>.Instance);
 
         await ShouldBeRestrictedAsync(() => http.GetKeyValues(MachineRequest(), Org, Project, DefaultView));
     }

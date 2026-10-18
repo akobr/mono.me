@@ -15,13 +15,14 @@ using Microsoft.Extensions.DependencyInjection;
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // Requests of the key/value tests: a user with a project role, or a machine with roles and an optional mTLS certificate.
+// A body goes as JSON, with its content type.
 internal static class KeyValueRequests
 {
     public const string UserScopes = "User.Impersonation Default.Read Default.ReadWrite";
 
-    public static TestHttpRequestData User(string method = "GET", bool secretsScope = false, Action<NameValueCollection>? query = null)
+    public static TestHttpRequestData User(string method = "GET", bool secretsScope = false, Action<NameValueCollection>? query = null, string? body = null)
     {
-        var (context, request) = FunctionTestDoubles.CreateRequest(new ServiceCollection().BuildServiceProvider(), method: method);
+        var (context, request) = CreateRequest(method, body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "user-1"),
@@ -33,9 +34,9 @@ internal static class KeyValueRequests
         return request;
     }
 
-    public static TestHttpRequestData Machine(bool mtls, string method = "GET", Action<NameValueCollection>? query = null, params string[] roles)
+    public static TestHttpRequestData Machine(bool mtls, string method = "GET", Action<NameValueCollection>? query = null, string? body = null, params string[] roles)
     {
-        var (context, request) = FunctionTestDoubles.CreateRequest(new ServiceCollection().BuildServiceProvider(), method: method);
+        var (context, request) = CreateRequest(method, body);
         var claims = new List<Claim> { new("sub", "machine-1") };
         claims.AddRange((roles.Length == 0 ? [Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Configuration.Secrets] : roles).Select(role => new Claim("roles", role)));
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;
@@ -48,6 +49,12 @@ internal static class KeyValueRequests
 
         query?.Invoke(request.Query);
         return request;
+    }
+
+    private static (TestFunctionContext Context, TestHttpRequestData Request) CreateRequest(string method, string? body)
+    {
+        var headers = body is null ? null : FunctionTestDoubles.JsonContentType();
+        return FunctionTestDoubles.CreateRequest(new ServiceCollection().BuildServiceProvider(), headers, method, body);
     }
 }
 
