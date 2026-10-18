@@ -22,6 +22,9 @@ public interface IConfigurationSchemaService
 
     Task<ConfigurationSchema?> GetDescendantTypeSchemaAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode);
 
+    // A type that cannot descend from the key (DescendantTypeRules) throws InvalidInputException (InvalidKey) before
+    // anything is stored, also with force. The reads and the delete take any pair, so a document stored earlier stays
+    // readable and deletable.
     Task<ConfigurationSchema> SetDescendantTypeSchemaAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode, JObject schemaContent, AuditActor actor, bool force);
 
     Task<bool> DeleteDescendantTypeSchemaAsync(string organization, string project, string view, string annotationKey, string descendantTypeCode);

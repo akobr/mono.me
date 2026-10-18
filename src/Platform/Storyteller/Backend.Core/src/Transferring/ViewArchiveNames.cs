@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
+using _42.Platform.Storyteller.Configuring;
 
 namespace _42.Platform.Storyteller.Transferring;
 
@@ -30,13 +31,6 @@ public static class ViewArchiveNames
     public const string SchemasFolder = "schemas";
     public const string TemplatesFolder = "templates";
     public const string ConfigurationsFolder = "configurations";
-
-    // The pairs (ancestor type, descendant type) of AnnotationHierarchy, read from one sample key of every type.
-    private static readonly HashSet<(string Ancestor, string Descendant)> DescendantTypes = AnnotationTypeCodes.ValidCodes
-        .SelectMany(code => AnnotationHierarchy.GetAncestorSchemaSources(AnnotationKey.Parse(
-            string.Join(Constants.DefaultKeySeparator, Enumerable.Repeat("x", GetSegmentCount(code.Value) - 1).Prepend(code.Key)))))
-        .Select(source => (source.Ancestor.TypeCode, source.DescendantTypeCode))
-        .ToHashSet();
 
     public static string GetAnnotationFileName(string annotationKey)
     {
@@ -226,12 +220,6 @@ public static class ViewArchiveNames
         };
     }
 
-    // Whether annotations of the descendant type can descend from the ancestor key (AnnotationHierarchy).
-    public static bool CanDescend(AnnotationKey ancestorKey, string descendantType)
-    {
-        return DescendantTypes.Contains((ancestorKey.TypeCode.ToLowerInvariant(), descendantType.ToLowerInvariant()));
-    }
-
     private static ViewArchiveName Descendant(AnnotationKey key, string descendantType, ulong? version)
     {
         var name = new ViewArchiveName
@@ -243,12 +231,12 @@ public static class ViewArchiveNames
         };
 
         // still a document, so a misplaced schema is reported instead of silently ignored
-        return CanDescend(key, descendantType)
+        return DescendantTypeRules.CanDescend(key, descendantType)
             ? name
             : name with
             {
                 ErrorCode = ErrorCodes.InvalidKey,
-                Message = $"The type {descendantType} cannot descend from {key}, so it has no descendant-type schema there.",
+                Message = DescendantTypeRules.GetCannotDescendMessage(key, descendantType),
             };
     }
 

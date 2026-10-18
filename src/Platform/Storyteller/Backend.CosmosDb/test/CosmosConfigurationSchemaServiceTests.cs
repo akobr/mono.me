@@ -114,6 +114,88 @@ public class CosmosConfigurationSchemaServiceTests(Startup startup)
     }
 
     [Fact]
+    public async Task DescendantTypeSchema_OfADeepPair_SetGetDelete()
+    {
+        var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
+        var project = "dt-deep-pair";
+        var annotationKey = "exe.dt-subject.dt-parent.dt-ctx";
+
+        var result = await schemas.SetDescendantTypeSchemaAsync(
+            TestConstants.Organization, project, View, annotationKey, "UXE", StrictNameSchema(), AuditActor.Account("test"), false);
+        result.AnnotationType.Should().Be(AnnotationTypeCodes.UnitOfExecution);
+        result.AnnotationKey.Should().Be(annotationKey);
+        result.Version.Should().Be(1);
+
+        (await schemas.GetDescendantTypeSchemaAsync(TestConstants.Organization, project, View, annotationKey, AnnotationTypeCodes.UnitOfExecution))
+            .Should().NotBeNull();
+        (await schemas.DeleteDescendantTypeSchemaAsync(TestConstants.Organization, project, View, annotationKey, AnnotationTypeCodes.UnitOfExecution))
+            .Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DescendantTypeSchema_OfATypeThatCannotDescend_IsRejectedAndNothingIsStored(bool force)
+    {
+        var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
+        var project = force ? "dt-cannot-descend-forced" : "dt-cannot-descend";
+        var annotationKey = "exe.s.r.c";
+
+        var act = () => schemas.SetDescendantTypeSchemaAsync(
+            TestConstants.Organization, project, View, annotationKey, AnnotationTypeCodes.Responsibility, StrictNameSchema(), AuditActor.Account("test"), force);
+
+        var exception = await act.Should().ThrowAsync<InvalidInputException>();
+        exception.Which.ErrorCode.Should().Be(ErrorCodes.InvalidKey);
+        exception.Which.Message.Should().Be("The type rst cannot descend from exe.s.r.c, so it has no descendant-type schema there.");
+
+        (await schemas.GetDescendantTypeSchemaAsync(TestConstants.Organization, project, View, annotationKey, AnnotationTypeCodes.Responsibility))
+            .Should().BeNull();
+        (await schemas.GetDescendantTypeSchemaVersionsAsync(TestConstants.Organization, project, View, annotationKey, AnnotationTypeCodes.Responsibility))
+            .Should().BeEmpty();
+        (await schemas.ListSchemasAsync(TestConstants.Organization, project, View)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task DescendantTypeSchema_StoredBeforeTheRule_StaysReadableAndDeletable()
+    {
+        var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
+        var containers = Context.Services.GetRequiredService<IContainerRepositoryProvider>();
+        var project = "dt-legacy-cannot-descend";
+        var annotationKey = "exe.s.r.c";
+        var typeCode = AnnotationTypeCodes.Responsibility;
+
+        // a document an earlier version of the service stored: the ids of SchemaIdentity.ForDescendant
+        await containers.GetOrganizationContainer(TestConstants.Organization).Container.CreateItemAsync(
+            new ConfigurationSchemaEntity
+            {
+                PartitionKey = $"{project}.schema",
+                Id = $"{View}.{EntityIdPrefixTypes.ConfigurationSchema}.d.{typeCode}.{annotationKey}",
+                AnnotationKey = annotationKey,
+                Name = $"dt.{typeCode}.{annotationKey}",
+                ProjectName = project,
+                ViewName = View,
+                Content = StrictNameSchema(),
+                Modified = AuditStamp.Of(AuditActor.System, DateTimeOffset.UtcNow),
+                Version = 1,
+            },
+            new PartitionKey($"{project}.schema"));
+
+        var stored = await schemas.GetDescendantTypeSchemaAsync(TestConstants.Organization, project, View, annotationKey, typeCode);
+        stored.Should().NotBeNull();
+        stored!.AnnotationType.Should().Be(typeCode);
+        stored.AnnotationKey.Should().Be(annotationKey);
+        stored.Version.Should().Be(1);
+
+        (await schemas.GetDescendantTypeSchemaVersionsAsync(TestConstants.Organization, project, View, annotationKey, typeCode))
+            .Should().ContainSingle();
+        (await schemas.ListSchemasAsync(TestConstants.Organization, project, View))
+            .Should().ContainSingle(summary => summary.Kind == ConfigurationSchemaKind.DescendantType && summary.AnnotationKey == annotationKey);
+
+        (await schemas.DeleteDescendantTypeSchemaAsync(TestConstants.Organization, project, View, annotationKey, typeCode)).Should().BeTrue();
+        (await schemas.GetDescendantTypeSchemaAsync(TestConstants.Organization, project, View, annotationKey, typeCode)).Should().BeNull();
+    }
+
+    [Fact]
     public async Task CombinedSchema_MergesTypeLevelAndAnnotationLevel()
     {
         var schemas = Context.Services.GetRequiredService<IConfigurationSchemaService>();
