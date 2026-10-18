@@ -5,7 +5,7 @@ import type {
   ConfigurationTemplateSummary,
   SchemaValidationErrorDetail,
 } from '@42for.net/2splatform.sdk'
-import { metaOf, typeCodes, type AnnotationTypeCode } from '@/utils/annotation-key'
+import { canDescend, cannotDescendMessage, metaOf, typeCodes, type AnnotationTypeCode } from '@/utils/annotation-key'
 import { stamp } from './audit'
 import type { MockDb } from './db'
 import { combinedSchema, ownContent, schemaErrors } from './configuration-handlers'
@@ -43,6 +43,8 @@ function versionedHandlers(
   ) => Record<string, unknown>,
   options: {
     patch?: boolean
+    /** A write (POST, PUT) the service refuses whatever the content and force: 400 before the compliance check. */
+    reject?: (params: Params) => { message: string; errorCode: string } | undefined
     validate?: (
       db: MockDb,
       scope: ScopeRef,
@@ -79,6 +81,10 @@ function versionedHandlers(
             return denied ?? errorResponse(400, 'Unknown annotation type.', 'InvalidInput')
           }
           const content = (await request.json()) as Record<string, unknown>
+          const rejected = options.reject?.(params)
+          if (rejected) {
+            return errorResponse(400, rejected.message, rejected.errorCode)
+          }
           const force = new URL(request.url).searchParams.get('force') === 'true'
           const errors = force ? [] : (options.validate?.(db, scopeOf(params), params, content) ?? [])
           if (errors.length) {
@@ -293,6 +299,11 @@ export const templateSchemaHandlers: HttpHandler[] = [
     (params) => (code(params.type) ? `schema:descendant:${params.key}:${code(params.type)}` : undefined),
     schemaWrap((params) => ({ AnnotationKey: params.key, AnnotationType: code(params.type) })),
     {
+      // like the service (DescendantTypeRules); the reads and the delete stay lenient for documents stored before
+      reject: (params) =>
+        canDescend(params.key!, code(params.type)!)
+          ? undefined
+          : { message: cannotDescendMessage(params.key!, code(params.type)!), errorCode: 'InvalidKey' },
       validate: (db, scope, params, content) =>
         nonCompliant(db, scope, `schema:descendant:${params.key}:${code(params.type)}`, content),
     },

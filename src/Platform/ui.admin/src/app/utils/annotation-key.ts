@@ -3,6 +3,7 @@ import {
   annotationTypes,
   getAllAncestors,
   getAnnotationTypeInfo,
+  isValidAnnotationKey,
   type AnnotationType,
   type AnnotationTypeCode,
 } from '@42for.net/2splatform.sdk'
@@ -159,4 +160,32 @@ export function deletedWith(key: string, keys: Iterable<string>): string[] {
     }
   }
   return result
+}
+
+/** The pairs (ancestor type, descendant type) of AnnotationHierarchy, read from one sample key of every type. */
+const descendantTypes = new Set(
+  annotationTypes.flatMap(({ code, segments }) => {
+    const sample = [code, ...Array.from({ length: segments - 1 }, () => 'x')].join('.')
+    return getAllAncestors(sample).map((ancestor) => `${ancestor.slice(0, ancestor.indexOf('.'))}>${code}`)
+  }),
+)
+
+/**
+ * Whether annotations of the descendant type can descend from the ancestor key (AnnotationHierarchy); a
+ * descendant-type schema exists only for such a pair (DescendantTypeRules of the service).
+ */
+export function canDescend(ancestorKey: string, descendantType: string): boolean {
+  const ancestorType = ancestorKey.slice(0, ancestorKey.indexOf('.')).toLowerCase()
+  return descendantTypes.has(`${ancestorType}>${descendantType.toLowerCase()}`)
+}
+
+/** The type codes that can descend from the key, in `typeCodes` order; none for an invalid key or a uxe key. */
+export function descendantTypeCodes(ancestorKey: string): AnnotationTypeCode[] {
+  return isValidAnnotationKey(ancestorKey) ? typeCodes.filter((code) => canDescend(ancestorKey, code)) : []
+}
+
+/** The API's message for a pair that cannot descend (DescendantTypeRules.GetCannotDescendMessage). */
+export function cannotDescendMessage(ancestorKey: string, descendantType: string): string {
+  const type = descendantType.toLowerCase()
+  return `The type ${type} cannot descend from ${ancestorKey}, so it has no descendant-type schema there.`
 }
