@@ -23,6 +23,9 @@ public class AnnotationsHttpTests
          "Title":"Invoices of Northwind"}
         """;
 
+    // One annotation of a bulk create, with every required member.
+    private const string SubjectJson = """{"AnnotationKey":"sbt.northwind","Name":"northwind","AnnotationType":"Subject","ProjectName":"x","ViewName":"y"}""";
+
     private static readonly DateTimeOffset Now = new(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
 
     [Theory]
@@ -91,10 +94,101 @@ public class AnnotationsHttpTests
     {
         var annotations = new RecordingAnnotations();
 
-        var result = await Http(annotations).SetAnnotationsSimple(Request("POST"), "acme", "billing", "staging", ["northwind.invoicing"]);
+        var result = await Http(annotations).SetAnnotationsSimple(Request("POST", FunctionTestDoubles.ToJsonBody<List<string>>(["northwind.invoicing"])), "acme", "billing", "staging");
 
         result.ShouldBeOfType<OkObjectResult>();
         annotations.Calls.ShouldBe(["simple:acme:billing:staging:northwind.invoicing"]);
+    }
+
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran.
+    [Theory]
+    [InlineData("", "The annotations are missing.")]
+    [InlineData("null", "The annotations are missing.")]
+    [InlineData("{}", "The request body is not a list of annotation keys or lines (at $).")]
+    public async Task SetSimple_MissingOrInvalidBody_IsBadRequestWithoutCallingTheService(string body, string message)
+    {
+        var annotations = new RecordingAnnotations();
+
+        var result = await Http(annotations).SetAnnotationsSimple(Request("POST", body), "acme", "billing", "staging");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SetMany_CreatesInTheProjectAndViewOfTheRoute()
+    {
+        var annotations = new RecordingAnnotations();
+        var body = FunctionTestDoubles.ToJsonBody<List<Annotation>>([Subject("sbt.northwind"), Subject("sbt.contoso")]);
+
+        var result = await Http(annotations).SetAnnotations(Request("POST", body), "acme", "billing", "staging");
+
+        var created = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IEnumerable<Annotation>>()!;
+        created.Select(annotation => annotation.AnnotationKey).ShouldBe(["sbt.northwind", "sbt.contoso"]);
+        annotations.Calls.ShouldBe(["create:acme:sbt.northwind,sbt.contoso"]);
+        annotations.LastCreated.ShouldNotBeNull().ShouldAllBe(annotation => annotation.ProjectName == "billing" && annotation.ViewName == "staging");
+    }
+
+    // The worker's [FromBody] binding failed the first three with a 500 before the handler ran, and a null entry
+    // failed the handler itself.
+    [Theory]
+    [InlineData("", "The annotations are missing.")]
+    [InlineData("null", "The annotations are missing.")]
+    [InlineData("{}", "The request body is not a list of annotations (at $).")]
+    [InlineData("[null]", "The annotations must not contain null entries.")]
+    [InlineData("[" + SubjectJson + ", null]", "The annotations must not contain null entries.")]
+    public async Task SetMany_MissingOrInvalidBody_IsBadRequestWithoutCallingTheService(string body, string message)
+    {
+        var annotations = new RecordingAnnotations();
+
+        var result = await Http(annotations).SetAnnotations(Request("POST", body), "acme", "billing", "staging");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task SetManyAndSimple_EmptyList_AnswerNoAnnotations()
+    {
+        var http = Http(new RecordingAnnotations());
+
+        var many = await http.SetAnnotations(Request("POST", "[]"), "acme", "billing", "staging");
+        var simple = await http.SetAnnotationsSimple(Request("POST", "[]"), "acme", "billing", "staging");
+
+        many.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IEnumerable<Annotation>>()!.ShouldBeEmpty();
+        simple.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IEnumerable<Annotation>>()!.ShouldBeEmpty();
+    }
+
+    // The worker's [FromBody] binding refused a body without a content type; the handler reads it.
+    [Fact]
+    public async Task SetMany_BodyWithoutAContentType_IsRead()
+    {
+        var annotations = new RecordingAnnotations();
+        var request = Request("POST", $"[{SubjectJson}]");
+        request.Headers.Remove("Content-Type").ShouldBeTrue();
+
+        var result = await Http(annotations).SetAnnotations(request, "acme", "billing", "staging");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        annotations.Calls.ShouldBe(["create:acme:sbt.northwind"]);
+    }
+
+    [Fact]
+    public async Task SetMany_PropertyAndEnumNamesInAnyCase_AreRead()
+    {
+        var annotations = new RecordingAnnotations();
+        const string body = """[{ "annotationKey": "usg.northwind.invoicing", "NAME": "invoicing", "annotationType": "usage", "projectName": "x", "viewName": "y", }]""";
+
+        var result = await Http(annotations).SetAnnotations(Request("POST", body), "acme", "billing", "staging");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        var created = annotations.LastCreated.ShouldNotBeNull().ShouldHaveSingleItem();
+        created.AnnotationKey.ShouldBe("usg.northwind.invoicing");
+        created.AnnotationType.ShouldBe(AnnotationType.Usage);
     }
 
     [Fact]
@@ -265,7 +359,7 @@ public class AnnotationsHttpTests
         var annotations = new RecordingAnnotations();
         var keys = Enumerable.Range(0, count).Select(index => $"sbt.s{index}").ToList();
 
-        var result = await Http(annotations).FindDeletedAnnotations(Request("POST"), new AnnotationKeysRequest { Keys = keys }, "acme", "billing", "default");
+        var result = await Http(annotations).FindDeletedAnnotations(Request("POST", FunctionTestDoubles.ToJsonBody(new AnnotationKeysRequest { Keys = keys })), "acme", "billing", "default");
 
         result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
         annotations.Calls.ShouldBeEmpty();
@@ -276,7 +370,7 @@ public class AnnotationsHttpTests
     {
         var annotations = new RecordingAnnotations();
 
-        var result = await Http(annotations).FindDeletedAnnotations(Request("POST"), new AnnotationKeysRequest { Keys = ["sbt.ok", "nope", "xyz.a"] }, "acme", "billing", "default");
+        var result = await Http(annotations).FindDeletedAnnotations(Request("POST", FunctionTestDoubles.ToJsonBody(new AnnotationKeysRequest { Keys = ["sbt.ok", "nope", "xyz.a"] })), "acme", "billing", "default");
 
         var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
         error.ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
@@ -290,7 +384,7 @@ public class AnnotationsHttpTests
     {
         var annotations = new RecordingAnnotations();
 
-        var result = await Http(annotations).FindDeletedAnnotations(Request("POST"), new AnnotationKeysRequest { Keys = ["sbt.a", "usg.a.b"] }, "acme", "billing", "default");
+        var result = await Http(annotations).FindDeletedAnnotations(Request("POST", FunctionTestDoubles.ToJsonBody(new AnnotationKeysRequest { Keys = ["sbt.a", "usg.a.b"] })), "acme", "billing", "default");
 
         result.ShouldBeOfType<OkObjectResult>();
         annotations.Calls.ShouldBe(["find:acme:billing:default:sbt.a,usg.a.b"]);
@@ -302,13 +396,60 @@ public class AnnotationsHttpTests
     public async Task Restore_PassesTheKeysTheDescendantsFlagAndTheCaller(bool descendants)
     {
         var annotations = new RecordingAnnotations();
-        var request = Request("POST");
+        var request = Request("POST", FunctionTestDoubles.ToJsonBody(new AnnotationRestoreRequest { Keys = ["sbt.a"], Descendants = descendants }));
 
-        var result = await Http(annotations).RestoreAnnotations(request, new AnnotationRestoreRequest { Keys = ["sbt.a"], Descendants = descendants }, "acme", "billing", "default");
+        var result = await Http(annotations).RestoreAnnotations(request, "acme", "billing", "default");
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<AnnotationRestoreResult>();
         annotations.Calls.ShouldBe([$"restore:acme:billing:default:sbt.a:{descendants}"]);
         annotations.LastActor.ShouldBe(request.GetAuditActor());
+    }
+
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran. The keys are required,
+    // so {} is not a request either.
+    [Theory]
+    [InlineData("", "No annotation keys in the body.")]
+    [InlineData("null", "No annotation keys in the body.")]
+    [InlineData("{}", "The request body is not an annotation lookup request (at $).")]
+    [InlineData("[1, 2]", "The request body is not an annotation lookup request (at $).")]
+    public async Task Lookup_MissingOrInvalidBody_IsRejected(string body, string message)
+    {
+        var annotations = new RecordingAnnotations();
+
+        var result = await Http(annotations).FindDeletedAnnotations(Request("POST", body), "acme", "billing", "default");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("", "No annotation keys in the body.")]
+    [InlineData("null", "No annotation keys in the body.")]
+    [InlineData("{}", "The request body is not an annotation restore request (at $).")]
+    [InlineData("[1, 2]", "The request body is not an annotation restore request (at $).")]
+    public async Task Restore_MissingOrInvalidBody_IsRejected(string body, string message)
+    {
+        var annotations = new RecordingAnnotations();
+
+        var result = await Http(annotations).RestoreAnnotations(Request("POST", body), "acme", "billing", "default");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Restore_PropertyNamesInAnyCase_AreRead()
+    {
+        var annotations = new RecordingAnnotations();
+
+        var result = await Http(annotations).RestoreAnnotations(Request("POST", """{ "keys": ["sbt.a"], "DESCENDANTS": false, }"""), "acme", "billing", "default");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        annotations.Calls.ShouldBe(["restore:acme:billing:default:sbt.a:False"]);
     }
 
     [Fact]
@@ -343,7 +484,7 @@ public class AnnotationsHttpTests
 
     private static AnnotationsHttp Http(RecordingAnnotations annotations)
     {
-        return new AnnotationsHttp(annotations, new ContributorAccess(), new FixedTime(Now), NullLogger<AnnotationsHttp>.Instance);
+        return new AnnotationsHttp(annotations, new ContributorAccess(), new FixedTime(Now), FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
     }
 
     // Every list endpoint and the descendants, called with the two include flags.
@@ -391,10 +532,12 @@ public class AnnotationsHttpTests
         };
     }
 
-    private static TestHttpRequestData Request(string method, string body = "")
+    // A body goes as JSON, with its content type.
+    private static TestHttpRequestData Request(string method, string? body = null)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var (context, request) = FunctionTestDoubles.CreateRequest(services, method: method, body: body);
+        var headers = body is null ? null : FunctionTestDoubles.JsonContentType();
+        var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, method, body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "user_01"),
@@ -414,6 +557,9 @@ public class AnnotationsHttpTests
         public AnnotationsRequest? LastRequest { get; private set; }
 
         public AuditActor? LastActor { get; private set; }
+
+        // The annotations CreateAnnotationsAsync was given.
+        public IReadOnlyList<Annotation>? LastCreated { get; private set; }
 
         // What GetAnnotationAsync and GetDeletedAnnotationAsync find.
         public Annotation? Stored { get; init; }
@@ -489,7 +635,14 @@ public class AnnotationsHttpTests
 
         public Task UpdateAnnotationAsync(string organization, Annotation annotation, AuditActor actor) => throw new NotImplementedException();
 
-        public Task<IEnumerable<Annotation>> CreateAnnotationsAsync(string organization, IEnumerable<Annotation> annotations, AuditActor actor) => throw new NotImplementedException();
+        public Task<IEnumerable<Annotation>> CreateAnnotationsAsync(string organization, IEnumerable<Annotation> annotations, AuditActor actor)
+        {
+            var created = annotations.ToList();
+            Calls.Add($"create:{organization}:{string.Join(",", created.Select(annotation => annotation.AnnotationKey))}");
+            LastCreated = created;
+            LastActor = actor;
+            return Task.FromResult<IEnumerable<Annotation>>(created.Select(annotation => annotation with { Created = Stamp, Modified = Stamp }).ToList());
+        }
 
         public Task<IReadOnlySet<string>> FindActiveAnnotationKeysAsync(string organization, string project, string view, IReadOnlyCollection<AnnotationKey> keys, CancellationToken cancellationToken = default) => throw new NotImplementedException();
 

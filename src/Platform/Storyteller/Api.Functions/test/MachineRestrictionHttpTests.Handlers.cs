@@ -72,7 +72,7 @@ public partial class MachineRestrictionHttpTests
         new(nameof(ConfigurationSchemaHttp.DeleteConfigurationSchema), http => http.Schemas.DeleteConfigurationSchema(MachineRequest("DELETE"), Org, Project, DefaultView, RestrictionType)),
         new(nameof(TemplateHttp.GetTemplate), http => http.Templates.GetTemplate(MachineRequest(), Org, Project, DefaultView, RestrictionType)),
         new(nameof(AnnotationsHttp.GetDeletedAnnotations), http => http.Annotations.GetDeletedAnnotations(MachineRequest(), Org, Project, DefaultView)),
-        new(nameof(AnnotationsHttp.SetAnnotationsSimple), http => http.Annotations.SetAnnotationsSimple(MachineRequest("POST"), Org, Project, DefaultView, [Restriction])),
+        new(nameof(AnnotationsHttp.SetAnnotationsSimple), http => http.Annotations.SetAnnotationsSimple(MachineRequest("POST", FunctionTestDoubles.ToJsonBody<List<string>>([Restriction])), Org, Project, DefaultView)),
     ];
 
     // Debug builds (DEV_AUTH) skip the role check of users.
@@ -161,7 +161,7 @@ public partial class MachineRestrictionHttpTests
             return;
         }
 
-        var http = new AnnotationsHttp(Untouched<IAnnotationService>(), new RoleAccess(AccountRole.Reader), TimeProvider.System, NullLogger<AnnotationsHttp>.Instance);
+        var http = new AnnotationsHttp(Untouched<IAnnotationService>(), new RoleAccess(AccountRole.Reader), TimeProvider.System, FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
 
         var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.DeleteAnnotation(KeyValueRequests.User("DELETE"), Org, Project, DefaultView, Restriction));
 
@@ -172,7 +172,7 @@ public partial class MachineRestrictionHttpTests
     public async Task DeleteAnnotation_ByAContributor_ReachesTheService()
     {
         var (annotations, recorder) = Recording<IAnnotationService>();
-        var http = new AnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor), TimeProvider.System, NullLogger<AnnotationsHttp>.Instance);
+        var http = new AnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor), TimeProvider.System, FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
 
         await http.DeleteAnnotation(KeyValueRequests.User("DELETE"), Org, Project, DefaultView, Restriction);
 
@@ -241,7 +241,7 @@ public partial class MachineRestrictionHttpTests
         IConfigurationSchemaService schemas,
         IConfigurationTemplateService templates)
     {
-        public AnnotationsHttp Annotations { get; } = new(annotations, Restricted(), TimeProvider.System, NullLogger<AnnotationsHttp>.Instance);
+        public AnnotationsHttp Annotations { get; } = new(annotations, Restricted(), TimeProvider.System, FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
 
         public ConfigurationHttp Configuration { get; } = new(configuration, annotations, Restricted(), new FixedKeyValuePolicies(requireMtls: false), NullLogger<ConfigurationHttp>.Instance);
 

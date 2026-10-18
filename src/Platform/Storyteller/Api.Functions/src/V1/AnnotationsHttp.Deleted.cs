@@ -10,8 +10,6 @@ using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.OpenApi.Models;
 
-using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
-
 namespace _42.Platform.Storyteller.Api.V1;
 
 // Deleted annotations (listing, lookup, restore, permanent delete) and the history of an annotation.
@@ -95,13 +93,20 @@ public partial class AnnotationsHttp
     public async Task<IActionResult> FindDeletedAnnotations(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Annotations.V1.DeletedLookup)]
         HttpRequestData request,
-        [FromBody] AnnotationKeysRequest? model,
         string organization,
         string project,
         string view)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<AnnotationKeysRequest>(_bodyJsonOptions, "an annotation lookup request", ErrorCodes.InvalidKey);
+
+        // The keys of the body are authorized before any 400 of the body; a body that cannot be read names no key.
         await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? []);
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (!TryParseKeys(model?.Keys, out var keys, out var badRequest))
         {
@@ -127,13 +132,20 @@ public partial class AnnotationsHttp
     public async Task<IActionResult> RestoreAnnotations(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Annotations.V1.DeletedRestore)]
         HttpRequestData request,
-        [FromBody] AnnotationRestoreRequest? model,
         string organization,
         string project,
         string view)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<AnnotationRestoreRequest>(_bodyJsonOptions, "an annotation restore request", ErrorCodes.InvalidKey);
+
+        // The keys of the body are authorized before any 400 of the body; a body that cannot be read names no key.
         var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Contributor);
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (!TryParseKeys(model?.Keys, out var keys, out var badRequest))
         {
