@@ -1,6 +1,7 @@
 import { hasRole, roleRank, type AccountRoleName } from '@42for.net/2splatform.sdk'
 import type { Scope } from '@/stores/context'
 import { hasOrganization } from '@/utils/memberships'
+import { modelingPath, modelingTabs } from '@/utils/modeling'
 import { defaultViewName, isDefaultView } from '@/utils/views'
 
 export interface NavigationEntry {
@@ -13,6 +14,10 @@ export interface NavigationEntry {
   minRole?: AccountRoleName
   /** Shown with a lock icon below this role (read-only for the caller). */
   editRole?: AccountRoleName
+  /** The tooltip of the lock, when the page is not read-only but closed for the caller. */
+  lockedHint?: string
+  /** The tabs of the page, each with its own path; the command palette lists them after the entry (424-38). */
+  tabs?: { label: string; icon: string; to: string }[]
 }
 
 export interface NavigationSection {
@@ -100,16 +105,20 @@ export function buildNavigation(
         { label: 'Configurations', icon: 'i-lucide-settings-2', to: `${base}/configurations`, editRole: 'Contributor' },
         { label: 'Values store', icon: 'i-lucide-vault', to: `${base}/key-values`, editRole: 'Contributor' },
         { label: 'Graph', icon: 'i-lucide-waypoints', to: `${base}/graph` },
-        { label: 'Templates', icon: 'i-lucide-layout-template', to: `${base}/templates`, editRole: 'Contributor' },
-        { label: 'Schemas', icon: 'i-lucide-braces', to: `${base}/schemas`, editRole: 'Contributor' },
-        { label: 'Compare views', icon: 'i-lucide-git-compare', to: `${base}/compare` },
+        // Templates, Schemas, Export & Import, Deleted and Compare views are its tabs (424-38). The whole page is
+        // locked for a Reader, who still sees the entry, with the lock.
         {
-          label: 'Export & Import',
-          icon: 'i-lucide-arrow-down-up',
-          to: `${base}/export-import`,
+          label: 'Modeling',
+          icon: 'i-lucide-puzzle',
+          to: modelingPath({ org, project, view }),
           editRole: 'Contributor',
+          lockedHint: 'Contributors only',
+          tabs: modelingTabs.map((tab) => ({
+            label: tab.label,
+            icon: tab.icon,
+            to: modelingPath({ org, project, view }, tab.value),
+          })),
         },
-        { label: 'Deleted', icon: 'i-lucide-archive-restore', to: `${base}/deleted`, editRole: 'Contributor' },
       ],
     })
   }

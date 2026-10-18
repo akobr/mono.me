@@ -37,7 +37,7 @@ const items = computed<NavigationMenuItem[][]>(() =>
       to: item.to,
       exact: item.exact,
       badge: item.locked ? { icon: 'i-lucide-lock', color: 'neutral' as const, variant: 'subtle' as const } : undefined,
-      tooltip: item.locked ? { text: 'Read-only for your role' } : undefined,
+      tooltip: item.locked ? { text: item.lockedHint ?? 'Read-only for your role' } : undefined,
     })),
   ]),
 )
