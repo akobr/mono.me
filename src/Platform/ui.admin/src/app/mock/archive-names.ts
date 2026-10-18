@@ -58,9 +58,6 @@ const isWord = (segment: string, word: string) => segment.toLowerCase() === word
 const codeOf = (segment: string) =>
   typeCodes.find((code) => code === segment.toLowerCase()) as AnnotationTypeCode | undefined
 
-// re-exported, so the importers of the port keep finding it here
-export { canDescend }
-
 const reserved = new Set(['%', '<', '>', ':', '"', '/', '\\', '|', '?', '*'])
 
 const mustEncode = (character: string) => {
