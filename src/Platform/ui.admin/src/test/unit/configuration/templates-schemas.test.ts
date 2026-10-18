@@ -19,9 +19,9 @@ const scope = { org: 'acme', project: 'billing', view: 'default' }
 
 describe('schema targets', () => {
   it('builds routes and API paths per kind', () => {
-    expect(schemaRoute(scope, { kind: 'type', type: 'exe' })).toBe('/acme/billing/default/schemas/type/exe')
+    expect(schemaRoute(scope, { kind: 'type', type: 'exe' })).toBe('/acme/billing/default/modeling/schemas/type/exe')
     expect(schemaRoute(scope, { kind: 'descendant', key: 'sbt.a', type: 'exe' })).toBe(
-      '/acme/billing/default/schemas/annotation/sbt.a/type/exe',
+      '/acme/billing/default/modeling/schemas/annotation/sbt.a/type/exe',
     )
     expect(schemaApi(scope, { kind: 'annotation', key: 'exe.a.b.c' }).path).toBe(
       '/v1/acme/billing/default/configuration-schema/exe.a.b.c',
@@ -69,7 +69,7 @@ describe('SchemaDetail', () => {
     const view = await mountScreen(
       SchemaDetail,
       { target: { kind: 'type', type: 'exe' } },
-      { path: '/acme/billing/default/schemas/type/exe' },
+      { path: '/acme/billing/default/modeling/schemas/type/exe' },
     )
     await settle(10)
 
@@ -94,7 +94,7 @@ describe('SchemaDetail', () => {
     const view = await mountScreen(
       SchemaDetail,
       { target: { kind: 'type', type: 'cnt' } },
-      { path: '/acme/billing/default/schemas/type/cnt' },
+      { path: '/acme/billing/default/modeling/schemas/type/cnt' },
     )
     await settle(10)
 
@@ -114,7 +114,11 @@ describe('SchemaDetail', () => {
 
 describe('TemplateDetail', () => {
   it('saves template edits as a guarded JSON Patch', async () => {
-    const view = await mountScreen(TemplateDetail, { type: 'exe' }, { path: '/acme/billing/default/templates/exe' })
+    const view = await mountScreen(
+      TemplateDetail,
+      { type: 'exe' },
+      { path: '/acme/billing/default/modeling/templates/exe' },
+    )
     await settle(10)
 
     const template = JSON.parse(view.host.find('textarea').element.value) as Record<string, unknown>

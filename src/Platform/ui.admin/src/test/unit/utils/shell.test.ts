@@ -91,6 +91,69 @@ describe('context paths', () => {
     expect(viewTarget('/acme/billing/monitor/graph', 'acme', 'billing', 'default')).toBe('/acme/billing/default/graph')
     expect(currentSection('/acme/billing/machines/graph')).toEqual({ kind: 'project', name: 'machines' })
   })
+
+  // Schemas, Templates, Export & Import, Deleted and Compare views are tabs of Modeling, each with its path (424-38).
+  it('keeps the Modeling tab, without the detail, when switching the project or the view', () => {
+    expect(currentSection('/acme/billing/default/modeling/templates')).toEqual({ kind: 'view', name: 'modeling' })
+    expect(viewTarget('/acme/billing/default/modeling/templates', 'acme', 'billing', 'staging')).toBe(
+      '/acme/billing/staging/modeling/templates',
+    )
+    expect(projectTarget('/acme/billing/staging/modeling/templates', 'acme', 'shipping')).toBe(
+      '/acme/shipping/default/modeling/templates',
+    )
+
+    expect(currentSection('/acme/billing/default/modeling/schemas/type/exe')).toEqual({
+      kind: 'view',
+      name: 'modeling',
+    })
+    expect(viewTarget('/acme/billing/default/modeling/schemas/type/exe', 'acme', 'billing', 'staging')).toBe(
+      '/acme/billing/staging/modeling/schemas',
+    )
+    expect(projectTarget('/acme/billing/staging/modeling/schemas/annotation/sbt.a/type/exe', 'acme', 'shipping')).toBe(
+      '/acme/shipping/default/modeling/schemas',
+    )
+    // Deleted stays on Deleted instead of going to Annotations
+    expect(viewTarget('/acme/billing/default/modeling/deleted', 'acme', 'billing', 'staging')).toBe(
+      '/acme/billing/staging/modeling/deleted',
+    )
+  })
+
+  it('opens Modeling on its first tab when the path names no tab', () => {
+    expect(currentSection('/acme/billing/default/modeling')).toEqual({ kind: 'view', name: 'modeling' })
+    expect(viewTarget('/acme/billing/default/modeling', 'acme', 'billing', 'staging')).toBe(
+      '/acme/billing/staging/modeling',
+    )
+    expect(projectTarget('/acme/billing/default/modeling', 'acme', 'shipping')).toBe('/acme/shipping/default/modeling')
+    expect(viewTarget('/acme/billing/default/modeling/foo', 'acme', 'billing', 'staging')).toBe(
+      '/acme/billing/staging/modeling',
+    )
+  })
+
+  // modeling is not a reserved view name: the Modeling page is the fourth segment, below the view (424-38).
+  it('tells the Modeling page from a view named modeling', () => {
+    expect(currentSection('/acme/billing/modeling/annotations')).toEqual({ kind: 'view', name: 'annotations' })
+    expect(viewLocation('/acme/billing/modeling/graph/rst.x')).toEqual({
+      scope: { org: 'acme', project: 'billing', view: 'modeling' },
+      section: 'graph',
+      root: false,
+    })
+    expect(currentSection('/acme/billing/modeling/modeling/schemas')).toEqual({ kind: 'view', name: 'modeling' })
+    expect(viewTarget('/acme/billing/modeling/modeling/templates/exe', 'acme', 'billing', 'default')).toBe(
+      '/acme/billing/default/modeling/templates',
+    )
+    expect(viewTarget('/acme/billing/default/modeling/compare', 'acme', 'billing', 'modeling')).toBe(
+      '/acme/billing/modeling/modeling/compare',
+    )
+    expect(viewTarget('/acme/billing/modeling/graph/rst.x', 'acme', 'billing', 'default')).toBe(
+      '/acme/billing/default/graph',
+    )
+    expect(projectTarget('/acme/billing/modeling/modeling/export-import', 'acme', 'shipping')).toBe(
+      '/acme/shipping/default/modeling/export-import',
+    )
+    expect(projectTarget('/acme/billing/modeling/annotations', 'acme', 'shipping')).toBe(
+      '/acme/shipping/default/annotations',
+    )
+  })
 })
 
 describe('navigation', () => {

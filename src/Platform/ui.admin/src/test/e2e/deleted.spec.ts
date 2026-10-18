@@ -59,7 +59,7 @@ test('restores a deletion from the Deleted screen, with and without descendants'
   await openApp(page, `${base}/annotations`)
   await deleteByApi(page, 'sbt.contoso')
   await deleteByApi(page, 'sbt.fabrikam')
-  await goto(page, `${base}/deleted`)
+  await goto(page, `${base}/modeling/deleted`)
 
   await expect(page.getByRole('row').filter({ hasText: 'sbt.contoso' })).toBeVisible()
   // only the roots of deletions are listed
@@ -107,14 +107,14 @@ test('only Administrators can delete permanently', async ({ page }) => {
   await deleteByApi(page, 'sbt.northwind', '/acme/shipping/default')
 
   // acme.shipping: the mock user is a Contributor
-  await goto(page, '/acme/shipping/default/deleted')
+  await goto(page, '/acme/shipping/default/modeling/deleted')
   await page.getByRole('button', { name: 'Actions for sbt.northwind' }).click()
   await expect(page.getByRole('menuitem', { name: 'Restore', exact: true })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Delete permanently' })).toHaveCount(0)
   await page.keyboard.press('Escape')
 
   // acme.billing: the mock user is the Owner
-  await goto(page, `${base}/deleted`)
+  await goto(page, `${base}/modeling/deleted`)
   await rowAction(page, 'sbt.contoso', 'Delete permanently')
   const confirm = page.getByRole('dialog', { name: 'Delete sbt.contoso permanently?' })
   await expect(confirm).toContainText('removed for good')
@@ -176,7 +176,7 @@ test('the configuration link tells own, inherited and missing configuration apar
 test('the Deleted screen has no serious accessibility violations', async ({ page }) => {
   await openApp(page, `${base}/annotations`)
   await deleteByApi(page, 'sbt.contoso')
-  await goto(page, `${base}/deleted`)
+  await goto(page, `${base}/modeling/deleted`)
   await expect(page.getByRole('row').filter({ hasText: 'sbt.contoso' })).toBeVisible()
   await expectAccessible(page)
 })

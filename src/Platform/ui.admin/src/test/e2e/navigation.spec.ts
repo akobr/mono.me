@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test'
-import { goto, isMobile, openApp } from './support'
+import { goto, isMobile, openApp, replaceEditorText } from './support'
 
 /** The navigation menu: the docked sidebar, or on a phone the slideover behind the menu button. */
 async function menu(page: Page, testInfo: TestInfo): Promise<Locator> {
@@ -53,6 +53,13 @@ test('updates the sections when another view is opened', async ({ page }, testIn
     '/acme/billing/default/annotations',
   )
 })
+
+/** The path, the query without the mock scenario of openApp, and the hash of the current page. */
+function relativeUrl(page: Page): string {
+  const url = new URL(page.url())
+  url.searchParams.delete('mock-scenario')
+  return `${url.pathname}${url.search}${url.hash}`
+}
 
 /** The section label of the view in the navigation menu ("View · default"). */
 const viewLabel = (navigation: Locator, view: string) =>
@@ -172,18 +179,22 @@ const movedPages: { from: string; to: string; section?: string }[] = [
   { from: '/acme/billing/secrets', to: '/acme/billing/settings#secrets', section: '#secrets' },
   { from: '/acme/billing/audit', to: '/acme/billing/monitor?tab=audit' },
   { from: '/acme/billing/usage', to: '/acme/billing/monitor' },
+  // The pages of a view that became the tabs of Modeling (424-38), with their details and their own query.
+  { from: '/acme/billing/default/schemas', to: '/acme/billing/default/modeling/schemas' },
+  {
+    from: '/acme/billing/default/schemas/annotation/sbt.a/type/exe?tab=versions',
+    to: '/acme/billing/default/modeling/schemas/annotation/sbt.a/type/exe?tab=versions',
+  },
+  { from: '/acme/billing/default/templates/exe', to: '/acme/billing/default/modeling/templates/exe' },
+  { from: '/acme/billing/default/export-import', to: '/acme/billing/default/modeling/export-import' },
+  { from: '/acme/billing/default/deleted?cascaded=1', to: '/acme/billing/default/modeling/deleted?cascaded=1' },
+  { from: '/acme/billing/default/compare?to=staging', to: '/acme/billing/default/modeling/compare?to=staging' },
 ]
 
 for (const moved of movedPages) {
   test(`opens ${moved.from} on the page that took it over`, async ({ page }) => {
     await openApp(page, moved.from)
-    await expect
-      .poll(() => {
-        const url = new URL(page.url())
-        url.searchParams.delete('mock-scenario')
-        return `${url.pathname}${url.search}${url.hash}`
-      })
-      .toBe(moved.to)
+    await expect.poll(() => relativeUrl(page)).toBe(moved.to)
     if (moved.section) {
       // Keyboard and screen-reader users continue from the section, as after a followed anchor.
       await expect(page.locator(moved.section)).toBeInViewport()
@@ -191,3 +202,145 @@ for (const moved of movedPages) {
     }
   })
 }
+
+// The View section after 424-38: Templates, Schemas, Export & Import, Deleted and Compare views are the tabs of
+// Modeling. Every role sees the entry; a Reader sees it with the lock.
+test('lists Modeling in the View section of every role, locked for a reader', async ({ page }, testInfo) => {
+  const moved = ['templates', 'schemas', 'compare', 'export-import', 'deleted']
+
+  for (const [project, locked] of [
+    ['/acme/billing', false],
+    ['/acme/shipping', false],
+    ['/northwind/portal', true],
+  ] as const) {
+    await openApp(page, `${project}/default/graph`)
+    const navigation = await menu(page, testInfo)
+    await expect(navigation.locator(`a[href^="${project}/default/"]`)).toHaveText([
+      'Annotations',
+      'Configurations',
+      'Values store',
+      'Graph',
+      'Modeling',
+    ])
+    const entry = navigation.getByRole('link', { name: 'Modeling', exact: true })
+    await expect(entry).toHaveAttribute('href', `${project}/default/modeling`)
+    // the lock badge of the entry
+    await expect(entry.locator('[data-slot="linkTrailingBadge"]')).toHaveCount(locked ? 1 : 0)
+    for (const section of moved) {
+      await expect(navigation.locator(`a[href^="${project}/default/${section}"]`)).toHaveCount(0)
+    }
+    if (isMobile(testInfo)) {
+      await page.keyboard.press('Escape')
+    }
+  }
+})
+
+const modeling = '/acme/billing/default/modeling'
+
+/** A tab of Modeling; exact, because "Schema" is not "Schemas" and the template detail has tabs of its own. */
+const modelingTab = (page: Page, name: string) => page.getByRole('tab', { name, exact: true })
+
+// Each tab of Modeling is a page with its own path (424-38), so a tab change is pushed to the history.
+test('opens the tabs of Modeling with a click, and Back returns to the previous tab', async ({ page }) => {
+  // Modeling opens on its first tab.
+  await openApp(page, modeling)
+  await expect.poll(() => relativeUrl(page)).toBe(`${modeling}/schemas`)
+  await expect(page.getByRole('tab')).toHaveText([
+    'Schemas',
+    'Templates',
+    'Export & Import',
+    'Deleted',
+    'Compare views',
+  ])
+  await expect(modelingTab(page, 'Schemas')).toHaveAttribute('aria-selected', 'true')
+
+  for (const [name, path] of [
+    ['Templates', 'templates'],
+    ['Export & Import', 'export-import'],
+    ['Deleted', 'deleted'],
+    ['Compare views', 'compare'],
+    ['Schemas', 'schemas'],
+  ] as const) {
+    await modelingTab(page, name).click()
+    await expect.poll(() => new URL(page.url()).pathname).toBe(`${modeling}/${path}`)
+    await expect(modelingTab(page, name)).toHaveAttribute('aria-selected', 'true')
+  }
+
+  await page.goBack()
+  await expect.poll(() => new URL(page.url()).pathname).toBe(`${modeling}/compare`)
+  await expect(modelingTab(page, 'Compare views')).toHaveAttribute('aria-selected', 'true')
+})
+
+test('a link opens its tab of Modeling, and a detail link opens the tab and the detail', async ({ page }, testInfo) => {
+  await openApp(page, `${modeling}/deleted?cascaded=1`)
+  await expect(modelingTab(page, 'Deleted')).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('switch', { name: 'Show cascaded' })).toBeChecked()
+  // Another tab opens without the query of this one.
+  await modelingTab(page, 'Templates').click()
+  await expect(page).toHaveURL(`${modeling}/templates`)
+
+  await openApp(page, `${modeling}/templates/exe`)
+  const detail = page.getByRole('region', { name: 'Execution template' })
+  await expect(detail).toBeVisible()
+  if (isMobile(testInfo)) {
+    // On a phone the detail is full screen and hides the list with the tabs; Back shows them.
+    await expect(modelingTab(page, 'Templates')).toBeHidden()
+    await detail.getByRole('button', { name: 'Back' }).click()
+    await expect(page).toHaveURL(`${modeling}/templates`)
+  }
+  await expect(modelingTab(page, 'Templates')).toHaveAttribute('aria-selected', 'true')
+})
+
+// acme/billing has the views default and staging; acme/shipping has only default, so it has nothing to compare.
+test('Compare views is enabled only when the project has another view', async ({ page }) => {
+  await openApp(page, `${modeling}/schemas`)
+  await modelingTab(page, 'Compare views').click()
+  // the only other view is preselected
+  await expect(page).toHaveURL(`${modeling}/compare?to=staging`)
+  await expect(modelingTab(page, 'Compare views')).toHaveAttribute('aria-selected', 'true')
+
+  await goto(page, '/acme/shipping/default/modeling/schemas')
+  await expect(modelingTab(page, 'Schemas')).toBeEnabled()
+  await expect(modelingTab(page, 'Compare views')).toBeDisabled()
+})
+
+// Modeling is closed below Contributor (424-38): the Reader of northwind/portal gets the lock on every tab and detail.
+test('a reader gets the lock of Modeling instead of its tabs', async ({ page }) => {
+  const base = '/northwind/portal/default/modeling'
+  // Modeling opens on Schemas for a Reader too.
+  await openApp(page, base)
+  await expect.poll(() => relativeUrl(page)).toBe(`${base}/schemas`)
+
+  for (const path of ['schemas', 'templates/exe', 'export-import', 'deleted', 'compare']) {
+    if (path !== 'schemas') {
+      await goto(page, `${base}/${path}`)
+    }
+    await expect(page.getByRole('heading', { name: 'Contributors only' })).toBeVisible()
+    await expect(page.getByRole('tab')).toHaveCount(0)
+    // no tab page is mounted, so neither is a detail
+    await expect(page.getByRole('region', { name: 'Execution template' })).toHaveCount(0)
+  }
+})
+
+// A tab change changes the path, so a dirty editor asks first (424-38).
+test('a dirty template asks before another tab of Modeling opens', async ({ page }, testInfo) => {
+  test.skip(isMobile(testInfo), 'On a phone the detail is full screen and hides the list with the tabs.')
+  await openApp(page, `${modeling}/templates/exe`)
+  await page.getByRole('radio', { name: 'JSON' }).click()
+  const editor = page.locator('.cm-content').first()
+  await expect(editor).toContainText('"retries"')
+  await replaceEditorText(page, '{\n  "retries": 9\n}')
+
+  const confirm = page.getByRole('dialog', { name: 'Discard changes?' })
+  await modelingTab(page, 'Schemas').click()
+  await confirm.getByRole('button', { name: 'Keep editing' }).click()
+  await expect(confirm).toBeHidden()
+  await expect.poll(() => relativeUrl(page)).toBe(`${modeling}/templates/exe`)
+  await expect(modelingTab(page, 'Templates')).toHaveAttribute('aria-selected', 'true')
+  await expect(editor).toContainText('"retries": 9')
+
+  await modelingTab(page, 'Schemas').click()
+  await confirm.getByRole('button', { name: 'Discard', exact: true }).click()
+  await expect(page).toHaveURL(`${modeling}/schemas`)
+  await expect(modelingTab(page, 'Schemas')).toHaveAttribute('aria-selected', 'true')
+})

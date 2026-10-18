@@ -81,13 +81,13 @@ describe('page memory guard', () => {
 
   it('does not redirect links with a query, unremembered sections or the first navigation', async () => {
     await router.push(`${base}/annotations/sbt.northwind`)
-    await router.push(`${base}/templates/exe`)
+    await router.push(`${base}/modeling/templates/exe`)
     await router.push(`${base}/annotations?q=key:sbt.contoso`)
     expect(current()).toBe(`${base}/annotations?q=key:sbt.contoso`)
 
-    await router.push(`${base}/templates`)
-    await router.push(`${base}/templates`)
-    expect(current()).toBe(`${base}/templates`)
+    await router.push(`${base}/modeling/templates`)
+    await router.push(`${base}/modeling/templates`)
+    expect(current()).toBe(`${base}/modeling/templates`)
 
     const fresh = createRouter({
       history: createMemoryHistory(),

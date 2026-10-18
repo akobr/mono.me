@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 import { goto, isMobile, openApp } from './support'
 
 // Names, colors and icons of the annotation types (424-13): the project's Settings, overridden by Preferences.
-const templates = '/acme/billing/default/templates'
+const templates = '/acme/billing/default/modeling/templates'
 
 /** Types a name and leaves the field: the names are saved on change, so they can contain spaces. */
 async function setName(page: Page, field: string, value: string) {

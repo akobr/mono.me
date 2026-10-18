@@ -3,8 +3,9 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 import { createZip, readZip, textFile, type ZipFile } from '../../app/mock/zip'
 import { goto, isMobile, openApp } from './support'
 
-// The Export & Import page of a view (spec 4.1-4.4 of the Export and Import of a View), against the mock API.
-const path = '/acme/billing/default/export-import'
+// The Export & Import page of a view (spec 4.1-4.4 of the Export and Import of a View), against the mock API. It is a
+// tab of Modeling (424-38).
+const path = '/acme/billing/default/modeling/export-import'
 
 const section = (page: Page, name: 'Export' | 'Import' | 'Latest import') =>
   page.getByRole('region', { name, exact: true })
@@ -67,12 +68,15 @@ test('opens the page from the sidebar and with g e; the configurations page has 
   await expect(page.getByRole('button', { name: 'Export configurations' })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Import configurations' })).toHaveCount(0)
 
-  await (await menu(page, testInfo)).getByRole('link', { name: 'Export & Import' }).click()
+  // Modeling opens on its first tab, Schemas.
+  await (await menu(page, testInfo)).getByRole('link', { name: 'Modeling', exact: true }).click()
+  await expect(page).toHaveURL('/acme/billing/default/modeling/schemas')
+  await page.getByRole('tab', { name: 'Export & Import', exact: true }).click()
   await expect(page).toHaveURL(path)
   await expect(section(page, 'Export')).toBeVisible()
   await expect(section(page, 'Import')).toBeVisible()
 
-  await goto(page, '/acme/billing/default/templates')
+  await goto(page, '/acme/billing/default/modeling/templates')
   await page.keyboard.press('g')
   await page.keyboard.press('e')
   await expect(page).toHaveURL(path)
@@ -169,10 +173,10 @@ test('checks an edited archive per kind, with a warning, and then imports it', a
   await expect(updated).toContainText('Updated')
   await expect(
     rows.filter({ hasText: 'templates/exe.template.json' }).getByRole('link', { name: 'exe' }),
-  ).toHaveAttribute('href', '/acme/billing/default/templates/exe')
+  ).toHaveAttribute('href', '/acme/billing/default/modeling/templates/exe')
   await expect(rows.filter({ hasText: 'schemas/exe.schema.json' }).getByRole('link', { name: 'exe' })).toHaveAttribute(
     'href',
-    '/acme/billing/default/schemas/type/exe',
+    '/acme/billing/default/modeling/schemas/type/exe',
   )
 
   await updated.getByRole('link', { name: 'rst.invoicing' }).click()
@@ -214,12 +218,15 @@ test('keeps what the view has with Skip, and shows the result again after a relo
   )
 })
 
-test('a reader can export but sees the import notice', async ({ page }) => {
-  await openApp(page, '/northwind/portal/default/export-import')
+// Modeling is locked below Contributor (424-38): a Reader exports with sform or the API, not on this page.
+test('a reader sees the Modeling lock', async ({ page }) => {
+  await openApp(page, '/northwind/portal/default/modeling/export-import')
 
-  await expect(section(page, 'Export').getByRole('button', { name: 'Export', exact: true })).toBeEnabled()
-  await expect(section(page, 'Import').getByText('Importing needs the Contributor role')).toBeVisible()
-  await expect(section(page, 'Import').locator('input[type="file"]')).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Contributors only' })).toBeVisible()
+  await expect(page.getByRole('tab')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Export', exact: true })).toHaveCount(0)
+  await expect(section(page, 'Export')).toHaveCount(0)
+  await expect(section(page, 'Import')).toHaveCount(0)
 })
 
 test('a file that is not a zip is refused by the import', async ({ page }, testInfo) => {
