@@ -582,7 +582,7 @@ The document is `open.api.v0.9.21.json`, in `Sdk.NSwag` and `sdk.typescript`:
 
 The background half is `Api.Functions/src/Transfers/ViewTransferFunctions.cs`:
 
-- `ProcessViewTransfer` is triggered by the queue `configuration-transfers` on `AzureWebJobsStorage`. `host.json` sets `batchSize` 4 and `maxDequeueCount` 3. A message that is not a valid job is logged and dropped. Any other failure fails the invocation (`ExceptionHandlingMiddleware` rethrows for invocations without an HTTP request), so the runtime delivers the message again.
+- `ProcessViewTransfer` is triggered by the queue `configuration-transfers` on `AzureWebJobsStorage`. `host.json` sets `batchSize` 1, so a worker runs one job at a time, and `maxDequeueCount` 3. A message that is not a valid job is logged and dropped. Any other failure fails the invocation (`ExceptionHandlingMiddleware` rethrows for invocations without an HTTP request), so the runtime delivers the message again.
 - `PurgeViewTransfers` runs every hour at minute 17 and deletes archives older than the retention plus one hour.
 - Both functions had the names of the first spec (`ProcessConfigurationTransfer`, `PurgeConfigurationTransfers`). The queue, the container, the partition and the options section keep theirs (see [Storage](#storage)).
 
@@ -820,9 +820,9 @@ Section `ConfigurationTransfers` (`ViewTransferOptions`):
 | `RetentionHours` | 24 | Jobs and archives, after their last change (1-168) |
 | `MaxActiveTransfers` | 3 | Queued or running jobs per project |
 | `MaxArchiveBytes` | 20 MiB | An uploaded zip |
-| `MaxExtractedBytes` | 256 MiB | The declared uncompressed size of the document files of an upload: of every kind at the upload, of the included kinds when the job reads it |
+| `MaxExtractedBytes` | 64 MiB | The declared uncompressed size of the document files of an upload: of every kind at the upload, of the included kinds when the job reads it |
 | `MaxDocumentBytes` | 2 MiB | One document file of any kind, also when its declared size lies |
 | `MaxArchiveEntries` | 50,000 | Entries of an uploaded zip |
 | `MaxReportedItems` | 1,000 | Items kept in an import job; the summaries count all |
 
-The upload limits are checked from the zip's central directory before anything is decompressed (`ViewArchiveReader.Validate`). Hidden paths, ignored files and excluded files don't count toward `MaxExtractedBytes` when the job reads the archive. An export holds the documents of the view and the zip in memory.
+The upload limits are checked from the zip's central directory before anything is decompressed (`ViewArchiveReader.Validate`). Hidden paths, ignored files and excluded files don't count toward `MaxExtractedBytes` when the job reads the archive. An import parses every included file before its first write, and parsed JSON takes several times the memory of its text, so `MaxExtractedBytes` bounds the memory of the worker: raise it only on a plan with the memory for it. An export holds the documents of the view and the zip in memory.
