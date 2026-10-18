@@ -7,6 +7,7 @@ import type {
   ViewImportItemOutcome,
 } from '@42for.net/2splatform.sdk'
 import type { Scope } from '@/stores/context'
+import { modelingPath } from '@/utils/modeling'
 
 /** The kinds of documents an archive holds, in import order (export-import.md). */
 export const archiveContents: readonly ViewArchiveContent[] = ['Annotations', 'Schemas', 'Templates', 'Configurations']
@@ -110,19 +111,20 @@ export function documentName(item: ViewImportItem): string {
 /** The page of the document of an item (spec 4.4), or nothing when the item does not name it. */
 export function documentPath(scope: Scope, item: ViewImportItem): string | undefined {
   const base = `/${scope.org}/${scope.project}/${scope.view}`
+  const schemas = modelingPath(scope, 'schemas')
   const { AnnotationKey: key, AnnotationType: type } = item
 
   switch (item.Kind) {
     case 'Annotation':
       return key ? `${base}/annotations/${key}` : undefined
     case 'Template':
-      return type ? `${base}/templates/${type}` : undefined
+      return type ? `${modelingPath(scope, 'templates')}/${type}` : undefined
     case 'TypeSchema':
-      return type ? `${base}/schemas/type/${type}` : undefined
+      return type ? `${schemas}/type/${type}` : undefined
     case 'AnnotationSchema':
-      return key ? `${base}/schemas/annotation/${key}` : undefined
+      return key ? `${schemas}/annotation/${key}` : undefined
     case 'DescendantTypeSchema':
-      return key && type ? `${base}/schemas/annotation/${key}/type/${type}` : undefined
+      return key && type ? `${schemas}/annotation/${key}/type/${type}` : undefined
     default:
       return key ? `${base}/configurations/${key}` : undefined
   }
@@ -186,5 +188,5 @@ export const recreatedAnnotations = (state: ViewImport) =>
     (item) => item.Kind === 'Annotation' && item.Warnings?.some((warning) => warning.Code === 'AnnotationRecreated'),
   )
 
-/** The page of the Export & Import of a view. */
-export const exportImportPath = (scope: Scope) => `/${scope.org}/${scope.project}/${scope.view}/export-import`
+/** The page of the Export & Import of a view, a tab of Modeling. */
+export const exportImportPath = (scope: Scope) => modelingPath(scope, 'export-import')

@@ -6,7 +6,7 @@ import ImportPanel from '@/components/transfer/ImportPanel.vue'
 
 // Export & Import of the view (spec 4.1 of the Export and Import of a View): the Export and Import sections, side by
 // side on desktop and stacked on phones, and below them the result of the view's latest import, also after a reload.
-// Every role exports; importing needs a Contributor.
+// A tab of Modeling, which is locked below Contributor (424-38), so Readers do not reach it.
 const context = useContextStore()
 const transfers = useTransfersStore()
 const canEdit = useCan('edit')
@@ -39,7 +39,7 @@ onBeforeUnmount(() => release?.())
 <template>
   <UDashboardPanel id="export-import">
     <template #header>
-      <AppNavbar title="Export & Import" />
+      <ModelingHeader />
     </template>
     <template #body>
       <div v-if="context.scope" class="mx-auto w-full max-w-6xl space-y-6">

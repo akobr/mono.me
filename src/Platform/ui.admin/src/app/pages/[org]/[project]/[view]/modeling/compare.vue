@@ -97,7 +97,7 @@ const documents = useQuery({
 <template>
   <UDashboardPanel id="compare">
     <template #header>
-      <AppNavbar title="Compare views" />
+      <ModelingHeader />
     </template>
     <template #body>
       <div class="space-y-4">

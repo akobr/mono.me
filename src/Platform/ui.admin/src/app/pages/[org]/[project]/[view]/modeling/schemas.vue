@@ -71,11 +71,11 @@ const current = computed(() => route.path)
 <template>
   <UDashboardPanel id="schemas" :class="{ hidden: detail.covers.value }">
     <template #header>
-      <AppNavbar title="Schemas">
+      <ModelingHeader>
         <template #right>
           <UButton v-if="canEdit" label="New schema" icon="i-lucide-plus" @click="creating = true" />
         </template>
-      </AppNavbar>
+      </ModelingHeader>
     </template>
     <template #body>
       <LoadingState v-if="schemas.isPending.value" />

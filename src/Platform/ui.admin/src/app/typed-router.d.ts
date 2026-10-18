@@ -278,48 +278,106 @@ declare module 'vue-router/auto-routes' {
       { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
-    '/[org]/[project]/[view]/schemas': RouteRecordInfo<
-      '/[org]/[project]/[view]/schemas',
-      '/:org/:project/:view/schemas',
+    '/[org]/[project]/[view]/modeling': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling',
+      '/:org/:project/:view/modeling',
       { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
       { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
-      | '/[org]/[project]/[view]/schemas/annotation/[key]/'
-      | '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]'
-      | '/[org]/[project]/[view]/schemas/type/[type]'
+      | '/[org]/[project]/[view]/modeling/'
+      | '/[org]/[project]/[view]/modeling/compare'
+      | '/[org]/[project]/[view]/modeling/deleted'
+      | '/[org]/[project]/[view]/modeling/export-import'
+      | '/[org]/[project]/[view]/modeling/schemas'
+      | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/'
+      | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/type/[type]'
+      | '/[org]/[project]/[view]/modeling/schemas/type/[type]'
+      | '/[org]/[project]/[view]/modeling/templates'
+      | '/[org]/[project]/[view]/modeling/templates/[type]'
     >,
-    '/[org]/[project]/[view]/schemas/annotation/[key]/': RouteRecordInfo<
-      '/[org]/[project]/[view]/schemas/annotation/[key]/',
-      '/:org/:project/:view/schemas/annotation/:key',
+    '/[org]/[project]/[view]/modeling/': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/',
+      '/:org/:project/:view/modeling',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/modeling/compare': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/compare',
+      '/:org/:project/:view/modeling/compare',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/modeling/deleted': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/deleted',
+      '/:org/:project/:view/modeling/deleted',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/modeling/export-import': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/export-import',
+      '/:org/:project/:view/modeling/export-import',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/modeling/schemas': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/schemas',
+      '/:org/:project/:view/modeling/schemas',
+      { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/'
+      | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/type/[type]'
+      | '/[org]/[project]/[view]/modeling/schemas/type/[type]'
+    >,
+    '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/',
+      '/:org/:project/:view/modeling/schemas/annotation/:key',
       { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
       { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
-    '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]': RouteRecordInfo<
-      '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]',
-      '/:org/:project/:view/schemas/annotation/:key/type/:type',
+    '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/type/[type]': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/type/[type]',
+      '/:org/:project/:view/modeling/schemas/annotation/:key/type/:type',
       { key: ParamValue<true>, org: ParamValue<true>, project: ParamValue<true>, type: ParamValue<true>, view: ParamValue<true> },
       { key: ParamValue<false>, org: ParamValue<false>, project: ParamValue<false>, type: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
-    '/[org]/[project]/[view]/schemas/type/[type]': RouteRecordInfo<
-      '/[org]/[project]/[view]/schemas/type/[type]',
-      '/:org/:project/:view/schemas/type/:type',
+    '/[org]/[project]/[view]/modeling/schemas/type/[type]': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/schemas/type/[type]',
+      '/:org/:project/:view/modeling/schemas/type/:type',
       { org: ParamValue<true>, project: ParamValue<true>, type: ParamValue<true>, view: ParamValue<true> },
       { org: ParamValue<false>, project: ParamValue<false>, type: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
-    '/[org]/[project]/[view]/templates': RouteRecordInfo<
-      '/[org]/[project]/[view]/templates',
-      '/:org/:project/:view/templates',
+    '/[org]/[project]/[view]/modeling/templates': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/templates',
+      '/:org/:project/:view/modeling/templates',
       { org: ParamValue<true>, project: ParamValue<true>, view: ParamValue<true> },
       { org: ParamValue<false>, project: ParamValue<false>, view: ParamValue<false> },
-      | '/[org]/[project]/[view]/templates/[type]'
+      | '/[org]/[project]/[view]/modeling/templates/[type]'
     >,
-    '/[org]/[project]/[view]/templates/[type]': RouteRecordInfo<
-      '/[org]/[project]/[view]/templates/[type]',
-      '/:org/:project/:view/templates/:type',
+    '/[org]/[project]/[view]/modeling/templates/[type]': RouteRecordInfo<
+      '/[org]/[project]/[view]/modeling/templates/[type]',
+      '/:org/:project/:view/modeling/templates/:type',
       { org: ParamValue<true>, project: ParamValue<true>, type: ParamValue<true>, view: ParamValue<true> },
       { org: ParamValue<false>, project: ParamValue<false>, type: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/schemas/[[...path]]': RouteRecordInfo<
+      '/[org]/[project]/[view]/schemas/[[...path]]',
+      '/:org/:project/:view/schemas/:path(.*)?',
+      { org: ParamValue<true>, path?: ParamValueZeroOrOne<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, path?: ParamValueZeroOrOne<false>, project: ParamValue<false>, view: ParamValue<false> },
+      | never
+    >,
+    '/[org]/[project]/[view]/templates/[[...path]]': RouteRecordInfo<
+      '/[org]/[project]/[view]/templates/[[...path]]',
+      '/:org/:project/:view/templates/:path(.*)?',
+      { org: ParamValue<true>, path?: ParamValueZeroOrOne<true>, project: ParamValue<true>, view: ParamValue<true> },
+      { org: ParamValue<false>, path?: ParamValueZeroOrOne<false>, project: ParamValue<false>, view: ParamValue<false> },
       | never
     >,
     '/[org]/[project]/audit': RouteRecordInfo<
@@ -768,57 +826,123 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
-    'app/pages/[org]/[project]/[view]/schemas.vue': {
+    'app/pages/[org]/[project]/[view]/modeling.vue': {
       routes:
-        | '/[org]/[project]/[view]/schemas'
-        | '/[org]/[project]/[view]/schemas/annotation/[key]/'
-        | '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]'
-        | '/[org]/[project]/[view]/schemas/type/[type]'
+        | '/[org]/[project]/[view]/modeling'
+        | '/[org]/[project]/[view]/modeling/'
+        | '/[org]/[project]/[view]/modeling/compare'
+        | '/[org]/[project]/[view]/modeling/deleted'
+        | '/[org]/[project]/[view]/modeling/export-import'
+        | '/[org]/[project]/[view]/modeling/schemas'
+        | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/'
+        | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/type/[type]'
+        | '/[org]/[project]/[view]/modeling/schemas/type/[type]'
+        | '/[org]/[project]/[view]/modeling/templates'
+        | '/[org]/[project]/[view]/modeling/templates/[type]'
       views:
         | 'default'
       pathParamNames:
         | never
     }
-    'app/pages/[org]/[project]/[view]/schemas/annotation/[key]/index.vue': {
+    'app/pages/[org]/[project]/[view]/modeling/index.vue': {
       routes:
-        | '/[org]/[project]/[view]/schemas/annotation/[key]/'
+        | '/[org]/[project]/[view]/modeling/'
       views:
         | never
       pathParamNames:
         | never
     }
-    'app/pages/[org]/[project]/[view]/schemas/annotation/[key]/type/[type].vue': {
+    'app/pages/[org]/[project]/[view]/modeling/compare.vue': {
       routes:
-        | '/[org]/[project]/[view]/schemas/annotation/[key]/type/[type]'
+        | '/[org]/[project]/[view]/modeling/compare'
       views:
         | never
       pathParamNames:
-        | 'type'
+        | never
     }
-    'app/pages/[org]/[project]/[view]/schemas/type/[type].vue': {
+    'app/pages/[org]/[project]/[view]/modeling/deleted.vue': {
       routes:
-        | '/[org]/[project]/[view]/schemas/type/[type]'
+        | '/[org]/[project]/[view]/modeling/deleted'
       views:
         | never
       pathParamNames:
-        | 'type'
+        | never
     }
-    'app/pages/[org]/[project]/[view]/templates.vue': {
+    'app/pages/[org]/[project]/[view]/modeling/export-import.vue': {
       routes:
-        | '/[org]/[project]/[view]/templates'
-        | '/[org]/[project]/[view]/templates/[type]'
+        | '/[org]/[project]/[view]/modeling/export-import'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/modeling/schemas.vue': {
+      routes:
+        | '/[org]/[project]/[view]/modeling/schemas'
+        | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/'
+        | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/type/[type]'
+        | '/[org]/[project]/[view]/modeling/schemas/type/[type]'
       views:
         | 'default'
       pathParamNames:
         | never
     }
-    'app/pages/[org]/[project]/[view]/templates/[type].vue': {
+    'app/pages/[org]/[project]/[view]/modeling/schemas/annotation/[key]/index.vue': {
       routes:
-        | '/[org]/[project]/[view]/templates/[type]'
+        | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/modeling/schemas/annotation/[key]/type/[type].vue': {
+      routes:
+        | '/[org]/[project]/[view]/modeling/schemas/annotation/[key]/type/[type]'
       views:
         | never
       pathParamNames:
         | 'type'
+    }
+    'app/pages/[org]/[project]/[view]/modeling/schemas/type/[type].vue': {
+      routes:
+        | '/[org]/[project]/[view]/modeling/schemas/type/[type]'
+      views:
+        | never
+      pathParamNames:
+        | 'type'
+    }
+    'app/pages/[org]/[project]/[view]/modeling/templates.vue': {
+      routes:
+        | '/[org]/[project]/[view]/modeling/templates'
+        | '/[org]/[project]/[view]/modeling/templates/[type]'
+      views:
+        | 'default'
+      pathParamNames:
+        | never
+    }
+    'app/pages/[org]/[project]/[view]/modeling/templates/[type].vue': {
+      routes:
+        | '/[org]/[project]/[view]/modeling/templates/[type]'
+      views:
+        | never
+      pathParamNames:
+        | 'type'
+    }
+    'app/pages/[org]/[project]/[view]/schemas/[[...path]].vue': {
+      routes:
+        | '/[org]/[project]/[view]/schemas/[[...path]]'
+      views:
+        | never
+      pathParamNames:
+        | 'path'
+    }
+    'app/pages/[org]/[project]/[view]/templates/[[...path]].vue': {
+      routes:
+        | '/[org]/[project]/[view]/templates/[[...path]]'
+      views:
+        | never
+      pathParamNames:
+        | 'path'
     }
     'app/pages/[org]/[project]/audit.vue': {
       routes:

@@ -4,6 +4,7 @@ import { isNotFound } from '@42for.net/2splatform.sdk'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore, type DocumentFormat } from '@/stores/preferences'
 import { metaOf } from '@/utils/annotation-key'
+import { modelingPath } from '@/utils/modeling'
 
 /** The combined schema of an annotation (`/definition`), read-only, with the applied layers in order. */
 const props = defineProps<{ annotationKey: string }>()
@@ -13,7 +14,10 @@ const preferences = usePreferencesStore()
 const { combined } = useConfiguration(() => props.annotationKey)
 const format = ref<DocumentFormat>(preferences.state.editorFormat)
 
-const base = computed(() => `/${context.org}/${context.project}/${context.view}/schemas`)
+// The schemas are on the Schemas tab of Modeling, which is locked below Contributor (424-38): a Reader gets their
+// names without links.
+const canEdit = useCan('edit')
+const base = computed(() => (canEdit.value && context.scope ? modelingPath(context.scope, 'schemas') : undefined))
 
 const layers = computed(() =>
   (combined.data.value?.AppliedSchemas ?? []).map((schema) => {
@@ -23,8 +27,9 @@ const layers = computed(() =>
       : type && metaOf(type)?.code !== metaOf(schema.AnnotationKey.slice(0, 3))?.code
         ? 'Descendant type'
         : 'Annotation'
-    const to =
-      kind === 'Type'
+    const to = !base.value
+      ? undefined
+      : kind === 'Type'
         ? `${base.value}/type/${metaOf(type)?.code ?? type}`
         : kind === 'Annotation'
           ? `${base.value}/annotation/${schema.AnnotationKey}`
@@ -57,9 +62,10 @@ const layers = computed(() =>
           <li v-for="(layer, index) in layers" :key="index" class="flex items-center gap-2 text-sm">
             <span class="w-4 text-xs text-dimmed">{{ index + 1 }}</span>
             <UBadge :label="layer.kind" color="neutral" variant="outline" size="sm" />
-            <RouterLink :to="layer.to" class="font-mono text-xs text-primary hover:underline">{{
+            <RouterLink v-if="layer.to" :to="layer.to" class="font-mono text-xs text-primary hover:underline">{{
               layer.label
             }}</RouterLink>
+            <span v-else class="font-mono text-xs">{{ layer.label }}</span>
             <span v-if="layer.version" class="font-mono text-xs text-dimmed">v{{ layer.version }}</span>
           </li>
         </ol>

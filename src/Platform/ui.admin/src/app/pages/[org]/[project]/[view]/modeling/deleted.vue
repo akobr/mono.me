@@ -206,7 +206,7 @@ const selectedRows = computed(() => rows.value.filter((row) => selected.value.ha
 <template>
   <UDashboardPanel id="deleted">
     <template #header>
-      <AppNavbar title="Deleted" />
+      <ModelingHeader />
       <UDashboardToolbar class="py-2">
         <div class="flex w-full flex-wrap items-center gap-3">
           <USwitch
