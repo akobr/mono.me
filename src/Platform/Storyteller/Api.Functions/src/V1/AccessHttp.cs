@@ -94,7 +94,7 @@ public class AccessHttp
             return new BadRequestResult();
         }
 
-        var (accountModel, invalidBody) = await request.ReadJsonBodyAsync<Models.AccountCreate>(_bodyJsonOptions, "an account");
+        var (accountModel, invalidBody) = await request.ReadJsonBodyAsync<Models.AccountCreate>(_bodyJsonOptions, "an account", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {
@@ -180,7 +180,7 @@ public class AccessHttp
         request.CheckScope(Scopes.User.Impersonation);
         var accountId = request.GetIdentityUniqueId();
         _logger.LogInformation("POST api/access/points call with accountId: {accountId}", accountId);
-        var (pointModel, invalidBody) = await request.ReadJsonBodyAsync<AccessPointCreate>(_bodyJsonOptions, "an access point");
+        var (pointModel, invalidBody) = await request.ReadJsonBodyAsync<AccessPointCreate>(_bodyJsonOptions, "an access point", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {
@@ -211,7 +211,7 @@ public class AccessHttp
         HttpRequestData request)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var (permissionModel, invalidBody) = await request.ReadJsonBodyAsync<Permission>(_bodyJsonOptions, "a permission");
+        var (permissionModel, invalidBody) = await request.ReadJsonBodyAsync<Permission>(_bodyJsonOptions, "a permission", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {
@@ -243,7 +243,7 @@ public class AccessHttp
         HttpRequestData request)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var (permissionModel, invalidBody) = await request.ReadJsonBodyAsync<Permission>(_bodyJsonOptions, "a permission");
+        var (permissionModel, invalidBody) = await request.ReadJsonBodyAsync<Permission>(_bodyJsonOptions, "a permission", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {
@@ -337,7 +337,7 @@ public class AccessHttp
     {
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
-        var (machineModel, invalidBody) = await request.ReadJsonBodyAsync<MachineAccessCreate>(_bodyJsonOptions, "a machine");
+        var (machineModel, invalidBody) = await request.ReadJsonBodyAsync<MachineAccessCreate>(_bodyJsonOptions, "a machine", RequestBodyLimits.FederationRules);
 
         if (invalidBody is not null)
         {
@@ -523,7 +523,7 @@ public class AccessHttp
             return badRequestResult;
         }
 
-        var (policy, invalidBody) = await request.ReadJsonBodyAsync<MachineAuthenticationPolicy>(_bodyJsonOptions, "a machine authentication policy");
+        var (policy, invalidBody) = await request.ReadJsonBodyAsync<MachineAuthenticationPolicy>(_bodyJsonOptions, "a machine authentication policy", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {

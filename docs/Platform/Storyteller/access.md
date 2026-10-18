@@ -100,7 +100,7 @@ Accepting the same invitation twice returns the account without changes.
 
 All errors use `ErrorResponse` without exception details, and the errors below carry a stable `ErrorCode`. See also [401 and 403](authentication.md#401-and-403).
 
-A route that takes a JSON body does not require a `Content-Type`, and answers `400` for an empty body, `null` or JSON that does not fit the documented type, unless it documents a default for a missing body. On the routes of this page, these `400`s name the problem in `Message` and have no `ErrorCode`.
+A route that takes a JSON body does not require a `Content-Type`, and answers `400` for an empty body, `null` or JSON that does not fit the documented type, unless it documents a default for a missing body. On the routes of this page, these `400`s name the problem in `Message` and have no `ErrorCode`. Each such route reads a limited number of bytes of its body, and answers `413` with `ErrorCode` `BodyTooLarge` for a larger body or a larger declared `Content-Length`, before it parses any JSON.
 
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
@@ -113,3 +113,4 @@ A route that takes a JSON body does not require a `Content-Type`, and answers `4
 | `409` | `InvitationExists`, `InvitationNotPending`, `InvitationExpired` | Invitation rules above. |
 | `409` | `ViewExists` | The view is already registered, or is `default`. |
 | `409` | `Conflict` | The membership or invitation changed concurrently twice; repeat the request. |
+| `413` | `BodyTooLarge` | The body is larger than its route reads: 64 KiB for a view, 8 KiB for an account, a member role or an invitation. |

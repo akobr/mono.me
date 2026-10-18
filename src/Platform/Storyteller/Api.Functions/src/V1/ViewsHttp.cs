@@ -81,7 +81,7 @@ public class ViewsHttp
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         EnsureNotMachine(request);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
-        var (model, invalidBody) = await request.ReadJsonBodyAsync<ViewCreate>(_bodyJsonOptions, "a view");
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<ViewCreate>(_bodyJsonOptions, "a view", RequestBodyLimits.View);
 
         if (invalidBody is not null)
         {
@@ -119,7 +119,7 @@ public class ViewsHttp
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         EnsureNotMachine(request);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
-        var (model, invalidBody) = await request.ReadJsonBodyAsync<ViewUpdate>(_bodyJsonOptions, "a view update");
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<ViewUpdate>(_bodyJsonOptions, "a view update", RequestBodyLimits.View);
 
         if (invalidBody is not null)
         {

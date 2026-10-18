@@ -397,7 +397,7 @@ public partial class AnnotationsHttp
         string view)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        var (annotations, invalidBody) = await request.ReadJsonBodyAsync<List<Annotation>>(_bodyJsonOptions, "a list of annotations");
+        var (annotations, invalidBody) = await request.ReadJsonBodyAsync<List<Annotation>>(_bodyJsonOptions, "a list of annotations", RequestBodyLimits.Annotations);
 
         // The keys of the body are authorized before any 400 of the body, so a caller without access gets 403 first.
         // A body that cannot be read names no key, which the restriction of a machine lets through to the 400.
@@ -461,7 +461,7 @@ public partial class AnnotationsHttp
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
-        var (annotations, invalidBody) = await request.ReadJsonBodyAsync<List<string>>(_bodyJsonOptions, "a list of annotation keys or lines");
+        var (annotations, invalidBody) = await request.ReadJsonBodyAsync<List<string>>(_bodyJsonOptions, "a list of annotation keys or lines", RequestBodyLimits.AnnotationKeys);
 
         if (invalidBody is not null)
         {

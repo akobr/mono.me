@@ -162,7 +162,7 @@ public class KeyValuesHttp
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
-        var (write, invalidBody) = await request.ReadJsonBodyAsync<KeyValueWrite>(_bodyJsonOptions, "a key/value write");
+        var (write, invalidBody) = await request.ReadJsonBodyAsync<KeyValueWrite>(_bodyJsonOptions, "a key/value write", RequestBodyLimits.KeyValueWrite);
 
         if (invalidBody is not null)
         {
@@ -254,7 +254,7 @@ public class KeyValuesHttp
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
-        var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request");
+        var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request", RequestBodyLimits.KeyValueBulk);
 
         if (invalidBody is not null)
         {
@@ -291,7 +291,7 @@ public class KeyValuesHttp
         string view)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
-        var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request");
+        var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request", RequestBodyLimits.KeyValueBulk);
 
         if (invalidBody is not null)
         {
@@ -334,7 +334,7 @@ public class KeyValuesHttp
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
-        var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request");
+        var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request", RequestBodyLimits.KeyValueBulk);
 
         if (invalidBody is not null)
         {
@@ -517,7 +517,7 @@ public class KeyValuesHttp
     {
         request.CheckScope(KeyValueAuthorization.ReadScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project);
-        var (export, invalidBody) = await request.ReadJsonBodyAsync<KeyValueExportRequest>(_bodyJsonOptions, "a key/value export request");
+        var (export, invalidBody) = await request.ReadJsonBodyAsync<KeyValueExportRequest>(_bodyJsonOptions, "a key/value export request", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {
@@ -567,7 +567,7 @@ public class KeyValuesHttp
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
-        var (document, invalidBody) = await request.ReadJsonBodyAsync<KeyValueDocument>(_bodyJsonOptions, "a key/value document", ErrorCodes.ImportInvalid);
+        var (document, invalidBody) = await request.ReadJsonBodyAsync<KeyValueDocument>(_bodyJsonOptions, "a key/value document", RequestBodyLimits.KeyValueImport, ErrorCodes.ImportInvalid);
 
         if (invalidBody is not null)
         {

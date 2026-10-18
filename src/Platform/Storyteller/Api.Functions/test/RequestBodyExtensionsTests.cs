@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Net;
 using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.V1;
 
@@ -9,6 +11,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 public class RequestBodyExtensionsTests
 {
     private const string Description = "an assignment";
+
+    private const int Limit = 1024;
 
     // The worker's [FromBody] binding fails these bodies with an exception before the function runs (500); the
     // reader gives no value, for the handler to name.
@@ -128,17 +132,72 @@ public class RequestBodyExtensionsTests
         context.Token = new CancellationToken(canceled: true);
 
         await Should.ThrowAsync<OperationCanceledException>(
-            () => request.ReadJsonBodyAsync<Assignment>(FunctionTestDoubles.ApiJsonSerializerOptions, Description));
+            () => request.ReadJsonBodyAsync<Assignment>(FunctionTestDoubles.ApiJsonSerializerOptions, Description, Limit));
     }
 
-    private static async Task<(T? Value, IActionResult? Error)> ReadAsync<T>(string body, bool contentType = true, string? errorCode = null)
+    // A body over the limit is refused before it is parsed, so even JSON that does not fit is a 413, not a 400. The
+    // larger limit takes several reads of the copy buffer.
+    [Theory]
+    [InlineData(Limit)]
+    [InlineData(200_000)]
+    public async Task ReadJsonBody_LargerThanTheLimit_IsTooLarge(int maxBytes)
+    {
+        var (value, error) = await ReadAsync<Assignment>(new string('[', maxBytes + 1), maxBytes: maxBytes);
+
+        value.ShouldBeNull();
+        var result = error.ShouldBeOfType<ObjectResult>();
+        result.StatusCode.ShouldBe((int)HttpStatusCode.RequestEntityTooLarge);
+        var response = result.Value.ShouldBeOfType<ErrorResponse>();
+        response.Message.ShouldBe($"The request body is larger than {maxBytes} bytes.");
+        response.ErrorCode.ShouldBe(ErrorCodes.BodyTooLarge);
+    }
+
+    [Theory]
+    [InlineData(Limit)]
+    [InlineData(200_000)]
+    public async Task ReadJsonBody_AtTheLimit_IsRead(int maxBytes)
+    {
+        const string json = """{ "Account": "ada" }""";
+
+        var (value, error) = await ReadAsync<Assignment>(json.PadRight(maxBytes), maxBytes: maxBytes);
+
+        error.ShouldBeNull();
+        value.ShouldBe(new Assignment { Account = "ada" });
+    }
+
+    // As the archive upload does, a declared length over the limit is refused without reading the body.
+    [Fact]
+    public async Task ReadJsonBody_DeclaredLengthOverTheLimit_IsTooLargeWithoutReadingTheBody()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var headers = FunctionTestDoubles.JsonContentType();
+        headers["Content-Length"] = (Limit + 1).ToString(CultureInfo.InvariantCulture);
+        var request = new TestHttpRequestData(new TestFunctionContext(services), headers, "POST", """{ "Account": "ada" }""");
+
+        var (value, error) = await request.ReadJsonBodyAsync<Assignment>(FunctionTestDoubles.ApiJsonSerializerOptions, Description, Limit);
+
+        value.ShouldBeNull();
+        error.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe((int)HttpStatusCode.RequestEntityTooLarge);
+        request.Body.Position.ShouldBe(0);
+    }
+
+    // The code of a handler names its 400s; the 413 is the same on every route.
+    [Fact]
+    public async Task ReadJsonBody_TooLarge_HasItsOwnCode()
+    {
+        var (_, error) = await ReadAsync<Assignment>(new string(' ', Limit + 1), errorCode: ErrorCodes.InvalidKey);
+
+        error.ShouldBeOfType<ObjectResult>().Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.BodyTooLarge);
+    }
+
+    private static async Task<(T? Value, IActionResult? Error)> ReadAsync<T>(string body, bool contentType = true, string? errorCode = null, int maxBytes = Limit)
         where T : class
     {
         using var services = new ServiceCollection().BuildServiceProvider();
         var headers = contentType ? FunctionTestDoubles.JsonContentType() : null;
         var (_, request) = FunctionTestDoubles.CreateRequest(services, headers, "POST", body);
 
-        return await request.ReadJsonBodyAsync<T>(FunctionTestDoubles.ApiJsonSerializerOptions, Description, errorCode);
+        return await request.ReadJsonBodyAsync<T>(FunctionTestDoubles.ApiJsonSerializerOptions, Description, maxBytes, errorCode);
     }
 
     private static async Task<(T? Value, IActionResult? Error)> ReadBytesAsync<T>(byte[] body)
@@ -147,7 +206,7 @@ public class RequestBodyExtensionsTests
         using var services = new ServiceCollection().BuildServiceProvider();
         var request = new TestHttpRequestData(new TestFunctionContext(services), FunctionTestDoubles.JsonContentType(), "POST", bodyBytes: body);
 
-        return await request.ReadJsonBodyAsync<T>(FunctionTestDoubles.ApiJsonSerializerOptions, Description);
+        return await request.ReadJsonBodyAsync<T>(FunctionTestDoubles.ApiJsonSerializerOptions, Description, Limit);
     }
 
     private sealed record Assignment

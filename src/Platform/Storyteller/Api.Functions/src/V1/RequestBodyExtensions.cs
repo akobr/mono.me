@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using _42.Platform.Storyteller.Api.Models;
 using Microsoft.AspNetCore.Mvc;
@@ -8,9 +9,12 @@ namespace _42.Platform.Storyteller.Api.V1;
 // The JSON body of a handler, read by the handler rather than through [FromBody]: the worker's FromBody binding
 // fails an empty body, a JSON null or a missing content type with an exception before the function runs (500).
 // Here an empty body or null is no value, for the handler to name (400), and JSON that does not fit is a 400 too,
-// a body without a required member included. The content type is not checked.
+// a body without a required member included. The content type is not checked. A body larger than the handler reads
+// (RequestBodyLimits) is a 413, before any of it is parsed.
 internal static class RequestBodyExtensions
 {
+    private const int CopyBufferBytes = 81920;
+
     // JSON whitespace (RFC 8259); a body of nothing else is no body.
     private static ReadOnlySpan<byte> Whitespace => " \t\r\n"u8;
 
@@ -20,6 +24,7 @@ internal static class RequestBodyExtensions
         this HttpRequestData request,
         JsonSerializerOptions options,
         string description,
+        int maxBytes,
         string? errorCode = null)
         where T : class
     {
@@ -28,7 +33,11 @@ internal static class RequestBodyExtensions
         // The bytes are deserialized as they came, not decoded to a string first, so a body that is not UTF-8
         // is a 400 too rather than JSON with replacement characters.
         using var body = new MemoryStream();
-        await request.Body.CopyToAsync(body, cancellationToken);
+
+        if (!await request.TryCopyBodyAsync(body, maxBytes, cancellationToken))
+        {
+            return (null, TooLarge(maxBytes));
+        }
 
         if (IsBlank(body.GetBuffer().AsSpan(0, (int)body.Length)))
         {
@@ -46,6 +55,44 @@ internal static class RequestBodyExtensions
             var at = string.IsNullOrEmpty(exception.Path) ? string.Empty : $" (at {exception.Path})";
             return (null, new BadRequestObjectResult(new ErrorResponse($"The request body is not {description}{at}.") { ErrorCode = errorCode }));
         }
+    }
+
+    // False when the declared Content-Length or the body itself is larger than maxBytes: nothing is read past the
+    // read that crosses the limit, and that read is not copied.
+    public static async Task<bool> TryCopyBodyAsync(this HttpRequestData request, Stream target, int maxBytes, CancellationToken cancellationToken)
+    {
+        if (request.Headers.TryGetValues("Content-Length", out var lengths)
+            && long.TryParse(lengths.FirstOrDefault(), out var length)
+            && length > maxBytes)
+        {
+            return false;
+        }
+
+        var buffer = new byte[Math.Min(CopyBufferBytes, maxBytes + 1L)];
+        var copied = 0L;
+        int read;
+
+        while ((read = await request.Body.ReadAsync(buffer, cancellationToken)) > 0)
+        {
+            copied += read;
+
+            if (copied > maxBytes)
+            {
+                return false;
+            }
+
+            await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        return true;
+    }
+
+    private static ObjectResult TooLarge(int maxBytes)
+    {
+        return new ObjectResult(new ErrorResponse($"The request body is larger than {maxBytes} bytes.") { ErrorCode = ErrorCodes.BodyTooLarge })
+        {
+            StatusCode = (int)HttpStatusCode.RequestEntityTooLarge,
+        };
     }
 
     private static bool IsBlank(ReadOnlySpan<byte> body)

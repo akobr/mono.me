@@ -238,7 +238,7 @@ The integration tests of `KeyValues.Azure.KeyVault/testint` start Lowkey Vault w
 | `ExportAsync`, `ImportAsync` | The document format below |
 | `LookupAsync` | For the binding sources: the current value, or null when missing, deleted, or a secret without secrets included |
 
-Error codes of this area: `InvalidKey`, `ValueRequired`, `ValueTooLarge`, `InvalidContentType`, `ProtectionRequired`, `ProtectionNotAllowed` (409), `ProtectionInUse` (409), `ProtectionNotConfigured` (501), `KeyValueNotFound`, `KeyValueBusy` (409), `KeyValueVersionMismatch` (412), `PolicyVersionMismatch` (409), `KeyEncryptionUnavailable` (503 with `Retry-After`), `CustomerKeyUnavailable` (424), `CustomerKeyInvalid`, `ByokNotConfigured` (409), `MtlsRequired` (403), `HttpsRequired` (400), `ImportInvalid` (400 with the failing items in `Details`), `SecretValueMissing`, `NotSupportedForProtection`, `ReprotectNotPossible`, `InvalidClientEncryptedValue`, `UnknownRecipient`, `RecipientExists`, `RecipientNotFound`, `RecipientInvalid`, `InvalidSecretReference`, and `AccessDenied` for missing secret rights.
+Error codes of this area: `InvalidKey`, `ValueRequired`, `ValueTooLarge`, `InvalidContentType`, `ProtectionRequired`, `ProtectionNotAllowed` (409), `ProtectionInUse` (409), `ProtectionNotConfigured` (501), `KeyValueNotFound`, `KeyValueBusy` (409), `KeyValueVersionMismatch` (412), `PolicyVersionMismatch` (409), `KeyEncryptionUnavailable` (503 with `Retry-After`), `CustomerKeyUnavailable` (424), `CustomerKeyInvalid`, `ByokNotConfigured` (409), `MtlsRequired` (403), `HttpsRequired` (400), `ImportInvalid` (400 with the failing items in `Details`), `SecretValueMissing`, `NotSupportedForProtection`, `ReprotectNotPossible`, `InvalidClientEncryptedValue`, `UnknownRecipient`, `RecipientExists`, `RecipientNotFound`, `RecipientInvalid`, `InvalidSecretReference`, `BodyTooLarge` (413 for a body larger than its route reads: 512 KiB for a write, 28 MiB for an import, 64 KiB for a bulk request or a new recipient, 8 KiB for the other bodies), and `AccessDenied` for missing secret rights.
 
 ## API
 
@@ -252,16 +252,16 @@ Base `K` = `v1/{organization}/{project}/{view}/key-values`.
 | --- | --- | --- | --- | --- |
 | `GET` | `K` | `keyPrefix`, `protection` (repeatable or comma-separated), `state` (`Active`, `Deleted`, `All`), `includeValues`, `continuationToken` | → `KeyValuesResponse`, ordered by key, up to 1,000 per page | 400 |
 | `GET` | `K/{key}` | `reveal`, `includeDeleted` | → `KeyValue`; a secret's value only with `reveal=true` and secret rights | 403, 404, 424, 503 |
-| `PUT` | `K/{key}` | | `KeyValueWrite` → `KeyValue` without a secret value | 400, 403, 409, 412, 424, 501, 503 |
+| `PUT` | `K/{key}` | | `KeyValueWrite` → `KeyValue` without a secret value | 400, 403, 409, 412, 413, 424, 501, 503 |
 | `DELETE` | `K/{key}` | `permanent` (Administrator), `expectedVersion` | → `204` | 403, 404, 409, 412 |
-| `POST` | `K/restore` | | `KeyValueBulkRequest` → `KeyValueBulkResult` | 400, 403 |
-| `POST` | `K/purge` | | `KeyValueBulkRequest` → `KeyValueBulkResult` (Administrator) | 400, 403 |
-| `POST` | `K/protect` | | `KeyValueBulkRequest` with `Protection` → `KeyValueBulkResult` | 400, 403, 409, 424, 501, 503 |
+| `POST` | `K/restore` | | `KeyValueBulkRequest` → `KeyValueBulkResult` | 400, 403, 413 |
+| `POST` | `K/purge` | | `KeyValueBulkRequest` → `KeyValueBulkResult` (Administrator) | 400, 403, 413 |
+| `POST` | `K/protect` | | `KeyValueBulkRequest` with `Protection` → `KeyValueBulkResult` | 400, 403, 409, 413, 424, 501, 503 |
 | `GET` | `K/{key}/versions` | | → `KeyValueVersion[]`, oldest first | 404 |
 | `GET` | `K/{key}/versions/{version}` | `reveal` | → `KeyValue` | 403, 404, 424, 503 |
 | `GET` | `K/{key}/versions/{version}/diff`, `…/diff/{versionFrom}` | `format=unified` | → `DiffResult`, or `text/plain`; version 0 is the empty text | 400, 403, 404, 424 |
-| `POST` | `K/export` | | `KeyValueExportRequest` (`KeyPrefix`, `Protections`, `IncludeSecrets`; an empty body or `null` exports the whole view, secrets without their values) → `KeyValueDocument` | 400, 403, 424, 503 |
-| `POST` | `K/import` | `mode` (`Merge`, `Replace`), `dryRun`, `keyPrefix` | `KeyValueDocument` → `KeyValueImportResult` | 400, 403, 409, 424, 501, 503 |
+| `POST` | `K/export` | | `KeyValueExportRequest` (`KeyPrefix`, `Protections`, `IncludeSecrets`; an empty body or `null` exports the whole view, secrets without their values) → `KeyValueDocument` | 400, 403, 413, 424, 503 |
+| `POST` | `K/import` | `mode` (`Merge`, `Replace`), `dryRun`, `keyPrefix` | `KeyValueDocument` → `KeyValueImportResult` | 400, 403, 409, 413, 424, 501, 503 |
 
 ### Policy, recipients, audit and usage of a project
 
