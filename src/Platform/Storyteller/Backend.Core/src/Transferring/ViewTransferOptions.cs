@@ -20,8 +20,9 @@ public class ViewTransferOptions
     // Size of an uploaded zip, below the 30 MB request limit of Kestrel.
     public int MaxArchiveBytes { get; set; } = 20 * 1024 * 1024;
 
-    // Uncompressed size of all document files of an upload, from the zip's central directory.
-    public long MaxExtractedBytes { get; set; } = 256L * 1024 * 1024;
+    // Uncompressed size of all document files of an upload, from the zip's central directory. An import parses every
+    // included file before it writes, and parsed JSON takes several times its text, so this bounds the worker's memory.
+    public long MaxExtractedBytes { get; set; } = 64L * 1024 * 1024;
 
     // Uncompressed size of one document file.
     public int MaxDocumentBytes { get; set; } = MaxAllowedDocumentBytes;
