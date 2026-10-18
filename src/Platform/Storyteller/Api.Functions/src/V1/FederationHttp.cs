@@ -173,7 +173,7 @@ public class FederationHttp
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
         var cancellationToken = request.FunctionContext.CancellationToken;
-        var (issuer, invalidBody) = await request.ReadJsonBodyAsync<FederatedIssuer>(_bodyJsonOptions, "a trusted issuer", ErrorCodes.InvalidFederation);
+        var (issuer, invalidBody) = await request.ReadJsonBodyAsync<FederatedIssuer>(_bodyJsonOptions, "a trusted issuer", RequestBodyLimits.FederatedIssuer, ErrorCodes.InvalidFederation);
 
         if (invalidBody is not null)
         {
@@ -278,7 +278,7 @@ public class FederationHttp
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
 
-        var (rules, invalidBody) = await request.ReadJsonBodyAsync<List<FederationRule>>(_bodyJsonOptions, "a list of federation rules", ErrorCodes.InvalidFederation);
+        var (rules, invalidBody) = await request.ReadJsonBodyAsync<List<FederationRule>>(_bodyJsonOptions, "a list of federation rules", RequestBodyLimits.FederationRules, ErrorCodes.InvalidFederation);
 
         if (invalidBody is not null)
         {

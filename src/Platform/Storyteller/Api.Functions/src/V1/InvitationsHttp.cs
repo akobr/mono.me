@@ -78,7 +78,7 @@ public class InvitationsHttp
         string key)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var (model, invalidBody) = await request.ReadJsonBodyAsync<InvitationCreate>(_bodyJsonOptions, "an invitation");
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<InvitationCreate>(_bodyJsonOptions, "an invitation", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {

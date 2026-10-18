@@ -180,14 +180,7 @@ public class ViewTransferHttp
         var cancellationToken = request.FunctionContext.CancellationToken;
         using var archive = new MemoryStream();
 
-        if (request.Headers.TryGetValues("Content-Length", out var lengths)
-            && long.TryParse(lengths.FirstOrDefault(), out var length)
-            && length > _options.MaxArchiveBytes)
-        {
-            return TooLarge();
-        }
-
-        if (!await TryCopyWithLimitAsync(request.Body, archive, _options.MaxArchiveBytes, cancellationToken))
+        if (!await request.TryCopyBodyAsync(archive, _options.MaxArchiveBytes, cancellationToken))
         {
             return TooLarge();
         }
@@ -247,24 +240,6 @@ public class ViewTransferHttp
     private static string JobLocation(HttpRequestData request, string id)
     {
         return $"{request.Url.GetLeftPart(UriPartial.Path).TrimEnd('/')}/{id}";
-    }
-
-    private static async Task<bool> TryCopyWithLimitAsync(Stream source, Stream target, long limit, CancellationToken cancellationToken)
-    {
-        var buffer = new byte[81920];
-        int read;
-
-        while ((read = await source.ReadAsync(buffer, cancellationToken)) > 0)
-        {
-            if (target.Length + read > limit)
-            {
-                return false;
-            }
-
-            await target.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
-        }
-
-        return true;
     }
 
     // A zip starts with a local file header, or with the end of the central directory when it is empty.

@@ -66,7 +66,7 @@ public class MembersHttp
         string accountId)
     {
         request.CheckScope(Scopes.User.Impersonation);
-        var (update, invalidBody) = await request.ReadJsonBodyAsync<MemberRoleUpdate>(_bodyJsonOptions, "a member role");
+        var (update, invalidBody) = await request.ReadJsonBodyAsync<MemberRoleUpdate>(_bodyJsonOptions, "a member role", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {

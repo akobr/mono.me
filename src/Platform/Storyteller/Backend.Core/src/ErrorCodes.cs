@@ -9,6 +9,9 @@ public static class ErrorCodes
     public const string InvalidName = "InvalidName";
     public const string ViewExists = "ViewExists";
 
+    // A JSON body larger than its route reads (413).
+    public const string BodyTooLarge = "BodyTooLarge";
+
     // A machine restricted to an annotation addressed another annotation, or an operation of the whole project.
     public const string AnnotationRestricted = "AnnotationRestricted";
 

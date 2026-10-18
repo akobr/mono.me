@@ -1061,6 +1061,7 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | `409` | `FederatedIssuerInUse` | Creating a trusted issuer whose name rules of machines still reference. |
 | `409` | `ElevatedRole` | Revoke names a lower role than the member holds. Revoke the stored role instead. |
 | `409` | `LastOwner` | The revoke would leave the access point without an `Owner`. |
+| `413` | `BodyTooLarge` | A body larger than its route reads: 8 KiB for an account, an access point, a permission, a machine authentication policy or a shared certificate, 1 MiB for a trusted issuer, and 4 MiB for a machine or its federation rules. |
 
 Grant only raises a role. To lower one, revoke the current role and grant the new one, or set the exact role through the members endpoint. Members and invitations, with their own error codes, are described in [Members and invitations](access.md).
 

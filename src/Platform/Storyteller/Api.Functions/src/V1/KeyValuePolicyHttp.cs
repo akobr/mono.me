@@ -77,7 +77,7 @@ public class KeyValuePolicyHttp
         string project)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
-        var (update, invalidBody) = await request.ReadJsonBodyAsync<KeyValuePolicyUpdate>(_bodyJsonOptions, "a key/value policy update");
+        var (update, invalidBody) = await request.ReadJsonBodyAsync<KeyValuePolicyUpdate>(_bodyJsonOptions, "a key/value policy update", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {
@@ -159,7 +159,7 @@ public class KeyValuePolicyHttp
         string project)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
-        var (rotate, invalidBody) = await request.ReadJsonBodyAsync<KeyValueRotateRequest>(_bodyJsonOptions, "a key rotation request");
+        var (rotate, invalidBody) = await request.ReadJsonBodyAsync<KeyValueRotateRequest>(_bodyJsonOptions, "a key rotation request", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {
@@ -217,7 +217,7 @@ public class KeyValuePolicyHttp
         string project)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
-        var (create, invalidBody) = await request.ReadJsonBodyAsync<ClientEncryptionRecipientCreate>(_bodyJsonOptions, "a client encryption recipient", ErrorCodes.RecipientInvalid);
+        var (create, invalidBody) = await request.ReadJsonBodyAsync<ClientEncryptionRecipientCreate>(_bodyJsonOptions, "a client encryption recipient", RequestBodyLimits.Recipient, ErrorCodes.RecipientInvalid);
 
         if (invalidBody is not null)
         {
@@ -256,7 +256,7 @@ public class KeyValuePolicyHttp
         string id)
     {
         await KeyValueAuthorization.CheckAdministratorAsync(request, _access, organization, project);
-        var (update, invalidBody) = await request.ReadJsonBodyAsync<ClientEncryptionRecipientUpdate>(_bodyJsonOptions, "a client encryption recipient update");
+        var (update, invalidBody) = await request.ReadJsonBodyAsync<ClientEncryptionRecipientUpdate>(_bodyJsonOptions, "a client encryption recipient update", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {

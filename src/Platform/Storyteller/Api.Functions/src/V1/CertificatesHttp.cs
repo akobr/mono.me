@@ -159,7 +159,7 @@ public class CertificatesHttp
             return new StatusCodeResult((int)HttpStatusCode.NotImplemented);
         }
 
-        var (model, invalidBody) = await request.ReadJsonBodyAsync<SharedCertificateCreate>(_bodyJsonOptions, "a shared certificate");
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<SharedCertificateCreate>(_bodyJsonOptions, "a shared certificate", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
         {

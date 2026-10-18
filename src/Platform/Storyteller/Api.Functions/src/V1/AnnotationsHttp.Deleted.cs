@@ -98,7 +98,7 @@ public partial class AnnotationsHttp
         string view)
     {
         request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
-        var (model, invalidBody) = await request.ReadJsonBodyAsync<AnnotationKeysRequest>(_bodyJsonOptions, "an annotation lookup request", ErrorCodes.InvalidKey);
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<AnnotationKeysRequest>(_bodyJsonOptions, "an annotation lookup request", RequestBodyLimits.AnnotationKeys, ErrorCodes.InvalidKey);
 
         // The keys of the body are authorized before any 400 of the body; a body that cannot be read names no key.
         await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? []);
@@ -137,7 +137,7 @@ public partial class AnnotationsHttp
         string view)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        var (model, invalidBody) = await request.ReadJsonBodyAsync<AnnotationRestoreRequest>(_bodyJsonOptions, "an annotation restore request", ErrorCodes.InvalidKey);
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<AnnotationRestoreRequest>(_bodyJsonOptions, "an annotation restore request", RequestBodyLimits.AnnotationKeys, ErrorCodes.InvalidKey);
 
         // The keys of the body are authorized before any 400 of the body; a body that cannot be read names no key.
         var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Contributor);
