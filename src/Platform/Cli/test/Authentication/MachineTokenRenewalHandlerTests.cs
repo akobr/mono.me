@@ -141,6 +141,9 @@ public class MachineTokenRenewalHandlerTests
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
         _api.Requests.Select(sent => sent.Authorization).ShouldBe(["Bearer st-1", "Bearer st-2"]);
+
+        // The same message goes again, so the POST keeps its body.
+        _api.Requests.Select(sent => sent.Body).ShouldBe(["""{"annotations":[]}""", """{"annotations":[]}"""]);
     }
 
     [Fact]

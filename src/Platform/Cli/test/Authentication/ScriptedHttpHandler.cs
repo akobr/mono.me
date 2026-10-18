@@ -31,11 +31,12 @@ internal sealed class ScriptedHttpHandler : HttpMessageHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var form = request.Content is null
-            ? new Dictionary<string, string>()
-            : ParseForm(await request.Content.ReadAsStringAsync(cancellationToken));
+        var sent = request.Content is null
+            ? null
+            : await request.Content.ReadAsStringAsync(cancellationToken);
+        var form = sent is null ? new Dictionary<string, string>() : ParseForm(sent);
         var headers = request.Headers.ToDictionary(header => header.Key, header => string.Join(",", header.Value), StringComparer.OrdinalIgnoreCase);
-        Requests.Add(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), form, headers));
+        Requests.Add(new RecordedRequest(request.Method, request.RequestUri!, request.Headers.Authorization?.ToString(), form, headers, sent));
 
         if (_failures.Count > 0)
         {
