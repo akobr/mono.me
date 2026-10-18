@@ -2,7 +2,7 @@
 
 ## Overview
 
-The 25 handlers of the Storyteller API that bound their JSON body with the worker's `[FromBody]` now read it themselves, through one reader shared with the federation routes. An empty body, `null`, a missing `Content-Type`, a body that is not UTF-8 or JSON that does not fit the type now answer **400**, never 500. Each handler keeps its existing missing-body message and code. Handlers that had none got one. The two optional bodies keep their defaults. The OpenAPI document and both SDKs are unchanged. This implements [Answer 400 Instead of 500 for Missing or Invalid JSON Bodies](../2026-10-18%20Answer%20400%20Instead%20of%20500%20for%20Missing%20or%20Invalid%20JSON%20Bodies.md) in full, for Linear 424-61. All three phases were delivered together, one commit per phase or handler group. The unit tests of `Api.Functions` went from 971 to 1103.
+The 25 handlers of the Storyteller API that bound their JSON body with the worker's `[FromBody]` now read it themselves, through one reader shared with the federation routes. An empty body, `null`, a missing `Content-Type`, a body that is not UTF-8 or JSON that does not fit the type now answer **400**, never 500. Each handler keeps its existing missing-body message and code. Handlers that had none got one. The two optional bodies keep their defaults. The OpenAPI document and both SDKs are unchanged. This implements [Answer 400 Instead of 500 for Missing or Invalid JSON Bodies](../2026-10-18%20Answer%20400%20Instead%20of%20500%20for%20Missing%20or%20Invalid%20JSON%20Bodies.md) in full, for Linear 424-61. All three phases were delivered together, one commit per phase or handler group. After the pull request review, the reader also limits the size of each body (413). The unit tests of `Api.Functions` went from 971 to 1115.
 
 ## What Was Done
 
@@ -96,7 +96,33 @@ Four reviews ran over the branch: correctness, authorization and security, tests
 
 No new warnings in the touched files, and no spec was edited.
 
+### Pull request review: body-size limits
+
+CodeRabbit noted that the reader copied the whole body into memory with no limit of its own. Only Kestrel's 30,000,000-byte request limit applied, and a body above it failed inside the copy as a 500. On six routes any signed-in user reaches the read, and on the bulk annotation create, lookup and restore it runs before the role check. The finding was valid and is fixed.
+
+- `ReadJsonBodyAsync` takes a required `int maxBytes` after `description`, so no route gets a limit by default. A larger declared `Content-Length`, or a body that grows past the limit while it is copied, answers **413** with `The request body is larger than {maxBytes} bytes.` and the new `ErrorCodes.BodyTooLarge`. This happens before any JSON is parsed, whatever `errorCode` the handler passes. Each handler returns the 413 where it returned the reader's 400, so the order of the access checks is unchanged.
+- The copy is `TryCopyBodyAsync` in `RequestBodyExtensions`: the Content-Length check and the bounded copy of the archive upload, moved from `ViewTransferHttp`, which now calls it. It does not copy the read that crosses the limit.
+- `Api.Functions/src/V1/RequestBodyLimits.cs` names the limit of each kind of body. Where the domain bounds a body, its limit is above the largest one, serialized as a System.Text.Json client does by default (a quote, `<` or a non-ASCII character as `\uXXXX`, 6 bytes). Where it does not, the limit is a cap above what the clients send: a view description, and the labels and values of annotations, have no length limit, and 1,000 import items at their limit do not fit below Kestrel's limit. These caps refuse some bodies the routes took before: a bulk create of annotations over 16 MiB, an import between 28 MiB and Kestrel's 30,000,000 bytes, and a view over 64 KiB. Every limit is below Kestrel's, so even a chunked body is refused with the 413 rather than by Kestrel's 500. The 32 KiB of the token endpoint is not used: a trusted issuer with a JWKS at its 16 KiB limit is already larger than that once its quotes are escaped.
+
+  | Limit | Bodies |
+  | --- | --- |
+  | `Control`, 8 KiB | account, access point, permission (grant and revoke), member role, invitation, shared certificate, machine authentication policy, key/value policy, key rotation, recipient update, key/value export request |
+  | `View`, 64 KiB | view create and update; the description has no limit of its own |
+  | `Recipient`, 64 KiB | a new client encryption recipient with its public key |
+  | `KeyValueBulk`, 64 KiB | restore, purge and protect (100 keys of 128 characters) |
+  | `KeyValueWrite`, 512 KiB | one key/value write (a client-encrypted value has at most 49,152 characters) |
+  | `AnnotationKeys`, 1 MiB | `…/simple`, the deleted lookup and the restore (100 keys) |
+  | `FederatedIssuer`, 1 MiB | a trusted issuer |
+  | `FederationRules`, 4 MiB | a machine and its federation rules (10 rules, each with up to 10 claims of 10 values) |
+  | `Annotations`, 16 MiB | a bulk create of up to 100 annotations, whose labels and values have no limit of their own |
+  | `KeyValueImport`, 28 MiB | an import of up to 1,000 items, just below Kestrel's limit. 1,000 values at their limit would not fit below it anyway, so raising Kestrel's limit is a separate decision. |
+
+- Tests: `RequestBodyExtensionsTests` covers a body one byte over the limit and one at it, for a limit that takes one read and one that takes several. It also covers a declared length over the limit, which leaves the body unread, and the 413 code when the handler passes its own. The new `RequestBodyLimitsTests` serializes the largest accepted bodies as the System.Text.Json default encoder does and checks that each fits its limit: a client-encrypted write, a bulk request, an import of 1,000 plain values, a trusted issuer (also over 32 KiB), ten federation rules and 100 annotation keys.
+- Docs: `access.md` states the 413 in the general rule and in its table. `authentication.md`, `key-values.md` (the code list and the Errors column of the body routes) and `annotation-lifecycle.md` list `BodyTooLarge` with the limits of their routes.
+- Review: four reviews (the reader, the limits, the handlers, and docs and tests), and a verifier who tried to refute each finding. Two were confirmed and fixed: the comments promised the escaped worst case for the capped bodies too, and a test comment had lost its escape text. The other four were refuted, among them these two. The recipient comment's 13 KiB is the size of a private-key PEM, which the route also parses. The federation route table of `authentication.md` lists no 413, but its status lists were never complete, and its error table lists the 413. The reader and the handlers had no findings.
+
 ### Left out
 
 - The single-annotation `PUT`/`POST` (`AnnotationsHttp.SetAnnotation`) still answers 500 for a JSON `null` or array root. It is a follow-up, as planned.
-- The new 400s are described in the docs, not in the OpenAPI responses, so the SDKs stay unchanged.
+- The new 400s and the 413 are described in the docs, not in the OpenAPI responses, so the SDKs stay unchanged. The NSwag client throws its generic `ApiException` for the 413, and the response text keeps the message.
+- The body readers that do not use `ReadJsonBodyAsync` have no limit of their own yet: the single annotation, configurations, schemas, templates and the export start.
