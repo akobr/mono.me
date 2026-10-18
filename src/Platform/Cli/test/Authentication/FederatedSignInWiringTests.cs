@@ -105,6 +105,26 @@ public class FederatedSignInWiringTests : IDisposable
         _http.Requests[4].Form["subject_token"].ShouldBe("gh-jwt-2");
     }
 
+    // The tests above replace every primary handler. The real one of the exchange client must not follow a
+    // redirect: the GitHub request carries the request token, and the exchange the platform token in its body.
+    [Fact]
+    public void TheExchangeClient_FollowsNoRedirect()
+    {
+        var services = new ServiceCollection();
+        services.AddHttpClient();
+        Startup.ConfigureMachineSignIn(services);
+        using var provider = services.BuildServiceProvider();
+
+        var handler = provider.GetRequiredService<IHttpMessageHandlerFactory>().CreateHandler(nameof(MachineAuthenticationService));
+
+        while (handler is DelegatingHandler { InnerHandler: { } inner })
+        {
+            handler = inner;
+        }
+
+        handler.ShouldBeOfType<HttpClientHandler>().AllowAutoRedirect.ShouldBeFalse();
+    }
+
     public void Dispose()
     {
         _provider.Dispose();
