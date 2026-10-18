@@ -105,8 +105,9 @@ public class InvitationsHttpTests
     {
         var service = new RecordingInvitations { CreateError = new ArgumentException("'x' is not a valid email address.") };
         var http = CreateHttp(service);
+        var body = FunctionTestDoubles.ToJsonBody(new InvitationCreate { Email = "x", Role = AccountRole.Reader });
 
-        var result = await http.CreateInvitation(Request([new("sub", "user_01")]), new InvitationCreate { Email = "x", Role = AccountRole.Reader }, " ACME.Billing ");
+        var result = await http.CreateInvitation(Request([new("sub", "user_01")], body), " ACME.Billing ");
 
         result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldContain("valid email");
         service.Calls.ShouldBe(["create:acme.billing:user_01"]);
@@ -118,21 +119,71 @@ public class InvitationsHttpTests
         var service = new RecordingInvitations();
         var http = CreateHttp(service);
 
-        var result = await http.CreateInvitation(Request([new("sub", "user_01")]), null, "acme.billing");
+        var result = await http.CreateInvitation(Request([new("sub", "user_01")], string.Empty), "acme.billing");
 
         result.ShouldBeOfType<BadRequestObjectResult>();
         service.Calls.ShouldBeEmpty();
     }
 
-    private static InvitationsHttp CreateHttp(RecordingInvitations service)
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran. The email and the role
+    // are required, so {} is not an invitation either.
+    [Theory]
+    [InlineData("", "The invitation is missing.")]
+    [InlineData("null", "The invitation is missing.")]
+    [InlineData("[1, 2]", "The request body is not an invitation (at $).")]
+    [InlineData("{}", "The request body is not an invitation (at $).")]
+    public async Task Create_MissingOrInvalidBody_ReturnsBadRequestWithoutCallingTheService(string body, string message)
     {
-        return new InvitationsHttp(service, Options.Create(new UserAuthenticationOptions()));
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+
+        var result = await http.CreateInvitation(Request([new("sub", "user_01")], body), "acme.billing");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        service.Calls.ShouldBeEmpty();
     }
 
-    private static TestHttpRequestData Request(List<Claim> claims)
+    // The worker's [FromBody] binding refused a body without a content type; the handler reads it.
+    [Fact]
+    public async Task Create_BodyWithoutAContentType_IsRead()
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+        var body = FunctionTestDoubles.ToJsonBody(new InvitationCreate { Email = "ada@example.com", Role = AccountRole.Reader });
+
+        var result = await http.CreateInvitation(Request([new("sub", "user_01")], body, contentType: false), "acme.billing");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        service.Calls.ShouldBe(["create:acme.billing:user_01"]);
+        service.LastCreated.ShouldBe(new InvitationCreate { Email = "ada@example.com", Role = AccountRole.Reader });
+    }
+
+    [Fact]
+    public async Task Create_PropertyAndEnumNamesInAnyCase_AreRead()
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+        const string body = """{ "email": "ada@example.com", "ROLE": "contributor", "expiresInDays": 3 }""";
+
+        var result = await http.CreateInvitation(Request([new("sub", "user_01")], body), "acme.billing");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        service.LastCreated.ShouldBe(new InvitationCreate { Email = "ada@example.com", Role = AccountRole.Contributor, ExpiresInDays = 3 });
+    }
+
+    private static InvitationsHttp CreateHttp(RecordingInvitations service)
+    {
+        return new InvitationsHttp(service, Options.Create(new UserAuthenticationOptions()), FunctionTestDoubles.ApiJsonOptions);
+    }
+
+    // A request with the claims; a body goes as JSON, with its content type unless contentType is false.
+    private static TestHttpRequestData Request(List<Claim> claims, string? body = null, bool contentType = true)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var (context, request) = FunctionTestDoubles.CreateRequest(services);
+        var headers = body is not null && contentType ? FunctionTestDoubles.JsonContentType() : null;
+        var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, body: body);
         claims.Add(new Claim("scp", Scopes.User.Impersonation));
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;
         return request;
@@ -144,11 +195,15 @@ public class InvitationsHttpTests
 
         public InvitationIdentity? LastInvitee { get; private set; }
 
+        // The model the handler passed to CreateInvitationAsync; null while nothing was created.
+        public InvitationCreate? LastCreated { get; private set; }
+
         public Exception? CreateError { get; init; }
 
         public Task<Invitation> CreateInvitationAsync(string accessPointKey, InvitationCreate model, string actorId, string? actorName)
         {
             Calls.Add($"create:{accessPointKey}:{actorId}");
+            LastCreated = model;
             return CreateError is null
                 ? Task.FromResult(Invitation(accessPointKey))
                 : Task.FromException<Invitation>(CreateError);

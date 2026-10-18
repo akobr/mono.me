@@ -20,9 +20,9 @@ public class MembersHttpTests
     public async Task SetMemberRole_UsesTheCallerAndANormalizedKey()
     {
         var access = new RecordingAccess();
-        var http = new MembersHttp(access);
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
 
-        var result = await http.SetMemberRole(UserRequest(), new MemberRoleUpdate { Role = AccountRole.Reader }, " ACME.Billing ", "user-2");
+        var result = await http.SetMemberRole(UserRequest(FunctionTestDoubles.ToJsonBody(new MemberRoleUpdate { Role = AccountRole.Reader })), " ACME.Billing ", "user-2");
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<AccessPointMember>().Role.ShouldBe(AccountRole.Reader);
         access.Calls.ShouldBe(["set:acme.billing:user-2:Reader:user-1"]);
@@ -34,19 +34,64 @@ public class MembersHttpTests
     public async Task SetMemberRole_InvalidRole_ReturnsBadRequest(AccountRole role)
     {
         var access = new RecordingAccess();
-        var http = new MembersHttp(access);
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
 
-        var result = await http.SetMemberRole(UserRequest(), new MemberRoleUpdate { Role = role }, "acme.billing", "user-2");
+        var result = await http.SetMemberRole(UserRequest(FunctionTestDoubles.ToJsonBody(new MemberRoleUpdate { Role = role })), "acme.billing", "user-2");
 
         result.ShouldBeOfType<BadRequestObjectResult>();
         access.Calls.ShouldBeEmpty();
+    }
+
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran. The role is required,
+    // so {} is not a member role either.
+    [Theory]
+    [InlineData("", "A role other than None is required; remove the member instead.")]
+    [InlineData("null", "A role other than None is required; remove the member instead.")]
+    [InlineData("[1, 2]", "The request body is not a member role (at $).")]
+    [InlineData("{}", "The request body is not a member role (at $).")]
+    public async Task SetMemberRole_MissingOrInvalidBody_ReturnsBadRequestWithoutCallingTheService(string body, string message)
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+
+        var result = await http.SetMemberRole(UserRequest(body), "acme.billing", "user-2");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        access.Calls.ShouldBeEmpty();
+    }
+
+    // The worker's [FromBody] binding refused a body without a content type; the handler reads it.
+    [Fact]
+    public async Task SetMemberRole_BodyWithoutAContentType_IsRead()
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+
+        var result = await http.SetMemberRole(UserRequest(FunctionTestDoubles.ToJsonBody(new MemberRoleUpdate { Role = AccountRole.Contributor }), contentType: false), "acme.billing", "user-2");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Calls.ShouldBe(["set:acme.billing:user-2:Contributor:user-1"]);
+    }
+
+    [Fact]
+    public async Task SetMemberRole_PropertyAndEnumNamesInAnyCase_AreRead()
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+
+        var result = await http.SetMemberRole(UserRequest("""{ "role": "administrator" }"""), "acme.billing", "user-2");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Calls.ShouldBe(["set:acme.billing:user-2:Administrator:user-1"]);
     }
 
     [Fact]
     public async Task RemoveMember_ReturnsNoContent()
     {
         var access = new RecordingAccess();
-        var http = new MembersHttp(access);
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
 
         var result = await http.RemoveMember(UserRequest(), "acme.billing", "user-1");
 
@@ -58,7 +103,7 @@ public class MembersHttpTests
     public async Task GetMembers_PassesTheCaller()
     {
         var access = new RecordingAccess();
-        var http = new MembersHttp(access);
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
 
         var result = await http.GetMembers(UserRequest(), "acme");
 
@@ -115,11 +160,11 @@ public class MembersHttpTests
         access.Created.ShouldBeNull();
     }
 
-    // A user's request; a body goes as JSON, with its content type.
-    private static TestHttpRequestData UserRequest(string? body = null)
+    // A user's request; a body goes as JSON, with its content type unless contentType is false.
+    private static TestHttpRequestData UserRequest(string? body = null, bool contentType = true)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var headers = body is null ? null : FunctionTestDoubles.JsonContentType();
+        var headers = body is not null && contentType ? FunctionTestDoubles.JsonContentType() : null;
         var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, body: body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {

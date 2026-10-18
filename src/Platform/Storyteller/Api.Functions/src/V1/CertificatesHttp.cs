@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Api.Models;
@@ -9,9 +10,8 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-
-using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace _42.Platform.Storyteller.Api.V1;
 
@@ -20,15 +20,18 @@ public class CertificatesHttp
     private readonly IAccessService _accessService;
     private readonly ICertificateRenewalService? _renewalService;
     private readonly SharedCertificateService? _sharedCertService;
+    private readonly JsonSerializerOptions _bodyJsonOptions;
     private readonly ILogger<CertificatesHttp> _logger;
 
     public CertificatesHttp(
         IAccessService accessService,
+        IOptions<JsonOptions> jsonOptions,
         ILogger<CertificatesHttp> logger,
         ICertificateRenewalService? renewalService = null,
         SharedCertificateService? sharedCertService = null)
     {
         _accessService = accessService;
+        _bodyJsonOptions = jsonOptions.Value.JsonSerializerOptions;
         _logger = logger;
         _renewalService = renewalService;
         _sharedCertService = sharedCertService;
@@ -145,7 +148,6 @@ public class CertificatesHttp
     public async Task<IActionResult> PostSharedCertificate(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.SharedCertificates)]
         HttpRequestData request,
-        [FromBody] SharedCertificateCreate model,
         string organization,
         string project)
     {
@@ -155,6 +157,18 @@ public class CertificatesHttp
         if (_sharedCertService is null)
         {
             return new StatusCodeResult((int)HttpStatusCode.NotImplemented);
+        }
+
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<SharedCertificateCreate>(_bodyJsonOptions, "a shared certificate");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
+        if (model is null)
+        {
+            return new BadRequestObjectResult(new ErrorResponse { Message = "The shared certificate is missing." });
         }
 
         if (!CertificateIdentity.IsValidSpiffePathSegment(model.Label))
