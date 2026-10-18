@@ -12,20 +12,27 @@ var storage = builder
         emulator.WithLifetime(ContainerLifetime.Persistent);
     });
 
-// Local Cosmos DB emulator
-/*var cosmos = builder.AddAzureCosmosDB("cosmos")
-    .RunAsEmulator();*/
+// Local Cosmos DB emulator, picked by Cosmos:Mode. "container" (default) runs the Linux vNext emulator in a container;
+// "local" uses the Windows emulator installed on the machine (ConnectionStrings:cosmos), which also supports stored
+// procedures, triggers and UDFs. The launch profiles *-local-cosmos set the local mode.
+var cosmosMode = builder.Configuration["Cosmos:Mode"] ?? "container";
 #pragma warning disable ASPIRECOSMOSDB001
-var cosmos = builder
-    .AddAzureCosmosDB("cosmos")
-    .RunAsPreviewEmulator(emulator =>
-    {
-        emulator.WithDataExplorer();
-        emulator.WithLifetime(ContainerLifetime.Persistent);
-        emulator.WithImageRegistry("mcr.microsoft.com");
-        emulator.WithImage("cosmosdb/linux/azure-cosmos-emulator");
-        emulator.WithImageTag("latest");
-    });
+IResourceBuilder<IResourceWithConnectionString> cosmos = cosmosMode.ToLowerInvariant() switch
+{
+    "container" => builder
+        .AddAzureCosmosDB("cosmos")
+        .RunAsPreviewEmulator(emulator =>
+        {
+            emulator.WithDataExplorer();
+            emulator.WithLifetime(ContainerLifetime.Persistent);
+            emulator.WithImageRegistry("mcr.microsoft.com");
+            emulator.WithImage("cosmosdb/linux/azure-cosmos-emulator");
+            emulator.WithImageTag("latest");
+        }),
+    "local" => builder.AddConnectionString("cosmos"),
+    _ => throw new InvalidOperationException($"Unknown Cosmos:Mode '{cosmosMode}', use 'container' or 'local'."),
+};
+#pragma warning restore ASPIRECOSMOSDB001
 
 var dbCreator = builder.AddProject<Projects.DbCreator>("db-creator")
     .WithReference(cosmos)
