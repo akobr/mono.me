@@ -29,6 +29,7 @@ public class MachineCreateFederatedTests
     private readonly Mock<ICommandContext> _context = new();
     private readonly MockFileSystem _fileSystem = new(new Dictionary<string, MockFileData>(), MockUnixSupport.Path(@"C:\work"));
     private MachineAccessCreate? _sent;
+    private string? _tokenEndpoint = TokenEndpoint;
 
     public MachineCreateFederatedTests()
     {
@@ -43,7 +44,7 @@ public class MachineCreateFederatedTests
                 ObjectId = MachineId,
                 AccessKey = string.Empty,
                 CredentialKind = MachineAccessCredentialKind.Federated,
-                TokenEndpoint = TokenEndpoint,
+                TokenEndpoint = _tokenEndpoint,
                 FederationRules = body.FederationRules,
             });
     }
@@ -155,6 +156,55 @@ public class MachineCreateFederatedTests
             + " --data-urlencode subject_token=$PLATFORM_TOKEN");
         _console.Lines.ShouldContain(line => line.Contains("The machine has no secret"));
         _console.Lines.ShouldNotContain(line => line.Contains("copy the access key") || line.Contains("Client secret"));
+    }
+
+    [Fact]
+    public async Task Output_EndsWithTheVariablesOfASignIn_WithTheBaseOfTheTokenEndpoint()
+    {
+        var exitCode = await Execute(issuer: "github", audience: TokenEndpoint, subject: "repo:acme/app:*", claims: ["repository_id=74"]);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+
+        // The host of the server's TokenEndpoint, not of general.baseUrl (api.example.test): the endpoint sform builds
+        // has to be the audience of the rule byte for byte.
+        PipelineLines().ShouldBe(
+        [
+            "! The machine has no secret: its workload signs in with a token of its platform that matches a rule.",
+            string.Empty,
+            "To sign in sform in a pipeline, set:",
+            "  STORYTELLER_API_URL=https://api.example.com/api",
+            "  STORYTELLER_PROJECT=org1.proj1",
+            $"  STORYTELLER_CLIENT_ID={MachineId}",
+            "  STORYTELLER_SUBJECT_TOKEN_FILE=<file with the platform token>",
+            "In a GitHub Actions job with permissions: id-token: write, leave out STORYTELLER_SUBJECT_TOKEN_FILE: sform asks the runner for a token for the token endpoint above.",
+            "Optional: STORYTELLER_SUBJECT_TOKEN_TYPE=jwt (access_token for Azure managed identity, id_token for Google Cloud) and STORYTELLER_TOKEN_SCOPE=<a subset of the machine's scopes>.",
+        ]);
+        _console.Lines.ShouldNotContain(line => line.Contains(StorytellerVariables.CLIENT_SECRET) || line.Contains(StorytellerVariables.API_KEY));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(" ")]
+    [InlineData("https://api.example.com/api/v1/org1/other/access/token")]
+    [InlineData("/v1/org1/proj1/access/token")]
+    public async Task Output_WithoutAUsableTokenEndpoint_FallsBackToTheBaseUrlWithANote(string? tokenEndpoint)
+    {
+        _tokenEndpoint = tokenEndpoint;
+
+        var exitCode = await Execute(issuer: "github", audience: TokenEndpoint, subject: "repo:acme/app:*", claims: ["repository_id=74"]);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        var lines = PipelineLines();
+        lines.ShouldContain("  STORYTELLER_API_URL=https://api.example.test/api");
+        lines.ShouldContain(
+            "STORYTELLER_API_URL could not be derived from the token endpoint; the rule's audience must then equal https://api.example.test/api/v1/org1/proj1/access/token.");
+        lines.IndexOf("  STORYTELLER_SUBJECT_TOKEN_FILE=<file with the platform token>").ShouldBeLessThan(lines.FindIndex(line => line.Contains("could not be derived")));
+    }
+
+    // From the last line of the setup on.
+    private List<string> PipelineLines()
+    {
+        return _console.Lines.SkipWhile(line => !line.StartsWith("! The machine has no secret")).ToList();
     }
 
     [Fact]

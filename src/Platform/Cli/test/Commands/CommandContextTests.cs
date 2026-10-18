@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.IO.Abstractions.TestingHelpers;
+using System.Net;
+using System.Threading.Tasks;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
@@ -13,8 +16,13 @@ namespace _42.Platform.Cli.UnitTests.Commands;
 
 public class CommandContextTests
 {
+    private const string FederatedMachineId = "6d0f2c4e-0000-4000-8000-000000000001";
+
+    private readonly ScriptedHttpHandler _http = new();
+    private readonly MockFileSystem _fileSystem = new();
     private readonly Dictionary<string, string> _environment = new() { [StorytellerVariables.API_URL] = "https://storyteller.example.com/api" };
     private readonly AccessDefaultOptions _file = new() { OrganizationName = "house", ProjectName = "stored", ViewName = "staging" };
+    private MachineAuthenticationService? _machine;
 
     [Fact]
     public void User_TargetsTheProjectOfAccessDefaults()
@@ -160,6 +168,55 @@ public class CommandContextTests
         exception.Message.ShouldBe("Set STORYTELLER_API_URL to the API base URL, for example https://<host>/api.");
     }
 
+    [Fact]
+    public async Task FederatedMachine_IsBoundToTheOptionOverStorytellerProject()
+    {
+        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        UseFederated();
+        _http.Respond(HttpStatusCode.OK, """{"access_token":"st-web","token_type":"Bearer","expires_in":900}""");
+        var context = CreateContext();
+
+        context.TrySetExplicitTarget("acme.web", null);
+
+        // The exchange goes to the token endpoint of the bound project.
+        (await _machine!.GetAccessTokenAsync()).ShouldBe("st-web");
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri("https://storyteller.example.com/api/v1/acme/web/access/token"));
+    }
+
+    [Fact]
+    public async Task FederatedMachine_WithoutAProject_IsStoppedAndBoundToNothing()
+    {
+        UseFederated();
+        var context = CreateContext();
+
+        var exception = Should.Throw<AuthenticationException>(() => context.TrySetExplicitTarget(null, null));
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        exception.Message.ShouldBe("No project is set for the machine: set STORYTELLER_PROJECT=<organization>.<project> or pass -p.");
+        (await _machine!.GetAccessTokenAsync()).ShouldBeNull();
+        _http.Requests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void FederatedMachine_NeverTargetsTheProjectOrViewOfAccessDefaults()
+    {
+        UseFederated();
+
+        var context = CreateContext();
+
+        // The credential names no project, and access.default.json may be left over from another job.
+        context.IsProjectKnown.ShouldBeFalse();
+        (context.OrganizationName, context.ProjectName, context.ViewName).ShouldBe(("house", "main", "default"));
+    }
+
+    private void UseFederated()
+    {
+        var path = MockUnixSupport.Path(@"C:\ci\platform-token");
+        _fileSystem.AddFile(path, new MockFileData("platform-token"));
+        _environment[StorytellerVariables.CLIENT_ID] = FederatedMachineId;
+        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = path;
+    }
+
     private void UseClientCredentials()
     {
         _environment[StorytellerVariables.CLIENT_ID] = "client_01";
@@ -170,11 +227,11 @@ public class CommandContextTests
     private CommandContext CreateContext(AccessDefaultOptions? file = null)
     {
         var settings = MachineSignInSettings.FromEnvironment(name => _environment.GetValueOrDefault(name));
-        var machine = new MachineAuthenticationService(
+        _machine = new MachineAuthenticationService(
             settings,
-            new MockFileSystem(),
-            new StubHttpClientFactory(new ScriptedHttpHandler()),
+            _fileSystem,
+            new StubHttpClientFactory(_http),
             Mock.Of<IAuthenticationConfigurationResolver>());
-        return new CommandContext(Options.Create(file ?? _file), machine);
+        return new CommandContext(Options.Create(file ?? _file), _machine);
     }
 }
