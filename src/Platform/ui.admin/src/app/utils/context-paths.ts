@@ -1,15 +1,11 @@
 import type { Scope } from '@/stores/context'
+import { modelingTab } from '@/utils/modeling'
 
-/** Sections that live under /{org}/{project}/{view}/… */
-export const viewSections = [
-  'annotations',
-  'configurations',
-  'graph',
-  'templates',
-  'schemas',
-  'compare',
-  'export-import',
-] as const
+/**
+ * Sections that live under /{org}/{project}/{view}/… The old schemas, templates, compare and export-import pages are
+ * tabs of modeling now (424-38); their URLs only redirect, so they are never the current path.
+ */
+export const viewSections = ['annotations', 'configurations', 'graph', 'modeling'] as const
 
 /** Sections that live under /{org}/{project}/… */
 export const projectSections = ['views', 'members', 'machines', 'settings', 'monitor'] as const
@@ -73,13 +69,19 @@ export function viewLocation(path: string): ViewLocation | undefined {
   return { scope: { org: org!, project: project!, view: view! }, section: section.name, root: rest.length === 0 }
 }
 
+/** A view section as the path below the view: on Modeling, with its tab (424-38). */
+function viewSectionPath(path: string, section: ViewSection): string {
+  const tab = section === 'modeling' ? modelingTab(path) : undefined
+  return tab ? `${section}/${tab}` : section
+}
+
 /** Target of switching to another project: the same section, in the default view; the detail (key) is dropped. */
 export function projectTarget(path: string, org: string, project: string): string {
   const section = currentSection(path)
 
   switch (section.kind) {
     case 'view':
-      return `/${org}/${project}/default/${section.name}`
+      return `/${org}/${project}/default/${viewSectionPath(path, section.name)}`
     case 'project':
       return `/${org}/${project}/${section.name}`
     default:
@@ -87,8 +89,8 @@ export function projectTarget(path: string, org: string, project: string): strin
   }
 }
 
-/** Target of switching the view: the same view section without the selected detail. */
+/** Target of switching the view: the same view section (and Modeling tab) without the selected detail. */
 export function viewTarget(path: string, org: string, project: string, view: string): string {
   const section = currentSection(path)
-  return `/${org}/${project}/${view}/${section.kind === 'view' ? section.name : 'annotations'}`
+  return `/${org}/${project}/${view}/${section.kind === 'view' ? viewSectionPath(path, section.name) : 'annotations'}`
 }

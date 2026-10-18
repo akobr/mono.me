@@ -67,9 +67,18 @@ const recentItems = computed<CommandPaletteItem[]>(() =>
     : [],
 )
 
+// The tabs of an entry (the five of Modeling) follow it, so their pages stay findable by name where they can be opened.
 const pageItems = computed<CommandPaletteItem[]>(() =>
   buildNavigation(navigation.value).flatMap((section) =>
-    section.items.map((item) => ({ label: item.label, suffix: section.label, icon: item.icon, to: item.to })),
+    section.items.flatMap((item) => [
+      { label: item.label, suffix: section.label, icon: item.icon, to: item.to },
+      ...(item.locked ? [] : (item.tabs ?? [])).map((tab) => ({
+        label: tab.label,
+        suffix: item.label,
+        icon: tab.icon,
+        to: tab.to,
+      })),
+    ]),
   ),
 )
 
@@ -144,9 +153,9 @@ defineShortcuts({
   'g-a': () => go(navigationBase.value && `${navigationBase.value}/annotations`),
   'g-c': () => go(navigationBase.value && `${navigationBase.value}/configurations`),
   'g-g': () => go(navigationBase.value && `${navigationBase.value}/graph`),
-  'g-t': () => go(navigationBase.value && `${navigationBase.value}/templates`),
-  'g-s': () => go(navigationBase.value && `${navigationBase.value}/schemas`),
-  'g-e': () => go(navigationBase.value && `${navigationBase.value}/export-import`),
+  'g-t': () => go(navigationBase.value && `${navigationBase.value}/modeling/templates`),
+  'g-s': () => go(navigationBase.value && `${navigationBase.value}/modeling/schemas`),
+  'g-e': () => go(navigationBase.value && `${navigationBase.value}/modeling/export-import`),
 })
 </script>
 
