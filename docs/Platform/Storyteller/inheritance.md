@@ -291,5 +291,5 @@ The admin UI calls the API cross-origin. It cannot read the `ETag`, but the brow
 
 - **Writes ignore `If-Match`.** The tags are weak, and `If-Match` needs a strong tag. A JSON Patch `test` operation guards a write instead.
 - **The tag follows the effective cache.** A descendant whose `CalculatedContent` is stale (see "Cache and descendant freshness") keeps its tag until the cache is cleared.
-- **The SDKs do not send `If-None-Match` yet.** The TypeScript SDK returns only the body, so it cannot see the `ETag`, and it throws on a 304 that script asked for itself. A polling client uses plain HTTP for now.
+- **The SDKs do not send `If-None-Match` yet.** The TypeScript SDK returns only the body, so it cannot see the `ETag`, and it throws on a 304 that the script asked for itself. A polling client uses plain HTTP for now.
 - **Not covered:** `HEAD`, `If-Modified-Since` and the listings.
