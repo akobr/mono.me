@@ -78,14 +78,22 @@ public partial class MachineRestrictionHttpTests
     public async Task GetConfigurationResolved_TheRestriction_ReachesTheService()
     {
         var (configuration, recorder) = Recording<IConfigurationService>();
-        recorder.Returns(nameof(IConfigurationService.GetResolvedConfigurationAsync), StoredConfiguration(Restriction));
+        recorder.Returns(nameof(IConfigurationService.GetRawConfigurationAsync), StoredConfiguration(Restriction));
+        recorder.Returns(nameof(IConfigurationService.HasBindings), true);
+        recorder.Returns(nameof(IConfigurationService.ResolveConfigurationAsync), StoredConfiguration(Restriction));
 
         var result = await CreateConfigurationHttp(configuration, Restricted()).GetConfigurationResolved(MachineRequest(), Org, Project, DefaultView, Restriction);
 
+        // The raw read gives the entity tag; the bindings are resolved from it only when it has some.
         result.ShouldBeOfType<OkObjectResult>();
-        var call = recorder.Calls.ShouldHaveSingleItem();
-        call.Method.ShouldBe(nameof(IConfigurationService.GetResolvedConfigurationAsync));
-        call.Arg<FullKey>(0).Annotation.ToString().ShouldBe(Restriction);
+        recorder.Calls.Select(call => call.Method).ShouldBe(
+        [
+            nameof(IConfigurationService.GetRawConfigurationAsync),
+            nameof(IConfigurationService.HasBindings),
+            nameof(IConfigurationService.ResolveConfigurationAsync),
+        ]);
+        recorder.Calls[0].Arg<FullKey>(0).Annotation.ToString().ShouldBe(Restriction);
+        recorder.Calls[2].Arg<FullKey>(0).Annotation.ToString().ShouldBe(Restriction);
     }
 
     [Fact]

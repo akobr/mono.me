@@ -33,7 +33,7 @@ public partial class MachineRestrictionHttpTests
         new(nameof(AnnotationsHttp.GetAnnotationHistory), nameof(IAnnotationService.GetAnnotationHistoryAsync), FullKeyArg, (http, key) => http.Annotations.GetAnnotationHistory(MachineRequest(), Org, Project, DefaultView, key)),
 
         new(nameof(ConfigurationHttp.GetConfiguration), nameof(IConfigurationService.GetRawConfigurationAsync), FullKeyArg, (http, key) => http.Configuration.GetConfiguration(MachineRequest(), Org, Project, DefaultView, key)),
-        new(nameof(ConfigurationHttp.GetConfigurationResolved), nameof(IConfigurationService.GetResolvedConfigurationAsync), FullKeyArg, (http, key) => http.Configuration.GetConfigurationResolved(MachineRequest(), Org, Project, DefaultView, key)),
+        new(nameof(ConfigurationHttp.GetConfigurationResolved), nameof(IConfigurationService.GetRawConfigurationAsync), FullKeyArg, (http, key) => http.Configuration.GetConfigurationResolved(MachineRequest(), Org, Project, DefaultView, key)),
         new(nameof(ConfigurationHttp.SetConfiguration), nameof(IConfigurationService.CreateOrUpdateConfigurationAsync), FullKeyArg, (http, key) => http.Configuration.SetConfiguration(MachineRequest("PUT", "{}"), Org, Project, DefaultView, key)),
         new(nameof(ConfigurationHttp.PatchConfiguration), nameof(IConfigurationService.PatchConfigurationAsync), FullKeyArg, (http, key) => http.Configuration.PatchConfiguration(MachineRequest("PATCH", "[]"), Org, Project, DefaultView, key)),
         new(nameof(ConfigurationHttp.DeleteConfiguration), nameof(IConfigurationService.ClearConfigurationAsync), FullKeyArg, (http, key) => http.Configuration.DeleteConfiguration(MachineRequest("DELETE"), Org, Project, DefaultView, key)),
