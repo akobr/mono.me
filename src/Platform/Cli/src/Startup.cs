@@ -80,6 +80,72 @@ namespace _42.Platform.Cli
         }
 
         /// <summary>
+        /// Registers the non-interactive sign-in of a machine from the STORYTELLER_* environment variables.
+        /// With machine credentials, STORYTELLER_API_URL replaces general.baseUrl; a user session is never sent to it.
+        /// </summary>
+        /// <param name="services">The service collection to configure.</param>
+        internal static void ConfigureMachineSignIn(IServiceCollection services)
+        {
+            services.AddSingleton(MachineSignInSettings.FromEnvironment(System.Environment.GetEnvironmentVariable));
+            services.AddSingleton<MachineAuthenticationService>();
+            services.AddSingleton<IMachineSignIn>(provider => provider.GetRequiredService<MachineAuthenticationService>());
+
+            // A redirect would resend the client secret to another host.
+            services.AddHttpClient(nameof(MachineAuthenticationService))
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+
+            services.AddOptions<GeneralOptions>().PostConfigure<MachineSignInSettings>((options, machine) =>
+            {
+                if (machine.IsConfigured && machine.ApiUrl is not null)
+                {
+                    options.BaseUrl = machine.ApiUrl;
+                }
+            });
+        }
+
+        /// <summary>
+        /// Registers the clients of the Storyteller SDK with the token of the IAuthenticationService the commands use.
+        /// After a 401, a federated machine sends the request once more with the token of a new exchange.
+        /// </summary>
+        /// <param name="services">The service collection to configure.</param>
+        internal static void ConfigureStorytellerSdk(IServiceCollection services)
+        {
+            // Registered before AddStorytellerSdk, which only adds a configuration when none exists,
+            // so the token comes from the same IAuthenticationService the commands use.
+            services.AddSingleton<ISdkConfiguration>(provider =>
+            {
+                var baseUrl = provider.GetRequiredService<IOptions<GeneralOptions>>().Value.BaseUrl;
+                var machine = provider.GetRequiredService<IMachineSignIn>();
+
+                return new SdkConfiguration
+                {
+                    AccessTokenFactory = () =>
+                    {
+                        try
+                        {
+                            var authentication = provider.GetRequiredService<IAuthenticationService>();
+                            return authentication.GetAccessTokenAsync().GetAwaiter().GetResult() ?? string.Empty;
+                        }
+                        catch (Exception exception) when (exception is not AuthenticationException)
+                        {
+                            // A sign-in that cannot work is reported; anything else ends as a 401 from the API.
+                            return string.Empty;
+                        }
+                    },
+                    BaseUrl = baseUrl,
+
+                    // Null when the certificate does not load; the token factory reports why before any request.
+                    ClientCertificate = machine.TryGetCertificate(),
+                    ClientCertificateHeaderName = IsLocalHttp(baseUrl) ? ClientCertificateHeaderName : null,
+                };
+            });
+
+            // Only on the typed clients: the exchange client of MachineAuthenticationService and the AuthKit client get no resend.
+            services.AddStorytellerSdk(null, builder => builder.AddHttpMessageHandler(
+                provider => new MachineTokenRenewalHandler(provider.GetRequiredService<IMachineSignIn>())));
+        }
+
+        /// <summary>
         /// Configures the application's logging providers and sinks (Serilog, file sink, Sentry) and enables debug logging in the development environment.
         /// </summary>
         /// <param name="builder">The logging builder to configure.</param>
@@ -120,65 +186,6 @@ namespace _42.Platform.Cli
             services.Configure<AuthenticationOptions>(configuration.GetSection(ConfigurationSections.AUTHENTICATION));
             services.Configure<GeneralOptions>(configuration.GetSection(ConfigurationSections.GENERAL));
             services.Configure<EditorOptions>(configuration.GetSection(ConfigurationSections.EDITOR));
-        }
-
-        /// <summary>
-        /// Registers the non-interactive sign-in of a machine from the STORYTELLER_* environment variables.
-        /// With machine credentials, STORYTELLER_API_URL replaces general.baseUrl; a user session is never sent to it.
-        /// </summary>
-        /// <param name="services">The service collection to configure.</param>
-        private static void ConfigureMachineSignIn(IServiceCollection services)
-        {
-            services.AddSingleton(MachineSignInSettings.FromEnvironment(System.Environment.GetEnvironmentVariable));
-            services.AddSingleton<MachineAuthenticationService>();
-            services.AddSingleton<IMachineSignIn>(provider => provider.GetRequiredService<MachineAuthenticationService>());
-
-            // A redirect would resend the client secret to another host.
-            services.AddHttpClient(nameof(MachineAuthenticationService))
-                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
-
-            services.AddOptions<GeneralOptions>().PostConfigure<MachineSignInSettings>((options, machine) =>
-            {
-                if (machine.IsConfigured && machine.ApiUrl is not null)
-                {
-                    options.BaseUrl = machine.ApiUrl;
-                }
-            });
-        }
-
-        private static void ConfigureStorytellerSdk(IServiceCollection services)
-        {
-            // Registered before AddStorytellerSdk, which only adds a configuration when none exists,
-            // so the token comes from the same IAuthenticationService the commands use.
-            services.AddSingleton<ISdkConfiguration>(provider =>
-            {
-                var baseUrl = provider.GetRequiredService<IOptions<GeneralOptions>>().Value.BaseUrl;
-                var machine = provider.GetRequiredService<IMachineSignIn>();
-
-                return new SdkConfiguration
-                {
-                    AccessTokenFactory = () =>
-                    {
-                        try
-                        {
-                            var authentication = provider.GetRequiredService<IAuthenticationService>();
-                            return authentication.GetAccessTokenAsync().GetAwaiter().GetResult() ?? string.Empty;
-                        }
-                        catch (Exception exception) when (exception is not AuthenticationException)
-                        {
-                            // A sign-in that cannot work is reported; anything else ends as a 401 from the API.
-                            return string.Empty;
-                        }
-                    },
-                    BaseUrl = baseUrl,
-
-                    // Null when the certificate does not load; the token factory reports why before any request.
-                    ClientCertificate = machine.TryGetCertificate(),
-                    ClientCertificateHeaderName = IsLocalHttp(baseUrl) ? ClientCertificateHeaderName : null,
-                };
-            });
-
-            services.AddStorytellerSdk();
         }
 
         // The local Functions host has no TLS handshake to carry a client certificate, so the

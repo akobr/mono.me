@@ -10,6 +10,14 @@ public static class ServicesCollectionExtensions
     public static IServiceCollection AddStorytellerSdk(
         this IServiceCollection services,
         Func<ISdkConfiguration>? configurationFactory = null)
+        => services.AddStorytellerSdk(configurationFactory, null);
+
+    // configureHttpClient runs for each of the seven typed clients, after the primary handler is set,
+    // for example to add a DelegatingHandler.
+    public static IServiceCollection AddStorytellerSdk(
+        this IServiceCollection services,
+        Func<ISdkConfiguration>? configurationFactory,
+        Action<IHttpClientBuilder>? configureHttpClient)
     {
         if (configurationFactory != null)
         {
@@ -20,22 +28,22 @@ public static class ServicesCollectionExtensions
             services.TryAddSingleton<ISdkConfiguration, SdkConfiguration>();
         }
 
-        ConfigureHttpClient<IAccessApiClient, AccessApiClient>(services);
-        ConfigureHttpClient<IAnnotationsApiClient, AnnotationsApiClient>(services);
-        ConfigureHttpClient<IConfigurationsApiClient, ConfigurationsApiClient>(services);
-        ConfigureHttpClient<ISchemasApiClient, SchemasApiClient>(services);
-        ConfigureHttpClient<IKeyValuesApiClient, KeyValuesApiClient>(services);
-        ConfigureHttpClient<ITemplatesApiClient, TemplatesApiClient>(services);
-        ConfigureHttpClient<ITransfersApiClient, TransfersApiClient>(services);
+        ConfigureHttpClient<IAccessApiClient, AccessApiClient>(services, configureHttpClient);
+        ConfigureHttpClient<IAnnotationsApiClient, AnnotationsApiClient>(services, configureHttpClient);
+        ConfigureHttpClient<IConfigurationsApiClient, ConfigurationsApiClient>(services, configureHttpClient);
+        ConfigureHttpClient<ISchemasApiClient, SchemasApiClient>(services, configureHttpClient);
+        ConfigureHttpClient<IKeyValuesApiClient, KeyValuesApiClient>(services, configureHttpClient);
+        ConfigureHttpClient<ITemplatesApiClient, TemplatesApiClient>(services, configureHttpClient);
+        ConfigureHttpClient<ITransfersApiClient, TransfersApiClient>(services, configureHttpClient);
 
         return services;
     }
 
-    private static void ConfigureHttpClient<TInterface, TImplementation>(IServiceCollection services)
+    private static void ConfigureHttpClient<TInterface, TImplementation>(IServiceCollection services, Action<IHttpClientBuilder>? configureHttpClient)
         where TInterface : class
         where TImplementation : class, TInterface
     {
-        services.AddHttpClient<TInterface, TImplementation>()
+        var builder = services.AddHttpClient<TInterface, TImplementation>()
             .ConfigurePrimaryHttpMessageHandler(sp =>
             {
                 var config = sp.GetService<ISdkConfiguration>();
@@ -55,5 +63,7 @@ public static class ServicesCollectionExtensions
 
                 return handler;
             });
+
+        configureHttpClient?.Invoke(builder);
     }
 }

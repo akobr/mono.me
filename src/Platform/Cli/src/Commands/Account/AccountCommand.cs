@@ -138,6 +138,13 @@ public class AccountCommand : BaseCommand
     // Non-interactive: no device code, no prompt and no account call, which machines are not allowed.
     private async Task<int> SignInMachineAsync()
     {
+        // A federated machine exchanges at the token endpoint of its project, so the project is checked and bound
+        // before any request. Invalid variables fall through to SignInAsync, which reports them.
+        if (_machine.TryGetIdentity() is { Kind: MachineSignInKind.Federated } && CheckTarget() is { } targetExitCode)
+        {
+            return targetExitCode;
+        }
+
         MachineIdentity identity;
 
         try
@@ -156,21 +163,9 @@ public class AccountCommand : BaseCommand
             (identity.MachineId is null ? "a machine" : $"machine {identity.MachineId}").ThemedHighlight(Console.Theme),
             $" with {DescribeKind(identity.Kind)} ({string.Join(", ", identity.Variables)}).");
 
-        if (!_context.IsProjectKnown)
+        if (CheckTarget() is { } exitCode)
         {
-            Console.WriteImportant($"No project is set: set {StorytellerVariables.PROJECT}=<organization>.<project> or pass -p to each command.");
-            return ExitCodes.WARNING_INTERACTION_NEEDED;
-        }
-
-        try
-        {
-            // The checks every command runs: e.g. STORYTELLER_PROJECT names another project than the key.
-            _context.TrySetExplicitTarget(null, null);
-        }
-        catch (AuthenticationException exception)
-        {
-            Console.WriteImportant(exception.Message);
-            return ToExitCode(exception);
+            return exitCode;
         }
 
         Console.WriteLine(
@@ -184,6 +179,28 @@ public class AccountCommand : BaseCommand
             ? $"Token valid until {expiresAt:O}.".ThemedLowlight(Console.Theme)
             : "The API checks the credentials on the first call.".ThemedLowlight(Console.Theme));
         return ExitCodes.SUCCESS;
+    }
+
+    // Null when the project is known and the target passes its checks, else the exit code.
+    private int? CheckTarget()
+    {
+        if (!_context.IsProjectKnown)
+        {
+            Console.WriteImportant($"No project is set: set {StorytellerVariables.PROJECT}=<organization>.<project> or pass -p to each command.");
+            return ExitCodes.WARNING_INTERACTION_NEEDED;
+        }
+
+        try
+        {
+            // The checks every command runs: e.g. STORYTELLER_PROJECT names another project than the key.
+            _context.TrySetExplicitTarget(null, null);
+            return null;
+        }
+        catch (AuthenticationException exception)
+        {
+            Console.WriteImportant(exception.Message);
+            return ToExitCode(exception);
+        }
     }
 
     private static int ToExitCode(AuthenticationException exception)
