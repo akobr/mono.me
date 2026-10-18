@@ -61,13 +61,14 @@ public partial class CosmosConfigurationSchemaService
         var identity = GetIdentity(target);
         var (organization, project, view) = (target.Organization, target.Project, target.View);
 
+        // the schema routes reject such a pair; an older or hand-made archive can still bring one
         if (identity.Kind == SchemaKind.Descendant
-            && !ViewArchiveNames.CanDescend(AnnotationKey.Parse(identity.ModelKey!), identity.ModelType!))
+            && !DescendantTypeRules.CanDescend(AnnotationKey.Parse(identity.ModelKey!), identity.ModelType!))
         {
             return new ViewImportResult(
                 ViewImportOutcome.Failed,
                 ErrorCode: ErrorCodes.InvalidKey,
-                Message: $"The type {identity.ModelType} cannot descend from {identity.ModelKey}, so it has no descendant-type schema there.");
+                Message: DescendantTypeRules.GetCannotDescendMessage(AnnotationKey.Parse(identity.ModelKey!), identity.ModelType!));
         }
 
         var repository = _repositoryProvider.GetOrganizationContainer(organization);

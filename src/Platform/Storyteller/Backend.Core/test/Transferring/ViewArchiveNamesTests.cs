@@ -296,20 +296,7 @@ public class ViewArchiveNamesTests
         name.AnnotationType.ShouldBe(type);
         name.AnnotationKey!.ToString().ShouldBe(key);
         name.ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
-        name.Message.ShouldNotBeNullOrEmpty();
-    }
-
-    [Fact]
-    public void CanDescend_FollowsTheAnnotationHierarchy()
-    {
-        ViewArchiveNames.CanDescend(AnnotationKey.Parse("rst.payments"), "unt").ShouldBeTrue();
-        ViewArchiveNames.CanDescend(AnnotationKey.Parse("rst.payments"), "UXE").ShouldBeTrue();
-        ViewArchiveNames.CanDescend(AnnotationKey.Parse("sbt.shop"), "cnt").ShouldBeTrue();
-        ViewArchiveNames.CanDescend(AnnotationKey.Parse("sbt.shop"), "unt").ShouldBeFalse();
-        ViewArchiveNames.CanDescend(AnnotationKey.Parse("cnt.shop.prod"), "exe").ShouldBeTrue();
-        ViewArchiveNames.CanDescend(AnnotationKey.Parse("cnt.shop.prod"), "usg").ShouldBeFalse();
-        ViewArchiveNames.CanDescend(AnnotationKey.Parse("exe.s.r.c"), "exe").ShouldBeFalse();
-        ViewArchiveNames.CanDescend(AnnotationKey.Parse("uxe.s.r.c.u"), "uxe").ShouldBeFalse();
+        name.Message.ShouldBe($"The type {type} cannot descend from {key}, so it has no descendant-type schema there.");
     }
 
     [Theory]

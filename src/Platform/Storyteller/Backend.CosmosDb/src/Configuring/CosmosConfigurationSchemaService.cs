@@ -157,7 +157,13 @@ public partial class CosmosConfigurationSchemaService : IConfigurationSchemaServ
         AuditActor actor,
         bool force)
     {
-        var identity = SchemaIdentity.ForDescendant(view, AnnotationKey.Parse(annotationKey).ToString(), NormalizeAnnotationType(descendantTypeCode));
+        var key = AnnotationKey.Parse(annotationKey);
+        var typeCode = NormalizeAnnotationType(descendantTypeCode);
+
+        // before anything is read or written, and whatever force is: such a layer would never apply to anything
+        DescendantTypeRules.EnsureCanDescend(key, typeCode);
+
+        var identity = SchemaIdentity.ForDescendant(view, key.ToString(), typeCode);
         return SaveAsync(organization, project, view, identity, schemaContent, actor, force);
     }
 
