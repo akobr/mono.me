@@ -93,6 +93,33 @@ public class RequestBodyExtensionsTests
         value.ShouldBe(assignments);
     }
 
+    // Decoding to a string first would replace the bytes that are not UTF-8 and store what the client never sent.
+    [Fact]
+    public async Task ReadJsonBody_NotUtf8_IsBadRequest()
+    {
+        // "café" in Latin-1.
+        byte[] body = [.. "{ \"Account\": \"caf"u8, 0xE9, .. "\" }"u8];
+
+        var (value, error) = await ReadBytesAsync<Assignment>(body);
+
+        value.ShouldBeNull();
+        error.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>()
+            .Message.ShouldBe("The request body is not an assignment (at $.Account).");
+    }
+
+    [Theory]
+    [InlineData("""{ "Account": "ada" }""")]
+    [InlineData("")]
+    public async Task ReadJsonBody_WithAByteOrderMark_IsReadAfterIt(string json)
+    {
+        byte[] body = [0xEF, 0xBB, 0xBF, .. System.Text.Encoding.UTF8.GetBytes(json)];
+
+        var (value, error) = await ReadBytesAsync<Assignment>(body);
+
+        error.ShouldBeNull();
+        value.ShouldBe(json.Length == 0 ? null : new Assignment { Account = "ada" });
+    }
+
     [Fact]
     public async Task ReadJsonBody_CanceledRequest_Throws()
     {
@@ -112,6 +139,15 @@ public class RequestBodyExtensionsTests
         var (_, request) = FunctionTestDoubles.CreateRequest(services, headers, "POST", body);
 
         return await request.ReadJsonBodyAsync<T>(FunctionTestDoubles.ApiJsonSerializerOptions, Description, errorCode);
+    }
+
+    private static async Task<(T? Value, IActionResult? Error)> ReadBytesAsync<T>(byte[] body)
+        where T : class
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var request = new TestHttpRequestData(new TestFunctionContext(services), FunctionTestDoubles.JsonContentType(), "POST", bodyBytes: body);
+
+        return await request.ReadJsonBodyAsync<T>(FunctionTestDoubles.ApiJsonSerializerOptions, Description);
     }
 
     private sealed record Assignment
