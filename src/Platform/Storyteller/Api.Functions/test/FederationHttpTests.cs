@@ -724,10 +724,11 @@ public class FederationHttpTests
         _access.Add(Org, Project, FederatedMachine(Rule()));
         _access.Add(Org, Project, apiKeyMachine);
         _access.Created = FederatedMachine(Rule());
-        var http = new AccessHttp(_access, NullLogger<AccessHttp>.Instance, federationOptions: Options.Create(_options));
+        var http = new AccessHttp(_access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance, federationOptions: Options.Create(_options));
         const string expected = "https://api.example/api/v1/org1/proj1/access/token";
+        var create = FunctionTestDoubles.ToJsonBody(new MachineAccessCreate { Organization = Org, Project = Project, Scope = MachineAccessScope.DefaultRead });
 
-        var created = await http.PostMachines(UserRequest(), new MachineAccessCreate { Organization = Org, Project = Project, Scope = MachineAccessScope.DefaultRead }, Org, Project);
+        var created = await http.PostMachines(UserRequest(headers: FunctionTestDoubles.JsonContentType(), method: "POST", body: create), Org, Project);
         var federated = await http.GetMachine(UserRequest(), Org, Project, MachineId);
         var apiKey = await http.GetMachine(UserRequest(), Org, Project, apiKeyMachine.Id);
         var list = await http.GetMachines(UserRequest(), Org, Project);

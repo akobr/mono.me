@@ -86,7 +86,7 @@ public class MachineHttpTests
             EnabledCredentialKinds = [MachineCredentialKind.ClientCredentials, MachineCredentialKind.ApiKey],
         };
 
-        var result = await http.PutMachineAuthentication(ContributorRequest(), requested, "org1.proj1");
+        var result = await http.PutMachineAuthentication(ContributorRequest(FunctionTestDoubles.ToJsonBody(requested)), "org1.proj1");
 
         store.Stored.ShouldNotBeNull();
         store.Stored.EnabledCredentialKinds.ShouldBe([MachineCredentialKind.ApiKey, MachineCredentialKind.ClientCredentials]);
@@ -107,7 +107,7 @@ public class MachineHttpTests
             CredentialKind = MachineCredentialKind.ApiKey,
         };
 
-        var result = await http.PutMachineAuthentication(ContributorRequest(), requested, "org1.proj1");
+        var result = await http.PutMachineAuthentication(ContributorRequest(FunctionTestDoubles.ToJsonBody(requested)), "org1.proj1");
 
         result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<Models.ErrorResponse>()
             .Message.ShouldBe("The default credential kind ApiKey is not one of the enabled kinds.");
@@ -121,7 +121,7 @@ public class MachineHttpTests
         var policy = new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey };
 
         (await http.GetMachineAuthentication(ContributorRequest(), "org1")).ShouldBeOfType<BadRequestObjectResult>();
-        (await http.PutMachineAuthentication(ContributorRequest(), policy, "org1")).ShouldBeOfType<BadRequestObjectResult>();
+        (await http.PutMachineAuthentication(ContributorRequest(FunctionTestDoubles.ToJsonBody(policy)), "org1")).ShouldBeOfType<BadRequestObjectResult>();
     }
 
     [Theory]
@@ -133,7 +133,7 @@ public class MachineHttpTests
         var access = new RecordingAccess(Machine());
         var http = CreateHttp(access);
 
-        var result = await http.PostMachines(ContributorRequest(), MachineCreate(annotationKey), "org1", "proj1");
+        var result = await http.PostMachines(ContributorRequest(FunctionTestDoubles.ToJsonBody(MachineCreate(annotationKey))), "org1", "proj1");
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>().AnnotationKey.ShouldBeNull();
         access.Created.ShouldNotBeNull();
@@ -151,7 +151,7 @@ public class MachineHttpTests
         var access = new RecordingAccess(Machine());
         var http = CreateHttp(access);
 
-        var result = await http.PostMachines(ContributorRequest(), MachineCreate(annotationKey), "org1", "proj1");
+        var result = await http.PostMachines(ContributorRequest(FunctionTestDoubles.ToJsonBody(MachineCreate(annotationKey))), "org1", "proj1");
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>().AnnotationKey.ShouldBe(expected);
         access.Created.ShouldNotBeNull();
@@ -172,7 +172,7 @@ public class MachineHttpTests
         var access = new RecordingAccess(Machine());
         var http = CreateHttp(access);
 
-        var result = await http.PostMachines(ContributorRequest(), MachineCreate(annotationKey), "org1", "proj1");
+        var result = await http.PostMachines(ContributorRequest(FunctionTestDoubles.ToJsonBody(MachineCreate(annotationKey))), "org1", "proj1");
 
         result.ShouldBeOfType<OkObjectResult>();
         access.Created.ShouldNotBeNull();
@@ -189,12 +189,61 @@ public class MachineHttpTests
         var access = new RecordingAccess(Machine());
         var http = CreateHttp(access);
 
-        var result = await http.PostMachines(ContributorRequest(), MachineCreate(annotationKey), "org1", "proj1");
+        var result = await http.PostMachines(ContributorRequest(FunctionTestDoubles.ToJsonBody(MachineCreate(annotationKey))), "org1", "proj1");
 
         var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<Models.ErrorResponse>();
         error.ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
         error.Message.ShouldContain(annotationKey);
         access.Created.ShouldBeNull();
+    }
+
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran.
+    [Theory]
+    [InlineData("", "The machine is missing.")]
+    [InlineData("null", "The machine is missing.")]
+    [InlineData("[1, 2]", "The request body is not a machine (at $).")]
+    public async Task PostMachines_MissingOrInvalidBody_IsBadRequestAndNoMachineIsCreated(string body, string message)
+    {
+        var access = new RecordingAccess(Machine());
+        var http = CreateHttp(access);
+
+        var result = await http.PostMachines(ContributorRequest(body), "org1", "proj1");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<Models.ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        access.Created.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task PostMachines_PropertyAndEnumNamesInAnyCase_AreRead()
+    {
+        var access = new RecordingAccess(Machine());
+        var http = CreateHttp(access);
+        const string body = """{ "organization": "", "project": "", "scope": "configurationread" }""";
+
+        var result = await http.PostMachines(ContributorRequest(body), "org1", "proj1");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Created.ShouldNotBeNull();
+        access.Created.Scope.ShouldBe(MachineAccessScope.ConfigurationRead);
+    }
+
+    [Theory]
+    [InlineData("", "The machine authentication policy is missing.")]
+    [InlineData("null", "The machine authentication policy is missing.")]
+    [InlineData("[1, 2]", "The request body is not a machine authentication policy (at $).")]
+    public async Task PutMachineAuthentication_MissingOrInvalidBody_IsBadRequestAndNotStored(string body, string message)
+    {
+        var store = new PolicyStore();
+        var http = CreateHttp(new RecordingAccess(Machine()), store);
+
+        var result = await http.PutMachineAuthentication(ContributorRequest(body), "org1.proj1");
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<Models.ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        store.Stored.ShouldBeNull();
     }
 
     private static AccessHttp CreateHttp(RecordingAccess access, IMachineAuthenticationPolicyStore? policyStore = null)
@@ -205,13 +254,15 @@ public class MachineHttpTests
             CertificateLifetimeDays = 180,
         });
 
-        return new AccessHttp(access, NullLogger<AccessHttp>.Instance, policyStore: policyStore, machineOptions: options);
+        return new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance, policyStore: policyStore, machineOptions: options);
     }
 
-    private static TestHttpRequestData ContributorRequest()
+    // A contributor's request; a body goes as JSON, with its content type.
+    private static TestHttpRequestData ContributorRequest(string? body = null)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var (context, request) = FunctionTestDoubles.CreateRequest(services);
+        var headers = body is null ? null : FunctionTestDoubles.JsonContentType();
+        var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, body: body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "user-1"),

@@ -2,6 +2,7 @@ using System.Security.Claims;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
+using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1;
 
@@ -71,9 +72,9 @@ public class MembersHttpTests
     public async Task PostAccount_OnlyOneOfOrganizationAndProject_ReturnsBadRequest(string? organization, string? project)
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, NullLogger<AccessHttp>.Instance);
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
 
-        var result = await http.PostAccount(UserRequest(), new ApiAccountCreate { Organization = organization, Project = project });
+        var result = await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate { Organization = organization, Project = project })));
 
         result.ShouldBeOfType<BadRequestObjectResult>();
         access.Calls.ShouldBe(["account:user-1"]);
@@ -83,9 +84,9 @@ public class MembersHttpTests
     public async Task PostAccount_WithoutOrganizationAndProject_CreatesABareAccount()
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, NullLogger<AccessHttp>.Instance);
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
 
-        var result = await http.PostAccount(UserRequest(), new ApiAccountCreate());
+        var result = await http.PostAccount(UserRequest(FunctionTestDoubles.ToJsonBody(new ApiAccountCreate())));
 
         result.ShouldBeOfType<OkObjectResult>();
         access.Created.ShouldNotBeNull();
@@ -94,10 +95,32 @@ public class MembersHttpTests
         access.Created.UserName.ShouldBe("ada@example.com");
     }
 
-    private static TestHttpRequestData UserRequest()
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran. An account without
+    // memberships is created with {}, not without a body.
+    [Theory]
+    [InlineData("", "The account is missing.")]
+    [InlineData("null", "The account is missing.")]
+    [InlineData("[1, 2]", "The request body is not an account (at $).")]
+    public async Task PostAccount_MissingOrInvalidBody_ReturnsBadRequestWithoutCreatingAnAccount(string body, string message)
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        var result = await http.PostAccount(UserRequest(body));
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        access.Calls.ShouldBe(["account:user-1"]);
+        access.Created.ShouldBeNull();
+    }
+
+    // A user's request; a body goes as JSON, with its content type.
+    private static TestHttpRequestData UserRequest(string? body = null)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var (context, request) = FunctionTestDoubles.CreateRequest(services);
+        var headers = body is null ? null : FunctionTestDoubles.JsonContentType();
+        var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, body: body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "user-1"),

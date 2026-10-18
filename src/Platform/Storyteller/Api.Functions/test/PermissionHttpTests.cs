@@ -28,9 +28,9 @@ public class PermissionHttpTests
     public async Task Grant_InvalidPermission_ReturnsBadRequestWithoutCallingTheService(Permission permission)
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, NullLogger<AccessHttp>.Instance);
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
 
-        var result = await http.PostGrantPermission(UserRequest(), permission);
+        var result = await http.PostGrantPermission(UserRequest(FunctionTestDoubles.ToJsonBody(permission)));
 
         result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldNotBeNullOrWhiteSpace();
         access.Calls.ShouldBeEmpty();
@@ -41,9 +41,9 @@ public class PermissionHttpTests
     public async Task Revoke_InvalidPermission_ReturnsBadRequestWithoutCallingTheService(Permission permission)
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, NullLogger<AccessHttp>.Instance);
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
 
-        var result = await http.PostRevokePermission(UserRequest(), permission);
+        var result = await http.PostRevokePermission(UserRequest(FunctionTestDoubles.ToJsonBody(permission)));
 
         result.ShouldBeOfType<BadRequestObjectResult>();
         access.Calls.ShouldBeEmpty();
@@ -53,9 +53,9 @@ public class PermissionHttpTests
     public async Task Grant_ValidPermission_UsesTheCallerAsCreator()
     {
         var access = new RecordingAccess();
-        var http = new AccessHttp(access, NullLogger<AccessHttp>.Instance);
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
 
-        var result = await http.PostGrantPermission(UserRequest(), Permission(AccountRole.Contributor) with { CreatedById = "spoofed" });
+        var result = await http.PostGrantPermission(UserRequest(FunctionTestDoubles.ToJsonBody(Permission(AccountRole.Contributor) with { CreatedById = "spoofed" })));
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<AccessPoint>().Key.ShouldBe(PointKey);
         access.Calls.ShouldBe(["grant:user-1:user-2:Contributor", $"point:{PointKey}"]);
@@ -65,9 +65,70 @@ public class PermissionHttpTests
     public async Task Revoke_AccessDenied_PropagatesForTheMiddleware()
     {
         var access = new RecordingAccess { RevokeError = new AccessDeniedException("no role") };
-        var http = new AccessHttp(access, NullLogger<AccessHttp>.Instance);
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
 
-        await Should.ThrowAsync<AccessDeniedException>(() => http.PostRevokePermission(UserRequest(), Permission(AccountRole.Reader)));
+        await Should.ThrowAsync<AccessDeniedException>(() => http.PostRevokePermission(UserRequest(FunctionTestDoubles.ToJsonBody(Permission(AccountRole.Reader)))));
+    }
+
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran.
+    [Theory]
+    [InlineData("", "The permission is missing.")]
+    [InlineData("null", "The permission is missing.")]
+    [InlineData("[1, 2]", "The request body is not a permission (at $).")]
+    public async Task Grant_MissingOrInvalidBody_ReturnsBadRequestWithoutCallingTheService(string body, string message)
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        var result = await http.PostGrantPermission(UserRequest(body));
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        access.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("", "The permission is missing.")]
+    [InlineData("null", "The permission is missing.")]
+    [InlineData("[1, 2]", "The request body is not a permission (at $).")]
+    public async Task Revoke_MissingOrInvalidBody_ReturnsBadRequestWithoutCallingTheService(string body, string message)
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        var result = await http.PostRevokePermission(UserRequest(body));
+
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>();
+        error.Message.ShouldBe(message);
+        error.ErrorCode.ShouldBeNull();
+        access.Calls.ShouldBeEmpty();
+    }
+
+    // The worker's [FromBody] binding refused a body without a content type; the handler reads it.
+    [Fact]
+    public async Task Grant_BodyWithoutAContentType_IsRead()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+
+        var result = await http.PostGrantPermission(UserRequest(FunctionTestDoubles.ToJsonBody(Permission(AccountRole.Reader)), contentType: false));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Calls.ShouldBe(["grant:user-1:user-2:Reader", $"point:{PointKey}"]);
+    }
+
+    [Fact]
+    public async Task Revoke_PropertyAndEnumNamesInAnyCase_AreRead()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        const string body = """{ "createdById": "", "accountId": "user-2", "accessPointKey": "org1.proj1", "role": "contributor" }""";
+
+        var result = await http.PostRevokePermission(UserRequest(body));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        access.Calls.ShouldBe(["revoke:user-1:user-2:Contributor", $"point:{PointKey}"]);
     }
 
     private static Permission Permission(AccountRole role)
@@ -81,10 +142,12 @@ public class PermissionHttpTests
         };
     }
 
-    private static TestHttpRequestData UserRequest()
+    // A user's request; the body goes as JSON, with its content type unless contentType is false.
+    private static TestHttpRequestData UserRequest(string body, bool contentType = true)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var (context, request) = FunctionTestDoubles.CreateRequest(services);
+        var headers = contentType ? FunctionTestDoubles.JsonContentType() : null;
+        var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, "POST", body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "user-1"),

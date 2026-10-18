@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Api.Models;
@@ -15,8 +16,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 
-using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
-
 namespace _42.Platform.Storyteller.Api.V1;
 
 public class AccessHttp
@@ -27,10 +26,12 @@ public class AccessHttp
     private readonly IUserProfileResolver? _profileResolver;
     private readonly MachineAuthenticationOptions _machineOptions;
     private readonly FederationOptions _federationOptions;
+    private readonly JsonSerializerOptions _bodyJsonOptions;
     private readonly ILogger<AccessHttp> _logger;
 
     public AccessHttp(
         IAccessService accessService,
+        IOptions<JsonOptions> jsonOptions,
         ILogger<AccessHttp> logger,
         ICertificateAuthorityProvider? caProvider = null,
         IMachineAuthenticationPolicyStore? policyStore = null,
@@ -39,6 +40,7 @@ public class AccessHttp
         IOptions<FederationOptions>? federationOptions = null)
     {
         _accessService = accessService;
+        _bodyJsonOptions = jsonOptions.Value.JsonSerializerOptions;
         _logger = logger;
         _caProvider = caProvider;
         _policyStore = policyStore;
@@ -80,8 +82,7 @@ public class AccessHttp
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostAccount(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Account)]
-        HttpRequestData request,
-        [FromBody] Models.AccountCreate accountModel)
+        HttpRequestData request)
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountId = request.GetIdentityUniqueId();
@@ -91,6 +92,19 @@ public class AccessHttp
         if (account is not null)
         {
             return new BadRequestResult();
+        }
+
+        var (accountModel, invalidBody) = await request.ReadJsonBodyAsync<Models.AccountCreate>(_bodyJsonOptions, "an account");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
+        // An account without memberships is created with {}; no body at all is a mistake of the client.
+        if (accountModel is null)
+        {
+            return new BadRequestObjectResult(new ErrorResponse("The account is missing."));
         }
 
         if (string.IsNullOrWhiteSpace(accountModel.Organization) != string.IsNullOrWhiteSpace(accountModel.Project))
@@ -161,12 +175,24 @@ public class AccessHttp
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostAccessPoints(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.AccessPoints)]
-        HttpRequestData request,
-        [FromBody] AccessPointCreate pointModel)
+        HttpRequestData request)
     {
         request.CheckScope(Scopes.User.Impersonation);
         var accountId = request.GetIdentityUniqueId();
         _logger.LogInformation("POST api/access/points call with accountId: {accountId}", accountId);
+        var (pointModel, invalidBody) = await request.ReadJsonBodyAsync<AccessPointCreate>(_bodyJsonOptions, "an access point");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
+        if (pointModel is null)
+        {
+            return new BadRequestObjectResult(new ErrorResponse("The access point is missing."));
+        }
+
+        // The caller owns what they create; clients do not send the owner.
         pointModel = pointModel with { OwnerId = accountId };
         var point = await _accessService.CreateAccessPointAsync(pointModel);
         return new OkObjectResult(point);
@@ -182,10 +208,15 @@ public class AccessHttp
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostGrantPermission(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Grant)]
-        HttpRequestData request,
-        [FromBody] Permission permissionModel)
+        HttpRequestData request)
     {
         request.CheckScope(Scopes.User.Impersonation);
+        var (permissionModel, invalidBody) = await request.ReadJsonBodyAsync<Permission>(_bodyJsonOptions, "a permission");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (!TryValidatePermission(permissionModel, out var badRequestResult))
         {
@@ -209,10 +240,15 @@ public class AccessHttp
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostRevokePermission(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Revoke)]
-        HttpRequestData request,
-        [FromBody] Permission permissionModel)
+        HttpRequestData request)
     {
         request.CheckScope(Scopes.User.Impersonation);
+        var (permissionModel, invalidBody) = await request.ReadJsonBodyAsync<Permission>(_bodyJsonOptions, "a permission");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
 
         if (!TryValidatePermission(permissionModel, out var badRequestResult))
         {
@@ -296,12 +332,22 @@ public class AccessHttp
     public async Task<IActionResult> PostMachines(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Machines)]
         HttpRequestData request,
-        [FromBody] MachineAccessCreate machineModel,
         string organization,
         string project)
     {
         request.CheckScope(Scopes.User.Impersonation);
         await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+        var (machineModel, invalidBody) = await request.ReadJsonBodyAsync<MachineAccessCreate>(_bodyJsonOptions, "a machine");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
+        if (machineModel is null)
+        {
+            return new BadRequestObjectResult(new ErrorResponse("The machine is missing."));
+        }
 
         // The annotation restriction is stored in its canonical form; blank means the whole project.
         if (!MachineAnnotationRestriction.TryNormalize(machineModel.AnnotationKey, out var annotationKey))
@@ -461,7 +507,6 @@ public class AccessHttp
     public async Task<IActionResult> PutMachineAuthentication(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.MachineAuthentication)]
         HttpRequestData request,
-        [FromBody] MachineAuthenticationPolicy policy,
         string key)
     {
         request.CheckScope(Scopes.User.Impersonation);
@@ -478,12 +523,20 @@ public class AccessHttp
             return badRequestResult;
         }
 
+        var (policy, invalidBody) = await request.ReadJsonBodyAsync<MachineAuthenticationPolicy>(_bodyJsonOptions, "a machine authentication policy");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
         if (MachineAuthenticationPolicies.Validate(policy, _machineOptions) is { } invalid)
         {
             return new BadRequestObjectResult(new ErrorResponse(invalid));
         }
 
-        var normalized = MachineAuthenticationPolicies.Normalize(policy);
+        // Validate refuses a missing policy, so there is one here.
+        var normalized = MachineAuthenticationPolicies.Normalize(policy!);
         await _policyStore.SetAsync(organization, project, normalized);
         return new OkObjectResult(MachineAuthenticationPolicies.Resolve(normalized, _machineOptions));
     }
@@ -509,7 +562,7 @@ public class AccessHttp
         return true;
     }
 
-    private static bool TryValidatePermission(Permission? model, [NotNullWhen(false)] out IActionResult? badRequestResult)
+    private static bool TryValidatePermission([NotNullWhen(true)] Permission? model, [NotNullWhen(false)] out IActionResult? badRequestResult)
     {
         var message = model switch
         {

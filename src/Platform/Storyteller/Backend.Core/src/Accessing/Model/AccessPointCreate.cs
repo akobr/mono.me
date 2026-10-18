@@ -6,5 +6,6 @@ public record class AccessPointCreate
 
     public string? Project { get; init; }
 
-    public required string OwnerId { get; init; }
+    // Not required: the API sets it from the caller, so clients do not send it.
+    public string OwnerId { get; init; } = string.Empty;
 }
