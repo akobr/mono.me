@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.21.3734
+ * OpenAPI spec version: 0.9.29.8872
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -340,6 +340,9 @@ export const getGetConfigurationUrl = (
   return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}`;
 };
 
+/**
+ * The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
+ */
 export const getConfiguration = async (
   organization: string,
   project: string,
@@ -367,7 +370,7 @@ export const getGetConfigurationQueryKey = (
 
 export const getGetConfigurationQueryOptions = <
   TData = Awaited<ReturnType<typeof getConfiguration>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<void | ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -429,11 +432,11 @@ export const getGetConfigurationQueryOptions = <
 export type GetConfigurationQueryResult = NonNullable<
   Awaited<ReturnType<typeof getConfiguration>>
 >;
-export type GetConfigurationQueryError = ErrorType<ErrorResponse | void>;
+export type GetConfigurationQueryError = ErrorType<void | ErrorResponse>;
 
 export function useGetConfiguration<
   TData = Awaited<ReturnType<typeof getConfiguration>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<void | ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -903,6 +906,9 @@ export const getGetResolvedConfigurationUrl = (
   return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/resolved`;
 };
 
+/**
+ * The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same. A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.
+ */
 export const getResolvedConfiguration = async (
   organization: string,
   project: string,
@@ -938,7 +944,7 @@ export const getGetResolvedConfigurationQueryKey = (
 
 export const getGetResolvedConfigurationQueryOptions = <
   TData = Awaited<ReturnType<typeof getResolvedConfiguration>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<void | ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
@@ -1001,11 +1007,11 @@ export type GetResolvedConfigurationQueryResult = NonNullable<
   Awaited<ReturnType<typeof getResolvedConfiguration>>
 >;
 export type GetResolvedConfigurationQueryError =
-  ErrorType<ErrorResponse | void>;
+  ErrorType<void | ErrorResponse>;
 
 export function useGetResolvedConfiguration<
   TData = Awaited<ReturnType<typeof getResolvedConfiguration>>,
-  TError = ErrorType<ErrorResponse | void>,
+  TError = ErrorType<void | ErrorResponse>,
 >(
   organization: MaybeRefOrGetter<string>,
   project: MaybeRefOrGetter<string>,
