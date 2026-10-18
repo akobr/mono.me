@@ -82,6 +82,30 @@ public class AccountCommandTests
     }
 
     [Fact]
+    public async Task Machine_Federated_WithAFile_ExchangesAndShowsTheMachineAndTheProject()
+    {
+        var fileSystem = new MockFileSystem();
+        fileSystem.AddFile(MockUnixSupport.Path(@"C:\ci\platform-token"), new MockFileData("platform-token"));
+        _environment[StorytellerVariables.CLIENT_ID] = "6d0f2c4e-0000-4000-8000-000000000001";
+        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = MockUnixSupport.Path(@"C:\ci\platform-token");
+        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        _http.Respond(HttpStatusCode.OK, """{"access_token":"st-1","token_type":"Bearer","expires_in":900}""");
+
+        var exitCode = await Execute(fileSystem: fileSystem);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        _console.Lines.ShouldBe(
+        [
+            "# Machine sign-in",
+            "Signed in as machine 6d0f2c4e-0000-4000-8000-000000000001 with workload identity federation (STORYTELLER_CLIENT_ID, STORYTELLER_SUBJECT_TOKEN_FILE).",
+            "Project acme.billing with default view.",
+            $"API {ApiUrl}",
+            "Token valid until 2026-10-17T12:15:00.0000000+00:00.",
+        ]);
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri($"{ApiUrl}/v1/acme/billing/access/token"));
+    }
+
+    [Fact]
     public async Task Machine_WithAnExpiredTokenFile_IsRejected()
     {
         var fileSystem = new MockFileSystem();
