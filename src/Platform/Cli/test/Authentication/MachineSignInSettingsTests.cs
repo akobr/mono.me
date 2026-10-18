@@ -9,6 +9,9 @@ public class MachineSignInSettingsTests
 {
     private const string ApiUrl = "https://storyteller.example.com/api";
 
+    private const string ClientIdWithoutSourceMessage =
+        "STORYTELLER_CLIENT_ID needs STORYTELLER_CLIENT_SECRET for client credentials, or a platform token for a federated machine: STORYTELLER_SUBJECT_TOKEN_FILE, or a GitHub Actions job with permissions: id-token: write.";
+
     [Fact]
     public void FromEnvironment_TrimsValuesAndTreatsEmptyAsUnset()
     {
@@ -64,7 +67,7 @@ public class MachineSignInSettingsTests
     }
 
     [Theory]
-    [InlineData("Client credentials need STORYTELLER_CLIENT_ID and STORYTELLER_CLIENT_SECRET; STORYTELLER_CLIENT_SECRET is missing.", StorytellerVariables.CLIENT_ID)]
+    [InlineData(ClientIdWithoutSourceMessage, StorytellerVariables.CLIENT_ID)]
     [InlineData("Client credentials need STORYTELLER_CLIENT_ID and STORYTELLER_CLIENT_SECRET; STORYTELLER_CLIENT_ID is missing.", StorytellerVariables.CLIENT_SECRET, StorytellerVariables.TOKEN_URL)]
     [InlineData("Client credentials need STORYTELLER_CLIENT_ID and STORYTELLER_CLIENT_SECRET; STORYTELLER_CLIENT_ID and STORYTELLER_CLIENT_SECRET are missing.", StorytellerVariables.TOKEN_SCOPE)]
     [InlineData("STORYTELLER_CERTIFICATE_PASSWORD is set without STORYTELLER_CERTIFICATE_FILE.", StorytellerVariables.CERTIFICATE_PASSWORD)]
