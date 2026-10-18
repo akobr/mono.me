@@ -201,12 +201,6 @@ public class MachineCreateFederatedTests
         lines.IndexOf("  STORYTELLER_SUBJECT_TOKEN_FILE=<file with the platform token>").ShouldBeLessThan(lines.FindIndex(line => line.Contains("could not be derived")));
     }
 
-    // From the last line of the setup on.
-    private List<string> PipelineLines()
-    {
-        return _console.Lines.SkipWhile(line => !line.StartsWith("! The machine has no secret")).ToList();
-    }
-
     [Fact]
     public async Task LifetimeAndOutput_AreIgnoredForAFederatedMachine()
     {
@@ -459,6 +453,12 @@ public class MachineCreateFederatedTests
     private string Important()
     {
         return _console.Lines.Single(line => line.StartsWith("! "));
+    }
+
+    // From the last line of the setup on.
+    private List<string> PipelineLines()
+    {
+        return _console.Lines.SkipWhile(line => !line.StartsWith("! The machine has no secret")).ToList();
     }
 
     private Task<int> Execute(

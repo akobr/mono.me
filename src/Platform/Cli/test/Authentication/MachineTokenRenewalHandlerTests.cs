@@ -19,7 +19,6 @@ namespace _42.Platform.Cli.UnitTests.Authentication;
 public class MachineTokenRenewalHandlerTests
 {
     private const string ApiUrl = "https://storyteller.example.com/api";
-    private const string TokenEndpoint = "https://storyteller.example.com/api/v1/acme/billing/access/token";
     private const string AnnotationsUrl = "https://storyteller.example.com/api/v1/acme/billing/default/annotations";
 
     private static readonly DateTimeOffset Start = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
