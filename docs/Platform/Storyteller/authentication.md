@@ -303,6 +303,7 @@ Without a stored policy a project enables only `MachineAuth:DefaultCredentialKin
 
 `GET v1/access/points/{organization}.{project}/machine-authentication` returns the policy with every property filled, so a client does not have to know the deployment defaults. It needs `Contributor`, because Contributors create machines. `PUT` on the same route sets it, needs `Administrator`, and returns the filled policy too. The body may leave out `CredentialKind` (the first listed kind becomes the default) and `CertificateLifetimeDays` (the project then follows the deployment default). A body with only `CredentialKind` enables that one kind, as older clients send it. `PUT` returns `400` when:
 
+* the body is empty, `null` or not a policy;
 * no kind is enabled;
 * a kind does not exist;
 * `CredentialKind` is not one of `EnabledCredentialKinds`;
@@ -962,6 +963,8 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
 | `400` | none | Grant or revoke with a missing account, a missing access point key, or the role `None`. |
+| `400` | none | An empty body or `null` where an account, an access point, a machine, a permission, a machine authentication policy or a shared certificate is required: `The account is missing.`, `The permission is missing.` and so on. |
+| `400` | none | A body that does not fit its type: invalid JSON, another shape, or a required member left out. The message names the expected body and the JSON path, for example `The request body is not a shared certificate (at $).` |
 | `400` | none | A machine of a kind the project does not enable or the deployment does not configure, or a reset of a `Federated` machine. |
 | `400` | `InvalidFederation` | A trusted issuer or a federation rule fails [validation](#federation-rules), or a `PUT` changes the `Issuer` of a trusted issuer. |
 | `400` | `MachineNotFederated` | Federation rules for a machine of another kind. |
