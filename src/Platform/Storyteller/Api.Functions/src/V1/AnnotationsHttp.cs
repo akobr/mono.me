@@ -15,9 +15,8 @@ using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Attributes;
 using Microsoft.Azure.WebJobs.Extensions.OpenApi.Core.Enums;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
-
-using FromBodyAttribute = Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute;
 
 namespace _42.Platform.Storyteller.Api.V1;
 
@@ -33,17 +32,20 @@ public partial class AnnotationsHttp
     private readonly IAnnotationService _annotations;
     private readonly IAccessService _access;
     private readonly TimeProvider _timeProvider;
+    private readonly JsonSerializerOptions _bodyJsonOptions;
     private readonly ILogger<AnnotationsHttp> _logger;
 
     public AnnotationsHttp(
         IAnnotationService annotations,
         IAccessService access,
         TimeProvider timeProvider,
+        IOptions<JsonOptions> jsonOptions,
         ILogger<AnnotationsHttp> logger)
     {
         _annotations = annotations;
         _access = access;
         _timeProvider = timeProvider;
+        _bodyJsonOptions = jsonOptions.Value.JsonSerializerOptions;
         _logger = logger;
     }
 
@@ -392,11 +394,31 @@ public partial class AnnotationsHttp
         HttpRequestData request,
         string organization,
         string project,
-        string view,
-        [FromBody] List<Annotation> annotations)
+        string view)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, annotations.Select(a => a.AnnotationKey), AccountRole.Contributor);
+        var (annotations, invalidBody) = await request.ReadJsonBodyAsync<List<Annotation>>(_bodyJsonOptions, "a list of annotations");
+
+        // The keys of the body are authorized before any 400 of the body, so a caller without access gets 403 first.
+        // A body that cannot be read names no key, which the restriction of a machine lets through to the 400.
+        var keys = (annotations ?? []).Where(a => a is not null).Select(a => a.AnnotationKey);
+        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, keys, AccountRole.Contributor);
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
+        if (annotations is null)
+        {
+            return new BadRequestObjectResult(new ErrorResponse("The annotations are missing."));
+        }
+
+        // The projection below would dereference a null entry.
+        if (annotations.Any(a => a is null))
+        {
+            return new BadRequestObjectResult(new ErrorResponse("The annotations must not contain null entries."));
+        }
 
         var annotationsToProcess = annotations
             .Select(a => a with { ProjectName = project, ViewName = view })
@@ -435,11 +457,21 @@ public partial class AnnotationsHttp
         HttpRequestData request,
         string organization,
         string project,
-        string view,
-        [FromBody] List<string> annotations)
+        string view)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        var (annotations, invalidBody) = await request.ReadJsonBodyAsync<List<string>>(_bodyJsonOptions, "a list of annotation keys or lines");
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
+        if (annotations is null)
+        {
+            return new BadRequestObjectResult(new ErrorResponse("The annotations are missing."));
+        }
 
         if (annotations.Count > ApiConstants.MaxInputItems)
         {

@@ -3,6 +3,7 @@ using System.Security.Claims;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
+using _42.Platform.Storyteller.Api.Models;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1;
 using _42.Platform.Storyteller.Binding;
@@ -167,7 +168,7 @@ public partial class MachineRestrictionHttpTests
         var http = CreateAnnotationsHttp(Untouched<IAnnotationService>());
         List<Annotation> body = [StoredAnnotation(Restriction), StoredAnnotation(Descendant), StoredAnnotation("cnt.northwind.prod")];
 
-        await ShouldBeRestrictedAsync(() => http.SetAnnotations(MachineRequest("POST"), Org, Project, DefaultView, body));
+        await ShouldBeRestrictedAsync(() => http.SetAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(body)), Org, Project, DefaultView));
     }
 
     [Fact]
@@ -177,7 +178,7 @@ public partial class MachineRestrictionHttpTests
         List<Annotation> body = [StoredAnnotation(Restriction), StoredAnnotation(Descendant)];
         recorder.Returns(nameof(IAnnotationService.CreateAnnotationsAsync), body.AsEnumerable());
 
-        var result = await CreateAnnotationsHttp(annotations).SetAnnotations(MachineRequest("POST"), Org, Project, DefaultView, body);
+        var result = await CreateAnnotationsHttp(annotations).SetAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(body)), Org, Project, DefaultView);
 
         result.ShouldBeOfType<OkObjectResult>();
         var call = recorder.Calls.ShouldHaveSingleItem();
@@ -193,7 +194,7 @@ public partial class MachineRestrictionHttpTests
         recorder.Returns(nameof(IAnnotationService.CreateAnnotationsAsync), CreatedWithTheAncestors());
         List<Annotation> body = [StoredAnnotation(Descendant)];
 
-        var result = await CreateAnnotationsHttp(annotations).SetAnnotations(MachineRequest("POST"), Org, Project, DefaultView, body);
+        var result = await CreateAnnotationsHttp(annotations).SetAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(body)), Org, Project, DefaultView);
 
         var created = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IEnumerable<Annotation>>()!;
         created.Select(annotation => annotation.AnnotationKey).ShouldBe([Restriction, Descendant]);
@@ -205,13 +206,37 @@ public partial class MachineRestrictionHttpTests
     {
         var (annotations, recorder) = Recording<IAnnotationService>();
         recorder.Returns(nameof(IAnnotationService.CreateAnnotationsAsync), CreatedWithTheAncestors());
-        var http = new AnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor), TimeProvider.System, NullLogger<AnnotationsHttp>.Instance);
+        var http = new AnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor), TimeProvider.System, FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
         List<Annotation> body = [StoredAnnotation(Descendant)];
 
-        var result = await http.SetAnnotations(MachineRequest("POST"), Org, Project, DefaultView, body);
+        var result = await http.SetAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(body)), Org, Project, DefaultView);
 
         var created = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IEnumerable<Annotation>>()!;
         created.Select(annotation => annotation.AnnotationKey).ShouldBe([Ancestor, Parent, Restriction, Descendant]);
+    }
+
+    // The keys of the body are checked before its 400s, so a null entry does not hide a key outside the restriction.
+    [Fact]
+    public async Task SetAnnotations_WithAKeyOutsideTheRestrictionAndANullEntry_IsRefusedBeforeTheService()
+    {
+        var http = CreateAnnotationsHttp(Untouched<IAnnotationService>());
+        var body = FunctionTestDoubles.ToJsonBody<List<Annotation?>>([StoredAnnotation(Restriction), null, StoredAnnotation(Ancestor)]);
+
+        await ShouldBeRestrictedAsync(() => http.SetAnnotations(MachineRequest("POST", body), Org, Project, DefaultView));
+    }
+
+    // A body that names no key passes the restriction and gets the 400 of the body.
+    [Theory]
+    [InlineData("{", "The request body is not a list of annotations (at $).")]
+    [InlineData("", "The annotations are missing.")]
+    [InlineData("[null]", "The annotations must not contain null entries.")]
+    public async Task SetAnnotations_ByTheRestrictedMachine_WithABodyWithoutKeys_IsBadRequest(string body, string message)
+    {
+        var http = CreateAnnotationsHttp(Untouched<IAnnotationService>());
+
+        var result = await http.SetAnnotations(MachineRequest("POST", body), Org, Project, DefaultView);
+
+        result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldBe(message);
     }
 
     [Fact]
@@ -220,7 +245,7 @@ public partial class MachineRestrictionHttpTests
         var http = CreateAnnotationsHttp(Untouched<IAnnotationService>());
         var model = new AnnotationKeysRequest { Keys = [Descendant, Sibling] };
 
-        await ShouldBeRestrictedAsync(() => http.FindDeletedAnnotations(MachineRequest("POST"), model, Org, Project, DefaultView));
+        await ShouldBeRestrictedAsync(() => http.FindDeletedAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(model)), Org, Project, DefaultView));
     }
 
     [Fact]
@@ -230,7 +255,7 @@ public partial class MachineRestrictionHttpTests
         recorder.Returns(nameof(IAnnotationService.FindDeletedAnnotationsAsync), (IReadOnlyList<Annotation>)[StoredAnnotation(Descendant)]);
         var model = new AnnotationKeysRequest { Keys = [Restriction, Descendant] };
 
-        var result = await CreateAnnotationsHttp(annotations).FindDeletedAnnotations(MachineRequest("POST"), model, Org, Project, DefaultView);
+        var result = await CreateAnnotationsHttp(annotations).FindDeletedAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(model)), Org, Project, DefaultView);
 
         var deleted = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeAssignableTo<IReadOnlyList<Annotation>>()!;
         deleted.ShouldHaveSingleItem().AnnotationKey.ShouldBe(Descendant);
@@ -246,7 +271,7 @@ public partial class MachineRestrictionHttpTests
         var http = CreateAnnotationsHttp(Untouched<IAnnotationService>());
         var model = new AnnotationRestoreRequest { Keys = [Restriction, Ancestor] };
 
-        await ShouldBeRestrictedAsync(() => http.RestoreAnnotations(MachineRequest("POST"), model, Org, Project, DefaultView));
+        await ShouldBeRestrictedAsync(() => http.RestoreAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(model)), Org, Project, DefaultView));
     }
 
     // The service restores the deleted ancestors too; the restricted machine gets back only what it may address.
@@ -261,7 +286,7 @@ public partial class MachineRestrictionHttpTests
         });
         var model = new AnnotationRestoreRequest { Keys = [Restriction] };
 
-        var result = await CreateAnnotationsHttp(annotations).RestoreAnnotations(MachineRequest("POST"), model, Org, Project, DefaultView);
+        var result = await CreateAnnotationsHttp(annotations).RestoreAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(model)), Org, Project, DefaultView);
 
         var restored = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<AnnotationRestoreResult>();
         restored.Annotations.Select(annotation => annotation.AnnotationKey).ShouldBe([Restriction, Descendant]);
@@ -277,14 +302,27 @@ public partial class MachineRestrictionHttpTests
             Annotations = [StoredAnnotation(Ancestor), StoredAnnotation(Restriction)],
             CreatedKeys = [Ancestor],
         });
-        var http = new AnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor), TimeProvider.System, NullLogger<AnnotationsHttp>.Instance);
+        var http = new AnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor), TimeProvider.System, FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
         var model = new AnnotationRestoreRequest { Keys = [Restriction] };
 
-        var result = await http.RestoreAnnotations(MachineRequest("POST"), model, Org, Project, DefaultView);
+        var result = await http.RestoreAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(model)), Org, Project, DefaultView);
 
         var restored = result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<AnnotationRestoreResult>();
         restored.Annotations.Select(annotation => annotation.AnnotationKey).ShouldBe([Ancestor, Restriction]);
         restored.CreatedKeys.ShouldBe([Ancestor]);
+    }
+
+    // A body that cannot be read names no key, so it passes the restriction and gets the 400 of the body.
+    [Fact]
+    public async Task DeletedAnnotations_ByTheRestrictedMachine_WithABodyThatCannotBeRead_AreBadRequest()
+    {
+        var http = CreateAnnotationsHttp(Untouched<IAnnotationService>());
+
+        var lookup = await http.FindDeletedAnnotations(MachineRequest("POST", "{"), Org, Project, DefaultView);
+        var restore = await http.RestoreAnnotations(MachineRequest("POST", "{"), Org, Project, DefaultView);
+
+        lookup.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
+        restore.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.InvalidKey);
     }
 
     [Fact]
@@ -365,10 +403,12 @@ public partial class MachineRestrictionHttpTests
         exception.ErrorCode.ShouldBe(ErrorCodes.AnnotationRestricted);
     }
 
-    // The scopes pass the scope checks of a Release build; the restriction comes from the machine document.
+    // The scopes pass the scope checks of a Release build; the restriction comes from the machine document. A body
+    // goes as JSON, with its content type.
     private static TestHttpRequestData MachineRequest(string method = "GET", string? body = null)
     {
-        var (context, request) = FunctionTestDoubles.CreateRequest(new ServiceCollection().BuildServiceProvider(), method: method, body: body);
+        var headers = body is null ? null : FunctionTestDoubles.JsonContentType();
+        var (context, request) = FunctionTestDoubles.CreateRequest(new ServiceCollection().BuildServiceProvider(), headers, method, body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "machine-1"),
@@ -396,7 +436,7 @@ public partial class MachineRestrictionHttpTests
 
     private static AnnotationsHttp CreateAnnotationsHttp(IAnnotationService annotations)
     {
-        return new AnnotationsHttp(annotations, Restricted(), TimeProvider.System, NullLogger<AnnotationsHttp>.Instance);
+        return new AnnotationsHttp(annotations, Restricted(), TimeProvider.System, FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
     }
 
     private static ConfigurationSchemaHttp CreateSchemaHttp(IConfigurationSchemaService schemas)
