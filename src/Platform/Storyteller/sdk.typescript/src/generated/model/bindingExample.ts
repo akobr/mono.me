@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.30.11684
+ * OpenAPI spec version: 0.9.31.35842
  */
 
 export interface BindingExample {

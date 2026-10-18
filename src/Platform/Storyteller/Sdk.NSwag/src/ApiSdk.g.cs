@@ -13698,7 +13698,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("The request is not well formed.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("The request is not well formed, or the descendant type cannot descend from the annotation key (ErrorCode InvalidKey).", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 401)

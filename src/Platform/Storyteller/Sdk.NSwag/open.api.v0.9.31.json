@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.30.11684"
+    "version": "0.9.31.35842"
   },
   "servers": [
     {
@@ -6494,7 +6494,7 @@
             }
           },
           "400": {
-            "description": "The request is not well formed.",
+            "description": "The request is not well formed, or the descendant type cannot descend from the annotation key (ErrorCode InvalidKey).",
             "content": {
               "application/json": {
                 "schema": {
