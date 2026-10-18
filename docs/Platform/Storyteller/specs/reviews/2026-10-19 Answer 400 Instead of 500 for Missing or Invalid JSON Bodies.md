@@ -1,0 +1,102 @@
+# Answer 400 Instead of 500 for Missing or Invalid JSON Bodies
+
+## Overview
+
+The 25 handlers of the Storyteller API that bound their JSON body with the worker's `[FromBody]` now read it themselves, through one reader shared with the federation routes. An empty body, `null`, a missing `Content-Type`, a body that is not UTF-8 or JSON that does not fit the type now answer **400**, never 500. Each handler keeps its existing missing-body message and code. Handlers that had none got one. The two optional bodies keep their defaults. The OpenAPI document and both SDKs are unchanged. This implements [Answer 400 Instead of 500 for Missing or Invalid JSON Bodies](../2026-10-18%20Answer%20400%20Instead%20of%20500%20for%20Missing%20or%20Invalid%20JSON%20Bodies.md) in full, for Linear 424-61. All three phases were delivered together, one commit per phase or handler group. The unit tests of `Api.Functions` went from 971 to 1103.
+
+## What Was Done
+
+### 1. The shared reader
+
+`Api.Functions/src/V1/RequestBodyExtensions.cs` holds `internal static class RequestBodyExtensions` with `ReadJsonBodyAsync<T>(this HttpRequestData request, JsonSerializerOptions options, string description, string? errorCode = null) where T : class`. It returns `(T? Value, IActionResult? Error)`. The explanation of why a handler reads its own body moved there from `FederationHttp`.
+
+It follows the spec: it reads the body with the cancellation token of the function context, a blank body and `null` give no value, `Content-Type` is not checked, and only a `JsonException` gives `The request body is not {description} (at {Path}).`, with the code only when one is given.
+
+Deviation, from the review: the reader no longer decodes the body to a string, as the federation reader did. It copies the bytes to a buffer and deserializes them with `JsonSerializer.DeserializeAsync`. With the string decoding, a body that is not UTF-8 was not refused: `StreamReader` replaces the invalid bytes with U+FFFD, so a Latin-1 `"café"` would have been stored as `"caf�"`, possibly as a secret. The worker's binding refused such a body. Now it is a 400 at the path of the value. A body is blank when it holds only JSON whitespace (space, tab, CR, LF) after an optional UTF-8 byte order mark, rather than any Unicode whitespace. The bytes are read once, without a UTF-16 copy of the whole body.
+
+### 2. JSON options for the handlers
+
+Every converted class takes `IOptions<JsonOptions>` and keeps the serializer options in `_bodyJsonOptions`, as `FederationHttp` does. The constructors follow the spec:
+
+- `AccessHttp(accessService, jsonOptions, logger, …optional)`
+- `CertificatesHttp(accessService, jsonOptions, logger, …optional)`
+- `InvitationsHttp(invitations, authOptions, jsonOptions, profileResolver = null)`
+- `MembersHttp(accessService, jsonOptions)`
+- `ViewsHttp(views, access, jsonOptions)`
+- `KeyValuesHttp(keyValues, access, policies, jsonOptions, logger)`
+- `KeyValuePolicyHttp(policies, policyStore, access, jsonOptions)`
+- `AnnotationsHttp(annotations, access, timeProvider, jsonOptions, logger)`
+
+`Program.cs` is unchanged, because the MVC `JsonOptions` were already registered. `FromBodyConversionFeature` of the AspNetCore extension binds through the MVC model binders. Reading with the same options therefore keeps valid bodies as they were: enum names, any property case and trailing commas.
+
+### 3. `FederationHttp` on the shared reader
+
+The private reader is gone. Both `PUT`s call the extension with `ErrorCodes.InvalidFederation`. Every federation test passes unchanged.
+
+### 4. Converting the 25 parameters
+
+Implemented as in the spec table. Every `FromBodyAttribute` alias is removed and every `[OpenApiRequestBody]` attribute is kept. No response attribute was added.
+
+- **Access:** `PostAccount` answers `The account is missing.` after the existing-account check. `PostAccessPoints` answers `The access point is missing.`. `PostMachines` answers `The machine is missing.` after the Contributor check, before the annotation key is normalized. Grant and revoke pass the value to `TryValidatePermission`, whose model parameter got `[NotNullWhen(true)]`. `PutMachineAuthentication` reads after the key format check and lets `MachineAuthenticationPolicies.Validate` name a missing policy. `Validate` returns a message and cannot tell the compiler that the policy is set, so `Normalize(policy!)` carries a comment, like `model!.Descendants` in `AnnotationsHttp.Deleted`.
+- **Certificates, invitations, members, views:** these follow the spec order. `PostSharedCertificate` answers `The shared certificate is missing.` after the 501 check. `UpdateView` keeps `model ?? new ViewUpdate()`, so a missing body clears the description.
+- **Key/values and policies:** `ImportKeyValues` passes `ImportInvalid` and `AddRecipient` passes `RecipientInvalid`. No other key/value read passes a code. `ExportKeyValues` reads after the project access check and before the `IncludeSecrets` check, and an empty body or `null` still exports the whole view without secret values. `ProtectKeyValues` still checks secret rights after its body checks.
+- **Annotations:** `SetAnnotationsSimple` answers `The annotations are missing.` and keeps the service's skipping of blank lines. Section 5 covers the other three.
+
+Because of C# `required` members, `{}` is the reader's 400 at `$` rather than the handler's own message for most DTOs, as the spec's current state notes. The tests record it per handler.
+
+### 5. Authorization that depends on the body
+
+Implemented as specified. `SetAnnotations` builds the reach `(annotations ?? []).Where(a => a is not null).Select(a => a.AnnotationKey)`, keeps it in a local, and runs `CheckAccessToAnnotationsAsync` before it returns the reader error, `The annotations are missing.` or `The annotations must not contain null entries.`. The null-entry check comes before the projection and before `MaxInputItems`. The deleted lookup and restore run their access check over `model?.Keys ?? []` before the reader error, and pass `InvalidKey`.
+
+### 6. Server-assigned members
+
+`AccessPointCreate.OwnerId` is no longer `required` and defaults to `string.Empty`, with a comment. The handler sets it from the caller, and replaces any value the client sends, which a test checks. `{ "Organization", "Project" }`, the body of the admin UI and the CLI, creates the access point again. The Cosmos service, the CLI and the `Access.Certificates` integration tests build unchanged. The OpenAPI schema is unchanged.
+
+### 7. Tests
+
+- **Fixture:** `FunctionTestDoubles` has `ApiJsonOptions` (as `Program.cs`, `JObjectConverter` included), `ApiJsonSerializerOptions`, `ToJsonBody<T>` and `JsonContentType()`. `FederationHttpTests` uses them instead of its private copy.
+- **Reader:** `RequestBodyExtensionsTests` has 10 tests. They cover:
+  - blank, `null`, malformed JSON, a wrong shape and an unknown enum name (with the path);
+  - a missing required member;
+  - the error code;
+  - enum names, any case and trailing commas;
+  - no `Content-Type` and a list;
+  - a body that is not UTF-8 and a byte order mark;
+  - cancellation.
+- **Handlers:** every constructor call passes the fixture, every DTO argument became a JSON body, and every `null` argument an empty body. Request helpers that had no body got an optional one. It is sent with `Content-Type: application/json` unless a test opts out. For `KeyValueRequests.Machine`, the body comes before `params roles`. Every group has theories over `""`, `"null"` and a wrong shape, and most also over `{}`. Each asserts the message, the code and that no service was called. Each group also has a valid body without `Content-Type` and one with names in another case. Specific cases:
+  - `AccessPointHttpTests` (new): no `OwnerId` in the body, and an `OwnerId` sent by the client is replaced.
+  - `CertificatesHttpTests` (new, the first tests of `CertificatesHttp`): 501 without the service whatever the body; missing or invalid bodies without touching the dependencies of `SharedCertificateService`; a 200 through `IssueAsync`. A hand-written fake implements its policy store, certificate store and authority.
+  - `ExportKeyValues` and `UpdateView` with an empty body or `null` answer 200 with their defaults.
+  - `SetAnnotations`: a null entry is a 400, a restricted machine with an outside key still gets `AnnotationRestricted` when another entry is null, and a restricted machine with a broken body gets the 400.
+- **Guards:** `RouteTableTests.Functions_ReadTheirJsonBodiesThemselves_NotThroughAFromBodyBinding` scans every `[Function]` method for the worker's or MVC's `FromBodyAttribute`. It replaces the federation-only test, which was removed. `OpenApiExportTests.Document_JsonRequestBodies_KeepTheirSchemaAndRequiredFlag` renders the document once and checks the 25 operations against a table. The content type is only `application/json`, the schema is the exact same `$ref` or inline array, and `required` is `true` for the nine key/value and policy operations and absent for the other 16. It is one fact rather than a theory, because each rendering takes almost a second.
+
+The ordering tests for a user without access cannot fail in Debug, because `DEV_AUTH` skips the user role check. The order is shown for restricted machines, as in the existing restriction tests.
+
+### 8. Contract check
+
+- The OpenAPI document exported before and after the change has no differences, compared as parsed JSON and ignoring `info.version`, which follows the git height. With `info.version` set to the committed `0.9.31.35842`, it equals `open.api.v0.9.31.json`.
+- NSwag 14.6.3, with the arguments of `Sdk.NSwag/README.md`, regenerates `ApiSdk.g.cs` byte for byte.
+- `npm ci` and `SPEC=… npm run generate` regenerate `sdk.typescript/src/generated` with no content change. Git listed the files as modified only because of line endings: Orval writes LF, and the checkout has CRLF.
+- Nothing regenerated was committed.
+
+### 9. Documentation
+
+- `access.md`: the account body is required, and `{}` creates an account without memberships. Views and members name the missing body. The error-codes section no longer claims that every error has a code. It also states the general rule: a route with a JSON body does not need a `Content-Type`, and answers 400 for an empty body, `null` or JSON that does not fit, unless the route documents a default.
+- `authentication.md`: the access-management error table has rows for a missing body and for a body that does not fit. The rows name the six bodies they cover. The `InvalidFederation` row now includes the federation `PUT` body that is not an issuer or a list of rules. The machine authentication `PUT` lists the missing body.
+- `key-values.md`: the export row lists 400 and the default.
+- `annotation-lifecycle.md`: bulk create lists the missing list and null entries. Lookup and restore list a body without `Keys` under `InvalidKey`.
+
+### Review
+
+Four reviews ran over the branch: correctness, authorization and security, tests, and docs and style. Each finding was then checked by a verifier who tried to refute it.
+
+- The confirmed finding: the misfit-body row in `authentication.md` also seemed to cover the federation `PUT`s, which answer `InvalidFederation`. It is fixed.
+- The verifier refuted the findings about the reader's UTF-16 copy and its lenient decoding, because the spec moved the federation reader unchanged. They were still fixed (section 1): taking a body the old binding refused and storing altered bytes is the opposite of what this change is for.
+- A Release-only gap in the `PutMachineAuthentication` test (the role check is skipped only in Debug) was refuted, because the existing tests of the file rely on `DEV_AUTH` in the same way.
+
+No new warnings in the touched files, and no spec was edited.
+
+### Left out
+
+- The single-annotation `PUT`/`POST` (`AnnotationsHttp.SetAnnotation`) still answers 500 for a JSON `null` or array root. It is a follow-up, as planned.
+- The new 400s are described in the docs, not in the OpenAPI responses, so the SDKs stay unchanged.
