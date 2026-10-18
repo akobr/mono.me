@@ -179,6 +179,57 @@ public class OpenApiExportTests
         PropertyNames(schemas, "MachineAccess").ShouldContain("FederationRules");
     }
 
+    // These handlers read their JSON bodies themselves, not through [FromBody], so [OpenApiRequestBody] alone documents
+    // them: each keeps its application/json body, its schema and its required flag, and the SDKs do not change. The
+    // generator writes "required" only when it is true; ExportKeyValues sets Required = false and the others nothing.
+    [Fact]
+    public async Task Document_JsonRequestBodies_KeepTheirSchemaAndRequiredFlag()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var bodies = new (string OperationId, string Schema, bool Required)[]
+        {
+            (Definitions.RouteIds.Access.CreateAccount, Reference("AccountCreate"), false),
+            (Definitions.RouteIds.Access.CreateAccessPoint, Reference("AccessPointCreate"), false),
+            (Definitions.RouteIds.Access.GrantUserAccess, Reference("Permission"), false),
+            (Definitions.RouteIds.Access.RevokeUserAccess, Reference("Permission"), false),
+            (Definitions.RouteIds.Access.CreateMachineAccess, Reference("MachineAccessCreate"), false),
+            (Definitions.RouteIds.Access.SetMachineAuthentication, Reference("MachineAuthenticationPolicy"), false),
+            (Definitions.RouteIds.Access.IssueSharedCertificate, Reference("SharedCertificateCreate"), false),
+            (Definitions.RouteIds.Access.CreateInvitation, Reference("InvitationCreate"), false),
+            (Definitions.RouteIds.Access.SetMemberRole, Reference("MemberRoleUpdate"), false),
+            (Definitions.RouteIds.Views.CreateView, Reference("ViewCreate"), false),
+            (Definitions.RouteIds.Views.UpdateView, Reference("ViewUpdate"), false),
+            (Definitions.RouteIds.KeyValues.SetKeyValue, Reference("KeyValueWrite"), true),
+            (Definitions.RouteIds.KeyValues.RestoreKeyValues, Reference("KeyValueBulkRequest"), true),
+            (Definitions.RouteIds.KeyValues.PurgeKeyValues, Reference("KeyValueBulkRequest"), true),
+            (Definitions.RouteIds.KeyValues.ProtectKeyValues, Reference("KeyValueBulkRequest"), true),
+            (Definitions.RouteIds.KeyValues.ExportKeyValues, Reference("KeyValueExportRequest"), false),
+            (Definitions.RouteIds.KeyValues.ImportKeyValues, Reference("KeyValueDocument"), true),
+            (Definitions.RouteIds.KeyValues.SetKeyValuePolicy, Reference("KeyValuePolicyUpdate"), true),
+            (Definitions.RouteIds.KeyValues.RotateKeyValueKey, Reference("KeyValueRotateRequest"), true),
+            (Definitions.RouteIds.KeyValues.AddRecipient, Reference("ClientEncryptionRecipientCreate"), true),
+            (Definitions.RouteIds.KeyValues.UpdateRecipient, Reference("ClientEncryptionRecipientUpdate"), true),
+            (Definitions.RouteIds.Annotations.SetAnnotations, $$"""{"type":"array","items":{{Reference("Annotation")}}}""", false),
+            (Definitions.RouteIds.Annotations.SetAnnotationsSimple, """{"type":"array","items":{"type":"string"}}""", false),
+            (Definitions.RouteIds.Annotations.FindDeletedAnnotations, Reference("AnnotationKeysRequest"), false),
+            (Definitions.RouteIds.Annotations.RestoreAnnotations, Reference("AnnotationRestoreRequest"), false),
+        };
+
+        foreach (var (operationId, schema, required) in bodies)
+        {
+            var body = Operation(document, operationId).GetProperty("requestBody");
+            var content = body.GetProperty("content");
+
+            content.EnumerateObject().Select(type => type.Name).ShouldBe([Definitions.ContentTypes.Json], operationId);
+            JsonSerializer.Serialize(content.GetProperty(Definitions.ContentTypes.Json).GetProperty("schema")).ShouldBe(schema, operationId);
+            (body.TryGetProperty("required", out var flag) ? flag.GetRawText() : null).ShouldBe(required ? "true" : null, operationId);
+        }
+
+        static string Reference(string model) => $$"""{"$ref":"#/components/schemas/{{model}}"}""";
+    }
+
     internal static async Task<string> RenderAsync()
     {
         // the same context the extension builds for the host, with the API's own options and filters

@@ -31,6 +31,26 @@ public partial class RouteTableTests
             .ShouldBeEmpty();
     }
 
+    // The functions read their JSON bodies themselves (RequestBodyExtensions): a FromBody binding fails an empty body,
+    // a JSON null or a body without a content type with an exception before the function runs, which answers 500.
+    [Fact]
+    public void Functions_ReadTheirJsonBodiesThemselves_NotThroughAFromBodyBinding()
+    {
+        var functions = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .Where(method => method.GetCustomAttribute<FunctionAttribute>() is not null)
+            .ToList();
+
+        functions.ShouldNotBeEmpty();
+        functions
+            .SelectMany(method => method.GetParameters()
+                .Where(parameter => parameter.IsDefined(typeof(Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute), false)
+                    || parameter.IsDefined(typeof(Microsoft.AspNetCore.Mvc.FromBodyAttribute), false))
+                .Select(parameter => $"{method.DeclaringType!.Name}.{method.Name}({parameter.Name})"))
+            .ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("GET v1/{}/{}/views")]
     [InlineData("POST v1/{}/{}/views")]

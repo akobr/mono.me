@@ -436,16 +436,6 @@ public class FederationHttpTests
     }
 
     [Fact]
-    public void PutRoutes_ReadTheirBodiesThemselves_NotThroughTheWorkersFromBodyBinding()
-    {
-        foreach (var name in new[] { nameof(FederationHttp.PutFederatedIssuer), nameof(FederationHttp.PutMachineFederationRules) })
-        {
-            typeof(FederationHttp).GetMethod(name)!.GetParameters()
-                .ShouldNotContain(parameter => parameter.IsDefined(typeof(Microsoft.Azure.Functions.Worker.Http.FromBodyAttribute), false));
-        }
-    }
-
-    [Fact]
     public async Task PutIssuer_ChangingTheIssuerOfAnExistingOne_IsBadRequest()
     {
         await _issuers.SetAsync(Org, Project, GitHub());
