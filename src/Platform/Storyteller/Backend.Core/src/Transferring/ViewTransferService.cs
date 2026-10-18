@@ -368,7 +368,7 @@ public sealed class ViewTransferService : IViewTransferService
                 isOverlayFilled = true;
             }
 
-            var result = await ImportFileAsync(record, file, options, overlay);
+            var result = await ImportFileOrConflictAsync(record, file, options, overlay);
             Track(file, result, overlay);
             progress.Add(file, Truncate(result));
 
@@ -448,6 +448,30 @@ public sealed class ViewTransferService : IViewTransferService
         while (!string.IsNullOrEmpty(continuationToken));
 
         return keys;
+    }
+
+    // A write that keeps hitting concurrent changes after its own retries fails its file, not the whole job: the
+    // overlay then treats the file as failed, so the documents that depend on it are skipped with DependencyFailed.
+    private async Task<ViewImportResult> ImportFileOrConflictAsync(ViewTransferRecord record, ViewArchiveFile file, ViewImportOptions options, ViewImportOverlay overlay)
+    {
+        try
+        {
+            return await ImportFileAsync(record, file, options, overlay);
+        }
+        catch (Exception exception) when (IsWriteConflict(exception))
+        {
+            _logger.LogWarning(exception, "The file {Path} of the import {Id} failed on concurrent changes.", file.Path, record.Id);
+            return new ViewImportResult(
+                ViewImportOutcome.Failed,
+                ErrorCode: ErrorCodes.Conflict,
+                Message: $"The document was changed concurrently while it was imported; import the file again. {exception.Message}");
+        }
+    }
+
+    private static bool IsWriteConflict(Exception exception)
+    {
+        return exception is SchemaConcurrencyException or TemplateConcurrencyException
+            || (exception is ConflictException conflict && conflict.ErrorCode == ErrorCodes.Conflict);
     }
 
     private Task<ViewImportResult> ImportFileAsync(ViewTransferRecord record, ViewArchiveFile file, ViewImportOptions options, ViewImportOverlay overlay)

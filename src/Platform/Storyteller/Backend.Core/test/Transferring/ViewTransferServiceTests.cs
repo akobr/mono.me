@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.Transferring;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -631,6 +632,63 @@ public class ViewTransferServiceTests
             ("sbt.kept.json", ViewImportOutcome.Skipped, ErrorCodes.DocumentExists),
             ("usg.dep.fail.json", ViewImportOutcome.Created, null),
         ]);
+    }
+
+    [Fact]
+    public async Task ProcessImport_WriteConflictsFailTheirFileNotTheJob()
+    {
+        _annotations.Import = (key, _, overlay) =>
+        {
+            if (key.Annotation.ToString() == "rst.busy")
+            {
+                throw new ConflictException("The annotations changed concurrently; try again.");
+            }
+
+            overlay.AddActiveAnnotation(key.Annotation);
+            return new ViewImportResult(ViewImportOutcome.Created);
+        };
+        _schemas.Import = (_, _, _) => throw new SchemaConcurrencyException("main", "default", "default.cfs.t.exe", 3);
+        _templates.Import = (_, _) => throw new TemplateConcurrencyException("main", "default", "exe", 3);
+        _configurations.Import = (key, _) => key.Annotation.ToString() == "rst.a"
+            ? throw new ConflictException("The configuration 'rst.a' was changed concurrently, try again.")
+            : new ViewImportResult(ViewImportOutcome.Created, 1);
+
+        using var zip = Zip(
+            ("rst.busy.json", "{}"),
+            ("rst.a.json", "{}"),
+            ("exe.schema.json", """{"type":"object"}"""),
+            ("exe.template.json", """{"t":1}"""),
+            ("rst.a.conf.json", """{"a":1}"""),
+            ("rst.busy.conf.json", """{"b":1}"""));
+
+        var import = await ImportAsync(zip);
+
+        import.Status.ShouldBe(ViewTransferStatus.Succeeded);
+        import.Items!.Select(item => (item.Path, item.Outcome, item.ErrorCode)).ShouldBe(
+        [
+            ("rst.a.json", ViewImportOutcome.Created, null),
+            ("rst.busy.json", ViewImportOutcome.Failed, ErrorCodes.Conflict),
+            ("exe.schema.json", ViewImportOutcome.Failed, ErrorCodes.Conflict),
+            ("exe.template.json", ViewImportOutcome.Failed, ErrorCodes.Conflict),
+            ("rst.a.conf.json", ViewImportOutcome.Failed, ErrorCodes.Conflict),
+            ("rst.busy.conf.json", ViewImportOutcome.Created, null),
+        ]);
+
+        // the annotation that failed on the conflict counts as failed for the documents that hang on it
+        _imports.Single("configuration of rst.busy").Seen!.FailedAnnotations.ShouldBe(["rst.busy"]);
+        import.Summary!.Failed.ShouldBe(4);
+    }
+
+    [Fact]
+    public async Task ProcessImport_OtherConflictsStillFailTheJob()
+    {
+        _templates.Import = (_, _) => throw new ConflictException("The view always exists.", ErrorCodes.ViewExists);
+
+        using var zip = Zip(("exe.template.json", """{"t":1}"""));
+
+        var import = await ImportAsync(zip);
+
+        import.Status.ShouldBe(ViewTransferStatus.Failed);
     }
 
     [Fact]
