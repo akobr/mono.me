@@ -161,11 +161,12 @@ describe('ModelingHeader', () => {
   })
 
   describe('focus', () => {
-    // Each tab is a page with its own header, so the header is mounted again for every tab.
+    // Each tab is a page with its own header, so the header is mounted again for every tab, but not for the details
+    // below the tab's list.
     const Page = {
       setup: () => {
         const route = useRoute()
-        return () => h(ModelingHeader, { key: route.path })
+        return () => (modelingTab(route.path) ? h(ModelingHeader, { key: modelingTab(route.path) }) : null)
       },
     }
     const press = (target: HTMLElement, key: string) =>
@@ -207,6 +208,48 @@ describe('ModelingHeader', () => {
       await settle()
       expect(selected()).toBe(tab('Deleted'))
       expect(document.activeElement).not.toBe(tab('Deleted'))
+    })
+
+    it('moves to the tab opened last when two are opened in a row', async () => {
+      const view = await mountScreen(Page, {}, { path: '/acme/billing/default/modeling/schemas' })
+      await settle()
+      // a page that takes its time, as one whose code is loaded the first time
+      let load!: () => void
+      const loaded = new Promise<void>((resolve) => (load = resolve))
+      const slow = view.router.beforeEach(() => loaded.then(() => true))
+
+      tab('Templates').focus()
+      press(tab('Templates'), 'Enter')
+      tab('Export & Import').focus()
+      press(tab('Export & Import'), 'Enter')
+      load()
+      await settle()
+      slow()
+
+      expect(view.router.currentRoute.value.path).toBe('/acme/billing/default/modeling/export-import')
+      expect(document.activeElement).toBe(tab('Export & Import'))
+    })
+
+    it('leaves the focus alone later when the open tab only closed its detail', async () => {
+      const view = await mountScreen(Page, {}, { path: '/acme/billing/default/modeling/templates/exe' })
+      await settle()
+      const templates = tab('Templates')
+
+      // the tab of the page itself goes back to its list, and the same header stays
+      templates.focus()
+      press(templates, 'Enter')
+      await settle()
+      expect(view.router.currentRoute.value.path).toBe('/acme/billing/default/modeling/templates')
+      expect(templates.isConnected).toBe(true)
+
+      // another page, and the same tab again from the menu
+      await view.router.push('/acme/billing/default/annotations')
+      await settle()
+      expect(tabs()).toEqual([])
+      await view.router.push('/acme/billing/default/modeling/templates')
+      await settle()
+      expect(selected()).toBe(tab('Templates'))
+      expect(document.activeElement).not.toBe(tab('Templates'))
     })
 
     it('leaves the focus alone when the tab changes from elsewhere', async () => {

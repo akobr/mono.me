@@ -298,6 +298,14 @@ test('opens the tabs of Modeling from the keyboard, and the opened tab keeps the
   }
 })
 
+test('a link to the last tab of Modeling shows the tab without taking the focus', async ({ page }) => {
+  await openApp(page, `${modeling}/compare`)
+  await expect(modelingTab(page, 'Compare views')).toHaveAttribute('aria-selected', 'true')
+  // On a phone the five tabs are wider than the screen; the header scrolls the open one into view.
+  await expect(modelingTab(page, 'Compare views')).toBeInViewport({ ratio: 1 })
+  await expect(modelingTab(page, 'Compare views')).not.toBeFocused()
+})
+
 test('a link opens its tab of Modeling, and a detail link opens the tab and the detail', async ({ page }, testInfo) => {
   await openApp(page, `${modeling}/deleted?cascaded=1`)
   await expect(modelingTab(page, 'Deleted')).toHaveAttribute('aria-selected', 'true')
