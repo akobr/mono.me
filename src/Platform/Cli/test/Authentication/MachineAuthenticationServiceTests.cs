@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO.Abstractions.TestingHelpers;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Threading;
@@ -16,6 +17,11 @@ public class MachineAuthenticationServiceTests
     private const string ApiUrl = "https://storyteller.example.com/api";
     private const string TokenUrl = "https://auth.example.com/oauth2/token";
     private const string ClientSecret = "client-secret-value";
+    private const string MachineId = "6d0f2c4e-0000-4000-8000-000000000001";
+    private const string TokenEndpoint = "https://storyteller.example.com/api/v1/acme/billing/access/token";
+    private const string GitHubRequestUrl = "https://pipelines.actions.githubusercontent.com/abc/idtoken?api-version=2.0";
+    private const string GitHubRequestToken = "github-request-token-value";
+    private const string EscapedTokenEndpoint = "https%3A%2F%2Fstoryteller.example.com%2Fapi%2Fv1%2Facme%2Fbilling%2Faccess%2Ftoken";
 
     private static readonly DateTimeOffset Start = new(2026, 10, 17, 12, 0, 0, TimeSpan.Zero);
 
@@ -416,7 +422,480 @@ public class MachineAuthenticationServiceTests
         (await service.GetAccessTokenAsync()).ShouldStartWith("ApiKey ");
     }
 
+    [Fact]
+    public async Task Federated_ExchangesThePlatformTokenAtTheTokenEndpointOfTheProject()
+    {
+        UseFederatedFile("platform-token-1");
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+
+        var request = _http.Requests.ShouldHaveSingleItem();
+        request.Method.ShouldBe(HttpMethod.Post);
+        request.Uri.ShouldBe(new Uri(TokenEndpoint));
+        request.Authorization.ShouldBeNull();
+        request.Form.ShouldBe(new Dictionary<string, string>
+        {
+            ["grant_type"] = "urn:ietf:params:oauth:grant-type:token-exchange",
+            ["client_id"] = MachineId,
+            ["subject_token"] = "platform-token-1",
+            ["subject_token_type"] = "urn:ietf:params:oauth:token-type:jwt",
+        });
+    }
+
+    [Fact]
+    public async Task Federated_EscapesTheTargetAndSendsTheScopeAndTheTokenType()
+    {
+        _environment[StorytellerVariables.API_URL] = $"{ApiUrl}/";
+        _environment[StorytellerVariables.TOKEN_SCOPE] = "story:read annotation:write";
+        _environment[StorytellerVariables.SUBJECT_TOKEN_TYPE] = "access_token";
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
+        var service = CreateService();
+        service.BindTarget("acme corp", "billing.eu");
+
+        await service.GetAccessTokenAsync();
+
+        var request = _http.Requests.ShouldHaveSingleItem();
+        request.Uri.AbsoluteUri.ShouldBe("https://storyteller.example.com/api/v1/acme%20corp/billing.eu/access/token");
+        request.Form["scope"].ShouldBe("story:read annotation:write");
+        request.Form["subject_token_type"].ShouldBe("urn:ietf:params:oauth:token-type:access_token");
+    }
+
+    [Fact]
+    public async Task Federated_ReadsTheFileAgainForEveryExchange()
+    {
+        var path = UseFederatedFile("platform-token-1");
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+
+        // A projected Kubernetes token rotates while the job runs.
+        _fileSystem.File.WriteAllText(path, "platform-token-2\n");
+        _time.Now = Start.AddMinutes(14);
+        (await service.GetAccessTokenAsync()).ShouldBe("st-2");
+
+        _http.Requests.Select(request => request.Form["subject_token"]).ShouldBe(["platform-token-1", "platform-token-2"]);
+    }
+
+    [Fact]
+    public async Task Federated_ReusesA900SecondTokenUntil60SecondsBeforeItExpires()
+    {
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+        _time.Now = Start.AddMinutes(13).AddSeconds(59);
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+        _time.Now = Start.AddMinutes(14);
+        (await service.GetAccessTokenAsync()).ShouldBe("st-2");
+
+        _http.Requests.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Federated_AJobOf40Minutes_KeepsGettingTokens()
+    {
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-3"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        for (var minute = 0; minute <= 40; minute++)
+        {
+            _time.Now = Start.AddMinutes(minute);
+            var identity = await service.SignInAsync();
+
+            identity.TokenExpiresAt!.Value.ShouldBeGreaterThan(_time.Now.AddSeconds(60));
+        }
+
+        // At 0, 14 and 28 minutes; the last token is valid until 43.
+        _http.Requests.Count.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task Federated_AnotherTarget_ExchangesAgain()
+    {
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-billing"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-web"));
+        var service = CreateService();
+
+        service.BindTarget("acme", "billing");
+        (await service.GetAccessTokenAsync()).ShouldBe("st-billing");
+        service.BindTarget("acme", "web");
+        (await service.GetAccessTokenAsync()).ShouldBe("st-web");
+
+        _http.Requests.Select(request => request.Uri.AbsoluteUri).ShouldBe([TokenEndpoint, "https://storyteller.example.com/api/v1/acme/web/access/token"]);
+    }
+
+    [Fact]
+    public async Task Federated_TheBoundTarget_WinsOverStorytellerProject()
+    {
+        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-web"));
+        var service = CreateService();
+        service.BindTarget("acme", "web");
+
+        var identity = await service.SignInAsync();
+
+        (identity.Organization, identity.Project).ShouldBe(("acme", "web"));
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri("https://storyteller.example.com/api/v1/acme/web/access/token"));
+        (await service.GetAccessTokenAsync()).ShouldBe("st-web");
+    }
+
+    [Fact]
+    public async Task Federated_WithoutABoundTarget_SendsNoTokenAndAsksNothing()
+    {
+        // sform account ca and the user-only commands bind no target.
+        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        UseFederatedGitHub();
+        var service = CreateService();
+
+        (await service.GetAccessTokenAsync()).ShouldBeNull();
+        (await service.RenewAccessTokenAsync("st-1")).ShouldBeNull();
+
+        _http.Requests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Federated_SignIn_WithoutABoundTarget_UsesStorytellerProject()
+    {
+        _environment[StorytellerVariables.PROJECT] = "acme.billing";
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
+        var service = CreateService();
+
+        var identity = await service.SignInAsync();
+
+        identity.ShouldBe(
+            new MachineIdentity(MachineSignInKind.Federated, [StorytellerVariables.CLIENT_ID, StorytellerVariables.SUBJECT_TOKEN_FILE], MachineId, "acme", "billing", Start.AddMinutes(15)),
+            new IdentityComparer());
+        (await service.GetSignedInUserAsync()).ShouldBe(new SignedInUser(MachineId, $"machine {MachineId} (acme.billing)", null));
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenEndpoint));
+    }
+
+    [Fact]
+    public async Task Federated_SignIn_WithoutAnyProject_IsAConfigurationError()
+    {
+        UseFederatedFile();
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => CreateService().SignInAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        exception.Message.ShouldBe("No project is set for the machine: set STORYTELLER_PROJECT=<organization>.<project> or pass -p.");
+        _http.Requests.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(false, new[] { StorytellerVariables.CLIENT_ID, StorytellerVariables.SUBJECT_TOKEN_FILE })]
+    [InlineData(true, new[] { StorytellerVariables.CLIENT_ID, GitHubActionsVariables.ID_TOKEN_REQUEST_URL, GitHubActionsVariables.ID_TOKEN_REQUEST_TOKEN })]
+    public void Federated_Identity_NamesTheMachineAndTheVariablesButNoProject(bool isGitHub, string[] variables)
+    {
+        if (isGitHub)
+        {
+            UseFederatedGitHub();
+        }
+        else
+        {
+            UseFederatedFile();
+        }
+
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        // The credential names no project, so no -p or STORYTELLER_PROJECT can conflict with it.
+        service.GetIdentity().ShouldBe(new MachineIdentity(MachineSignInKind.Federated, variables, MachineId, null, null), new IdentityComparer());
+        _http.Requests.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(GitHubRequestUrl, $"{GitHubRequestUrl}&audience={EscapedTokenEndpoint}")]
+    [InlineData("https://token.actions.example.com/idtoken", $"https://token.actions.example.com/idtoken?audience={EscapedTokenEndpoint}")]
+    public async Task GitHub_RequestsAnIdTokenForTheTokenEndpoint(string requestUrl, string expectedUrl)
+    {
+        UseFederatedGitHub(requestUrl);
+        _http.Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+
+        _http.Requests.Count.ShouldBe(2);
+        var gitHub = _http.Requests[0];
+        gitHub.Method.ShouldBe(HttpMethod.Get);
+        gitHub.Uri.AbsoluteUri.ShouldBe(expectedUrl);
+        gitHub.Authorization.ShouldBe($"Bearer {GitHubRequestToken}");
+        gitHub.Headers!["Accept"].ShouldBe("application/json");
+        var exchange = _http.Requests[1];
+        exchange.Uri.ShouldBe(new Uri(TokenEndpoint));
+        exchange.Form["subject_token"].ShouldBe("gh-jwt-1");
+        exchange.Form["subject_token_type"].ShouldBe("urn:ietf:params:oauth:token-type:jwt");
+    }
+
+    [Fact]
+    public async Task GitHub_TheRequestTokenGoesToTheRunnerOnly()
+    {
+        UseFederatedGitHub();
+        _http.Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
+            .Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-2"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+
+        // The ID token lives about 5 minutes, so every exchange gets a fresh one.
+        _time.Now = Start.AddMinutes(14);
+        (await service.GetAccessTokenAsync()).ShouldBe("st-2");
+
+        _http.Requests.Select(request => request.Method).ShouldBe([HttpMethod.Get, HttpMethod.Post, HttpMethod.Get, HttpMethod.Post]);
+        _http.Requests[3].Form["subject_token"].ShouldBe("gh-jwt-2");
+        var exchanges = _http.Requests.Where(request => request.Method == HttpMethod.Post).ToList();
+        exchanges.ShouldAllBe(request => request.Authorization == null);
+        exchanges.ShouldAllBe(request => !request.Headers!.Values.Any(value => value.Contains(GitHubRequestToken)));
+        exchanges.ShouldAllBe(request => !request.Form.Values.Contains(GitHubRequestToken));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden, "", "The GitHub Actions ID token request failed with 403.")]
+    [InlineData(HttpStatusCode.Found, "", "The GitHub Actions ID token request failed with 302.")]
+    [InlineData(HttpStatusCode.OK, """{"count":0}""", "The GitHub Actions ID token request returned no token.")]
+    [InlineData(HttpStatusCode.OK, "<html/>", "The GitHub Actions ID token request returned no token.")]
+    public async Task GitHub_UnusableAnswers_AreServiceErrors(HttpStatusCode status, string body, string message)
+    {
+        UseFederatedGitHub();
+        _http.Respond(status, body);
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
+        exception.Message.ShouldBe(message);
+        _http.Requests.ShouldHaveSingleItem().Method.ShouldBe(HttpMethod.Get);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task GitHub_UnreachableOrTimedOut_IsAServiceError(bool isTimeout)
+    {
+        UseFederatedGitHub();
+        _http.Fail(isTimeout ? new TaskCanceledException("The request timed out.") : new HttpRequestException("No such host is known."));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
+        exception.Message.ShouldBe("The GitHub Actions ID token could not be requested.");
+    }
+
+    [Fact]
+    public async Task Federated_InvalidRequest_IsDeniedWithoutTheSubjectToken()
+    {
+        UseFederatedFile("platform-token-secret");
+        _http.Respond(HttpStatusCode.BadRequest, """{"error":"invalid_request","error_description":"The subject token was not accepted."}""");
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Denied);
+        exception.Message.ShouldBe($"The token request to {TokenEndpoint} was rejected: invalid_request: The subject token was not accepted.");
+        exception.Message.ShouldNotContain("platform-token-secret");
+    }
+
+    [Fact]
+    public async Task GitHub_InvalidRequest_IsDeniedWithTheAudienceItWasRequestedFor()
+    {
+        UseFederatedGitHub();
+        _http.Respond(HttpStatusCode.OK, GitHubAnswer("gh-jwt-secret"))
+            .Respond(HttpStatusCode.BadRequest, """{"error":"invalid_request","error_description":"The subject token was not accepted."}""");
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Denied);
+        exception.Message.ShouldBe(
+            $"The token request to {TokenEndpoint} was rejected: invalid_request: The subject token was not accepted; the GitHub Actions token of this job was requested for the audience {TokenEndpoint}, which a rule of the machine must name exactly. For client credentials, set STORYTELLER_CLIENT_SECRET instead.");
+        exception.Message.ShouldNotContain("gh-jwt-secret");
+        exception.Message.ShouldNotContain(GitHubRequestToken);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable, """{"error":"temporarily_unavailable"}""", $"The token request to {TokenEndpoint} failed with 503.")]
+    [InlineData(HttpStatusCode.Found, "", $"The token request to {TokenEndpoint} failed with 302.")]
+    [InlineData(HttpStatusCode.OK, "{}", $"The token endpoint {TokenEndpoint} returned no bearer token.")]
+    public async Task Federated_UnusableAnswers_AreServiceErrors(HttpStatusCode status, string body, string message)
+    {
+        UseFederatedFile();
+        _http.Respond(status, body);
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
+        exception.Message.ShouldBe(message);
+    }
+
+    [Fact]
+    public async Task Federated_UnreachableEndpoint_IsAServiceError()
+    {
+        UseFederatedFile();
+        _http.Fail(new HttpRequestException("No such host is known."));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.ServiceError);
+        exception.Message.ShouldBe($"The token endpoint {TokenEndpoint} could not be reached.");
+    }
+
+    [Theory]
+    [InlineData(null, "does not exist")]
+    [InlineData("  \n", "is empty")]
+    public async Task Federated_MissingOrEmptyFile_IsAConfigurationError(string? content, string problem)
+    {
+        var path = P(@"C:\ci\platform-token");
+        _environment[StorytellerVariables.CLIENT_ID] = MachineId;
+        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = path;
+
+        if (content is not null)
+        {
+            _fileSystem.AddFile(path, new MockFileData(content));
+        }
+
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        var exception = await Should.ThrowAsync<AuthenticationException>(() => service.GetAccessTokenAsync());
+
+        exception.Reason.ShouldBe(AuthenticationFailureReason.Configuration);
+        exception.Message.ShouldBe($"The platform token file {path} in STORYTELLER_SUBJECT_TOKEN_FILE {problem}.");
+        _http.Requests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Renew_OfTheCachedToken_ExchangesAgain()
+    {
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+        (await service.RenewAccessTokenAsync("st-1")).ShouldBe("st-2");
+        (await service.GetAccessTokenAsync()).ShouldBe("st-2");
+
+        _http.Requests.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Renew_OfAnOlderToken_KeepsTheNewerOne()
+    {
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"));
+        var service = CreateService();
+        service.BindTarget("acme", "billing");
+
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+        (await service.RenewAccessTokenAsync("st-1")).ShouldBe("st-2");
+
+        // A late 401 of a request that still carried st-1.
+        (await service.RenewAccessTokenAsync("st-1")).ShouldBe("st-2");
+
+        _http.Requests.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Renew_ABurstOfRejections_ExchangesOnce()
+    {
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"))
+            .Respond(HttpStatusCode.OK, ExchangeAnswer("st-2"));
+        var held = new HeldHttpHandler(_http);
+        var service = CreateService(held);
+        service.BindTarget("acme", "billing");
+        held.Release();
+        (await service.GetAccessTokenAsync()).ShouldBe("st-1");
+        held.Hold();
+
+        var renewals = Enumerable.Range(0, 5).Select(_ => service.RenewAccessTokenAsync("st-1")).ToList();
+        held.Release();
+
+        (await Task.WhenAll(renewals)).ShouldAllBe(token => token == "st-2");
+        _http.Requests.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Renew_IsOnlyForAFederatedMachine()
+    {
+        (await CreateService().RenewAccessTokenAsync("token")).ShouldBeNull();
+
+        _environment[StorytellerVariables.API_KEY] = TestApiKeys.Create("acme", "billing", "3f2c");
+        var apiKey = CreateService();
+        apiKey.BindTarget("acme", "billing");
+        (await apiKey.RenewAccessTokenAsync((await apiKey.GetAccessTokenAsync())!)).ShouldBeNull();
+
+        _environment.Remove(StorytellerVariables.API_KEY);
+        UseClientCredentials("client_01");
+        _http.Respond(HttpStatusCode.OK, """{"access_token":"cc-1","expires_in":3600}""");
+        var clientCredentials = CreateService();
+        clientCredentials.BindTarget("acme", "billing");
+        (await clientCredentials.GetAccessTokenAsync()).ShouldBe("cc-1");
+        (await clientCredentials.RenewAccessTokenAsync("cc-1")).ShouldBeNull();
+        (await clientCredentials.GetAccessTokenAsync()).ShouldBe("cc-1");
+
+        _http.Requests.ShouldHaveSingleItem().Uri.ShouldBe(new Uri(TokenUrl));
+    }
+
+    [Fact]
+    public async Task Federated_ConcurrentCalls_ExchangeOnce()
+    {
+        UseFederatedFile();
+        _http.Respond(HttpStatusCode.OK, ExchangeAnswer("st-1"));
+        var held = new HeldHttpHandler(_http);
+        var service = CreateService(held);
+        service.BindTarget("acme", "billing");
+
+        var calls = Enumerable.Range(0, 5).Select(_ => service.GetAccessTokenAsync()).ToList();
+        held.Release();
+
+        (await Task.WhenAll(calls)).ShouldAllBe(token => token == "st-1");
+        _http.Requests.ShouldHaveSingleItem();
+    }
+
     private static string P(string path) => MockUnixSupport.Path(path);
+
+    private static string ExchangeAnswer(string accessToken)
+    {
+        return $$"""{"access_token":"{{accessToken}}","issued_token_type":"urn:ietf:params:oauth:token-type:access_token","token_type":"Bearer","expires_in":900,"scope":"story:read"}""";
+    }
+
+    private static string GitHubAnswer(string idToken)
+    {
+        return $$"""{"count":1,"value":"{{idToken}}"}""";
+    }
 
     private void AddCertificate(string spiffeUri)
     {
@@ -437,10 +916,27 @@ public class MachineAuthenticationServiceTests
         }
     }
 
-    private MachineAuthenticationService CreateService()
+    private string UseFederatedFile(string content = "platform-token")
+    {
+        var path = P(@"C:\ci\platform-token");
+        _fileSystem.AddFile(path, new MockFileData(content));
+        _environment[StorytellerVariables.CLIENT_ID] = MachineId;
+        _environment[StorytellerVariables.SUBJECT_TOKEN_FILE] = path;
+        return path;
+    }
+
+    // The variables of a GitHub Actions job with permissions: id-token: write.
+    private void UseFederatedGitHub(string requestUrl = GitHubRequestUrl)
+    {
+        _environment[StorytellerVariables.CLIENT_ID] = MachineId;
+        _environment[GitHubActionsVariables.ID_TOKEN_REQUEST_URL] = requestUrl;
+        _environment[GitHubActionsVariables.ID_TOKEN_REQUEST_TOKEN] = GitHubRequestToken;
+    }
+
+    private MachineAuthenticationService CreateService(HttpMessageHandler? handler = null)
     {
         var settings = MachineSignInSettings.FromEnvironment(name => _environment.GetValueOrDefault(name));
-        return new MachineAuthenticationService(settings, _fileSystem, new StubHttpClientFactory(_http), _resolver, _time);
+        return new MachineAuthenticationService(settings, _fileSystem, new StubHttpClientFactory(handler ?? _http), _resolver, _time);
     }
 
     private sealed class IdentityComparer : IEqualityComparer<MachineIdentity>
@@ -485,6 +981,33 @@ public class MachineAuthenticationServiceTests
         public Task ForgetAsync(CancellationToken cancellationToken = default)
         {
             return Task.CompletedTask;
+        }
+    }
+
+    // Holds every request until released, so that calls overlap while one exchange is in flight.
+    private sealed class HeldHttpHandler : DelegatingHandler
+    {
+        private TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public HeldHttpHandler(HttpMessageHandler innerHandler)
+            : base(innerHandler)
+        {
+        }
+
+        public void Hold()
+        {
+            _release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        }
+
+        public void Release()
+        {
+            _release.TrySetResult();
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await _release.Task;
+            return await base.SendAsync(request, cancellationToken);
         }
     }
 }
