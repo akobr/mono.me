@@ -9,4 +9,5 @@ internal sealed record RecordedRequest(
     Uri Uri,
     string? Authorization,
     Dictionary<string, string> Form,
-    IReadOnlyDictionary<string, string>? Headers = null);
+    IReadOnlyDictionary<string, string>? Headers = null,
+    string? Body = null);
