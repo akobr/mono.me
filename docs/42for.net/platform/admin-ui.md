@@ -37,7 +37,7 @@ Selecting the screen you are already on in the sidebar goes back to its start: t
 - **Grid:** sortable, resizable columns.
 - **Tree:** by subject or by responsibility.
 
-The catalog shows every status: active, disabled, scheduled and expired, each with its badge. The API returns only active annotations unless it is asked for the others, and the admin UI always asks; filter with `is:active` to see what services see. Deleted annotations are on their own page (**Deleted**).
+The catalog shows every status: active, disabled, scheduled and expired, each with its badge. The API returns only active annotations unless it is asked for the others, and the admin UI always asks; filter with `is:active` to see what services see. Deleted annotations are on the **Deleted** tab of **Modeling**.
 
 The tree shows only subjects, or only responsibilities, at the root, with every path down to their descendants:
 
@@ -107,7 +107,7 @@ The breadcrumb and **Lineage** show its ancestors in merge order.
 
 **Delete** moves the annotation and everything below it in the graph to **Deleted**, with their configuration. The toast after a delete says until when they can be restored and offers **Undo**. The bulk bar deletes the same way.
 
-**Deleted** (in the sidebar of the view) lists what was deleted, newest first: who deleted it, how many descendants went with it, and when it is purged automatically (after 90 days). **Show cascaded** lists every deleted annotation, with the key whose delete took it.
+**Deleted**, a tab of **Modeling**, lists what was deleted, newest first: who deleted it, how many descendants went with it, and when it is purged automatically (after 90 days). **Show cascaded** lists every deleted annotation, with the key whose delete took it.
 
 - **Restore** brings back the annotation with its descendants; **Restore without descendants** brings back only the annotation. Missing or deleted ancestors come back with it.
 - **Delete permanently** removes it for good, with its history. Only Administrators and Owners see it, and it asks you to type the key.
@@ -143,9 +143,9 @@ Saving sends only your changes. Two situations stop a save:
 - **Schema violation:** the server rejected the document. The errors are listed at the fields, and an Owner or Contributor can still save with **Save anyway**.
 - **Concurrent change:** someone else changed the same values in the meantime. The conflict dialog shows their version next to yours. You can reload theirs, copy yours, or overwrite.
 
-**Versions** lists the history of a configuration, a template or a schema. Any two versions can be compared side by side, or in one column on small screens. **Compare views** shows the same key in two views. When the project has only one other view, it is already selected.
+**Versions** lists the history of a configuration, a template or a schema. Any two versions can be compared side by side, or in one column on small screens. **Compare views**, a tab of **Modeling**, shows the same key in two views. When the project has only one other view, it is already selected. When it has no other view, the tab is disabled.
 
-**Templates** hold the defaults per annotation type. **Schemas** define the form and the validation, for a type, for an annotation, or for the descendants of an annotation. A schema shows a form preview, and before you save a change it lists the configurations that the change would break.
+**Templates** and **Schemas** are tabs of **Modeling** too. Templates hold the defaults per annotation type. Schemas define the form and the validation, for a type, for an annotation, or for the descendants of an annotation. A schema shows a form preview, and before you save a change it lists the configurations that the change would break.
 
 ## Graph
 
@@ -159,11 +159,19 @@ Saving sends only your changes. Two situations stop a save:
 - **Keyboard:** the arrow keys move between connected annotations, and `Enter` opens one.
 - **Toolbar:** Fit, Reheat (runs the layout again), the layered, force and radial layouts, **Export PNG**, and **Open as list**.
 
+## Modeling
+
+**Modeling**, in the sidebar of the view after **Graph**, has five tabs: **Schemas**, **Templates**, **Export & Import**, **Deleted** and **Compare views**. Each tab is a page of its own, at `/{organization}/{project}/{view}/modeling/{tab}`, and `…/modeling` opens **Schemas**. The browser's **Back** returns to the previous tab, and an unsaved template or schema asks before you leave it. **Compare views** is disabled when the project has no other view.
+
+The switcher keeps the tab when it changes the view or the project. The command palette lists the five tabs, and `G` then `T`, `S` or `E` opens **Templates**, **Schemas** or **Export & Import**. Links to the old addresses of the five pages still work: `…/{view}/schemas/type/exe`, for example, opens `…/{view}/modeling/schemas/type/exe`, and the query and the hash stay.
+
+Modeling needs the Contributor role or a higher one. A Reader sees the entry with a lock, and the page shows the notice "Contributors only" instead of the tabs. In the collapsed sidebar, the tooltip of the entry says the same. So a Reader cannot browse the schemas, the templates or the deleted annotations, export the view or compare views in the admin UI. For the same reason, the **Views** page shows **Compare** only to Contributors and the roles above, and the schema layers on the **Schema** tab of a configuration are plain text for a Reader. The API and `sform` do not change.
+
 ## Export and import
 
-**Export & Import**, in the sidebar of the view after **Compare views** (or `G` then `E`), moves the documents of a view as one zip: its annotations, schemas, templates and configurations. The page has an **Export** and an **Import** section, side by side, or one below the other on a phone. Below them is the result of the view's latest import.
+**Export & Import**, a tab of **Modeling** (or `G` then `E`), moves the documents of a view as one zip: its annotations, schemas, templates and configurations. The page has an **Export** and an **Import** section, side by side, or one below the other on a phone. Below them is the result of the view's latest import. Like the rest of **Modeling**, it needs the Contributor role or a higher one.
 
-**Export** works for every role:
+The **Export** section:
 
 - Pick the kinds, all four by default, and the format:
   - **Folder of JSON files**: one folder per kind (`annotations/`, `schemas/`, `templates/`, `configurations/`) with the current documents, the earlier versions as version files, and `export.json`.
@@ -171,7 +179,7 @@ Saving sends only your changes. Two situations stop a save:
 - The server builds the zip, and the browser downloads it when it is ready, named after the organization, project and view, with the date and the time in UTC. You can leave the page in the meantime: the download still starts, and a toast confirms it with the counts per kind.
 - Never included: secrets, effective documents, the audit, the version history of annotations, and deleted annotations.
 
-**Import** needs the Contributor role or a higher one; a Reader sees a notice instead of the form.
+The **Import** section:
 
 - Drop a zip, for example an edited export or a zipped clone of the repository. Each file's name tells its kind, so folders don't matter: `<key>.json` is an annotation, `<key>.conf.json` a configuration, `<type>.template.json` a template, and a name that ends in `.schema.json` a schema. Version files, `export.json` and hidden folders are ignored.
 - Pick the kinds the import may write, all four by default.
@@ -187,7 +195,7 @@ An import writes the annotations first, ancestors before their descendants, then
 
 **The result** counts the documents per kind and in total, with the files left out by the kinds and the ignored files. Chips filter the documents by kind, and by **Failed**, **Skipped** and **Warnings**. Every document that was not unchanged is listed with its kind, outcome, version, code, message and warnings, and links to its page when the view has it. On a phone, the table becomes a list. After a reload, the page shows the view's latest import again.
 
-The CLI does the same with `sform story export` and `sform story import` (see [Configuration](configuration#export-and-import)).
+The CLI does the same with `sform story export` and `sform story import` (see [Configuration](configuration#export-and-import)). `sform story export` works for a Reader too.
 
 ## People, machines and settings
 
@@ -235,7 +243,7 @@ New credentials (API keys, certificates with their password, client secrets) are
 | `Ctrl K` / `⌘ K` | Command palette |
 | `/` | Focus the filter |
 | `[` | Collapse or expand the sidebar |
-| `G` then `A`, `C`, `G`, `T`, `S`, `E`, `O` | Annotations, Configurations, Graph, Templates, Schemas, Export & Import, Organizations |
+| `G` then `A`, `C`, `G`, `T`, `S`, `E`, `O` | Annotations, Configurations, Graph, the Templates, Schemas and Export & Import tabs of Modeling, Organizations |
 | `J` / `K`, `Enter`, `Esc` | Next / previous row, open, close the detail |
 | `Ctrl S` / `⌘ S` | Save |
 | `?` | All shortcuts |

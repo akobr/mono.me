@@ -680,9 +680,9 @@ Each warning is a row of its own under its document, with `!` in the `Outcome` c
 
 ## Administration UI
 
-The **Export & Import** page of a view (`ui.admin/src/app/pages/[org]/[project]/[view]/export-import.vue`) exports and imports the view. It replaced the **Export** and **Import** buttons of the Configurations page and their dialogs (`ConfigurationExportDialog`, `ConfigurationImportDialog`, `ConfigurationImportResult`), which are removed.
+The **Export & Import** page of a view, a tab of **Modeling** (`ui.admin/src/app/pages/[org]/[project]/[view]/modeling/export-import.vue`), exports and imports the view. It replaced the **Export** and **Import** buttons of the Configurations page and their dialogs (`ConfigurationExportDialog`, `ConfigurationImportDialog`, `ConfigurationImportResult`), which are removed.
 
-- **Navigation.** The sidebar entry **Export & Import** (icon `i-lucide-arrow-down-up`) follows **Compare views** in the view section (`utils/navigation.ts`). It has `editRole: 'Contributor'`, so a Reader sees it with a lock ("Read-only for your role") and can still export. The command palette lists it with the other pages, and `g e` opens it (`components/shell/CommandPalette.vue`; the shortcut help lists it, `composables/useShortcutsHelp.ts`). `export-import` is one of the view sections of `utils/context-paths.ts`, so switching the view stays on the page.
+- **Navigation.** The page is the third tab of **Modeling** (icon `i-lucide-arrow-down-up`), at `…/{view}/modeling/export-import` (`utils/modeling.ts`). The sidebar entry **Modeling** (icon `i-lucide-puzzle`) follows **Graph** in the view section (`utils/navigation.ts`). It has `editRole: 'Contributor'` and `lockedHint: 'Contributors only'`, so a Reader sees it with a lock, and its tooltip in the collapsed sidebar says "Contributors only". `modeling.vue` locks the whole page below `Contributor`. The [access](#access) of the API does not change, so a Reader still exports with `sform story export`. The command palette lists the tab after the Modeling entry, except for a Reader, and `g e` opens it (`components/shell/CommandPalette.vue`; the shortcut help lists it, `composables/useShortcutsHelp.ts`). `modeling` is one of the view sections of `utils/context-paths.ts`, and switching the view or the project keeps the tab. The old address `…/{view}/export-import` redirects to the tab, with its query and hash.
 - **Layout.** The **Export** and **Import** sections sit side by side from the `lg` breakpoint and are stacked below it. Below them, full width, the section **Latest import** shows the result of the view's latest import (`latestImport`) once it has succeeded. While a newer import or check runs, and after one fails, the section is hidden; the Import section shows the progress or the error.
 - While the page is open, it marks that import as shown (`showInPage`), so `TransferToaster` does not report its end. The mark is set synchronously, as soon as the import becomes the latest one: an import restored after a reload that ended meanwhile is tracked and finished in one step, and gets no toast either.
 
@@ -700,7 +700,7 @@ The **Export & Import** page of a view (`ui.admin/src/app/pages/[org]/[project]/
 
 `components/transfer/ImportPanel.vue`:
 
-- **Who.** Below `Contributor`, the section shows "Importing needs the Contributor role" instead of the form.
+- **Who.** A Reader does not reach the section: the Modeling lock closes the page below `Contributor`. As a fallback, the section still shows "Importing needs the Contributor role" instead of the form below `Contributor`.
 - **The file:** `UFileUpload` takes a zip. Its hint: "Folders don't matter: files are recognized by their names. Version files, export.json and hidden folders are ignored."
 - **Kinds:** the same four checkboxes, all checked. They say what the import may write; at least one is needed.
 - **Existing documents:** radio cards.
@@ -729,10 +729,10 @@ The **Export & Import** page of a view (`ui.admin/src/app/pages/[org]/[project]/
   | --- | --- |
   | Annotation | `…/annotations/{key}` |
   | Configuration | `…/configurations/{key}` |
-  | Template | `…/templates/{type}` |
-  | Type schema | `…/schemas/type/{type}` |
-  | Annotation schema | `…/schemas/annotation/{key}` |
-  | Descendant-type schema | `…/schemas/annotation/{key}/type/{type}` |
+  | Template | `…/modeling/templates/{type}` |
+  | Type schema | `…/modeling/schemas/type/{type}` |
+  | Annotation schema | `…/modeling/schemas/annotation/{key}` |
+  | Descendant-type schema | `…/modeling/schemas/annotation/{key}/type/{type}` |
 
 - Without items, the result says that every document equals the stored one, or that the archive holds no document of the included kinds.
 
@@ -797,15 +797,15 @@ A dry run refreshes nothing.
   - the store's options, polling and restore after a reload (`transfers.test.ts`);
   - the names, links and invalidation of a result (`transfer-utils.test.ts`);
   - the sections, the result and the toaster, and the page after a reload: a resumed export in the Export section, and an import that ended during the reload shown without a toast (`transfer-page.test.ts`);
-  - the navigation entry and the shortcut (`test/unit/utils/navigation.test.ts`).
+  - the Modeling entry with its tabs, and the shortcut (`test/unit/utils/navigation.test.ts`).
 - **Playwright** (`test/e2e/transfers.spec.ts`), on desktop and mobile:
-  - the page from the sidebar and with `g e`, and a Configurations page without transfer buttons;
+  - the page from the sidebar (**Modeling**, then the **Export & Import** tab) and with `g e`, and a Configurations page without transfer buttons;
   - an export of annotations and templates, a git export, and the need for one kind;
   - a check of an edited archive per kind, with a warning, then **Import now** (desktop only);
   - an import with **Skip** that reports `DocumentExists` and shows again after a reload;
-  - the notice of a reader;
+  - the Modeling lock of a reader;
   - a file that is not a zip (desktop only).
-- **axe** (`accessibility.spec.ts`) runs on the page for a Contributor and for a reader, and on the result of a check.
+- **axe** (`accessibility.spec.ts`) runs on the page for a Contributor, on the locked Modeling page of a reader, and on the result of a check.
 - **Visual baselines** (`visual.spec.ts`) capture the page as it opens, in both themes, on desktop and mobile.
 
 ## Storage
