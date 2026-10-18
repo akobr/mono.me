@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  canDescend,
   describe as describeDocument,
   getAnnotationFileName,
   getAnnotationSchemaFileName,
@@ -237,18 +236,9 @@ describe('parsing file names', () => {
     const name = parseArchiveName(fileName)
 
     expect(name).toMatchObject({ kind: 'DescendantTypeSchema', type, key, errorCode: 'InvalidKey' })
-    expect(name!.message).toBeTruthy()
-  })
-
-  it('follows the annotation hierarchy for descendant types', () => {
-    expect(canDescend('rst.payments', 'unt')).toBe(true)
-    expect(canDescend('rst.payments', 'UXE')).toBe(true)
-    expect(canDescend('sbt.shop', 'cnt')).toBe(true)
-    expect(canDescend('sbt.shop', 'unt')).toBe(false)
-    expect(canDescend('cnt.shop.prod', 'exe')).toBe(true)
-    expect(canDescend('cnt.shop.prod', 'usg')).toBe(false)
-    expect(canDescend('exe.s.r.c', 'exe')).toBe(false)
-    expect(canDescend('uxe.s.r.c.u', 'uxe')).toBe(false)
+    expect(name!.message).toBe(
+      `The type ${type} cannot descend from ${key}, so it has no descendant-type schema there.`,
+    )
   })
 
   it.each<[string, ...Parsed]>([
