@@ -2,7 +2,6 @@ using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Federation;
@@ -39,9 +38,6 @@ public class FederationHttpTests
         RequiredClaims = new Dictionary<string, IReadOnlyList<string>> { ["repository_owner_id"] = ["123456"] },
     };
 
-    // The JSON options Program.cs configures for the API.
-    private static readonly IOptions<JsonOptions> ApiJsonOptions = CreateApiJsonOptions();
-
     private readonly FederationAccessService _access = new();
     private readonly InMemoryFederatedIssuerStore _issuers = new();
     private readonly RecordingTokenExchange _exchange = new();
@@ -49,7 +45,7 @@ public class FederationHttpTests
 
     private static bool DevAuth => Security.HttpRequestDataExtensions.IsDevelopmentAuthentication;
 
-    private FederationHttp Http => new(_access, _issuers, _exchange, Options.Create(_options), ApiJsonOptions, NullLogger<FederationHttp>.Instance);
+    private FederationHttp Http => new(_access, _issuers, _exchange, Options.Create(_options), FunctionTestDoubles.ApiJsonOptions, NullLogger<FederationHttp>.Instance);
 
     // Token endpoint: form and parameters
     [Fact]
@@ -792,29 +788,18 @@ public class FederationHttpTests
     // A PUT of a user with the issuer as the API's JSON; null sends an empty body.
     private static TestHttpRequestData IssuerRequest(FederatedIssuer? issuer)
     {
-        return RawRequest(issuer is null ? string.Empty : JsonSerializer.Serialize(issuer, ApiJsonOptions.Value.JsonSerializerOptions));
+        return RawRequest(issuer is null ? string.Empty : FunctionTestDoubles.ToJsonBody(issuer));
     }
 
     // A PUT of a user with the rules as the API's JSON; null sends an empty body.
     private static TestHttpRequestData RulesRequest(IEnumerable<FederationRule>? rules)
     {
-        return RawRequest(rules is null ? string.Empty : JsonSerializer.Serialize(rules.ToList(), ApiJsonOptions.Value.JsonSerializerOptions));
+        return RawRequest(rules is null ? string.Empty : FunctionTestDoubles.ToJsonBody(rules.ToList()));
     }
 
     private static TestHttpRequestData RawRequest(string body)
     {
-        return UserRequest(headers: new Dictionary<string, string> { ["Content-Type"] = "application/json" }, method: "PUT", body: body);
-    }
-
-    private static IOptions<JsonOptions> CreateApiJsonOptions()
-    {
-        var options = new JsonOptions();
-        options.JsonSerializerOptions.PropertyNamingPolicy = new NoChangeNamingPolicy();
-        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
-        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
-        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-        options.JsonSerializerOptions.AllowTrailingCommas = true;
-        return Options.Create(options);
+        return UserRequest(headers: FunctionTestDoubles.JsonContentType(), method: "PUT", body: body);
     }
 
     // An issuer read from a request body is a copy, so its pins are other instances: compared by content.
