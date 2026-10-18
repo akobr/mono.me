@@ -224,6 +224,11 @@ The credential variables decide the kind. Variables of two kinds at once, for ex
 
 * The certificate goes in the TLS handshake.
 * For `http://localhost`, which has no handshake, the SDK sends it in `X-ARR-ClientCert`. The local Functions host accepts that header (`MachineAuth:IsCertificateHeaderFromClientAllowed` in `local.settings.json`).
+* **The API reads a client certificate only from that header, and only when `MachineAuth:IsCertificateHeaderFromClientAllowed` is `true`.**
+  * The isolated worker never sees the TLS session. In Azure App Service, the front end forwards the handshake certificate in `X-ARR-ClientCert`.
+  * The setting defaults to `false`. Then `MachineAuthenticationMiddleware.TryExtractCertificate` ignores the header completely, including the one App Service injects. So no `Certificate` or `CertificateAndApiKey` machine can sign in, and no machine counts as mTLS for [secret delivery](key-values.md#secret-delivery).
+  * A deployment that uses certificates must set it to `true`. App Service must also require or accept client certificates (`clientCertMode`), so that it overwrites any `X-ARR-ClientCert` header a client sends. Otherwise anyone who holds a certificate's public part could present it without its private key.
+  * The mTLS spec calls the setting development-only. The code does not separate the platform's header from a client's, so that is not how it works today.
 * A shared certificate signs in only together with its machine's API key.
 * A certificate and an API key of different machines or projects stop `sform` before any call.
 
