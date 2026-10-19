@@ -8,9 +8,10 @@ import {
 import { isRememberedSection, usePageMemoryStore } from '@/stores/page-memory'
 import { sameView, viewLocation, type ViewLocation } from '@/utils/context-paths'
 
-// The navigations this guard sent to a remembered location. Their next pass comes back with the same redirectedFrom,
-// and goes through, however the remembered location is spelled: one recorded from the address bar keeps the
-// browser's spelling (%27), which the router writes again ('), so a comparison of the strings could loop (424-67).
+// The navigations this guard sent to a remembered location, by the location first asked for: `to.redirectedFrom`
+// behind Modeling's redirect, `to` itself otherwise. Their next pass comes back with it as its redirectedFrom, and goes
+// through however the remembered location is spelled: one recorded from the address bar keeps the browser's spelling
+// (%27), which the router writes again ('), so a comparison of the strings could loop (424-67).
 const restored = new WeakSet<object>()
 
 /**
