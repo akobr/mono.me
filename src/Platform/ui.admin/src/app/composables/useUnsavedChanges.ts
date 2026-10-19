@@ -22,8 +22,9 @@ export function useUnsavedChanges(
   dirtySources.add(isDirty)
   onBeforeUnmount(() => dirtySources.delete(isDirty))
 
-  // The navigations the user chose Discard for. A redirect, such as the page memory's, runs this guard again with the
-  // first pass as its redirectedFrom: the user is asked once per navigation (424-67).
+  // The navigations the user chose Discard for: the location first asked for, which is `to.redirectedFrom` behind a
+  // route-record redirect (the plain Modeling URL) and `to` itself otherwise. A redirect, such as the page memory's,
+  // runs this guard again with that location as its redirectedFrom: the user is asked once per navigation (424-67).
   const discarded = new WeakSet<object>()
 
   const guard = async (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
