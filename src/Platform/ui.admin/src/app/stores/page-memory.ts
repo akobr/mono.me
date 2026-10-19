@@ -6,8 +6,8 @@ import type { AnnotationTypeCode } from '@/utils/annotation-key'
 import type { Scope } from './context'
 import { onSignOut } from './session'
 
-/** The view sections that come back as the user left them. */
-export const rememberedSections = ['annotations', 'configurations', 'graph'] as const
+/** The view sections that come back as the user left them; Modeling only to its last tab, detail and query (424-67). */
+export const rememberedSections = ['annotations', 'configurations', 'graph', 'modeling'] as const
 
 export type RememberedSection = (typeof rememberedSections)[number]
 
@@ -52,24 +52,31 @@ export interface GraphMemory {
   frame?: GraphFrameMemory
 }
 
+/** Modeling keeps nothing outside its URL. */
+export type ModelingMemory = Record<string, never>
+
 export interface SectionMemories {
   annotations: AnnotationsMemory
   configurations: ConfigurationsMemory
   graph: GraphMemory
+  modeling: ModelingMemory
 }
 
 const empty: { [S in RememberedSection]: () => SectionMemories[S] } = {
   annotations: () => ({ expanded: new Set(), selection: {}, sorting: [], scrollTop: 0 }),
   configurations: () => ({ scrollTop: 0 }),
   graph: () => ({ hidden: new Set() }),
+  modeling: () => ({}),
 }
 
 const memoryKey = (scope: Scope, section: RememberedSection) => `${scope.org}/${scope.project}/${scope.view}/${section}`
 
 /**
  * What the annotations, configurations and graph pages need to come back as the user left them, per view: the last
- * location (path and query) and the state the URL does not hold. Kept in memory only, so a reload, a typed URL or
- * a new tab starts from the URL alone (spec "Remember the State of the Annotations, Configurations and Graph Pages").
+ * location (path and query) and the state the URL does not hold. Modeling keeps only its last location: the tab, the
+ * detail and their query (spec "Remember the Last Modeling Tab and Detail of a View"). Kept in memory only, so a
+ * reload, a typed URL or a new tab starts from the URL alone (spec "Remember the State of the Annotations,
+ * Configurations and Graph Pages").
  */
 export const usePageMemoryStore = defineStore('page-memory', () => {
   const locations = new Map<string, string>()
