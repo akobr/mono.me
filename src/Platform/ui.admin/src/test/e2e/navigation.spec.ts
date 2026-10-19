@@ -351,6 +351,47 @@ test('a link opens its tab of Modeling, and a detail link opens the tab and the 
   await expect(modelingTab(page, 'Templates')).toHaveAttribute('aria-selected', 'true')
 })
 
+// Modeling comes back to its last tab, detail and query from the menu, like Annotations (424-67). The memory lives in
+// the page, so after openApp the test only clicks: goto would reload the app.
+test('comes back to the tab, the detail and the query of Modeling after another section', async ({
+  page,
+}, testInfo) => {
+  const navigate = async (name: string) => (await menu(page, testInfo)).getByRole('link', { name, exact: true }).click()
+  const cascaded = page.getByRole('switch', { name: 'Show cascaded' })
+
+  await openApp(page, `${modeling}/deleted`)
+  await cascaded.click()
+  await expect.poll(() => relativeUrl(page)).toBe(`${modeling}/deleted?cascaded=1`)
+
+  await navigate('Annotations')
+  await expect.poll(() => relativeUrl(page)).toBe('/acme/billing/default/annotations')
+  await navigate('Modeling')
+  await expect.poll(() => relativeUrl(page)).toBe(`${modeling}/deleted?cascaded=1`)
+  await expect(modelingTab(page, 'Deleted')).toHaveAttribute('aria-selected', 'true')
+  await expect(cascaded).toBeChecked()
+
+  // On a phone the detail covers the screen, and the menu button with it, until it is closed.
+  if (!isMobile(testInfo)) {
+    await modelingTab(page, 'Templates').click()
+    // anchored: "Unit of execution" is a template too
+    await page.getByRole('link', { name: /^Execution\b/ }).click()
+    const detail = page.getByRole('region', { name: 'Execution template' })
+    await expect(detail).toBeVisible()
+
+    await navigate('Configurations')
+    await expect.poll(() => relativeUrl(page)).toBe('/acme/billing/default/configurations')
+    await navigate('Modeling')
+    await expect.poll(() => relativeUrl(page)).toBe(`${modeling}/templates/exe`)
+    await expect(modelingTab(page, 'Templates')).toHaveAttribute('aria-selected', 'true')
+    await expect(detail).toBeVisible()
+  }
+
+  // Selecting Modeling again while it is open starts over on its first tab.
+  await navigate('Modeling')
+  await expect.poll(() => relativeUrl(page)).toBe(`${modeling}/schemas`)
+  await expect(modelingTab(page, 'Schemas')).toHaveAttribute('aria-selected', 'true')
+})
+
 // acme/billing has the views default and staging; acme/shipping has only default, so it has nothing to compare.
 test('Compare views is enabled only when the project has another view', async ({ page }) => {
   await openApp(page, `${modeling}/schemas`)
