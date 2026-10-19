@@ -94,6 +94,10 @@ One build serves every environment. At start-up the app reads `/app-config.json`
 | `apiBaseUrl` | `VITE_API_BASE_URL` | API root including `/api`, for example `https://api.2s.42for.net/api`. A relative value means the app's origin. |
 | `authApiHostname` | `VITE_AUTH_API_HOSTNAME` | Custom AuthKit domain, for example `auth.42for.net`. **Required on every host except localhost**: without it AuthKit keeps the refresh token in `localStorage` (devMode), so the app refuses to start. |
 | `environmentName` | `VITE_ENVIRONMENT_NAME` | Shown in the sidebar footer. |
+| `sentryDsn` | `VITE_SENTRY_DSN` | Sentry DSN of the admin UI project; no Sentry without it. |
+| `posthogProjectToken` | `VITE_POSTHOG_PROJECT_TOKEN` | PostHog project token (`phc_…`); no PostHog without it. |
+| `posthogHost` | `VITE_POSTHOG_HOST` | PostHog API host; `https://eu.i.posthog.com` when missing. |
+| `release` | — | The commit SHA, written by the deployment; the Sentry release. |
 
 The sign-in provider and the AuthKit client ID come from the API (`GET v1/auth/configuration`). A deployment that uses another provider shows an "unsupported" page.
 
@@ -124,9 +128,12 @@ On `main` it also deploys `dist/` to Azure Static Web Apps (`skip_app_build`). T
 | `UI_ADMIN_API_BASE_URL` | variable | `apiBaseUrl`; its origin goes into the CSP `connect-src` |
 | `UI_ADMIN_AUTH_API_HOSTNAME` | variable | `authApiHostname`; goes into `connect-src` and `form-action` |
 | `UI_ADMIN_ENVIRONMENT_NAME` | variable | optional `environmentName` |
+| `UI_ADMIN_SENTRY_DSN` | variable | optional `sentryDsn`; its origin, without the key, goes into `connect-src` |
+| `UI_ADMIN_POSTHOG_PROJECT_TOKEN` | variable | optional `posthogProjectToken`; puts the PostHog host into `connect-src` |
+| `UI_ADMIN_POSTHOG_HOST` | variable | optional `posthogHost`; its origin goes into `connect-src` (`https://eu.i.posthog.com` when missing) |
 | `AZURE_STATIC_WEB_APPS_API_TOKEN_UI_ADMIN` | secret | deployment token of the Static Web App |
 
-The deploy step writes `dist/app-config.json` and replaces `__API_ORIGIN__` and `__AUTH_HOSTNAME__` in `dist/staticwebapp.config.json`. That file (from `public/`) sets the following:
+The deploy step runs `node build/write-environment-config.ts` (Node 24 runs TypeScript). It writes `dist/app-config.json`, with `release` set to the commit SHA, and replaces `__API_ORIGIN__`, `__AUTH_HOSTNAME__`, `__SENTRY_ORIGIN__` and `__POSTHOG_ORIGIN__` in `dist/staticwebapp.config.json`. Without a DSN or a PostHog token, the Sentry or PostHog origin is empty, and a deployment without the three variables deploys as before. A DSN or host that is not an absolute `https` URL fails the step. Playwright serves `vite preview` without the CSP, so `test/unit/build/csp.test.ts` and `environment-config.test.ts` check the policy and the step, and `write-environment-config.test.ts` runs the script with Node, as the deploy step does: syntax that Node's type stripping rejects, such as an `enum`, fails `npm test` instead of the deployment. The config file (from `public/`) sets the following:
 
 - the SPA navigation fallback;
 - the headers: CSP, `Referrer-Policy`, `X-Content-Type-Options`;
@@ -138,20 +145,35 @@ The CSP allows no `eval`. Keep these in mind when adding code:
 - **Fonts:** they are never inlined as `data:` URLs.
 - **Validation:** JSON Schema validation uses `@cfworker/json-schema`, which interprets schemas, instead of Ajv, which generates code with `new Function`.
 - **Zod:** it runs `jitless`.
+- **Telemetry:** PostHog comes from `posthog-js/no-external`, which loads no script from PostHog. The default `posthog-js` injects its config, recorder and surveys from a CDN, which `script-src 'self'` blocks.
+
+### Telemetry
+
+Sentry reports errors and PostHog counts pages and clicks. Each starts only when the deployment sets its key (`sentryDsn`, `posthogProjectToken`). `boot/telemetry.ts`, the only module the app calls, loads the SDKs with dynamic imports, so a deployment without keys downloads neither. A failure to load or start an SDK is logged with `console.warn` and changes nothing else.
+
+- **Off:** in the `e2e` and `test` modes (mock mode, Playwright, Vitest) neither SDK is imported, whatever the variables say, because Vite loads `.env.local` in these modes too. `public/app-config.json` and `.env.development` set no keys, so local development sends nothing.
+- **URLs:** a page goes out as its route template, for example `https://<admin-host>/:org/:project/:view/key-values/:key`, without the query and the hash (`utils/telemetry-privacy.ts`). The AuthKit `code` and `state`, the `invitation_token` and the filter text stay in the browser, and no page URL names an organization, project, view or key. The names still leave the browser in two ways: a PostHog click keeps the text of its link or button, which is a name on the organizations page, in the context switcher, in the breadcrumb of an annotation and in the lists; and Sentry's request breadcrumbs keep the paths (without the query) of the API calls before the error, which name their organization, project, view and key.
+- **Identity:** both get the AuthKit user id, never the e-mail, the name or the picture. Sign-out resets both.
+- **Sentry** (`boot/sentry.ts`) gets errors only, with `environmentName` and `release`: Vue errors, unhandled errors and rejections, and the API errors of the global toast (network failures and `5xx`). An API error is sent with its status and error code, never with its message, hint or body. There is no tracing (no trace headers to the API), no replay, no release-health session and no component prop. There are no console, click or key-press breadcrumbs (Sentry writes the `aria-label`, `title` and `alt` of the clicked element into them, which can be a name or an e-mail) and no breadcrumbs of PostHog's own requests, and the `Referer` header is removed. Each event carries the `posthog_session_id` and `posthog_distinct_id` tags of the current PostHog session, so an error leads to the PostHog session and user.
+- **PostHog** (`boot/posthog.ts`) gets a `$pageview` for the first page and for each change of the path (a change of the query only, such as typing a filter, is no new page), and the clicks on links and buttons, with their text (which can be an organization, project, view, annotation or key name) but no attributes. Recordings, exceptions, web vitals, heatmaps, dead clicks, surveys and feature flags stay off, whatever the project settings say. PostHog keeps its state in `localStorage` (no cookie), saves no referrer or campaign parameters (the `utm_*`, `gclid` and similar values and the search keyword it still reads from the entry URL are removed before sending), and honours Do Not Track and Global Privacy Control.
+- **`ph-no-capture`:** clicks inside an element with this class send nothing to PostHog. It is on the root of every component that shows secrets (one-time secrets, new machines, shared certificates, key values and their versions, the key-value list on narrow screens, the create and import dialogs of key values), documents (the code, diff and document editors, the configuration form, the hunk list), personal data (the invite dialog, members, invitations, the invitations page, the user menu, the account page, the author and actor links of `AuditActorLink` and the stamps of an annotation) or typed text (the active terms of the filter sheet). A new component that shows secrets, documents or personal data gets it too. A dialog gets it on its `UModal`, which teleports its content out of the page.
 
 ## Architecture
 
 ```
 src/
 ├── index.html, vite.config.ts, vitest.config.ts, eslint.config.ts, .oxlintrc.json, tsconfig*.json
-├── build/mock-service-worker.ts   # serves msw's worker script in the e2e mode only
+├── build/                         # mock-service-worker (msw's worker script in the e2e mode only), sdk-freshness,
+│                                  #   environment-config + write-environment-config (the deploy step)
 ├── public/                        # app-config.json, theme-init.js (color mode before first paint), 16 and 32 px favicons
 ├── app/
-│   ├── main.ts                    # boot: app-config → SDK fetcher → AuthKit → Pinia, Vue Query, router, Nuxt UI
+│   ├── main.ts                    # boot: app-config → SDK fetcher → AuthKit → telemetry → Pinia, Vue Query, router,
+│   │                              #   Nuxt UI
 │   ├── App.vue                    # <UApp>, layout switch on route.meta.layout
 │   ├── assets/                    # css/main.css (Tailwind, Nuxt UI theme with the purple accent, fonts, type
 │   │                              #   tokens), images/ (the 42 logo)
-│   ├── boot/                      # app-config, auth (AuthKit), api (SDK fetcher), query (QueryClient), api-errors
+│   ├── boot/                      # app-config, auth (AuthKit), api (SDK fetcher), query (QueryClient), api-errors,
+│   │                              #   telemetry, sentry and posthog (the SDKs, loaded only when configured)
 │   ├── router/                    # router + guards (auth: sign-in, account, onboarding; context: org/project/view;
 │   │                              #   page-memory: back to where a section was left)
 │   ├── layouts/                   # DefaultLayout (dashboard shell), BareLayout (centered card)
@@ -166,7 +188,7 @@ src/
 
 - **Server state** lives in TanStack Query through the SDK's generated composables. **Client state** lives in Pinia: `session` (user, account, AccessMap), `context` (org, project and view of the route), `preferences` (UI state only, in `localStorage`, including the personal date format and personal names, colors and icons of the annotation types), `project-settings` (per project defaults such as the time zone of new annotations, the date format and the names, colors and icons of the types, in `localStorage` until the API stores project settings), `type-appearance` (resolves the type overrides, personal over project over built-in, and applies them to `typeMeta` and the `--st-*` color tokens), `date-format` (resolves the date format, personal over project over `yyyy-mm-dd`, and applies it to the formatters of `utils/dates.ts`), `page-memory` (in memory only: per view, the last location and the URL-less state of the annotations, configurations and graph pages, restored by the `page-memory` router guard when the user returns to the plain list of one of these sections).
 - **Merged pages:** the old Invitations, Certificates, Secrets, Audit and Usage pages of a project are redirect stubs (`definePage({ redirect })`) to the section that took them over: `members#invitations`, `machines#shared-certificates`, `settings#secrets` and `monitor` (`?tab=audit`). The router does not scroll to anchors, and the panel body is the scroll container, so `useHashScroll(ready)` scrolls the section of the hash into view once the content above it has loaded. The old Schemas, Templates, Export & Import, Deleted and Compare views pages of a view redirect to their tab, `modeling/{tab}`: `movedToModeling` (`utils/modeling.ts`) inserts `modeling` after the view and keeps the rest of the path, and `schemas/[[...path]].vue` and `templates/[[...path]].vue` cover the details below them too. The redirects return a path, so the query and the hash stay.
-- **Errors:** the SDK throws `StorytellerError`. `5xx` and network failures show a global toast; screens handle `4xx` themselves. Server stack traces are never shown.
+- **Errors:** the SDK throws `StorytellerError`. `5xx` and network failures show a global toast, and `reportApiError` sends the same errors to Sentry when it is configured ([Telemetry](#telemetry)); screens handle `4xx` themselves. Server stack traces are never shown.
 - **Roles:** `useRole()` and `<RoleGate>` read the caller's role from `Account.AccessMap` (an organization role does not grant project access).
 - **Forms:** VeeValidate 4 with Zod 4 through `forms/typed-schema.ts` (`@vee-validate/zod` supports Zod 3 only).
 - **Values store** (`pages/[org]/[project]/[view]/key-values*`, `components/key-values/`, `components/secrets/`, `components/monitor/`): the key values of a view with their levels, the detail with Reveal (masked again after 60 seconds, never cached) and Set new value, versions loaded only on request, import in three steps and export through a Blob URL, the Secrets section of the project's Settings (allowed levels, keys and rotation, the BYOK wizard, recipients), and the Usage and Audit tabs of the Monitor page (`pages/[org]/[project]/monitor.vue`, `?tab=audit`). HYOK values are encrypted in the browser with `@42for.net/2splatform.sdk/hyok` before they leave; `app/mock/key-value-handlers.ts` is the stateful mock behind them. See [key-values.md](../../../docs/Platform/Storyteller/key-values.md#admin-ui).
