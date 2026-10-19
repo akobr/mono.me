@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -7,8 +8,10 @@ using _42.CLI.Toolkit;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Telemetry;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
+using McMaster.Extensions.CommandLineUtils.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -21,6 +24,9 @@ namespace _42.Platform.Cli;
 
 public class Program
 {
+    // What the usage event reports; the command line application itself is disposed with the host.
+    private static readonly CommandRun CurrentRun = new();
+
     private static IHost? _host;
     private static ILogger<Program>? _logger;
     private static LoggingOptions? _loggingOptions;
@@ -28,21 +34,37 @@ public class Program
     // Captured before the run: the host is disposed before a command's exception reaches Main.
     private static MachineSignInSettings? _machineSignIn;
 
+    // Built outside the container for the same reason.
+    private static ICommandTelemetry _telemetry = NoCommandTelemetry.Instance;
+
     public static IHost Host => _host ?? throw new InvalidOperationException("The host app is not initialized.");
 
     public static async Task<int> Main(string[] args)
     {
+        CurrentRun.Stopwatch.Start();
+
         if (!InitializeHost(args))
         {
             return ExitCodes.ERROR_CRASH;
         }
 
+        System.Console.CancelKeyPress += OnCancelKeyPress;
+        var exitCode = await RunAsync(args);
+        await _telemetry.SendAsync(CurrentRun, exitCode);
+        return exitCode;
+    }
+
+    private static async Task<int> RunAsync(string[] args)
+    {
         try
         {
             return await Host.RunCommandLineApplicationAsync();
         }
         catch (UnrecognizedCommandParsingException parsingException)
         {
+            // The parser throws before OnParsingComplete; the command is the deepest one it matched.
+            CurrentRun.Exception = parsingException;
+            CurrentRun.Command = CommandPath.Of(parsingException.Command);
             parsingException.WriteOutput();
 
             await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
@@ -54,6 +76,7 @@ public class Program
         }
         catch (UnauthorizedAccessException exception)
         {
+            CurrentRun.Exception = exception;
             var reportedException = exception.InnerException ?? exception;
             await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
                 reportedException,
@@ -66,6 +89,7 @@ public class Program
         }
         catch (AuthenticationException exception)
         {
+            CurrentRun.Exception = exception;
             await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
                 exception,
                 "Sign-in failed ({reason}); Arguments: {args}",
@@ -83,6 +107,7 @@ public class Program
         }
         catch (ApiException exception) when (exception.StatusCode is (int)HttpStatusCode.Unauthorized or (int)HttpStatusCode.Forbidden)
         {
+            CurrentRun.Exception = exception;
             await Task.Run(() => LogWithSentry(() => _logger?.LogWarning(
                 "The API refused the request with {statusCode}; Arguments: {args}",
                 exception.StatusCode,
@@ -102,6 +127,13 @@ public class Program
         }
         catch (Exception exception)
         {
+            CurrentRun.Exception = exception;
+
+            if (exception is CommandParsingException parsingException)
+            {
+                CurrentRun.Command = CommandPath.Of(parsingException.Command);
+            }
+
             // TODO: [P2] Hot fix for bug https://github.com/natemcmaster/CommandLineUtils/issues/541
             if (exception.GetType() == typeof(InvalidOperationException)
                 && string.Equals(
@@ -115,6 +147,7 @@ public class Program
                 return ExitCodes.ERROR_INPUT_PARSING;
             }
 
+            CurrentRun.Crashed = true;
             Console.WriteWithGradient("# Total mayhem", Color.Yellow, Color.Magenta);
             Console.WriteLine(", the tool is broken! ):", Color.Magenta);
 
@@ -137,6 +170,12 @@ public class Program
             _logger = _host.Services.GetRequiredService<ILogger<Program>>();
             _loggingOptions = Host.Services.GetService<IOptions<LoggingOptions>>()?.Value;
             _machineSignIn = Host.Services.GetService<MachineSignInSettings>();
+            _telemetry = CommandTelemetry.Create(
+                Host.Services.GetService<IOptions<TelemetryOptions>>()?.Value,
+                Host.Services.GetRequiredService<IFileSystem>(),
+                Host.Services.GetRequiredService<IHostEnvironment>(),
+                _machineSignIn,
+                _logger);
             return true;
         }
         catch (Exception exception)
@@ -169,6 +208,27 @@ public class Program
         application.MakeSuggestionsInErrorMessage = true;
         application.ShortVersionGetter = null;
         application.SetLongVersionGetter();
+        application.OnParsingComplete(OnParsingComplete);
+    }
+
+    // On the root, it runs for every selected subcommand too, before the command executes. A handler that throws
+    // would end the run in place of the command, so nothing escapes.
+    private static void OnParsingComplete(ParseResult result)
+    {
+        try
+        {
+            CurrentRun.RecordParsing(result.SelectedCommand);
+        }
+        catch (Exception)
+        {
+            CurrentRun.Command = CommandPath.UNKNOWN;
+        }
+    }
+
+    // Only marks the run; the lifetime of the command line host stops the command.
+    private static void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
+    {
+        CurrentRun.Cancelled = true;
     }
 
     private static void LogWithSentry(Action logOperation)
@@ -180,9 +240,20 @@ public class Program
             return;
         }
 
-        using (SentrySdk.Init(_loggingOptions.SentryDsn))
+        using (SentrySdk.Init(ConfigureSentry))
         {
             logOperation();
+        }
+    }
+
+    private static void ConfigureSentry(SentryOptions options)
+    {
+        options.Dsn = _loggingOptions?.SentryDsn;
+
+        // Finds the run in PostHog; with telemetry off there is no id and no tag.
+        if (_telemetry.InstallationId is { } installationId)
+        {
+            options.DefaultTags["posthog_distinct_id"] = installationId;
         }
     }
 }
