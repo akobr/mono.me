@@ -57,7 +57,8 @@ const rows = computed<KeyValueSummary[]>(() => {
 })
 
 const selected = ref<Set<string>>(new Set())
-watch([state, () => context.view], () => (selected.value = new Set()))
+// The switcher keeps this page through a project switch too, often to the same view name (424-68).
+watch([state, () => context.projectKey, () => context.view], () => (selected.value = new Set()))
 
 function toggle(key: string, on: boolean) {
   const next = new Set(selected.value)
