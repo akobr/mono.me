@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { useForm } from 'vee-validate'
 import { z } from 'zod'
@@ -10,6 +10,8 @@ import { viewNameSchema } from '@/forms/names.schema'
 import { toTypedSchema } from '@/forms/typed-schema'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
+import { hasOtherView } from '@/utils/modeling'
+import { defaultViewName, isDefaultView } from '@/utils/views'
 
 // Views of the project (companion spec E5): registered views with description and creation, discovered views
 // (Administrators, ?discover=true) with Register, create, edit description and compare.
@@ -25,6 +27,14 @@ const views = useGetViews(
   () => context.project ?? '',
   () => ({ discover: canAdmin.value }),
   { query: { enabled: () => !!context.project, meta: { silent: true } } },
+)
+
+// Compare opens Compare views of the default view (this page has no view of its own) with the view of the row as ?to=.
+// The default view's own row has nothing to compare with, and without another view it is the only row (424-64).
+const compareHint = computed(() =>
+  hasOtherView(views.data.value, defaultViewName)
+    ? 'The other views are compared with this one'
+    : 'The project has no other view to compare with',
 )
 
 const creating = ref(false)
@@ -109,14 +119,16 @@ function edit(view: View) {
           <span class="min-w-0 flex-1 truncate text-sm text-muted">{{ view.Description }}</span>
           <RelativeTime v-if="view.Created" :value="view.Created.At" class="text-xs text-dimmed" />
           <span class="flex gap-1">
-            <UButton
-              v-if="canCompare"
-              :to="`/${context.org}/${context.project}/${context.view ?? 'default'}/modeling/compare?to=${view.Name}`"
-              label="Compare"
-              size="xs"
-              color="neutral"
-              variant="ghost"
-            />
+            <UTooltip v-if="canCompare" :text="compareHint" :disabled="!isDefaultView(view.Name)">
+              <UButton
+                :to="`/${context.org}/${context.project}/${defaultViewName}/modeling/compare?to=${view.Name}`"
+                :disabled="isDefaultView(view.Name)"
+                label="Compare"
+                size="xs"
+                color="neutral"
+                variant="ghost"
+              />
+            </UTooltip>
             <template v-if="canAdmin">
               <UButton
                 v-if="!view.IsRegistered"
