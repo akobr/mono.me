@@ -143,7 +143,7 @@ async function send() {
   <UModal
     v-model:open="open"
     title="Invite people"
-    :description="`To ${accessPointKey}. Everyone gets the same role and expiry; WorkOS sends the emails.`"
+    :description="`To ${accessPointKey}. Everyone gets the same role and expiry.`"
     :dismissible="!sending"
     :close="!sending"
   >
