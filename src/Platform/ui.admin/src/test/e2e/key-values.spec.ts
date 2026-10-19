@@ -169,6 +169,32 @@ test('loads the versions only when the tab opens', async ({ page }, testInfo) =>
   expect(versionRequests.length).toBeGreaterThan(0)
 })
 
+// The switcher keeps Values store, without the open key, and the selection stays behind with its project (424-68).
+test('the switcher keeps Values store, without the key and the selection', async ({ page }, testInfo) => {
+  test.skip(isMobile(testInfo), 'The view switcher of the top bar is hidden on a phone')
+  const switcher = page.getByRole('navigation', { name: 'Context' })
+  // not by role: while a menu of the switcher closes, the page is aria-hidden, and a role query finds nothing either way
+  const detail = page.locator('#key-value-detail')
+  await openApp(page, '/acme/billing/staging/key-values/db.host/versions')
+  await expect(detail).toBeVisible()
+
+  await switcher.getByRole('button').nth(2).click()
+  await page.getByRole('menuitem', { name: /^default\s*prod$/ }).click()
+  await expect(page).toHaveURL('/acme/billing/default/key-values')
+  await expect(detail).toHaveCount(0)
+  await expect(page.getByRole('row').filter({ hasText: 'db.host' })).toContainText('sql.internal')
+
+  await page.getByRole('checkbox', { name: 'Select db.host' }).click()
+  await expect(page.getByRole('toolbar', { name: 'Bulk actions' })).toContainText('1 selected')
+
+  // the default view of the other project: the same view name, so the same page goes on
+  await switcher.getByRole('button').nth(1).click()
+  await page.getByRole('menuitem', { name: 'shipping', exact: true }).click()
+  await expect(page).toHaveURL('/acme/shipping/default/key-values')
+  await expect(page.getByText('No key values in this view')).toBeVisible()
+  await expect(page.getByText('1 selected')).toHaveCount(0)
+})
+
 test('imports an .env text with a secret pattern after showing the plan', async ({ page }) => {
   await openApp(page, '/acme/billing/default/key-values')
   await page.getByRole('button', { name: 'Import' }).first().click()
