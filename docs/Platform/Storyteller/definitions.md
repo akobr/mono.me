@@ -193,6 +193,13 @@ sform story schema definition exe.northwind.invoicing.prod
 
 `set` creates the schema or replaces it. It takes `-i|--import` and sends that file as the body. `edit` opens the current document in the editor and replaces it with the result; there has to be a schema already. `get` takes `--version` to print one stored version. `diff` takes the target version, an optional source version, and `--format`. `definition` is read-only. Add `-f` or `--force` to `set` and `edit` when the new schema should be stored even though configurations already in the view do not comply. See [Force](#force).
 
+When the API refuses a schema command, `sform` prints the server's message:
+
+- A `400` or `404` prints the message and its error code on the next line, for example `Error code: InvalidKey` for a descendant type that cannot descend from the key. The command exits with `2`.
+- A failed compliance check prints the message, then each configuration that does not comply as `annotationKey (view)` with its messages. The command exits with `2`.
+- Any other refusal with a message, such as a `403` or a `500`, prints the message and exits with `1`. A response without a message prints the text of the error, also with `1`.
+- A `404` of `get`, `delete`, `versions`, `diff`, `definition` or of the read of `edit` prints a sentence of `sform`, such as "The schema for 'exe' has not been found.", instead of the server's message.
+
 ## What is checked
 
 Validation looks at the stored configuration document, the `Content` that is about to be written. It does not look at the calculated document, the resolved document, inherited values, or template output. A property that exists only because a template or an ancestor contributed it is invisible to the schema. A required property has to be present in the stored document of the annotation being written.
