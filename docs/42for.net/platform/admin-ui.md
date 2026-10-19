@@ -161,15 +161,15 @@ Saving sends only your changes. Two situations stop a save:
 
 ## Modeling
 
-**Modeling**, in the sidebar of the view after **Graph**, has five tabs: **Schemas**, **Templates**, **Export & Import**, **Deleted** and **Compare views**. Each tab is a page of its own, at `/{organization}/{project}/{view}/modeling/{tab}`, and `…/modeling` opens **Schemas**. The browser's **Back** returns to the previous tab, and an unsaved template or schema asks before you leave it. **Compare views** is disabled when the project has no other view.
+**Modeling**, in the sidebar of the view after **Graph**, has five tabs: **Schemas**, **Templates**, **Export & Import**, **Deleted** and **Compare views**. **Export & Import** is a tab of Administrators and Owners only, so Contributors get the other four. Each tab is a page of its own, at `/{organization}/{project}/{view}/modeling/{tab}`, and `…/modeling` opens **Schemas**. The browser's **Back** returns to the previous tab, and an unsaved template or schema asks before you leave it. **Compare views** is disabled when the project has no other view.
 
-The switcher keeps the tab when it changes the view or the project. For Contributors and the roles above, the command palette lists the five tabs after **Modeling**, and `G` then `T`, `S` or `E` opens **Templates**, **Schemas** or **Export & Import**. Links to the old addresses of the five pages still work: `…/{view}/schemas/type/exe`, for example, opens `…/{view}/modeling/schemas/type/exe`, and the query and the hash stay.
+The switcher keeps the tab when it changes the view or the project. For Contributors and the roles above, the command palette lists the tabs of your role after **Modeling**, and `G` then `T`, `S` or `E` opens **Templates**, **Schemas** or **Export & Import**. Links to the old addresses of the five pages still work: `…/{view}/schemas/type/exe`, for example, opens `…/{view}/modeling/schemas/type/exe`, and the query and the hash stay.
 
-Modeling needs the Contributor role or a higher one. A Reader sees the entry with a lock, and the page shows the notice "Contributors only" instead of the tabs. In the collapsed sidebar, the tooltip of the entry says the same. So a Reader cannot browse the schemas, the templates or the deleted annotations, export the view or compare views in the admin UI. For the same reason, the **Views** page shows **Compare** only to Contributors and the roles above, and the schema layers on the **Schema** tab of a configuration are plain text for a Reader. The API and `sform` do not change.
+Modeling needs the Contributor role or a higher one. A Reader sees the entry with a lock, and the page shows the notice "Contributors only" instead of the tabs. In the collapsed sidebar, the tooltip of the entry says the same. So a Reader cannot browse the schemas, the templates or the deleted annotations, export the view or compare views in the admin UI. For the same reason, the **Views** page shows **Compare** only to Contributors and the roles above, and the schema layers on the **Schema** tab of a configuration are plain text for a Reader. This lock is a choice of the admin UI: the API and `sform` still let a Reader read the schemas, the templates and the deleted annotations, and compare views. The export and the import are different: they need the Administrator role in the API and in `sform` too (see [Export and import](#export-and-import)).
 
 ## Export and import
 
-**Export & Import**, a tab of **Modeling** (or `G` then `E`), moves the documents of a view as one zip: its annotations, schemas, templates and configurations. The page has an **Export** and an **Import** section, side by side, or one below the other on a phone. Below them is the result of the view's latest import. Like the rest of **Modeling**, it needs the Contributor role or a higher one.
+**Export & Import**, a tab of **Modeling** (or `G` then `E`), moves the documents of a view as one zip: its annotations, schemas, templates and configurations. The page has an **Export** and an **Import** section, side by side, or one below the other on a phone. Below them is the result of the view's latest import. It needs the Administrator role or the Owner role on the project. A Contributor who opens it, with a link or `G` then `E`, sees the notice "Administrators only" under the other tabs of **Modeling**.
 
 The **Export** section:
 
@@ -195,7 +195,7 @@ An import writes the annotations first, ancestors before their descendants, then
 
 **The result** counts the documents per kind and in total, with the files left out by the kinds and the ignored files. Chips filter the documents by kind, and by **Failed**, **Skipped** and **Warnings**. Every document that was not unchanged is listed with its kind, outcome, version, code, message and warnings, and links to its page when the view has it. On a phone, the table becomes a list. After a reload, the page shows the view's latest import again.
 
-The CLI does the same with `sform story export` and `sform story import` (see [Configuration](configuration#export-and-import)). `sform story export` works for a Reader too.
+The CLI does the same with `sform story export` and `sform story import` (see [Configuration](configuration#export-and-import)). The API and the CLI follow the same rule: a user needs the Administrator role, and a machine, which has no role, the scopes of the kinds it exports or imports.
 
 ## People, machines and settings
 

@@ -170,7 +170,7 @@ The functions and sources depend on the deployment: each Azure Key Vault is a so
 
 ## Export and import
 
-The documents of a view can leave the platform as one zip and come back the same way: from the **Export & Import** page of the [Administration UI](admin-ui#export-and-import), or with `sform story export` and `sform story import`. An archive holds four kinds, all of them by default: the **annotations**, the **schemas**, the **templates** and the **configurations** of the view. `--include` (or the kind checkboxes of the page) narrows either side to some of them.
+The documents of a view can leave the platform as one zip and come back the same way: from the **Export & Import** page of the [Administration UI](admin-ui#export-and-import), or with `sform story export` and `sform story import`. An archive holds four kinds, all of them by default: the **annotations**, the **schemas**, the **templates** and the **configurations** of the view. `--include` (or the kind checkboxes of the page) narrows either side to some of them. Both need the Administrator role on the project, or Owner, on the page, in `sform` and in the API. A machine has no role and needs the scopes of the kinds it exports or imports instead.
 
 The file name tells the kind of a document, so the folders don't matter to an import:
 
