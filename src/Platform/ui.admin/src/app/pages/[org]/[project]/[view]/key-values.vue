@@ -101,19 +101,25 @@ async function refresh() {
 }
 
 async function remove(key: string) {
+  // the scope the user asked in: a switch while the confirmation is open cancels the delete (424-68)
+  const scope = context.scope
+  if (!scope) {
+    return
+  }
   const confirmed = await confirm({
     title: `Delete '${key}'?`,
     description: 'The key can be restored for 90 days with every version; after that it is removed for good.',
     confirmLabel: 'Delete',
     color: 'error',
   })
-  if (!confirmed || !context.scope) {
+  const current = context.scope
+  if (!confirmed || current?.org !== scope.org || current.project !== scope.project || current.view !== scope.view) {
     return
   }
   try {
-    await deleteKeyValue(context.scope.org, context.scope.project, context.scope.view, key)
+    await deleteKeyValue(scope.org, scope.project, scope.view, key)
     toast.add({ title: `'${key}' deleted`, description: 'Restore it from the Deleted keys.', color: 'success', icon: 'i-lucide-trash-2' })
-    await refresh()
+    await invalidateKeyValues(queryClient, scope)
   } catch (error) {
     toast.add({ title: 'The key was not deleted', description: errorMessage(error), color: 'error' })
   }
