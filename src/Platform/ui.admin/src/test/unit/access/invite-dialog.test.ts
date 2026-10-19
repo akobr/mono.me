@@ -86,7 +86,14 @@ describe('InviteDialog', () => {
     expect(tags()).toEqual(['ada@example.com', 'grace@example.com'])
     expect(input().value).toBe('alan@example.com')
     expect(text()).toContain('Separate addresses with spaces or commas, or paste a list.')
-    expect(text()).toContain('Everyone gets the same role and expiry')
+  })
+
+  it('describes the destination and the shared role and expiry, not who sends the emails (424-65)', async () => {
+    await openDialog()
+
+    const description = document.getElementById(dialog().getAttribute('aria-describedby')!)
+    expect(description?.textContent).toBe('To acme.billing. Everyone gets the same role and expiry.')
+    expect(text()).not.toContain('WorkOS')
   })
 
   it('makes one tag per address of a pasted list, without the duplicates', async () => {
