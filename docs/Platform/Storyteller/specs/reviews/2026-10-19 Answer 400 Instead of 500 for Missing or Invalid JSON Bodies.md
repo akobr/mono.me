@@ -2,7 +2,7 @@
 
 ## Overview
 
-The 25 handlers of the Storyteller API that bound their JSON body with the worker's `[FromBody]` now read it themselves, through one reader shared with the federation routes. An empty body, `null`, a missing `Content-Type`, a body that is not UTF-8 or JSON that does not fit the type now answer **400**, never 500. Each handler keeps its existing missing-body message and code. Handlers that had none got one. The two optional bodies keep their defaults. The OpenAPI document and both SDKs are unchanged. This implements [Answer 400 Instead of 500 for Missing or Invalid JSON Bodies](../2026-10-18%20Answer%20400%20Instead%20of%20500%20for%20Missing%20or%20Invalid%20JSON%20Bodies.md) in full, for Linear 424-61. All three phases were delivered together, one commit per phase or handler group. After the pull request review, the reader also limits the size of each body (413). The single-annotation `PUT`/`POST`, left out at first, followed. The unit tests of `Api.Functions` went from 971 to 1123.
+The 25 handlers of the Storyteller API that bound their JSON body with the worker's `[FromBody]` now read it themselves, through one reader shared with the federation routes. An empty body, `null`, a missing `Content-Type`, a body that is not UTF-8 or JSON that does not fit the type now answer **400**, never 500. Each handler keeps its existing missing-body message and code. Handlers that had none got one. The two optional bodies keep their defaults. The OpenAPI document and both SDKs are unchanged. This implements [Answer 400 Instead of 500 for Missing or Invalid JSON Bodies](../2026-10-18%20Answer%20400%20Instead%20of%20500%20for%20Missing%20or%20Invalid%20JSON%20Bodies.md) in full, for Linear 424-61. All three phases were delivered together, one commit per phase or handler group. After the pull request review, the reader also limits the size of each body (413). The single-annotation `PUT`/`POST`, left out at first, followed. So did limits for the configuration, schema and template writes. The unit tests of `Api.Functions` went from 971 to 1126.
 
 ## What Was Done
 
@@ -131,6 +131,16 @@ CodeRabbit noted that the reader copied the whole body into memory with no limit
 - Tests in `AnnotationsHttpTests`: the four root kinds, a body that is not UTF-8, a byte order mark, a body over the limit and a declared length over it, each without calling the service.
 - Docs: the `PUT`/`POST` row and `BodyTooLarge` in `annotation-lifecycle.md`.
 
+### Follow-up: configuration, schema and template writes
+
+The seven writes that parse their body with Newtonsoft (`ConfigurationHttp` `PUT` and `PATCH`, the three schema `PUT`s of `ConfigurationSchemaHttp`, `TemplateHttp` `PUT` and `PATCH`) read it through a `StreamReader` with no limit of their own.
+
+- `RequestBodyExtensions.ReadBodyAsync(request, maxBytes)` copies the body with `TryCopyBodyAsync` and returns it from its start, or null when it or its declared `Content-Length` is larger than the limit. Each of the seven handlers reads through it, after its scope, access and key or type checks as before, and answers `413 BodyTooLarge` for null. The parsing after it is unchanged.
+- `RequestBodyLimits.Document` is 4 MiB: a configuration, a schema or a template is one Cosmos item (2 MB). A JSON Patch has no bound of its own, so for a patch the limit is a cap above what the clients send.
+- Tests: `ReadBodyAsync` at the limit and over it in `RequestBodyExtensionsTests`, and a schema `PUT` over the limit that writes nothing in `ConfigurationSchemaHttpTests`.
+- Docs: the 413 in the status lists of `definitions.md` and `templating.md`.
+- Not changed: these readers still decode the body with `StreamReader`, so a body that is not UTF-8 is stored with replacement characters, as before.
+
 ### Left out
 - The new 400s and the 413 are described in the docs, not in the OpenAPI responses, so the SDKs stay unchanged. The NSwag client throws its generic `ApiException` for the 413, and the response text keeps the message.
-- The body readers that do not use `ReadJsonBodyAsync` have no limit of their own yet: configurations, schemas, templates and the export start.
+- The body readers that do not use `ReadJsonBodyAsync` have no limit of their own yet: only the export start is left.

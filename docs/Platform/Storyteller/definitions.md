@@ -163,6 +163,7 @@ PUT accepts a query parameter `force`. It defaults to false. See [Force](#force)
 - Writes require `Configuration.Write` or `Default.Write` and the `Contributor` role on the project.
 - `400` means the body is not JSON or is not a schema NJsonSchema can parse, or the type code or annotation key is unknown. On the descendant-type `PUT` it also means that the type cannot descend from `{key}`; that response carries `ErrorCode` `InvalidKey`.
 - `404` means the requested schema, version, or (for a patch of configuration) the configuration is absent.
+- `413` with `ErrorCode` `BodyTooLarge` means the body of a schema, configuration or JSON Patch write is larger than 4 MiB; it is refused before it is parsed. A stored document is one Cosmos item of at most 2 MB.
 - `409` with `SchemaValidationErrorResponse` means a compliance check failed and force was not set. Each entry carries `AnnotationKey`, `ViewName`, and the list of messages. A message is the JSON path and the NJsonSchema error kind, for example `#/currency: NotInEnumeration`.
 - `409` with `ErrorResponse` means a concurrent writer won the race after the retries. That body is a different type from the compliance failure.
 - `500` means storage failed.

@@ -87,6 +87,22 @@ internal static class RequestBodyExtensions
         return true;
     }
 
+    // The body copied into memory, for a handler that parses it itself; null when it, or its declared Content-Length,
+    // is larger than maxBytes.
+    public static async Task<MemoryStream?> ReadBodyAsync(this HttpRequestData request, int maxBytes)
+    {
+        var body = new MemoryStream();
+
+        if (!await request.TryCopyBodyAsync(body, maxBytes, request.FunctionContext.CancellationToken))
+        {
+            await body.DisposeAsync();
+            return null;
+        }
+
+        body.Position = 0;
+        return body;
+    }
+
     public static ObjectResult BodyTooLarge(int maxBytes)
     {
         return new ObjectResult(new ErrorResponse($"The request body is larger than {maxBytes} bytes.") { ErrorCode = ErrorCodes.BodyTooLarge })

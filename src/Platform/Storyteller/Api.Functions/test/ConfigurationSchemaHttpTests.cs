@@ -40,6 +40,21 @@ public class ConfigurationSchemaHttpTests
         schemas.Writes.ShouldBeEmpty();
     }
 
+    // A schema is one Cosmos item; a larger body is refused before it is parsed or written.
+    [Fact]
+    public async Task SetDescendantTypeSchema_LargerThanADocument_IsTooLargeWithoutWriting()
+    {
+        var (http, schemas) = Create();
+        var body = """{ "type": "object" }""".PadRight(RequestBodyLimits.Document + 1);
+
+        var result = await http.SetDescendantTypeSchema(Request(Services(), body: body), Org, Project, View, "rst.payments", "exe");
+
+        var error = result.ShouldBeOfType<ObjectResult>();
+        error.StatusCode.ShouldBe((int)HttpStatusCode.RequestEntityTooLarge);
+        error.Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.BodyTooLarge);
+        schemas.Writes.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -113,9 +128,9 @@ public class ConfigurationSchemaHttpTests
             .BuildServiceProvider();
     }
 
-    private static TestHttpRequestData Request(IServiceProvider services, bool force = false)
+    private static TestHttpRequestData Request(IServiceProvider services, bool force = false, string body = """{ "type": "object" }""")
     {
-        var (context, request) = FunctionTestDoubles.CreateRequest(services, method: "PUT", body: """{ "type": "object" }""");
+        var (context, request) = FunctionTestDoubles.CreateRequest(services, method: "PUT", body: body);
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "user-1"),

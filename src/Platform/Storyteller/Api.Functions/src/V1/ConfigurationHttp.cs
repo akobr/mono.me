@@ -230,9 +230,16 @@ public class ConfigurationHttp
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
         JObject inputModel;
 
+        using var body = await request.ReadBodyAsync(RequestBodyLimits.Document);
+
+        if (body is null)
+        {
+            return RequestBodyExtensions.BodyTooLarge(RequestBodyLimits.Document);
+        }
+
         try
         {
-            using var sReader = new StreamReader(request.Body);
+            using var sReader = new StreamReader(body);
             await using var jReader = new JsonTextReader(sReader);
             inputModel = await JObject.LoadAsync(jReader);
         }
@@ -312,9 +319,16 @@ public class ConfigurationHttp
         var fullKey = FullKey.Create(annotationKey, organization, project, view);
         JArray patchOperations;
 
+        using var body = await request.ReadBodyAsync(RequestBodyLimits.Document);
+
+        if (body is null)
+        {
+            return RequestBodyExtensions.BodyTooLarge(RequestBodyLimits.Document);
+        }
+
         try
         {
-            using var sReader = new StreamReader(request.Body);
+            using var sReader = new StreamReader(body);
             await using var jReader = new JsonTextReader(sReader);
             patchOperations = await JArray.LoadAsync(jReader);
         }
