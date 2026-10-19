@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { exportKeyValues, serializeDotEnv, toFlatJson, type KeyValueDocument } from '@42for.net/2splatform.sdk'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
@@ -13,6 +13,8 @@ const toast = useToast()
 const canSecrets = useCan('secrets')
 const includeSecrets = ref(false)
 const busy = ref(false)
+// A request for one view: the switcher keeps Values store, and this menu, through a view or project switch (424-68).
+watch([() => context.projectKey, () => context.view], () => (includeSecrets.value = false))
 
 async function download(format: 'json' | 'env' | 'flat') {
   if (!context.scope || busy.value) {
