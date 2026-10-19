@@ -28,7 +28,9 @@ The browser remembers this context, and the address `/` opens it again.
 - on Configurations, the scroll position;
 - on Graph, the layout, the focus, the hidden types, the dragged nodes, and the zoom and pan.
 
-Selecting the screen you are already on in the sidebar goes back to its start: the filter, the open annotation or configuration, the mode, the layout and the focus start over. The other things above stay as they were. The memory lasts until you reload the page or sign out. An address you type or open from a bookmark is shown as it is.
+**Modeling** remembers, per view, its last tab, the open template or schema, and the query of the tab: **Show cascaded** on **Deleted**, the compared key and view on **Compare views**, and the **Edit** or **Versions** tab of the open template or schema. Its sidebar entry and its entry in the command palette bring you back there. The switcher keeps the tab you are on, and the tab entries of the command palette and `G` then `T`, `S` or `E` open the tab they name.
+
+Selecting the screen you are already on in the sidebar goes back to its start: the filter, the open annotation or configuration, the mode, the layout and the focus start over, and **Modeling** opens **Schemas**. The other things above stay as they were. The memory lasts until you reload the page or sign out. An address you type or open from a bookmark is shown as it is.
 
 ## The catalog
 
@@ -161,7 +163,7 @@ Saving sends only your changes. Two situations stop a save:
 
 ## Modeling
 
-**Modeling**, in the sidebar of the view after **Graph**, has five tabs: **Schemas**, **Templates**, **Export & Import**, **Deleted** and **Compare views**. **Export & Import** is a tab of Administrators and Owners only, so Contributors get the other four. Each tab is a page of its own, at `/{organization}/{project}/{view}/modeling/{tab}`, and `…/modeling` opens **Schemas**. The browser's **Back** returns to the previous tab, and an unsaved template or schema asks before you leave it. **Compare views** is disabled when the project has no other view.
+**Modeling**, in the sidebar of the view after **Graph**, has five tabs: **Schemas**, **Templates**, **Export & Import**, **Deleted** and **Compare views**. **Export & Import** is a tab of Administrators and Owners only, so Contributors get the other four. Each tab is a page of its own, at `/{organization}/{project}/{view}/modeling/{tab}`. The sidebar entry returns to the tab you left in the view, with its open template or schema and its query. Modeling opens **Schemas** the first time, when you select its entry while it is open, and from an address `…/modeling` you type or open from a bookmark. The browser's **Back** returns to the previous tab, and an unsaved template or schema asks before you leave it. **Compare views** is disabled when the project has no other view.
 
 The switcher keeps the tab when it changes the view or the project. For Contributors and the roles above, the command palette lists the tabs of your role after **Modeling**, and `G` then `T`, `S` or `E` opens **Templates**, **Schemas** or **Export & Import**. Links to the old addresses of the five pages still work: `…/{view}/schemas/type/exe`, for example, opens `…/{view}/modeling/schemas/type/exe`, and the query and the hash stay.
 
