@@ -1,7 +1,7 @@
 import { hasRole, roleRank, type AccountRoleName } from '@42for.net/2splatform.sdk'
 import type { Scope } from '@/stores/context'
 import { hasOrganization } from '@/utils/memberships'
-import { modelingPath, modelingTabs } from '@/utils/modeling'
+import { modelingPath, modelingTabsFor } from '@/utils/modeling'
 import { defaultViewName, isDefaultView } from '@/utils/views'
 
 export interface NavigationEntry {
@@ -106,14 +106,15 @@ export function buildNavigation(
         { label: 'Values store', icon: 'i-lucide-vault', to: `${base}/key-values`, editRole: 'Contributor' },
         { label: 'Graph', icon: 'i-lucide-waypoints', to: `${base}/graph` },
         // Templates, Schemas, Export & Import, Deleted and Compare views are its tabs (424-38). The whole page is
-        // locked for a Reader, who still sees the entry, with the lock.
+        // locked for a Reader, who still sees the entry, with the lock. Export & Import is a tab of Administrators and
+        // Owners only (424-66), so the command palette lists it for them only.
         {
           label: 'Modeling',
           icon: 'i-lucide-puzzle',
           to: modelingPath({ org, project, view }),
           editRole: 'Contributor',
           lockedHint: 'Contributors only',
-          tabs: modelingTabs.map((tab) => ({
+          tabs: modelingTabsFor(context.projectRole).map((tab) => ({
             label: tab.label,
             icon: tab.icon,
             to: modelingPath({ org, project, view }, tab.value),

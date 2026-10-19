@@ -10,6 +10,7 @@ import {
   isStorytellerError,
   startViewExport,
   startViewImport,
+  type AccountRole,
   type StartViewImportParams,
   type ViewExportCreate,
   type ViewImport,
@@ -17,6 +18,8 @@ import {
 } from '@42for.net/2splatform.sdk'
 import { mockHandlers } from '@/mock/all-handlers'
 import { parseArchiveName } from '@/mock/archive-names'
+import { loadDb, saveDb } from '@/mock/db'
+import { roleOf } from '@/mock/handlers'
 import { resetTransfers } from '@/mock/transfer-handlers'
 import { createZip, readZip, textFile, type ZipFile } from '@/mock/zip'
 
@@ -560,5 +563,57 @@ describe('mock import', () => {
         Message: "The annotation 'rst.long' is not valid: Title has 201 characters, at most 200 are allowed.",
       }),
     ])
+  })
+})
+
+// Every route needs the Administrator role on the project (424-66). The seed makes the mock user the Owner of
+// acme.billing, a Contributor of acme.shipping and a Reader of northwind.portal; no project has an Administrator.
+describe('mock transfer roles', () => {
+  /** Sets the mock user's role on a project in the stored database, which every route reads. */
+  function setRole(key: string, role: AccountRole) {
+    const db = loadDb()
+    db.account!.AccessMap![key] = role
+    saveDb(db)
+  }
+
+  const zip = () => new Blob([createZip([textFile('annotations/rst.invoicing.json', '{"Title":"Edited"}')])])
+
+  it.each([
+    ['acme', 'shipping', 'Contributor'],
+    ['northwind', 'portal', 'Reader'],
+  ])('refuses the five routes on %s.%s, where the mock user is a %s', async (target, name, seeded) => {
+    const key = `${target}.${name}`
+    expect(roleOf(loadDb(), key)).toBe(seeded)
+    // jobs of the view, started while the mock user was its Administrator, so their reads find them
+    setRole(key, 'Administrator')
+    const exported = await startViewExport(target, name, 'default', { Format: 'Folder' })
+    const imported = await startViewImport(target, name, 'default', zip(), { dryRun: true })
+    setRole(key, seeded as AccountRole)
+
+    for (const call of [
+      () => startViewExport(target, name, 'default', { Format: 'Folder' }),
+      () => getViewExport(target, name, 'default', exported.Id!),
+      () => getViewExportArchive(target, name, 'default', exported.Id!),
+      () => startViewImport(target, name, 'default', zip(), { dryRun: true }),
+      () => getViewImport(target, name, 'default', imported.Id!),
+    ]) {
+      await expect(call()).rejects.toMatchObject({
+        status: 403,
+        errorCode: 'AccessDenied',
+        message: `The Administrator role on ${key} is required.`,
+      })
+    }
+  })
+
+  it.each(['Owner', 'Administrator'] as const)('runs the five routes for an %s', async (role) => {
+    setRole(`${org}.${project}`, role)
+
+    const { state, files } = await exportView()
+    expect(state.Status).toBe('Succeeded')
+    expect(files.map((file) => file.name)).toContain('export.json')
+    const imported = await importFiles([textFile('annotations/rst.invoicing.json', '{"Title":"Edited"}')], {
+      dryRun: true,
+    })
+    expect(imported).toMatchObject({ Status: 'Succeeded', IsDryRun: true })
   })
 })

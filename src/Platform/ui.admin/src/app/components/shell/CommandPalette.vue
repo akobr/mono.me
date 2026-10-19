@@ -67,7 +67,8 @@ const recentItems = computed<CommandPaletteItem[]>(() =>
     : [],
 )
 
-// The tabs of an entry (the five of Modeling) follow it, so their pages stay findable by name where they can be opened.
+// The tabs of an entry (the Modeling tabs of the caller's role, 424-66) follow it, so their pages stay findable by name
+// where they can be opened.
 const pageItems = computed<CommandPaletteItem[]>(() =>
   buildNavigation(navigation.value).flatMap((section) =>
     section.items.flatMap((item) => [

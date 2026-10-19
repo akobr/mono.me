@@ -21,7 +21,7 @@ describe('Modeling entry', () => {
     ])
   })
 
-  it('opens the Modeling page with the puzzle icon and lists its five tabs in order', () => {
+  it('opens the Modeling page with the puzzle icon and lists the tabs of a Contributor in order', () => {
     const base = '/acme/billing/staging/modeling'
 
     expect(modeling('Contributor')).toEqual({
@@ -33,11 +33,28 @@ describe('Modeling entry', () => {
       tabs: [
         { label: 'Schemas', icon: 'i-lucide-braces', to: `${base}/schemas` },
         { label: 'Templates', icon: 'i-lucide-layout-template', to: `${base}/templates` },
-        { label: 'Export & Import', icon: 'i-lucide-arrow-down-up', to: `${base}/export-import` },
         { label: 'Deleted', icon: 'i-lucide-archive-restore', to: `${base}/deleted` },
         { label: 'Compare views', icon: 'i-lucide-git-compare', to: `${base}/compare` },
       ],
       locked: false,
+    })
+  })
+
+  // Export & Import needs the Administrator role (424-66), so the command palette lists it from Administrator up.
+  it.each([
+    ['Contributor', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
+    ['ContributorWithSecrets', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
+    ['Administrator', ['Schemas', 'Templates', 'Export & Import', 'Deleted', 'Compare views']],
+    ['Owner', ['Schemas', 'Templates', 'Export & Import', 'Deleted', 'Compare views']],
+  ] as const)('lists the tabs of Modeling that %s sees', (role, tabs) => {
+    expect(modeling(role)?.tabs?.map((tab) => tab.label)).toEqual(tabs)
+  })
+
+  it('links Export & Import to its tab for an Administrator', () => {
+    expect(modeling('Administrator')?.tabs).toContainEqual({
+      label: 'Export & Import',
+      icon: 'i-lucide-arrow-down-up',
+      to: '/acme/billing/staging/modeling/export-import',
     })
   })
 

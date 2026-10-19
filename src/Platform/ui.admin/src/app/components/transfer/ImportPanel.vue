@@ -15,7 +15,8 @@ import { archiveContents, contentItems } from '@/utils/transfers'
 const props = defineProps<{ scope: Scope }>()
 
 const transfers = useTransfersStore()
-const canEdit = useCan('edit')
+// the page mounts the panel for Administrators only (424-66), so its lock is a fallback
+const canTransfer = useCan('transfer')
 const file = ref<File | null>(null)
 const include = ref<ViewArchiveContent[]>([...archiveContents])
 const existing = ref<ViewImportExisting>('Overwrite')
@@ -92,12 +93,12 @@ defineExpose({ importNow, starting: computed(() => starting.value === 'import') 
     </template>
 
     <UAlert
-      v-if="!canEdit"
+      v-if="!canTransfer"
       color="neutral"
       variant="subtle"
       icon="i-lucide-lock"
-      title="Importing needs the Contributor role"
-      description="You can export the view; ask a Contributor of the project to import an archive."
+      title="Importing needs the Administrator role"
+      description="Ask an Administrator or an Owner of the project to import an archive."
     />
 
     <template v-else>

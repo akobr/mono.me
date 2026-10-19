@@ -8,7 +8,7 @@ import { computed, nextTick, onMounted, useTemplateRef, type ComponentPublicInst
 import { useRoute, useRouter } from 'vue-router'
 import { useGetViews } from '@42for.net/2splatform.sdk/vue-query'
 import { useContextStore } from '@/stores/context'
-import { hasOtherView, modelingPath, modelingTab, modelingTabs } from '@/utils/modeling'
+import { hasOtherView, modelingPath, modelingTab, modelingTabs, modelingTabsFor } from '@/utils/modeling'
 
 // The header of every tab of Modeling (424-38): the navbar and the tabs, as on Monitor. Each tab is a page of its own
 // (modeling/{tab}), not a ?tab= query: the schema and template details keep their Edit and Versions tabs there, and
@@ -16,6 +16,7 @@ import { hasOtherView, modelingPath, modelingTab, modelingTabs } from '@/utils/m
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
+const role = useRole()
 
 // The arguments of compare.vue and ContextSwitcher.vue, so the three share one query.
 const views = useGetViews(
@@ -25,10 +26,11 @@ const views = useGetViews(
   { query: { enabled: () => !!context.project } },
 )
 
-// Compare views is off only once the views are known and none of them is another view; while they load, or after an
-// error, it stays on.
+// The tabs of the caller's role: Export & Import only from Administrator up (424-66), so on its locked page a
+// Contributor gets the four others and none is selected. Compare views is off only once the views are known and none
+// of them is another view; while they load, or after an error, it stays on.
 const items = computed(() =>
-  modelingTabs.map((tab) => ({
+  modelingTabsFor(role.projectRole.value).map((tab) => ({
     ...tab,
     disabled: tab.value === 'compare' && views.isSuccess.value && !hasOtherView(views.data.value, context.view),
   })),
