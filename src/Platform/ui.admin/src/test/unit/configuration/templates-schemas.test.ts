@@ -190,7 +190,9 @@ describe('SchemaCreateDialog', () => {
 
     openEditor().click()
     await settle()
-    expect(screen.router.currentRoute.value.path).toBe('/acme/billing/default/schemas/annotation/rst.payments/type/uxe')
+    expect(screen.router.currentRoute.value.path).toBe(
+      '/acme/billing/default/modeling/schemas/annotation/rst.payments/type/uxe',
+    )
   })
 
   it('keeps Open editor disabled for a unit of execution key', async () => {
