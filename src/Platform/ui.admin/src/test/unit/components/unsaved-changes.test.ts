@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
+import type { VueWrapper } from '@vue/test-utils'
 import { RouterView, type RouteRecordRaw } from 'vue-router'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { installPageMemoryGuard } from '@/router/guards/page-memory'
@@ -30,10 +31,13 @@ const routes: RouteRecordRaw[] = [
 ]
 
 describe('useUnsavedChanges', () => {
+  const mounted: VueWrapper[] = []
   beforeEach(() => confirm.mockReset())
+  afterEach(() => mounted.splice(0).forEach((host) => host.unmount()))
 
   async function mountEditor() {
     const view = await mountScreen(RouterView, {}, { path: `${base}/annotations/sbt.northwind`, routes })
+    mounted.push(view.host)
     installPageMemoryGuard(view.router)
     const memory = usePageMemoryStore()
     memory.rememberLocation(scope, 'modeling', `${base}/modeling/deleted?cascaded=1`)
