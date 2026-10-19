@@ -36,7 +36,7 @@ internal static class RequestBodyExtensions
 
         if (!await request.TryCopyBodyAsync(body, maxBytes, cancellationToken))
         {
-            return (null, TooLarge(maxBytes));
+            return (null, BodyTooLarge(maxBytes));
         }
 
         if (IsBlank(body.GetBuffer().AsSpan(0, (int)body.Length)))
@@ -87,12 +87,19 @@ internal static class RequestBodyExtensions
         return true;
     }
 
-    private static ObjectResult TooLarge(int maxBytes)
+    public static ObjectResult BodyTooLarge(int maxBytes)
     {
         return new ObjectResult(new ErrorResponse($"The request body is larger than {maxBytes} bytes.") { ErrorCode = ErrorCodes.BodyTooLarge })
         {
             StatusCode = (int)HttpStatusCode.RequestEntityTooLarge,
         };
+    }
+
+    // The bytes after an optional UTF-8 byte order mark, which a JSON reader of bytes does not skip itself.
+    public static ReadOnlyMemory<byte> WithoutByteOrderMark(this MemoryStream body)
+    {
+        var bytes = body.GetBuffer().AsMemory(0, (int)body.Length);
+        return bytes.Span.StartsWith(Utf8ByteOrderMark) ? bytes[Utf8ByteOrderMark.Length..] : bytes;
     }
 
     private static bool IsBlank(ReadOnlySpan<byte> body)
