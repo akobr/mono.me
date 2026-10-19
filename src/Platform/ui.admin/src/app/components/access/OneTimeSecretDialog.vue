@@ -84,6 +84,7 @@ function close() {
 
 <template>
   <UModal
+    class="ph-no-capture"
     :open="open"
     :title="secret?.title"
     description="These credentials are shown only once. Store them now."

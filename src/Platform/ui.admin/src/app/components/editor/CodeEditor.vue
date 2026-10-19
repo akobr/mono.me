@@ -163,7 +163,7 @@ defineExpose({
 <template>
   <div
     ref="host"
-    class="code-editor overflow-hidden rounded-md border border-default"
+    class="code-editor ph-no-capture overflow-hidden rounded-md border border-default"
     :class="height === 'auto' ? 'min-h-24' : ''"
     :style="height === 'auto' ? undefined : { height: `${height}px` }"
   />

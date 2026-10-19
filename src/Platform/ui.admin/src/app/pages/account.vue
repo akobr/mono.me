@@ -63,7 +63,7 @@ const densities = [
 </script>
 
 <template>
-  <UDashboardPanel id="account">
+  <UDashboardPanel id="account" class="ph-no-capture">
     <template #header>
       <AppNavbar title="Account" />
     </template>

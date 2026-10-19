@@ -3,6 +3,9 @@ import { StorytellerError } from '@42for.net/2splatform.sdk'
 import { AppConfigError, isLocalhost, loadAppConfig } from '@/boot/app-config'
 import { onApiError, reportApiError, shouldReport } from '@/boot/api-errors'
 import { shouldRetry } from '@/boot/query'
+import { captureApiError } from '@/boot/telemetry'
+
+vi.mock('@/boot/telemetry', () => ({ captureApiError: vi.fn() }))
 
 const json = (body: unknown) =>
   vi.fn(
@@ -19,7 +22,47 @@ describe('loadAppConfig', () => {
       apiBaseUrl: 'https://api.test/api',
       authApiHostname: 'auth.test',
       environmentName: 'staging',
+      posthogHost: 'https://eu.i.posthog.com',
     })
+  })
+
+  it('reads the telemetry keys and the release, with the PostHog EU host by default', async () => {
+    const config = await loadAppConfig(
+      json({
+        apiBaseUrl: 'https://api.test/api',
+        sentryDsn: 'https://key@o1.ingest.de.sentry.io/2',
+        posthogProjectToken: ' phc_file ',
+        release: '65c570ed',
+      }),
+      {
+        VITE_SENTRY_DSN: 'https://other@o1.ingest.de.sentry.io/3',
+        VITE_POSTHOG_PROJECT_TOKEN: 'phc_env',
+      } as ImportMetaEnv,
+    )
+
+    expect(config).toMatchObject({
+      sentryDsn: 'https://key@o1.ingest.de.sentry.io/2',
+      posthogProjectToken: 'phc_file',
+      posthogHost: 'https://eu.i.posthog.com',
+      release: '65c570ed',
+    })
+  })
+
+  it('falls back to the telemetry variables and leaves the keys out when neither is set', async () => {
+    const fromVariables = await loadAppConfig(json({ apiBaseUrl: 'https://api.test/api', posthogHost: ' ' }), {
+      VITE_POSTHOG_PROJECT_TOKEN: 'phc_env',
+      VITE_POSTHOG_HOST: 'https://posthog.example.com',
+    } as ImportMetaEnv)
+    const none = await loadAppConfig(json({ apiBaseUrl: 'https://api.test/api', sentryDsn: '' }), {} as ImportMetaEnv)
+
+    expect(fromVariables).toMatchObject({
+      posthogProjectToken: 'phc_env',
+      posthogHost: 'https://posthog.example.com',
+    })
+    expect(fromVariables.sentryDsn).toBeUndefined()
+    expect(none.sentryDsn).toBeUndefined()
+    expect(none.posthogProjectToken).toBeUndefined()
+    expect(none.release).toBeUndefined()
   })
 
   it('resolves a relative API address against the origin', async () => {
@@ -60,6 +103,26 @@ describe('global API errors', () => {
     reportApiError(new StorytellerError({ status: 500, message: 'Again' }))
 
     expect(listener).toHaveBeenCalledExactlyOnceWith({ title: 'The API failed', description: 'Try later.' })
+  })
+
+  it('sends Sentry exactly what it reports', () => {
+    vi.mocked(captureApiError).mockClear()
+    const reported = [
+      new StorytellerError({ status: 503, message: 'down' }),
+      new StorytellerError({ status: 0, message: 'offline' }),
+      new TypeError('boom'),
+    ]
+    const ignored = [
+      new StorytellerError({ status: 404, message: 'missing' }),
+      new StorytellerError({ status: 0, message: 'aborted', aborted: true }),
+      new DOMException('aborted', 'AbortError'),
+    ]
+
+    for (const error of [...reported, ...ignored]) {
+      reportApiError(error)
+    }
+
+    expect(vi.mocked(captureApiError).mock.calls).toEqual(reported.map((error) => [error]))
   })
 
   it('retries a failed read once, but never a 4xx', () => {

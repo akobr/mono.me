@@ -123,7 +123,7 @@ defineExpose({ jump })
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-col gap-2">
+  <div class="ph-no-capture flex min-h-0 flex-col gap-2">
     <div class="flex flex-wrap items-center gap-2 text-sm">
       <span v-if="summary" class="font-mono text-xs">
         <span class="text-success">+{{ stats?.Additions ?? 0 }}</span>

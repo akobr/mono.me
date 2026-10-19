@@ -211,7 +211,7 @@ const counts = (entries: { Action?: string }[] | undefined) => {
 </script>
 
 <template>
-  <UModal v-model:open="open" title="Import key values" :description="`Into ${context.org}/${context.project}, view ${context.view}.`" :ui="{ content: 'max-w-3xl' }">
+  <UModal v-model:open="open" class="ph-no-capture" title="Import key values" :description="`Into ${context.org}/${context.project}, view ${context.view}.`" :ui="{ content: 'max-w-3xl' }">
     <template #body>
       <div class="space-y-4">
         <ol class="flex gap-4 text-xs text-muted" aria-label="Steps">

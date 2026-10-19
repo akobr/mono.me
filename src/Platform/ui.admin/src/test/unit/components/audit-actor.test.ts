@@ -38,4 +38,22 @@ describe('audit actors', () => {
     expect(link.classes()).not.toContain('text-highlighted')
     screen.host.unmount()
   })
+
+  it('keep the name out of PostHog clicks, as a link and as text', async () => {
+    const name = (screen: Awaited<ReturnType<typeof mountScreen>>) =>
+      screen.host.findAll('a, span').find((element) => element.text() === 'Ada Lovelace')
+    const actor = { Kind: 'Account' as const, Id: 'user_01MOCKADA', Name: 'Ada Lovelace' }
+
+    const admin = await mountScreen(AuditActorLink, { actor })
+    await settle()
+    expect(name(admin)?.element.tagName).toBe('A')
+    expect(name(admin)?.classes()).toContain('ph-no-capture')
+    admin.host.unmount()
+
+    const reader = await mountScreen(AuditActorLink, { actor }, { accessMap: { 'acme.billing': 'Reader' } })
+    await settle()
+    expect(reader.host.find('a').exists()).toBe(false)
+    expect(name(reader)?.classes()).toContain('ph-no-capture')
+    reader.host.unmount()
+  })
 })

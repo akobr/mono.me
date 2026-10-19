@@ -70,7 +70,7 @@ provideSchemaForm({
 </script>
 
 <template>
-  <div class="schema-form space-y-4">
+  <div class="schema-form ph-no-capture space-y-4">
     <JsonForms
       :data="modelValue ?? {}"
       :schema="schema as JsonSchema"

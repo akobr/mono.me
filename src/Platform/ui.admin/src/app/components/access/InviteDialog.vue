@@ -142,6 +142,7 @@ async function send() {
 <template>
   <UModal
     v-model:open="open"
+    class="ph-no-capture"
     title="Invite people"
     :description="`To ${accessPointKey}. Everyone gets the same role and expiry.`"
     :dismissible="!sending"

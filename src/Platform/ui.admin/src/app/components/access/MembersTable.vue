@@ -105,7 +105,7 @@ async function remove() {
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="ph-no-capture space-y-2">
     <LoadingState v-if="members.isPending.value" />
     <ErrorState v-else-if="members.isError.value" :error="members.error.value" @retry="members.refetch()" />
     <div v-else class="overflow-x-auto rounded-md border border-default">

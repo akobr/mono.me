@@ -1,4 +1,5 @@
 import { isStorytellerError } from '@42for.net/2splatform.sdk'
+import { captureApiError } from './telemetry'
 
 export interface ApiErrorNotice {
   title: string
@@ -31,6 +32,9 @@ export function reportApiError(error: unknown): void {
   if (!shouldReport(error)) {
     return
   }
+
+  // Sentry gets exactly what the toasts show.
+  captureApiError(error)
 
   const notice: ApiErrorNotice = isStorytellerError(error)
     ? {
