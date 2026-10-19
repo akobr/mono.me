@@ -108,6 +108,8 @@ public class SchemaOperationsTests
         ShouldNotDumpTheException();
     }
 
+    // The schema writes declare no 404 today, so the case of a 404 only pins the mapping of 424-69 (as in
+    // ConfigPatchCommand) for a write that declares it; an undeclared 404 is in the theory below.
     [Theory]
     [InlineData(400, ExitCodes.ERROR_WRONG_INPUT)]
     [InlineData(404, ExitCodes.ERROR_WRONG_INPUT)]
@@ -124,7 +126,8 @@ public class SchemaOperationsTests
     }
 
     [Theory]
-    [InlineData("untyped")]
+    [InlineData("undeclared 404")]
+    [InlineData("undeclared 413")]
     [InlineData("no result")]
     [InlineData("blank message")]
     public async Task Set_ErrorWithoutAMessage_PrintsTheTextOfTheException(string kind)
@@ -132,7 +135,8 @@ public class SchemaOperationsTests
         var headers = new Dictionary<string, IEnumerable<string>>();
         ApiException exception = kind switch
         {
-            "untyped" => new ApiException("The HTTP status code of the response was not expected (413).", 413, """{"Message":"Too large."}""", headers, null),
+            "undeclared 404" => new ApiException("The HTTP status code of the response was not expected (404).", 404, string.Empty, headers, null),
+            "undeclared 413" => new ApiException("The HTTP status code of the response was not expected (413).", 413, """{"Message":"Too large."}""", headers, null),
             "no result" => new ApiException<ErrorResponse>(BadRequest, 400, string.Empty, headers, null!, null),
             _ => new ApiException<ErrorResponse>(BadRequest, 400, string.Empty, headers, new ErrorResponse { Message = " ", ErrorCode = "InvalidKey" }, null),
         };
@@ -180,6 +184,26 @@ public class SchemaOperationsTests
     }
 
     [Fact]
+    public async Task Set_ConcurrentChange_PrintsTheTextOfTheException()
+    {
+        // The server sends an ErrorResponse, but the SDK reads every 409 of a write as a SchemaValidationErrorResponse:
+        // a message and no entries, which neither TryWrite nor the ErrorResponse branch takes (out of scope of 424-69).
+        var exception = new ApiException<SchemaValidationErrorResponse>(
+            "Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.",
+            409,
+            string.Empty,
+            new Dictionary<string, IEnumerable<string>>(),
+            new SchemaValidationErrorResponse { Message = "The schema was changed by another writer." },
+            null);
+        SetupSet(SchemaLayer.Type).ThrowsAsync(exception);
+
+        var exitCode = await Set(SchemaLayer.Type);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_CRASH);
+        Lines.ShouldBe([$"Error occurred: {exception.Message}"]);
+    }
+
+    [Fact]
     public async Task Set_Unauthorized_LeavesTheOperation()
     {
         SetupSet(SchemaLayer.Type).ThrowsAsync(AnnotationCommandFixture.Error(401));
@@ -194,20 +218,20 @@ public class SchemaOperationsTests
     public async Task Get_BadRequest_PrintsTheMessage()
     {
         _api
-            .Setup(api => api.GetConfigurationSchemaAsync("org1", "proj1", "default", "exe"))
-            .ThrowsAsync(Error(400, BadRequest, "Invalid annotation type code: exe"));
+            .Setup(api => api.GetConfigurationSchemaAsync("org1", "proj1", "default", "xyz"))
+            .ThrowsAsync(Error(400, BadRequest, "Invalid annotation type: xyz"));
 
         var exitCode = await SchemaOperations.GetAsync(
             _fixture.Console.Object,
             _api.Object,
             _fixture.Context.Object,
             SchemaLayer.Type,
-            "exe",
+            "xyz",
             null,
             null);
 
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
-        Lines.ShouldBe(["! Invalid annotation type code: exe"]);
+        Lines.ShouldBe(["! Invalid annotation type: xyz"]);
     }
 
     [Fact]
