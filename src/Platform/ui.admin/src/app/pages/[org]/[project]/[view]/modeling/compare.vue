@@ -7,6 +7,7 @@ import { useGetViews } from '@42for.net/2splatform.sdk/vue-query'
 import { useCatalogStore } from '@/stores/catalog'
 import { useContextStore } from '@/stores/context'
 import { toJson } from '@/utils/json-yaml'
+import { hasOtherView } from '@/utils/modeling'
 
 const DiffEditor = defineAsyncComponent(() => import('@/components/editor/DiffEditor.vue'))
 
@@ -35,8 +36,22 @@ const key = computed({
   get: () => text(route.query.key),
   set: (value) => void router.replace({ query: { ...route.query, key: value } }),
 })
+
+// The view of this page is the one of its route, which changes together with ?to=. The context guard puts the next
+// org, project and view in the store before a navigation lands; until the store and the route agree again, nothing is
+// preselected or requested, as a router.replace would cancel that navigation (424-64).
+const page = computed(() => route.params as { org?: string; project?: string; view?: string })
+const landed = computed(
+  () => page.value.org === context.org && page.value.project === context.project && page.value.view === context.view,
+)
+
+// ?to= naming the view of this page is no other view: the Views page used to link the default view to itself
+// (424-64). It counts as no target, so nothing is requested and the only other view is preselected over it.
 const target = computed({
-  get: () => text(route.query.to),
+  get: () => {
+    const to = text(route.query.to)
+    return to === page.value.view ? undefined : to
+  },
   set: (value) => void router.replace({ query: { ...route.query, to: value } }),
 })
 
@@ -49,18 +64,24 @@ const viewItems = computed(() =>
 )
 
 // With one other view there is nothing to pick: preselect it, unless ?to= already names a view (the Views page
-// can link to a discovered view, which is not in this list).
+// can link to a discovered view, which is not in this list). Once a navigation has landed, it looks again.
 watch(
-  viewItems,
-  (items) => {
-    if (!target.value && items.length === 1) {
+  [viewItems, target, landed],
+  ([items, to, here]) => {
+    if (here && !to && items.length === 1) {
       target.value = items[0]
     }
   },
   { immediate: true },
 )
 
-const ready = computed(() => !!key.value && !!target.value && !!context.scope)
+const ready = computed(() => landed.value && !!key.value && !!target.value && !!context.scope)
+
+// Without another view the tab is disabled (ModelingHeader, the same test), but its address still opens the page: it
+// says there is nothing to compare with instead of asking for another view (424-64).
+const alone = computed(
+  () => landed.value && !target.value && views.isSuccess.value && !hasOtherView(views.data.value, context.view),
+)
 
 const diff = useQuery({
   queryKey: computed(() => ['view-diff', context.org, context.project, context.view, key.value, target.value]),
@@ -118,7 +139,13 @@ const documents = useQuery({
         </div>
 
         <EmptyState
-          v-if="!ready"
+          v-if="alone"
+          icon="i-lucide-git-compare"
+          title="No other view to compare with"
+          description="The project has only this view. An Administrator can create another one on the Views page."
+        />
+        <EmptyState
+          v-else-if="!ready"
           icon="i-lucide-git-compare"
           title="Compare a configuration across views"
           description="Pick a key and another view of this project to see how its effective configuration differs."
