@@ -123,12 +123,17 @@ async function removePermanently() {
   if (!context.scope || !permanentTarget.value) {
     return
   }
+  // the scope and the key of this request: a switch while it runs closes the dialog and may open another (424-68)
+  const scope = context.scope
+  const key = permanentTarget.value
   busy.value = true
   try {
-    await deleteKeyValue(context.scope.org, context.scope.project, context.scope.view, permanentTarget.value, { permanent: true })
-    toast.add({ title: `'${permanentTarget.value}' removed for good`, color: 'success', icon: 'i-lucide-flame' })
-    permanentTarget.value = undefined
-    await refresh()
+    await deleteKeyValue(scope.org, scope.project, scope.view, key, { permanent: true })
+    toast.add({ title: `'${key}' removed for good`, color: 'success', icon: 'i-lucide-flame' })
+    if (permanentTarget.value === key && context.projectKey === `${scope.org}.${scope.project}` && context.view === scope.view) {
+      permanentTarget.value = undefined
+    }
+    await invalidateKeyValues(queryClient, scope)
   } catch (error) {
     toast.add({ title: 'The key was not removed', description: errorMessage(error), color: 'error' })
   } finally {
