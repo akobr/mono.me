@@ -172,6 +172,7 @@ async function create() {
 <template>
   <UModal
     v-model:open="open"
+    class="ph-no-capture"
     title="New machine access"
     :description="`For ${context.org}/${context.project}.`"
     :ui="{ content: federated ? 'max-w-2xl' : undefined }"

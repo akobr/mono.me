@@ -24,7 +24,12 @@ const items = computed<DropdownMenuItem[][]>(() => [
 </script>
 
 <template>
-  <UDropdownMenu :items="items" :content="{ align: 'end' }" :ui="{ content: 'w-56' }">
+  <UDropdownMenu
+    class="ph-no-capture"
+    :items="items"
+    :content="{ align: 'end' }"
+    :ui="{ content: 'w-56 ph-no-capture' }"
+  >
     <UButton color="neutral" variant="ghost" square :aria-label="`User menu for ${session.user?.name ?? 'user'}`">
       <UAvatar :src="session.user?.pictureUrl" :alt="session.user?.name" size="xs" />
     </UButton>

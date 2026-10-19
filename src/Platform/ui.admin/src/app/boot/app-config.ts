@@ -4,7 +4,17 @@ export interface AppConfig {
   /** Custom AuthKit domain (refresh token in an HttpOnly cookie). Required on every host except localhost. */
   authApiHostname?: string
   environmentName: string
+  /** Sentry DSN of the admin UI project; no error reporting without it. */
+  sentryDsn?: string
+  /** PostHog project token (phc_…); no product analytics without it. */
+  posthogProjectToken?: string
+  /** PostHog API host; loadAppConfig fills in the EU cloud when it is missing. */
+  posthogHost?: string
+  /** Written by the deployment (the commit SHA); the Sentry release. */
+  release?: string
 }
+
+export const defaultPostHogHost = 'https://eu.i.posthog.com'
 
 export class AppConfigError extends Error {}
 
@@ -42,6 +52,10 @@ export async function loadAppConfig(
     apiBaseUrl: new URL(apiBaseUrl, location.origin).href.replace(/\/+$/, ''),
     authApiHostname: nonEmpty(file.authApiHostname) ?? nonEmpty(env.VITE_AUTH_API_HOSTNAME),
     environmentName: nonEmpty(file.environmentName) ?? nonEmpty(env.VITE_ENVIRONMENT_NAME) ?? 'unknown',
+    sentryDsn: nonEmpty(file.sentryDsn) ?? nonEmpty(env.VITE_SENTRY_DSN),
+    posthogProjectToken: nonEmpty(file.posthogProjectToken) ?? nonEmpty(env.VITE_POSTHOG_PROJECT_TOKEN),
+    posthogHost: nonEmpty(file.posthogHost) ?? nonEmpty(env.VITE_POSTHOG_HOST) ?? defaultPostHogHost,
+    release: nonEmpty(file.release),
   }
 }
 

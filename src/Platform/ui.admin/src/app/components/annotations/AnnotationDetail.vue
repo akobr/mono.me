@@ -177,7 +177,7 @@ async function remove() {
       <RouterLink
         v-if="created"
         :to="historyLink"
-        class="flex flex-wrap items-center gap-1 text-xs text-muted hover:text-highlighted"
+        class="ph-no-capture flex flex-wrap items-center gap-1 text-xs text-muted hover:text-highlighted"
         data-testid="annotation-stamps"
       >
         <span>Created <RelativeTime :value="created.At" /></span>

@@ -6,7 +6,7 @@ defineProps<{ hunks: DiffHunk[] }>()
 </script>
 
 <template>
-  <div class="overflow-auto rounded-md border border-default font-mono text-xs">
+  <div class="ph-no-capture overflow-auto rounded-md border border-default font-mono text-xs">
     <div v-for="(hunk, index) in hunks" :key="index" class="border-b border-default last:border-b-0">
       <div class="bg-elevated px-3 py-1 text-dimmed">
         @@ -{{ hunk.OldStart }},{{ hunk.OldCount }} +{{ hunk.NewStart }},{{ hunk.NewCount }} @@

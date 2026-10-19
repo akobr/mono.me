@@ -73,6 +73,17 @@ describe('SchemaForm (JSON Forms with the Nuxt UI renderers)', () => {
     view.host.unmount()
   })
 
+  it('keeps the values out of PostHog clicks: the title of an array item is a value', async () => {
+    const { view } = mountForm({ modelValue: { retries: 1, tiers: [{ name: 'Server=db;Password=SECRET' }] } })
+    await settle(6)
+
+    const header = field(view, '/tiers')
+      .findAll('button')
+      .find((button) => button.text().includes('SECRET'))
+    expect(header?.element.closest('.ph-no-capture')).toBeInstanceOf(HTMLElement)
+    view.host.unmount()
+  })
+
   it('edits map entries with dotted keys without nesting them', async () => {
     const { view, updates } = mountForm({
       modelValue: { retries: 1, headers: { 'X-A': '1', 'Microsoft.AspNetCore': 'Warning' } },

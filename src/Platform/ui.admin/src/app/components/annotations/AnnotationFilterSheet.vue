@@ -103,7 +103,8 @@ const examples = [
             <h3 class="text-sm font-semibold text-highlighted">Active filter</h3>
             <UButton label="Clear all" color="neutral" variant="link" size="sm" @click="emit('update:query', '')" />
           </div>
-          <div class="flex flex-wrap gap-2">
+          <!-- ph-no-capture: the labels are the filter text. -->
+          <div class="ph-no-capture flex flex-wrap gap-2">
             <UButton
               v-for="(term, index) in parsed.terms"
               :key="`${index}:${term.raw}`"

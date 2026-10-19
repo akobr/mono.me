@@ -70,7 +70,7 @@ const expiry = (entry: KeyValueVersion) =>
 </script>
 
 <template>
-  <div class="space-y-4 p-4">
+  <div class="ph-no-capture space-y-4 p-4">
     <LoadingState v-if="versions.isPending.value" />
     <ErrorState v-else-if="versions.isError.value" :error="versions.error.value" compact @retry="versions.refetch()" />
     <EmptyState v-else-if="rows.length === 0" icon="i-lucide-history" title="No versions" />

@@ -40,7 +40,7 @@ async function copyLink(invitation: Invitation) {
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="ph-no-capture space-y-2">
     <LoadingState v-if="invitations.isPending.value" />
     <ErrorState v-else-if="invitations.isError.value" :error="invitations.error.value" @retry="invitations.refetch()" />
     <div v-else class="overflow-x-auto rounded-md border border-default">

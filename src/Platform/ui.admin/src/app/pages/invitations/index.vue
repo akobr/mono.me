@@ -60,7 +60,7 @@ async function decline(invitation: Invitation) {
 </script>
 
 <template>
-  <UCard>
+  <UCard class="ph-no-capture">
     <div class="space-y-4">
       <div class="space-y-1">
         <h1 class="text-xl font-semibold text-highlighted">Invitations</h1>

@@ -108,7 +108,7 @@ const onSubmit = handleSubmit(async (form) => {
 </script>
 
 <template>
-  <UModal v-model:open="open" title="New key" :description="`In ${context.org}/${context.project}, view ${context.view}.`">
+  <UModal v-model:open="open" class="ph-no-capture" title="New key" :description="`In ${context.org}/${context.project}, view ${context.view}.`">
     <template #body>
       <form id="key-value-create" class="space-y-4" novalidate @submit="onSubmit">
         <UFormField label="Key" name="key" required :error="errors.key" help="Dot-separated, for example db.password.">

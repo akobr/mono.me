@@ -82,7 +82,7 @@ async function revoke() {
 </script>
 
 <template>
-  <div class="space-y-2">
+  <div class="ph-no-capture space-y-2">
     <div class="flex justify-end">
       <UButton label="Issue certificate" icon="i-lucide-plus" :disabled="disabled" @click="issuing = true" />
     </div>
@@ -164,7 +164,7 @@ async function revoke() {
       </table>
     </div>
 
-    <UModal v-model:open="issuing" title="Issue a shared certificate">
+    <UModal v-model:open="issuing" class="ph-no-capture" title="Issue a shared certificate">
       <template #body>
         <form class="space-y-4" @submit.prevent="issue">
           <UFormField label="Label" required>

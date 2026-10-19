@@ -227,7 +227,7 @@ const protectTargets = computed(() =>
 </script>
 
 <template>
-  <div class="space-y-4 p-4">
+  <div class="ph-no-capture space-y-4 p-4">
     <LoadingState v-if="pair.isPending.value" />
     <ErrorState v-else-if="pair.isError.value" :error="pair.error.value" compact @retry="pair.refetch()" />
     <template v-else-if="pair.data.value">

@@ -32,7 +32,8 @@ const to = computed(() => {
 const tooltip = computed(() =>
   props.actor?.Kind === 'Account' && props.actor.Id && props.actor.Name ? props.actor.Id : undefined,
 )
-const textClass = computed(() => (props.subtle ? 'text-muted' : 'font-medium text-highlighted'))
+// ph-no-capture: the text is a person's name or e-mail (or a machine id), so no PostHog click may carry it.
+const textClass = computed(() => ['ph-no-capture', props.subtle ? 'text-muted' : 'font-medium text-highlighted'])
 </script>
 
 <template>

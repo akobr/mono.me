@@ -11,6 +11,7 @@ import { loadAppConfig } from './boot/app-config'
 import { createAuth } from './boot/auth'
 import { createQueryClient } from './boot/query'
 import { setBootState, type BootState } from './boot/state'
+import { resetTelemetry, startTelemetry } from './boot/telemetry'
 import { createAppRouter } from './router'
 import { onSignOut, useSessionStore } from './stores/session'
 
@@ -47,8 +48,13 @@ z.config({ jitless: true })
 const router = createAppRouter()
 
 app.use(createPinia())
-setBootState(await boot(router))
+const state = await boot(router)
+setBootState(state)
+// The configuration is known and AuthKit has removed code and state from the URL; the router and the mount come after,
+// so Sentry's Vue error handler also catches the errors of the first render.
+await startTelemetry(app, router, state.config)
 onSignOut(() => queryClient.clear())
+onSignOut(() => resetTelemetry())
 
 app.use(VueQueryPlugin, { queryClient })
 app.use(router)

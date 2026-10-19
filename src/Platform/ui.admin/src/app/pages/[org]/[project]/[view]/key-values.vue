@@ -269,7 +269,7 @@ const levelItems = computed(() => [{ label: 'All levels', value: 'all' }, ...lev
         :ui="{ td: 'py-2 text-sm', th: 'py-2 text-xs', tr: 'cursor-pointer' }"
         :on-select="(_event: Event, row: { original: KeyValueSummary }) => open(row.original.Key ?? '')"
       />
-      <ul v-else class="divide-y divide-default overflow-auto">
+      <ul v-else class="ph-no-capture divide-y divide-default overflow-auto">
         <li v-for="row in rows" :key="row.Key">
           <button type="button" class="flex w-full flex-col gap-1 px-4 py-3 text-start" :aria-current="row.Key === selectedKey ? 'true' : undefined" @click="open(row.Key ?? '')">
             <span class="flex items-center gap-2">

@@ -131,7 +131,7 @@ defineExpose({ requestFormat, valid })
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-col gap-2">
+  <div class="ph-no-capture flex min-h-0 flex-col gap-2">
     <div v-if="!hideToggle || $slots.actions" class="flex flex-wrap items-center gap-2">
       <FormatToggle
         v-if="!hideToggle"
