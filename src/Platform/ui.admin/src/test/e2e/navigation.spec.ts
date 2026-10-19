@@ -114,6 +114,31 @@ test('marks the default view as production on the Views page', async ({ page }) 
   await expect(row('staging').getByText('production', { exact: true })).toHaveCount(0)
 })
 
+// Compare on the Views page compares the default view with the view of its row, so the default view's own row, the
+// only row of acme/shipping, has nothing to compare with (424-64).
+test('Compare on the Views page is enabled only for another view', async ({ page }, testInfo) => {
+  const compare = (view: string) =>
+    page
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('link', { name: view, exact: true }) })
+      .getByRole('link', { name: 'Compare' })
+
+  await openApp(page, '/acme/billing/views')
+  await expect(compare('default')).toBeDisabled()
+  await expect(compare('staging')).toBeEnabled()
+  await compare('staging').click()
+  await expect(page).toHaveURL('/acme/billing/default/modeling/compare?to=staging')
+
+  await goto(page, '/acme/shipping/views')
+  await expect(compare('default')).toBeDisabled()
+  await expect(compare('default')).not.toHaveAttribute('href')
+  if (!isMobile(testInfo)) {
+    // the open tooltip describes the link
+    await compare('default').hover()
+    await expect(compare('default')).toHaveAccessibleDescription('The project has no other view to compare with')
+  }
+})
+
 // The unit tests compare the src of the logo only; this checks that the browser loads the 128 px 42 logo (424-32).
 test('shows the 42 logo at the top of the navigation menu', async ({ page }, testInfo) => {
   await openApp(page, '/acme/billing/default/annotations')
@@ -337,6 +362,19 @@ test('Compare views is enabled only when the project has another view', async ({
   await goto(page, '/acme/shipping/default/modeling/schemas')
   await expect(modelingTab(page, 'Schemas')).toBeEnabled()
   await expect(modelingTab(page, 'Compare views')).toBeDisabled()
+})
+
+// The switcher keeps the tab of Modeling, and the view that was compared with becomes the current one (424-64).
+test('the view switcher opens Compare views of the view it compared with', async ({ page }, testInfo) => {
+  test.skip(isMobile(testInfo), 'The view switcher of the top bar is hidden on a phone')
+  await openApp(page, `${modeling}/compare?to=staging`)
+  await expect(page.getByRole('combobox', { name: 'Compare default with' })).toHaveText('staging')
+
+  await viewButton(page).click()
+  await page.getByRole('menuitem', { name: /^staging$/ }).click()
+  // there, the only other view is default
+  await expect(page).toHaveURL('/acme/billing/staging/modeling/compare?to=default')
+  await expect(page.getByRole('combobox', { name: 'Compare staging with' })).toHaveText('default')
 })
 
 // Modeling is closed below Contributor (424-38): the Reader of northwind/portal gets the lock on every tab and detail.
