@@ -22,18 +22,29 @@ export function useUnsavedChanges(
   dirtySources.add(isDirty)
   onBeforeUnmount(() => dirtySources.delete(isDirty))
 
+  // The navigations the user chose Discard for. A redirect, such as the page memory's, runs this guard again with the
+  // first pass as its redirectedFrom: the user is asked once per navigation (424-67).
+  const discarded = new WeakSet<object>()
+
   const guard = async (to: RouteLocationNormalized, from: RouteLocationNormalized) => {
     if (!isDirty() || options.ignore?.(to, from) || to.path === from.path) {
       return true
     }
+    if (to.redirectedFrom && discarded.has(to.redirectedFrom)) {
+      return true
+    }
 
-    return confirm({
+    const discard = await confirm({
       title: 'Discard changes?',
       description: options.message ?? 'Your changes have not been saved.',
       confirmLabel: 'Discard',
       cancelLabel: 'Keep editing',
       color: 'warning',
     })
+    if (discard) {
+      discarded.add(to.redirectedFrom ?? to)
+    }
+    return discard
   }
 
   onBeforeRouteLeave(guard)
