@@ -20,6 +20,9 @@ describe('view locations', () => {
     })
     expect(viewLocation('/acme/billing/settings')).toBeUndefined()
     expect(viewLocation('/orgs')).toBeUndefined()
+    // a section of the view for the switcher (424-68), which page memory leaves out
+    expect(viewLocation(`${base}/key-values`)).toMatchObject({ section: 'key-values', root: true })
+    expect(viewLocation(`${base}/key-values/db.host/versions`)).toMatchObject({ section: 'key-values', root: false })
   })
 })
 
@@ -64,6 +67,27 @@ describe('page memory guard', () => {
     // The view switcher goes to the same section of the other view.
     await router.push('/acme/billing/other/annotations')
     expect(current()).toBe('/acme/billing/other/annotations?q=b')
+    await router.push(`${base}/annotations`)
+    expect(current()).toBe(`${base}/annotations?q=a`)
+  })
+
+  // Values store is a section of the view for the switcher, but it is not remembered (424-68).
+  it('leaves Values store out of the memory', async () => {
+    await router.push(`${base}/key-values/db.host?q=db`)
+    await router.push('/acme/billing/settings')
+    await router.push(`${base}/key-values`)
+    expect(current()).toBe(`${base}/key-values`)
+
+    // the switcher from Values store to another view, where a key and Annotations were left open
+    await router.push('/acme/billing/other/key-values/db.host')
+    await router.push('/acme/billing/other/annotations?q=b')
+    await router.push(`${base}/key-values`)
+    await router.push('/acme/billing/other/key-values')
+    expect(current()).toBe('/acme/billing/other/key-values')
+
+    // Values store is another section of the view, so Annotations still come back as they were
+    await router.push(`${base}/annotations?q=a`)
+    await router.push(`${base}/key-values`)
     await router.push(`${base}/annotations`)
     expect(current()).toBe(`${base}/annotations?q=a`)
   })

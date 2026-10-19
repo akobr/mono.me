@@ -2,10 +2,11 @@ import type { Scope } from '@/stores/context'
 import { modelingTab } from '@/utils/modeling'
 
 /**
- * Sections that live under /{org}/{project}/{view}/… The old schemas, templates, compare and export-import pages are
- * tabs of modeling now (424-38); their URLs only redirect, so they are never the current path.
+ * Sections that live under /{org}/{project}/{view}/…, in the order of the menu; Values store is `key-values` (424-68).
+ * The old schemas, templates, compare and export-import pages are tabs of modeling now (424-38); their URLs only
+ * redirect, so they are never the current path.
  */
-export const viewSections = ['annotations', 'configurations', 'graph', 'modeling'] as const
+export const viewSections = ['annotations', 'configurations', 'key-values', 'graph', 'modeling'] as const
 
 /** Sections that live under /{org}/{project}/… */
 export const projectSections = ['views', 'members', 'machines', 'settings', 'monitor'] as const
