@@ -36,6 +36,10 @@ internal static class RequestBodyLimits
     // or a new machine with them.
     public const int FederationRules = 4 * 1024 * 1024;
 
+    // A configuration, a configuration schema or a template, each stored as one Cosmos item (2 MB), or a JSON Patch of
+    // a configuration or a template.
+    public const int Document = 4 * 1024 * 1024;
+
     // One annotation, which is at most a Cosmos item (2 MB).
     public const int Annotation = 4 * 1024 * 1024;
 

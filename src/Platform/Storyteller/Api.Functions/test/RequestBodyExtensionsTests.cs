@@ -190,6 +190,29 @@ public class RequestBodyExtensionsTests
         error.ShouldBeOfType<ObjectResult>().Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.BodyTooLarge);
     }
 
+    // The copy for a handler that parses the body itself, as the configuration, schema and template writes do.
+    [Fact]
+    public async Task ReadBody_AtTheLimit_IsTheWholeBodyFromItsStart()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var json = """{ "Account": "ada" }""".PadRight(Limit);
+        var (_, request) = FunctionTestDoubles.CreateRequest(services, FunctionTestDoubles.JsonContentType(), "PUT", json);
+
+        await using var body = await request.ReadBodyAsync(Limit);
+
+        body.ShouldNotBeNull().Position.ShouldBe(0);
+        new StreamReader(body).ReadToEnd().ShouldBe(json);
+    }
+
+    [Fact]
+    public async Task ReadBody_LargerThanTheLimit_IsNull()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var (_, request) = FunctionTestDoubles.CreateRequest(services, FunctionTestDoubles.JsonContentType(), "PUT", new string(' ', Limit + 1));
+
+        (await request.ReadBodyAsync(Limit)).ShouldBeNull();
+    }
+
     private static async Task<(T? Value, IActionResult? Error)> ReadAsync<T>(string body, bool contentType = true, string? errorCode = null, int maxBytes = Limit)
         where T : class
     {
