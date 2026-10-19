@@ -7,4 +7,5 @@ public static class ConfigurationSections
     public const string AUTHENTICATION = "authentication";
     public const string GENERAL = "general";
     public const string EDITOR = "editor";
+    public const string TELEMETRY = "telemetry";
 }

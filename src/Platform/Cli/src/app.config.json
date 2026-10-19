@@ -10,5 +10,9 @@
   "logging": {
     "logFilePath": "logs/cli.log",
     "sentryDsn": ""
+  },
+  "telemetry": {
+    "postHogProjectToken": "phc_uGDiouxjcaRUArCSCi3knvAbub5eoCorCg8c9Wam7yke",
+    "postHogHost": "https://eu.i.posthog.com"
   }
 }

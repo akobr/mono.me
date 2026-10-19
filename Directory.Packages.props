@@ -127,6 +127,7 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
     <PackageVersion Include="OrleansDashboard" Version="8.2.0" />
     <PackageVersion Include="Polly" Version="8.6.6" />
+    <PackageVersion Include="PostHog" Version="2.15.8" />
     <PackageVersion Include="QuikGraph" Version="2.5.0" />
     <PackageVersion Include="QuikGraph.Serialization" Version="2.5.0" />
     <PackageVersion Include="Semver" Version="3.0.0" />

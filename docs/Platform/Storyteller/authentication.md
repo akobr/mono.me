@@ -182,7 +182,7 @@ One `sform` build therefore follows whichever provider the server at `general.ba
 * The session (access token, refresh token, user, organization) is stored in `~/.42for.net/authkit.cache`, encrypted with DPAPI on Windows, the Keychain on macOS and libsecret on Linux.
 * An access token is reused until 60 seconds before it expires. Then the refresh token is exchanged and the stored one replaced, because WorkOS rotates refresh tokens. A file lock (`authkit.cache.lockfile`) keeps two `sform` processes from using the same refresh token. If WorkOS rejects the refresh token, the session is deleted and `sform account` asks for a new sign-in.
 
-Entra ID sign-in still uses MSAL with the cache in `~/.42for.net/msal.cache`.
+Entra ID sign-in still uses MSAL with the cache in `~/.42for.net/msal.cache`. The same directory keeps `telemetry.json`, the random installation id of the anonymous usage data `sform` sends to PostHog. It is not a secret and is not protected; [the telemetry section of the sform page](https://42for.net/cli/sform#telemetry) lists what is sent and how to turn it off.
 
 ### Machine sign-in for pipelines
 

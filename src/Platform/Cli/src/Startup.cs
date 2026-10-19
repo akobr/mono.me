@@ -177,7 +177,7 @@ namespace _42.Platform.Cli
         /// <summary>
         /// Registers and binds specific configuration sections to their corresponding options types in the dependency injection container.
         /// </summary>
-        /// <param name="configuration">The application configuration root from which the LOGGING, ACCESS, AUTHENTICATION, and EDITOR sections are read.</param>
+        /// <param name="configuration">The application configuration root from which the LOGGING, ACCESS, AUTHENTICATION, GENERAL, EDITOR, and TELEMETRY sections are read.</param>
         /// <param name="services">The service collection where the configured options are registered.</param>
         private static void ConfigureOptions(IConfiguration configuration, IServiceCollection services)
         {
@@ -186,6 +186,7 @@ namespace _42.Platform.Cli
             services.Configure<AuthenticationOptions>(configuration.GetSection(ConfigurationSections.AUTHENTICATION));
             services.Configure<GeneralOptions>(configuration.GetSection(ConfigurationSections.GENERAL));
             services.Configure<EditorOptions>(configuration.GetSection(ConfigurationSections.EDITOR));
+            services.Configure<TelemetryOptions>(configuration.GetSection(ConfigurationSections.TELEMETRY));
         }
 
         // The local Functions host has no TLS handshake to carry a client certificate, so the

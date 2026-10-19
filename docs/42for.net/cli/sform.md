@@ -89,3 +89,34 @@ Commands print what they read or write. A step that reads a resolved configurati
 ::: tip
 The details, such as the token URL rules, the certificate header for a local API, how a federated machine gets and renews its token, and every exit code, are in [the technical documentation](https://github.com/akobr/mono.me/blob/main/docs/Platform/Storyteller/authentication.md#machine-sign-in-for-pipelines).
 :::
+
+## Telemetry
+
+`sform` sends anonymous usage data to PostHog in the EU cloud: which commands run, how they end and how long they take. It sends one event per run, after the command has finished. The output and the exit code stay the same, the run waits for the event about two seconds at most, and an event that cannot be sent is dropped.
+
+| Sent | Example |
+|---|---|
+| The command, by its full name, without arguments or option values | `sform storyteller kv get` |
+| The outcome and the exit code | `success`, `0` |
+| How long the run took, in milliseconds | `840` |
+| The type of a failure, the reason of a failed sign-in, the HTTP status of a refused API call; never a message | `ApiException`, `403` |
+| The version of `sform` and whether it is a release or a development build | `0.8.85-alpha+0cab16204f`, `Production` |
+| The operating system, its architecture and the .NET version | `linux`, `X64`, `10.0.8` |
+| Whether the run is in a CI pipeline, and whether it signed in as a machine | `true`, `false` |
+| A random installation id | `3f1c2a9e5b7d4c119e0a2d4f6b8c1a07` |
+
+Never sent: arguments, option values, error messages, names of organizations, projects, views or keys, addresses, file paths, your name or e-mail, the name of the machine, and tokens. The events create no person profile, and PostHog does not look up a location for them.
+
+The installation id is a random number, not derived from the machine or your account. It is kept in `telemetry.json`, next to the stored session: in `%LOCALAPPDATA%\.42for.net` on Windows and in `~/.42for.net` elsewhere, so it survives tool updates. On the first run `sform` creates it and prints a notice to standard error. When `sform` reports a failure to Sentry, the report carries the same id.
+
+Set `DO_NOT_TRACK` or `SFORM_TELEMETRY_OPTOUT` to `1`, `true`, `yes` or `on` to turn telemetry off. `DO_NOT_TRACK` is honoured by other tools too, `SFORM_TELEMETRY_OPTOUT` only by `sform`. With telemetry off, `sform` sends nothing and creates no id.
+
+``` powershell
+# This session only
+$env:DO_NOT_TRACK = "1"
+
+# Every new session of your user
+[Environment]::SetEnvironmentVariable("SFORM_TELEMETRY_OPTOUT", "1", "User")
+```
+
+In a pipeline, set the variable in the `env` of the job like the sign-in variables above.

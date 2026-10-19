@@ -6,5 +6,6 @@ public static class Constants
     public const string ACCESS_DEFAULT_JSON = "access.default.json";
     public const string EDITOR_CONFIG_JSON = "editor.config.json";
     public const string AUTH_DISCOVERY_JSON = "auth.discovery.json";
+    public const string TELEMETRY_JSON = "telemetry.json";
     public const string DIRECTORY_SEPARATOR = "/";
 }
