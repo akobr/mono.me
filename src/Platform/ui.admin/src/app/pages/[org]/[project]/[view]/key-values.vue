@@ -91,6 +91,8 @@ const creating = ref(false)
 const importing = ref(false)
 const permanentTarget = ref<string>()
 const busy = ref(false)
+// the switcher keeps this page mounted: a permanent deletion is never carried into another scope (424-68)
+watch([() => context.projectKey, () => context.view], () => (permanentTarget.value = undefined))
 
 async function refresh() {
   if (context.scope) {

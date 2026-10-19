@@ -23,7 +23,9 @@ async function download(format: 'json' | 'env' | 'flat') {
   busy.value = true
   try {
     const { org, project, view } = context.scope
-    const document: KeyValueDocument = await exportKeyValues(org, project, view, { IncludeSecrets: includeSecrets.value && canSecrets.value })
+    // the request of this download, so its warning matches the file even if the opt-in changes meanwhile
+    const withSecrets = includeSecrets.value && canSecrets.value
+    const document: KeyValueDocument = await exportKeyValues(org, project, view, { IncludeSecrets: withSecrets })
     const items = document.Items ?? []
     const withoutValue = items.filter((item) => item.Value === undefined || item.Value === null).length
     let text: string
@@ -59,7 +61,7 @@ async function download(format: 'json' | 'env' | 'flat') {
         color: 'warning',
         icon: 'i-lucide-triangle-alert',
       })
-    } else if (includeSecrets.value) {
+    } else if (withSecrets) {
       toast.add({ title: 'The file contains secret values', description: 'Store it where it belongs, then delete it.', color: 'warning', icon: 'i-lucide-key-round' })
     }
   } catch (error) {
