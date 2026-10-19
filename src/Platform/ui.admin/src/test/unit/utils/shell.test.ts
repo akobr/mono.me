@@ -79,6 +79,31 @@ describe('context paths', () => {
     expect(viewTarget('/acme/billing/members', 'acme', 'billing', 'staging')).toBe('/acme/billing/staging/annotations')
   })
 
+  // Values store is a section of the view too, so the switcher keeps it instead of opening Annotations (424-68).
+  it.each([
+    '/acme/billing/staging/key-values',
+    '/acme/billing/staging/key-values/db.host',
+    '/acme/billing/staging/key-values/db.host/versions',
+    '/acme/billing/staging/key-values?level=Standard&state=Deleted',
+  ])('keeps Values store, without the key, when switching the project or the view from %s', (path) => {
+    expect(currentSection(path)).toEqual({ kind: 'view', name: 'key-values' })
+    expect(viewTarget(path, 'acme', 'billing', 'default')).toBe('/acme/billing/default/key-values')
+    expect(projectTarget(path, 'acme', 'shipping')).toBe('/acme/shipping/default/key-values')
+  })
+
+  it('tells the list of Values store from a key', () => {
+    expect(viewLocation('/acme/billing/staging/key-values?q=db')).toEqual({
+      scope: { org: 'acme', project: 'billing', view: 'staging' },
+      section: 'key-values',
+      root: true,
+    })
+    expect(viewLocation('/acme/billing/staging/key-values/db.host')).toMatchObject({
+      section: 'key-values',
+      root: false,
+    })
+    expect(viewLocation('/acme/billing/staging/key-values/db.host/versions')).toMatchObject({ root: false })
+  })
+
   // monitor is not a reserved view name; the Monitor page has no pages below it (424-35).
   it('tells the Monitor page from a view named monitor', () => {
     expect(currentSection('/acme/billing/monitor/graph/rst.x')).toEqual({ kind: 'view', name: 'graph' })
@@ -89,6 +114,10 @@ describe('context paths', () => {
     })
     expect(projectTarget('/acme/billing/monitor/graph/rst.x', 'acme', 'shipping')).toBe('/acme/shipping/default/graph')
     expect(viewTarget('/acme/billing/monitor/graph', 'acme', 'billing', 'default')).toBe('/acme/billing/default/graph')
+    expect(currentSection('/acme/billing/monitor/key-values')).toEqual({ kind: 'view', name: 'key-values' })
+    expect(viewTarget('/acme/billing/monitor/key-values/db.host', 'acme', 'billing', 'default')).toBe(
+      '/acme/billing/default/key-values',
+    )
     expect(currentSection('/acme/billing/machines/graph')).toEqual({ kind: 'project', name: 'machines' })
   })
 
