@@ -2,7 +2,7 @@
 
 ## Overview
 
-The 25 handlers of the Storyteller API that bound their JSON body with the worker's `[FromBody]` now read it themselves, through one reader shared with the federation routes. An empty body, `null`, a missing `Content-Type`, a body that is not UTF-8 or JSON that does not fit the type now answer **400**, never 500. Each handler keeps its existing missing-body message and code. Handlers that had none got one. The two optional bodies keep their defaults. The OpenAPI document and both SDKs are unchanged. This implements [Answer 400 Instead of 500 for Missing or Invalid JSON Bodies](../2026-10-18%20Answer%20400%20Instead%20of%20500%20for%20Missing%20or%20Invalid%20JSON%20Bodies.md) in full, for Linear 424-61. All three phases were delivered together, one commit per phase or handler group. After the pull request review, the reader also limits the size of each body (413). The unit tests of `Api.Functions` went from 971 to 1115.
+The 25 handlers of the Storyteller API that bound their JSON body with the worker's `[FromBody]` now read it themselves, through one reader shared with the federation routes. An empty body, `null`, a missing `Content-Type`, a body that is not UTF-8 or JSON that does not fit the type now answer **400**, never 500. Each handler keeps its existing missing-body message and code. Handlers that had none got one. The two optional bodies keep their defaults. The OpenAPI document and both SDKs are unchanged. This implements [Answer 400 Instead of 500 for Missing or Invalid JSON Bodies](../2026-10-18%20Answer%20400%20Instead%20of%20500%20for%20Missing%20or%20Invalid%20JSON%20Bodies.md) in full, for Linear 424-61. All three phases were delivered together, one commit per phase or handler group. After the pull request review, the reader also limits the size of each body (413). The single-annotation `PUT`/`POST`, left out at first, followed. The unit tests of `Api.Functions` went from 971 to 1123.
 
 ## What Was Done
 
@@ -121,8 +121,16 @@ CodeRabbit noted that the reader copied the whole body into memory with no limit
 - Docs: `access.md` states the 413 in the general rule and in its table. `authentication.md`, `key-values.md` (the code list and the Errors column of the body routes) and `annotation-lifecycle.md` list `BodyTooLarge` with the limits of their routes.
 - Review: four reviews (the reader, the limits, the handlers, and docs and tests), and a verifier who tried to refute each finding. Two were confirmed and fixed: the comments promised the escaped worst case for the capped bodies too, and a test comment had lost its escape text. The other four were refuted, among them these two. The recipient comment's 13 KiB is the size of a private-key PEM, which the route also parses. The federation route table of `authentication.md` lists no 413, but its status lists were never complete, and its error table lists the 413. The reader and the handlers had no findings.
 
-### Left out
+### Follow-up: the single annotation
 
-- The single-annotation `PUT`/`POST` (`AnnotationsHttp.SetAnnotation`) still answers 500 for a JSON `null` or array root. It is a follow-up, as planned.
+`AnnotationsHttp.SetAnnotation` reads its body itself, because it parses it twice: once for `AnnotationType`, then into the runtime type of that type. It answered 500 for a root that is not an object (`null`, an array, a number, a string): `JsonDocument.TryGetProperty` throws `InvalidOperationException` there, and only `JsonException` was caught.
+
+- The root kind is checked first; anything but an object answers `400` with the existing `No annotation object in body.`.
+- The body is copied with `TryCopyBodyAsync` under the new `RequestBodyLimits.Annotation` of 4 MiB (one annotation is at most a 2 MB Cosmos item, stored in the escaped form), after the access check as before; a larger body or declared `Content-Length` answers `413 BodyTooLarge`. `RequestBodyExtensions.BodyTooLarge` became public for it.
+- The bytes are parsed as they came, after an optional byte order mark (`WithoutByteOrderMark`), instead of a `StreamReader` string: a body that is not UTF-8 is a `400` rather than a title with U+FFFD. The runtime type is deserialized from the parsed `JsonDocument`, so the body is parsed once and not copied to UTF-16.
+- Tests in `AnnotationsHttpTests`: the four root kinds, a body that is not UTF-8, a byte order mark, a body over the limit and a declared length over it, each without calling the service.
+- Docs: the `PUT`/`POST` row and `BodyTooLarge` in `annotation-lifecycle.md`.
+
+### Left out
 - The new 400s and the 413 are described in the docs, not in the OpenAPI responses, so the SDKs stay unchanged. The NSwag client throws its generic `ApiException` for the 413, and the response text keeps the message.
-- The body readers that do not use `ReadJsonBodyAsync` have no limit of their own yet: the single annotation, configurations, schemas, templates and the export start.
+- The body readers that do not use `ReadJsonBodyAsync` have no limit of their own yet: configurations, schemas, templates and the export start.

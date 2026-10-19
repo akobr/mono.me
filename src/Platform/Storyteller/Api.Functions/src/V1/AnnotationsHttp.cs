@@ -317,14 +317,24 @@ public partial class AnnotationsHttp
         await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
 
         // The body is read once, into the runtime type of its AnnotationType: the type-specific members
-        // (SubjectKey, UnitType, ...) are required there, so a body without them is rejected instead of stored.
+        // (SubjectKey, UnitType, ...) are required there, so a body without them is rejected instead of stored. Its
+        // bytes are parsed as they came, so a body that is not UTF-8 is a 400 rather than replacement characters.
         Annotation annotation;
+        using var body = new MemoryStream();
+
+        if (!await request.TryCopyBodyAsync(body, RequestBodyLimits.Annotation, request.FunctionContext.CancellationToken))
+        {
+            return RequestBodyExtensions.BodyTooLarge(RequestBodyLimits.Annotation);
+        }
 
         try
         {
-            using var reader = new StreamReader(request.Body);
-            var body = await reader.ReadToEndAsync();
-            using var document = JsonDocument.Parse(body);
+            using var document = JsonDocument.Parse(body.WithoutByteOrderMark());
+
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return new BadRequestObjectResult(new ErrorResponse("No annotation object in body."));
+            }
 
             if (!document.RootElement.TryGetProperty(nameof(Annotation.AnnotationType), out var typeElement)
                 || !Enum.TryParse(typeElement.ToString(), ignoreCase: true, out AnnotationType type)
@@ -333,7 +343,7 @@ public partial class AnnotationsHttp
                 return new BadRequestObjectResult(new ErrorResponse("The annotation has no known AnnotationType."));
             }
 
-            var deserializedObject = JsonSerializer.Deserialize(body, AnnotationTypes.GetRuntimeType(type), AnnotationBodyOptions);
+            var deserializedObject = document.RootElement.Deserialize(AnnotationTypes.GetRuntimeType(type), AnnotationBodyOptions);
 
             if (deserializedObject is null)
             {

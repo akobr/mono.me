@@ -1,4 +1,7 @@
+using System.Globalization;
+using System.Net;
 using System.Security.Claims;
+using System.Text;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
@@ -9,6 +12,7 @@ using _42.Platform.Storyteller.Api.V1;
 using _42.Platform.Storyteller.Transferring;
 
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
@@ -87,6 +91,78 @@ public class AnnotationsHttpTests
         var result = await Http(new RecordingAnnotations()).SetAnnotation(Request("POST", """{"AnnotationKey":"x.y","AnnotationType":"Thing"}"""), "acme", "billing", "default", "x.y");
 
         result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldContain("AnnotationType");
+    }
+
+    // TryGetProperty throws for a root that is not an object, which answered 500.
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("1")]
+    [InlineData("\"usg.northwind.invoicing\"")]
+    public async Task Set_BodyThatIsNotAnObject_IsRejected(string body)
+    {
+        var annotations = new RecordingAnnotations();
+
+        var result = await Http(annotations).SetAnnotation(Request("POST", body), "acme", "billing", "default", "usg.northwind.invoicing");
+
+        result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldBe("No annotation object in body.");
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    // Decoding to a string first would store a replacement character the client never sent.
+    [Fact]
+    public async Task Set_BodyThatIsNotUtf8_IsRejected()
+    {
+        var annotations = new RecordingAnnotations();
+
+        // The title "Café" in Latin-1.
+        var json = UsageBody.Replace("Invoices of Northwind", "Caf", StringComparison.Ordinal);
+        var at = json.IndexOf("\"Caf\"", StringComparison.Ordinal) + 4;
+        byte[] body = [.. Encoding.UTF8.GetBytes(json[..at]), 0xE9, .. Encoding.UTF8.GetBytes(json[at..])];
+
+        var result = await Http(annotations).SetAnnotation(Request("POST", body), "acme", "billing", "default", "usg.northwind.invoicing");
+
+        result.ShouldBeOfType<BadRequestObjectResult>();
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Set_WithAByteOrderMark_IsStored()
+    {
+        var annotations = new RecordingAnnotations();
+        byte[] body = [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes(UsageBody)];
+
+        var result = await Http(annotations).SetAnnotation(Request("POST", body), "acme", "billing", "default", "usg.northwind.invoicing");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        annotations.Calls.ShouldBe(["set:acme:usg.northwind.invoicing"]);
+    }
+
+    [Fact]
+    public async Task Set_LargerThanItsLimit_IsTooLargeWithoutCallingTheService()
+    {
+        var annotations = new RecordingAnnotations();
+        var body = Encoding.UTF8.GetBytes(UsageBody.PadRight(RequestBodyLimits.Annotation + 1));
+
+        var result = await Http(annotations).SetAnnotation(Request("POST", body), "acme", "billing", "default", "usg.northwind.invoicing");
+
+        var error = result.ShouldBeOfType<ObjectResult>();
+        error.StatusCode.ShouldBe((int)HttpStatusCode.RequestEntityTooLarge);
+        error.Value.ShouldBeOfType<ErrorResponse>().ErrorCode.ShouldBe(ErrorCodes.BodyTooLarge);
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Set_DeclaredLengthOverItsLimit_IsTooLarge()
+    {
+        var headers = FunctionTestDoubles.JsonContentType();
+        headers["Content-Length"] = (RequestBodyLimits.Annotation + 1).ToString(CultureInfo.InvariantCulture);
+        var request = Request("POST", Encoding.UTF8.GetBytes(UsageBody), headers);
+
+        var result = await Http(new RecordingAnnotations()).SetAnnotation(request, "acme", "billing", "default", "usg.northwind.invoicing");
+
+        result.ShouldBeOfType<ObjectResult>().StatusCode.ShouldBe((int)HttpStatusCode.RequestEntityTooLarge);
+        request.Body.Position.ShouldBe(0);
     }
 
     [Fact]
@@ -535,9 +611,15 @@ public class AnnotationsHttpTests
     // A body goes as JSON, with its content type.
     private static TestHttpRequestData Request(string method, string? body = null)
     {
+        return Request(method, body is null ? null : Encoding.UTF8.GetBytes(body));
+    }
+
+    private static TestHttpRequestData Request(string method, byte[]? body, Dictionary<string, string>? headers = null)
+    {
         using var services = new ServiceCollection().BuildServiceProvider();
-        var headers = body is null ? null : FunctionTestDoubles.JsonContentType();
-        var (context, request) = FunctionTestDoubles.CreateRequest(services, headers, method, body);
+        var context = new TestFunctionContext(services);
+        var request = new TestHttpRequestData(context, headers ?? (body is null ? null : FunctionTestDoubles.JsonContentType()), method, bodyBytes: body);
+        ((TestInvocationFeatures)context.Features).Set<IHttpRequestDataFeature>(new TestHttpRequestFeature(request));
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "user_01"),

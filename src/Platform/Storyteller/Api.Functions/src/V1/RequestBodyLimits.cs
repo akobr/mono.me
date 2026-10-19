@@ -36,6 +36,9 @@ internal static class RequestBodyLimits
     // or a new machine with them.
     public const int FederationRules = 4 * 1024 * 1024;
 
+    // One annotation, which is at most a Cosmos item (2 MB).
+    public const int Annotation = 4 * 1024 * 1024;
+
     // At most 100 annotations. Their labels and values have no limit of their own; one annotation is at most a Cosmos
     // item (2 MB).
     public const int Annotations = 16 * 1024 * 1024;

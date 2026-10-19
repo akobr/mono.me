@@ -153,7 +153,7 @@ All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Func
 
 | Method | Route | Role | Result |
 | --- | --- | --- | --- |
-| PUT, POST | `…/{key}` | Contributor | Creates, updates, or re-creates; `200` with the stored annotation, so the client receives the stamps. `400 InvalidAnnotation` or `InvalidKey`; `409` after three concurrent changes. |
+| PUT, POST | `…/{key}` | Contributor | Creates, updates, or re-creates; `200` with the stored annotation, so the client receives the stamps. `400 InvalidAnnotation` or `InvalidKey`, and `400` for a body that is not a JSON object, has no known `AnnotationType` or is not UTF-8; `409` after three concurrent changes. |
 | POST | `…` and `…/simple` | Contributor | Bulk create (at most 100); deleted keys and deleted ancestors are re-created. `400` for a missing list (an empty body or `null`), and on `…` for a `null` entry; an empty list answers `200 []`. |
 | DELETE | `…/{key}` | Contributor | Soft delete with the descendants; `200 AnnotationDeletionResult`. A repeated delete returns the existing deletion. `404` when missing. |
 | GET | `…` and the per-type lists | Reader | `AnnotationsResponse` of active annotations; `?includeInactive=true` and `?includeDeleted=true` add the others ([Active annotations](#active-annotations)); `?continuationToken=`. |
@@ -214,4 +214,4 @@ A violation answers `InvalidInputException` with `ErrorCode` `InvalidAnnotation`
 | `AnnotationInactive` | `GET …/annotations/{key}` of a disabled, scheduled or expired annotation without `includeInactive=true` (`404`). |
 | `NotFound` | A restore of a key that does not exist or was purged. |
 | `Conflict` | The annotations changed concurrently three times in a row, or a descendant was restored during a permanent delete. |
-| `BodyTooLarge` | `413`: the body of a bulk create is larger than 16 MiB, or that of `…/simple`, a lookup or a restore larger than 1 MiB. |
+| `BodyTooLarge` | `413`: the body of a bulk create is larger than 16 MiB, that of a single annotation larger than 4 MiB, or that of `…/simple`, a lookup or a restore larger than 1 MiB. |
