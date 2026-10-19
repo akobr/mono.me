@@ -11,7 +11,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.IMPORT, Description = "Import a zip or a folder into the view: annotations, schemas, templates and configurations, each recognized by its file name. Only current documents are imported, never versions, and nothing is deleted.")]
+[Command(CommandNames.IMPORT, Description = "Import a zip or a folder into the view (Administrator): annotations, schemas, templates and configurations, each recognized by its file name. Only current documents are imported, never versions, and nothing is deleted. A machine needs the scopes of the included kinds instead of a role.")]
 public class StorytellerImportCommand : BaseContextCommand
 {
     private readonly ITransfersApiClient _transfersApi;
@@ -103,10 +103,10 @@ public class StorytellerImportCommand : BaseContextCommand
                     fileName,
                     archive);
             }
-            catch (ApiException exception) when (exception.StatusCode is 400 or 401 or 403 or 409 or 413)
+            catch (ApiException exception) when (exception.StatusCode is 400 or 403 or 409 or 413)
             {
-                Console.WriteLine(exception.GetErrorMessage().ThemedError(Console.Theme));
-                return exception.StatusCode is 401 or 403 ? ExitCodes.WARNING_UNAUTHORIZED_ACCESS : ExitCodes.ERROR_WRONG_INPUT;
+                // a 401 goes to Program.Main, at every step
+                return Console.WriteRefusal(exception);
             }
         }
 
@@ -114,10 +114,21 @@ public class StorytellerImportCommand : BaseContextCommand
             $"Importing {fileName} into {Context.OrganizationName}.{Context.ProjectName}.{Context.ViewName}{FormatOptions(include, existing)}…"
                 .ThemedLowlight(Console.Theme));
 
-        var (finished, isDone) = await _polling.WaitAsync(
-            () => _transfersApi.GetViewImportAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, import.Id),
-            job => job.Status is ViewImportStatus.Succeeded or ViewImportStatus.Failed,
-            TimeSpan.FromMinutes(TimeoutMinutes));
+        ViewImport finished;
+        bool isDone;
+
+        try
+        {
+            (finished, isDone) = await _polling.WaitAsync(
+                () => _transfersApi.GetViewImportAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, import.Id),
+                job => job.Status is ViewImportStatus.Succeeded or ViewImportStatus.Failed,
+                TimeSpan.FromMinutes(TimeoutMinutes));
+        }
+        catch (ApiException exception) when (exception.StatusCode is 403)
+        {
+            // every read checks the current role, which can be lowered while the job runs
+            return Console.WriteRefusal(exception);
+        }
 
         if (!isDone)
         {

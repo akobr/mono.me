@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using _42.CLI.Toolkit.Output;
+using _42.Platform.Cli.Services;
 using _42.Platform.Storyteller.Sdk;
 
 namespace _42.Platform.Cli.Output;
@@ -14,6 +15,17 @@ public static class TransferConsoleExtensions
     public const string TotalLabel = "Total";
 
     private static readonly string[] ItemHeaders = ["Kind", "Document", "Outcome", "Code", "Message"];
+
+    /// <summary>
+    /// Writes the server's message of a refused export or import, at any step, and returns the exit code of the command:
+    /// <see cref="ExitCodes.WARNING_UNAUTHORIZED_ACCESS"/> for a 403, <see cref="ExitCodes.ERROR_WRONG_INPUT"/> otherwise.
+    /// The commands leave a 401 to <c>Program.Main</c>, as it has no message of the server.
+    /// </summary>
+    public static int WriteRefusal(this IExtendedConsole @this, ApiException exception)
+    {
+        @this.WriteLine(exception.GetErrorMessage().ThemedError(@this.Theme));
+        return exception.StatusCode is 403 ? ExitCodes.WARNING_UNAUTHORIZED_ACCESS : ExitCodes.ERROR_WRONG_INPUT;
+    }
 
     /// <summary>
     /// Writes a table of the documents that were not unchanged, with their warnings under them, then the summary per kind,

@@ -29,6 +29,9 @@ public class StorytellerTransferCommandTests
     private const string View = AnnotationCommandFixture.View;
     private const string FileName = "export-org1-proj1-default-20261017-013012Z.zip";
 
+    // The message of the API to a user below Administrator.
+    private const string Refused = "No Administrator access to 'org1.proj1'.";
+
     private static readonly DateTimeOffset Now = new(2026, 10, 17, 1, 30, 12, TimeSpan.Zero);
 
     private readonly AnnotationCommandFixture _fixture = new();
@@ -47,6 +50,18 @@ public class StorytellerTransferCommandTests
         config.Select(type => type.GetCustomAttribute<CommandAttribute>()!.Name).ShouldNotContain(CommandNames.IMPORT);
         typeof(StorytellerExportCommand).GetCustomAttribute<CommandAttribute>()!.Name.ShouldBe("export");
         typeof(StorytellerImportCommand).GetCustomAttribute<CommandAttribute>()!.Name.ShouldBe("import");
+    }
+
+    [Theory]
+    [InlineData(typeof(StorytellerExportCommand))]
+    [InlineData(typeof(StorytellerImportCommand))]
+    public void Commands_NameTheAdministratorRole_AndWhatAMachineNeeds(Type command)
+    {
+        var description = command.GetCustomAttribute<CommandAttribute>()!.Description;
+
+        description.ShouldNotBeNull();
+        description.ShouldContain("(Administrator)", Case.Sensitive);
+        description.ShouldEndWith(" A machine needs the scopes of the included kinds instead of a role.");
     }
 
     [Fact]
@@ -237,6 +252,73 @@ public class StorytellerTransferCommandTests
     }
 
     [Fact]
+    public async Task Export_UnauthorizedAtTheStart_IsLeftToProgramMain()
+    {
+        _api
+            .Setup(api => api.StartViewExportAsync(Org, Project, View, It.IsAny<ViewExportCreate>()))
+            .ThrowsAsync(AnnotationCommandFixture.Error(401));
+
+        var exception = await Should.ThrowAsync<ApiException>(() => ExportAsync());
+
+        exception.StatusCode.ShouldBe(401);
+        _fixture.Console.Lines.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public async Task Export_RefusedAtAReadOfTheJob_PrintsTheServersMessage(int runningReads)
+    {
+        StartsExport([.. Enumerable.Repeat(Export(ViewExportStatus.Running), runningReads)], Refusal());
+
+        var exitCode = await ExportAsync();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _fixture.Console.Lines.ShouldBe(["Exporting the annotations, schemas, templates and configurations of org1.proj1.default (folder)…", Refused]);
+        _api.Verify(api => api.GetViewExportAsync(Org, Project, View, "job-1"), Times.Exactly(runningReads + 1));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Export_WhoseArchiveIsRefused_PrintsTheServersMessage_AndWritesNothing(bool extract)
+    {
+        StartsExport(Export(ViewExportStatus.Succeeded));
+        _api.Setup(api => api.GetViewExportArchiveAsync(Org, Project, View, "job-1")).ThrowsAsync(Refusal());
+
+        var exitCode = await ExportAsync(extract: extract);
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _fixture.Console.Lines.ShouldBe(["Exporting the annotations, schemas, templates and configurations of org1.proj1.default (folder)…", Refused]);
+        _fileSystem.AllFiles.ShouldBeEmpty();
+        _fileSystem.Directory.Exists(P(@"C:\work\export-org1-proj1-default-20261017-013012Z")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Export_UnauthorizedWhileWaiting_IsLeftToProgramMain()
+    {
+        StartsExport([Export(ViewExportStatus.Running)], AnnotationCommandFixture.Error(401));
+
+        var exception = await Should.ThrowAsync<ApiException>(() => ExportAsync());
+
+        exception.StatusCode.ShouldBe(401);
+        _fixture.Console.Lines.ShouldBe(["Exporting the annotations, schemas, templates and configurations of org1.proj1.default (folder)…"]);
+    }
+
+    [Fact]
+    public async Task Export_UnauthorizedAtTheDownload_IsLeftToProgramMain()
+    {
+        StartsExport(Export(ViewExportStatus.Succeeded));
+        _api.Setup(api => api.GetViewExportArchiveAsync(Org, Project, View, "job-1")).ThrowsAsync(AnnotationCommandFixture.Error(401));
+
+        var exception = await Should.ThrowAsync<ApiException>(() => ExportAsync());
+
+        exception.StatusCode.ShouldBe(401);
+        _fixture.Console.Lines.ShouldBe(["Exporting the annotations, schemas, templates and configurations of org1.proj1.default (folder)…"]);
+        _fileSystem.AllFiles.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Import_OfAFolder_PacksItsJsonFiles_WithoutHiddenPaths_AndPassesTheDefaults()
     {
         _fileSystem.AddFile(P(@"C:\work\view\annotations\rst.a.json"), new MockFileData("{}"));
@@ -397,6 +479,47 @@ public class StorytellerTransferCommandTests
     }
 
     [Fact]
+    public async Task Import_UnauthorizedAtTheStart_IsLeftToProgramMain()
+    {
+        _fileSystem.AddFile(P(@"C:\work\export.zip"), new MockFileData(Zip(("annotations/rst.a.json", "{}"))));
+        _api
+            .Setup(api => api.StartViewImportAsync(Org, Project, View, null, null, null, null, "export.zip", It.IsAny<Stream>()))
+            .ThrowsAsync(AnnotationCommandFixture.Error(401));
+
+        var exception = await Should.ThrowAsync<ApiException>(() => ImportAsync("export.zip"));
+
+        exception.StatusCode.ShouldBe(401);
+        _fixture.Console.Lines.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    public async Task Import_RefusedAtAReadOfTheJob_PrintsTheServersMessage(int runningReads)
+    {
+        _fileSystem.AddFile(P(@"C:\work\export.zip"), new MockFileData(Zip(("annotations/rst.a.json", "{}"))));
+        StartsImport([.. Enumerable.Repeat(Import(ViewImportStatus.Running), runningReads)], Refusal());
+
+        var exitCode = await ImportAsync("export.zip");
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _fixture.Console.Lines.ShouldBe(["Importing export.zip into org1.proj1.default…", Refused]);
+        _api.Verify(api => api.GetViewImportAsync(Org, Project, View, "job-2"), Times.Exactly(runningReads + 1));
+    }
+
+    [Fact]
+    public async Task Import_UnauthorizedWhileWaiting_IsLeftToProgramMain()
+    {
+        _fileSystem.AddFile(P(@"C:\work\export.zip"), new MockFileData(Zip(("annotations/rst.a.json", "{}"))));
+        StartsImport([Import(ViewImportStatus.Running)], AnnotationCommandFixture.Error(401));
+
+        var exception = await Should.ThrowAsync<ApiException>(() => ImportAsync("export.zip"));
+
+        exception.StatusCode.ShouldBe(401);
+        _fixture.Console.Lines.ShouldBe(["Importing export.zip into org1.proj1.default…"]);
+    }
+
+    [Fact]
     public async Task Import_ThatFails_PrintsTheError()
     {
         _fileSystem.AddFile(P(@"C:\work\export.zip"), new MockFileData(Zip(("annotations/rst.a.json", "{}"))));
@@ -500,6 +623,11 @@ public class StorytellerTransferCommandTests
         return stream.ToArray();
     }
 
+    private static ApiException Refusal()
+    {
+        return AnnotationCommandFixture.Error(403, "AccessDenied", Refused);
+    }
+
     private static List<string> Entries(Stream body)
     {
         using var archive = new ZipArchive(body, ZipArchiveMode.Read, leaveOpen: true);
@@ -523,13 +651,19 @@ public class StorytellerTransferCommandTests
 
     private List<ViewExportCreate> StartsExport(params ViewExport[] states)
     {
+        return StartsExport(states, null);
+    }
+
+    // The reads of the job return the states, then the next read throws the error, when there is one.
+    private List<ViewExportCreate> StartsExport(ViewExport[] states, ApiException? error)
+    {
         var bodies = new List<ViewExportCreate>();
         _api
             .Setup(api => api.StartViewExportAsync(Org, Project, View, It.IsAny<ViewExportCreate>()))
             .Callback<string, string, string, ViewExportCreate>((_, _, _, body) => bodies.Add(body))
             .ReturnsAsync(Export(ViewExportStatus.Queued));
 
-        if (states.Length == 1)
+        if (states.Length == 1 && error is null)
         {
             _api.Setup(api => api.GetViewExportAsync(Org, Project, View, "job-1")).ReturnsAsync(states[0]);
             return bodies;
@@ -540,6 +674,11 @@ public class StorytellerTransferCommandTests
         foreach (var state in states)
         {
             reads = reads.ReturnsAsync(state);
+        }
+
+        if (error is not null)
+        {
+            reads.ThrowsAsync(error);
         }
 
         return bodies;
@@ -553,6 +692,12 @@ public class StorytellerTransferCommandTests
     }
 
     private List<Upload> StartsImport(params ViewImport[] states)
+    {
+        return StartsImport(states, null);
+    }
+
+    // The reads of the job return the states, then the last state again, or the error when there is one.
+    private List<Upload> StartsImport(ViewImport[] states, ApiException? error)
     {
         var uploads = new List<Upload>();
         _api
@@ -576,6 +721,12 @@ public class StorytellerTransferCommandTests
         foreach (var state in states)
         {
             reads = reads.ReturnsAsync(state);
+        }
+
+        if (error is not null)
+        {
+            reads.ThrowsAsync(error);
+            return uploads;
         }
 
         // the last state stays, as a job that is still running when the timeout runs out

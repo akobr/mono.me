@@ -9,7 +9,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.EXPORT, Description = "Export the view as a zip: its annotations, schemas, templates and configurations, as a folder of JSON files with the versions, or as a git repository with every version as a commit.")]
+[Command(CommandNames.EXPORT, Description = "Export the view as a zip (Administrator): its annotations, schemas, templates and configurations, as a folder of JSON files with the versions, or as a git repository with every version as a commit. A machine needs the scopes of the included kinds instead of a role.")]
 public class StorytellerExportCommand : BaseContextCommand
 {
     private const string ZipExtension = ".zip";
@@ -67,20 +67,31 @@ public class StorytellerExportCommand : BaseContextCommand
                 Context.ViewName,
                 new ViewExportCreate { Format = format, Include = include is null ? null : [.. include] });
         }
-        catch (ApiException exception) when (exception.StatusCode is 400 or 401 or 403 or 409)
+        catch (ApiException exception) when (exception.StatusCode is 400 or 403 or 409)
         {
-            Console.WriteLine(exception.GetErrorMessage().ThemedError(Console.Theme));
-            return exception.StatusCode is 401 or 403 ? ExitCodes.WARNING_UNAUTHORIZED_ACCESS : ExitCodes.ERROR_WRONG_INPUT;
+            // a 401 goes to Program.Main, at every step
+            return Console.WriteRefusal(exception);
         }
 
         Console.WriteLine(
             $"Exporting the {ViewTransferArguments.FormatKinds(include)} of {target} ({format.ToString().ToLowerInvariant()})…"
                 .ThemedLowlight(Console.Theme));
 
-        var (finished, isDone) = await _polling.WaitAsync(
-            () => _transfersApi.GetViewExportAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, export.Id),
-            job => job.Status is ViewExportStatus.Succeeded or ViewExportStatus.Failed,
-            TimeSpan.FromMinutes(TimeoutMinutes));
+        ViewExport finished;
+        bool isDone;
+
+        try
+        {
+            (finished, isDone) = await _polling.WaitAsync(
+                () => _transfersApi.GetViewExportAsync(Context.OrganizationName, Context.ProjectName, Context.ViewName, export.Id),
+                job => job.Status is ViewExportStatus.Succeeded or ViewExportStatus.Failed,
+                TimeSpan.FromMinutes(TimeoutMinutes));
+        }
+        catch (ApiException exception) when (exception.StatusCode is 403)
+        {
+            // every read checks the current role, which can be lowered while the job runs
+            return Console.WriteRefusal(exception);
+        }
 
         if (!isDone)
         {
@@ -95,40 +106,53 @@ public class StorytellerExportCommand : BaseContextCommand
             return ExitCodes.ERROR_CRASH;
         }
 
-        using var archive = await _transfersApi.GetViewExportArchiveAsync(
-            Context.OrganizationName,
-            Context.ProjectName,
-            Context.ViewName,
-            export.Id);
+        FileResponse archive;
+
+        try
+        {
+            archive = await _transfersApi.GetViewExportArchiveAsync(
+                Context.OrganizationName,
+                Context.ProjectName,
+                Context.ViewName,
+                export.Id);
+        }
+        catch (ApiException exception) when (exception.StatusCode is 403)
+        {
+            // nothing is written: the file and its folder are created only for a served archive
+            return Console.WriteRefusal(exception);
+        }
 
         string destination;
 
-        if (IsExtractRequested)
+        using (archive)
         {
-            destination = Output ?? StripZip(finished.FileName);
-
-            try
+            if (IsExtractRequested)
             {
-                await ViewArchives.ExtractAsync(_fileSystem, archive.Stream, destination);
-            }
-            catch (InvalidOperationException exception)
-            {
-                Console.WriteLine(exception.Message.ThemedError(Console.Theme));
-                return ExitCodes.ERROR_WRONG_INPUT;
-            }
-        }
-        else
-        {
-            destination = ResolveOutputFile(finished.FileName);
-            var folder = _fileSystem.Path.GetDirectoryName(_fileSystem.Path.GetFullPath(destination));
+                destination = Output ?? StripZip(finished.FileName);
 
-            if (!string.IsNullOrEmpty(folder))
-            {
-                _fileSystem.Directory.CreateDirectory(folder);
+                try
+                {
+                    await ViewArchives.ExtractAsync(_fileSystem, archive.Stream, destination);
+                }
+                catch (InvalidOperationException exception)
+                {
+                    Console.WriteLine(exception.Message.ThemedError(Console.Theme));
+                    return ExitCodes.ERROR_WRONG_INPUT;
+                }
             }
+            else
+            {
+                destination = ResolveOutputFile(finished.FileName);
+                var folder = _fileSystem.Path.GetDirectoryName(_fileSystem.Path.GetFullPath(destination));
 
-            await using var file = _fileSystem.File.Create(destination);
-            await archive.Stream.CopyToAsync(file);
+                if (!string.IsNullOrEmpty(folder))
+                {
+                    _fileSystem.Directory.CreateDirectory(folder);
+                }
+
+                await using var file = _fileSystem.File.Create(destination);
+                await archive.Stream.CopyToAsync(file);
+            }
         }
 
         Console.WriteImportant(

@@ -139,6 +139,21 @@ public class TransferConsoleExtensionsTests
         console.Lines[0].ShouldBe("Only the first 1 files are listed; the counts include all.");
     }
 
+    [Theory]
+    [InlineData(403, ExitCodes.WARNING_UNAUTHORIZED_ACCESS)]
+    [InlineData(400, ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(409, ExitCodes.ERROR_WRONG_INPUT)]
+    [InlineData(413, ExitCodes.ERROR_WRONG_INPUT)]
+    public void WriteRefusal_PrintsTheServersMessage_AndOnlyA403IsUnauthorized(int status, int expected)
+    {
+        var console = new RecordingConsole();
+
+        var exitCode = console.Object.WriteRefusal(AnnotationCommandFixture.Error(status, "Refused", $"Refused with {status}."));
+
+        exitCode.ShouldBe(expected);
+        console.Lines.ShouldBe([$"Refused with {status}."]);
+    }
+
     [Fact]
     public void ExportSummary_CountsTheIncludedKinds_WithVersionsOnlyForVersionedKinds()
     {
