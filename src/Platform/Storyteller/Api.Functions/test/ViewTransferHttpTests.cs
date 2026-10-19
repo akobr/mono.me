@@ -3,6 +3,7 @@ using System.Net;
 using System.Reflection;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
 using System.Web;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.Models;
@@ -20,9 +21,11 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
-// The routes of the export and import of a view: the options and their defaults, the scopes per included kind (on
-// requests and on reading jobs), and the background functions. Debug builds skip the scope checks (DEV_AUTH), so the
-// tests of the scopes turn them on (ChecksScopes); the role checks are the shared helpers' and pass for an Owner.
+// The routes of the export and import of a view: the options and their defaults, the role, the scopes per included kind
+// (on requests and on reading jobs), and the background functions. Debug builds skip the scope checks (DEV_AUTH), so
+// the tests of the scopes turn them on (ChecksScopes). Users need the Administrator role on every route (424-66): the
+// access double gives an Owner unless a test names the role, and as Debug builds skip the role checks of users, the tests
+// of a refused role return early there.
 public class ViewTransferHttpTests
 {
     private const string AllScopes = "Default.ReadWrite";
@@ -465,6 +468,62 @@ public class ViewTransferHttpTests
         }
     }
 
+    // Users need the Administrator role on the project on every route, also to read a job (424-66); a Debug build
+    // (DEV_AUTH) skips the role checks of users. The starts check the scopes first, so the requests carry all of them, and
+    // the reads check the role before the job, so a refused user learns nothing about it.
+    [Theory]
+    [InlineData(AccountRole.None)]
+    [InlineData(AccountRole.Reader)]
+    [InlineData(AccountRole.Contributor)]
+    [InlineData(AccountRole.ContributorWithSecrets)]
+    public async Task EveryRoute_ByAUserBelowAdministrator_IsRefused(AccountRole role)
+    {
+        if (DevAuth)
+        {
+            return;
+        }
+
+        var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, null, AuditActor.System);
+        var import = _transfers.AddImport("acme", "web", "default", null);
+        _transfers.Calls.Clear();
+        var http = Http(checksScopes: true, role: role);
+
+        (string Route, Func<Task<IActionResult>> Act)[] routes =
+        [
+            (nameof(ViewTransferHttp.StartViewExport), () => http.StartViewExport(Request("{}"), "acme", "web", "default")),
+            (nameof(ViewTransferHttp.GetViewExport), () => http.GetViewExport(Request(), "acme", "web", "default", export.Id)),
+            (nameof(ViewTransferHttp.GetViewExportArchive), () => http.GetViewExportArchive(Request(), "acme", "web", "default", export.Id)),
+            (nameof(ViewTransferHttp.StartViewImport), () => http.StartViewImport(Request(EmptyZip()), "acme", "web", "default")),
+            (nameof(ViewTransferHttp.GetViewImport), () => http.GetViewImport(Request(), "acme", "web", "default", import.Id)),
+        ];
+
+        foreach (var (route, act) in routes)
+        {
+            var exception = await act.ShouldThrowAsync<AccessDeniedException>(route);
+            exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied, route);
+            exception.Message.ShouldBe("No Administrator access to 'acme.web'.", route);
+        }
+
+        _transfers.Calls.ShouldBeEmpty("a refused user starts no job and never opens the archive");
+        _transfers.Reads.ShouldBeEmpty("a refused user never reads a job");
+    }
+
+    // Only a Release build checks the role; a Debug build passes every user.
+    [Theory]
+    [InlineData(AccountRole.Administrator)]
+    [InlineData(AccountRole.Owner)]
+    public async Task EveryRoute_ByAnAdministratorOrAnOwner_Succeeds(AccountRole role)
+    {
+        await ShouldPassEveryRoute(Http(checksScopes: true, role: role), machine: false);
+    }
+
+    // A machine has no role, and the double has none for it either: the scopes of the included kinds decide, in every build.
+    [Fact]
+    public async Task EveryRoute_ByAMachineWithTheFullScopes_SucceedsWithoutARole()
+    {
+        await ShouldPassEveryRoute(Http(checksScopes: true, role: AccountRole.None), machine: true);
+    }
+
     // The routes of the first spec below configurations/ were never released and are gone.
     [Fact]
     public void Routes_OfTheFirstSpecAreRemoved()
@@ -505,6 +564,31 @@ public class ViewTransferHttpTests
                 "GET v1/{organization}/{project}/{view}/imports/{id} GetViewImport GetViewImport Transfers",
             ],
             ignoreOrder: true);
+    }
+
+    // The 403 of every route names the role users need, beside the scopes and the restriction of machines (424-66).
+    [Fact]
+    public async Task Document_TheForbiddenOfEveryRoute_NamesTheAdministratorRole()
+    {
+        var json = await OpenApiExportTests.RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var forbidden = new Dictionary<string, string>
+        {
+            [Definitions.RouteIds.Transfers.StartViewExport] = Definitions.Descriptions.ResponseTransferForbiddenExport,
+            [Definitions.RouteIds.Transfers.GetViewExport] = Definitions.Descriptions.ResponseTransferForbiddenExport,
+            [Definitions.RouteIds.Transfers.GetViewExportArchive] = Definitions.Descriptions.ResponseTransferForbiddenExport,
+            [Definitions.RouteIds.Transfers.StartViewImport] = Definitions.Descriptions.ResponseTransferForbiddenImport,
+            [Definitions.RouteIds.Transfers.GetViewImport] = Definitions.Descriptions.ResponseTransferForbiddenImport,
+        };
+
+        foreach (var (operationId, expected) in forbidden)
+        {
+            var description = ForbiddenOf(document, operationId);
+            description.ShouldBe(expected, operationId);
+            description.ShouldStartWith("The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted).", Case.Sensitive, operationId);
+            description.ShouldEndWith("The message names the missing role or scope.", Case.Sensitive, operationId);
+        }
     }
 
     [Fact]
@@ -575,6 +659,15 @@ public class ViewTransferHttpTests
         _transfers.Calls.ShouldBe(["purge"]);
     }
 
+    private static string? ForbiddenOf(JsonDocument document, string operationId)
+    {
+        return document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject())
+            .Select(entry => entry.Value)
+            .Single(entry => entry.GetProperty("operationId").GetString() == operationId)
+            .GetProperty("responses").GetProperty("403").GetProperty("description").GetString();
+    }
+
     private static async Task ShouldFollowTheScopes(Func<Task<IActionResult>> act, bool isAllowed)
     {
         if (isAllowed)
@@ -587,6 +680,31 @@ public class ViewTransferHttpTests
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
         exception.Message.ShouldStartWith("Missing scope for ");
         exception.Message.ShouldContain("include");
+    }
+
+    // Starts an export, reads it and downloads its archive, then starts an import and reads it, as a user or a machine.
+    private async Task ShouldPassEveryRoute(ViewTransferHttp http, bool machine)
+    {
+        var zip = EmptyZip();
+        var actor = machine ? "machine_01" : "user_01";
+
+        var export = (await http.StartViewExport(Request(Encoding.UTF8.GetBytes("{}"), machine: machine), "acme", "web", "default"))
+            .ShouldBeOfType<AcceptedResult>().Value.ShouldBeOfType<ViewExport>();
+        (await http.GetViewExport(Request(machine: machine), "acme", "web", "default", export.Id))
+            .ShouldBeOfType<OkObjectResult>().Value.ShouldBe(export);
+        (await http.GetViewExportArchive(Request(machine: machine), "acme", "web", "default", export.Id))
+            .ShouldBeOfType<FileStreamResult>().FileDownloadName.ShouldBe(export.FileName);
+        var import = (await http.StartViewImport(Request(zip, machine: machine), "acme", "web", "default"))
+            .ShouldBeOfType<AcceptedResult>().Value.ShouldBeOfType<ViewImport>();
+        (await http.GetViewImport(Request(machine: machine), "acme", "web", "default", import.Id))
+            .ShouldBeOfType<OkObjectResult>().Value.ShouldBe(import);
+
+        _transfers.Calls.ShouldBe(
+        [
+            $"export acme/web/default Folder all {actor}",
+            $"open {export.Id}",
+            $"import acme/web/default {zip.Length} bytes  all Overwrite - - {actor}",
+        ]);
     }
 
     private static byte[] EmptyZip()
@@ -641,23 +759,25 @@ public class ViewTransferHttpTests
         return request;
     }
 
-    // Without checksScopes, the class default: no scope checks in a Debug build.
-    private ViewTransferHttp Http(ViewTransferOptions? options = null, bool? checksScopes = null, string? machineAnnotationKey = null)
+    // Without checksScopes, the class default: no scope checks in a Debug build. Without role, the user is an Owner.
+    private ViewTransferHttp Http(ViewTransferOptions? options = null, bool? checksScopes = null, string? machineAnnotationKey = null, AccountRole role = AccountRole.Owner)
     {
-        var access = OwnerAccess.Create(machineAnnotationKey);
+        var access = ProjectAccess.Create(role, machineAnnotationKey);
         var resolved = Options.Create(options ?? new ViewTransferOptions());
         return checksScopes is { } checks
             ? new ViewTransferHttp(_transfers, access, resolved) { ChecksScopes = checks }
             : new ViewTransferHttp(_transfers, access, resolved);
     }
 
-    // Records the calls and keeps the jobs, with their include resolved as the service stores it.
+    // Records the calls and the reads of jobs, and keeps the jobs, with their include resolved as the service stores it.
     private sealed class RecordingTransfers : IViewTransferService
     {
         private readonly Dictionary<string, ViewExport> _exports = [];
         private readonly Dictionary<string, ViewImport> _imports = [];
 
         public List<string> Calls { get; } = [];
+
+        public List<string> Reads { get; } = [];
 
         public ViewImport AddImport(string organization, string project, string view, IReadOnlyList<ViewArchiveContent>? include)
         {
@@ -695,6 +815,7 @@ public class ViewTransferHttpTests
 
         public Task<ViewExport?> GetExportAsync(string organization, string project, string view, string id, CancellationToken cancellationToken = default)
         {
+            Reads.Add($"export {id}");
             return Task.FromResult(_exports.GetValueOrDefault($"{organization}/{project}/{view}/{id}"));
         }
 
@@ -727,6 +848,7 @@ public class ViewTransferHttpTests
 
         public Task<ViewImport?> GetImportAsync(string organization, string project, string view, string id, CancellationToken cancellationToken = default)
         {
+            Reads.Add($"import {id}");
             return Task.FromResult(_imports.GetValueOrDefault($"{organization}/{project}/{view}/{id}"));
         }
 
@@ -754,16 +876,19 @@ public class ViewTransferHttpTests
         }
     }
 
-    // The caller is an Owner of every project, and a machine has access to it, restricted to an annotation when one is
-    // given; the role checks themselves are the shared helpers' (skipped in a Debug build).
-    public class OwnerAccess : DispatchProxy
+    // A user has the given role on every project (an Owner by default), and a machine has access to it, restricted to an
+    // annotation when one is given; the role checks themselves are the shared helpers' (skipped for users in a Debug build).
+    public class ProjectAccess : DispatchProxy
     {
+        private AccountRole _role;
         private string? _machineAnnotationKey;
 
-        public static IAccessService Create(string? machineAnnotationKey = null)
+        public static IAccessService Create(AccountRole role = AccountRole.Owner, string? machineAnnotationKey = null)
         {
-            var access = Create<IAccessService, OwnerAccess>();
-            ((OwnerAccess)(object)access)._machineAnnotationKey = machineAnnotationKey;
+            var access = Create<IAccessService, ProjectAccess>();
+            var proxy = (ProjectAccess)(object)access;
+            proxy._role = role;
+            proxy._machineAnnotationKey = machineAnnotationKey;
             return access;
         }
 
@@ -771,7 +896,7 @@ public class ViewTransferHttpTests
         {
             return targetMethod?.Name switch
             {
-                nameof(IAccessService.GetAccountRoleAsync) => Task.FromResult(AccountRole.Owner),
+                nameof(IAccessService.GetAccountRoleAsync) => Task.FromResult(_role),
                 nameof(IAccessService.VerifyAccessForMachineAsync) => Task.FromResult(true),
                 nameof(IAccessService.GetMachineAccessAsync) => Task.FromResult<MachineAccess?>(new MachineAccess
                 {

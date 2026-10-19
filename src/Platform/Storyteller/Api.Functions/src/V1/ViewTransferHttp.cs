@@ -16,7 +16,8 @@ using Microsoft.OpenApi.Models;
 namespace _42.Platform.Storyteller.Api.V1;
 
 // Export and import of the documents of a view (annotations, schemas, templates and configurations), as jobs processed
-// in the background (export-import.md). The scopes depend on the included kinds (ViewTransferScopes).
+// in the background (export-import.md). Users need the Administrator role on the project on every route, also to read a
+// job (424-66); machines have no role and need the scopes of the included kinds (ViewTransferScopes), as user tokens do.
 public class ViewTransferHttp
 {
     private readonly IViewTransferService _transfers;
@@ -68,7 +69,7 @@ public class ViewTransferHttp
         }
 
         CheckScopes(request, model.Include, ViewTransferKind.Export);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
 
         var export = await _transfers.StartExportAsync(
             organization,
@@ -103,7 +104,7 @@ public class ViewTransferHttp
         string view,
         string id)
     {
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
 
         var export = await GetExportAsync(request, organization, project, view, id);
         return new OkObjectResult(export);
@@ -131,7 +132,7 @@ public class ViewTransferHttp
         string view,
         string id)
     {
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
 
         // the scopes of the export's kinds are checked before its state or archive tells anything
         await GetExportAsync(request, organization, project, view, id);
@@ -175,7 +176,7 @@ public class ViewTransferHttp
         var existing = ViewTransferRequests.ParseExisting(request.Query[Definitions.Parameters.Existing]);
 
         CheckScopes(request, include, ViewTransferKind.Import);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
 
         var cancellationToken = request.FunctionContext.CancellationToken;
         using var archive = new MemoryStream();
@@ -228,7 +229,7 @@ public class ViewTransferHttp
         string view,
         string id)
     {
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
 
         var import = await _transfers.GetImportAsync(organization, project, view, id, request.FunctionContext.CancellationToken)
                      ?? throw new NotFoundException($"The import '{id}' does not exist or has expired.");
