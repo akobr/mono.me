@@ -87,7 +87,7 @@ A second delete of the same key returns the existing deletion. A delete that did
 
 ## Re-create
 
-A create of a deleted key re-creates it, and so does a create below a deleted ancestor, which re-creates the ancestor. Four calls do it: `SetAnnotation`, `SetAnnotations`, `SetAnnotationsSimple`, and the import of an annotation file with `Existing` set to `Overwrite` ([Export and import](#export-and-import)). Any Contributor may do it. The API never asks; clients look up deleted keys first and offer a restore.
+A create of a deleted key re-creates it, and so does a create below a deleted ancestor, which re-creates the ancestor. Four calls do it: `SetAnnotation`, `SetAnnotations`, `SetAnnotationsSimple`, and the import of an annotation file with `Existing` set to `Overwrite` ([Export and import](#export-and-import)). Any Contributor may do it with the first three; the import needs the Administrator role ([export-import.md](export-import.md#access)). The API never asks; clients look up deleted keys first and offer a restore.
 
 - The item is replaced by the new content, with empty relation arrays and a new `Created` stamp.
 - The configuration is deleted after its content went to the versions. The first new configuration version continues the numbering, so the versions of the previous lifetime stay visible until they expire.
@@ -189,7 +189,7 @@ The `sform story` commands (`src/Platform/Cli/src/Commands/Storyteller/`) work o
 | `sform story get <key>` | Prints the annotation whatever its status (`includeInactive=true`). For a deleted key, it says who deleted it and when, the purge date, and the restore command. |
 | `sform story set <key> [--restore-deleted\|--recreate]` | Before writing, it looks up the key and its ancestors. When some are deleted, it lists them and asks: **Restore and update** (restore them alone, then write), **Create new** (write, which re-creates them empty), or **Cancel**. The options answer the question in advance. When the input is redirected and neither option is given, it stops with `2` and names both. A rejected body prints the server's message (for example `InvalidAnnotation`). |
 
-`sform story export` and `sform story import` move the documents of the view as a zip, annotations included ([export-import.md](export-import.md#cli)).
+`sform story export` and `sform story import` move the documents of the view as a zip, annotations included, for an Administrator or an Owner of the project, or a machine with the scopes of the included kinds ([export-import.md](export-import.md#cli)).
 
 ## Validation
 

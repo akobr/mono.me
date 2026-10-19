@@ -43,11 +43,13 @@ A `View` has `Name`, `Description`, `Created` (the [audit stamp](audit-stamps.md
 | Read deleted annotations and the history of an annotation | `Reader` on the project |
 | Delete, restore, and re-create annotations | `Contributor` on the project; machines with annotation write |
 | Delete an annotation permanently (`DELETE …/annotations/deleted/{key}`) | `Administrator` on the project, users only: machine credentials get `403` |
-| Export a view, import into a view, and read those jobs | Any role on the project to export, `Contributor` to import and to read an import, and the scopes of every included kind (see [export-import.md](export-import.md#access)) |
+| Export a view, import into a view, and read those jobs | `Administrator` on the project for users, and the scopes of every included kind. Machines have no role and need only the scopes; a machine restricted to an annotation gets `403` `AnnotationRestricted` (see [export-import.md](export-import.md#access)) |
 | Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, or the scope `Configuration.Secrets` (see [key-values.md](key-values.md#secret-delivery)) |
 | Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project |
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
+
+The API reads schemas, templates, deleted annotations and what the comparison of views needs (the views, the configurations and their diffs) with `Reader`. The admin UI locks its **Modeling** page, where they are, below `Contributor`; that lock is a choice of the admin UI. Its **Export & Import** tab is locked below `Administrator`, as the API requires (see [export-import.md](export-import.md#administration-ui)).
 
 Machines have no role; their scope decides. A machine created with an `AnnotationKey` reaches only that annotation and its descendants, and gets `403` `AnnotationRestricted` for other annotations and for operations of the whole project (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)).
 

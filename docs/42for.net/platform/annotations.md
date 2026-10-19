@@ -163,8 +163,8 @@ Writing a key that is deleted creates it again with an empty configuration. `sfo
 The annotations of a view travel in its [export](configuration#export-and-import), next to its schemas, templates and configurations. Each annotation is a file named by its key, such as `exe.northwind.invoicing.production.json`. The file holds what you can edit: title, description, documentation link, labels, values, the disabled flag, the validity window and the time zone, and for a [unit](#unit) its unit type and definition. An import replaces the content, so a field left out of the file is cleared; a unit without its type or definition gets the defaults of a new unit (`event`, `unknown`). The key gives the type and the parents, so they are not in the file. The audit and the deleted annotations stay with the platform.
 
 ```text
-sform story export --include annotations     # only the catalog
-sform story import catalog.zip --dry-run     # what an import would change, without writing
+sform story export --include annotations     # only the catalog (Administrator or Owner)
+sform story import catalog.zip --dry-run     # what an import would change, without writing (Administrator or Owner)
 ```
 
 An import creates the missing annotations, ancestors before their descendants, and updates the ones that differ. With `--existing skip`, it keeps the ones the view has. A deleted annotation in the archive is created again, as any write of a deleted key does: its old configuration does not come back, only the one the archive holds. With `skip`, it stays deleted. Every write is recorded with the account or machine that ran the import. In the Administration UI, the **Export & Import** page of the view does the same.

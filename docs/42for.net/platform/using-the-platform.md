@@ -165,7 +165,7 @@ A view can be exported as one zip and imported into any view of any project: its
 - `Include`, and the comma-separated `include` of an import, name the kinds: `Annotations`, `Schemas`, `Templates` and `Configurations`. Without them, all four are included.
 - `existing` is `Overwrite` (the default) or `Skip`. `force=true` stores schemas and configurations that break each other, with a warning. `dryRun=true` reports every outcome without writing anything.
 - The result of an import counts the documents per kind and in total, and lists every document that was not unchanged, with its kind, outcome, error code and warnings.
-- Exporting needs any role on the project, and importing `Contributor`. Each included kind also needs its scopes: annotations those of annotations, the other three those of configuration. A machine that may only write configuration imports with `include=schemas,templates,configurations`.
+- Exporting and importing, and reading their jobs, need the `Administrator` role on the project, or `Owner`; below it, the API answers `403`. Each included kind also needs its scopes: annotations those of annotations, the other three those of configuration. A machine has no role, so its scopes alone decide: a machine that may only write configuration imports with `include=schemas,templates,configurations`.
 
 `sform` starts the job, waits for it, and saves or prints the result:
 

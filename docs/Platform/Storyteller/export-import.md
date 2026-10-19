@@ -12,7 +12,7 @@ The code is in:
 - `src/Platform/Cli/src/`: `sform story export` and `sform story import` (see [CLI](#cli));
 - `src/Platform/ui.admin/src/app/`: the **Export & Import** page of a view, its store and the mock API (see [Administration UI](#administration-ui)).
 
-The design and its decisions are in [the spec](specs/2026-10-15%20Export%20and%20Import%20of%20a%20View.md), which extends [the first spec](specs/2026-10-14%20Export%20and%20Import%20of%20Configurations.md) (configurations only).
+The design and its decisions are in [the spec](specs/2026-10-15%20Export%20and%20Import%20of%20a%20View.md), which extends [the first spec](specs/2026-10-14%20Export%20and%20Import%20of%20Configurations.md) (configurations only). The Administrator role of every route comes from [Administrator Role for the Export and Import of a View](specs/2026-10-19%20Administrator%20Role%20for%20the%20Export%20and%20Import%20of%20a%20View.md).
 
 ## What travels
 
@@ -526,22 +526,26 @@ What the import options do is described under [Import](#import), in [Options](#o
 | `400` | `InvalidQuery` | `StartViewImport` | `include` names an unknown kind, or `existing` is neither `Overwrite` nor `Skip` |
 | `400` | `InvalidArchive` | `StartViewImport` | The body is not a zip, or its central directory breaks a limit: more than `MaxArchiveEntries` entries, or document files declared larger than `MaxExtractedBytes` together (see [Limits](#limits)) |
 | `401` | | every route | Missing or invalid credentials, or a machine without access to the project |
-| `403` | `AccessDenied` | every route | A scope of an included kind is missing, or the caller's role is below the one the route needs (see [Access](#access)) |
+| `403` | `AccessDenied` | every route | A scope of an included kind is missing, or the user's role on the project is below `Administrator` (see [Access](#access)) |
 | `403` | `AnnotationRestricted` | every route | The caller is a machine restricted to an annotation; an export or import spans the whole view |
 | `404` | `NotFound` | the three reads | The job doesn't exist in this view, or has expired. For the archive, also an expired archive. |
 | `409` | `TransferLimit` | both starts | The project already has `MaxActiveTransfers` jobs queued or running |
 | `409` | `TransferNotReady` | `GetViewExportArchive` | The export is queued, running or failed. The message of a failed one holds its error. |
 | `413` | `ArchiveTooLarge` | `StartViewImport` | The upload, or its declared `Content-Length`, is larger than `MaxArchiveBytes` |
 
-The checks run in this order, and the first failure answers:
+The checks run in this order, and the first failure answers. The project access is the role of a user (`403 AccessDenied`), or for a machine its membership of the project and its credential policy (`401`), then its annotation restriction (`403 AnnotationRestricted`):
 
-- `StartViewExport`: the body (`400`), the credentials (`401`), the scopes (`403`), the role (`403`, or `401` for a machine), the job limit (`409`).
-- `StartViewImport`: `include` and `existing` (`400 InvalidQuery`), the credentials (`401`), the scopes (`403`), the role (`403`, or `401` for a machine), the size (`413`), the zip signature (`400 InvalidArchive`), the job limit (`409`), the central directory (`400 InvalidArchive`).
-- The reads: the role, the job (`404`), and then the scopes of its `Include` (`403`). The download then checks the state (`409 TransferNotReady`) and opens the archive (`404`).
+- `StartViewExport`: the body (`400`), the credentials (`401`), the scopes (`403`), the project access, the job limit (`409`).
+- `StartViewImport`: `include` and `existing` (`400 InvalidQuery`), the credentials (`401`), the scopes (`403`), the project access, the size (`413`), the zip signature (`400 InvalidArchive`), the job limit (`409`), the central directory (`400 InvalidArchive`).
+- The reads: the project access, the job (`404`), and then the scopes of its `Include` (`403`). So a user below `Administrator` gets `403` for any id, also for a job that does not exist. The download then checks the state (`409 TransferNotReady`) and opens the archive (`404`).
 
 ### Access
 
-The roles stay as in the first spec: any role on the project to export and to read an export or download its archive, `Contributor` to import and to read an import. The scopes depend on the included kinds:
+**Users** need the `Administrator` role on the project, so `Administrator` or `Owner`, on every route: to start an export, to read it and download its archive, to start an import and to read it. Below it, the route answers `403` with the error code `AccessDenied` and the message that every role check of the API gives, for example `No Administrator access to 'acme.billing'.` The role is read again on every request, so a user who loses it while a job runs gets `403` at the next read or at the download. The job itself still ends: the queue functions check no access.
+
+**Machines** have no role: they need only the scopes of the included kinds, which user tokens need too. This differs on purpose from the other Administrator operations, such as the permanent delete of an annotation, which refuse machines ([access.md](access.md#roles)): a backup or a copy between projects from a pipeline exports and imports as a machine, and the scopes already tell a reading machine from a writing one.
+
+The scopes depend on the included kinds:
 
 | Included kind | Export, and reading an export | Import, and reading an import |
 | --- | --- | --- |
@@ -550,7 +554,7 @@ The roles stay as in the first spec: any role on the project to export and to re
 
 - **A request** needs the scopes of every kind it includes, and without include those of all four. `Default.Read` for an export, and `Default.ReadWrite` for an import, cover any include.
 - **Reading a job**, or downloading the archive of an export, needs the scopes of the job's stored `Include`, not of the request: the read scopes for an export, the write scopes for an import. A job without a stored `Include` counts as all four kinds. So polling an import needs the write scopes of its kinds too.
-  - The role is checked first. Then the job is read (`404`), and its scopes are checked (`403`).
+  - The project access is checked first. Then the job is read (`404`), and its scopes are checked (`403`).
   - The archive is not opened, and the job's state not told, before the scopes pass.
 - **A missing scope** throws `AccessDeniedException`, which answers `403` with the error code `AccessDenied`. `401` stays for missing or invalid credentials: a request without credentials (no claims) gets `401` before its scopes are checked, so it is never told to change `include`, and clients sign in again. (In the first spec, a missing scope answered `401`.) The message has one sentence per rule that fails, and names the kinds, the scopes that would allow them, and `include`:
 
@@ -562,21 +566,21 @@ The roles stay as in the first spec: any role on the project to export and to re
 
   Kinds with the same rule share a sentence: `Missing scope for schemas, templates and configurations: exporting them needs …`.
 - So a machine with only `Configuration.ReadWrite` (the machine access scope `ConfigurationReadWrite`, see [authentication.md](authentication.md#the-machineaccess-object)) imports with `include=schemas,templates,configurations`, and exports with `"Include": [ "Schemas", "Templates", "Configurations" ]`.
-- Machines are allowed with the same scopes, except a machine restricted to an annotation: export and import span the whole view, so it gets `403 AnnotationRestricted` (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)). The caller's audit actor becomes the job's `CreatedBy`, and the actor of written versions and audit entries.
-- **Debug builds** (`DEV_AUTH`) skip the scope and role checks, as on every route. The handler's internal `ChecksScopes` follows that by default. `ViewTransferHttpTests` turn it on, so the rules per kind and their wiring are tested in Debug too.
+- Machines are allowed with these scopes and without a role, except a machine restricted to an annotation: export and import span the whole view, so it gets `403 AnnotationRestricted` (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)). The caller's audit actor becomes the job's `CreatedBy`, and the actor of written versions and audit entries.
+- **Debug builds** (`DEV_AUTH`) skip the scope and role checks, as on every route, so there a user of any role exports and imports, also under Aspire. The checks of machines (their document, the credential policy and the annotation restriction) run in every build. The handler's internal `ChecksScopes` follows `DEV_AUTH` by default. `ViewTransferHttpTests` turn it on, so the rules per kind and their wiring are tested in Debug too. The role is tested in Release only (`-c Release`): the tests of the roles below `Administrator` return early under `DEV_AUTH`, and in Debug the tests of `Administrator` and `Owner` would pass with any role.
 - The granted scopes come from `HttpRequestDataExtensions.GetScopes()`: the `scp`, `roles` and scope claims, without an `App.` prefix. `CheckScope` and `TryCheckScope` use it as well.
 
 ### OpenAPI and SDKs
 
-The document publishes the five operations with the tag `Transfers`, each with its `401` and `403`.
+The document publishes the five operations with the tag `Transfers`, each with its `401` and `403`. The `403` of the export operations and that of the import operations each have their own description (`ResponseTransferForbiddenExport` and `ResponseTransferForbiddenImport` in `Definitions.cs`). Both start with "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted).", then list the scopes of their side, and end with "The message names the missing role or scope." The operations themselves name no role.
 
 - `include` is an array with `style: form` and `explode: false`, so it is sent comma-separated. `existing` has the default `Overwrite`.
 - `ViewTransferSchemaDocumentFilter` makes both parameters, and the `Include` lists and `Existing` of the bodies and jobs, reference two shared schemas: `ViewArchiveContent` (without a default, since no include means all four kinds) and `ViewImportExisting`. Inline, the generators would name an enum after each list (NSwag: `Include`, `Include2`, `Include3`, `Anonymous`).
 - The other enums stay inline: the format (`ViewExportCreateFormat` in the body, `ViewExportFormat` on the job), the kind of a summary (`ViewImportSummaryContent`) and the kind of an item (`ViewImportItemKind`).
 
-The document is `open.api.v0.9.21.json`, in `Sdk.NSwag` and `sdk.typescript`:
+The document is `open.api.v0.9.32.json`, in `Sdk.NSwag` and `sdk.typescript`:
 
-- The C# SDK has `ITransfersApiClient` (`TransfersApiClient`, registered by `AddStorytellerSdk`): `StartViewExportAsync`, `GetViewExportAsync`, `GetViewExportArchiveAsync` (a `FileResponse`), `StartViewImportAsync(…, IEnumerable<ViewArchiveContent> include, ViewImportExisting? existing, bool? force, bool? dryRun, string fileName, Stream body)` and `GetViewImportAsync`. It sends `include` comma-separated.
+- The C# SDK has `ITransfersApiClient` (`TransfersApiClient`, registered by `AddStorytellerSdk`): `StartViewExportAsync`, `GetViewExportAsync`, `GetViewExportArchiveAsync` (a `FileResponse`), `StartViewImportAsync(…, IEnumerable<ViewArchiveContent> include, ViewImportExisting? existing, bool? force, bool? dryRun, string fileName, Stream body)` and `GetViewImportAsync`. It sends `include` comma-separated. The description of each `403` is the message of its `ApiException<ErrorResponse>`, which `sform` prints, with the status and the response, when the answer has no message of its own.
 - The TypeScript SDK has the `transfers` tag: `startViewExport`, `getViewExport`, `getViewExportArchive` (a `Blob`), `startViewImport(…, file, { include, existing, force, dryRun, fileName })` and `getViewImport`, with their Vue Query composables, Zod schemas and MSW handlers (`getTransfersMock()`, part of `getStorytellerMock()` in the `./msw` entry). `include` goes comma-separated (`include=Annotations%2CTemplates`).
 
 ### Background functions
@@ -599,13 +603,15 @@ sform story export [-f|--format folder|git] [-i|--include <kinds>] [-o|--output 
 sform story import <zip-or-folder> [-i|--include <kinds>] [-e|--existing overwrite|skip] [--dry-run] [--force] [--timeout <minutes>]
 ```
 
+A user needs the `Administrator` role on the project, and a machine the scopes of the included kinds (see [Access](#access)). The help of both commands says so: `(Administrator)` after what the command does, and "A machine needs the scopes of the included kinds instead of a role." at the end. `sform` checks no role of its own, because a `403` can also be a missing scope or `AnnotationRestricted`; it prints the server's message instead (see [Exit codes](#exit-codes)).
+
 The code is in `src/Platform/Cli/src/`:
 
 - `Commands/Storyteller/StorytellerExportCommand.cs` and `StorytellerImportCommand.cs`, subcommands of `StorytellerListCommand` (`sform story`);
 - `Commands/Storyteller/ViewTransferArguments.cs`: the checks of the options;
 - `Services/ViewArchives.cs`: packing a folder and unpacking an export, through `IFileSystem`;
 - `Services/TransferPolling.cs`: waiting for a job;
-- `Output/TransferConsoleExtensions.cs`: the tables and the export summary.
+- `Output/TransferConsoleExtensions.cs`: the tables, the export summary, and `WriteRefusal`, which prints the server's message of a refused step and returns its exit code.
 
 The commands call `ITransfersApiClient`. The `sform story config export` and `sform story config import` of the first spec are removed; they were never released.
 
@@ -633,8 +639,8 @@ What the import options do is described in [Options](#options). `ViewTransferArg
 ### sform story export
 
 1. The command always sends a `ViewExportCreate` body with the format and the include. The C# SDK would send `null` for a missing body, which the API answers with `400`.
-2. It prints `Exporting the annotations and templates of acme.billing.default (git)…` and waits for the job. It reads the job every second, then every 2 and 3 seconds (`TransferPolling`).
-3. It downloads the archive and saves it under the server's file name: in the current folder, or in the folder `--output` names (an existing folder, or a path that ends with a separator). Any other `--output` is the file itself. Missing folders are created.
+2. It prints `Exporting the annotations and templates of acme.billing.default (git)…` and waits for the job. It reads the job every second, then every 2 and 3 seconds (`TransferPolling`). Every read checks the access again, so a `403` can come at the first read or at a later one, for example `No Administrator access to 'acme.billing'.` for a user who lost the role while the job runs. The command then prints the server's message and exits with `44`.
+3. It downloads the archive and saves it under the server's file name: in the current folder, or in the folder `--output` names (an existing folder, or a path that ends with a separator). Any other `--output` is the file itself. Missing folders are created. A `403` of the download prints the server's message and exits with `44`, and nothing is written: the file, its folders and the folder of `--extract` are created only for a served archive.
 4. `--extract` unpacks the archive into a new or empty folder instead: the one `--output` names, or by default the file name without `.zip`. So `sform story export -f git -x` leaves a checked-out repository with the folders of every kind. A file in place of the folder, a folder that is not empty, and an entry that would land outside the folder are refused with `2`.
 5. It ends with the counts of the exported kinds, without the kinds left out, then the versions and the size: `Exported 4 annotations and 2 templates (9 versions, 2 KB) to export-acme-billing-default-git-20261017-081500Z.zip.` With `--extract`, it says `into` the folder. The versions are not mentioned when only annotations were exported, since annotations have none.
 
@@ -646,7 +652,7 @@ What the import options do is described in [Options](#options). `ViewTransferArg
    - The upload is named `<folder>.zip`.
 
    So a clone of an exported repository, or an extracted and edited export, imports as it is. A folder without such files, and a path that does not exist, exit with `2`.
-2. It prints `Importing acme.zip into acme.billing.default (annotations and templates, skip existing, forced, dry run)…`. The brackets list only the options that differ from the defaults. Then it waits for the job, as the export does.
+2. It prints `Importing acme.zip into acme.billing.default (annotations and templates, skip existing, forced, dry run)…`. The brackets list only the options that differ from the defaults. Then it waits for the job, as the export does, and a `403` at a read of the job ends it the same way, with the server's message and `44`.
 3. At the end, under the header `Import of <file>`, it writes:
    - a table of the documents the job lists, every outcome except `Unchanged` (none when every document was unchanged);
    - when the job cut that list (`AreItemsTruncated`): `Only the first N files are listed; the counts include all.`;
@@ -671,20 +677,21 @@ Each warning is a row of its own under its document, with `!` in the `Outcome` c
 | Code | When |
 | --- | --- |
 | `0` | The job succeeded and no file failed. Warnings don't change it. |
-| `1` | The job failed on the server; its error is printed. Any other error of the API, for example while waiting, goes to the general error handler of `sform`, which exits with `1` too. |
+| `1` | The job failed on the server; its error is printed. Any other error of the API, for example a `404` or a `500` while waiting, goes to the general error handler of `sform`, which exits with `1` too. A `401` or `403` never ends here (see `44`). |
 | `2` | An option, the path or the folder to extract into is wrong. Or the server refused the start with `400` (for example `InvalidArchive`), `409` (`TransferLimit`) or `413` (`ArchiveTooLarge`); its message is printed. Or a file of the import failed, also in a dry run. |
 | `40` | `--timeout` ran out. The command prints the job id and its status, with the processed files of an import. The job continues on the server. |
-| `44` | The start answered `401` or `403`, for example for a missing scope of an included kind. The server's message is printed; for a scope, it names `include` (see [Access](#access)). |
+| `44` | The server answered `403` at the start, at a read of the job or at the download of the archive, for example for a user below `Administrator` or a missing scope of an included kind. The server's message is printed: `No Administrator access to 'acme.billing'.` for the role, and for a scope a message that names `include` (see [Access](#access)). Or the API answered `401` at any step: missing or expired credentials, or a machine without access to the project. A `401` has no message of the server, so the commands leave it to `Program.Main`, which prints "You are not authorized to execute the command or you don't have access to requested resources.", adds a hint when `sform` signed in as a machine, and exits with `44`. |
 
-**Tests.** `Cli/test` covers the options and their defaults (`ViewTransferArgumentsTests`), the requests, the files, the output and the exit codes of both commands (`StorytellerTransferCommandTests`), the packing and unpacking (`ViewArchivesTests`), and the tables (`TransferConsoleExtensionsTests`). `RecordingConsole` records each table as the text of its cells (`RecordedTable`).
+**Tests.** `Cli/test` covers the options and their defaults (`ViewTransferArgumentsTests`), the requests, the files, the output and the exit codes of both commands (`StorytellerTransferCommandTests`), the packing and unpacking (`ViewArchivesTests`), and the tables and `WriteRefusal` (`TransferConsoleExtensionsTests`). The refusals are covered at each step: a `403` at the start, at the first and at a later read of the job, and at the download, without a file or a folder; a `401` at the start, while waiting and at the download, which leaves the command; and the help, which names the role. `RecordingConsole` records each table as the text of its cells (`RecordedTable`).
 
 ## Administration UI
 
 The **Export & Import** page of a view, a tab of **Modeling** (`ui.admin/src/app/pages/[org]/[project]/[view]/modeling/export-import.vue`), exports and imports the view. It replaced the **Export** and **Import** buttons of the Configurations page and their dialogs (`ConfigurationExportDialog`, `ConfigurationImportDialog`, `ConfigurationImportResult`), which are removed.
 
-- **Navigation.** The page is the third tab of **Modeling** (icon `i-lucide-arrow-down-up`), at `…/{view}/modeling/export-import` (`utils/modeling.ts`). The sidebar entry **Modeling** (icon `i-lucide-puzzle`) follows **Graph** in the view section (`utils/navigation.ts`). It has `editRole: 'Contributor'` and `lockedHint: 'Contributors only'`, so a Reader sees it with a lock, and its tooltip in the collapsed sidebar says "Contributors only". `modeling.vue` locks the whole page below `Contributor`. The [access](#access) of the API does not change, so a Reader still exports with `sform story export`. The command palette lists the tab after the Modeling entry, except for a Reader, and `g e` opens it (`components/shell/CommandPalette.vue`; the shortcut help lists it, `composables/useShortcutsHelp.ts`). `modeling` is one of the view sections of `utils/context-paths.ts`, and switching the view or the project keeps the tab. The old address `…/{view}/export-import` redirects to the tab, with its query and hash.
+- **Navigation.** The page is the third tab of **Modeling** (icon `i-lucide-arrow-down-up`), at `…/{view}/modeling/export-import` (`utils/modeling.ts`). The sidebar entry **Modeling** (icon `i-lucide-puzzle`) follows **Graph** in the view section (`utils/navigation.ts`). It has `editRole: 'Contributor'` and `lockedHint: 'Contributors only'`, so a Reader sees it with a lock, and its tooltip in the collapsed sidebar says "Contributors only". `modeling.vue` locks the whole page below `Contributor`. The tab itself has `minRole: 'Administrator'`, so `modelingTabsFor` leaves it out below `Administrator`: the header of Modeling (`components/modeling/ModelingHeader.vue`) shows a Contributor the four other tabs, and the command palette lists the tab after the Modeling entry only for Administrators and Owners (`components/shell/CommandPalette.vue`). `g e` opens the page for every role (the shortcut help lists it, `composables/useShortcutsHelp.ts`): a Reader gets the Modeling lock, and a Contributor the lock of the page (see **Who** below). `modeling` is one of the view sections of `utils/context-paths.ts`, and switching the view or the project keeps the tab. The old address `…/{view}/export-import` redirects to the tab, with its query and hash.
+- **Who.** The export and the import need the Administrator role, as in the [API](#access): `useCan('transfer')`, with `transfer: 'Administrator'` in `capabilityRoles` (`composables/useRole.ts`). Below it, the page keeps `ModelingHeader`, with the four other tabs and none of them selected, and its body is the lock "Administrators only" (icon `i-lucide-lock`) with "The export and the import of the view are available to the project's Administrators." It mounts no section and no result, so it requests nothing. The Modeling lock of a Reader names both rules: "The schemas, the templates, the deleted annotations and the comparison of views are available to the project's Contributors, the export and the import to its Administrators." The Contributor lock of the other tabs is a choice of the admin UI only; the API reads them with `Reader` ([access.md](access.md#roles)).
 - **Layout.** The **Export** and **Import** sections sit side by side from the `lg` breakpoint and are stacked below it. Below them, full width, the section **Latest import** shows the result of the view's latest import (`latestImport`) once it has succeeded. While a newer import or check runs, and after one fails, the section is hidden; the Import section shows the progress or the error.
-- While the page is open, it marks that import as shown (`showInPage`), so `TransferToaster` does not report its end. The mark is set synchronously, as soon as the import becomes the latest one: an import restored after a reload that ended meanwhile is tracked and finished in one step, and gets no toast either.
+- While the page is open, it marks that import as shown (`showInPage`), so `TransferToaster` does not report its end. The mark is set synchronously, as soon as the import becomes the latest one: an import restored after a reload that ended meanwhile is tracked and finished in one step, and gets no toast either. Behind the lock the page shows no import and marks none, so the toaster still reports it.
 
 ### The Export section
 
@@ -700,7 +707,7 @@ The **Export & Import** page of a view, a tab of **Modeling** (`ui.admin/src/app
 
 `components/transfer/ImportPanel.vue`:
 
-- **Who.** A Reader does not reach the section: the Modeling lock closes the page below `Contributor`. As a fallback, the section still shows "Importing needs the Contributor role" instead of the form below `Contributor`.
+- **Who.** Only Administrators and Owners reach the section: below `Administrator` the page shows its lock instead. As a fallback, the section itself still shows "Importing needs the Administrator role" with "Ask an Administrator or an Owner of the project to import an archive." instead of the form below `Administrator` (`useCan('transfer')`).
 - **The file:** `UFileUpload` takes a zip. Its hint: "Folders don't matter: files are recognized by their names. Version files, export.json and hidden folders are ignored."
 - **Kinds:** the same four checkboxes, all checked. They say what the import may write; at least one is needed.
 - **Existing documents:** radio cards.
@@ -741,12 +748,12 @@ The **Export & Import** page of a view, a tab of **Modeling** (`ui.admin/src/app
 **`stores/transfers.ts`** starts and follows the jobs, independently of the page:
 
 - `startExport(scope, { format, include })` and `startImport(scope, file, { include, existing, force, dryRun })` call `startViewExport` and `startViewImport` of the TypeScript SDK. Options that are left out are not sent, so the API's defaults apply. An empty include means all four kinds.
-- It reads a job every second, then every 2 and 3 seconds, for at most 15 minutes. A `404` ends the job as expired, and so do three failed reads in a row, with their error.
+- It reads a job every second, then every 2 and 3 seconds, for at most 15 minutes. A `404` ends the job as expired, and so do three failed reads in a row, with their error. A `403`, for a user who lost the Administrator role while the job runs, is such a failed read, so the job ends after three with the server's message.
 - A succeeded export is fetched with the bearer token and saved under its `FileName` (`utils/download.ts`).
 - `latestExport(scope)` and `latestImport(scope)` give the newest job of a view; `showInPage(id)` marks the one a page shows.
 - **After a reload:**
   - Running exports are kept in `sessionStorage` (`2s-admin:pending-exports`) and followed again. One started more than 15 minutes earlier is dropped.
-  - The latest import of each view is kept there too (`2s-admin:latest-imports`) and read again from the server. An import that had finished is shown on the page without a toast. One that was still running is followed, and its end is reported unless the page shows it, also when it ended during the reload; it keeps its original start, so after 15 minutes it ends at once with "The job did not end within 15 minutes; it may still end on the server." One that has expired (the server keeps jobs for 24 hours), cannot be read, or was replaced by a newer import of the view in the meantime is forgotten.
+  - The latest import of each view is kept there too (`2s-admin:latest-imports`) and read again from the server. An import that had finished is shown on the page without a toast. One that was still running is followed, and its end is reported unless the page shows it, also when it ended during the reload; it keeps its original start, so after 15 minutes it ends at once with "The job did not end within 15 minutes; it may still end on the server." One that has expired (the server keeps jobs for 24 hours) or was replaced by a newer import of the view in the meantime is forgotten. One that cannot be read for another reason, a `403` included, is kept and read again at the next reload, until 24 hours after its start.
 
 **`components/transfer/TransferToaster.vue`** sits in the default layout. It calls `resume()` when it is mounted and reports the ends of the jobs, wherever the user is by then:
 
@@ -770,7 +777,7 @@ A dry run refreshes nothing.
 
 - **File names** come from `mock/archive-names.ts`, a TypeScript port of `ViewArchiveNames`: the names of every kind and version, the reserved second segment, the parser, the descendant-type check (`canDescend`, which lives in `utils/annotation-key.ts` and serves the **New schema** dialog too), the identities that find duplicates, hidden paths and the zip name. `test/unit/transfers/archive-names.test.ts` runs the cases of `ViewArchiveNamesTests`, and `test/unit/utils/annotations.test.ts` the pairs of `DescendantTypeRulesTests`.
 - **Jobs.** A job is `Running` on its first read and ends on the second, so the UI shows its progress.
-  - An export needs any role on the project, and an import `Contributor`. The scopes and the job limit are not checked.
+  - Every route needs the Administrator role on the project, as in the API. Below it, the route answers `403` `AccessDenied` with the shared message of the mock, for example `The Administrator role on acme.shipping is required.` The seed has no Administrator project, so in the e2e tests the Owner of `acme.billing` stands in for an Administrator. The scopes and the job limit are not checked.
   - The options are read like the API's: an unknown kind or mode answers `400` (`InvalidQuery` for the query).
   - The last ten finished imports are kept in `sessionStorage` (`2s-admin:mock-finished-imports`), so the page shows a result again after a reload, as the API keeps its jobs.
 - **Export.**
@@ -793,19 +800,23 @@ A dry run refreshes nothing.
 
 - **Vitest** (`test/unit/transfers/`):
   - the archive names;
-  - the mock's exports and imports (`mock-transfers.test.ts`);
+  - the mock's exports and imports, and its roles: the five routes refuse the Contributor of `acme.shipping` and the Reader of `northwind.portal`, also for jobs started while the mock user was the Administrator there, and serve an Owner and an Administrator (`mock-transfers.test.ts`);
   - the store's options, polling and restore after a reload (`transfers.test.ts`);
   - the names, links and invalidation of a result (`transfer-utils.test.ts`);
   - the sections, the result and the toaster, and the page after a reload: a resumed export in the Export section, and an import that ended during the reload shown without a toast (`transfer-page.test.ts`);
-  - the Modeling entry with its tabs, and the shortcut (`test/unit/utils/navigation.test.ts`).
+  - the role on the page: the fallback of the Import section for a Contributor, and the lock of a Contributor under four tabs, without sections and without marking the import, which mounts the sections once the role becomes Administrator (`transfer-page.test.ts`);
+  - the Modeling entry with the tabs of each role, Export & Import from Administrator up, and the shortcut (`test/unit/utils/navigation.test.ts`);
+  - the tabs of `ModelingHeader` per role, and no selected tab on the lock of a Contributor (`test/unit/modeling/modeling.test.ts`).
 - **Playwright** (`test/e2e/transfers.spec.ts`), on desktop and mobile:
   - the page from the sidebar (**Modeling**, then the **Export & Import** tab) and with `g e`, and a Configurations page without transfer buttons;
   - an export of annotations and templates, a git export, and the need for one kind;
   - a check of an edited archive per kind, with a warning, then **Import now** (desktop only);
   - an import with **Skip** that reports `DocumentExists` and shows again after a reload;
-  - the Modeling lock of a reader;
+  - the Modeling lock of a Reader;
+  - the lock of a Contributor (`acme/shipping`): "Administrators only" under the four other tabs, none of them selected, without sections, and **Schemas** still opens;
   - a file that is not a zip (desktop only).
-- **axe** (`accessibility.spec.ts`) runs on the page for a Contributor, on the locked Modeling page of a reader, and on the result of a check.
+- **Playwright** (`test/e2e/navigation.spec.ts`): the four tabs of a Contributor, and the command palette, which lists Export & Import for the Owner and not for the Contributor.
+- **axe** (`accessibility.spec.ts`), in both themes, runs on the page for an Owner (`acme/billing`), on the locked Modeling page of a Reader, on the lock of a Contributor, and on the result of a check.
 - **Visual baselines** (`visual.spec.ts`) capture the page as it opens, in both themes, on desktop and mobile.
 
 ## Storage
