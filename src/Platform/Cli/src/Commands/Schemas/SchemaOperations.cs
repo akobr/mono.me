@@ -318,6 +318,23 @@ internal static class SchemaOperations
             return ExitCodes.ERROR_WRONG_INPUT;
         }
 
+        // A status the operation declares: the message of the exception is only its OpenAPI description, the server's
+        // message and code are in the ErrorResponse.
+        if (exception is ApiException<ErrorResponse> error
+            && !string.IsNullOrWhiteSpace(error.Result?.Message))
+        {
+            console.WriteImportant(error.Result.Message);
+
+            if (!string.IsNullOrWhiteSpace(error.Result.ErrorCode))
+            {
+                console.WriteLine($"Error code: {error.Result.ErrorCode}".ThemedLowlight(console.Theme));
+            }
+
+            return exception.StatusCode is (int)HttpStatusCode.BadRequest or (int)HttpStatusCode.NotFound
+                ? ExitCodes.ERROR_WRONG_INPUT
+                : ExitCodes.ERROR_CRASH;
+        }
+
         console.WriteLine($"Error occurred: {exception.Message}");
         return ExitCodes.ERROR_CRASH;
     }
