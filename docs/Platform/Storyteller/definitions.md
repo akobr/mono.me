@@ -195,7 +195,7 @@ sform story schema definition exe.northwind.invoicing.prod
 
 When the API refuses a schema command, `sform` prints the server's message where it has one:
 
-- A `400` prints the message and its error code on the next line, for example `Error code: InvalidKey` for a descendant type that cannot descend from the key. The command exits with `2`.
+- A `400` prints the message, and its error code on the next line when the response has one, for example `Error code: InvalidKey` for a descendant type that cannot descend from the key. The command exits with `2`.
 - A failed compliance check prints the message, then each configuration that does not comply as `annotationKey (view)` with its messages. The command exits with `2`.
 - A `404` of `get`, `delete`, `versions`, `diff`, `definition` or of the read of `edit` prints a sentence of `sform`, such as "The schema for 'exe' has not been found.", and exits with `2`.
 - A `403`, a `500` or the `409` of a concurrent change on `delete` prints the server's message and exits with `1`.
