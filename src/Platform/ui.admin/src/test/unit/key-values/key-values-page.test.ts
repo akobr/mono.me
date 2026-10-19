@@ -36,17 +36,9 @@ afterEach(() => {
 afterAll(() => server.close())
 
 describe('Values store through the switcher', () => {
-  async function mountValuesStore() {
+  async function mountValuesStore(accessMap = { 'acme.billing': 'Owner', 'acme.shipping': 'Contributor' }) {
     // the pages through the generated routes, as in the app, so a switch keeps the page's component
-    const view = await mountScreen(
-      RouterView,
-      {},
-      {
-        path: '/acme/billing/default/key-values',
-        accessMap: { 'acme.billing': 'Owner', 'acme.shipping': 'Contributor' },
-        routes,
-      },
-    )
+    const view = await mountScreen(RouterView, {}, { path: '/acme/billing/default/key-values', accessMap, routes })
     mounted.push(view)
     view.router.beforeEach(contextGuard)
     await vi.waitFor(() => expect(checkbox('db.host')).toBeTruthy())
@@ -84,5 +76,35 @@ describe('Values store through the switcher', () => {
     expect(bulkBar()).toBeNull()
     await vi.waitFor(() => expect(text()).toContain('sql.staging'))
     expect(checkbox('db.host')?.getAttribute('aria-checked')).toBe('false')
+  })
+
+  /** The "Include secret values" item of the open Export menu. */
+  const includeSecrets = () =>
+    [...document.body.querySelectorAll('[role="menuitemcheckbox"]')].find((item) =>
+      item.textContent?.includes('Include secret values'),
+    )
+
+  async function toggleExportMenu() {
+    document.body.querySelector<HTMLElement>('button[aria-label="Export"]')!.click()
+    await settle()
+  }
+
+  it('asks again for the secret values of an export in another project or view', async () => {
+    const view = await mountValuesStore({ 'acme.billing': 'Owner', 'acme.shipping': 'Owner' })
+
+    for (const path of ['/acme/shipping/default/key-values', '/acme/shipping/staging/key-values']) {
+      await toggleExportMenu()
+      ;(includeSecrets() as HTMLElement).click()
+      await settle()
+      expect(includeSecrets()?.getAttribute('aria-checked')).toBe('true')
+      await toggleExportMenu()
+
+      await view.router.push(path)
+      await settle()
+
+      await toggleExportMenu()
+      expect(includeSecrets()?.getAttribute('aria-checked')).toBe('false')
+      await toggleExportMenu()
+    }
   })
 })
