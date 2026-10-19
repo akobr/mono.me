@@ -11,6 +11,8 @@ test('invites a member to the project from its Members page', async ({ page }) =
   await page.getByRole('button', { name: 'Invite', exact: true }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Invite people' })
+  // where the invitations go and what they share, not who sends the emails (424-65)
+  await expect(dialog).toHaveAccessibleDescription('To acme.billing. Everyone gets the same role and expiry.')
   await dialog.getByPlaceholder('ada@example.com').fill('marie@example.com')
   await page.keyboard.press('Enter')
   await dialog.getByRole('button', { name: 'Send invitations' }).click()
@@ -53,7 +55,7 @@ test('invites a pasted list to the organization from its Members page', async ({
   await page.getByRole('button', { name: 'Invite', exact: true }).click()
 
   const dialog = page.getByRole('dialog', { name: 'Invite people' })
-  await expect(dialog).toContainText('To acme.')
+  await expect(dialog).toHaveAccessibleDescription('To acme. Everyone gets the same role and expiry.')
   // a list copied from a mail client: the display names go, the addresses become tags
   await dialog.getByPlaceholder('ada@example.com').evaluate((input, text) => {
     const clipboardData = new DataTransfer()
