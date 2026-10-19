@@ -8,6 +8,7 @@ import type { AccountRoleName, View } from '@42for.net/2splatform.sdk'
 import ModelingHeader from '@/components/modeling/ModelingHeader.vue'
 import { mockHandlers } from '@/mock/all-handlers'
 import ModelingPage from '@/pages/[org]/[project]/[view]/modeling.vue'
+import { useSessionStore } from '@/stores/session'
 import { hasOtherView, modelingPath, modelingTab, movedToModeling } from '@/utils/modeling'
 import { mountScreen, settle } from '../../helpers'
 
@@ -136,6 +137,22 @@ describe('ModelingHeader', () => {
 
     expect(tabs()).toHaveLength(4)
     expect(selected()).toBeUndefined()
+  })
+
+  it('rebuilds the tabs when the role drops below Administrator on the Export & Import page', async () => {
+    const tabList = () => document.body.querySelector('[role="tablist"]')
+    await mountHeader('/acme/billing/default/modeling/export-import')
+    const before = tabList()
+    expect(selected()?.textContent?.trim()).toBe('Export & Import')
+
+    // A switch to a project of a Contributor keeps the page, and so this header. The underline of the tabs stays where
+    // it was when no tab is selected, so only new tabs drop the one of Export & Import (jsdom has no layout to show it).
+    useSessionStore().setAccount({ Id: 'user_1', AccessMap: { 'acme.billing': 'Contributor' } })
+    await settle()
+
+    expect(tabs()).toHaveLength(4)
+    expect(selected()).toBeUndefined()
+    expect(tabList()).not.toBe(before)
   })
 
   it.each([
