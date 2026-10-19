@@ -143,24 +143,18 @@ jobs:
           (cd "$UI_DIR" && npm ci && npm run build)
 
       # One build serves every environment: app-config.json and the CSP origins are written per deployment.
+      # Sentry and PostHog are optional (build/environment-config.ts); Node 24 (.nvmrc) runs the TypeScript as it is.
       - name: Environment configuration
         working-directory: ${{ env.UI_DIR }}
         env:
           API_BASE_URL: ${{ vars.UI_ADMIN_API_BASE_URL }}
           AUTH_API_HOSTNAME: ${{ vars.UI_ADMIN_AUTH_API_HOSTNAME }}
           ENVIRONMENT_NAME: ${{ vars.UI_ADMIN_ENVIRONMENT_NAME }}
-        run: |
-          node --input-type=module -e "
-            import { readFileSync, writeFileSync } from 'node:fs'
-            const { API_BASE_URL, AUTH_API_HOSTNAME, ENVIRONMENT_NAME } = process.env
-            if (!API_BASE_URL || !AUTH_API_HOSTNAME) throw new Error('UI_ADMIN_API_BASE_URL and UI_ADMIN_AUTH_API_HOSTNAME are required.')
-            writeFileSync('dist/app-config.json', JSON.stringify({ apiBaseUrl: API_BASE_URL, authApiHostname: AUTH_API_HOSTNAME, environmentName: ENVIRONMENT_NAME || undefined }, null, 2))
-            const file = 'dist/staticwebapp.config.json'
-            const config = readFileSync(file, 'utf8')
-              .replaceAll('__API_ORIGIN__', new URL(API_BASE_URL).origin)
-              .replaceAll('__AUTH_HOSTNAME__', AUTH_API_HOSTNAME)
-            writeFileSync(file, config)
-          "
+          SENTRY_DSN: ${{ vars.UI_ADMIN_SENTRY_DSN }}
+          POSTHOG_PROJECT_TOKEN: ${{ vars.UI_ADMIN_POSTHOG_PROJECT_TOKEN }}
+          POSTHOG_HOST: ${{ vars.UI_ADMIN_POSTHOG_HOST }}
+          RELEASE: ${{ github.sha }}
+        run: node build/write-environment-config.ts
 
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1

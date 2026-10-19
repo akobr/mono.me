@@ -12,7 +12,7 @@
   ],
   "globalHeaders": {
     "Cache-Control": "no-cache",
-    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' __API_ORIGIN__ https://api.workos.com https://__AUTH_HOSTNAME__; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://__AUTH_HOSTNAME__",
+    "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' __API_ORIGIN__ __SENTRY_ORIGIN__ __POSTHOG_ORIGIN__ https://api.workos.com https://__AUTH_HOSTNAME__; worker-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://__AUTH_HOSTNAME__",
     "Referrer-Policy": "strict-origin-when-cross-origin",
     "X-Content-Type-Options": "nosniff"
   },
