@@ -23103,7 +23103,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("No role on the project, or a scope of an included kind is missing (AccessDenied). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("The user\'s role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing role or scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 409)
@@ -23250,7 +23250,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("No role on the project, or a scope of an included kind is missing (AccessDenied). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("The user\'s role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing role or scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -23396,7 +23396,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("No role on the project, or a scope of an included kind is missing (AccessDenied). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("The user\'s role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing role or scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
@@ -23611,7 +23611,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("The role on the project is below Contributor, or a scope of an included kind is missing (AccessDenied). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("The user\'s role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing role or scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 409)
@@ -23768,7 +23768,7 @@ namespace _42.Platform.Storyteller.Sdk
                             {
                                 throw new ApiException("Response was null which was not expected.", status_, objectResponse_.Text, headers_, null);
                             }
-                            throw new ApiException<ErrorResponse>("The role on the project is below Contributor, or a scope of an included kind is missing (AccessDenied). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
+                            throw new ApiException<ErrorResponse>("The user\'s role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing role or scope.", status_, objectResponse_.Text, headers_, objectResponse_.Object, null);
                         }
                         else
                         if (status_ == 404)
