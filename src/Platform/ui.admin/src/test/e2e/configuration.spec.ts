@@ -207,3 +207,29 @@ test('compare views preselects the only other view', async ({ page }) => {
   await expect(page.getByText('Compare a configuration across views')).toBeHidden()
   await expect(page.locator('.cm-editor').first()).toBeVisible()
 })
+
+// The Views page used to link the default view to itself (424-64); such a link no longer compares a view with itself.
+test('compare views never compares a view with itself', async ({ page }) => {
+  const diffs: string[] = []
+  page.on('request', (request) => {
+    if (request.url().includes('/diff/')) {
+      diffs.push(new URL(request.url()).pathname)
+    }
+  })
+
+  // acme/billing has staging too: it takes the place of the current view in ?to=
+  await openApp(page, `/acme/billing/default/modeling/compare?to=default&key=${key}`)
+  await expect(page).toHaveURL(/[?&]to=staging(&|$)/)
+  await expect(page.getByRole('combobox', { name: 'Compare default with' })).toHaveText('staging')
+  await expect(page.locator('.cm-editor').first()).toBeVisible()
+  // the page sees the requests of the mock API: the diff with staging is among them
+  await expect.poll(() => diffs.some((diff) => diff.endsWith('/diff/staging'))).toBe(true)
+  expect(diffs.filter((diff) => diff.endsWith('/diff/default'))).toEqual([])
+
+  // acme/shipping has only its default view: nothing to compare with, and nothing is requested
+  diffs.length = 0
+  await goto(page, `/acme/shipping/default/modeling/compare?to=default&key=${key}`)
+  await expect(page.getByText('No other view to compare with')).toBeVisible()
+  await expect(page.getByText('Compare a configuration across views')).toBeHidden()
+  expect(diffs).toEqual([])
+})

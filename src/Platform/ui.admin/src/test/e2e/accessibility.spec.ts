@@ -14,6 +14,7 @@ const screens: [string, string][] = [
   ['graph', '/acme/billing/default/graph'],
   ['export and import', '/acme/billing/default/modeling/export-import'],
   ['compare views', '/acme/billing/default/modeling/compare'],
+  ['views with nothing to compare', '/acme/shipping/views'],
   ['members', '/acme/billing/members'],
   ['machines', '/acme/billing/machines'],
   ['federated machine detail', '/acme/billing/machines/mach-release-pipeline'],

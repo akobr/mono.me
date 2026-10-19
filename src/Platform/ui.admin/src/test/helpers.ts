@@ -2,7 +2,7 @@
 import { defineComponent, h, nextTick, type Component } from 'vue'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import ui from '@nuxt/ui/vue-plugin'
-import { createMemoryHistory, createRouter, type Router } from 'vue-router'
+import { createMemoryHistory, createRouter, type Router, type RouteRecordRaw } from 'vue-router'
 import { QueryClient, VueQueryPlugin } from '@tanstack/vue-query'
 import type { AccountAccessMap } from '@42for.net/2splatform.sdk'
 import { useContextStore } from '@/stores/context'
@@ -82,6 +82,8 @@ export interface AppMountOptions {
   path?: string
   scope?: { org: string; project: string; view: string }
   accessMap?: Record<string, string>
+  /** The routes of the router; one catch-all route (no params) by default. */
+  routes?: RouteRecordRaw[]
 }
 
 /**
@@ -96,7 +98,7 @@ export async function mountScreen<T extends Component>(
   const scope = options.scope ?? { org: 'acme', project: 'billing', view: 'default' }
   const router: Router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/:pathMatch(.*)*', component: { render: () => null } }],
+    routes: options.routes ?? [{ path: '/:pathMatch(.*)*', component: { render: () => null } }],
   })
   await router.push(options.path ?? `/${scope.org}/${scope.project}/${scope.view}`)
   await router.isReady()
