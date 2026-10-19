@@ -2,7 +2,8 @@
 // Modeling (424-38): the schemas, templates, export and import, deleted annotations and comparison of views of a view,
 // a tab each (modeling/{tab}). Every tab page brings its own panel and detail outlet, which must stay children of the
 // dashboard group, so for Contributors this page is only the outlet, without an element around it. Below Contributor
-// the whole page is locked, and no tab is mounted.
+// the whole page is locked, and no tab is mounted. Export & Import needs the Administrator role, and its page has a
+// lock of its own (424-66).
 const canEdit = useCan('edit')
 </script>
 
@@ -15,7 +16,7 @@ const canEdit = useCan('edit')
       <EmptyState
         icon="i-lucide-lock"
         title="Contributors only"
-        description="The schemas, the templates, the export and import, the deleted annotations and the comparison of views are available to the project's Contributors."
+        description="The schemas, the templates, the deleted annotations and the comparison of views are available to the project's Contributors, the export and the import to its Administrators."
       />
     </template>
   </UDashboardPanel>

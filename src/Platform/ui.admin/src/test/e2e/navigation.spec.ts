@@ -377,6 +377,25 @@ test('the view switcher opens Compare views of the view it compared with', async
   await expect(page.getByRole('combobox', { name: 'Compare staging with' })).toHaveText('default')
 })
 
+// Export & Import is a tab of Administrators and Owners (424-66): the Contributor of acme/shipping gets the other four,
+// in the tabs and in the command palette, and the Owner of acme/billing all five.
+test('a contributor gets the tabs of Modeling without Export & Import', async ({ page }) => {
+  await openApp(page, '/acme/shipping/default/modeling/schemas')
+  await expect(page.getByRole('tab')).toHaveText(['Schemas', 'Templates', 'Deleted', 'Compare views'])
+  await expect(modelingTab(page, 'Schemas')).toHaveAttribute('aria-selected', 'true')
+
+  const palette = page.getByPlaceholder('Search annotations, pages, projects and actions…')
+  await page.getByRole('button', { name: 'Search…' }).click()
+  await palette.fill('Export & Import')
+  await expect(page.getByRole('option', { name: /^Export & Import/ })).toHaveCount(0)
+  await page.keyboard.press('Escape')
+
+  await goto(page, `${modeling}/schemas`)
+  await page.getByRole('button', { name: 'Search…' }).click()
+  await palette.fill('Export & Import')
+  await expect(page.getByRole('option', { name: /^Export & Import/ })).toHaveCount(1)
+})
+
 // Modeling is closed below Contributor (424-38): the Reader of northwind/portal gets the lock on every tab and detail.
 test('a reader gets the lock of Modeling instead of its tabs', async ({ page }) => {
   const base = '/northwind/portal/default/modeling'

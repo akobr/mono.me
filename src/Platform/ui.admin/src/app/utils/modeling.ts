@@ -1,19 +1,32 @@
-import type { View } from '@42for.net/2splatform.sdk'
+import { hasRole, type AccountRoleName, type View } from '@42for.net/2splatform.sdk'
 import type { Scope } from '@/stores/context'
+
+interface ModelingTabEntry {
+  label: string
+  value: string
+  icon: string
+  /** Hidden below this role (424-66); the other tabs follow the lock of the whole page. */
+  minRole?: AccountRoleName
+}
 
 /** The tabs of the Modeling page of a view (424-38), in their order; each is a page below `modeling/`. */
 export const modelingTabs = [
   { label: 'Schemas', value: 'schemas', icon: 'i-lucide-braces' },
   { label: 'Templates', value: 'templates', icon: 'i-lucide-layout-template' },
-  { label: 'Export & Import', value: 'export-import', icon: 'i-lucide-arrow-down-up' },
+  { label: 'Export & Import', value: 'export-import', icon: 'i-lucide-arrow-down-up', minRole: 'Administrator' },
   { label: 'Deleted', value: 'deleted', icon: 'i-lucide-archive-restore' },
   { label: 'Compare views', value: 'compare', icon: 'i-lucide-git-compare' },
-] as const
+] as const satisfies readonly ModelingTabEntry[]
 
 export type ModelingTab = (typeof modelingTabs)[number]['value']
 
 const isModelingTab = (value: string | undefined): value is ModelingTab =>
   modelingTabs.some((tab) => tab.value === value)
+
+/** The tabs the role sees, in their order: Export & Import only from Administrator up (424-66). */
+export function modelingTabsFor(role: AccountRoleName) {
+  return modelingTabs.filter((tab: ModelingTabEntry) => !tab.minRole || hasRole(role, tab.minRole))
+}
 
 /** /{org}/{project}/{view}/modeling, or one of its tabs. */
 export function modelingPath(scope: Scope, tab?: ModelingTab): string {

@@ -4,7 +4,7 @@ import { createMemoryHistory, createRouter, RouterView, useRoute } from 'vue-rou
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { routes } from 'vue-router/auto-routes'
-import type { View } from '@42for.net/2splatform.sdk'
+import type { AccountRoleName, View } from '@42for.net/2splatform.sdk'
 import ModelingHeader from '@/components/modeling/ModelingHeader.vue'
 import { mockHandlers } from '@/mock/all-handlers'
 import ModelingPage from '@/pages/[org]/[project]/[view]/modeling.vue'
@@ -12,7 +12,7 @@ import { hasOtherView, modelingPath, modelingTab, movedToModeling } from '@/util
 import { mountScreen, settle } from '../../helpers'
 
 // The Modeling page of a view (424-38): Schemas, Templates, Export & Import, Deleted and Compare views as tabs, each a
-// page of its own below modeling/, locked below Contributor.
+// page of its own below modeling/, locked below Contributor. Export & Import is a tab from Administrator up (424-66).
 
 // the navbar needs the dashboard shell; the stand-in shows its title and what the page puts on its right
 vi.mock('@/components/shell/AppNavbar.vue', async () => {
@@ -96,8 +96,12 @@ describe('ModelingHeader', () => {
   const tab = (label: string) => tabs().find((candidate) => candidate.textContent?.trim() === label)!
   const selected = () => tabs().find((candidate) => candidate.getAttribute('aria-selected') === 'true')
 
-  async function mountHeader(path: string, project = 'billing') {
-    const view = await mountScreen(ModelingHeader, {}, { path, scope: { ...scope, project } })
+  async function mountHeader(path: string, project = 'billing', role: AccountRoleName = 'Owner') {
+    const view = await mountScreen(
+      ModelingHeader,
+      {},
+      { path, scope: { ...scope, project }, accessMap: { [`${scope.org}.${project}`]: role } },
+    )
     await settle()
     return view
   }
@@ -113,6 +117,25 @@ describe('ModelingHeader', () => {
       'Deleted',
       'Compare views',
     ])
+  })
+
+  it.each([
+    ['Contributor', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
+    ['ContributorWithSecrets', ['Schemas', 'Templates', 'Deleted', 'Compare views']],
+    ['Administrator', ['Schemas', 'Templates', 'Export & Import', 'Deleted', 'Compare views']],
+    ['Owner', ['Schemas', 'Templates', 'Export & Import', 'Deleted', 'Compare views']],
+  ] as const)('shows %s only the tabs of the role, Export & Import from Administrator up', async (role, labels) => {
+    await mountHeader('/acme/billing/default/modeling/schemas', 'billing', role)
+
+    expect(tabs().map((candidate) => candidate.textContent?.trim())).toEqual(labels)
+    expect(selected()?.textContent?.trim()).toBe('Schemas')
+  })
+
+  it('selects no tab on the locked Export & Import page of a Contributor', async () => {
+    await mountHeader('/acme/billing/default/modeling/export-import', 'billing', 'Contributor')
+
+    expect(tabs()).toHaveLength(4)
+    expect(selected()).toBeUndefined()
   })
 
   it.each([
@@ -336,6 +359,7 @@ describe('the Modeling page', () => {
     expect(document.body.querySelector('[data-navbar]')?.getAttribute('data-navbar')).toBe('Modeling')
     expect(view.host.text()).toContain('Contributors only')
     expect(view.host.text()).toContain("available to the project's Contributors")
+    expect(view.host.text()).toContain('the export and the import to its Administrators')
     expect(document.body.querySelectorAll('[role="tab"]')).toHaveLength(0)
     // no tab page is mounted, so none of their queries runs
     expect(view.inner().findComponent(RouterView).exists()).toBe(false)

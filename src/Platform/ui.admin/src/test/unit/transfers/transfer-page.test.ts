@@ -12,6 +12,7 @@ import { mockHandlers } from '@/mock/all-handlers'
 import { resetTransfers } from '@/mock/transfer-handlers'
 import { createZip, textFile } from '@/mock/zip'
 import ExportImportPage from '@/pages/[org]/[project]/[view]/modeling/export-import.vue'
+import { useSessionStore } from '@/stores/session'
 import { useTransfersStore } from '@/stores/transfers'
 import { saveBlob } from '@/utils/download'
 import { mountScreen, settle } from '../../helpers'
@@ -125,11 +126,14 @@ describe('ImportPanel', () => {
     await settle()
   }
 
-  it('tells a reader that importing needs the Contributor role', async () => {
-    const view = await mountScreen(ImportPanel, { scope }, { accessMap: { 'acme.billing': 'Reader' } })
+  // the page mounts the panel for Administrators only (424-66); the lock of the panel is a fallback
+  it('tells a Contributor that importing needs the Administrator role', async () => {
+    const view = await mountScreen(ImportPanel, { scope }, { accessMap: { 'acme.billing': 'Contributor' } })
     const root = view.inner().element as HTMLElement
 
-    expect(root.textContent).toContain('Importing needs the Contributor role')
+    expect(root.textContent).toContain('Importing needs the Administrator role')
+    expect(root.textContent).toContain('Ask an Administrator or an Owner of the project to import an archive.')
+    expect(root.textContent).not.toContain('You can export the view')
     expect(root.querySelector('input[type="file"]')).toBeNull()
     expect(button('Check', root)).toBeUndefined()
   })
@@ -361,5 +365,41 @@ describe('the Export & Import page', () => {
     expect(transfers.watched.has(started.Id!)).toBe(true)
     expect(document.body.textContent).toContain('Checked: nothing was written')
     expect(document.body.textContent).not.toContain('Checked edited.zip')
+  })
+
+  // The export and the import need the Administrator role (424-66). The mock API reads the role of its own database,
+  // where the mock user owns acme.billing, so only the page is locked here.
+  it('shows a Contributor the lock of Administrators under the other tabs, and the sections once Administrator', async () => {
+    const tabs = () => [...document.body.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent?.trim())
+    const view = await mountScreen(
+      ExportImportPage,
+      {},
+      { path: '/acme/billing/default/modeling/export-import', accessMap: { 'acme.billing': 'Contributor' } },
+    )
+    const transfers = useTransfersStore()
+    const job = await transfers.startImport(scope, archive(), { dryRun: true })
+    await settle()
+
+    expect(document.body.textContent).toContain('Administrators only')
+    expect(document.body.textContent).toContain(
+      "The export and the import of the view are available to the project's Administrators.",
+    )
+    expect(tabs()).toEqual(['Schemas', 'Templates', 'Deleted', 'Compare views'])
+    for (const section of [ExportPanel, ImportPanel, ImportResult]) {
+      expect(view.inner().findComponent(section).exists()).toBe(false)
+    }
+    // the page shows no import, so the toaster still reports this one
+    expect(transfers.watched.has(job.id)).toBe(false)
+
+    useSessionStore().setAccount({ Id: 'user_1', AccessMap: { 'acme.billing': 'Administrator' } })
+    await settle()
+
+    expect(document.body.textContent).not.toContain('Administrators only')
+    expect(tabs()).toEqual(['Schemas', 'Templates', 'Export & Import', 'Deleted', 'Compare views'])
+    expect(view.inner().findComponent(ExportPanel).exists()).toBe(true)
+    expect(view.inner().findComponent(ImportPanel).exists()).toBe(true)
+    expect(transfers.watched.has(job.id)).toBe(true)
+    await vi.waitFor(() => expect(view.inner().findComponent(ImportResult).exists()).toBe(true), { timeout: 10_000 })
+    expect(document.body.textContent).toContain('Checked: nothing was written')
   })
 })

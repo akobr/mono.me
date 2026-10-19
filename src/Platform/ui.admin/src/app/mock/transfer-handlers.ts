@@ -1213,11 +1213,13 @@ function findJob<T extends 'export' | 'import'>(kind: T, params: ScopeParams & {
 const notFound = (kind: string, id: string) =>
   errorResponse(404, `The ${kind} '${id}' does not exist or has expired.`, 'NotFound')
 
+// Every route needs the Administrator role on the project, as in the API (424-66). The seed gives the mock user no
+// Administrator role, so Owner stands in for it.
 export const transferHandlers: HttpHandler[] = [
   http.post<ScopeParams>(
     `${api}/exports`,
     withDb(async (db, { params, request }) => {
-      const denied = requireRole(db, `${params.org}.${params.project}`, 'Reader')
+      const denied = requireRole(db, `${params.org}.${params.project}`, 'Administrator')
       if (denied) {
         return denied
       }
@@ -1250,7 +1252,7 @@ export const transferHandlers: HttpHandler[] = [
   http.get<ScopeParams & { id: string }>(
     `${api}/exports/:id`,
     withDb((db, { params }) => {
-      const denied = requireRole(db, `${params.org}.${params.project}`, 'Reader')
+      const denied = requireRole(db, `${params.org}.${params.project}`, 'Administrator')
       if (denied) {
         return denied
       }
@@ -1286,7 +1288,7 @@ export const transferHandlers: HttpHandler[] = [
   http.get<ScopeParams & { id: string }>(
     `${api}/exports/:id/archive`,
     withDb((db, { params }) => {
-      const denied = requireRole(db, `${params.org}.${params.project}`, 'Reader')
+      const denied = requireRole(db, `${params.org}.${params.project}`, 'Administrator')
       if (denied) {
         return denied
       }
@@ -1313,7 +1315,7 @@ export const transferHandlers: HttpHandler[] = [
   http.post<ScopeParams>(
     `${api}/imports`,
     withDb(async (db, { params, request }) => {
-      const denied = requireRole(db, `${params.org}.${params.project}`, 'Contributor')
+      const denied = requireRole(db, `${params.org}.${params.project}`, 'Administrator')
       if (denied) {
         return denied
       }
@@ -1370,7 +1372,7 @@ export const transferHandlers: HttpHandler[] = [
   http.get<ScopeParams & { id: string }>(
     `${api}/imports/:id`,
     withDb((db, { params }) => {
-      const denied = requireRole(db, `${params.org}.${params.project}`, 'Contributor')
+      const denied = requireRole(db, `${params.org}.${params.project}`, 'Administrator')
       if (denied) {
         return denied
       }

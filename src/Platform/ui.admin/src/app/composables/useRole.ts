@@ -10,6 +10,8 @@ export const capabilityRoles = {
   machines: 'Contributor',
   secrets: 'ContributorWithSecrets',
   manageAccess: 'Administrator',
+  // the export and the import of a view (424-66)
+  transfer: 'Administrator',
   owner: 'Owner',
 } as const satisfies Record<string, AccountRoleName>
 

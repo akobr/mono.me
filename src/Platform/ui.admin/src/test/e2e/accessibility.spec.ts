@@ -83,6 +83,14 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
+    // A Contributor gets the lock of Administrators on Export & Import (424-66), under the tabs, none of them selected.
+    test('the Export & Import lock of a contributor has no serious accessibility violations', async ({ page }) => {
+      await openApp(page, '/acme/shipping/default/modeling/export-import')
+      await expect(page.getByRole('heading', { name: 'Administrators only' })).toBeVisible()
+      await expect(page.getByRole('tab')).toHaveCount(4)
+      await expectAccessible(page)
+    })
+
     test('onboarding has no serious accessibility violations', async ({ page }) => {
       await openApp(page, '/onboarding', 'new-user')
       await expectAccessible(page)
