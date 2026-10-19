@@ -35,6 +35,7 @@ const items = computed(() =>
     disabled: tab.value === 'compare' && views.isSuccess.value && !hasOtherView(views.data.value, context.view),
   })),
 )
+const tabKeys = computed(() => items.value.map((item) => item.value).join())
 
 const tabs = useTemplateRef<ComponentPublicInstance>('tabs')
 const tabList = () => tabs.value?.$el as HTMLElement | undefined
@@ -82,7 +83,17 @@ onMounted(() => {
     </template>
   </AppNavbar>
   <UDashboardToolbar>
-    <!-- every activation is a navigation, so the arrow keys only move the focus -->
-    <UTabs ref="tabs" v-model="tab" :items="items" :content="false" variant="link" size="sm" activation-mode="manual" />
+    <!-- Every activation is a navigation, so the arrow keys only move the focus. New tabs for a new set of tabs: when the
+    role loses Export & Import on its page, no tab is selected, and the underline would stay where that tab was. -->
+    <UTabs
+      ref="tabs"
+      :key="tabKeys"
+      v-model="tab"
+      :items="items"
+      :content="false"
+      variant="link"
+      size="sm"
+      activation-mode="manual"
+    />
   </UDashboardToolbar>
 </template>
