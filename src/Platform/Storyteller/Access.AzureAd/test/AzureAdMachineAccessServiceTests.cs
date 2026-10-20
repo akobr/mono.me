@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
@@ -15,6 +16,8 @@ public class AzureAdMachineAccessServiceTests
 {
     private const string ReadRole = "008029ec-407f-48b2-8618-f38b8e03eebf";
     private const string ReadWriteRole = "6eb2cfb3-a936-4077-8a58-620896871d32";
+    private const string TransferRole = "1b2c3d4e-5f60-4718-892a-0b1c2d3e4f50";
+    private const string SchemaWriteRole = "9a8b7c6d-5e4f-4321-8fed-cba987654321";
     private const string MachineSp = "2f4b1c5e-0d6a-4f3e-9b8a-1c2d3e4f5a6b";
     private const string ApiSp = "7a8b9c0d-1e2f-4a3b-8c4d-5e6f7a8b9c0d";
 
@@ -43,7 +46,9 @@ public class AzureAdMachineAccessServiceTests
         access.CredentialKind.ShouldBe(MachineCredentialKind.ClientCredentials);
         access.TokenEndpoint.ShouldBe("https://login.microsoftonline.com/machine-tenant/oauth2/v2.0/token");
         access.TokenScope.ShouldBe("api://api-client/.default");
+        access.ManagementScopes.ShouldBeNull();
 
+        // The management roles are configured, but this machine asks for none of them.
         _graph.Requests.Select(request => $"{request.Method} {request.PathAndQuery.Split('?')[0]}").ShouldBe(
             [
                 "POST /v1.0/applications",
@@ -58,7 +63,7 @@ public class AzureAdMachineAccessServiceTests
         application.RootElement.GetProperty("notes").GetString().ShouldBe($"organization=org1|project=proj1|scope={scope:G}|annotation=sbt.payments");
         var resourceAccess = application.RootElement.GetProperty("requiredResourceAccess")[0];
         resourceAccess.GetProperty("resourceAppId").GetString().ShouldBe("api-client");
-        resourceAccess.GetProperty("resourceAccess")[0].GetProperty("id").GetString().ShouldBe(roleId);
+        resourceAccess.GetProperty("resourceAccess").EnumerateArray().Select(role => role.GetProperty("id").GetString()).ShouldBe([roleId]);
 
         _graph.Requests[3].PathAndQuery.ShouldContain("$filter=appId eq 'api-client'");
 
@@ -66,6 +71,56 @@ public class AzureAdMachineAccessServiceTests
         assignment.RootElement.GetProperty("principalId").GetString().ShouldBe(MachineSp);
         assignment.RootElement.GetProperty("resourceId").GetString().ShouldBe(ApiSp);
         assignment.RootElement.GetProperty("appRoleId").GetString().ShouldBe(roleId);
+    }
+
+    [Fact]
+    public async Task Create_WithManagementScopes_AssignsTheirRolesAfterTheRuntimeRole()
+    {
+        StubCreate();
+
+        var access = await CreateService().CreateMachineAccessAsync(new MachineAccessCreate
+        {
+            Organization = "org1",
+            Project = "proj1",
+            Scope = MachineAccessScope.ConfigurationReadWrite,
+            ManagementScopes = [MachineManagementScope.SchemaWrite, MachineManagementScope.ConfigurationTransfer],
+        });
+
+        // The Scope collapse stays; the management scopes are kept as requested.
+        access.Scope.ShouldBe(MachineAccessScope.DefaultReadWrite);
+        access.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite]);
+
+        using var application = JsonDocument.Parse(_graph.Requests[0].Body!);
+        application.RootElement.GetProperty("notes").GetString().ShouldBe("organization=org1|project=proj1|scope=ConfigurationReadWrite|manage=ConfigurationTransfer,SchemaWrite");
+        application.RootElement.GetProperty("requiredResourceAccess").GetArrayLength().ShouldBe(1);
+        application.RootElement.GetProperty("requiredResourceAccess")[0].GetProperty("resourceAccess").EnumerateArray()
+            .Select(role => (role.GetProperty("id").GetString(), role.GetProperty("type").GetString()))
+            .ShouldBe([(ReadWriteRole, "Role"), (TransferRole, "Role"), (SchemaWriteRole, "Role")]);
+
+        var assignments = _graph.Requests
+            .Where(request => request.PathAndQuery == $"/v1.0/servicePrincipals/{MachineSp}/appRoleAssignments")
+            .Select(request => JsonNode.Parse(request.Body!)!)
+            .ToList();
+        assignments.Select(assignment => (string?)assignment["appRoleId"]).ShouldBe([ReadWriteRole, TransferRole, SchemaWriteRole]);
+        assignments.ShouldAllBe(assignment => (string?)assignment["principalId"] == MachineSp && (string?)assignment["resourceId"] == ApiSp);
+    }
+
+    [Fact]
+    public async Task Create_ManagementRoleNotConfigured_FailsBeforeCallingGraph()
+    {
+        StubCreate();
+
+        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => CreateService().CreateMachineAccessAsync(new MachineAccessCreate
+        {
+            Organization = "org1",
+            Project = "proj1",
+            Scope = MachineAccessScope.DefaultReadWrite,
+            ManagementScopes = [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.KeyValueManage],
+        }));
+
+        exception.Message.ShouldBe(
+            "Machines with the management scope KeyValue.Manage need the app role Auth:AppRoles:KeyValueManage, which this deployment does not configure.");
+        _graph.Requests.ShouldBeEmpty();
     }
 
     [Fact]
@@ -156,6 +211,8 @@ public class AzureAdMachineAccessServiceTests
                 {
                     [AzureAdMachineAccessService.ReadRoleKey] = ReadRole,
                     [AzureAdMachineAccessService.ReadWriteRoleKey] = ReadWriteRole,
+                    ["ConfigurationTransfer"] = TransferRole,
+                    ["SchemaWrite"] = SchemaWriteRole,
                 },
             }),
             Options.Create(new AzureAdMachineAccessOptions { TenantId = "machine-tenant" }));
