@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO.Abstractions;
+using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Authentication;
@@ -44,6 +45,9 @@ public class MachineCreateCommand : BaseContextCommand
     [Option("-w|--write", CommandOptionType.NoValue, Description = "Scope will be read and write.")]
     public bool IsScopeReadWrite { get; set; }
 
+    [Option("-m|--manage", CommandOptionType.MultipleValue, ValueName = "scope", Description = "A management scope to grant: " + ManagementScopes.Names + ". Repeat it or separate the values with commas. Needs the Administrator role; never part of -r or -w.")]
+    public string[]? ManagementScope { get; set; }
+
     [Option("-k|--credential-kind", CommandOptionType.SingleValue, Description = "One of the kinds the project enables: " + CredentialKinds.Names + ". Default: the project's default kind.")]
     public string? CredentialKind { get; set; }
 
@@ -71,6 +75,29 @@ public class MachineCreateCommand : BaseContextCommand
     [Option("--rules-file", CommandOptionType.SingleValue, Description = "Federated: a JSON file with an array of rules ({ Issuer, Audience, Subject, Claims }) instead of --issuer, --audience and --subject.")]
     public string? RulesFile { get; set; }
 
+    // The created machine as it is printed, without the certificate and its password. The anonymous object loses the SDK's
+    // StringEnumConverter, so the management scopes are turned into their names here.
+    internal static object Describe(_42.Platform.Storyteller.Sdk.MachineAccess machine)
+    {
+        return new
+        {
+            machine.Id,
+            machine.ObjectId,
+            machine.AccessKey,
+            machine.Scope,
+            ManagementScopes = machine.ManagementScopes?.Select(scope => scope.ToString()).ToList(),
+            machine.AnnotationKey,
+            machine.CredentialKind,
+            machine.CertificateThumbprint,
+            machine.CertificateLifetimeDays,
+            machine.CertificateNotAfter,
+            machine.LastRenewalAt,
+            machine.UsesSharedCertificate,
+            Certificate = string.IsNullOrEmpty(machine.Certificate) ? null : "[written to file]",
+            CertificatePassword = string.IsNullOrEmpty(machine.CertificatePassword) ? null : "[see below]",
+        };
+    }
+
     protected override async Task<int> ExecuteAsync()
     {
         if (!string.IsNullOrWhiteSpace(AnnotationKey))
@@ -89,6 +116,12 @@ public class MachineCreateCommand : BaseContextCommand
             }
 
             credentialKind = kind;
+        }
+
+        if (!ManagementScopes.TryParse(ManagementScope, out var managementScopes, out var unknownScope))
+        {
+            Console.WriteImportant($"Unknown management scope '{unknownScope}'. Use {ManagementScopes.Names}.");
+            return ExitCodes.ERROR_WRONG_INPUT;
         }
 
         var ruleOptions = new FederationRuleOptions(FederationIssuer, FederationAudience, FederationSubject, FederationClaims, RulesFile);
@@ -155,6 +188,9 @@ public class MachineCreateCommand : BaseContextCommand
                     CertificateLifetimeDays = UseSharedCertificate || federationRules is not null ? null : LifetimeDays,
                     UseSharedCertificate = UseSharedCertificate ? true : null,
                     FederationRules = federationRules,
+
+                    // Null without --manage: the member is left out and the machine gets no management scope.
+                    ManagementScopes = managementScopes,
                 });
         }
         catch (ApiException exception)
@@ -163,22 +199,7 @@ public class MachineCreateCommand : BaseContextCommand
             return Console.WriteApiError(exception);
         }
 
-        Console.WriteJson(new
-        {
-            machine.Id,
-            machine.ObjectId,
-            machine.AccessKey,
-            machine.Scope,
-            machine.AnnotationKey,
-            machine.CredentialKind,
-            machine.CertificateThumbprint,
-            machine.CertificateLifetimeDays,
-            machine.CertificateNotAfter,
-            machine.LastRenewalAt,
-            machine.UsesSharedCertificate,
-            Certificate = string.IsNullOrEmpty(machine.Certificate) ? null : "[written to file]",
-            CertificatePassword = string.IsNullOrEmpty(machine.CertificatePassword) ? null : "[see below]",
-        });
+        Console.WriteJson(Describe(machine));
         Console.WriteLine();
 
         string? certificatePath = null;

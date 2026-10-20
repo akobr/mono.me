@@ -61,6 +61,47 @@ public class MachineListAndResetCommandTests
     }
 
     [Fact]
+    public async Task List_ShowsTheManagementScopeStringsInTheLastColumn()
+    {
+        _accessApi
+            .Setup(api => api.GetMachineAccessesAsync("org1", "proj1"))
+            .ReturnsAsync(new List<MachineAccess>
+            {
+                new() { Id = "m-sync", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scope = MachineAccessScope.DefaultReadWrite, ManagementScopes = [MachineManagementScope.ConfigurationTransfer] },
+                new()
+                {
+                    Id = "m-all",
+                    AccessKey = "2s.***",
+                    CredentialKind = MachineAccessCredentialKind.ApiKey,
+                    Scope = MachineAccessScope.DefaultReadWrite,
+                    ManagementScopes =
+                    [
+                        MachineManagementScope.ConfigurationTransfer,
+                        MachineManagementScope.SchemaWrite,
+                        MachineManagementScope.TemplateWrite,
+                        MachineManagementScope.AnnotationManage,
+                        MachineManagementScope.KeyValueManage,
+                    ],
+                },
+                new() { Id = "m-runtime", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scope = MachineAccessScope.DefaultRead },
+                new() { Id = "m-empty", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scope = MachineAccessScope.DefaultRead, ManagementScopes = [] },
+            });
+
+        var exitCode = await new MachineListCommand(_console.Object, _context.Object, _accessApi.Object).OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        var table = _console.Tables.ShouldHaveSingleItem();
+        table.Headers.ShouldBe(["Id", "Role", "Kind", "Secret", "RestrictionTo", "Management"]);
+        table.Rows.Select(row => (row[0], row[1], row[^1])).ShouldBe(
+        [
+            ("m-sync", "DefaultReadWrite", "Configuration.Transfer"),
+            ("m-all", "DefaultReadWrite", "Configuration.Transfer, Schema.Write, Template.Write, Annotation.Manage, KeyValue.Manage"),
+            ("m-runtime", "DefaultRead", string.Empty),
+            ("m-empty", "DefaultRead", string.Empty),
+        ]);
+    }
+
+    [Fact]
     public async Task Reset_OfAFederatedMachine_PrintsTheServerMessage()
     {
         // ResetMachineAccess declares no 400, so the body arrives as text.

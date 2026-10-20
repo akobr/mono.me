@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using _42.Platform.Cli.Authentication;
@@ -10,6 +11,8 @@ using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.MachineAccess;
 using _42.Platform.Cli.Configuration;
 using _42.Platform.Storyteller.Sdk;
+using McMaster.Extensions.CommandLineUtils;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Moq;
 using Shouldly;
@@ -305,6 +308,141 @@ public class MachineCreateCommandTests
         ]);
     }
 
+    [Theory]
+    [InlineData("ConfigurationTransfer", MachineManagementScope.ConfigurationTransfer)]
+    [InlineData("Configuration.Transfer", MachineManagementScope.ConfigurationTransfer)]
+    [InlineData("configuration-transfer", MachineManagementScope.ConfigurationTransfer)]
+    [InlineData("CONFIGURATION.TRANSFER", MachineManagementScope.ConfigurationTransfer)]
+    [InlineData(" configurationtransfer ", MachineManagementScope.ConfigurationTransfer)]
+    [InlineData("schema.write", MachineManagementScope.SchemaWrite)]
+    [InlineData("template-write", MachineManagementScope.TemplateWrite)]
+    [InlineData("Annotation.Manage", MachineManagementScope.AnnotationManage)]
+    [InlineData("KeyValue.Manage", MachineManagementScope.KeyValueManage)]
+    [InlineData("key-value-manage", MachineManagementScope.KeyValueManage)]
+    [InlineData("keyvalue-manage", MachineManagementScope.KeyValueManage)]
+    public async Task ManagementScope_InEverySpelling_IsSentByItsName(string value, MachineManagementScope expected)
+    {
+        var bodies = CapturesTheBodies();
+
+        var exitCode = await Execute(managementScopes: [value]);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        bodies.ShouldHaveSingleItem().ManagementScopes.ShouldBe([expected]);
+        Newtonsoft.Json.JsonConvert.SerializeObject(bodies[0]).ShouldContain($"\"ManagementScopes\":[\"{expected}\"]");
+    }
+
+    [Fact]
+    public async Task ManagementScopes_RepeatedOrCommaSeparated_AreSentOnceInEnumOrder()
+    {
+        var bodies = CapturesTheBodies();
+
+        var exitCode = await Execute(managementScopes: ["key-value-manage, Schema.Write", "ConfigurationTransfer,,", "schemawrite"]);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        bodies.ShouldHaveSingleItem().ManagementScopes.ShouldBe(
+            [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite, MachineManagementScope.KeyValueManage]);
+    }
+
+    [Fact]
+    public async Task WithoutManagementScopes_SendsNoMember()
+    {
+        var bodies = CapturesTheBodies();
+
+        await Execute();
+
+        bodies.ShouldHaveSingleItem().ManagementScopes.ShouldBeNull();
+        Newtonsoft.Json.JsonConvert.SerializeObject(bodies[0]).ShouldNotContain("ManagementScopes");
+    }
+
+    [Fact]
+    public async Task ManagementScopeOption_NamingNoScope_SendsNoMember()
+    {
+        var bodies = CapturesTheBodies();
+
+        var exitCode = await Execute(managementScopes: [",", " "]);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        Newtonsoft.Json.JsonConvert.SerializeObject(bodies.ShouldHaveSingleItem()).ShouldNotContain("ManagementScopes");
+    }
+
+    [Theory]
+    [InlineData("transfer", "transfer")]
+    [InlineData("SchemaWrite,Schema.Read", "Schema.Read")]
+    [InlineData("0", "0")]
+    [InlineData("ConfigurationTransfer;SchemaWrite", "ConfigurationTransfer;SchemaWrite")]
+    [InlineData("Default.ReadWrite", "Default.ReadWrite")]
+    public async Task UnknownManagementScope_NamesTheScopesAndFailsWithoutCallingTheServer(string value, string unknown)
+    {
+        var exitCode = await Execute(managementScopes: [value]);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _console.Lines.ShouldContain(
+            $"! Unknown management scope '{unknown}'. Use ConfigurationTransfer, SchemaWrite, TemplateWrite, AnnotationManage or KeyValueManage.");
+        _accessApi.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task ManagementScopeOption_ParsedFromTheArguments_IsSent()
+    {
+        var bodies = CapturesTheBodies();
+        var app = Application();
+
+        var exitCode = await app.ExecuteAsync(["-m", "configuration-transfer,Template.Write", "--manage", "AnnotationManage", "-w"]);
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        app.Model.ManagementScope.ShouldBe(["configuration-transfer,Template.Write", "AnnotationManage"]);
+        var body = bodies.ShouldHaveSingleItem();
+        body.ManagementScopes.ShouldBe(
+            [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.TemplateWrite, MachineManagementScope.AnnotationManage]);
+        body.Scope.ShouldBe(MachineAccessCreateScope.DefaultReadWrite);
+    }
+
+    [Fact]
+    public void ManagementScopeOption_IsMissingByDefault()
+    {
+        var app = Application();
+
+        app.Parse();
+
+        app.Model.ManagementScope.ShouldBeNull();
+    }
+
+    [Fact]
+    public void ManagementScopeHelp_NamesTheScopesAndTheAdministratorRole()
+    {
+        var option = typeof(MachineCreateCommand)
+            .GetProperty(nameof(MachineCreateCommand.ManagementScope))!
+            .GetCustomAttribute<OptionAttribute>()!;
+
+        option.Template.ShouldBe("-m|--manage");
+        option.OptionType.ShouldBe(CommandOptionType.MultipleValue);
+        option.Description.ShouldBe(
+            "A management scope to grant: ConfigurationTransfer, SchemaWrite, TemplateWrite, AnnotationManage or KeyValueManage."
+            + " Repeat it or separate the values with commas. Needs the Administrator role; never part of -r or -w.");
+    }
+
+    [Fact]
+    public void PrintedMachine_NamesItsManagementScopes()
+    {
+        var printed = MachineCreateCommand.Describe(new MachineAccess
+        {
+            Id = "m1",
+            ManagementScopes = [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.KeyValueManage],
+        });
+
+        Newtonsoft.Json.JsonConvert.SerializeObject(printed).ShouldContain("\"ManagementScopes\":[\"ConfigurationTransfer\",\"KeyValueManage\"]");
+    }
+
+    [Fact]
+    public void PrintedMachine_WithoutManagementScopes_LeavesTheMemberOut()
+    {
+        var printed = MachineCreateCommand.Describe(new MachineAccess { Id = "m1" });
+
+        // As sform's default settings print it (Startup.ConfigureApplication).
+        Newtonsoft.Json.JsonConvert.SerializeObject(printed, new Newtonsoft.Json.JsonSerializerSettings { NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore })
+            .ShouldNotContain("ManagementScopes");
+    }
+
     private List<string> PipelineVariables()
     {
         return _console.Lines
@@ -326,7 +464,23 @@ public class MachineCreateCommandTests
         return _console.Lines.Single(line => line.TrimStart().StartsWith(start));
     }
 
-    private Task<int> Execute(string? credentialKind = null, int? lifetimeDays = null, bool useSharedCertificate = false, IFileSystem? fileSystem = null)
+    // The bodies of the create requests; the server answers with an API key machine.
+    private List<MachineAccessCreate> CapturesTheBodies()
+    {
+        var bodies = new List<MachineAccessCreate>();
+        _accessApi
+            .Setup(api => api.CreateMachineAccessAsync("org1", "proj1", It.IsAny<MachineAccessCreate>()))
+            .Callback((string _, string _, MachineAccessCreate body) => bodies.Add(body))
+            .ReturnsAsync(new MachineAccess { Id = "m1", AccessKey = "api-key", CredentialKind = MachineAccessCredentialKind.ApiKey });
+        return bodies;
+    }
+
+    private Task<int> Execute(
+        string? credentialKind = null,
+        int? lifetimeDays = null,
+        bool useSharedCertificate = false,
+        IFileSystem? fileSystem = null,
+        string[]? managementScopes = null)
     {
         var command = new MachineCreateCommand(
             _console.Object,
@@ -339,8 +493,25 @@ public class MachineCreateCommandTests
             CredentialKind = credentialKind,
             LifetimeDays = lifetimeDays,
             UseSharedCertificate = useSharedCertificate,
+            ManagementScope = managementScopes,
         };
 
         return command.OnExecuteAsync();
+    }
+
+    // The command as sform builds it, so the options are parsed from the arguments.
+    private CommandLineApplication<MachineCreateCommand> Application()
+    {
+        var services = new ServiceCollection()
+            .AddSingleton(_console.Object)
+            .AddSingleton(_context.Object)
+            .AddSingleton(_accessApi.Object)
+            .AddSingleton(Mock.Of<IFileSystem>())
+            .AddSingleton(_authentication.Object)
+            .AddSingleton(Options.Create(new GeneralOptions { BaseUrl = ApiUrl, UserAgent = "test" }))
+            .BuildServiceProvider();
+        var app = new CommandLineApplication<MachineCreateCommand>();
+        app.Conventions.UseDefaultConventions().UseConstructorInjection(services);
+        return app;
     }
 }
