@@ -114,6 +114,28 @@ public class StorytellerReadCommandsTests
     }
 
     [Fact]
+    public async Task Restore_WithoutTheManagementScope_ReportsTheEarlierRequestsAndTheServerMessage()
+    {
+        var keys = Enumerable.Range(0, 150).Select(index => $"sbt.s{index}").ToArray();
+        _fixture.Api
+            .SetupSequence(api => api.RestoreAnnotationsAsync("org1", "proj1", "default", It.IsAny<AnnotationRestoreRequest>()))
+            .ReturnsAsync(new AnnotationRestoreResult { Annotations = [AnnotationCommandFixture.Active("sbt.s0")], CreatedKeys = [], Failed = [] })
+            .ThrowsAsync(AnnotationCommandFixture.MissingManagementScope("Annotation.Manage"));
+
+        var command = new StorytellerRestoreCommand(_fixture.Console.Object, _fixture.Context.Object, _fixture.Api.Object)
+        {
+            AnnotationKeys = keys,
+        };
+
+        var exitCode = await command.OnExecuteAsync();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _fixture.Console.Lines.ShouldContain("- sbt.s0");
+        _fixture.Console.Lines.ShouldContain($"! {AnnotationCommandFixture.MissingManagementScopeMessage("Annotation.Manage")}");
+        _fixture.Console.Lines.ShouldContain("Error code: AccessDenied");
+    }
+
+    [Fact]
     public async Task History_OfAPurgedKey_AnswersNotFound()
     {
         _fixture.Api

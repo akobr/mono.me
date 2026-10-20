@@ -206,6 +206,11 @@ public class StorytellerSetCommand : BaseContextCommand
             Console.WriteLine(e.GetErrorMessage());
             return e.StatusCode == (int)HttpStatusCode.BadRequest ? ExitCodes.ERROR_WRONG_INPUT : ExitCodes.ERROR_CRASH;
         }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
+        {
+            // for example the restore of --restore-deleted by a machine without the management scope Annotation.Manage
+            return Console.WriteApiError(e);
+        }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             Console.WriteLine($"Error occurred: {e.Message}");

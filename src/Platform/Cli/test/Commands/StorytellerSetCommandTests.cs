@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.Linq;
@@ -129,6 +130,23 @@ public class StorytellerSetCommandTests
         exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
         _fixture.Console.Lines.ShouldContain("Too many annotation keys.");
         _calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DeletedKey_WithRestoreDeletedAndWithoutTheManagementScope_PrintsTheServerMessageAndWritesNothing()
+    {
+        DeletedAmong(Key);
+        _fixture.Api
+            .Setup(api => api.RestoreAnnotationsAsync("org1", "proj1", "default", It.IsAny<AnnotationRestoreRequest>()))
+            .ThrowsAsync(AnnotationCommandFixture.MissingManagementScope("Annotation.Manage"));
+
+        var exitCode = await Execute(restoreDeleted: true);
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _calls.ShouldBeEmpty();
+        _fixture.Console.Lines.ShouldContain($"! {AnnotationCommandFixture.MissingManagementScopeMessage("Annotation.Manage")}");
+        _fixture.Console.Lines.ShouldContain("Error code: AccessDenied");
+        _fixture.Console.Lines.ShouldNotContain(line => line.StartsWith("Error occurred", StringComparison.Ordinal));
     }
 
     [Fact]

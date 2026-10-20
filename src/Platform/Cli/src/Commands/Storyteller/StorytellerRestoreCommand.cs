@@ -72,6 +72,13 @@ public class StorytellerRestoreCommand : BaseContextCommand
                 Console.WriteLine(e.GetErrorMessage());
                 return ExitCodes.ERROR_WRONG_INPUT;
             }
+            catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
+            {
+                // for example a machine without the management scope Annotation.Manage: the server names it
+                WriteRestored(restored, created);
+                WriteFailed(failed);
+                return Console.WriteApiError(e);
+            }
 
             restored.AddRange(result.Annotations ?? []);
             created.UnionWith(result.CreatedKeys ?? []);
