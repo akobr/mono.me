@@ -249,7 +249,7 @@ public class FederationHttp
     }
 
     [Function(nameof(PutMachineFederationRules))]
-    [OpenApiOperation(Definitions.RouteIds.Access.SetMachineFederationRules, Definitions.Tags.Access, Description = "Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor.")]
+    [OpenApiOperation(Definitions.RouteIds.Access.SetMachineFederationRules, Definitions.Tags.Access, Description = "Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; Administrator for a machine with management scopes.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -261,6 +261,7 @@ public class FederationHttp
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine access doesn't exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine was changed concurrently while its rules were replaced (ErrorCode Conflict); reload it and retry.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutMachineFederationRules(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.MachineFederationRules)]

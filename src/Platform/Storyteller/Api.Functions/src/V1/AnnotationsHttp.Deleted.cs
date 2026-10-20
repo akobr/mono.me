@@ -128,6 +128,7 @@ public partial class AnnotationsHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationRestoreResult), Description = "The restored and created annotations, ancestors first, and the keys that failed.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No keys, more than 100 keys, or an invalid key (InvalidKey).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> RestoreAnnotations(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Annotations.V1.DeletedRestore)]
@@ -140,7 +141,7 @@ public partial class AnnotationsHttp
         var (model, invalidBody) = await request.ReadJsonBodyAsync<AnnotationRestoreRequest>(_bodyJsonOptions, "an annotation restore request", RequestBodyLimits.AnnotationKeys, ErrorCodes.InvalidKey);
 
         // The keys of the body are authorized before any 400 of the body; a body that cannot be read names no key.
-        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Contributor);
+        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Contributor, MachineManagementScope.AnnotationManage);
 
         if (invalidBody is not null)
         {

@@ -398,6 +398,7 @@ public partial class AnnotationsHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(List<Annotation>), Description = "The created annotations, with the ancestors created for them; existing keys are skipped.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetAnnotations(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Annotations.V1.Annotations)]
@@ -412,7 +413,7 @@ public partial class AnnotationsHttp
         // The keys of the body are authorized before any 400 of the body, so a caller without access gets 403 first.
         // A body that cannot be read names no key, which the restriction of a machine lets through to the 400.
         var keys = (annotations ?? []).Where(a => a is not null).Select(a => a.AnnotationKey);
-        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, keys, AccountRole.Contributor);
+        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, keys, AccountRole.Contributor, MachineManagementScope.AnnotationManage);
 
         if (invalidBody is not null)
         {
@@ -461,6 +462,7 @@ public partial class AnnotationsHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(List<Annotation>), Description = "The created annotations, with the ancestors created for them; existing keys are skipped.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetAnnotationsSimple(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Annotations.V1.AnnotationsSimple)]
@@ -470,7 +472,7 @@ public partial class AnnotationsHttp
         string view)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.AnnotationManage);
         var (annotations, invalidBody) = await request.ReadJsonBodyAsync<List<string>>(_bodyJsonOptions, "a list of annotation keys or lines", RequestBodyLimits.AnnotationKeys);
 
         if (invalidBody is not null)
@@ -506,6 +508,7 @@ public partial class AnnotationsHttp
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConcurrentChange)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteAnnotation(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.Annotations.V1.Annotation)]
@@ -516,7 +519,7 @@ public partial class AnnotationsHttp
         string key)
     {
         request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor, MachineManagementScope.AnnotationManage);
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {

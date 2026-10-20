@@ -110,6 +110,7 @@ public class TemplateHttp
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The template was changed concurrently too many times, the request can be repeated.")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetTemplate(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Definitions.Methods.Put, Route = Definitions.Routes.Template.V1.Template)]
@@ -120,7 +121,7 @@ public class TemplateHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.TemplateWrite);
 
         if (!AnnotationTypeValidation.TryValidate(annotationType, _logger, out var badRequestResult))
         {
@@ -184,6 +185,7 @@ public class TemplateHttp
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The template was changed concurrently too many times, the request can be repeated.")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponsePreconditionFailed)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PatchTemplate(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Patch, Route = Definitions.Routes.Template.V1.Template)]
@@ -194,7 +196,7 @@ public class TemplateHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.TemplateWrite);
 
         if (!AnnotationTypeValidation.TryValidate(annotationType, _logger, out var badRequestResult))
         {
@@ -260,6 +262,7 @@ public class TemplateHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The template was changed concurrently too many times, the request can be repeated.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteTemplate(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.Template.V1.Template)]
@@ -270,7 +273,7 @@ public class TemplateHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.TemplateWrite);
 
         if (!AnnotationTypeValidation.TryValidate(annotationType, _logger, out var badRequestResult))
         {

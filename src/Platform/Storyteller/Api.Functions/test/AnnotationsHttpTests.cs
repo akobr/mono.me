@@ -32,6 +32,15 @@ public class AnnotationsHttpTests
 
     private static readonly DateTimeOffset Now = new(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
 
+    // The annotation operations a machine needs Annotation.Manage for.
+    public static TheoryData<string> ManagementOperations => new()
+    {
+        nameof(AnnotationsHttp.SetAnnotations),
+        nameof(AnnotationsHttp.SetAnnotationsSimple),
+        nameof(AnnotationsHttp.DeleteAnnotation),
+        nameof(AnnotationsHttp.RestoreAnnotations),
+    };
+
     [Theory]
     [InlineData("POST")]
     [InlineData("PUT")]
@@ -550,6 +559,60 @@ public class AnnotationsHttpTests
         annotations.Calls.ShouldBe(["purge:acme:sbt.a"]);
     }
 
+    // Bulk create, soft delete (it cascades to the descendants) and restore need the management scope Annotation.Manage
+    // from a machine (424-57), checked with the machine document in every build. Without it, the machine is refused
+    // (403 AccessDenied) before any service call; SetAnnotation, one annotation at a time, stays a runtime write.
+    [Theory]
+    [MemberData(nameof(ManagementOperations))]
+    public async Task ManagementOperation_ByAMachineWithTheRuntimeScopesOnly_IsAccessDeniedBeforeTheService(string operation)
+    {
+        var annotations = new RecordingAnnotations();
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => CallManagement(MachineHttp(annotations, managementScopes: null), operation, MachineRequest(operation)));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the management scope Annotation.Manage, which the machine was not created with.");
+        annotations.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [MemberData(nameof(ManagementOperations))]
+    public async Task ManagementOperation_ByAMachineWithAnnotationManage_ReachesTheService(string operation)
+    {
+        var annotations = new RecordingAnnotations();
+        MachineManagementScope[] manage = [MachineManagementScope.AnnotationManage];
+
+        var result = await CallManagement(MachineHttp(annotations, manage), operation, MachineRequest(operation, manage));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        annotations.Calls.ShouldHaveSingleItem();
+    }
+
+    [Fact]
+    public async Task SetAnnotation_ByAMachineWithTheRuntimeScopesOnly_StaysARuntimeWrite()
+    {
+        var annotations = new RecordingAnnotations();
+        var request = KeyValueRequests.Machine(mtls: false, "PUT", body: SubjectJson, roles: [Scopes.Annotation.Read, Scopes.Annotation.Write]);
+
+        var result = await MachineHttp(annotations, managementScopes: null).SetAnnotation(request, "acme", "billing", "default", "sbt.northwind");
+
+        result.ShouldBeOfType<OkObjectResult>();
+        annotations.Calls.ShouldBe(["set:acme:sbt.northwind"]);
+    }
+
+    // Users never need a management scope; their role decides, as before.
+    [Theory]
+    [MemberData(nameof(ManagementOperations))]
+    public async Task ManagementOperation_ByAUser_NeedsNoManagementScope(string operation)
+    {
+        var annotations = new RecordingAnnotations();
+
+        var result = await CallManagement(Http(annotations), operation, Request(ManagementMethod(operation), ManagementBody(operation)));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        annotations.Calls.ShouldHaveSingleItem();
+    }
+
     [Fact]
     public async Task History_OfUnknownKey_Answers404()
     {
@@ -561,6 +624,46 @@ public class AnnotationsHttpTests
     private static AnnotationsHttp Http(RecordingAnnotations annotations)
     {
         return new AnnotationsHttp(annotations, new ContributorAccess(), new FixedTime(Now), FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
+    }
+
+    // The machine of the project has the given management scopes.
+    private static AnnotationsHttp MachineHttp(RecordingAnnotations annotations, IReadOnlyList<MachineManagementScope>? managementScopes)
+    {
+        return new AnnotationsHttp(annotations, new RoleAccess(AccountRole.None, managementScopes: managementScopes), new FixedTime(Now), FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
+    }
+
+    // A machine with the runtime scopes of annotations, and the given management scopes in its credentials.
+    private static TestHttpRequestData MachineRequest(string operation, IReadOnlyList<MachineManagementScope>? managementScopes = null)
+    {
+        return KeyValueRequests.Machine(mtls: false, ManagementMethod(operation), body: ManagementBody(operation), managementScopes: managementScopes, roles: [Scopes.Annotation.Read, Scopes.Annotation.Write]);
+    }
+
+    private static Task<IActionResult> CallManagement(AnnotationsHttp http, string operation, TestHttpRequestData request)
+    {
+        return operation switch
+        {
+            nameof(AnnotationsHttp.SetAnnotations) => http.SetAnnotations(request, "acme", "billing", "default"),
+            nameof(AnnotationsHttp.SetAnnotationsSimple) => http.SetAnnotationsSimple(request, "acme", "billing", "default"),
+            nameof(AnnotationsHttp.DeleteAnnotation) => http.DeleteAnnotation(request, "acme", "billing", "default", "sbt.northwind"),
+            nameof(AnnotationsHttp.RestoreAnnotations) => http.RestoreAnnotations(request, "acme", "billing", "default"),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null),
+        };
+    }
+
+    private static string ManagementMethod(string operation)
+    {
+        return operation == nameof(AnnotationsHttp.DeleteAnnotation) ? "DELETE" : "POST";
+    }
+
+    private static string? ManagementBody(string operation)
+    {
+        return operation switch
+        {
+            nameof(AnnotationsHttp.SetAnnotations) => $"[{SubjectJson}]",
+            nameof(AnnotationsHttp.SetAnnotationsSimple) => FunctionTestDoubles.ToJsonBody<List<string>>(["sbt.northwind"]),
+            nameof(AnnotationsHttp.RestoreAnnotations) => """{ "Keys": ["sbt.northwind"] }""",
+            _ => null,
+        };
     }
 
     // Every list endpoint and the descendants, called with the two include flags.

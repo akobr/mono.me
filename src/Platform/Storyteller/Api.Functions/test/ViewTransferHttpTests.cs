@@ -517,11 +517,74 @@ public class ViewTransferHttpTests
         await ShouldPassEveryRoute(Http(checksScopes: true, role: role), machine: false);
     }
 
-    // A machine has no role, and the double has none for it either: the scopes of the included kinds decide, in every build.
+    // A machine has no role, and the double has none for it either: the scopes of the included kinds and the management
+    // scope Configuration.Transfer decide.
     [Fact]
     public async Task EveryRoute_ByAMachineWithTheFullScopes_SucceedsWithoutARole()
     {
         await ShouldPassEveryRoute(Http(checksScopes: true, role: AccountRole.None), machine: true);
+    }
+
+    // The management scope is checked with the machine document in every build, also where the scopes of the kinds are
+    // not (ChecksScopes off). The reads check it before the job, so a refused machine learns nothing about it.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task EveryRoute_ByAMachineWithTheRuntimeScopesOnly_IsAccessDenied(bool checksScopes)
+    {
+        await ShouldRefuseEveryRouteToAMachine(
+            Http(checksScopes: checksScopes, role: AccountRole.None, managementScopes: []),
+            machineManagementScopes: string.Empty,
+            ErrorCodes.AccessDenied,
+            "This operation needs the management scope Configuration.Transfer, which the machine was not created with.");
+    }
+
+    // A federated token that asked for a subset of the machine's scopes, without Configuration.Transfer.
+    [Fact]
+    public async Task EveryRoute_ByAMachineWhoseCredentialsDoNotCarryConfigurationTransfer_IsAccessDenied()
+    {
+        await ShouldRefuseEveryRouteToAMachine(
+            Http(checksScopes: true, role: AccountRole.None),
+            machineManagementScopes: string.Empty,
+            ErrorCodes.AccessDenied,
+            "This operation needs the management scope Configuration.Transfer, which the credentials of the machine do not carry.");
+    }
+
+    // Another management scope does not stand in for the transfer scope.
+    [Fact]
+    public async Task EveryRoute_ByAMachineWithOtherManagementScopes_IsAccessDenied()
+    {
+        MachineManagementScope[] others = [MachineManagementScope.SchemaWrite, MachineManagementScope.TemplateWrite, MachineManagementScope.AnnotationManage];
+
+        await ShouldRefuseEveryRouteToAMachine(
+            Http(checksScopes: true, role: AccountRole.None, managementScopes: others),
+            machineManagementScopes: $"{Scopes.Schema.Write} {Scopes.Template.Write} {Scopes.Annotation.Manage}",
+            ErrorCodes.AccessDenied,
+            "This operation needs the management scope Configuration.Transfer, which the machine was not created with.");
+    }
+
+    // The restriction comes first: a machine restricted to an annotation learns that a transfer is out of its reach.
+    [Fact]
+    public async Task EveryRoute_ByARestrictedMachineWithoutConfigurationTransfer_IsRestrictedFirst()
+    {
+        await ShouldRefuseEveryRouteToAMachine(
+            Http(checksScopes: true, machineAnnotationKey: "rst.payments", role: AccountRole.None, managementScopes: []),
+            machineManagementScopes: string.Empty,
+            ErrorCodes.AnnotationRestricted,
+            message: null);
+    }
+
+    // The starts check the scopes of the included kinds before the access check, so a machine without either learns
+    // first which kinds it may include.
+    [Fact]
+    public async Task Start_ByAMachineWithoutTheScopeOfAKindOrConfigurationTransfer_NamesTheKindFirst()
+    {
+        var http = Http(checksScopes: true, role: AccountRole.None, managementScopes: []);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.StartViewImport(Request(EmptyZip(), scopes: Scopes.Configuration.Write, machine: true, machineManagementScopes: string.Empty), "acme", "web", "default"));
+
+        exception.Message.ShouldStartWith("Missing scope for annotations: ");
+        _transfers.Calls.ShouldBeEmpty();
     }
 
     // The routes of the first spec below configurations/ were never released and are gone.
@@ -566,7 +629,8 @@ public class ViewTransferHttpTests
             ignoreOrder: true);
     }
 
-    // The 403 of every route names the role users need, beside the scopes and the restriction of machines (424-66).
+    // The 403 of every route names the role users need, beside the scopes and the restriction of machines (424-66), and
+    // the management scope Configuration.Transfer machines need (424-57).
     [Fact]
     public async Task Document_TheForbiddenOfEveryRoute_NamesTheAdministratorRole()
     {
@@ -586,7 +650,7 @@ public class ViewTransferHttpTests
         {
             var description = ForbiddenOf(document, operationId);
             description.ShouldBe(expected, operationId);
-            description.ShouldStartWith("The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted).", Case.Sensitive, operationId);
+            description.ShouldStartWith("The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine also needs the management scope Configuration.Transfer (AccessDenied).", Case.Sensitive, operationId);
             description.ShouldEndWith("The message names the missing role or scope.", Case.Sensitive, operationId);
         }
     }
@@ -707,6 +771,38 @@ public class ViewTransferHttpTests
         ]);
     }
 
+    // Every route refuses the machine with the code (and the message, when given) before it starts, reads or opens a job.
+    private async Task ShouldRefuseEveryRouteToAMachine(ViewTransferHttp http, string machineManagementScopes, string errorCode, string? message)
+    {
+        var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, null, AuditActor.System);
+        var import = _transfers.AddImport("acme", "web", "default", null);
+        _transfers.Calls.Clear();
+        _transfers.Reads.Clear();
+
+        (string Route, Func<Task<IActionResult>> Act)[] routes =
+        [
+            (nameof(ViewTransferHttp.StartViewExport), () => http.StartViewExport(Request(Encoding.UTF8.GetBytes("{}"), machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default")),
+            (nameof(ViewTransferHttp.GetViewExport), () => http.GetViewExport(Request(machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default", export.Id)),
+            (nameof(ViewTransferHttp.GetViewExportArchive), () => http.GetViewExportArchive(Request(machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default", export.Id)),
+            (nameof(ViewTransferHttp.StartViewImport), () => http.StartViewImport(Request(EmptyZip(), machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default")),
+            (nameof(ViewTransferHttp.GetViewImport), () => http.GetViewImport(Request(machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default", import.Id)),
+        ];
+
+        foreach (var (route, act) in routes)
+        {
+            var exception = await act.ShouldThrowAsync<AccessDeniedException>(route);
+            exception.ErrorCode.ShouldBe(errorCode, route);
+
+            if (message is not null)
+            {
+                exception.Message.ShouldBe(message, route);
+            }
+        }
+
+        _transfers.Calls.ShouldBeEmpty("a refused machine starts no job and never opens the archive");
+        _transfers.Reads.ShouldBeEmpty("a refused machine never reads a job");
+    }
+
     private static byte[] EmptyZip()
     {
         using var stream = new MemoryStream();
@@ -722,9 +818,10 @@ public class ViewTransferHttpTests
         return Request(Encoding.UTF8.GetBytes(body), url, scopes: scopes, isAnonymous: isAnonymous);
     }
 
-    // A user with the given scp; a machine carries them as roles, like the machine validators. The query is parsed as
-    // HttpRequestData.Query parses it, so a repeated parameter is joined by commas. An anonymous request has no claims,
-    // as one without credentials leaves the authentication middlewares.
+    // A user with the given scp; a machine carries them as roles, like the machine validators, and its management scopes
+    // too (Configuration.Transfer unless the test names others). The query is parsed as HttpRequestData.Query parses it,
+    // so a repeated parameter is joined by commas. An anonymous request has no claims, as one without credentials leaves
+    // the authentication middlewares.
     private static TestHttpRequestData Request(
         byte[]? body = null,
         string? url = null,
@@ -732,7 +829,8 @@ public class ViewTransferHttpTests
         string scopes = AllScopes,
         bool machine = false,
         string? query = null,
-        bool isAnonymous = false)
+        bool isAnonymous = false,
+        string machineManagementScopes = Scopes.Configuration.Transfer)
     {
         var services = new ServiceCollection().BuildServiceProvider();
         var context = new TestFunctionContext(services);
@@ -747,7 +845,7 @@ public class ViewTransferHttpTests
 
         var claims = new List<Claim> { new("sub", machine ? "machine_01" : "user_01") };
         claims.AddRange(machine
-            ? scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(scope => new Claim("roles", scope))
+            ? $"{scopes} {machineManagementScopes}".Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(scope => new Claim("roles", scope))
             : [new Claim("scp", scopes)]);
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;
 
@@ -760,9 +858,15 @@ public class ViewTransferHttpTests
     }
 
     // Without checksScopes, the class default: no scope checks in a Debug build. Without role, the user is an Owner.
-    private ViewTransferHttp Http(ViewTransferOptions? options = null, bool? checksScopes = null, string? machineAnnotationKey = null, AccountRole role = AccountRole.Owner)
+    // Without managementScopes, the machine has Configuration.Transfer, as a machine that transfers views needs.
+    private ViewTransferHttp Http(
+        ViewTransferOptions? options = null,
+        bool? checksScopes = null,
+        string? machineAnnotationKey = null,
+        AccountRole role = AccountRole.Owner,
+        IReadOnlyList<MachineManagementScope>? managementScopes = null)
     {
-        var access = ProjectAccess.Create(role, machineAnnotationKey);
+        var access = ProjectAccess.Create(role, machineAnnotationKey, managementScopes ?? [MachineManagementScope.ConfigurationTransfer]);
         var resolved = Options.Create(options ?? new ViewTransferOptions());
         return checksScopes is { } checks
             ? new ViewTransferHttp(_transfers, access, resolved) { ChecksScopes = checks }
@@ -877,18 +981,24 @@ public class ViewTransferHttpTests
     }
 
     // A user has the given role on every project (an Owner by default), and a machine has access to it, restricted to an
-    // annotation when one is given; the role checks themselves are the shared helpers' (skipped for users in a Debug build).
+    // annotation when one is given, with the given management scopes; the role checks themselves are the shared helpers'
+    // (skipped for users in a Debug build).
     public class ProjectAccess : DispatchProxy
     {
         private AccountRole _role;
         private string? _machineAnnotationKey;
+        private IReadOnlyList<MachineManagementScope>? _managementScopes;
 
-        public static IAccessService Create(AccountRole role = AccountRole.Owner, string? machineAnnotationKey = null)
+        public static IAccessService Create(
+            AccountRole role = AccountRole.Owner,
+            string? machineAnnotationKey = null,
+            IReadOnlyList<MachineManagementScope>? managementScopes = null)
         {
             var access = Create<IAccessService, ProjectAccess>();
             var proxy = (ProjectAccess)(object)access;
             proxy._role = role;
             proxy._machineAnnotationKey = machineAnnotationKey;
+            proxy._managementScopes = managementScopes;
             return access;
         }
 
@@ -905,6 +1015,7 @@ public class ViewTransferHttpTests
                     AccessKey = "***",
                     Scope = MachineAccessScope.DefaultReadWrite,
                     AnnotationKey = _machineAnnotationKey,
+                    ManagementScopes = _managementScopes,
                 }),
                 _ => throw new NotSupportedException(targetMethod?.Name),
             };

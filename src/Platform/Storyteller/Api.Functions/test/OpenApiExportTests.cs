@@ -179,6 +179,91 @@ public class OpenApiExportTests
         PropertyNames(schemas, "MachineAccess").ShouldContain("FederationRules");
     }
 
+    // The management scopes of a machine (424-57): an optional list on the create model and the machine, of one shared
+    // enum without a default, so both SDKs have one type for it and send nothing on their own.
+    [Fact]
+    public async Task Document_ManagementScopes_AreAnOptionalListOfTheSharedEnum()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+
+        foreach (var name in new[] { "MachineAccess", "MachineAccessCreate" })
+        {
+            var property = schemas.GetProperty(name).GetProperty("properties").GetProperty("ManagementScopes");
+            property.GetProperty("type").GetString().ShouldBe("array", name);
+            property.GetProperty("items").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/MachineManagementScope", name);
+            (schemas.GetProperty(name).TryGetProperty("required", out var required) ? required.EnumerateArray().Select(item => item.GetString()) : [])
+                .ShouldNotContain("ManagementScopes", name);
+        }
+
+        var scope = schemas.GetProperty("MachineManagementScope");
+        scope.GetProperty("type").GetString().ShouldBe("string");
+        scope.GetProperty("enum").EnumerateArray().Select(value => value.GetString())
+            .ShouldBe(["ConfigurationTransfer", "SchemaWrite", "TemplateWrite", "AnnotationManage", "KeyValueManage"]);
+        scope.TryGetProperty("default", out _).ShouldBeFalse();
+    }
+
+    // The 403 of every management operation names the management scope a machine needs; the key/value ones keep the
+    // secret rights and the mTLS rule. The machine routes name the Administrator role of machines with management scopes.
+    [Fact]
+    public async Task Document_ManagementOperations_NameTheManagementScopeInTheir403()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var forbidden = new Dictionary<string, string>
+        {
+            [Definitions.RouteIds.ConfigurationSchema.SetConfigurationSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.DeleteConfigurationSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.SetAnnotationSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.DeleteAnnotationSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.SetDescendantTypeSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.DeleteDescendantTypeSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
+            [Definitions.RouteIds.Template.SetTemplate] = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite,
+            [Definitions.RouteIds.Template.PatchTemplate] = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite,
+            [Definitions.RouteIds.Template.DeleteTemplate] = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite,
+            [Definitions.RouteIds.Annotations.SetAnnotations] = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage,
+            [Definitions.RouteIds.Annotations.SetAnnotationsSimple] = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage,
+            [Definitions.RouteIds.Annotations.DeleteAnnotation] = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage,
+            [Definitions.RouteIds.Annotations.RestoreAnnotations] = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage,
+            [Definitions.RouteIds.KeyValues.RestoreKeyValues] = Definitions.Descriptions.ResponseForbiddenManagementKeyValueManage,
+            [Definitions.RouteIds.KeyValues.ProtectKeyValues] = Definitions.Descriptions.ResponseMtlsRequiredKeyValueManage,
+            [Definitions.RouteIds.KeyValues.ExportKeyValues] = Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer,
+            [Definitions.RouteIds.KeyValues.ImportKeyValues] = Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer,
+            [Definitions.RouteIds.Access.CreateMachineAccess] = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes,
+            [Definitions.RouteIds.Access.ResetMachineAccess] = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes,
+            [Definitions.RouteIds.Access.SetMachineFederationRules] = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes,
+        };
+
+        foreach (var (operationId, expected) in forbidden)
+        {
+            var operations = Operations(document, operationId);
+            operations.ShouldNotBeEmpty(operationId);
+
+            foreach (var operation in operations)
+            {
+                var response = operation.GetProperty("responses").GetProperty("403");
+                response.GetProperty("description").GetString().ShouldBe(expected, operationId);
+                response.GetProperty("content").GetProperty(Definitions.ContentTypes.Json).GetProperty("schema").GetProperty("$ref").GetString()
+                    .ShouldBe("#/components/schemas/ErrorResponse", operationId);
+            }
+        }
+
+        Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite.ShouldBe(Definitions.Descriptions.ResponseForbidden + " A machine also needs the management scope Schema.Write (AccessDenied).");
+        Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite.ShouldEndWith(" A machine also needs the management scope Template.Write (AccessDenied).");
+        Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage.ShouldEndWith(" A machine also needs the management scope Annotation.Manage (AccessDenied).");
+        Definitions.Descriptions.ResponseForbiddenManagementKeyValueManage.ShouldEndWith(" A machine also needs the management scope KeyValue.Manage (AccessDenied).");
+        Definitions.Descriptions.ResponseMtlsRequiredKeyValueManage.ShouldBe(Definitions.Descriptions.ResponseMtlsRequired + " A machine also needs the management scope KeyValue.Manage (AccessDenied).");
+        Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer.ShouldBe(Definitions.Descriptions.ResponseMtlsRequired + " A machine also needs the management scope Configuration.Transfer (AccessDenied).");
+        Definitions.Descriptions.ResponseForbiddenMachineManagementScopes.ShouldStartWith(Definitions.Descriptions.ResponseForbidden);
+        Definitions.Descriptions.ResponseForbiddenMachineManagementScopes.ShouldContain("management scopes");
+        Definitions.Descriptions.ResponseForbiddenMachineManagementScopes.ShouldContain("Administrator role");
+
+        Operation(document, Definitions.RouteIds.Access.CreateMachineAccess).GetProperty("responses").GetProperty("400").GetProperty("description").GetString()
+            .ShouldBe("The annotation key is not valid (ErrorCode InvalidKey), a management scope doesn't exist, or the credential kind is not supported.");
+    }
+
     // These handlers read their JSON bodies themselves, not through [FromBody], so [OpenApiRequestBody] alone documents
     // them: each keeps its application/json body, its schema and its required flag, and the SDKs do not change. The
     // generator writes "required" only when it is true; ExportKeyValues sets Required = false and the others nothing.
@@ -260,10 +345,17 @@ public class OpenApiExportTests
 
     private static JsonElement Operation(JsonDocument document, string operationId)
     {
+        return Operations(document, operationId).Single();
+    }
+
+    // One function can answer several methods (SetTemplate: POST and PUT), each with the same operation id.
+    private static List<JsonElement> Operations(JsonDocument document, string operationId)
+    {
         return document.RootElement.GetProperty("paths").EnumerateObject()
             .SelectMany(path => path.Value.EnumerateObject())
             .Select(operation => operation.Value)
-            .Single(operation => operation.GetProperty("operationId").GetString() == operationId);
+            .Where(operation => operation.GetProperty("operationId").GetString() == operationId)
+            .ToList();
     }
 
     // The extension looks for functions in every assembly next to the one it renders, as the host does in its bin folder.

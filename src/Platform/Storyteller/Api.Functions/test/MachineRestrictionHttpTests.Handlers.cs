@@ -13,7 +13,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 // any service is called, and passes the key of its route to the service for the restriction and its descendants. The
 // project-wide handlers next to them (type-level schemas, templates, the composition of a configuration, deleted
 // annotations, simple create) refuse the restricted machine before any service is called. A new handler of one
-// annotation belongs in KeyedHandlers.
+// annotation belongs in KeyedHandlers. The rows of the management operations name their management scope, which a
+// machine needs after the restriction.
 public partial class MachineRestrictionHttpTests
 {
     private const string RestrictionType = AnnotationTypeCodes.Execution;
@@ -29,7 +30,7 @@ public partial class MachineRestrictionHttpTests
         new(nameof(AnnotationsHttp.GetAnnotation), nameof(IAnnotationService.GetAnnotationAsync), FullKeyArg, (http, key) => http.Annotations.GetAnnotation(MachineRequest(), Org, Project, DefaultView, key)),
         new(nameof(AnnotationsHttp.GetDescendants), nameof(IAnnotationService.GetAnnotationsAsync), DescendantsOfArg, (http, key) => http.Annotations.GetDescendants(MachineRequest(), Org, Project, DefaultView, key), WithDescendant: false),
         new(nameof(AnnotationsHttp.SetAnnotation), nameof(IAnnotationService.SetAnnotationAsync), AnnotationArg, (http, key) => http.Annotations.SetAnnotation(MachineRequest("PUT", AnnotationBody(key)), Org, Project, DefaultView, key)),
-        new(nameof(AnnotationsHttp.DeleteAnnotation), nameof(IAnnotationService.DeleteAnnotationAsync), FullKeyArg, (http, key) => http.Annotations.DeleteAnnotation(MachineRequest("DELETE"), Org, Project, DefaultView, key)),
+        new(nameof(AnnotationsHttp.DeleteAnnotation), nameof(IAnnotationService.DeleteAnnotationAsync), FullKeyArg, (http, key) => http.Annotations.DeleteAnnotation(MachineRequest("DELETE"), Org, Project, DefaultView, key), ManagementScope: MachineManagementScope.AnnotationManage),
         new(nameof(AnnotationsHttp.GetDeletedAnnotation), nameof(IAnnotationService.GetDeletedAnnotationAsync), FullKeyArg, (http, key) => http.Annotations.GetDeletedAnnotation(MachineRequest(), Org, Project, DefaultView, key)),
         new(nameof(AnnotationsHttp.GetAnnotationHistory), nameof(IAnnotationService.GetAnnotationHistoryAsync), FullKeyArg, (http, key) => http.Annotations.GetAnnotationHistory(MachineRequest(), Org, Project, DefaultView, key)),
 
@@ -45,11 +46,11 @@ public partial class MachineRestrictionHttpTests
         new(nameof(ConfigurationHttp.GetConfigurationViewDiff), nameof(IConfigurationService.GetConfigurationViewChangesAsync), FullKeyArg, (http, key) => http.Configuration.GetConfigurationViewDiff(MachineRequest(), Org, Project, DefaultView, key, OtherView)),
 
         new(nameof(ConfigurationSchemaHttp.GetAnnotationSchema), nameof(IConfigurationSchemaService.GetAnnotationSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.GetAnnotationSchema(MachineRequest(), Org, Project, DefaultView, key)),
-        new(nameof(ConfigurationSchemaHttp.SetAnnotationSchema), nameof(IConfigurationSchemaService.SetAnnotationSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.SetAnnotationSchema(MachineRequest("PUT", "{}"), Org, Project, DefaultView, key)),
-        new(nameof(ConfigurationSchemaHttp.DeleteAnnotationSchema), nameof(IConfigurationSchemaService.DeleteAnnotationSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.DeleteAnnotationSchema(MachineRequest("DELETE"), Org, Project, DefaultView, key)),
+        new(nameof(ConfigurationSchemaHttp.SetAnnotationSchema), nameof(IConfigurationSchemaService.SetAnnotationSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.SetAnnotationSchema(MachineRequest("PUT", "{}"), Org, Project, DefaultView, key), ManagementScope: MachineManagementScope.SchemaWrite),
+        new(nameof(ConfigurationSchemaHttp.DeleteAnnotationSchema), nameof(IConfigurationSchemaService.DeleteAnnotationSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.DeleteAnnotationSchema(MachineRequest("DELETE"), Org, Project, DefaultView, key), ManagementScope: MachineManagementScope.SchemaWrite),
         new(nameof(ConfigurationSchemaHttp.GetDescendantTypeSchema), nameof(IConfigurationSchemaService.GetDescendantTypeSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.GetDescendantTypeSchema(MachineRequest(), Org, Project, DefaultView, key, DescendantType), WithDescendant: false),
-        new(nameof(ConfigurationSchemaHttp.SetDescendantTypeSchema), nameof(IConfigurationSchemaService.SetDescendantTypeSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.SetDescendantTypeSchema(MachineRequest("PUT", "{}"), Org, Project, DefaultView, key, DescendantType), WithDescendant: false),
-        new(nameof(ConfigurationSchemaHttp.DeleteDescendantTypeSchema), nameof(IConfigurationSchemaService.DeleteDescendantTypeSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.DeleteDescendantTypeSchema(MachineRequest("DELETE"), Org, Project, DefaultView, key, DescendantType), WithDescendant: false),
+        new(nameof(ConfigurationSchemaHttp.SetDescendantTypeSchema), nameof(IConfigurationSchemaService.SetDescendantTypeSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.SetDescendantTypeSchema(MachineRequest("PUT", "{}"), Org, Project, DefaultView, key, DescendantType), WithDescendant: false, ManagementScope: MachineManagementScope.SchemaWrite),
+        new(nameof(ConfigurationSchemaHttp.DeleteDescendantTypeSchema), nameof(IConfigurationSchemaService.DeleteDescendantTypeSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.DeleteDescendantTypeSchema(MachineRequest("DELETE"), Org, Project, DefaultView, key, DescendantType), WithDescendant: false, ManagementScope: MachineManagementScope.SchemaWrite),
         new(nameof(ConfigurationSchemaHttp.GetCombinedConfigurationSchema), nameof(IConfigurationSchemaService.GetCombinedSchemaAsync), SchemaKeyArg, (http, key) => http.Schemas.GetCombinedConfigurationSchema(MachineRequest(), Org, Project, DefaultView, key)),
 
         new(nameof(ConfigurationSchemaHttp.GetAnnotationSchemaVersions), nameof(IConfigurationSchemaService.GetAnnotationSchemaVersionsAsync), SchemaKeyArg, (http, key) => http.Schemas.GetAnnotationSchemaVersions(MachineRequest(), Org, Project, DefaultView, key)),
@@ -69,12 +70,15 @@ public partial class MachineRestrictionHttpTests
         new(nameof(ConfigurationSchemaHttp.GetSchemaVersion), http => http.Schemas.GetSchemaVersion(MachineRequest(), Org, Project, DefaultView, RestrictionType, Version)),
         new(nameof(ConfigurationSchemaHttp.GetSchemaVersionDiff), http => http.Schemas.GetSchemaVersionDiff(MachineRequest(), Org, Project, DefaultView, RestrictionType, Version)),
         new(nameof(ConfigurationSchemaHttp.GetSchemaVersionDiffCustom), http => http.Schemas.GetSchemaVersionDiffCustom(MachineRequest(), Org, Project, DefaultView, RestrictionType, Version, VersionFrom)),
-        new(nameof(ConfigurationSchemaHttp.SetConfigurationSchema), http => http.Schemas.SetConfigurationSchema(MachineRequest("PUT", "{}"), Org, Project, DefaultView, RestrictionType)),
-        new(nameof(ConfigurationSchemaHttp.DeleteConfigurationSchema), http => http.Schemas.DeleteConfigurationSchema(MachineRequest("DELETE"), Org, Project, DefaultView, RestrictionType)),
+        new(nameof(ConfigurationSchemaHttp.SetConfigurationSchema), http => http.Schemas.SetConfigurationSchema(MachineRequest("PUT", "{}"), Org, Project, DefaultView, RestrictionType), MachineManagementScope.SchemaWrite),
+        new(nameof(ConfigurationSchemaHttp.DeleteConfigurationSchema), http => http.Schemas.DeleteConfigurationSchema(MachineRequest("DELETE"), Org, Project, DefaultView, RestrictionType), MachineManagementScope.SchemaWrite),
         new(nameof(TemplateHttp.GetTemplate), http => http.Templates.GetTemplate(MachineRequest(), Org, Project, DefaultView, RestrictionType)),
+        new(nameof(TemplateHttp.SetTemplate), http => http.Templates.SetTemplate(MachineRequest("PUT", "{}"), Org, Project, DefaultView, RestrictionType), MachineManagementScope.TemplateWrite),
+        new(nameof(TemplateHttp.PatchTemplate), http => http.Templates.PatchTemplate(MachineRequest("PATCH", "[]"), Org, Project, DefaultView, RestrictionType), MachineManagementScope.TemplateWrite),
+        new(nameof(TemplateHttp.DeleteTemplate), http => http.Templates.DeleteTemplate(MachineRequest("DELETE"), Org, Project, DefaultView, RestrictionType), MachineManagementScope.TemplateWrite),
         new(nameof(ConfigurationHttp.GetConfigurationComposition), http => http.Configuration.GetConfigurationComposition(MachineRequest(), Org, Project, DefaultView, Restriction)),
         new(nameof(AnnotationsHttp.GetDeletedAnnotations), http => http.Annotations.GetDeletedAnnotations(MachineRequest(), Org, Project, DefaultView)),
-        new(nameof(AnnotationsHttp.SetAnnotationsSimple), http => http.Annotations.SetAnnotationsSimple(MachineRequest("POST", FunctionTestDoubles.ToJsonBody<List<string>>([Restriction])), Org, Project, DefaultView)),
+        new(nameof(AnnotationsHttp.SetAnnotationsSimple), http => http.Annotations.SetAnnotationsSimple(MachineRequest("POST", FunctionTestDoubles.ToJsonBody<List<string>>([Restriction])), Org, Project, DefaultView), MachineManagementScope.AnnotationManage),
     ];
 
     // Debug builds (DEV_AUTH) skip the role check of users.
@@ -122,6 +126,49 @@ public partial class MachineRestrictionHttpTests
         return cases;
     }
 
+    // The handlers of one annotation that need a management scope from a machine, with the keys of the restriction.
+    public static TheoryData<string, string> KeyedManagementHandlersInsideTheRestriction()
+    {
+        var cases = new TheoryData<string, string>();
+
+        foreach (var handler in KeyedHandlers.Where(handler => handler.ManagementScope is not null))
+        {
+            cases.Add(handler.Name, Restriction);
+
+            if (handler.WithDescendant)
+            {
+                cases.Add(handler.Name, Descendant);
+            }
+        }
+
+        return cases;
+    }
+
+    public static TheoryData<string, string> KeyedManagementHandlersOutsideTheRestriction()
+    {
+        var cases = new TheoryData<string, string>();
+
+        foreach (var handler in KeyedHandlers.Where(handler => handler.ManagementScope is not null))
+        {
+            cases.Add(handler.Name, Ancestor);
+            cases.Add(handler.Name, Sibling);
+        }
+
+        return cases;
+    }
+
+    public static TheoryData<string> ProjectWideManagementHandlerNames()
+    {
+        var cases = new TheoryData<string>();
+
+        foreach (var handler in ProjectWideHandlers.Where(handler => handler.ManagementScope is not null))
+        {
+            cases.Add(handler.Name);
+        }
+
+        return cases;
+    }
+
     [Theory]
     [MemberData(nameof(KeyedHandlersOutsideTheRestriction))]
     public async Task KeyedHandler_OutsideTheRestriction_IsRefusedBeforeAnyService(string handler, string key)
@@ -150,6 +197,37 @@ public partial class MachineRestrictionHttpTests
     public async Task ProjectWideHandler_ByTheRestrictedMachine_IsRefusedBeforeAnyService(string handler)
     {
         var http = UntouchedHandlers();
+
+        await ShouldBeRestrictedAsync(() => ProjectWideHandlers.Single(projectWide => projectWide.Name == handler).Invoke(http));
+    }
+
+    // The management scope comes after the restriction (424-57): the restricted machine without it reaches its
+    // annotation and the descendants no further than the 403 AccessDenied of the scope, before any service call.
+    [Theory]
+    [MemberData(nameof(KeyedManagementHandlersInsideTheRestriction))]
+    public async Task KeyedManagementHandler_InsideTheRestrictionWithoutTheManagementScope_IsAccessDeniedBeforeAnyService(string handler, string key)
+    {
+        var keyed = Keyed(handler);
+        var http = UntouchedHandlers(RestrictedWithoutManagementScopes());
+
+        await ShouldNeedTheManagementScopeAsync(() => keyed.Invoke(http, key), keyed.ManagementScope!.Value);
+    }
+
+    // And the restriction comes first: outside of it, the machine learns that the annotation is out of its reach.
+    [Theory]
+    [MemberData(nameof(KeyedManagementHandlersOutsideTheRestriction))]
+    public async Task KeyedManagementHandler_OutsideTheRestrictionWithoutTheManagementScope_IsRestrictedFirst(string handler, string key)
+    {
+        var http = UntouchedHandlers(RestrictedWithoutManagementScopes());
+
+        await ShouldBeRestrictedAsync(() => Keyed(handler).Invoke(http, key));
+    }
+
+    [Theory]
+    [MemberData(nameof(ProjectWideManagementHandlerNames))]
+    public async Task ProjectWideManagementHandler_ByTheRestrictedMachineWithoutTheManagementScope_IsRestrictedFirst(string handler)
+    {
+        var http = UntouchedHandlers(RestrictedWithoutManagementScopes());
 
         await ShouldBeRestrictedAsync(() => ProjectWideHandlers.Single(projectWide => projectWide.Name == handler).Invoke(http));
     }
@@ -207,9 +285,9 @@ public partial class MachineRestrictionHttpTests
             """;
     }
 
-    private static HttpHandlers UntouchedHandlers()
+    private static HttpHandlers UntouchedHandlers(IAccessService? access = null)
     {
-        return new HttpHandlers(Untouched<IAnnotationService>(), Untouched<IConfigurationService>(), Untouched<IConfigurationSchemaService>(), Untouched<IConfigurationTemplateService>());
+        return new HttpHandlers(Untouched<IAnnotationService>(), Untouched<IConfigurationService>(), Untouched<IConfigurationSchemaService>(), Untouched<IConfigurationTemplateService>(), access ?? Restricted());
     }
 
     // The configuration answers the reads that the handlers do not check for null: there is content to delete, and no
@@ -223,32 +301,35 @@ public partial class MachineRestrictionHttpTests
         configurationCalls.Returns(nameof(IConfigurationService.HasConfigurationContentAsync), true);
         configurationCalls.Returns(nameof(IConfigurationService.GetConfigurationVersionsAsync), Array.Empty<ConfigurationVersion>());
 
-        return (new HttpHandlers(annotations, configuration, schemas, templates), [annotationCalls, configurationCalls, schemaCalls, templateCalls]);
+        return (new HttpHandlers(annotations, configuration, schemas, templates, Restricted()), [annotationCalls, configurationCalls, schemaCalls, templateCalls]);
     }
 
-    // A handler of one annotation: how it is called with the key of its route, and the service method that gets the key.
+    // A handler of one annotation: how it is called with the key of its route, the service method that gets the key,
+    // and the management scope a machine needs for it, if any.
     private sealed record KeyedHandler(
         string Name,
         string Method,
         Func<RecordedCall, string> KeyOf,
         Func<HttpHandlers, string, Task<IActionResult>> Invoke,
-        bool WithDescendant = true);
+        bool WithDescendant = true,
+        MachineManagementScope? ManagementScope = null);
 
-    private sealed record ProjectWideHandler(string Name, Func<HttpHandlers, Task<IActionResult>> Invoke);
+    private sealed record ProjectWideHandler(string Name, Func<HttpHandlers, Task<IActionResult>> Invoke, MachineManagementScope? ManagementScope = null);
 
-    // The handlers over the same services, for the restricted machine.
+    // The handlers over the same services, for the machine of the access double (the restricted one in the tables).
     private sealed class HttpHandlers(
         IAnnotationService annotations,
         IConfigurationService configuration,
         IConfigurationSchemaService schemas,
-        IConfigurationTemplateService templates)
+        IConfigurationTemplateService templates,
+        IAccessService access)
     {
-        public AnnotationsHttp Annotations { get; } = new(annotations, Restricted(), TimeProvider.System, FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
+        public AnnotationsHttp Annotations { get; } = new(annotations, access, TimeProvider.System, FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
 
-        public ConfigurationHttp Configuration { get; } = new(configuration, annotations, Restricted(), new FixedKeyValuePolicies(requireMtls: false), NullLogger<ConfigurationHttp>.Instance);
+        public ConfigurationHttp Configuration { get; } = new(configuration, annotations, access, new FixedKeyValuePolicies(requireMtls: false), NullLogger<ConfigurationHttp>.Instance);
 
-        public ConfigurationSchemaHttp Schemas { get; } = new(schemas, Restricted(), NullLogger<ConfigurationSchemaHttp>.Instance);
+        public ConfigurationSchemaHttp Schemas { get; } = new(schemas, access, NullLogger<ConfigurationSchemaHttp>.Instance);
 
-        public TemplateHttp Templates { get; } = new(templates, Restricted(), NullLogger<TemplateHttp>.Instance);
+        public TemplateHttp Templates { get; } = new(templates, access, NullLogger<TemplateHttp>.Instance);
     }
 }

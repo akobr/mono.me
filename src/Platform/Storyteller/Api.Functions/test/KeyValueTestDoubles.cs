@@ -15,7 +15,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // Requests of the key/value tests: a user with a project role, or a machine with roles and an optional mTLS certificate.
-// A body goes as JSON, with its content type.
+// A machine's credentials carry its management scopes as roles too, as the machine validators put them. A body goes as
+// JSON, with its content type.
 internal static class KeyValueRequests
 {
     public const string UserScopes = "User.Impersonation Default.Read Default.ReadWrite";
@@ -34,11 +35,18 @@ internal static class KeyValueRequests
         return request;
     }
 
-    public static TestHttpRequestData Machine(bool mtls, string method = "GET", Action<NameValueCollection>? query = null, string? body = null, params string[] roles)
+    public static TestHttpRequestData Machine(
+        bool mtls,
+        string method = "GET",
+        Action<NameValueCollection>? query = null,
+        string? body = null,
+        IReadOnlyList<MachineManagementScope>? managementScopes = null,
+        params string[] roles)
     {
         var (context, request) = CreateRequest(method, body);
         var claims = new List<Claim> { new("sub", "machine-1") };
         claims.AddRange((roles.Length == 0 ? [Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Configuration.Secrets] : roles).Select(role => new Claim("roles", role)));
+        claims.AddRange((managementScopes ?? []).Select(scope => new Claim("roles", MachineAccessScopes.Get(scope)!)));
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;
         context.Items[FunctionContextItemKeys.MachineIdentity] = "machine-1";
 
@@ -71,8 +79,11 @@ internal sealed class FixedKeyValuePolicies(bool requireMtls = true, KeyValuePol
 }
 
 // Every user has the given role on every access point; every machine has access to every project, restricted to the
-// given annotation when there is one.
-internal sealed class RoleAccess(AccountRole role, string? machineAnnotationKey = null) : IAccessService
+// given annotation when there is one, and with the given management scopes (none by default).
+internal sealed class RoleAccess(
+    AccountRole role,
+    string? machineAnnotationKey = null,
+    IReadOnlyList<MachineManagementScope>? managementScopes = null) : IAccessService
 {
     public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey) => Task.FromResult(role);
 
@@ -110,6 +121,7 @@ internal sealed class RoleAccess(AccountRole role, string? machineAnnotationKey 
             AccessKey = "***",
             Scope = MachineAccessScope.SecretsReadWrite,
             AnnotationKey = machineAnnotationKey,
+            ManagementScopes = managementScopes,
         });
 
     public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotSupportedException();
