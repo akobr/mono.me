@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.42.14388"
+    "version": "0.9.44.51111"
   },
   "servers": [
     {
@@ -633,7 +633,17 @@
             }
           },
           "400": {
-            "description": "The annotation key is not valid (ErrorCode InvalidKey), or the credential kind is not supported.",
+            "description": "The annotation key is not valid (ErrorCode InvalidKey), a management scope doesn't exist, or the credential kind is not supported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). Creating a machine with management scopes, resetting it or replacing its federation rules needs the Administrator role (ErrorCode AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -654,16 +664,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -820,6 +820,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). Creating a machine with management scopes, resetting it or replacing its federation rules needs the Administrator role (ErrorCode AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -832,16 +842,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -1345,6 +1345,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Annotation.Manage (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -1357,16 +1367,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -1726,6 +1726,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Annotation.Manage (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -1741,16 +1751,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -1987,6 +1987,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Annotation.Manage (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -1999,16 +2009,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -3548,6 +3548,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Annotation.Manage (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -3560,16 +3570,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Annotation.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -5914,6 +5914,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Schema.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -5926,16 +5936,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -6021,6 +6021,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Schema.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -6039,16 +6049,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -6274,6 +6274,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Schema.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -6286,16 +6296,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -6381,6 +6381,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Schema.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -6399,16 +6409,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -6652,6 +6652,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Schema.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -6664,16 +6674,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -6768,6 +6768,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Schema.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -6786,16 +6796,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -9038,7 +9038,7 @@
         "tags": [
           "Access"
         ],
-        "description": "Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor.",
+        "description": "Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; Administrator for a machine with management scopes.",
         "operationId": "SetMachineFederationRules",
         "parameters": [
           {
@@ -9123,6 +9123,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). Creating a machine with management scopes, resetting it or replacing its federation rules needs the Administrator role (ErrorCode AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -9135,16 +9145,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): User.Impersonation"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -11573,6 +11573,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope KeyValue.Manage (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -11585,16 +11595,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -11798,7 +11798,7 @@
             }
           },
           "403": {
-            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted).",
+            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine also needs the management scope KeyValue.Manage (AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -12548,7 +12548,7 @@
             }
           },
           "403": {
-            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted).",
+            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine also needs the management scope Configuration.Transfer (AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -12704,7 +12704,7 @@
             }
           },
           "403": {
-            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted).",
+            "description": "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted). A machine also needs the management scope Configuration.Transfer (AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -13637,6 +13637,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Template.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -13649,16 +13659,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -13784,6 +13784,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Template.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -13796,16 +13806,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -13891,6 +13891,16 @@
               }
             }
           },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted). A machine also needs the management scope Template.Write (AccessDenied).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Unexpected error occurred on the service.",
             "content": {
@@ -13909,16 +13919,6 @@
           },
           "401": {
             "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.ReadWrite, Default.ReadWrite"
-          },
-          "403": {
-            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -14863,7 +14863,7 @@
             }
           },
           "403": {
-            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing role or scope.",
+            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine also needs the management scope Configuration.Transfer (AccessDenied). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing role or scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14973,7 +14973,7 @@
             }
           },
           "403": {
-            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing role or scope.",
+            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine also needs the management scope Configuration.Transfer (AccessDenied). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing role or scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15094,7 +15094,7 @@
             }
           },
           "403": {
-            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing role or scope.",
+            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine also needs the management scope Configuration.Transfer (AccessDenied). Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. The message names the missing role or scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15272,7 +15272,7 @@
             }
           },
           "403": {
-            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing role or scope.",
+            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine also needs the management scope Configuration.Transfer (AccessDenied). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing role or scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -15382,7 +15382,7 @@
             }
           },
           "403": {
-            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing role or scope.",
+            "description": "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine also needs the management scope Configuration.Transfer (AccessDenied). Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. The message names the missing role or scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -17820,6 +17820,12 @@
             "items": {
               "$ref": "#/components/schemas/FederationRule"
             }
+          },
+          "ManagementScopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MachineManagementScope"
+            }
           }
         }
       },
@@ -17873,6 +17879,12 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/FederationRule"
+            }
+          },
+          "ManagementScopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MachineManagementScope"
             }
           }
         }
@@ -18727,6 +18739,16 @@
           "CertificateAndApiKey",
           "ClientCredentials",
           "Federated"
+        ],
+        "type": "string"
+      },
+      "MachineManagementScope": {
+        "enum": [
+          "ConfigurationTransfer",
+          "SchemaWrite",
+          "TemplateWrite",
+          "AnnotationManage",
+          "KeyValueManage"
         ],
         "type": "string"
       },
