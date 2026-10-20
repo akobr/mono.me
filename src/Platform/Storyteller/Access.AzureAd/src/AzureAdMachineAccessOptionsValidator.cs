@@ -5,7 +5,8 @@ using Microsoft.Extensions.Options;
 namespace _42.Platform.Storyteller;
 
 // Registered only with AddAzureAdMachineAccess: machine app registrations need the directory,
-// the API application they get roles on, and the two app roles (read, read/write).
+// the API application they get roles on, and the two app roles (read, read/write). The secrets and
+// management roles are optional.
 public sealed class AzureAdMachineAccessOptionsValidator : IValidateOptions<UserAuthenticationOptions>
 {
     private readonly IOptions<AzureAdMachineAccessOptions> _machineOptions;
@@ -34,6 +35,19 @@ public sealed class AzureAdMachineAccessOptionsValidator : IValidateOptions<User
             if (!options.AppRoles.TryGetValue(role, out var roleId) || !Guid.TryParse(roleId, out _))
             {
                 failures.Add($"Auth:AppRoles:{role} must be the ID of the API app role for Entra ID machine access.");
+            }
+        }
+
+        // The management roles are optional; one that is set must still be an ID.
+        foreach (var scope in Enum.GetValues<MachineManagementScope>())
+        {
+            var role = AzureAdMachineAccessService.GetManagementRoleKey(scope);
+
+            if (options.AppRoles.TryGetValue(role, out var roleId)
+                && !string.IsNullOrWhiteSpace(roleId)
+                && !Guid.TryParse(roleId, out _))
+            {
+                failures.Add($"Auth:AppRoles:{role} must be the ID of the API app role {MachineAccessScopes.Get(scope)} when it is set.");
             }
         }
 

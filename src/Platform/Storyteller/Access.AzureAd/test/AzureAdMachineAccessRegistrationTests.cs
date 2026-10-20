@@ -52,6 +52,21 @@ public class AzureAdMachineAccessRegistrationTests
     }
 
     [Fact]
+    public async Task AddAzureAdMachineAccess_ManagementRoles_AreOptionalButMustBeIdsWhenSet()
+    {
+        var settings = new Dictionary<string, string?>(Settings)
+        {
+            ["Auth:AppRoles:ConfigurationTransfer"] = "1b2c3d4e-5f60-4718-892a-0b1c2d3e4f50",
+            ["Auth:AppRoles:SchemaWrite"] = "not-a-guid",
+        };
+        using var host = BuildHost(settings);
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
+
+        exception.Failures.ShouldBe(["Auth:AppRoles:SchemaWrite must be the ID of the API app role Schema.Write when it is set."]);
+    }
+
+    [Fact]
     public async Task EntraUsersAndEntraMachines_ShareOneTokenValidator()
     {
         var builder = Host.CreateApplicationBuilder();

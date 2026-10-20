@@ -19,7 +19,21 @@ public class AuthKitMachineAccessServiceTests
         ["storyteller:secrets"] = "Configuration.Secrets",
         ["storyteller:reader"] = "Annotation.Read Configuration.Read",
         ["storyteller:mixed"] = "Annotation.Read Configuration.Secrets",
+        ["storyteller:configuration-transfer"] = "Configuration.Transfer",
+        ["storyteller:schema-write"] = "Schema.Write",
+        ["storyteller:template-write"] = "Template.Write",
+        ["storyteller:annotation-manage"] = "Annotation.Manage",
+        ["storyteller:transfer-secrets"] = "Configuration.Transfer Configuration.Secrets",
     };
+
+    private static readonly HashSet<string> ManagementSlugs =
+    [
+        "storyteller:configuration-transfer",
+        "storyteller:schema-write",
+        "storyteller:template-write",
+        "storyteller:annotation-manage",
+        "storyteller:transfer-secrets",
+    ];
 
     private readonly FakeWorkOsManagementClient _client = new();
 
@@ -67,6 +81,86 @@ public class AuthKitMachineAccessServiceTests
 
         _client.CreatedApplication!.Description.ShouldBe("organization=org1|project=proj1|scope=AnnotationRead|annotation=sbt.payments");
         _client.CreatedApplication.Scopes.ShouldBe(["storyteller:annotation-read"]);
+    }
+
+    [Fact]
+    public async Task Create_WithManagementScopes_AddsOnlyTheirSlugs()
+    {
+        var access = await CreateService().CreateMachineAccessAsync(Model(MachineAccessScope.DefaultRead) with
+        {
+            AnnotationKey = "sbt.payments",
+            ManagementScopes = [MachineManagementScope.SchemaWrite, MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite],
+        });
+
+        var application = _client.CreatedApplication.ShouldNotBeNull();
+        application.Scopes.ShouldBe(
+            [
+                "storyteller:annotation-read",
+                "storyteller:configuration-read",
+                "storyteller:configuration-transfer",
+                "storyteller:default-read",
+                "storyteller:reader",
+                "storyteller:schema-write",
+            ]);
+        application.Description.ShouldBe("organization=org1|project=proj1|scope=DefaultRead|manage=ConfigurationTransfer,SchemaWrite|annotation=sbt.payments");
+        access.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite]);
+    }
+
+    [Fact]
+    public async Task Create_WithoutManagementScopes_NeverGetsAManagementSlug()
+    {
+        foreach (var scope in Enum.GetValues<MachineAccessScope>())
+        {
+            var access = await CreateService().CreateMachineAccessAsync(Model(scope) with { ManagementScopes = [] });
+
+            _client.CreatedApplication!.Scopes.ShouldNotContain(slug => ManagementSlugs.Contains(slug), $"{scope}");
+            _client.CreatedApplication.Description.ShouldNotContain("manage=");
+            access.ManagementScopes.ShouldBeNull();
+        }
+    }
+
+    [Fact]
+    public async Task Create_ManagementScopeWithoutPermission_FailsBeforeCallingWorkOs()
+    {
+        var model = Model(MachineAccessScope.DefaultReadWrite) with
+        {
+            ManagementScopes = [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.KeyValueManage],
+        };
+
+        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => CreateService().CreateMachineAccessAsync(model));
+
+        exception.Message.ShouldBe("No WorkOS permission in Auth:AuthKit:PermissionMap maps to the management scope KeyValue.Manage.");
+        _client.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Create_ManagementScopeOnlyInAPermissionThatNeedsMore_FailsBeforeCallingWorkOs()
+    {
+        // storyteller:transfer-secrets also needs Configuration.Secrets, which DefaultRead does not grant.
+        var service = CreateService(permissionMap: new Dictionary<string, string>
+        {
+            ["storyteller:default-read"] = "Default.Read",
+            ["storyteller:transfer-secrets"] = "Configuration.Transfer Configuration.Secrets",
+        });
+
+        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => service.CreateMachineAccessAsync(
+            Model(MachineAccessScope.DefaultRead) with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer] }));
+
+        exception.Message.ShouldBe("No WorkOS permission in Auth:AuthKit:PermissionMap maps to the management scope Configuration.Transfer.");
+        _client.Calls.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Create_OnlyAManagementPermission_StillNeedsOneForThePreset()
+    {
+        var service = CreateService(permissionMap: new Dictionary<string, string> { ["storyteller:configuration-transfer"] = "Configuration.Transfer" });
+
+        var exception = await Should.ThrowAsync<MachineAccessNotSupportedException>(() => service.CreateMachineAccessAsync(
+            Model(MachineAccessScope.DefaultRead) with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer] }));
+
+        exception.Message.ShouldBe(
+            "No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scopes of DefaultRead (Default.Read, Annotation.Read, Configuration.Read).");
+        _client.Calls.ShouldBeEmpty();
     }
 
     [Fact]
