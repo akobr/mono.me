@@ -12,7 +12,14 @@ import { useBootState } from '@/boot/state'
 import { invalidateAccess } from '@/queries/invalidation'
 import { useContextStore } from '@/stores/context'
 import { errorMessage } from '@/utils/errors'
-import { certificateDaysLeft, credentialKindLabel, hasSecret, isFederated, machineSecret } from '@/utils/machines'
+import {
+  certificateDaysLeft,
+  credentialKindLabel,
+  hasSecret,
+  isFederated,
+  machineSecret,
+  managementScopeLabels,
+} from '@/utils/machines'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
 // Machine access of the project (spec section 13). Create and Reset return credentials once; they go straight
@@ -156,6 +163,16 @@ useHashScroll(
                   </td>
                   <td class="px-3 py-2">
                     <UBadge :label="machine.Scope" color="neutral" variant="outline" size="sm" />
+                    <!-- Only machines with management scopes get more badges; the others look as before (424-57). -->
+                    <UBadge
+                      v-for="managementScope in machine.ManagementScopes ?? []"
+                      :key="managementScope"
+                      :label="managementScopeLabels[managementScope] ?? managementScope"
+                      color="neutral"
+                      variant="subtle"
+                      size="sm"
+                      class="ms-1"
+                    />
                   </td>
                   <td class="px-3 py-2 font-mono text-xs">{{ machine.AnnotationKey ?? 'any' }}</td>
                   <td class="px-3 py-2 text-xs">{{ credentialKindLabel(machine.CredentialKind) }}</td>

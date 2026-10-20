@@ -10,6 +10,7 @@ import type {
   MachineAccessCreate,
   MachineAuthenticationPolicy,
   MachineCredentialKind,
+  MachineManagementScope,
   MemberRoleUpdate,
   SharedCertificate,
   SharedCertificateCreate,
@@ -72,6 +73,21 @@ const credentialKinds: MachineCredentialKind[] = [
   'Federated',
 ]
 const deploymentLifetime = { min: 1, max: 3650, default: 365 }
+
+const managementScopes: MachineManagementScope[] = [
+  'ConfigurationTransfer',
+  'SchemaWrite',
+  'TemplateWrite',
+  'AnnotationManage',
+  'KeyValueManage',
+]
+
+/**
+ * Only an Administrator gives out the credentials of a machine with management scopes (424-57): its creation, a reset
+ * and new federation rules. A Contributor manages the other machines.
+ */
+const requireAdministratorFor = (db: MockDb, key: string, scopes?: MachineManagementScope[]) =>
+  scopes?.length ? requireRole(db, key, 'Administrator') : undefined
 
 /** The policy as the API resolves it (424-14): the enabled kinds in enum order, a default among them, a lifetime. */
 function effectivePolicy(stored: MachineAuthenticationPolicy | undefined): MachineAuthenticationPolicy {
@@ -413,6 +429,16 @@ export const accessManagementHandlers: HttpHandler[] = [
         return denied
       }
       const body = (await request.json()) as MachineAccessCreate
+      const unknownScope = body.ManagementScopes?.find((scope) => !managementScopes.includes(scope))
+      if (unknownScope !== undefined) {
+        return errorResponse(400, `The machine management scope ${unknownScope} doesn't exist.`)
+      }
+      // Stored as the API stores them: distinct, in the order of the enum, and none for an empty list.
+      const picked = managementScopes.filter((scope) => body.ManagementScopes?.includes(scope))
+      const notAdministrator = requireAdministratorFor(db, key, picked)
+      if (notAdministrator) {
+        return notAdministrator
+      }
       const policy = effectivePolicy(db.accessPoints[key]?.MachineAuthentication)
       const kind = body.CredentialKind ?? policy.CredentialKind!
       if (!policy.EnabledCredentialKinds!.includes(kind)) {
@@ -435,6 +461,7 @@ export const accessManagementHandlers: HttpHandler[] = [
           // A Federated machine exists only in Storyteller, like an API key machine in the API: ObjectId is its id.
           ObjectId: kind === 'Federated' ? id : `obj_${random(8)}`,
           Scope: body.Scope,
+          ManagementScopes: picked.length ? picked : undefined,
           AnnotationKey: body.AnnotationKey,
           FederationRules: kind === 'Federated' ? body.FederationRules : undefined,
         },
@@ -471,6 +498,10 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (denied || index < 0) {
         return denied ?? errorResponse(404, 'Not found.', 'NotFound')
       }
+      const notAdministrator = requireAdministratorFor(db, key, list[index]!.ManagementScopes)
+      if (notAdministrator) {
+        return notAdministrator
+      }
       if (list[index]!.CredentialKind === 'Federated') {
         return errorResponse(400, resetNotSupportedMessage)
       }
@@ -503,7 +534,9 @@ export const accessManagementHandlers: HttpHandler[] = [
     `${api}/:org/:project/access/machines/:id/federation-rules`,
     withDb(async (db, { params, request }) => {
       const key = machineScope(params)
-      const denied = requireRole(db, key, 'Contributor')
+      const machine = db.machines?.[key]?.find((entry) => entry.Id === params.id)
+      // As in the API, the role comes before the body: the rules decide which workload gets the machine's tokens.
+      const denied = requireRole(db, key, 'Contributor') ?? requireAdministratorFor(db, key, machine?.ManagementScopes)
       if (denied) {
         return denied
       }
@@ -512,7 +545,6 @@ export const accessManagementHandlers: HttpHandler[] = [
       if (invalid) {
         return errorResponse(400, invalid, 'InvalidFederation')
       }
-      const machine = db.machines?.[key]?.find((entry) => entry.Id === params.id)
       if (!machine) {
         return errorResponse(404, 'Not found.', 'NotFound')
       }

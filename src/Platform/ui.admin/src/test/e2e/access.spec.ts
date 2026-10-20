@@ -145,6 +145,46 @@ test('shared certificates follow CertificateAndApiKey, and a machine can use one
   await expect(page.getByText('shared', { exact: true })).toBeVisible()
 })
 
+// Management scopes (424-57): bulk and structural operations that only Administrators give a machine, shown after its
+// scope in the list and with what they open on the detail.
+test('an Owner creates a machine with a management scope and sees it on its detail', async ({ page }) => {
+  await openApp(page, '/acme/billing/machines')
+  // The seeded machines have none.
+  await expect(page.getByRole('row').filter({ hasText: 'Configuration.Transfer' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'New machine' }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'New machine access' })
+  await expect(dialog.getByText('Bulk and structural operations.')).toBeVisible()
+  const transfer = dialog.getByRole('checkbox', { name: 'Configuration.Transfer' })
+  await expect(transfer).toBeEnabled()
+  await expect(transfer).not.toBeChecked()
+  await transfer.check()
+  await dialog.getByRole('button', { name: 'Create' }).click()
+
+  const secret = page.getByRole('dialog').filter({ hasText: 'Shown only once' })
+  await secret.getByRole('checkbox', { name: 'I have stored these credentials' }).check()
+  await secret.getByRole('button', { name: 'Done' }).click()
+  await expect(secret).toBeHidden()
+
+  const row = page.getByRole('row').filter({ hasText: 'Configuration.Transfer' })
+  await expect(row).toHaveCount(1)
+  await expect(row).toContainText('DefaultRead')
+  await row.getByRole('link').click()
+  const detail = page.locator('#machine-detail')
+  await expect(detail).toContainText('Management scopes')
+  await expect(detail.getByText('Configuration.Transfer', { exact: true })).toBeVisible()
+  await expect(detail.getByText('Exports and imports the views and the key/values of the project.')).toBeVisible()
+})
+
+test('a Contributor cannot give a machine management scopes', async ({ page }) => {
+  // The user contributes to acme.shipping.
+  await openApp(page, '/acme/shipping/machines')
+  await page.getByRole('button', { name: 'New machine' }).first().click()
+  const dialog = page.getByRole('dialog', { name: 'New machine access' })
+  await expect(dialog.getByText('Only Administrators give management scopes.')).toBeVisible()
+  await expect(dialog.getByRole('checkbox', { name: 'Configuration.Transfer' })).toBeDisabled()
+})
+
 // Workload identity federation (424-46): Administrators trust issuers on the Machines page, Contributors create
 // Federated machines with rules; such a machine has no secret and no Reset.
 test('an Administrator adds a trusted issuer from a template', async ({ page }) => {

@@ -4,6 +4,7 @@ import {
   type MachineAccessCreateScope,
   type MachineAuthenticationPolicy,
   type MachineCredentialKind,
+  type MachineManagementScope,
 } from '@42for.net/2splatform.sdk'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
@@ -26,6 +27,30 @@ export const scopeDescriptions: Record<MachineAccessCreateScope, string> = {
   DefaultReadWrite: 'Reads and writes annotations and configurations.',
   SecretsRead: 'Reads configurations and receives key/value secrets (over mTLS when the project requires it).',
   SecretsReadWrite: 'Reads and writes configurations and key/value secrets (over mTLS when the project requires it).',
+}
+
+/**
+ * What each management scope opens (424-57): bulk and structural operations that no scope includes. Each adds to the
+ * scope of the machine, which still decides what the operation may read and write.
+ */
+export const managementScopeDescriptions: Record<MachineManagementScope, string> = {
+  ConfigurationTransfer: 'Exports and imports the views and the key/values of the project.',
+  SchemaWrite: 'Writes and deletes type, annotation and descendant-type schemas.',
+  TemplateWrite: 'Writes and deletes the templates of a view.',
+  AnnotationManage: 'Creates annotations in bulk, deletes them with their descendants and restores them.',
+  KeyValueManage: 'Moves key/values between protection levels in bulk, and restores them in bulk.',
+}
+
+/** Every management scope, in the order of the API. */
+export const managementScopes = Object.keys(managementScopeDescriptions) as MachineManagementScope[]
+
+/** The scope strings of the management scopes, as the credentials of a machine carry them. */
+export const managementScopeLabels: Record<MachineManagementScope, string> = {
+  ConfigurationTransfer: 'Configuration.Transfer',
+  SchemaWrite: 'Schema.Write',
+  TemplateWrite: 'Template.Write',
+  AnnotationManage: 'Annotation.Manage',
+  KeyValueManage: 'KeyValue.Manage',
 }
 
 export const credentialKindDescriptions: Record<MachineCredentialKind, string> = {
