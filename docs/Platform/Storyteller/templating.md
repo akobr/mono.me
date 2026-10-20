@@ -167,7 +167,7 @@ The graph built by `BuildInheritanceGraph` makes the effective order:
 | Unit | Responsibility, then the unit template, then the unit content |
 | Context | Subject, then the context template, then the context content |
 | Usage | Responsibility, subject, then the usage template, then the usage content |
-| Execution | Responsibility, subject, usage, context, then the execution template, then the execution content |
+| Execution | The usage's calculated document (responsibility, subject, usage template, usage content), then the context's calculated document (subject again, context template, context content), then the execution template, then the execution content |
 | Unit of execution | The unit's calculated document, then the execution's calculated document, then the unit-of-execution template, then the unit-of-execution content |
 
 Each ancestor's calculated document already contains that ancestor's template. A responsibility template is inherited by a usage. The usage template is then merged on top of that inherited document, and the usage's stored content is merged last.
@@ -267,6 +267,7 @@ A template item written directly into Cosmos, bypassing the service, leaves exis
 | `GetResolvedConfigurationAsync` and the with-secrets / without-secrets variants | Included, then resolved. `@` strings and `$binding` envelopes are evaluated. |
 | `GetConfigurationHierarchyViewAsync` | Omitted. The view is a map of each annotation key to its stored `Content`. |
 | `GetConfigurationVersionContentAsync` | Omitted. A version stores the document that was written. |
+| `GetConfigurationCompositionAsync` | Included and shown apart. Each template of the view that the walk merges is a source with its version and content, and a step at every node of its type. The origins tell which values it set. See [inheritance.md](inheritance.md#composition-read). |
 
 `GetResolvedConfigurationInternalAsync` loads the calculated document first. Its binding snapshot is a deep clone of that document, so `@config` sees values that arrived from a template. Strings contributed by a template are bound with the same rules as strings stored on the annotation. An object envelope contributed by a template is still an envelope in this calculated document. The resolved read evaluates it. See [binding.md](binding.md).
 
@@ -310,6 +311,8 @@ sform story template delete exe -v rollout
 ```
 
 The configuration commands work the same way. `sform story config versions <key>` lists configuration versions, `config <key> --version <n>` prints the stored content of a version, and `config set --replace` and `config edit` replace the stored content through a JSON Patch. `config edit` edits the stored content of the configuration, without inherited values and templates.
+
+`sform story config composition <key> [-e|--export <file>]` shows how the effective document of `<key>` is composed. It prints a table of the merges in order (`Step`, `Applied at` indented by depth, `Source`, `Version`, `Presence`, and `Values`, the number of values the merge set) and then the effective document with the step that set each line. `--export` writes the whole composition response. A machine restricted to one annotation gets the server's `403 AnnotationRestricted`. See [inheritance.md](inheritance.md#composition-read).
 
 `sform story config patch <key>` applies a JSON Patch to stored content that already exists. With no file, it opens that content in the configured editor, builds the patch from the document that went in and the document that came out, and asks before sending it. `sform story config patch <key> -i patch.json -y` sends the JSON array in the file and skips the question. A change prints `Configuration for '<key>' patched: version 4 → 5.` and the saved configuration. Unchanged content prints `Patch did not change the stored content of '<key>'. Still version 4.`
 
