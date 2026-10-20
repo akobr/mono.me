@@ -39,6 +39,7 @@ declare global {
   const useCan: typeof import('./composables/useRole').useCan
   const useCatalogStore: typeof import('./stores/catalog').useCatalogStore
   const useConfiguration: typeof import('./composables/useConfiguration').useConfiguration
+  const useConfigurationComposition: typeof import('./composables/useConfigurationComposition').useConfigurationComposition
   const useConfirm: typeof import('./composables/useConfirm').useConfirm
   const useContentSearch: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/useContentSearch').useContentSearch
   const useContextStore: typeof import('./stores/context').useContextStore

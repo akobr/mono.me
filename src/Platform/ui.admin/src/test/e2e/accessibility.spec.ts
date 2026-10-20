@@ -120,6 +120,22 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
+    // The Composition view of the Effective tab (424-36), with a step selected and its paths open; the mock composes
+    // flat, so it has depth-1 nodes only.
+    test('the composition of a configuration has no serious accessibility violations', async ({ page }) => {
+      await openApp(
+        page,
+        '/acme/billing/default/configurations/exe.northwind.invoicing.prod/effective?show=composition',
+      )
+      // the first marker is the hidden spacer of the gutter
+      await expect(page.locator('.cm-composition-marker').last()).toBeVisible()
+      const template = page.locator('li[data-step]').filter({ hasText: 'Template · Execution' })
+      await template.getByRole('button', { name: /^Show the lines of step/ }).click()
+      await template.locator('summary').click()
+      await expect(page.locator('.cm-line.cm-composition-selected').first()).toBeVisible()
+      await expectAccessible(page)
+    })
+
     // New configuration (424-42).
     test('the new configuration dialog has no serious accessibility violations', async ({ page }) => {
       await openApp(page, '/acme/billing/default/configurations')

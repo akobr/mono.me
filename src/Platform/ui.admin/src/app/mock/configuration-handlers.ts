@@ -1,8 +1,15 @@
 import { http, HttpResponse, type HttpHandler } from 'msw'
 import { applyPatch, type Operation } from 'fast-json-patch'
-import type { ConfigurationSchema, ConfigurationSummary } from '@42for.net/2splatform.sdk'
+import type {
+  ConfigurationComposition,
+  ConfigurationCompositionOrigin,
+  ConfigurationCompositionSource,
+  ConfigurationCompositionStep,
+  ConfigurationSchema,
+  ConfigurationSummary,
+} from '@42for.net/2splatform.sdk'
 import { codeOfKey, getAllAncestors, metaOf, typeMeta, type AnnotationTypeCode } from '@/utils/annotation-key'
-import { getAt, parsePointer } from '@/utils/json-pointer'
+import { escapeSegment, getAt, parsePointer } from '@/utils/json-pointer'
 import { validateAgainst } from '@/utils/schema-validation'
 import { appendAudit, newEntry } from './audit'
 import { annotationsOf, overridesOf, type MockDb } from './db'
@@ -27,6 +34,7 @@ type KeyParams = ScopeParams & { key: string }
 const projectKey = (params: ScopeParams) => `${params.org}.${params.project}`
 const scopeOf = (params: ScopeParams): ScopeRef => ({ org: params.org, project: params.project, view: params.view })
 const mergeOrder = (key: string) => typeMeta[codeOfKey(key) ?? 'rst'].mergeOrder
+const inMergeOrder = (keys: string[]) => keys.toSorted((a, b) => mergeOrder(a) - mergeOrder(b) || a.localeCompare(b))
 
 const isDeleted = (db: MockDb, params: ScopeParams, key: string) =>
   !!overridesOf(db, params.org, params.project, params.view).trash?.[key]
@@ -51,14 +59,127 @@ export function ownContent(db: MockDb, scope: ScopeRef, key: string): Record<str
 
 /** Ancestors in merge order, then the type template, then the own content (inheritance.md, templating.md). */
 export function effectiveContent(db: MockDb, scope: ScopeRef, key: string): Record<string, unknown> {
-  const layers = getAllAncestors(key)
-    .toSorted((a, b) => mergeOrder(a) - mergeOrder(b) || a.localeCompare(b))
-    .map((ancestor) => ownContent(db, scope, ancestor))
+  const layers = inMergeOrder(getAllAncestors(key)).map((ancestor) => ownContent(db, scope, ancestor))
   layers.push(latest(getDocument(db, scope, `template:${codeOfKey(key)}`))?.Content, ownContent(db, scope, key))
   return layers.reduce<Record<string, unknown>>(
     (merged, layer) => (layer ? (deepMerge(merged, layer) as Record<string, unknown>) : merged),
     {},
   )
+}
+
+/** The Hash of the mock Effective read; the mock composition answers the same one. */
+const mockHash = (content: Record<string, unknown>) =>
+  ((JSON.stringify(content).length * 2654435761) >>> 0).toString(16)
+
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
+
+function compositionSource(db: MockDb, scope: ScopeRef, id: DocumentId): ConfigurationCompositionSource {
+  const version = latest(getDocument(db, scope, id))
+  const content = version?.Content
+  const template = id.startsWith('template:')
+  const key = id.slice(id.indexOf(':') + 1)
+  const code = (template ? key : codeOfKey(key)) as AnnotationTypeCode
+  return {
+    Id: id,
+    Kind: template ? 'Template' : 'Configuration',
+    AnnotationType: typeMeta[code].type,
+    ...(template ? {} : { AnnotationKey: key }),
+    Presence: !content ? 'Missing' : Object.keys(content).length ? 'Present' : 'Empty',
+    Version: content ? version!.Version : 0,
+    ...(content ? { Modified: version!.Modified, Content: content } : {}),
+  }
+}
+
+/**
+ * The composition of the mock Effective read (spec 8.6 of the Composition of the Effective Configuration). It is as
+ * flat as `effectiveContent`: every ancestor is a node at depth 1 merged into the annotation and applies only its own
+ * document, then the annotation applies the template of its type and its own document, so no source is applied twice.
+ * The origins follow `deepMerge`, which replaces arrays: a write takes the step of its value, unless it leaves an
+ * equal scalar in place, which keeps the step that set it first, as on the server.
+ */
+export function compositionOf(db: MockDb, scope: ScopeRef, key: string): ConfigurationComposition {
+  const ancestors = inMergeOrder(getAllAncestors(key))
+  const target = ancestors.length
+  const template: DocumentId = `template:${codeOfKey(key)}`
+  const applied: [DocumentId, number][] = [
+    ...ancestors.map((ancestor, index): [DocumentId, number] => [`configuration:${ancestor}`, index]),
+    ...(latest(getDocument(db, scope, template))?.Content ? [[template, target] as [DocumentId, number]] : []),
+    [`configuration:${key}`, target],
+  ]
+  const sources = applied.map(([id]) => compositionSource(db, scope, id))
+
+  const origins = new Map<string, number>()
+  const mark = (pointer: string, value: unknown, step: number) => {
+    origins.set(pointer, step)
+    if (value && typeof value === 'object') {
+      for (const [name, item] of Object.entries(value)) {
+        mark(`${pointer}/${escapeSegment(name)}`, item, step)
+      }
+    }
+  }
+  // The walk of deepMerge(base, overlay) at `pointer`.
+  const attribute = (base: unknown, overlay: unknown, pointer: string, step: number) => {
+    if (isObject(base) && isObject(overlay)) {
+      for (const [name, value] of Object.entries(overlay)) {
+        const child = `${pointer}/${escapeSegment(name)}`
+        if (name in base) {
+          attribute(base[name], value, child, step)
+        } else {
+          mark(child, value, step)
+        }
+      }
+      return
+    }
+    const scalar = (value: unknown) => value === null || typeof value !== 'object'
+    if (scalar(base) && scalar(overlay) && base === overlay) {
+      return
+    }
+    for (const path of [...origins.keys()].filter((entry) => entry.startsWith(`${pointer}/`))) {
+      origins.delete(path)
+    }
+    mark(pointer, overlay, step)
+  }
+
+  let merged: Record<string, unknown> = {}
+  sources.forEach((source, index) => {
+    if (source.Content) {
+      attribute(merged, source.Content, '', index + 1)
+      merged = deepMerge(merged, source.Content) as Record<string, unknown>
+    }
+  })
+
+  // In document order, a container before its children; the root has no origin.
+  const content = effectiveContent(db, scope, key)
+  const listed: ConfigurationCompositionOrigin[] = []
+  const list = (value: unknown, pointer: string) => {
+    if (pointer && origins.has(pointer)) {
+      listed.push({ Path: pointer, Step: origins.get(pointer) })
+    }
+    if (value && typeof value === 'object') {
+      for (const [name, item] of Object.entries(value)) {
+        list(item, `${pointer}/${escapeSegment(name)}`)
+      }
+    }
+  }
+  list(content, '')
+
+  return {
+    AnnotationKey: key,
+    Content: content,
+    Hash: mockHash(content),
+    Sources: sources,
+    Nodes: [
+      ...ancestors.map((ancestor, index) => ({ Index: index, AnnotationKey: ancestor, MergedInto: target, Depth: 1 })),
+      { Index: target, AnnotationKey: key, MergedInto: null, Depth: 0 },
+    ],
+    Steps: applied.map(([id, node], index): ConfigurationCompositionStep => ({
+      Order: index + 1,
+      SourceId: id,
+      Node: node,
+    })),
+    Origins: listed,
+  }
 }
 
 /** Type schema, descendant-type schemas of the ancestors, then the annotation's own schema. */
@@ -151,7 +272,7 @@ function configurationResponse(db: MockDb, scope: ScopeRef, key: string, content
     Version: version?.Version ?? 0,
     Modified: version?.Modified ?? { At: new Date().toISOString(), By: { Kind: 'System' as const, Id: 'system' } },
     Content: content,
-    Hash: ((JSON.stringify(content).length * 2654435761) >>> 0).toString(16),
+    Hash: mockHash(content),
   }
 }
 
@@ -197,6 +318,19 @@ export const configurationHandlers: HttpHandler[] = [
         return missing
       }
       return HttpResponse.json(configurationResponse(db, scope, params.key, effectiveContent(db, scope, params.key)))
+    }),
+  ),
+
+  // The composition of the mock Effective read, with the same rules for the role and a missing or deleted annotation.
+  http.get<KeyParams>(
+    `${api}/configuration/:key/composition`,
+    withDb((db, { params }) => {
+      const denied = requireRole(db, projectKey(params), 'Reader')
+      if (denied) {
+        return denied
+      }
+      const missing = missingOrDeleted(db, params, 404)
+      return missing ?? HttpResponse.json(compositionOf(db, scopeOf(params), params.key))
     }),
   ),
 

@@ -233,3 +233,94 @@ test('compare views never compares a view with itself', async ({ page }) => {
   await expect(page.getByText('Compare a configuration across views')).toBeHidden()
   expect(diffs).toEqual([])
 })
+
+/** The step marker of the gutter level with the editor line that contains `text`. */
+async function markerOf(page: Page, text: string): Promise<string | undefined> {
+  return page.evaluate((needle) => {
+    const line = [...document.querySelectorAll('.cm-line')].find((element) => element.textContent?.includes(needle))
+    const box = line?.getBoundingClientRect()
+    const marker = [...document.querySelectorAll('.cm-composition-gutter .cm-composition-marker')].find((element) => {
+      const rect = element.getBoundingClientRect()
+      const middle = (rect.top + rect.bottom) / 2
+      // the hidden spacer keeps the width of the gutter
+      return getComputedStyle(element).visibility !== 'hidden' && !!box && middle > box.top && middle < box.bottom
+    })
+    return marker?.textContent ?? undefined
+  }, text)
+}
+
+// The Composition view of the Effective tab (424-36): the mock composes flat, so every ancestor is applied once.
+test('the composition shows the step that set each line and selects the lines of a step', async ({ page }) => {
+  const effectiveReads: string[] = []
+  page.on('requestfinished', (request) => {
+    if (request.method() === 'GET' && new URL(request.url()).pathname.endsWith(`/configuration/${key}`)) {
+      effectiveReads.push(request.url())
+    }
+  })
+  await openApp(page, `${path}/effective`)
+  // The usage gets a value the execution template lacks and a mode the template replaces. The context's 120 values
+  // put the own value of the execution far below the top of the editor (70vh).
+  await page.evaluate(
+    ([usage, context, execution]) => {
+      const mock = window.storytellerMock!
+      mock.changeConfiguration(usage, { queue: 'invoices', mode: 'stream' })
+      mock.changeConfiguration(
+        context,
+        Object.fromEntries(Array.from({ length: 120 }, (_, index) => [`setting${index + 1}`, index + 1])),
+      )
+      mock.changeConfiguration(execution, { owner: 'invoices-team' })
+    },
+    ['usg.northwind.invoicing', 'cnt.northwind.prod', key] as const,
+  )
+  const readsBefore = effectiveReads.length
+  await page.getByRole('radio', { name: 'Composition' }).click()
+  await expect(page).toHaveURL(/[?&]show=composition(&|$)/)
+  await expect(page.locator('.cm-content')).toContainText('"queue": "invoices"')
+
+  const steps = page.locator('li[data-step]')
+  const usage = await steps.filter({ hasText: 'usg.northwind.invoicing' }).getAttribute('data-step')
+  const template = await steps.filter({ hasText: 'Template · Execution' }).getAttribute('data-step')
+  await expect.poll(() => markerOf(page, '"queue": "invoices"')).toBe(usage)
+  await expect.poll(() => markerOf(page, '"mode": "batch"')).toBe(`${template}T`)
+  // the Effective read from before the changes is read again once, and then the hashes agree
+  await expect.poll(() => effectiveReads.length).toBe(readsBefore + 1)
+  await expect(page.getByText('Read at different times')).toHaveCount(0)
+
+  // the toggle highlights the lines of the template step and keeps the focus
+  const toggle = page.getByRole('button', { name: `Show the lines of step ${template}` })
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(toggle).toBeFocused()
+  const selected = page.locator('.cm-line.cm-composition-selected')
+  await expect(selected.filter({ hasText: '"mode": "batch"' })).toHaveCount(1)
+  await expect(selected.filter({ hasText: '"queue"' })).toHaveCount(0)
+  const status = page.getByText(/^Line \d+: step \d+ · /)
+  await expect(status).toHaveText(new RegExp(String.raw`^Line \d+: step ${template} · Template · Execution$`))
+
+  // a click on a marker selects its step
+  await page
+    .locator('.cm-composition-marker')
+    .filter({ hasText: new RegExp(`^${usage}$`) })
+    .first()
+    .click()
+  await expect(page.getByRole('button', { name: `Show the lines of step ${usage}` })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  )
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+  await expect(selected.filter({ hasText: '"queue": "invoices"' })).toHaveCount(1)
+  await expect(status).toHaveText(new RegExp(String.raw`^Line \d+: step ${usage} · usg\.northwind\.invoicing$`))
+
+  // the toggle of the own step scrolls the editor down to its line, and the focus stays on the toggle
+  const own = await steps.filter({ hasText: key }).getAttribute('data-step')
+  expect(await page.locator('.cm-scroller').evaluate((element) => element.scrollTop)).toBe(0)
+  const ownToggle = page.getByRole('button', { name: `Show the lines of step ${own}` })
+  await ownToggle.click()
+  await expect(selected.filter({ hasText: '"owner": "invoices-team"' })).toBeInViewport()
+  await expect(ownToggle).toBeFocused()
+
+  // Document is the default again, without the query
+  await page.getByRole('radio', { name: 'Document' }).click()
+  await expect(page).not.toHaveURL(/show=/)
+  await expect(page.locator('.cm-composition-gutter')).toHaveCount(0)
+})
