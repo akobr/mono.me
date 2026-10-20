@@ -12,13 +12,27 @@ namespace _42.Platform.Cli.Output;
 public static class CompositionConsoleExtensions
 {
     /// <summary>
+    /// The columns of the step table. The key in 'Applied at' takes the width that is left and wraps in it, so the short
+    /// columns keep their text on one line in an 80-column terminal.
+    /// </summary>
+    public static IReadOnlyList<IHeaderColumn> StepColumns { get; } =
+    [
+        new HeaderColumn("Step"),
+        new HeaderColumn("Applied at", GridLength.Star(1)),
+        new HeaderColumn("Source"),
+        new HeaderColumn("Version"),
+        new HeaderColumn("Presence"),
+        new HeaderColumn("Values"),
+    ];
+
+    /// <summary>
     /// Writes the steps of a composition as a table, in the order of application, then the effective document with the
     /// step that set each line (the blame listing).
     /// </summary>
     public static void WriteComposition(this IExtendedConsole @this, ConfigurationComposition composition)
     {
         @this.WriteHeader($"Composition of the configuration for '{composition.AnnotationKey}'");
-        @this.WriteTable(GetStepRows(composition), new[] { "Step", "Applied at", "Source", "Version", "Presence", "Values" });
+        @this.WriteTable(GetStepRows(composition), StepColumns);
 
         @this.WriteLine();
         @this.WriteHeader("Effective configuration, by step");

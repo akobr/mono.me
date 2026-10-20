@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Commands.Configuration;
+using _42.Platform.Cli.Output;
 using _42.Platform.Storyteller.Sdk;
+using Alba.CsConsoleFormat;
 using McMaster.Extensions.CommandLineUtils;
 using Microsoft.Extensions.DependencyInjection;
 using Moq;
@@ -58,6 +61,21 @@ public class ConfigCompositionCommandTests
             ["6", Key, "template Execution", "v4", "present", "1"],
             ["7", Key, "configuration", "v1", "empty", "0"],
         ]);
+    }
+
+    [Fact]
+    public void StepTable_In80Columns_WrapsOnlyTheKey()
+    {
+        var rows = CompositionConsoleExtensions.GetStepRows(Execution());
+
+        var lines = RenderTable(rows, CompositionConsoleExtensions.StepColumns, 80);
+
+        lines.ShouldContain(line => Regex.IsMatch(line, @"^\s*Step\s+Applied at\s+Source\s+Version\s+Presence\s+Values\s*$"));
+        foreach (var row in rows)
+        {
+            var pattern = $@"^\s*{row[0]}\s+.*\s{Regex.Escape(row[2])}\s+{Regex.Escape(row[3])}\s+{row[4]}\s+{row[5]}\s*$";
+            lines.ShouldContain(line => Regex.IsMatch(line, pattern), $"row {row[0]}:{Environment.NewLine}{string.Join(Environment.NewLine, lines)}");
+        }
     }
 
     [Fact]
@@ -230,6 +248,23 @@ public class ConfigCompositionCommandTests
                 Origin("/mode", 6),
             ],
         };
+    }
+
+    // The grid of ExtendedConsole.WriteTable, rendered as text at the given width.
+    private static IReadOnlyList<string> RenderTable(IEnumerable<string[]> rows, IReadOnlyList<IHeaderColumn> columns, int width)
+    {
+        var grid = new Grid { Stroke = LineThickness.None, Margin = new Thickness(1, 0) };
+        grid.Columns.Add(columns.Select(column => column.Size).OfType<object>().ToArray());
+        grid.Children.Add(columns.Select(column => new Cell(column.Content) { Stroke = LineThickness.None, Margin = new Thickness(1, 0) }).ToList());
+        grid.Children.Add(new Cell(new Separator()) { ColumnSpan = columns.Count, Stroke = LineThickness.None });
+
+        foreach (var row in rows)
+        {
+            grid.Children.Add(row.Select(text => new Cell(text) { Stroke = LineThickness.None, Margin = new Thickness(1, 0) }).OfType<object>().ToArray());
+        }
+
+        var text = ConsoleRenderer.RenderDocumentToText(new Document(grid), new TextRenderTarget(), new Rect(0, 0, width, Size.Infinity));
+        return text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
     }
 
     private static ConfigurationCompositionSource Configuration(
