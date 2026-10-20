@@ -200,11 +200,14 @@ public class MachineHttpTests
         access.Created.ShouldBeNull();
     }
 
-    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran.
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran. A name that is not a
+    // management scope, also the dotted scope string that only sform accepts, is not a machine either.
     [Theory]
     [InlineData("", "The machine is missing.")]
     [InlineData("null", "The machine is missing.")]
     [InlineData("[1, 2]", "The request body is not a machine (at $).")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scope": "DefaultRead", "ManagementScopes": ["Bogus"] }""", "The request body is not a machine (at $.ManagementScopes[0]).")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scope": "DefaultRead", "ManagementScopes": ["Configuration.Transfer"] }""", "The request body is not a machine (at $.ManagementScopes[0]).")]
     public async Task PostMachines_MissingOrInvalidBody_IsBadRequestAndNoMachineIsCreated(string body, string message)
     {
         var access = new RecordingAccess(Machine());

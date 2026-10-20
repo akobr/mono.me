@@ -325,6 +325,68 @@ public class MachineAccessRulesTests
         exception.Message.ShouldContain("workload identity federation");
     }
 
+    // A federated machine reaches its document on its own branch (424-57); the management scope of the operation is still
+    // checked on that document and on the token of the exchange.
+    [Theory]
+    [MemberData(nameof(MachineAccessCheckTests.EveryManagementReach), MemberType = typeof(MachineAccessCheckTests))]
+    public async Task CheckAccessTo_FederatedMachineWithTheManagementScopeStoredAndCarried_Passes(MachineAccessCheckTests.Reach reach)
+    {
+        var access = new FederationAccessService();
+        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead, MachineManagementScope.ConfigurationTransfer));
+        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read, Scopes.Configuration.Transfer);
+
+        await CheckManagement(reach, request, access, MachineManagementScope.ConfigurationTransfer);
+
+        access.Calls.ShouldBe([$"get:org1/proj1/{FederatedMachineId}"]);
+    }
+
+    // A token that asked for a subset of the machine's scopes leaves the management scope out.
+    [Theory]
+    [MemberData(nameof(MachineAccessCheckTests.EveryManagementReach), MemberType = typeof(MachineAccessCheckTests))]
+    public async Task CheckAccessTo_FederatedMachineWithoutTheCarriedManagementScope_IsAccessDenied(MachineAccessCheckTests.Reach reach)
+    {
+        var access = new FederationAccessService();
+        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead, MachineManagementScope.ConfigurationTransfer));
+        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(
+            () => CheckManagement(reach, request, access, MachineManagementScope.ConfigurationTransfer));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the management scope Configuration.Transfer, which the credentials of the machine do not carry.");
+    }
+
+    [Theory]
+    [MemberData(nameof(MachineAccessCheckTests.EveryManagementReach), MemberType = typeof(MachineAccessCheckTests))]
+    public async Task CheckAccessTo_FederatedMachineWithoutTheStoredManagementScope_IsAccessDenied(MachineAccessCheckTests.Reach reach)
+    {
+        var access = new FederationAccessService();
+        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead));
+        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(
+            () => CheckManagement(reach, request, access, MachineManagementScope.ConfigurationTransfer));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the management scope Configuration.Transfer, which the machine was not created with.");
+    }
+
+    // The entry points that take a management scope, in org1.proj1: the project, one annotation and several.
+    private static Task CheckManagement(
+        MachineAccessCheckTests.Reach reach,
+        TestHttpRequestData request,
+        IAccessService access,
+        MachineManagementScope managementScope)
+    {
+        return reach switch
+        {
+            MachineAccessCheckTests.Reach.Project => request.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Contributor, managementScope),
+            MachineAccessCheckTests.Reach.Annotation => request.CheckAccessToAnnotationAsync(access, "org1", "proj1", "exe.S.R.C", AccountRole.Contributor, managementScope),
+            MachineAccessCheckTests.Reach.Annotations => request.CheckAccessToAnnotationsAsync(access, "org1", "proj1", ["exe.S.R.C", "uxe.S.R.C.U"], AccountRole.Contributor, managementScope),
+            _ => throw new ArgumentOutOfRangeException(nameof(reach), reach, null),
+        };
+    }
+
     private static TestHttpRequestData FederatedRequest(string organization, string project, params string[] roles)
     {
         return FederatedRequest(organization, project, new FixedPolicyStore(MachineCredentialKind.Federated), roles);
