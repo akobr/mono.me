@@ -181,7 +181,7 @@ configureStoryteller({
     project: 'billing',
     machineId: '3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07',                  // client_id
     getSubjectToken: () => getVercelOidcToken({ audience: tokenEndpoint }), // never the default audience
-    scope: 'Annotation.Read',                                             // optional: a subset of the machine's scopes
+    scope: 'Annotation.Read',                                             // optional: a subset of the machine's scopes, its management scopes included; all of them when omitted
   }),
 })
 

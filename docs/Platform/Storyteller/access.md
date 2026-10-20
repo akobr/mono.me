@@ -41,9 +41,9 @@ A `View` has `Name`, `Description`, `Created` (the [audit stamp](audit-stamps.md
 | Give, change, or remove the role `Owner` | `Owner` |
 | Leave an access point (remove yourself) | any membership |
 | Read deleted annotations and the history of an annotation | `Reader` on the project |
-| Delete, restore, and re-create annotations | `Contributor` on the project; machines with annotation write |
+| Delete, restore, and re-create annotations | `Contributor` on the project; machines with annotation write and the management scope `Annotation.Manage`. A machine re-creates a single key (`PUT …/annotations/{key}`) without it |
 | Delete an annotation permanently (`DELETE …/annotations/deleted/{key}`) | `Administrator` on the project, users only: machine credentials get `403` |
-| Export a view, import into a view, and read those jobs | `Administrator` on the project for users, and the scopes of every included kind. Machines have no role and need only the scopes; a machine restricted to an annotation gets `403` `AnnotationRestricted` (see [export-import.md](export-import.md#access)) |
+| Export a view, import into a view, and read those jobs | `Administrator` on the project for users, and the scopes of every included kind. Machines have no role and need the scopes and the management scope `Configuration.Transfer`; a machine restricted to an annotation gets `403` `AnnotationRestricted` (see [export-import.md](export-import.md#access)) |
 | Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, or the scope `Configuration.Secrets` (see [key-values.md](key-values.md#secret-delivery)) |
 | Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project |
 
@@ -51,7 +51,7 @@ See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation ro
 
 The API reads schemas, templates, deleted annotations and what the comparison of views needs (the views, the configurations and their diffs) with `Reader`. The admin UI locks its **Modeling** page, where they are, below `Contributor`; that lock is a choice of the admin UI. Its **Export & Import** tab is locked below `Administrator`, as the API requires (see [export-import.md](export-import.md#administration-ui)).
 
-Machines have no role; their scope decides. A machine created with an `AnnotationKey` reaches only that annotation and its descendants, and gets `403` `AnnotationRestricted` for other annotations and for operations of the whole project (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)).
+Machines have no role; their scope and their [management scopes](authentication.md#management-scopes-of-machines) decide. The scope is a runtime preset of per-document reads and writes. Bulk and structural operations need a management scope on top of it: the export and import of a view or of key/values, schema and template writes, the bulk create, soft delete and restore of annotations, and the protect and bulk restore of key/values. Only an `Administrator` creates a machine with management scopes, resets it or replaces its federation rules. A machine created with an `AnnotationKey` reaches only that annotation and its descendants, and gets `403` `AnnotationRestricted` for other annotations and for operations of the whole project (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)).
 
 Every access point keeps at least one `Owner`. The last owner can't be demoted, removed, or leave (`409`, `LastOwner`).
 

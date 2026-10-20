@@ -87,7 +87,7 @@ A second delete of the same key returns the existing deletion. A delete that did
 
 ## Re-create
 
-A create of a deleted key re-creates it, and so does a create below a deleted ancestor, which re-creates the ancestor. Four calls do it: `SetAnnotation`, `SetAnnotations`, `SetAnnotationsSimple`, and the import of an annotation file with `Existing` set to `Overwrite` ([Export and import](#export-and-import)). Any Contributor may do it with the first three; the import needs the Administrator role ([export-import.md](export-import.md#access)). The API never asks; clients look up deleted keys first and offer a restore.
+A create of a deleted key re-creates it, and so does a create below a deleted ancestor, which re-creates the ancestor. Four calls do it: `SetAnnotation`, `SetAnnotations`, `SetAnnotationsSimple`, and the import of an annotation file with `Existing` set to `Overwrite` ([Export and import](#export-and-import)). Any Contributor may do it with the first three; the import needs the Administrator role ([export-import.md](export-import.md#access)). A machine needs an annotation write scope for the first three, and also the management scope `Annotation.Manage` for the two bulk calls, so `SetAnnotation` re-creates one key without it; the import needs the management scope `Configuration.Transfer` instead (see [Management scopes of machines](authentication.md#management-scopes-of-machines)). The API never asks; clients look up deleted keys first and offer a restore.
 
 - The item is replaced by the new content, with empty relation arrays and a new `Created` stamp.
 - The configuration is deleted after its content went to the versions. The first new configuration version continues the numbering, so the versions of the previous lifetime stay visible until they expire.
@@ -154,17 +154,19 @@ All routes are under `v1/{organization}/{project}/{view}/annotations` (`Api.Func
 | Method | Route | Role | Result |
 | --- | --- | --- | --- |
 | PUT, POST | `…/{key}` | Contributor | Creates, updates, or re-creates; `200` with the stored annotation, so the client receives the stamps. `400 InvalidAnnotation` or `InvalidKey`, and `400` for a body that is not a JSON object, has no known `AnnotationType` or is not UTF-8; `409` after three concurrent changes. |
-| POST | `…` and `…/simple` | Contributor | Bulk create (at most 100); deleted keys and deleted ancestors are re-created. `400` for a missing list (an empty body or `null`), and on `…` for a `null` entry; an empty list answers `200 []`. |
-| DELETE | `…/{key}` | Contributor | Soft delete with the descendants; `200 AnnotationDeletionResult`. A repeated delete returns the existing deletion. `404` when missing. |
+| POST | `…` and `…/simple` | Contributor; machines `Annotation.Manage` | Bulk create (at most 100); deleted keys and deleted ancestors are re-created. `400` for a missing list (an empty body or `null`), and on `…` for a `null` entry; an empty list answers `200 []`. |
+| DELETE | `…/{key}` | Contributor; machines `Annotation.Manage` | Soft delete with the descendants; `200 AnnotationDeletionResult`. A repeated delete returns the existing deletion. `404` when missing. |
 | GET | `…` and the per-type lists | Reader | `AnnotationsResponse` of active annotations; `?includeInactive=true` and `?includeDeleted=true` add the others ([Active annotations](#active-annotations)); `?continuationToken=`. |
 | GET | `…/{key}` | Reader | The annotation; `404` when missing or deleted, `404 AnnotationInactive` when it is not active. `?includeInactive=true` and `?includeDeleted=true` return those too. |
 | GET | `…/{key}/{descendants}` | Reader | The descendants of the key that are active; the same two flags. |
 | GET | `…/deleted` | Reader | `AnnotationsResponse` with `Deletion` on each item, newest deletion first. `?roots=true` (default) lists only the roots, `?roots=false` everything; `?deletionId=` what one delete removed; `?continuationToken=`. |
 | GET | `…/deleted/{key}` | Reader | The deleted annotation with `Deletion`; `404` when it is not deleted. |
 | POST | `…/deleted/lookup` | Reader | `AnnotationKeysRequest` (at most 100 keys) → the deleted annotations among them; active and unknown keys are left out. `400 InvalidKey` for an invalid key, no keys, too many, or a body that is not an object with `Keys`. |
-| POST | `…/deleted/restore` | Contributor | `AnnotationRestoreRequest` (`Keys`, at most 100, and `Descendants`, default `true`) → `200 AnnotationRestoreResult`; a partial success lists the failed keys in `Failed`. `400 InvalidKey` as for the lookup. |
+| POST | `…/deleted/restore` | Contributor; machines `Annotation.Manage` | `AnnotationRestoreRequest` (`Keys`, at most 100, and `Descendants`, default `true`) → `200 AnnotationRestoreResult`; a partial success lists the failed keys in `Failed`. `400 InvalidKey` as for the lookup. |
 | DELETE | `…/deleted/{key}` | Administrator, users only | Permanent delete; `200 AnnotationPurgeResult`. `409 AnnotationNotDeleted` for an active key, `404` when missing. |
 | GET | `…/{key}/history` | Reader | `AnnotationHistory`, for active and deleted keys; `404` for a purged or unknown key. |
+
+Machines have no role: their scopes decide, and the permanent delete refuses them. The rows marked `Annotation.Manage` also need that [management scope](authentication.md#management-scopes-of-machines), stored on the machine and carried by its credentials; without it they answer `403 AccessDenied`, also in Debug builds. A single `PUT` or `POST` of `…/{key}` needs no management scope.
 
 The literal segments `deleted` and `history` win over `{key}` and `{descendants}`; an annotation key always starts with a type code and a dot, so it can't be `deleted`, `lookup`, or `restore`.
 
@@ -189,7 +191,7 @@ The `sform story` commands (`src/Platform/Cli/src/Commands/Storyteller/`) work o
 | `sform story get <key>` | Prints the annotation whatever its status (`includeInactive=true`). For a deleted key, it says who deleted it and when, the purge date, and the restore command. |
 | `sform story set <key> [--restore-deleted\|--recreate]` | Before writing, it looks up the key and its ancestors. When some are deleted, it lists them and asks: **Restore and update** (restore them alone, then write), **Create new** (write, which re-creates them empty), or **Cancel**. The options answer the question in advance. When the input is redirected and neither option is given, it stops with `2` and names both. A rejected body prints the server's message (for example `InvalidAnnotation`). |
 
-`sform story export` and `sform story import` move the documents of the view as a zip, annotations included, for an Administrator or an Owner of the project, or a machine with the scopes of the included kinds ([export-import.md](export-import.md#cli)).
+`sform story export` and `sform story import` move the documents of the view as a zip, annotations included, for an Administrator or an Owner of the project, or a machine with the scopes of the included kinds and the management scope `Configuration.Transfer` ([export-import.md](export-import.md#cli)).
 
 ## Validation
 

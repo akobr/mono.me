@@ -281,19 +281,27 @@ Base `P` = `v1/{organization}/{project}/key-values`.
 | `GET` | `P/audit` | query `view`, `key`, `operation`, `from`, `to`, `continuationToken` → `KeyValueAuditResponse`, newest first | Administrator |
 | `GET` | `v1/{organization}/{project}/usage/key-values` | query `from`, `to` (`yyyy-MM-dd`, the last 30 days by default, at most 400) → `KeyValueUsageReport` | Administrator |
 
-The Administrator operations are for users only; a machine gets `403` whatever its scopes.
+The Administrator operations are for users only; a machine gets `403` whatever its scopes and management scopes.
 
 ### Who may do what
 
 | Operation | User, project role | Machine, any of these scopes |
 | --- | --- | --- |
-| List, get without reveal, versions, a public version or diff, export without secrets, policy, recipients | `Reader` | `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read`, `Default.ReadWrite` |
-| Reveal, a secret version or diff, export with secrets | `ContributorWithSecrets` | a read scope and `Configuration.Secrets`, under the mTLS rule |
-| Set, delete or restore a public pair; import of public items | `Contributor` | `Configuration.ReadWrite`, `Default.ReadWrite` |
-| Set, delete, restore or protect a secret; a change to or from a secret level; import with secrets | `ContributorWithSecrets` | a write scope and `Configuration.Secrets`, under the mTLS rule |
+| List, get without reveal, versions, a public version or diff, policy, recipients | `Reader` | `Configuration.Read`, `Configuration.ReadWrite`, `Default.Read`, `Default.ReadWrite` |
+| Export without secrets | `Reader` | a read scope and `Configuration.Transfer` |
+| Reveal, a secret version or diff | `ContributorWithSecrets` | a read scope and `Configuration.Secrets`, under the mTLS rule |
+| Export with secrets | `ContributorWithSecrets` | a read scope, `Configuration.Secrets` and `Configuration.Transfer`, under the mTLS rule |
+| Set or delete a public pair | `Contributor` | `Configuration.ReadWrite`, `Default.ReadWrite` |
+| Restore public pairs (`K/restore`) | `Contributor` | a write scope and `KeyValue.Manage` |
+| Import of public items | `Contributor` | a write scope and `Configuration.Transfer` |
+| Set or delete a secret; a change to or from a secret level | `ContributorWithSecrets` | a write scope and `Configuration.Secrets`, under the mTLS rule |
+| Restore or protect secrets (`K/restore`, `K/protect`) | `ContributorWithSecrets` | a write scope, `Configuration.Secrets` and `KeyValue.Manage`, under the mTLS rule |
+| Import with secrets | `ContributorWithSecrets` | a write scope, `Configuration.Secrets` and `Configuration.Transfer`, under the mTLS rule |
 | Permanent delete, purge, policy changes, BYOK setup and verify, rotation, recipients, audit, usage | `Administrator` | never |
 
-A machine restricted to an annotation gets `403 AnnotationRestricted` for every operation of this table that machines may call, because key/values belong to the whole view (the Administrator operations refuse every machine with `403 AccessDenied`); it receives the values that the configuration of its annotation binds, through the resolved configuration (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)). A caller without the rights to a secret gets `403 AccessDenied`; a machine whose only missing piece is the mTLS certificate gets `403 MtlsRequired`. Responses that carry a secret value are `Cache-Control: no-store`. A query parameter that does not parse is `400 InvalidQuery`.
+`Configuration.Transfer` and `KeyValue.Manage` are [management scopes](authentication.md#management-scopes-of-machines): no machine preset includes them, and an Administrator grants them to a machine explicitly. A machine without the management scope of an operation gets `403 AccessDenied` with a message that names it, for example "This operation needs the management scope KeyValue.Manage, which the machine was not created with.". The single-key writes stay runtime: a `PUT` with `Protection` and secret rights still changes the level of one key, a `PUT` to a deleted key re-creates it, and a `DELETE` soft-deletes one key, all without a management scope.
+
+A machine restricted to an annotation gets `403 AnnotationRestricted` for every operation of this table that machines may call, because key/values belong to the whole view (the Administrator operations refuse every machine with `403 AccessDenied`); it receives the values that the configuration of its annotation binds, through the resolved configuration (see [Annotation restriction of machines](authentication.md#annotation-restriction-of-machines)). The restriction is checked before the management scope. A caller without the rights to a secret gets `403 AccessDenied`; a machine whose only missing piece is the mTLS certificate gets `403 MtlsRequired`. Responses that carry a secret value are `Cache-Control: no-store`. A query parameter that does not parse is `400 InvalidQuery`.
 
 ### Examples
 
@@ -339,7 +347,7 @@ The C# SDK (`Sdk.NSwag`, generated by NSwag) has `IKeyValuesApiClient` with one 
 
 ## CLI
 
-`sform story kv` (also `sform story key-values`) works in the context of the signed-in user: the organization, project and view of `sform` (`-p <organization>.<project>` and `-v <view>` override them). The project commands (`policy`, `recipients`, `audit`, `usage`) ignore the view. The API decides the rights, so a Reader lists and reads public pairs, a `ContributorWithSecrets` reveals and writes secrets, and an Administrator changes the policy; a refusal prints the message and the error code of the API, and a `403 MtlsRequired` says that a machine needs its certificate.
+`sform story kv` (also `sform story key-values`) works in the context of the signed-in user: the organization, project and view of `sform` (`-p <organization>.<project>` and `-v <view>` override them). The project commands (`policy`, `recipients`, `audit`, `usage`) ignore the view. The API decides the rights, so a Reader lists and reads public pairs, a `ContributorWithSecrets` reveals and writes secrets, and an Administrator changes the policy. A machine sign-in also needs the management scope `Configuration.Transfer` for `export` and `import`, and `KeyValue.Manage` for `restore` and `protect` (see [Who may do what](#who-may-do-what)); a refusal prints the message and the error code of the API, and a `403 MtlsRequired` says that a machine needs its certificate.
 
 ```text
 sform story kv [--prefix <prefix>] [--protection <level>]... [--values] [--deleted|--all] [-k <token>]
@@ -427,6 +435,8 @@ An export lists the active keys, filtered by prefix and levels, ordered by key. 
 An import of up to 1,000 items first validates everything (keys, sizes, duplicates, allowed levels, and with `Replace` the prefix) and plans every item against the current state, deleted keys included. Any error returns `400 ImportInvalid` with the failing items, and nothing is written. The plan gives each item `Create`, `Update`, `Unchanged` or, in `Replace` mode, `Delete` for the active keys under the prefix that the document does not list. `DryRun` returns the plan. The writes go in atomic batches of 50 keys; a batch that another writer disturbed falls back to single writes. An import is idempotent: a second run of the same document changes nothing, and a run after a partial failure writes the rest. The keys a `Replace` deleted come back with one restore by prefix.
 
 A caller without secret rights can import public items only: a secret value in the document, a level change to or from a secret, or a `Replace` that would delete a secret answers `403`.
+
+A machine needs the management scope `Configuration.Transfer` for both, on top of a read scope for an export and a write scope for an import; without it, the export and the import answer `403 AccessDenied` before the body is read (see [Who may do what](#who-may-do-what)).
 
 ## Binding
 
