@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using _42.Platform.Cli.Output;
 using _42.Platform.Cli.UnitTests.Commands;
+using _42.Platform.Storyteller.Sdk;
 using Shouldly;
 using Xunit;
 
@@ -25,6 +27,23 @@ public class ApiRefusalTests
 
         refusal.Message.ShouldBe("No Administrator access to 'acme.billing'.");
         refusal.ErrorCode.ShouldBeNull();
+        refusal.MayBeTheCredentials.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Forbidden_NotDeclaredByTheOperation_ReadsTheMessageFromTheResponseText()
+    {
+        var exception = new ApiException(
+            "Forbidden",
+            403,
+            "{\"Message\":\"No Administrator access to 'acme.billing'.\",\"ErrorCode\":\"AccessDenied\"}",
+            new Dictionary<string, IEnumerable<string>>(),
+            null);
+
+        var refusal = ApiRefusal.Of(exception);
+
+        refusal.Message.ShouldBe("No Administrator access to 'acme.billing'.");
+        refusal.ErrorCode.ShouldBe("AccessDenied");
         refusal.MayBeTheCredentials.ShouldBeFalse();
     }
 

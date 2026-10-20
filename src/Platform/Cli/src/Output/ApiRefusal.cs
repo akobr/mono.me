@@ -17,14 +17,18 @@ internal sealed record ApiRefusal(string Message, string? ErrorCode, bool MayBeT
     {
         // A 403 with the server's message names what is missing, for example a management scope the machine was not
         // created with: the credentials were accepted. A 401, or a 403 without a message, says nothing more.
-        if (exception.StatusCode == (int)HttpStatusCode.Forbidden
-            && exception is ApiException<ErrorResponse> { Result: { } error }
-            && !string.IsNullOrWhiteSpace(error.Message))
+        // An operation that does not declare 403 leaves the body as text, so read both shapes.
+        if (exception.StatusCode == (int)HttpStatusCode.Forbidden)
         {
-            return new ApiRefusal(
-                error.Message,
-                string.IsNullOrWhiteSpace(error.ErrorCode) ? null : error.ErrorCode,
-                MayBeTheCredentials: false);
+            var (message, errorCode) = KeyValueConsoleExtensions.ReadError(exception);
+
+            if (!string.IsNullOrWhiteSpace(message))
+            {
+                return new ApiRefusal(
+                    message,
+                    string.IsNullOrWhiteSpace(errorCode) ? null : errorCode,
+                    MayBeTheCredentials: false);
+            }
         }
 
         return new ApiRefusal(GeneralMessage, null, MayBeTheCredentials: true);
