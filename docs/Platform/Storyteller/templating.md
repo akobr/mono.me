@@ -297,6 +297,8 @@ sform story template diff <type> [to] [from]
 | `versions` | Lists the versions, newest first: version, author, creation time, and expiration time (`—` for the current version). |
 | `diff` | Shows the diff of the latest version against its previous one, of `to` against its previous one, or of `from → to`. |
 
+When the API refuses `set`, `edit` or `delete` with `403`, for example for a machine without the management scope `Template.Write`, the command prints the server's message ("This operation needs the management scope Template.Write, which the machine was not created with.") and `Error code: AccessDenied`, and exits with `44`.
+
 Examples, for the `default` view of the current project:
 
 ```text

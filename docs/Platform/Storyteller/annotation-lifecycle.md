@@ -191,6 +191,8 @@ The `sform story` commands (`src/Platform/Cli/src/Commands/Storyteller/`) work o
 | `sform story get <key>` | Prints the annotation whatever its status (`includeInactive=true`). For a deleted key, it says who deleted it and when, the purge date, and the restore command. |
 | `sform story set <key> [--restore-deleted\|--recreate]` | Before writing, it looks up the key and its ancestors. When some are deleted, it lists them and asks: **Restore and update** (restore them alone, then write), **Create new** (write, which re-creates them empty), or **Cancel**. The options answer the question in advance. When the input is redirected and neither option is given, it stops with `2` and names both. A rejected body prints the server's message (for example `InvalidAnnotation`). |
 
+A machine without the management scope `Annotation.Manage` gets `403` from `sform story delete`, `sform story restore` and the restore of `sform story set --restore-deleted`. The command prints the server's message, for example "This operation needs the management scope Annotation.Manage, which the machine was not created with.", and `Error code: AccessDenied`, and exits with `44`. `restore` first lists what its earlier requests restored.
+
 `sform story export` and `sform story import` move the documents of the view as a zip, annotations included, for an Administrator or an Owner of the project, or a machine with the scopes of the included kinds and the management scope `Configuration.Transfer` ([export-import.md](export-import.md#cli)).
 
 ## Validation
