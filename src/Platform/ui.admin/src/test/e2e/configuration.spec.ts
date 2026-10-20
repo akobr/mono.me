@@ -249,6 +249,42 @@ async function markerOf(page: Page, text: string): Promise<string | undefined> {
   }, text)
 }
 
+/** The scroll position of the panel around the steps of the composition: its nearest scrolling ancestor. */
+async function panelScrollTop(page: Page): Promise<number> {
+  return page
+    .locator('li[data-step]')
+    .first()
+    .evaluate((element) => {
+      for (let node = element.parentElement; node; node = node.parentElement) {
+        const overflow = getComputedStyle(node).overflowY
+        if ((overflow === 'auto' || overflow === 'scroll') && node.scrollHeight > node.clientHeight) {
+          return node.scrollTop
+        }
+      }
+      return document.scrollingElement?.scrollTop ?? 0
+    })
+}
+
+/** True when the editor line that contains `text` is in the window and inside every clipping ancestor. */
+async function lineInView(page: Page, text: string): Promise<boolean> {
+  return page.evaluate((needle) => {
+    const line = [...document.querySelectorAll('.cm-line')].find((element) => element.textContent?.includes(needle))
+    if (!line) {
+      return false
+    }
+    const box = line.getBoundingClientRect()
+    for (let node = line.parentElement; node; node = node.parentElement) {
+      if (getComputedStyle(node).overflowY !== 'visible') {
+        const rect = node.getBoundingClientRect()
+        if (box.top < rect.top || box.bottom > rect.bottom) {
+          return false
+        }
+      }
+    }
+    return box.top >= 0 && box.bottom <= window.innerHeight
+  }, text)
+}
+
 // The Composition view of the Effective tab (424-36): the mock composes flat, so every ancestor is applied once.
 test('the composition shows the step that set each line and selects the lines of a step', async ({ page }) => {
   const effectiveReads: string[] = []
@@ -286,13 +322,22 @@ test('the composition shows the step that set each line and selects the lines of
   await expect.poll(() => effectiveReads.length).toBe(readsBefore + 1)
   await expect(page.getByText('Read at different times')).toHaveCount(0)
 
-  // the toggle highlights the lines of the template step and keeps the focus
+  // the toggle highlights the lines of the template step and keeps the focus; its first line, the mode, is in view
+  // already on a large screen, and then nothing scrolls
   const toggle = page.getByRole('button', { name: `Show the lines of step ${template}` })
+  await toggle.scrollIntoViewIfNeeded()
+  const modeInView = await lineInView(page, '"mode": "batch"')
+  const scrolled = await panelScrollTop(page)
   await toggle.click()
   await expect(toggle).toHaveAttribute('aria-pressed', 'true')
   await expect(toggle).toBeFocused()
   const selected = page.locator('.cm-line.cm-composition-selected')
   await expect(selected.filter({ hasText: '"mode": "batch"' })).toHaveCount(1)
+  if (modeInView) {
+    // CodeMirror scrolls in its next measure, in an animation frame
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    expect(await panelScrollTop(page)).toBe(scrolled)
+  }
   await expect(selected.filter({ hasText: '"queue"' })).toHaveCount(0)
   const status = page.getByText(/^Line \d+: step \d+ · /)
   await expect(status).toHaveText(new RegExp(String.raw`^Line \d+: step ${template} · Template · Execution$`))

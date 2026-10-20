@@ -9,6 +9,7 @@ import {
 } from '@42for.net/2splatform.sdk'
 import ConfigurationComposition from '@/components/configuration/ConfigurationComposition.vue'
 import ConfigurationEffective from '@/components/configuration/ConfigurationEffective.vue'
+import { invalidateByPath, pathToQueryKey } from '@42for.net/2splatform.sdk/vue-query'
 import { compositionOf, effectiveContent } from '@/mock/configuration-handlers'
 import { mockHandlers } from '@/mock/all-handlers'
 import { loadDb, saveDb } from '@/mock/db'
@@ -163,7 +164,7 @@ function countRequests() {
 
 async function mountComposition(
   props: Record<string, unknown> = {},
-  options: { query?: string; accessMap?: Record<string, string>; catalog?: string[] } = {},
+  options: { query?: string; accessMap?: Record<string, string>; catalog?: string[]; catalogLoading?: boolean } = {},
 ) {
   const view = await mountScreen(
     ConfigurationComposition,
@@ -175,6 +176,7 @@ async function mountComposition(
   for (const entry of options.catalog ?? ['rst.invoicing', 'sbt.northwind', 'usg.northwind.invoicing']) {
     catalog.upsert(annotation(entry))
   }
+  catalog.status = options.catalogLoading ? 'loading' : 'ready'
   await settle(10)
   return view
 }
@@ -186,6 +188,8 @@ async function mountEffective(query = '') {
   return view
 }
 
+const radio = (name: string) =>
+  [...document.body.querySelectorAll<HTMLElement>('[role="radio"]')].find((item) => item.textContent?.trim() === name)!
 const rows = () => [...document.body.querySelectorAll<HTMLElement>('li[data-step]')]
 const row = (order: number) => rows().find((item) => item.dataset.step === String(order))!
 const toggle = (order: number) => row(order).querySelector<HTMLButtonElement>('button[aria-pressed]')!
@@ -448,6 +452,56 @@ describe('ConfigurationComposition', () => {
     expect(toggle(1).getAttribute('aria-pressed')).toBe('false')
     expect(status()).toBe('')
   })
+
+  it('names a step that sets no value when the effective document is empty', async () => {
+    serveComposition({
+      AnnotationKey: key,
+      Content: {},
+      Hash: 'e0e0e0e0',
+      Sources: [
+        {
+          Id: `configuration:${key}`,
+          Kind: 'Configuration',
+          AnnotationType: 'Execution',
+          AnnotationKey: key,
+          Presence: 'Missing',
+          Version: 0,
+        },
+      ],
+      Nodes: [{ Index: 0, AnnotationKey: key, MergedInto: null, Depth: 0 }],
+      Steps: [{ Order: 1, SourceId: `configuration:${key}`, Node: 0 }],
+      Origins: [],
+    })
+    await mountComposition({ effectiveHash: 'e0e0e0e0' })
+
+    expect(document.body.textContent).toContain('The effective document is empty')
+    expect(editorText()).toBeUndefined()
+    toggle(1).click()
+    await settle()
+    expect(toggle(1).getAttribute('aria-pressed')).toBe('true')
+    expect(status()).toBe(`Step 1 · ${key}: sets no value`)
+  })
+
+  it('marks an ancestor that is not in the catalog as deleted', async () => {
+    serveComposition(execution)
+    await mountComposition({ effectiveHash: execution.Hash }, { catalog: ['usg.northwind.invoicing'] })
+
+    // the responsibility, the subject (twice) and the context are not in the catalog; the template and the own step
+    // are not ancestors
+    expect(
+      rows()
+        .filter((item) => item.textContent?.includes('Deleted'))
+        .map((item) => item.dataset.step),
+    ).toEqual(['1', '2', '4', '5'])
+  })
+
+  it('marks no ancestor as deleted while the catalog is loading', async () => {
+    serveComposition(execution)
+    await mountComposition({ effectiveHash: execution.Hash }, { catalog: [], catalogLoading: true })
+
+    expect(rows().filter((item) => item.textContent?.includes('Deleted'))).toEqual([])
+    expect(document.querySelectorAll('.line-through')).toHaveLength(0)
+  })
 })
 
 describe('ConfigurationEffective', () => {
@@ -455,10 +509,6 @@ describe('ConfigurationEffective', () => {
     const counts = countRequests()
     const view = await mountEffective('?q=northwind')
 
-    const radio = (name: string) =>
-      [...document.body.querySelectorAll<HTMLElement>('[role="radio"]')].find(
-        (item) => item.textContent?.trim() === name,
-      )!
     expect(document.body.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe('Effective view')
     expect(radio('Document').getAttribute('aria-checked')).toBe('true')
     expect(document.body.textContent).toContain('Bindings (@…) are not evaluated here')
@@ -494,6 +544,8 @@ describe('ConfigurationEffective', () => {
       (button) => button.textContent?.trim() === 'Refresh',
     )!
     refresh.click()
+    // the warning and its button are hidden while both are read again: the focus goes on to the steps
+    expect(document.activeElement?.textContent?.trim()).toBe('Steps, in the order applied')
     await settle(12)
     expect(counts).toEqual({ effective: 3, composition: 2 })
     expect(document.body.textContent).toContain('Read at different times')
@@ -516,6 +568,96 @@ describe('ConfigurationEffective', () => {
     await mountEffective('?show=composition')
 
     expect(counts).toEqual({ effective: 2, composition: 1 })
+    expect(document.body.textContent).not.toContain('Read at different times')
+  })
+
+  it('announces the warning in a status that is there before it', async () => {
+    serveComposition(execution)
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/configuration/:key', () =>
+        HttpResponse.json({ AnnotationKey: key, Version: 0, Content: execution.Content, Hash: 'beefcafe' }),
+      ),
+    )
+    await mountEffective('?show=composition')
+
+    const announced = [...document.body.querySelectorAll('p[role="status"]')].map((item) => item.textContent?.trim())
+    expect(announced).toContain('The Effective document and the composition were read at different times.')
+  })
+
+  /**
+   * Serves the composition and the Effective document with the hash `hashes.current`, the composition behind a gate;
+   * the first Effective read can have an older hash.
+   */
+  function serveHashes(firstEffective?: string) {
+    const hashes = { current: 'aaaa1111', gate: undefined as Promise<void> | undefined }
+    let reads = 0
+    server.use(
+      http.get('*/api/v1/:org/:project/:view/configuration/:key/composition', async () => {
+        await hashes.gate
+        return HttpResponse.json({ ...execution, Hash: hashes.current })
+      }),
+      http.get('*/api/v1/:org/:project/:view/configuration/:key', () =>
+        HttpResponse.json({
+          AnnotationKey: key,
+          Version: 0,
+          Content: execution.Content,
+          Hash: reads++ === 0 && firstEffective ? firstEffective : hashes.current,
+        }),
+      ),
+    )
+    return hashes
+  }
+
+  const configurationPath = `/v1/acme/billing/default/configuration/${key}`
+
+  it('compares a cached composition only once it is read again', async () => {
+    const hashes = serveHashes()
+    const counts = countRequests()
+    const view = await mountEffective('?show=composition')
+    expect(counts).toEqual({ effective: 1, composition: 1 })
+
+    // a save elsewhere: the Effective read is active and read again, the composition is only marked invalid
+    radio('Document').click()
+    await settle(12)
+    hashes.current = 'bbbb2222'
+    let release = () => {}
+    hashes.gate = new Promise<void>((resolve) => (release = resolve))
+    await invalidateByPath(view.queryClient, configurationPath)
+    await settle(12)
+    expect(counts).toEqual({ effective: 2, composition: 1 })
+
+    // the cached composition still has the older hash while it is read again
+    radio('Composition').click()
+    await settle(12)
+    expect(counts).toEqual({ effective: 2, composition: 2 })
+    expect(rows().length).toBeGreaterThan(0)
+    expect(document.body.textContent).not.toContain('Read at different times')
+
+    release()
+    await settle(12)
+    expect(counts).toEqual({ effective: 2, composition: 2 })
+    expect(document.body.textContent).not.toContain('Read at different times')
+  })
+
+  it('reads the Effective document again for a hash that comes back after the hashes agreed', async () => {
+    // the first Effective read is older than the composition
+    const hashes = serveHashes('old00000')
+    const counts = countRequests()
+    const view = await mountEffective('?show=composition')
+    expect(counts).toEqual({ effective: 2, composition: 1 })
+    expect(document.body.textContent).not.toContain('Read at different times')
+
+    // a value is changed, both are read again and agree
+    hashes.current = 'bbbb2222'
+    await invalidateByPath(view.queryClient, configurationPath)
+    await settle(12)
+    expect(counts).toEqual({ effective: 3, composition: 2 })
+
+    // and changed back: only the composition is read again (focus), the Effective read is still fresh
+    hashes.current = 'aaaa1111'
+    await view.queryClient.refetchQueries({ queryKey: pathToQueryKey(`${configurationPath}/composition`), exact: true })
+    await settle(12)
+    expect(counts).toEqual({ effective: 4, composition: 3 })
     expect(document.body.textContent).not.toContain('Read at different times')
   })
 })

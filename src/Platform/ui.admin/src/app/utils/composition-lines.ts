@@ -116,7 +116,12 @@ export function compositionSteps(composition: ConfigurationComposition | undefin
   const paths = new Map<number, string[]>()
   for (const origin of composition.Origins ?? []) {
     if (origin.Step !== undefined && origin.Path !== undefined) {
-      paths.set(origin.Step, [...(paths.get(origin.Step) ?? []), origin.Path])
+      const list = paths.get(origin.Step)
+      if (list) {
+        list.push(origin.Path)
+      } else {
+        paths.set(origin.Step, [origin.Path])
+      }
     }
   }
 
