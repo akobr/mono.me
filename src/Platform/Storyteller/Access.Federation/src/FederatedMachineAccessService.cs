@@ -39,6 +39,7 @@ public class FederatedMachineAccessService : IFederatedMachineAccessService
             AnnotationKey = model.AnnotationKey,
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = model.FederationRules!.ToList(),
+            ManagementScopes = model.ManagementScopes,
         };
     }
 

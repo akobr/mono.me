@@ -94,7 +94,7 @@ public class ClientCertificateValidator : IClientCertificateValidator
             return null;
         }
 
-        // Identity/scope comes from the API key, not the certificate.
+        // Identity/scope (and the management scopes) come from the API key, not the certificate.
         return new ClientCertificateValidationResult(
             identity.Organization,
             identity.Project,
@@ -146,6 +146,7 @@ public class ClientCertificateValidator : IClientCertificateValidator
             thumbprint,
             ClientCertificateKind.Machine,
             record.AnnotationKey,
-            record.CredentialKind);
+            record.CredentialKind,
+            record.ManagementScopes);
     }
 }

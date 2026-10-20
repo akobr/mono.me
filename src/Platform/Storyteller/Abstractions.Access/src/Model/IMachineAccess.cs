@@ -36,4 +36,6 @@ public interface IMachineAccess
     string? TokenScope { get; }
 
     IReadOnlyList<FederationRule>? FederationRules { get; }
+
+    IReadOnlyList<MachineManagementScope>? ManagementScopes { get; }
 }

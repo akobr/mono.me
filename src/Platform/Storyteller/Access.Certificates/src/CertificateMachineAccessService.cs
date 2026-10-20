@@ -45,7 +45,8 @@ public class CertificateMachineAccessService
             Scope: model.Scope,
             AnnotationKey: model.AnnotationKey,
             LastRenewalAt: null,
-            CredentialKind: MachineCredentialKind.Certificate);
+            CredentialKind: MachineCredentialKind.Certificate,
+            ManagementScopes: model.ManagementScopes);
 
         await _store.StoreAsync(model.Organization, model.Project, record);
 
@@ -62,9 +63,11 @@ public class CertificateMachineAccessService
             CertificateThumbprint = issued.Thumbprint,
             CertificateLifetimeDays = lifetimeDays,
             CertificateNotAfter = issued.NotAfter,
+            ManagementScopes = model.ManagementScopes,
         };
     }
 
+    // The result keeps what the API key half set, ManagementScopes included.
     public async Task<MachineAccess> ExtendWithCertificateAsync(MachineAccess existingAccess, MachineAccessCreate model)
     {
         var opts = _options.Value;
@@ -85,7 +88,8 @@ public class CertificateMachineAccessService
             Scope: model.Scope,
             AnnotationKey: model.AnnotationKey,
             LastRenewalAt: null,
-            CredentialKind: MachineCredentialKind.CertificateAndApiKey);
+            CredentialKind: MachineCredentialKind.CertificateAndApiKey,
+            ManagementScopes: model.ManagementScopes);
 
         await _store.StoreAsync(model.Organization, model.Project, record);
 

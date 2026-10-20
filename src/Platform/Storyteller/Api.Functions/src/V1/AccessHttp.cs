@@ -355,8 +355,29 @@ public class AccessHttp
             return new BadRequestObjectResult(new ErrorResponse($"Invalid annotation key: {machineModel.AnnotationKey}") { ErrorCode = ErrorCodes.InvalidKey });
         }
 
+        // The JSON reads integers as enum values too, so [99] gets here.
+        if (MachineAccessScopes.FindUndefined(machineModel.ManagementScopes) is { } undefined)
+        {
+            return new BadRequestObjectResult(new ErrorResponse($"The machine management scope {undefined:D} doesn't exist."));
+        }
+
+        var managementScopes = MachineAccessScopes.Normalize(machineModel.ManagementScopes);
+
+        // An Administrator decides on management scopes; a Contributor creates machines without them.
+        if (managementScopes is not null)
+        {
+            await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
+        }
+
         // TODO: [P1] hide the model from the client
-        machineModel = machineModel with { Organization = organization, Project = project, AnnotationKey = annotationKey };
+        machineModel = machineModel with
+        {
+            Organization = organization,
+            Project = project,
+            AnnotationKey = annotationKey,
+            ManagementScopes = managementScopes,
+        };
+
         try
         {
             var machineAccess = await _accessService.CreateMachineAccessAsync(machineModel);
@@ -392,6 +413,9 @@ public class AccessHttp
         {
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
+
+        // A new secret gives out the machine's management scopes.
+        await EnsureAdministratorForManagementScopesAsync(request, _accessService, organization, project, id);
 
         try
         {
@@ -539,6 +563,24 @@ public class AccessHttp
         var normalized = MachineAuthenticationPolicies.Normalize(policy!);
         await _policyStore.SetAsync(organization, project, normalized);
         return new OkObjectResult(MachineAuthenticationPolicies.Resolve(normalized, _machineOptions));
+    }
+
+    // An Administrator decides on management scopes, so whatever gives out or redirects the credentials of a machine
+    // that has them (reset, the federation rules) needs an Administrator; a Contributor manages the other machines.
+    // One point read; a missing machine is left to the route, which answers as before.
+    internal static async Task EnsureAdministratorForManagementScopesAsync(
+        HttpRequestData request,
+        IAccessService accessService,
+        string organization,
+        string project,
+        string id)
+    {
+        var machine = await accessService.GetMachineAccessAsync(organization, project, id);
+
+        if (machine?.ManagementScopes is { Count: > 0 })
+        {
+            await request.CheckAccessToProjectAsync(accessService, organization, project, AccountRole.Administrator);
+        }
     }
 
     private static bool TrySplitProjectKey(

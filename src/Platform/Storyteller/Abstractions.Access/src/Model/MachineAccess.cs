@@ -44,4 +44,7 @@ public record class MachineAccess : IMachineAccess
 
     // Federated only: the rules a platform token must match. Returned by create, get and list.
     public IReadOnlyList<FederationRule>? FederationRules { get; init; }
+
+    // Granted on top of Scope at creation, distinct and in enum order. Null (or empty): none.
+    public IReadOnlyList<MachineManagementScope>? ManagementScopes { get; init; }
 }

@@ -21,6 +21,7 @@ public sealed class RecordingIdentityProviderMachineAccessService : IIdentityPro
             AccessKey = $"secret-{suffix}",
             Scope = model.Scope,
             AnnotationKey = model.AnnotationKey,
+            ManagementScopes = model.ManagementScopes,
         });
     }
 

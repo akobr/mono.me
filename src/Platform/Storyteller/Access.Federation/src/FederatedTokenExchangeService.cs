@@ -129,7 +129,8 @@ public class FederatedTokenExchangeService : IFederatedTokenExchange
             return FederatedTokenExchangeResult.NotAccepted();
         }
 
-        var machineScopes = MachineAccessScopes.Get(machine.Scope);
+        // The management scopes count as the machine's: a request may name them, and without scope the token gets them too.
+        var machineScopes = MachineAccessScopes.Get(machine.Scope, machine.ManagementScopes);
         var requestedScopes = request.Scopes is { Count: > 0 } scopes ? scopes.Distinct(StringComparer.Ordinal).ToList() : machineScopes;
 
         // Least privilege for a single job: the token gets the requested subset only.

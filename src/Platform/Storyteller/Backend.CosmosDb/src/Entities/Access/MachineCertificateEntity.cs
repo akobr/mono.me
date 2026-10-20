@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json.Serialization;
 using _42.Platform.Storyteller.Accessing;
 using Newtonsoft.Json;
@@ -46,6 +48,9 @@ public record class MachineCertificateEntity
     // The kind of the machine. Null on records stored before it was kept here.
     public MachineCredentialKind? CredentialKind { get; init; }
 
+    // Granted on top of Scope. Null for none; records stored before it was kept belong to machines without any.
+    public List<MachineManagementScope>? ManagementScopes { get; init; }
+
     public static string GetId(string thumbprint) => $"{IdPrefix}{thumbprint.ToUpperInvariant()}";
 
     public CertificateRecord ToRecord() => new(
@@ -60,7 +65,8 @@ public record class MachineCertificateEntity
         Scope,
         AnnotationKey,
         LastRenewalAt,
-        CredentialKind);
+        CredentialKind,
+        ManagementScopes);
 
     public static MachineCertificateEntity FromRecord(string partitionKey, CertificateRecord record, DateTimeOffset now) => new()
     {
@@ -79,5 +85,6 @@ public record class MachineCertificateEntity
         AnnotationKey = record.AnnotationKey,
         LastRenewalAt = record.LastRenewalAt,
         CredentialKind = record.CredentialKind,
+        ManagementScopes = record.ManagementScopes?.ToList(),
     };
 }

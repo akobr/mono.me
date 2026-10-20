@@ -296,6 +296,7 @@ public class FederationPersistenceTests(CosmosFixture fixture)
                 Scope = model.Scope,
                 CredentialKind = MachineCredentialKind.Federated,
                 FederationRules = model.FederationRules,
+                ManagementScopes = model.ManagementScopes,
             });
 
         return new CosmosAccessService(

@@ -21,4 +21,8 @@ public record class MachineAccessCreate
 
     // Federated only, and required for it: the rules a platform token must match.
     public IReadOnlyList<FederationRule>? FederationRules { get; init; }
+
+    // Granted on top of Scope; never part of a preset. Null (or empty): none. Not required, so older clients
+    // can leave it out.
+    public IReadOnlyList<MachineManagementScope>? ManagementScopes { get; init; }
 }

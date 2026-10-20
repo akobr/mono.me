@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -21,8 +23,13 @@ public class CosmosApiKeyHashStore : IApiKeyHashStore
         _serializerOptions = serializerOptions.Value;
     }
 
-    public async Task StoreAsync(string organization, string project, string machineAccessId,
-                                  string hashedSecret, MachineAccessScope scope)
+    public async Task StoreAsync(
+        string organization,
+        string project,
+        string machineAccessId,
+        string hashedSecret,
+        MachineAccessScope scope,
+        IReadOnlyList<MachineManagementScope>? managementScopes = null)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKey = new PartitionKey($"{project}.access");
@@ -32,6 +39,7 @@ public class CosmosApiKeyHashStore : IApiKeyHashStore
             Id = $"akh.{machineAccessId}",
             HashedSecret = hashedSecret,
             Scope = scope,
+            ManagementScopes = managementScopes?.ToList(),
         };
 
         await repository.Container.UpsertItemAsync(entity, partitionKey);
@@ -46,7 +54,7 @@ public class CosmosApiKeyHashStore : IApiKeyHashStore
             stream => stream.DeserializeSystemTextJson<ApiKeyHashEntity>(_serializerOptions));
 
         return entity is not null
-            ? new ApiKeyHashEntry(entity.HashedSecret, entity.Scope)
+            ? new ApiKeyHashEntry(entity.HashedSecret, entity.Scope, ManagementScopes: entity.ManagementScopes)
             : null;
     }
 

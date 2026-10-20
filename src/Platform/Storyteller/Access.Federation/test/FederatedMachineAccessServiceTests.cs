@@ -35,6 +35,17 @@ public class FederatedMachineAccessServiceTests
         access.FederationRules.ShouldBe(rules);
         access.TokenScope.ShouldBeNull();
         access.Certificate.ShouldBeNull();
+        access.ManagementScopes.ShouldBeNull();
+    }
+
+    // The access service stores what the service returns, so the management scopes have to come back.
+    [Fact]
+    public async Task Create_ReturnsTheManagementScopes()
+    {
+        var access = await _service.CreateMachineAccessAsync(
+            Model([Rule()]) with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.TemplateWrite] });
+
+        access.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer, MachineManagementScope.TemplateWrite]);
     }
 
     [Fact]

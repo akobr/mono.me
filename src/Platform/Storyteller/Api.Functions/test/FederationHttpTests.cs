@@ -688,6 +688,23 @@ public class FederationHttpTests
         await ShouldBeAllowedAsync(() => Http.PutMachineFederationRules(RulesRequest([Rule()]), Org, Project, MachineId), allowed);
     }
 
+    // The rules decide which workload gets the tokens of the machine, so its management scopes need an Administrator.
+    [Theory]
+    [InlineData(AccountRole.Contributor, false)]
+    [InlineData(AccountRole.Administrator, true)]
+    public async Task PutRules_OfAMachineWithManagementScopes_IsForAdministrators(AccountRole role, bool allowed)
+    {
+        await _issuers.SetAsync(Org, Project, GitHub());
+        _access.Add(Org, Project, FederatedMachine(Rule()) with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer] });
+        _access.Role = role;
+
+        await ShouldBeAllowedAsync(() => Http.PutMachineFederationRules(RulesRequest([Rule("repo:acme/app:environment:prod")]), Org, Project, MachineId), allowed);
+
+        _access.Find(Org, Project, MachineId)!.FederationRules!.Single().Subject
+            .ShouldBe(allowed || DevAuth ? "repo:acme/app:environment:prod" : Rule().Subject);
+        _access.Find(Org, Project, MachineId)!.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer]);
+    }
+
     // Token endpoint URL
     [Fact]
     public void TokenEndpoint_WithoutPublicBaseUrl_IsTheRequestSchemeAndHost_NeverAForwardedHost()
