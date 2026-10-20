@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest'
 import { invalidateByPath, pathToQueryKey, queryKeyStartsWith, removeByPath } from '../lib/invalidation'
 import { collectAll, paginate } from '../lib/paging'
 import { getRole, hasRole, roleOrder, roleRank } from '../lib/roles'
-import { getGetConfigurationQueryKey, getGetConfigurationsQueryKey, getGetResolvedConfigurationQueryKey } from '../generated/vue-query'
+import {
+  getGetConfigurationCompositionQueryKey,
+  getGetConfigurationQueryKey,
+  getGetConfigurationsQueryKey,
+  getGetResolvedConfigurationQueryKey,
+} from '../generated/vue-query'
 
 describe('invalidation', () => {
   it('turns paths into the generated key prefixes', () => {
@@ -20,6 +25,7 @@ describe('invalidation', () => {
 
     expect(queryKeyStartsWith(getGetConfigurationQueryKey('acme', 'billing', 'default', 'exe.a.b.c'), path)).toBe(true)
     expect(queryKeyStartsWith(getGetResolvedConfigurationQueryKey('acme', 'billing', 'default', 'exe.a.b.c'), path)).toBe(true)
+    expect(queryKeyStartsWith(getGetConfigurationCompositionQueryKey('acme', 'billing', 'default', 'exe.a.b.c'), path)).toBe(true)
     expect(queryKeyStartsWith(getGetConfigurationsQueryKey('acme', 'billing', 'default'), path)).toBe(false)
     expect(queryKeyStartsWith(getGetConfigurationQueryKey('acme', 'billing', 'default', 'exe.a.b.d'), path)).toBe(false)
   })

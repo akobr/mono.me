@@ -2,6 +2,7 @@ using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 
 namespace _42.Platform.Storyteller.Sdk;
 
@@ -48,6 +49,10 @@ public partial class ConfigurationsApiClient
         _configuration = configuration;
         BaseUrl = configuration.BaseUrl;
     }
+
+    // Configuration documents keep their date-like strings as stored; typed dates (AuditStamp.At) still parse.
+    static partial void UpdateJsonSerializerSettings(JsonSerializerSettings settings)
+        => settings.DateParseHandling = DateParseHandling.None;
 
     partial void PrepareRequest(HttpClient client, HttpRequestMessage request, string url)
         => SdkRequestHelper.ApplyAuthorization(_configuration, request);

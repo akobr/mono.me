@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.32.54789
+ * OpenAPI spec version: 0.9.42.14388
  */
 import { faker } from "@faker-js/faker";
 
@@ -13,6 +13,7 @@ import type { RequestHandlerOptions } from "msw";
 import type {
   BindingCatalog,
   Configuration,
+  ConfigurationComposition,
   ConfigurationVersion,
   ConfigurationsResponse,
   DiffResult,
@@ -121,6 +122,123 @@ export const getGetBindingCatalogResponseMock = (
         })),
         undefined,
       ]),
+    })),
+    undefined,
+  ]),
+  ...overrideResponse,
+});
+
+export const getGetConfigurationCompositionResponseMock = (
+  overrideResponse: Partial<Extract<ConfigurationComposition, object>> = {},
+): ConfigurationComposition => ({
+  AnnotationKey: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Content: faker.helpers.arrayElement([{}, undefined]),
+  Hash: faker.helpers.arrayElement([
+    faker.string.alpha({ length: { min: 10, max: 20 } }),
+    undefined,
+  ]),
+  Sources: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Id: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Kind: faker.helpers.arrayElement(["Configuration", "Template"] as const),
+      AnnotationType: faker.helpers.arrayElement([
+        "Responsibility",
+        "Unit",
+        "Subject",
+        "Usage",
+        "Context",
+        "Execution",
+        "UnitOfExecution",
+      ] as const),
+      AnnotationKey: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Presence: faker.helpers.arrayElement([
+        "Missing",
+        "Empty",
+        "Present",
+      ] as const),
+      Version: faker.helpers.arrayElement([faker.number.int(), undefined]),
+      Modified: faker.helpers.arrayElement([
+        {
+          At: faker.helpers.arrayElement([
+            faker.date.past().toISOString().slice(0, 19) + "Z",
+            undefined,
+          ]),
+          By: faker.helpers.arrayElement([
+            {
+              Kind: faker.helpers.arrayElement([
+                "Account",
+                "Machine",
+                "System",
+              ] as const),
+              Id: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+              Name: faker.helpers.arrayElement([
+                faker.string.alpha({ length: { min: 10, max: 20 } }),
+                undefined,
+              ]),
+            },
+            undefined,
+          ]),
+        },
+        undefined,
+      ]),
+      Content: faker.helpers.arrayElement([{}, undefined]),
+    })),
+    undefined,
+  ]),
+  Nodes: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Index: faker.helpers.arrayElement([faker.number.int(), undefined]),
+      AnnotationKey: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      MergedInto: faker.helpers.arrayElement([faker.number.int(), null]),
+      Depth: faker.helpers.arrayElement([faker.number.int(), undefined]),
+    })),
+    undefined,
+  ]),
+  Steps: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Order: faker.helpers.arrayElement([faker.number.int(), undefined]),
+      SourceId: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Node: faker.helpers.arrayElement([faker.number.int(), undefined]),
+    })),
+    undefined,
+  ]),
+  Origins: faker.helpers.arrayElement([
+    Array.from(
+      { length: faker.number.int({ min: 1, max: 10 }) },
+      (_, i) => i + 1,
+    ).map(() => ({
+      Path: faker.helpers.arrayElement([
+        faker.string.alpha({ length: { min: 10, max: 20 } }),
+        undefined,
+      ]),
+      Step: faker.helpers.arrayElement([faker.number.int(), undefined]),
     })),
     undefined,
   ]),
@@ -779,6 +897,30 @@ export const getGetBindingCatalogMockHandler = (
   );
 };
 
+export const getGetConfigurationCompositionMockHandler = (
+  overrideResponse?:
+    | ConfigurationComposition
+    | ((
+        info: Parameters<Parameters<typeof http.get>[1]>[0],
+      ) => Promise<ConfigurationComposition> | ConfigurationComposition),
+  options?: RequestHandlerOptions,
+) => {
+  return http.get(
+    "*/api/v1/:organization/:project/:view/configuration/:key/composition",
+    async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+      return HttpResponse.json(
+        overrideResponse !== undefined
+          ? typeof overrideResponse === "function"
+            ? await overrideResponse(info)
+            : overrideResponse
+          : getGetConfigurationCompositionResponseMock(),
+        { status: 200 },
+      );
+    },
+    options,
+  );
+};
+
 export const getGetConfigurationsMockHandler = (
   overrideResponse?:
     | ConfigurationsResponse
@@ -1047,6 +1189,7 @@ export const getGetConfigurationViewDiffMockHandler = (
 };
 export const getConfigurationsMock = () => [
   getGetBindingCatalogMockHandler(),
+  getGetConfigurationCompositionMockHandler(),
   getGetConfigurationsMockHandler(),
   getGetConfigurationMockHandler(),
   getSetConfigurationMockHandler(),

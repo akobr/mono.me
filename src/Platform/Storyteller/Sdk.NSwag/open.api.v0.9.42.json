@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.32.54789"
+    "version": "0.9.42.14388"
   },
   "servers": [
     {
@@ -4077,6 +4077,145 @@
         "security": [
           {
             "manual": [ ]
+          }
+        ]
+      }
+    },
+    "/v1/{organization}/{project}/{view}/configuration/{key}/composition": {
+      "get": {
+        "tags": [
+          "Configurations"
+        ],
+        "description": "How the effective configuration is composed, read from the stored documents. Sources lists every merged document once: the configurations of the annotation and its ancestors (Missing when there is none) and the view's templates of their types. Nodes are the calculations of the inheritance graph in the order they finish, the annotation last; a shared ancestor is calculated once per branch, so it has a node per branch. Steps are the merges of the sources in the order of application, and Origins give the step that set each value of Content, by RFC 6901 pointer. Content and Hash are those of the effective read while its cache matches the stored documents. Bindings are not evaluated. The read shows the ancestors' documents and the templates in full, so it needs the whole project: a machine restricted to an annotation is refused (ErrorCode AnnotationRestricted), even for its own annotation. The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.",
+        "operationId": "GetConfigurationComposition",
+        "parameters": [
+          {
+            "name": "organization",
+            "in": "path",
+            "description": "Target organization name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "project",
+            "in": "path",
+            "description": "Target project name.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "view",
+            "in": "path",
+            "description": "The target view inside the project.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "The key of the requested annotation.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The composition of the effective configuration.",
+            "headers": {
+              "ETag": {
+                "description": "Weak entity tag of the configuration, for If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationComposition"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not well formed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The configuration doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unexpected error occurred on the service.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "The configuration is unchanged since the ETag sent in If-None-Match.",
+            "headers": {
+              "ETag": {
+                "description": "Weak entity tag of the configuration, for If-None-Match.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): Configuration.Read, Configuration.ReadWrite, Default.Read, Default.ReadWrite"
+          },
+          "403": {
+            "description": "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "manual": [ ]
+          },
+          {
+            "integrated": [
+              "api:///Annotation.Read",
+              "api:///Annotation.ReadWrite",
+              "api:///Configuration.Read",
+              "api:///Configuration.ReadWrite",
+              "api:///Configuration.Secrets",
+              "api:///Default.Read",
+              "api:///Default.ReadWrite",
+              "api:///User.Impersonation",
+              "api:///.default"
+            ]
           }
         ]
       }
@@ -16271,6 +16410,144 @@
             "additionalProperties": {
               "type": "object"
             }
+          }
+        }
+      },
+      "ConfigurationComposition": {
+        "type": "object",
+        "properties": {
+          "AnnotationKey": {
+            "type": "string"
+          },
+          "Content": {
+            "type": "object"
+          },
+          "Hash": {
+            "type": "string"
+          },
+          "Sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigurationCompositionSource"
+            }
+          },
+          "Nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigurationCompositionNode"
+            }
+          },
+          "Steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigurationCompositionStep"
+            }
+          },
+          "Origins": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConfigurationCompositionOrigin"
+            }
+          }
+        }
+      },
+      "ConfigurationCompositionNode": {
+        "type": "object",
+        "properties": {
+          "Index": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "AnnotationKey": {
+            "type": "string"
+          },
+          "MergedInto": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "Depth": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ConfigurationCompositionOrigin": {
+        "type": "object",
+        "properties": {
+          "Path": {
+            "type": "string"
+          },
+          "Step": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "ConfigurationCompositionSource": {
+        "type": "object",
+        "properties": {
+          "Id": {
+            "type": "string"
+          },
+          "Kind": {
+            "enum": [
+              "Configuration",
+              "Template"
+            ],
+            "type": "string",
+            "default": "Configuration"
+          },
+          "AnnotationType": {
+            "enum": [
+              "Responsibility",
+              "Unit",
+              "Subject",
+              "Usage",
+              "Context",
+              "Execution",
+              "UnitOfExecution"
+            ],
+            "type": "string",
+            "default": "Responsibility"
+          },
+          "AnnotationKey": {
+            "type": "string"
+          },
+          "Presence": {
+            "enum": [
+              "Missing",
+              "Empty",
+              "Present"
+            ],
+            "type": "string",
+            "default": "Missing"
+          },
+          "Version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "Modified": {
+            "$ref": "#/components/schemas/AuditStamp"
+          },
+          "Content": {
+            "type": "object"
+          }
+        }
+      },
+      "ConfigurationCompositionStep": {
+        "type": "object",
+        "properties": {
+          "Order": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "SourceId": {
+            "type": "string"
+          },
+          "Node": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
