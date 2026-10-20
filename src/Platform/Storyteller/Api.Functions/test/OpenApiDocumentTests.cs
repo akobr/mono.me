@@ -128,6 +128,41 @@ public class OpenApiDocumentTests
             .ShouldBe(["AnnotationCount", "SchemaCount", "TemplateCount", "ConfigurationCount", "VersionCount"], ignoreOrder: true);
     }
 
+    // The model is flat: no schema refers to itself. The enums of a source are written inline, as ViewImportItem.Kind is.
+    [Fact]
+    public void ConfigurationCompositionSchemas_ArePublished()
+    {
+        var helper = new DocumentHelper(new RouteConstraintFilter(), new OpenApiSchemaAcceptor());
+        var methods = typeof(ConfigurationHttp).GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly).ToList();
+
+        var schemas = helper.GetOpenApiSchemas(methods, new DefaultNamingStrategy(), VisitorCollection.CreateInstance());
+
+        schemas["ConfigurationComposition"].Properties.Keys.ShouldBe(["AnnotationKey", "Content", "Hash", "Sources", "Nodes", "Steps", "Origins"], ignoreOrder: true);
+        schemas["ConfigurationCompositionSource"].Properties.Keys.ShouldBe(["Id", "Kind", "AnnotationType", "AnnotationKey", "Presence", "Version", "Modified", "Content"], ignoreOrder: true);
+        schemas["ConfigurationCompositionNode"].Properties.Keys.ShouldBe(["Index", "AnnotationKey", "MergedInto", "Depth"], ignoreOrder: true);
+        schemas["ConfigurationCompositionStep"].Properties.Keys.ShouldBe(["Order", "SourceId", "Node"], ignoreOrder: true);
+        schemas["ConfigurationCompositionOrigin"].Properties.Keys.ShouldBe(["Path", "Step"], ignoreOrder: true);
+
+        var composition = schemas["ConfigurationComposition"];
+        composition.Properties["Content"].Type.ShouldBe("object");
+        composition.Properties["Sources"].Items.Reference.Id.ShouldBe("ConfigurationCompositionSource");
+        composition.Properties["Nodes"].Items.Reference.Id.ShouldBe("ConfigurationCompositionNode");
+        composition.Properties["Steps"].Items.Reference.Id.ShouldBe("ConfigurationCompositionStep");
+        composition.Properties["Origins"].Items.Reference.Id.ShouldBe("ConfigurationCompositionOrigin");
+
+        var source = schemas["ConfigurationCompositionSource"];
+        source.Properties["Kind"].Enum.Select(Name).ShouldBe(["Configuration", "Template"]);
+        source.Properties["Presence"].Enum.Select(Name).ShouldBe(["Missing", "Empty", "Present"]);
+        source.Properties["AnnotationType"].Enum.Select(Name).ShouldBe(["Responsibility", "Unit", "Subject", "Usage", "Context", "Execution", "UnitOfExecution"]);
+        source.Properties["Modified"].Reference.Id.ShouldBe("AuditStamp");
+        schemas.Keys.ShouldNotContain(key => key.StartsWith("ConfigurationCompositionSource", StringComparison.Ordinal) && key != "ConfigurationCompositionSource");
+
+        var mergedInto = schemas["ConfigurationCompositionNode"].Properties["MergedInto"];
+        mergedInto.Type.ShouldBe("integer");
+        mergedInto.Nullable.ShouldBeTrue();
+        schemas["ConfigurationCompositionNode"].Properties["Depth"].Nullable.ShouldBeFalse();
+    }
+
     private static void ShouldBeAListOfKinds(OpenApiSchema include)
     {
         include.Type.ShouldBe("array");

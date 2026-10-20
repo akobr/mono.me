@@ -22,7 +22,7 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Api.V1;
 
-public class ConfigurationHttp
+public partial class ConfigurationHttp
 {
     private readonly IConfigurationService _configuration;
     private readonly IAnnotationService _annotations;

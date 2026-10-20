@@ -23,7 +23,8 @@ using Newtonsoft.Json.Linq;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
-// ETag and If-None-Match on the effective and resolved configuration reads.
+// ETag and If-None-Match on the effective and resolved configuration reads; ConfigurationCompositionHttpTests has the
+// composition read's.
 public class ConfigurationConditionalReadTests
 {
     private const string Org = "acme";
@@ -371,6 +372,7 @@ public class ConfigurationConditionalReadTests
     [Theory]
     [InlineData(Definitions.RouteIds.Configuration.GetConfiguration)]
     [InlineData(Definitions.RouteIds.Configuration.GetResolvedConfiguration)]
+    [InlineData(Definitions.RouteIds.Configuration.GetConfigurationComposition)]
     public async Task Document_ConfigurationReads_DeclareTheNotModifiedAndTheTag(string operationId)
     {
         var json = await OpenApiExportTests.RenderAsync();
