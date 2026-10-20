@@ -457,6 +457,7 @@ public class CosmosAccessService : IAccessService
             NotAfter = machineAccess.CertificateNotAfter,
             UsesSharedCertificate = machineAccess.UsesSharedCertificate,
             FederationRules = machineAccess.FederationRules?.ToList(),
+            ManagementScopes = machineAccess.ManagementScopes?.ToList(),
             HashedSecret = existing?.HashedSecret,
         };
 

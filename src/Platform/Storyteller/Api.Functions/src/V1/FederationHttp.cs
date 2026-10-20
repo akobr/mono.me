@@ -278,6 +278,9 @@ public class FederationHttp
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
 
+        // The rules decide which workload gets the machine's tokens, management scopes included.
+        await AccessHttp.EnsureAdministratorForManagementScopesAsync(request, _accessService, organization, project, id);
+
         var (rules, invalidBody) = await request.ReadJsonBodyAsync<List<FederationRule>>(_bodyJsonOptions, "a list of federation rules", RequestBodyLimits.FederationRules, ErrorCodes.InvalidFederation);
 
         if (invalidBody is not null)

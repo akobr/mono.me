@@ -25,7 +25,7 @@ public class ApiKeyMachineAccessService : IMachineAccessService, IApiKeyValidato
         var rawKey = structuredKey.Format();
 
         await _hashStore.StoreAsync(
-            model.Organization, model.Project, id, HashSecret(secret), scope);
+            model.Organization, model.Project, id, HashSecret(secret), scope, model.ManagementScopes);
 
         return new MachineAccess
         {
@@ -34,6 +34,7 @@ public class ApiKeyMachineAccessService : IMachineAccessService, IApiKeyValidato
             AccessKey = rawKey,
             AnnotationKey = model.AnnotationKey,
             Scope = scope,
+            ManagementScopes = model.ManagementScopes,
         };
     }
 
@@ -49,8 +50,9 @@ public class ApiKeyMachineAccessService : IMachineAccessService, IApiKeyValidato
         var secret = GenerateSecret();
         var structuredKey = new StructuredApiKey(organization, project, objectId, secret);
 
+        // A new secret keeps what the machine was granted.
         await _hashStore.StoreAsync(
-            organization, project, objectId, HashSecret(secret), existing.Scope);
+            organization, project, objectId, HashSecret(secret), existing.Scope, existing.ManagementScopes);
 
         return structuredKey.Format();
     }
@@ -90,7 +92,8 @@ public class ApiKeyMachineAccessService : IMachineAccessService, IApiKeyValidato
             parsed.Project,
             parsed.MachineAccessId,
             entry.Scope,
-            entry.CredentialKind);
+            entry.CredentialKind,
+            entry.ManagementScopes);
     }
 
     private static string GenerateSecret()

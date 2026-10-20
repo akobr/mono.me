@@ -42,6 +42,25 @@ public class MachineAccessRulesTests
         MachineScopeClaims.GetRoleClaimsForScope(scope).ShouldBe(expected);
     }
 
+    // MachineAccessScopes keeps its own literals; the checks of the API use these constants.
+    [Fact]
+    public void ManagementScopes_MatchTheApiScopeNames()
+    {
+        Enum.GetValues<MachineManagementScope>().Select(scope => MachineAccessScopes.Get(scope)).ShouldBe(
+            [Scopes.Configuration.Transfer, Scopes.Schema.Write, Scopes.Template.Write, Scopes.Annotation.Manage, Scopes.KeyValue.Manage]);
+    }
+
+    [Fact]
+    public void MachineScopeRoles_WithManagementScopes_AreTheUnion()
+    {
+        var roles = MachineScopeClaims.GetRoleClaimsForScope(
+            MachineAccessScope.ConfigurationReadWrite,
+            [MachineManagementScope.TemplateWrite, MachineManagementScope.SchemaWrite]);
+
+        roles.ShouldBe([Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Schema.Write, Scopes.Template.Write]);
+        MachineScopeClaims.GetRoleClaimsForScope(MachineAccessScope.ConfigurationReadWrite, null).ShouldBe([Scopes.Configuration.Read, Scopes.Configuration.Write]);
+    }
+
     [Fact]
     public async Task Policy_MachineWithoutBearerCredential_IsNotChecked()
     {
@@ -249,6 +268,34 @@ public class MachineAccessRulesTests
         exception.Message.ShouldContain("scopes the machine doesn't have");
     }
 
+    // The exchange puts the stored management scopes into the token, so the check of each call accepts them.
+    [Fact]
+    public async Task Federated_ManagementScopeOfTheStoredMachine_IsAllowed()
+    {
+        var access = new FederationAccessService();
+        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead, MachineManagementScope.ConfigurationTransfer));
+        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read, Scopes.Configuration.Transfer);
+
+        var machine = await FederatedMachineAccess.EnsureAllowedAsync(request, access, "org1", "proj1", FederatedMachineId);
+
+        machine.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer]);
+    }
+
+    [Theory]
+    [InlineData(Scopes.Schema.Write, new[] { MachineManagementScope.ConfigurationTransfer })]
+    [InlineData(Scopes.Configuration.Transfer, new MachineManagementScope[0])]
+    public async Task Federated_ManagementScopeTheStoredMachineDoesNotHave_IsRejected(string scope, MachineManagementScope[] stored)
+    {
+        var access = new FederationAccessService();
+        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead, stored));
+        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read, scope);
+
+        var exception = await Should.ThrowAsync<SecurityTokenException>(
+            () => FederatedMachineAccess.EnsureAllowedAsync(request, access, "org1", "proj1", FederatedMachineId));
+
+        exception.Message.ShouldContain($"scopes the machine doesn't have ({scope})");
+    }
+
     [Fact]
     public async Task CheckAccessTo_FederatedIdentity_ReadsTheMachineInsteadOfVerifyingIt()
     {
@@ -301,7 +348,7 @@ public class MachineAccessRulesTests
         return request;
     }
 
-    private static MachineAccess FederatedMachine(MachineAccessScope scope)
+    private static MachineAccess FederatedMachine(MachineAccessScope scope, params MachineManagementScope[] managementScopes)
     {
         return new MachineAccess
         {
@@ -310,6 +357,7 @@ public class MachineAccessRulesTests
             AccessKey = string.Empty,
             Scope = scope,
             CredentialKind = MachineCredentialKind.Federated,
+            ManagementScopes = managementScopes.Length > 0 ? managementScopes : null,
         };
     }
 

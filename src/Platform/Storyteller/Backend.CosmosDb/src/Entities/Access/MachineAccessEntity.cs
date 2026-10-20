@@ -49,6 +49,9 @@ public record class MachineAccessEntity
     // Federated only: the rules a platform token must match.
     public List<FederationRule>? FederationRules { get; init; }
 
+    // Granted on top of Scope, distinct and in enum order. Null for none, and on machines created before it was stored.
+    public List<MachineManagementScope>? ManagementScopes { get; init; }
+
     [JsonProperty("_etag")]
     [JsonPropertyName("_etag")]
     public string? ETag { get; init; }

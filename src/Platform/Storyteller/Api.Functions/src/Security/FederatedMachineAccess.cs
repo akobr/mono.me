@@ -46,7 +46,8 @@ public static class FederatedMachineAccess
             throw new SecurityTokenException($"The machine {machineId} of the project {organization}.{project} is {machine.CredentialKind:G}, not Federated.");
         }
 
-        var granted = MachineAccessScopes.Get(machine.Scope);
+        // The same scopes the exchange gives out: the preset's and the management scopes of the machine.
+        var granted = MachineAccessScopes.Get(machine.Scope, machine.ManagementScopes);
         var excess = request.GetScopes()
             .Where(scope => !granted.Contains(scope, StringComparer.Ordinal))
             .Order(StringComparer.Ordinal)

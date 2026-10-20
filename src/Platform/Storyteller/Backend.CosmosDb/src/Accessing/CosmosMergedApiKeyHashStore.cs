@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing;
@@ -20,8 +22,13 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
         _serializerOptions = serializerOptions.Value;
     }
 
-    public async Task StoreAsync(string organization, string project, string machineAccessId,
-                                  string hashedSecret, MachineAccessScope scope)
+    public async Task StoreAsync(
+        string organization,
+        string project,
+        string machineAccessId,
+        string hashedSecret,
+        MachineAccessScope scope,
+        IReadOnlyList<MachineManagementScope>? managementScopes = null)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = $"{project}.access";
@@ -34,7 +41,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
 
         if (existing is not null)
         {
-            var updated = existing with { HashedSecret = hashedSecret, Scope = scope };
+            var updated = existing with { HashedSecret = hashedSecret, Scope = scope, ManagementScopes = managementScopes?.ToList() };
             await repository.Container.UpsertItemAsync(updated, partitionKey);
         }
         else
@@ -49,6 +56,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
                 ObjectId = machineAccessId,
                 AccessKey = "***",
                 Scope = scope,
+                ManagementScopes = managementScopes?.ToList(),
                 HashedSecret = hashedSecret,
             };
 
@@ -68,7 +76,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
 
         if (machineAccess?.HashedSecret is not null)
         {
-            return new ApiKeyHashEntry(machineAccess.HashedSecret, machineAccess.Scope, machineAccess.CredentialKind);
+            return new ApiKeyHashEntry(machineAccess.HashedSecret, machineAccess.Scope, machineAccess.CredentialKind, machineAccess.ManagementScopes);
         }
 
         return null;

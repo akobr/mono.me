@@ -105,6 +105,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         string project;
         string machineAccessId;
         MachineAccessScope scope;
+        IReadOnlyList<MachineManagementScope>? managementScopes;
 
         if (certResult is not null && apiKeyResult is not null)
         {
@@ -124,6 +125,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
                 project = certResult.Project;
                 machineAccessId = certResult.MachineAccessId!;
                 scope = certResult.Scope;
+                managementScopes = certResult.ManagementScopes;
             }
             else
             {
@@ -140,6 +142,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
                 project = apiKeyResult.Project;
                 machineAccessId = apiKeyResult.MachineAccessId;
                 scope = apiKeyResult.Scope;
+                managementScopes = apiKeyResult.ManagementScopes;
             }
         }
         else if (certResult is not null)
@@ -156,6 +159,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
             project = certResult.Project;
             machineAccessId = certResult.MachineAccessId!;
             scope = certResult.Scope;
+            managementScopes = certResult.ManagementScopes;
         }
         else
         {
@@ -164,6 +168,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
             project = apiKeyResult.Project;
             machineAccessId = apiKeyResult.MachineAccessId;
             scope = apiKeyResult.Scope;
+            managementScopes = apiKeyResult.ManagementScopes;
         }
 
         // The machine presents what its own kind requires, and the project still enables that kind.
@@ -210,13 +215,15 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
             new("sub", machineAccessId),
         };
 
-        var roleClaims = MachineScopeClaims.GetRoleClaimsForScope(scope);
-
-        if (roleClaims.Count == 0)
+        // A machine without runtime scopes is refused; management scopes only add to them.
+        if (MachineScopeClaims.GetRoleClaimsForScope(scope).Count == 0)
         {
             await RespondUnauthorizedAsync(context, httpReqData);
             return;
         }
+
+        // The management scopes come from the same record as the scope.
+        var roleClaims = MachineScopeClaims.GetRoleClaimsForScope(scope, managementScopes);
 
         foreach (var roleClaim in roleClaims)
         {

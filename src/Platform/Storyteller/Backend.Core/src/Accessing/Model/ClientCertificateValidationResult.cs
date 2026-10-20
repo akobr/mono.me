@@ -8,4 +8,5 @@ public record ClientCertificateValidationResult(
     string Thumbprint,
     ClientCertificateKind Kind,
     string? AnnotationKey,
-    MachineCredentialKind? CredentialKind = null);
+    MachineCredentialKind? CredentialKind = null,
+    IReadOnlyList<MachineManagementScope>? ManagementScopes = null);

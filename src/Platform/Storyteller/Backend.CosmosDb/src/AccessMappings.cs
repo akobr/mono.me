@@ -48,5 +48,6 @@ internal static class AccessMappings
         CertificateNotAfter = e.NotAfter,
         UsesSharedCertificate = e.UsesSharedCertificate,
         FederationRules = e.FederationRules,
+        ManagementScopes = e.ManagementScopes,
     };
 }

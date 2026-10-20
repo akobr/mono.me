@@ -12,4 +12,5 @@ public record CertificateRecord(
     MachineAccessScope Scope,
     string? AnnotationKey,
     DateTimeOffset? LastRenewalAt,
-    MachineCredentialKind? CredentialKind = null);
+    MachineCredentialKind? CredentialKind = null,
+    IReadOnlyList<MachineManagementScope>? ManagementScopes = null);

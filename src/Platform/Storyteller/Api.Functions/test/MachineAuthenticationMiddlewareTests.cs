@@ -1,4 +1,5 @@
 using System.Net;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
@@ -189,6 +190,83 @@ public class MachineAuthenticationMiddlewareTests
         called.ShouldBeFalse();
         _middleware.Response!.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
         context.Items.ContainsKey(FunctionContextItemKeys.PresentingCertificateThumbprint).ShouldBeFalse();
+    }
+
+    // The roles claims carry the management scopes of the record that also supplies the scope.
+    [Fact]
+    public async Task RoleClaims_OfAnApiKey_HoldItsManagementScopes()
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.ApiKey);
+        GiveMachine(MachineCredentialKind.ApiKey);
+        _apiKeyValidator.Result = _apiKeyValidator.Result! with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer] };
+
+        var (called, context) = await InvokeAsync(sendApiKey: true, sendCertificate: false);
+
+        called.ShouldBeTrue();
+        Roles(context).ShouldBe([Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Configuration.Transfer]);
+    }
+
+    [Fact]
+    public async Task RoleClaims_OfAMachineCertificateWithItsApiKey_HoldTheManagementScopesOfTheCertificate()
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
+        GiveMachine(MachineCredentialKind.CertificateAndApiKey);
+        _certificateValidator.Result = _certificateValidator.Result! with { ManagementScopes = [MachineManagementScope.SchemaWrite] };
+        _apiKeyValidator.Result = _apiKeyValidator.Result! with { ManagementScopes = [MachineManagementScope.KeyValueManage] };
+
+        var (called, context) = await InvokeAsync(sendApiKey: true, sendCertificate: true);
+
+        called.ShouldBeTrue();
+        Roles(context).ShouldBe([Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Schema.Write]);
+    }
+
+    [Fact]
+    public async Task RoleClaims_OfAMachineCertificate_HoldItsManagementScopes()
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.Certificate);
+        GiveMachine(MachineCredentialKind.Certificate);
+        _certificateValidator.Result = _certificateValidator.Result! with { ManagementScopes = [MachineManagementScope.TemplateWrite] };
+
+        var (called, context) = await InvokeAsync(sendApiKey: false, sendCertificate: true);
+
+        called.ShouldBeTrue();
+        Roles(context).ShouldContain(Scopes.Template.Write);
+    }
+
+    [Fact]
+    public async Task RoleClaims_OfASharedCertificateWithAnApiKey_HoldTheManagementScopesOfTheApiKey()
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
+        GiveMachineWithSharedCertificate(MachineCredentialKind.CertificateAndApiKey);
+        _apiKeyValidator.Result = _apiKeyValidator.Result! with { ManagementScopes = [MachineManagementScope.AnnotationManage] };
+
+        var (called, context) = await InvokeAsync(sendApiKey: true, sendCertificate: true);
+
+        called.ShouldBeTrue();
+        Roles(context).ShouldBe([Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Annotation.Manage]);
+    }
+
+    // A result of a store that does not keep management scopes gives the runtime scopes only.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task RoleClaims_OfAResultWithoutManagementScopes_AreTheRuntimeScopesOnly(bool sendApiKey, bool sendCertificate)
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate);
+        GiveMachine(sendApiKey ? MachineCredentialKind.ApiKey : MachineCredentialKind.Certificate);
+
+        var (called, context) = await InvokeAsync(sendApiKey, sendCertificate);
+
+        called.ShouldBeTrue();
+        Roles(context).ShouldBe([Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read]);
+    }
+
+    private static List<string> Roles(TestFunctionContext context)
+    {
+        return ((IEnumerable<Claim>)context.Items[FunctionContextItemKeys.CachedClaims])
+            .Where(claim => claim.Type == "roles")
+            .Select(claim => claim.Value)
+            .ToList();
     }
 
     private static ClientCertificateValidationResult SharedCertificateResult()

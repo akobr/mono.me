@@ -64,6 +64,35 @@ public class ClientCertificateValidatorTests
         result.Scope.ShouldBe(MachineAccessScope.DefaultRead);
     }
 
+    [Fact]
+    public async Task ValidateAsync_MachineCert_ReturnsTheManagementScopesOfItsRecord()
+    {
+        var leaf = TestCertificateHelper.IssueMachineLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "m1");
+        var record = new CertificateRecord("m1", leaf.Thumbprint, null, null, "serial", DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow.AddDays(365), false, MachineAccessScope.DefaultRead, null, null,
+            MachineCredentialKind.Certificate, [MachineManagementScope.ConfigurationTransfer]);
+        var validator = CreateValidator(record);
+
+        var result = await validator.ValidateAsync(leaf);
+
+        result.ShouldNotBeNull();
+        result.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer]);
+    }
+
+    // A shared certificate is no machine: the API key it comes with supplies the scope and the management scopes.
+    [Fact]
+    public async Task ValidateAsync_SharedCert_ReturnsNoManagementScopes()
+    {
+        var leaf = TestCertificateHelper.IssueSharedLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "svc");
+        var validator = CreateValidator(sharedStore: SharedStoreWith(leaf));
+
+        var result = await validator.ValidateAsync(leaf);
+
+        result.ShouldNotBeNull();
+        result.Kind.ShouldBe(ClientCertificateKind.Shared);
+        result.ManagementScopes.ShouldBeNull();
+    }
+
     private static ISharedCertificateStore SharedStoreWith(X509Certificate2 leaf, bool isRevoked = false)
     {
         var sharedStoreMock = new Mock<ISharedCertificateStore>();
