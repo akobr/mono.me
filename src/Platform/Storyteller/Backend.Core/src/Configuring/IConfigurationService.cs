@@ -34,6 +34,9 @@ public interface IConfigurationService
 
     Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key);
 
+    // How the effective configuration is composed, from the stored documents; null as GetRawConfigurationAsync.
+    Task<ConfigurationComposition?> GetConfigurationCompositionAsync(FullKey key);
+
     // The actor stamps the new version and is recorded in the annotation's audit (best effort, after the write).
     Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force = false);
 
