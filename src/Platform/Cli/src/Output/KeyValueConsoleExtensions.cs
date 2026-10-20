@@ -254,7 +254,7 @@ public static class KeyValueConsoleExtensions
         };
     }
 
-    private static (string? Message, string? ErrorCode) ReadError(ApiException exception)
+    internal static (string? Message, string? ErrorCode) ReadError(ApiException exception)
     {
         // A status the operation declares: the client has read the body into an ErrorResponse and kept no text.
         if (exception is ApiException<ErrorResponse> { Result: { } error })
