@@ -3,11 +3,12 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.32.54789
+ * OpenAPI spec version: 0.9.42.14388
  */
 import type {
   BindingCatalog,
   Configuration,
+  ConfigurationComposition,
   ConfigurationVersion,
   ConfigurationsResponse,
   DiffResult,
@@ -40,6 +41,34 @@ export const getBindingCatalog = async (
 ): Promise<BindingCatalog> => {
   return storytellerFetch<BindingCatalog>(
     getGetBindingCatalogUrl(organization, project),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetConfigurationCompositionUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/composition`;
+};
+
+/**
+ * How the effective configuration is composed, read from the stored documents. Sources lists every merged document once: the configurations of the annotation and its ancestors (Missing when there is none) and the view's templates of their types. Nodes are the calculations of the inheritance graph in the order they finish, the annotation last; a shared ancestor is calculated once per branch, so it has a node per branch. Steps are the merges of the sources in the order of application, and Origins give the step that set each value of Content, by RFC 6901 pointer. Content and Hash are those of the effective read while its cache matches the stored documents. Bindings are not evaluated. The read shows the ancestors' documents and the templates in full, so it needs the whole project: a machine restricted to an annotation is refused (ErrorCode AnnotationRestricted), even for its own annotation. The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
+ */
+export const getConfigurationComposition = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<ConfigurationComposition> => {
+  return storytellerFetch<ConfigurationComposition>(
+    getGetConfigurationCompositionUrl(organization, project, view, key),
     {
       ...options,
       method: "GET",

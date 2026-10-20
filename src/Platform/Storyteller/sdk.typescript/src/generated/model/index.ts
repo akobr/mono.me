@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.32.54789
+ * OpenAPI spec version: 0.9.42.14388
  */
 
 export * from "./accessPoint";
@@ -70,6 +70,16 @@ export * from "./clientEncryptionRecipientUpdate";
 export * from "./combinedConfigurationSchema";
 export * from "./combinedConfigurationSchemaMergedContent";
 export * from "./configuration";
+export * from "./configurationComposition";
+export * from "./configurationCompositionContent";
+export * from "./configurationCompositionNode";
+export * from "./configurationCompositionOrigin";
+export * from "./configurationCompositionSource";
+export * from "./configurationCompositionSourceAnnotationType";
+export * from "./configurationCompositionSourceContent";
+export * from "./configurationCompositionSourceKind";
+export * from "./configurationCompositionSourcePresence";
+export * from "./configurationCompositionStep";
 export * from "./configurationContent";
 export * from "./configurationSchema";
 export * from "./configurationSchemaContent";

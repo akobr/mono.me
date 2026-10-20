@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.32.54789
+ * OpenAPI spec version: 0.9.42.14388
  */
 import * as zod from "zod";
 
@@ -58,6 +58,101 @@ export const GetBindingCatalogResponse = zod.object({
             }),
           )
           .optional(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * How the effective configuration is composed, read from the stored documents. Sources lists every merged document once: the configurations of the annotation and its ancestors (Missing when there is none) and the view's templates of their types. Nodes are the calculations of the inheritance graph in the order they finish, the annotation last; a shared ancestor is calculated once per branch, so it has a node per branch. Steps are the merges of the sources in the order of application, and Origins give the step that set each value of Content, by RFC 6901 pointer. Content and Hash are those of the effective read while its cache matches the stored documents. Bindings are not evaluated. The read shows the ancestors' documents and the templates in full, so it needs the whole project: a machine restricted to an annotation is refused (ErrorCode AnnotationRestricted), even for its own annotation. The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
+ */
+export const GetConfigurationCompositionParams = zod.object({
+  organization: zod.string().describe("Target organization name."),
+  project: zod.string().describe("Target project name."),
+  view: zod.string().describe("The target view inside the project."),
+  key: zod.string().describe("The key of the requested annotation."),
+});
+
+export const getConfigurationCompositionResponseSourcesItemKindDefault = `Configuration`;
+export const getConfigurationCompositionResponseSourcesItemAnnotationTypeDefault = `Responsibility`;
+export const getConfigurationCompositionResponseSourcesItemPresenceDefault = `Missing`;
+export const getConfigurationCompositionResponseSourcesItemModifiedByKindDefault = `Account`;
+
+export const GetConfigurationCompositionResponse = zod.object({
+  AnnotationKey: zod.string().optional(),
+  Content: zod.looseObject({}).optional(),
+  Hash: zod.string().optional(),
+  Sources: zod
+    .array(
+      zod.object({
+        Id: zod.string().optional(),
+        Kind: zod
+          .enum(["Configuration", "Template"])
+          .default(getConfigurationCompositionResponseSourcesItemKindDefault),
+        AnnotationType: zod
+          .enum([
+            "Responsibility",
+            "Unit",
+            "Subject",
+            "Usage",
+            "Context",
+            "Execution",
+            "UnitOfExecution",
+          ])
+          .default(
+            getConfigurationCompositionResponseSourcesItemAnnotationTypeDefault,
+          ),
+        AnnotationKey: zod.string().optional(),
+        Presence: zod
+          .enum(["Missing", "Empty", "Present"])
+          .default(
+            getConfigurationCompositionResponseSourcesItemPresenceDefault,
+          ),
+        Version: zod.int().optional(),
+        Modified: zod
+          .object({
+            At: zod.iso.datetime({ offset: true }).optional(),
+            By: zod
+              .object({
+                Kind: zod
+                  .enum(["Account", "Machine", "System"])
+                  .default(
+                    getConfigurationCompositionResponseSourcesItemModifiedByKindDefault,
+                  ),
+                Id: zod.string().optional(),
+                Name: zod.string().optional(),
+              })
+              .optional(),
+          })
+          .optional(),
+        Content: zod.looseObject({}).optional(),
+      }),
+    )
+    .optional(),
+  Nodes: zod
+    .array(
+      zod.object({
+        Index: zod.int().optional(),
+        AnnotationKey: zod.string().optional(),
+        MergedInto: zod.int().nullish(),
+        Depth: zod.int().optional(),
+      }),
+    )
+    .optional(),
+  Steps: zod
+    .array(
+      zod.object({
+        Order: zod.int().optional(),
+        SourceId: zod.string().optional(),
+        Node: zod.int().optional(),
+      }),
+    )
+    .optional(),
+  Origins: zod
+    .array(
+      zod.object({
+        Path: zod.string().optional(),
+        Step: zod.int().optional(),
       }),
     )
     .optional(),

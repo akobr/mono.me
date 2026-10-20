@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.32.54789
+ * OpenAPI spec version: 0.9.42.14388
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -24,6 +24,7 @@ import type { MaybeRefOrGetter } from "vue";
 import type {
   BindingCatalog,
   Configuration,
+  ConfigurationComposition,
   ConfigurationVersion,
   ConfigurationsResponse,
   DiffResult,
@@ -150,6 +151,162 @@ export function useGetBindingCatalog<
   const queryOptions = getGetBindingCatalogQueryOptions(
     organization,
     project,
+    options,
+  );
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getGetConfigurationCompositionUrl = (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+) => {
+  return `/v1/${encodeURIComponent(String(organization))}/${encodeURIComponent(String(project))}/${encodeURIComponent(String(view))}/configuration/${encodeURIComponent(String(key))}/composition`;
+};
+
+/**
+ * How the effective configuration is composed, read from the stored documents. Sources lists every merged document once: the configurations of the annotation and its ancestors (Missing when there is none) and the view's templates of their types. Nodes are the calculations of the inheritance graph in the order they finish, the annotation last; a shared ancestor is calculated once per branch, so it has a node per branch. Steps are the merges of the sources in the order of application, and Origins give the step that set each value of Content, by RFC 6901 pointer. Content and Hash are those of the effective read while its cache matches the stored documents. Bindings are not evaluated. The read shows the ancestors' documents and the templates in full, so it needs the whole project: a machine restricted to an annotation is refused (ErrorCode AnnotationRestricted), even for its own annotation. The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.
+ */
+export const getConfigurationComposition = async (
+  organization: string,
+  project: string,
+  view: string,
+  key: string,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<ConfigurationComposition> => {
+  return storytellerFetch<ConfigurationComposition>(
+    getGetConfigurationCompositionUrl(organization, project, view, key),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getGetConfigurationCompositionQueryKey = (
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  key: MaybeRefOrGetter<string>,
+) => {
+  return [
+    "v1",
+    organization,
+    project,
+    view,
+    "configuration",
+    key,
+    "composition",
+  ] as const;
+};
+
+export const getGetConfigurationCompositionQueryOptions = <
+  TData = Awaited<ReturnType<typeof getConfigurationComposition>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  key: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getConfigurationComposition>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetConfigurationCompositionQueryKey(
+    organization,
+    project,
+    view,
+    key,
+  );
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getConfigurationComposition>>
+  > = ({ signal }) =>
+    getConfigurationComposition(
+      toValue(organization),
+      toValue(project),
+      toValue(view),
+      toValue(key),
+      { signal, ...requestOptions },
+    );
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: computed(
+      () =>
+        toValue(organization) !== null &&
+        toValue(organization) !== undefined &&
+        toValue(project) !== null &&
+        toValue(project) !== undefined &&
+        toValue(view) !== null &&
+        toValue(view) !== undefined &&
+        toValue(key) !== null &&
+        toValue(key) !== undefined,
+    ),
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getConfigurationComposition>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetConfigurationCompositionQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getConfigurationComposition>>
+>;
+export type GetConfigurationCompositionQueryError =
+  ErrorType<void | ErrorResponse>;
+
+export function useGetConfigurationComposition<
+  TData = Awaited<ReturnType<typeof getConfigurationComposition>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  organization: MaybeRefOrGetter<string>,
+  project: MaybeRefOrGetter<string>,
+  view: MaybeRefOrGetter<string>,
+  key: MaybeRefOrGetter<string>,
+  options?: {
+    query?: Partial<
+      UseQueryOptions<
+        Awaited<ReturnType<typeof getConfigurationComposition>>,
+        TError,
+        TData
+      >
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetConfigurationCompositionQueryOptions(
+    organization,
+    project,
+    view,
+    key,
     options,
   );
 
