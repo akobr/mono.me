@@ -19,6 +19,7 @@ import {
   isFederated,
   machineSecret,
   managementScopeLabels,
+  needsAdministrator,
 } from '@/utils/machines'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
@@ -27,7 +28,8 @@ import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 // default certificate lifetime of new machines (424-14). Administrators also see the shared certificates (424-35) and
 // the trusted issuers of Federated machines (424-46) below the machines; Contributors don't, the API answers 403 to the
 // certificates and only Administrators change issuers. A Federated machine has no secret: creating one shows how a
-// workload exchanges its platform token (FederatedSetupDialog), and it has no Reset.
+// workload exchanges its platform token (FederatedSetupDialog), and it has no Reset. Neither has a machine with
+// management scopes below Administrator, as the API refuses the reset (424-57); Contributors still delete it.
 const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
@@ -202,9 +204,10 @@ useHashScroll(
                   <td class="px-3 py-2"><RelativeTime :value="machine.LastRenewalAt" /></td>
                   <td class="px-3 py-2 text-end">
                     <span v-if="canManage" class="flex justify-end gap-1">
-                      <!-- A Federated machine has no secret to reset; its rules change on its detail. -->
+                      <!-- A Federated machine has no secret to reset; its rules change on its detail. Only
+                        Administrators reset a machine with management scopes (424-57). -->
                       <UButton
-                        v-if="hasSecret(machine.CredentialKind)"
+                        v-if="hasSecret(machine.CredentialKind) && (canAdmin || !needsAdministrator(machine))"
                         label="Reset"
                         size="xs"
                         color="neutral"

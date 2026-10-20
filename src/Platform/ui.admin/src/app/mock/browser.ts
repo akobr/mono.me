@@ -1,4 +1,5 @@
 import { setupWorker } from 'msw/browser'
+import type { MachineAccess } from '@42for.net/2splatform.sdk'
 import { getStorytellerMock } from '@42for.net/2splatform.sdk/msw'
 import { accountActor } from './audit'
 import { applyScenarioFromUrl, loadDb, resetDb, saveDb, type MockScenario } from './db'
@@ -11,6 +12,8 @@ declare global {
       reset: (scenario?: MockScenario) => void
       /** Saves a new configuration version as another user, like a concurrent edit (E2E conflict flow). */
       changeConfiguration: (key: string, changes: Record<string, unknown>, scope?: ScopeRef) => void
+      /** Adds a machine to a project as its Owner would, for what a lower role may do with it (E2E access flows). */
+      addMachine: (projectKey: string, machine: MachineAccess) => void
     }
   }
 }
@@ -31,6 +34,11 @@ export async function startMockApi(): Promise<void> {
       const id = `configuration:${key}` as const
       const content = { ...latest(getDocument(db, scope, id))?.Content, ...changes }
       putVersion(db, scope, id, content).Modified.By = accountActor('user_01MOCKGRACE')
+      saveDb(db)
+    },
+    addMachine: (projectKey, machine) => {
+      const db = loadDb()
+      ;((db.machines ??= {})[projectKey] ??= []).push(machine)
       saveDb(db)
     },
   }

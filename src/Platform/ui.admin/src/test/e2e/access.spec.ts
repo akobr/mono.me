@@ -185,6 +185,66 @@ test('a Contributor cannot give a machine management scopes', async ({ page }) =
   await expect(dialog.getByRole('checkbox', { name: 'Configuration.Transfer' })).toBeDisabled()
 })
 
+test('a Contributor neither resets a machine with management scopes nor edits its rules, but deletes it', async ({
+  page,
+}) => {
+  // The user contributes to acme.shipping, whose Owner created these machines; the API refuses a Contributor the reset
+  // and new federation rules of a machine with management scopes.
+  await openApp(page, '/acme/shipping/machines')
+  await page.evaluate(() => {
+    const mock = window.storytellerMock!
+    mock.addMachine('acme.shipping', {
+      Id: 'mach-shipping-worker',
+      ObjectId: 'obj_11',
+      Scope: 'DefaultRead',
+      CredentialKind: 'ApiKey',
+    })
+    mock.addMachine('acme.shipping', {
+      Id: 'mach-shipping-export',
+      ObjectId: 'obj_12',
+      Scope: 'DefaultRead',
+      CredentialKind: 'ApiKey',
+      ManagementScopes: ['ConfigurationTransfer'],
+    })
+    mock.addMachine('acme.shipping', {
+      Id: 'mach-shipping-sync',
+      ObjectId: 'mach-shipping-sync',
+      AccessKey: '',
+      Scope: 'DefaultReadWrite',
+      CredentialKind: 'Federated',
+      FederationRules: [
+        {
+          Issuer: 'github',
+          Audience: `${location.origin}/api/v1/acme/shipping/access/token`,
+          Subject: 'repo:acme/shipping:ref:refs/heads/main',
+        },
+      ],
+      ManagementScopes: ['ConfigurationTransfer'],
+    })
+  })
+  await goto(page, '/acme/shipping/machines')
+
+  await expect(
+    page.getByRole('row').filter({ hasText: 'mach-shipping-worker' }).getByRole('button', { name: 'Reset' }),
+  ).toBeVisible()
+  const managed = page.getByRole('row').filter({ hasText: 'mach-shipping-export' })
+  await expect(managed).toContainText('Configuration.Transfer')
+  await expect(managed.getByRole('button', { name: 'Reset' })).toHaveCount(0)
+
+  await page.getByRole('link', { name: 'mach-shipping-sync' }).click()
+  const rules = page.getByRole('region', { name: 'Federation rules' })
+  await expect(rules.getByRole('button', { name: 'Setup' })).toBeVisible()
+  await expect(rules.getByRole('button', { name: 'Edit rules' })).toHaveCount(0)
+  await page.locator('#machine-detail').getByRole('button', { name: 'Close' }).click()
+
+  await managed.getByRole('button', { name: 'Delete mach-shipping-export' }).click()
+  const confirm = page.getByRole('dialog', { name: 'Delete mach-shipping-export?' })
+  await confirm.getByRole('textbox').fill('mach-shipping-export')
+  await confirm.getByRole('button', { name: 'Delete' }).click()
+  await expect(page.getByText('Machine mach-shipping-export deleted', { exact: true })).toBeVisible()
+  await expect(managed).toHaveCount(0)
+})
+
 // Workload identity federation (424-46): Administrators trust issuers on the Machines page, Contributors create
 // Federated machines with rules; such a machine has no secret and no Reset.
 test('an Administrator adds a trusted issuer from a template', async ({ page }) => {

@@ -25,6 +25,7 @@ import {
   managementScopeDescriptions,
   managementScopeLabels,
   managementScopes,
+  needsAdministrator,
 } from '@/utils/machines'
 import MachineCreateDialog from '@/components/access/MachineCreateDialog.vue'
 import OneTimeSecretDialog from '@/components/access/OneTimeSecretDialog.vue'
@@ -142,6 +143,13 @@ describe('machines', () => {
       'KeyValue.Manage',
     ])
     expect(managementScopes.every((scope) => managementScopeDescriptions[scope].length > 0)).toBe(true)
+  })
+
+  it('leaves the reset and the federation rules of a machine with management scopes to Administrators', () => {
+    expect(needsAdministrator({ Scope: 'DefaultRead', ManagementScopes: ['ConfigurationTransfer'] })).toBe(true)
+    expect(needsAdministrator({ Scope: 'DefaultRead', ManagementScopes: [] })).toBe(false)
+    expect(needsAdministrator({ Scope: 'DefaultRead' })).toBe(false)
+    expect(needsAdministrator(undefined)).toBe(false)
   })
 })
 

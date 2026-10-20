@@ -85,6 +85,12 @@ export const credentialKindLabel = (kind?: MachineCredentialKind | null) =>
  */
 export const hasSecret = (kind?: MachineCredentialKind | null) => kind !== 'Federated'
 
+/**
+ * Whether a reset of the machine, and new federation rules, need an Administrator: the machine has management scopes,
+ * which only Administrators give out (424-57). Contributors reset the other machines, and delete any machine.
+ */
+export const needsAdministrator = (machine?: MachineAccess | null) => !!machine?.ManagementScopes?.length
+
 /** Whether machines of this kind exchange a token of a trusted issuer instead of holding a secret (424-46). */
 export const isFederated = (kind?: MachineCredentialKind | null) => kind === 'Federated'
 
