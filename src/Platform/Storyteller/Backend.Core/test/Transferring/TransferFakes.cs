@@ -182,6 +182,8 @@ internal sealed class FakeConfigurationService(ExportReads? reads = null, Import
 
     public Task<Configuration?> GetConfigurationHierarchyViewAsync(FullKey key) => throw new NotSupportedException();
 
+    public Task<ConfigurationComposition?> GetConfigurationCompositionAsync(FullKey key) => throw new NotSupportedException();
+
     public Task<Configuration> CreateOrUpdateConfigurationAsync(FullKey key, JObject value, AuditActor actor, bool force = false) => throw new NotSupportedException();
 
     public Task<Configuration> PatchConfigurationAsync(FullKey key, JArray patchOperations, AuditActor actor, bool force = false) => throw new NotSupportedException();

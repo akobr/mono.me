@@ -22,7 +22,7 @@ using PartitionKey = Microsoft.Azure.Cosmos.PartitionKey;
 
 namespace _42.Platform.Storyteller.Configuring;
 
-public class CosmosConfigurationService : IConfigurationService
+public partial class CosmosConfigurationService : IConfigurationService
 {
     private readonly IContainerRepositoryProvider _repositoryProvider;
     private readonly IConfigurationBindingResolver? _bindingResolver;
