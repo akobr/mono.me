@@ -38,7 +38,13 @@ GET /v1/house/main/default/configuration/exe.northwind.invoicing.production/reso
 
 The body is the same document with expressions evaluated. Secret sources are included only when the caller has the `Configuration.Secrets` scope. A caller without that scope can still read secrets when it has both the `User.Impersonation` scope and a project role of `ContributorWithSecrets` or higher. Everyone else receives the document with those secret expressions left unresolved.
 
-Both reads return an `ETag`. A service that polls sends it back in `If-None-Match`, and gets `304 Not Modified` without a body while nothing has changed. A document without bindings (no `@` expressions and no object bindings) is answered cheaply. A document with bindings is still evaluated on every poll, so the 304 saves only the transfer.
+```text
+GET /v1/house/main/default/configuration/exe.northwind.invoicing.production/composition
+```
+
+The body explains the effective configuration: every document merged into it (ancestor configurations and type templates) with its content, the merges in order, and the merge that set each value. It is for people and support tools, not for a service at runtime, and it needs access to the whole project: a machine restricted to its key gets `403 AnnotationRestricted`.
+
+The effective and resolved reads return an `ETag`, and so does the composition. A service that polls sends it back in `If-None-Match`, and gets `304 Not Modified` without a body while nothing has changed. A document without bindings (no `@` expressions and no object bindings) is answered cheaply. A document with bindings is still evaluated on every poll, so the 304 saves only the transfer.
 
 The service does not merge customer files, environment files, and default files itself. The execution key is the merge.
 

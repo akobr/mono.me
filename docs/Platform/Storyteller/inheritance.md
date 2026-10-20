@@ -226,12 +226,68 @@ The invalidation skips configuration items of soft-deleted annotations (`Annotat
 | `GetConfigurationHierarchyViewAsync` | One property per visited annotation key. The value is that annotation's stored `Content`. Ancestors are walked with the same graph, and a shared node is recorded once. A key is omitted when it has no configuration item. A system cache row from an earlier calculation has empty stored `Content`, so that key appears as `{}`. |
 | `GetConfigurationVersionContentAsync` | The stored document of that version. |
 | `GetConfigurationViewChangesAsync` | A diff of the effective document of one annotation in two views. |
+| `GetConfigurationCompositionAsync` | The effective document composed again from the stored documents, with every merged document, the calculations, the merges in order and the merge that set each value. See "Composition read". |
 
 `GetConfigurationHierarchyViewAsync` is the per-level breakdown. `GetRawConfigurationAsync` is the single merged object.
 
+## Composition read
+
+`GET v1/{organization}/{project}/{view}/configuration/{key}/composition` explains the effective document: which documents are merged, in which order, and which one set each value. The service method is `GetConfigurationCompositionAsync` (`Backend.CosmosDb/src/Configuring/CosmosConfigurationService.Composition.cs`), the model is `ConfigurationComposition` (`Abstractions.Annotations/src/Model/ConfigurationComposition.cs`). The admin UI shows it in the Composition view of the Effective tab, and `sform story config composition <key>` prints it.
+
+### What it does
+
+It walks the same graph as the calculation, node by node: the finished document of each direct ancestor in enum order, then the template of the node's type, then the node's stored `Content`. It reads the stored documents only. It never reads `CalculatedContent`, never writes, and creates no cache item. Each configuration item and each template is read once per request, and a shared node reuses the read, but the merges are repeated per branch, as in the calculation. Deleted ancestors are not filtered, as in the calculation.
+
+The root follows the effective read: a soft-deleted annotation answers `404 AnnotationDeleted`, an annotation without an item answers `404` unless it is active, and an existing item is composed without a state check.
+
+### The response
+
+| Field | Content |
+| --- | --- |
+| `Content` | The effective document, composed again. |
+| `Hash` | The hash of `Content`, calculated as `CalculatedContentHash`; null for an empty document. |
+| `Sources` | Every merged document once: `Kind` (`Configuration` or `Template`), `AnnotationType`, `AnnotationKey` (configurations), `Presence`, `Version`, `Modified` and the stored `Content`. Ids are `configuration:{annotationKey}` and `template:{typeCode}`. |
+| `Nodes` | The calculations, unfolded into a tree: `Index`, `AnnotationKey`, `Depth` (0 for the target) and `MergedInto`, the node whose calculation merges this one (null for the target). A shared ancestor has one node per branch. Nodes are listed in the order they finish, so the target is last. |
+| `Steps` | The merges of stored documents in the order of application: `Order` (from 1), `SourceId` and `Node`. Each node applies its template, when the view has one for the type, and then its configuration. |
+| `Origins` | `Path`, an RFC 6901 JSON Pointer into `Content`, and `Step`, the merge that set the value. One per value and container, the root left out, in document order. |
+
+Every node has a configuration step, so the whole lineage shows. A configuration without an item is `Missing` and applies nothing. So is an item with version 0 and empty `Content`: the calculation writes such an item only to cache an effective document (see "How a read is assembled"), and every write gives version 1 or more. The composition therefore stays the same after the first effective read. `Empty` is a stored document without properties. A template exists as a step only when the view has it.
+
+On an execution with a template for every type the nodes are `rst` (via `usg`), `sbt` (via `usg`), `usg`, `sbt` (via `cnt`), `cnt`, `exe`, and the twelve steps are each node's template and then its configuration. On a unit of execution the nine nodes are `rst` (via `unt`), `unt`, `rst` (via `usg`), `sbt` (via `usg`), `usg`, `sbt` (via `cnt`), `cnt`, `exe`, `uxe`.
+
+### Origins
+
+The origins come from the merge itself. Each applied document is cloned and every value in it is marked with its step (a Newtonsoft annotation). `MergeInto` clones the values it takes, and a clone keeps the mark; the values it keeps keep theirs. `ConfigurationCompositionOrigins` reads the marks after the target.
+
+So the rules are the merge rules:
+
+- a value added to a missing property, or replacing another value, keeps the step it had in the incoming document;
+- a scalar equal to the existing one (same type and value) is not replaced, so the value keeps the step that first set it; `1` and `1.0` differ;
+- an object merged into an object keeps its step, and its properties are attributed one by one;
+- an incoming `null` on an existing property changes nothing;
+- an array merged into an array keeps its step and its items; incoming items already present are skipped, and the appended ones keep their steps.
+
+In the execution example of "What an ancestor changes", `currency` comes from the subject's configuration merged through the context, `residency` from the subject's configuration merged through the usage (the second merge repeats the same value), `plan` from the usage and `endpoint` from the context. A step can set no value at all.
+
+### Replaying
+
+A client can rebuild `Content` from the response. For each node in order: start from `{}`, merge the result of every node whose `MergedInto` is this node, in order, then merge the `Content` of this node's steps, in order, skipping `Missing`. The result of the last node is `Content`.
+
+A flat replay of the steps is not the same. Merging a finished document is not the same as merging its parts one after the other. If the target holds `a: {x: 1}` and an ancestor is composed of a template `a: 5` and its own `a: {y: 2}`, the ancestor's document is `a: {y: 2}`, and merging it gives `a: {x: 1, y: 2}`. Merging the template and then the own document gives `a: {y: 2}`, because `5` replaces the object first.
+
+### Access and tags
+
+The read needs the scopes of the effective read and access to the whole project (`CheckAccessToProjectAsync`), as the templates do. The response shows ancestor documents in full, including values the annotation overrides, and the templates. A machine restricted to one annotation therefore gets `403 AnnotationRestricted`, also for its own annotation; it gets its effective configuration from the effective read. Bindings are not evaluated.
+
+The read answers with a weak `ETag` of kind `c` (see "Conditional reads").
+
+### Consistency
+
+The composition reads up to seven configuration items in two partitions and up to seven templates, one after the other, without a snapshot. A write between two reads can give a composition that no single moment had. The effective read can also serve a stale cache (see "Cache and descendant freshness"). In both cases the composition's `Hash` differs from the effective `Hash`. The admin UI then reads the effective document again and warns if they still differ.
+
 ## Conditional reads
 
-The effective read (`GET .../configuration/{key}`) and the resolved read (`.../resolved`) answer with a weak `ETag`. A client sends it back in `If-None-Match`. When the configuration is the same, the API answers `304 Not Modified` without a body. `If-None-Match: *` matches any configuration that exists, and a header that is not a valid list of entity tags is ignored. The code is in `Api.Functions/src/ConditionalReads` and `ConfigurationHttp`.
+The effective read (`GET .../configuration/{key}`), the resolved read (`.../resolved`) and the composition read (`.../composition`) answer with a weak `ETag`. A client sends it back in `If-None-Match`. When the configuration is the same, the API answers `304 Not Modified` without a body. `If-None-Match: *` matches any configuration that exists, and a header that is not a valid list of entity tags is ignored. The code is in `Api.Functions/src/ConditionalReads` and `ConfigurationHttp`.
 
 ### The tags
 
@@ -242,6 +298,7 @@ A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, ov
 | `e` | Effective | – |
 | `r` | Resolved, document without bindings | The secret rights |
 | `b` | Resolved, document with bindings | The secret rights; `Content` is the resolved one, and the digest is HMAC-SHA256 |
+| `c` | Composition | Instead of `Version`, `Hash` and `Content`: the whole composition as JSON, so a change of any merged document changes the tag, even one that leaves the effective document as it was |
 
 - **`Hash`.** `Hash` (`CalculatedContentHash`) is part of every tag, but it is not the tag:
   - it is null for an empty document;
@@ -250,7 +307,7 @@ A tag is `W/"<kind>.<digest>"`. The digest is 16 bytes of SHA-256, base64url, ov
   - it stays the same when an own write bumps `Version` without changing the merge.
 
   With `Version`, `Hash` and `Content` hashed together, the tag follows every field of the body that can change.
-- **`Modified`.** Not hashed. Past version 0 it changes only with `Version`. A configuration without an item gets `Modified` set to the time of the read, which would defeat every revalidation.
+- **`Modified`.** Not hashed in `e`, `r` and `b`. Past version 0 it changes only with `Version`. A configuration without an item gets `Modified` set to the time of the read, which would defeat every revalidation. The `c` tag hashes the stamps of the merged documents: a stored document's stamp changes only with its version, and a `Missing` one has none.
 - **The full key.** The same document under another key gets another tag, so nobody can make the server compute someone else's tag in their own configuration.
 - **The secret rights.** There are three values:
   - the caller may read secrets;

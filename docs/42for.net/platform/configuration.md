@@ -45,7 +45,11 @@ For a unit of execution the unit is merged as well. The execution's effective do
 2. The execution's effective document
 3. The unit of execution
 
+Each annotation's document is calculated on its own first: its ancestors' documents, then the **template** of its type in the view, then its stored document. The lists above are therefore the short form. The usage and the context both inherit the subject, so the execution merges the subject twice: once inside the usage's document and once inside the context's document. A subject value that the usage overrode comes back with the context, unless the context or the execution sets it too.
+
 Objects merge. A scalar written later replaces the same scalar written earlier, which is how a more specific document turns a flag off: store it as a boolean or a string, and set the new value. Arrays are **unioned**, so an allow-list or a package of feature ids grows as more specific annotations add entries. A more specific annotation can add entries to an inherited array, but it cannot remove or replace the entries it inherited. A null does not erase an inherited value. To change an inherited scalar setting, write the new value on the more specific annotation.
+
+To see which document set a value, open the **Composition** view of the configuration's **Effective** tab in the admin UI, or run `sform story config composition <key>`. Both list the merged documents in order (configurations and templates) and show, next to each line of the effective document, the merge that set it, like a blame view. The API read is `GET /v1/{organization}/{project}/{view}/configuration/{key}/composition`; it needs access to the whole project.
 
 ```mermaid
 flowchart TB

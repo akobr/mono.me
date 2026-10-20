@@ -140,6 +140,8 @@ The JSON and YAML editors help with bindings too:
 
 The header has the breadcrumb of the annotation detail, always by subject: the parents of the annotation up to its subject. **Lineage**, at its right, lists every ancestor in merge order, the order in which their configuration is inherited. Each ancestor, in the breadcrumb or in **Lineage**, opens its own configuration.
 
+**Effective** shows the merged document: the ancestors, the template of the type and the own document, read-only, as JSON or YAML. Its **Composition** view explains it like a blame view. The list on the side has every merge in order: each ancestor's template and configuration, indented under the ancestor that inherits it, with its version and the number of values it set. A shared ancestor, such as the subject of an execution, appears once per branch and is marked **Applied again**. The gutter of the document shows, on each line, the step that set it, and hovering it names the document. Selecting a step highlights its lines; its paths are listed under it too. An ancestor opens its own configuration, and a template opens in **Modeling** for Contributors and the roles above. A value that a later document repeats keeps the document that set it first. The view loads when you open it, and its address keeps it (`?show=composition`). When the effective document and the composition were read at different moments, a warning offers **Refresh**.
+
 Saving sends only your changes. Two situations stop a save:
 
 - **Schema violation:** the server rejected the document. The errors are listed at the fields, and an Owner or Contributor can still save with **Save anyway**.
