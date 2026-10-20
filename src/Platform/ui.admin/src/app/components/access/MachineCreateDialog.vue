@@ -6,6 +6,7 @@ import {
   type MachineAccessCreateScope,
   type MachineAuthenticationPolicy,
   type MachineCredentialKind,
+  type MachineManagementScope,
 } from '@42for.net/2splatform.sdk'
 import { useGetFederatedIssuers } from '@42for.net/2splatform.sdk/vue-query'
 import { useCatalogStore } from '@/stores/catalog'
@@ -18,6 +19,9 @@ import {
   credentialKinds,
   isFederated,
   issuesCertificates,
+  managementScopeDescriptions,
+  managementScopeLabels,
+  managementScopes,
   scopeDescriptions,
 } from '@/utils/machines'
 
@@ -30,7 +34,8 @@ import {
  * with the project's token endpoint at the address the UI calls the API at; the API may name it differently behind a
  * proxy, and the machine detail flags such a rule), the subject and claim pins; Create waits until every rule is
  * complete. Without a trusted issuer, Administrators are sent to the Trusted issuers section and Contributors are told
- * to ask one.
+ * to ask one. Management scopes (424-57) add bulk and structural operations to the scope. None is picked when the
+ * dialog opens, and only Administrators give them, as in the API: below Administrator the group is disabled.
  */
 const props = defineProps<{ policy?: MachineAuthenticationPolicy }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -41,6 +46,7 @@ const catalog = useCatalogStore()
 const canAdmin = useCan('manageAccess')
 
 const scope = ref<MachineAccessCreateScope>('DefaultRead')
+const management = ref<MachineManagementScope[]>([])
 const annotationKey = ref('')
 const kind = ref<MachineCredentialKind>()
 const lifetime = ref<number>(365)
@@ -68,6 +74,8 @@ watch(open, (value) => {
   if (value) {
     failure.value = undefined
     followingIssuersLink = false
+    // A grant of the previous machine must not carry over to the next one.
+    management.value = []
     kind.value = props.policy?.CredentialKind ?? kindItems.value[0]
     lifetime.value = props.policy?.CertificateLifetimeDays ?? 365
     useSharedCertificate.value = false
@@ -142,6 +150,11 @@ function closeAutoFocus(event: Event) {
 }
 
 const scopes = Object.entries(scopeDescriptions).map(([value, description]) => ({ label: value, value, description }))
+const managementItems = managementScopes.map((value) => ({
+  label: managementScopeLabels[value],
+  value,
+  description: managementScopeDescriptions[value],
+}))
 const keys = computed(() => [...catalog.byKey.keys()].toSorted())
 
 async function create() {
@@ -152,6 +165,10 @@ async function create() {
       Organization: context.org,
       Project: context.project,
       Scope: scope.value,
+      // In the order of the API; without a pick the member is left out, as for older clients.
+      ManagementScopes: management.value.length
+        ? managementScopes.filter((value) => management.value.includes(value))
+        : undefined,
       AnnotationKey: annotationKey.value.trim() || undefined,
       CredentialKind: kind.value,
       CertificateLifetimeDays: ownCertificate.value ? lifetime.value : null,
@@ -183,6 +200,14 @@ async function create() {
         <UFormField label="Scope" required>
           <USelect v-model="scope" :items="scopes" class="w-full" />
           <template #help>{{ scopeDescriptions[scope] }}</template>
+        </UFormField>
+        <UFormField
+          label="Management scopes"
+          description="Bulk and structural operations. They are never part of the scope above; give them only to machines that need them."
+          :help="canAdmin ? undefined : 'Only Administrators give management scopes.'"
+          :ui="{ description: 'text-warning' }"
+        >
+          <UCheckboxGroup v-model="management" :items="managementItems" :disabled="!canAdmin" />
         </UFormField>
         <UFormField label="Annotation key" help="Optional: limits the machine to this annotation and its descendants.">
           <UInputMenu

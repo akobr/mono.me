@@ -5,13 +5,19 @@ import type { FederationRule, MachineAccess } from '@42for.net/2splatform.sdk'
 import { useGetFederatedIssuers, useGetMachineAccess } from '@42for.net/2splatform.sdk/vue-query'
 import { useContextStore } from '@/stores/context'
 import { audienceDiffers } from '@/utils/federation'
-import { credentialKindLabel, isFederated, scopeDescriptions } from '@/utils/machines'
+import {
+  credentialKindLabel,
+  isFederated,
+  managementScopeDescriptions,
+  managementScopeLabels,
+  scopeDescriptions,
+} from '@/utils/machines'
 
-// One machine access: scope, restriction, credential kind and certificate (with its lifetime and expiry). Reset and
-// delete live in the list. A Federated machine (424-46) shows its token endpoint and federation rules instead of a
-// certificate; Contributors edit the rules here (FederationRulesDialog) and can show the setup again. A rule whose
-// issuer was deleted, or whose audience is not the token endpoint (the UI presets it from the address it calls the API
-// at, which a proxy or the API's public base URL can change), is flagged.
+// One machine access: scope, management scopes (424-57), restriction, credential kind and certificate (with its
+// lifetime and expiry). Reset and delete live in the list. A Federated machine (424-46) shows its token endpoint and
+// federation rules instead of a certificate; Contributors edit the rules here (FederationRulesDialog) and can show the
+// setup again. A rule whose issuer was deleted, or whose audience is not the token endpoint (the UI presets it from the
+// address it calls the API at, which a proxy or the API's public base URL can change), is flagged.
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
@@ -68,6 +74,21 @@ function close() {
               {{ machine.data.value?.Scope ? scopeDescriptions[machine.data.value.Scope] : '' }}
             </p>
           </dd>
+          <dt class="text-muted">Management scopes</dt>
+          <dd v-if="machine.data.value?.ManagementScopes?.length">
+            <ul class="space-y-2">
+              <li v-for="managementScope in machine.data.value.ManagementScopes" :key="managementScope">
+                <UBadge
+                  :label="managementScopeLabels[managementScope] ?? managementScope"
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                />
+                <p class="mt-1 text-xs text-muted">{{ managementScopeDescriptions[managementScope] }}</p>
+              </li>
+            </ul>
+          </dd>
+          <dd v-else>None</dd>
           <dt class="text-muted">Annotation</dt>
           <dd class="font-mono text-xs">{{ machine.data.value?.AnnotationKey ?? 'any annotation' }}</dd>
           <dt class="text-muted">Credentials</dt>

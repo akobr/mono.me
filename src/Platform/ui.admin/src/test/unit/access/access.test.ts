@@ -4,21 +4,33 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import {
   createMachineAccess,
+  getMachineAccess,
   getMachineAuthentication,
   issueSharedCertificate,
+  MachineManagementScope,
   resetMachineAccess,
   setMachineAuthentication,
+  setMachineFederationRules,
   type AccessPointMember,
+  type FederationRule,
   type MachineAccessCreate,
   type MachineAuthenticationPolicy,
 } from '@42for.net/2splatform.sdk'
 import { memberRules } from '@/utils/roles'
-import { allowsSharedCertificates, certificateDaysLeft, issuesCertificates, machineSecret } from '@/utils/machines'
+import {
+  allowsSharedCertificates,
+  certificateDaysLeft,
+  issuesCertificates,
+  machineSecret,
+  managementScopeDescriptions,
+  managementScopeLabels,
+  managementScopes,
+} from '@/utils/machines'
 import MachineCreateDialog from '@/components/access/MachineCreateDialog.vue'
 import OneTimeSecretDialog from '@/components/access/OneTimeSecretDialog.vue'
 import MembersTable from '@/components/access/MembersTable.vue'
 import { mockHandlers } from '@/mock/all-handlers'
-import { loadDb } from '@/mock/db'
+import { loadDb, saveDb } from '@/mock/db'
 import { mountInApp, mountScreen, settle } from '../../helpers'
 
 const server = setupServer(...mockHandlers)
@@ -119,6 +131,108 @@ describe('machines', () => {
     expect(allowsSharedCertificates({ EnabledCredentialKinds: ['ApiKey', 'Certificate'] })).toBe(false)
     expect(allowsSharedCertificates(undefined)).toBe(false)
   })
+
+  it('lists every management scope in the order of the API, with its scope string and what it opens', () => {
+    expect(managementScopes).toEqual(Object.values(MachineManagementScope))
+    expect(managementScopes.map((scope) => managementScopeLabels[scope])).toEqual([
+      'Configuration.Transfer',
+      'Schema.Write',
+      'Template.Write',
+      'Annotation.Manage',
+      'KeyValue.Manage',
+    ])
+    expect(managementScopes.every((scope) => managementScopeDescriptions[scope].length > 0)).toBe(true)
+  })
+})
+
+describe('management scopes against the mock API', () => {
+  const rule: FederationRule = {
+    Issuer: 'github',
+    Audience: 'http://api.test/api/v1/acme/billing/access/token',
+    Subject: 'repo:acme/billing:ref:refs/heads/main',
+  }
+
+  /** Changes the user's role in acme.billing, which is Owner in the seed. */
+  function setRole(role: 'Contributor' | 'Owner') {
+    const db = loadDb()
+    db.account!.AccessMap!['acme.billing'] = role
+    saveDb(db)
+  }
+
+  it('stores the management scopes of a new machine, distinct and in the order of the API', async () => {
+    const machine = await createMachineAccess('acme', 'billing', {
+      Scope: 'DefaultReadWrite',
+      ManagementScopes: ['SchemaWrite', 'ConfigurationTransfer', 'SchemaWrite'],
+    })
+
+    expect(machine.ManagementScopes).toEqual(['ConfigurationTransfer', 'SchemaWrite'])
+    expect((await getMachineAccess('acme', 'billing', machine.Id!)).ManagementScopes).toEqual([
+      'ConfigurationTransfer',
+      'SchemaWrite',
+    ])
+    // None, or an empty list, stores none.
+    expect((await createMachineAccess('acme', 'billing', { Scope: 'DefaultRead' })).ManagementScopes).toBeUndefined()
+    expect(
+      (await createMachineAccess('acme', 'billing', { Scope: 'DefaultRead', ManagementScopes: [] })).ManagementScopes,
+    ).toBeUndefined()
+  })
+
+  it('refuses an unknown management scope', async () => {
+    await expect(
+      createMachineAccess('acme', 'billing', {
+        Scope: 'DefaultRead',
+        ManagementScopes: ['ConfigurationTransfer', 'Everything' as MachineManagementScope],
+      }),
+    ).rejects.toMatchObject({ status: 400, message: "The machine management scope Everything doesn't exist." })
+  })
+
+  it('lets only Administrators create a machine with management scopes', async () => {
+    // The user contributes to acme.shipping.
+    await expect(
+      createMachineAccess('acme', 'shipping', { Scope: 'DefaultRead', ManagementScopes: ['ConfigurationTransfer'] }),
+    ).rejects.toMatchObject({ status: 403, errorCode: 'AccessDenied' })
+    expect(loadDb().machines?.['acme.shipping'] ?? []).toEqual([])
+    await expect(createMachineAccess('acme', 'shipping', { Scope: 'DefaultRead' })).resolves.toMatchObject({
+      Scope: 'DefaultRead',
+    })
+  })
+
+  it('lets only Administrators reset a machine with management scopes or replace its federation rules', async () => {
+    const managed = await createMachineAccess('acme', 'billing', {
+      Scope: 'DefaultRead',
+      CredentialKind: 'ApiKey',
+      ManagementScopes: ['KeyValueManage'],
+    })
+    const federated = await createMachineAccess('acme', 'billing', {
+      Scope: 'DefaultReadWrite',
+      CredentialKind: 'Federated',
+      FederationRules: [rule],
+      ManagementScopes: ['ConfigurationTransfer'],
+    })
+
+    setRole('Contributor')
+    await expect(resetMachineAccess('acme', 'billing', managed.Id!)).rejects.toMatchObject({
+      status: 403,
+      errorCode: 'AccessDenied',
+    })
+    await expect(setMachineFederationRules('acme', 'billing', federated.Id!, [rule])).rejects.toMatchObject({
+      status: 403,
+      errorCode: 'AccessDenied',
+    })
+    // Machines without management scopes stay with Contributors.
+    expect((await resetMachineAccess('acme', 'billing', 'mach-invoicing-worker')).AccessKey).toBeDefined()
+    await expect(setMachineFederationRules('acme', 'billing', 'mach-release-pipeline', [rule])).resolves.toMatchObject({
+      FederationRules: [rule],
+    })
+
+    setRole('Owner')
+    const reset = await resetMachineAccess('acme', 'billing', managed.Id!)
+    expect(reset.AccessKey).toBeDefined()
+    expect(reset.ManagementScopes).toEqual(['KeyValueManage'])
+    await expect(setMachineFederationRules('acme', 'billing', federated.Id!, [rule])).resolves.toMatchObject({
+      ManagementScopes: ['ConfigurationTransfer'],
+    })
+  })
 })
 
 describe('machine authentication policy against the mock API', () => {
@@ -189,8 +303,8 @@ describe('machine authentication policy against the mock API', () => {
 })
 
 describe('MachineCreateDialog', () => {
-  /** Mounts the dialog with a policy that a test may replace, and opens it. */
-  async function openDialog(policy: Ref<MachineAuthenticationPolicy | undefined>) {
+  /** Mounts the dialog with a policy that a test may replace, and opens it; the user is an Owner unless a role is given. */
+  async function openDialog(policy: Ref<MachineAuthenticationPolicy | undefined>, role?: string) {
     const open = ref(false)
     const Harness = defineComponent({
       setup: () => () =>
@@ -200,13 +314,19 @@ describe('MachineCreateDialog', () => {
           policy: policy.value,
         }),
     })
-    const screen = await mountScreen(Harness, {})
+    const screen = await mountScreen(Harness, {}, role ? { accessMap: { 'acme.billing': role } } : {})
     open.value = true
     await settle(6)
-    return screen
+    return { ...screen, open }
   }
 
-  async function create(policy: MachineAuthenticationPolicy, before?: () => Promise<void>) {
+  /** The checkbox of the dialog with this label. */
+  function checkbox(label: string) {
+    const element = [...document.body.querySelectorAll('label')].find((entry) => entry.textContent?.trim() === label)
+    return document.getElementById(element!.htmlFor) as HTMLButtonElement
+  }
+
+  async function create(policy: MachineAuthenticationPolicy, before?: () => Promise<void>, role?: string) {
     const bodies: MachineAccessCreate[] = []
     server.use(
       http.post('*/api/v1/:org/:project/access/machines', async ({ request }) => {
@@ -214,7 +334,7 @@ describe('MachineCreateDialog', () => {
         return HttpResponse.json({ Id: 'm1', AccessKey: '' }, { status: 201 })
       }),
     )
-    const screen = await openDialog(ref(policy))
+    const screen = await openDialog(ref(policy), role)
     await before?.()
     const text = document.body.textContent ?? ''
     ;[...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Create')!.click()
@@ -297,7 +417,7 @@ describe('MachineCreateDialog', () => {
     expect(own.body?.UseSharedCertificate).toBeUndefined()
 
     const shared = await create(policy, async () => {
-      ;(document.body.querySelector('button[role="checkbox"]') as HTMLButtonElement).click()
+      checkbox('Use a shared certificate of the project').click()
       await settle(4)
     })
     expect(shared.text).not.toContain('Certificate lifetime (days)')
@@ -306,6 +426,77 @@ describe('MachineCreateDialog', () => {
       CredentialKind: 'CertificateAndApiKey',
       CertificateLifetimeDays: null,
       UseSharedCertificate: true,
+    })
+  })
+
+  describe('management scopes', () => {
+    const policy: MachineAuthenticationPolicy = { EnabledCredentialKinds: ['ApiKey'], CredentialKind: 'ApiKey' }
+
+    it('picks none by default and then sends none', async () => {
+      const { body, text } = await create(policy, async () => {
+        for (const scope of managementScopes) {
+          expect(checkbox(managementScopeLabels[scope]).disabled).toBe(false)
+          expect(checkbox(managementScopeLabels[scope]).getAttribute('aria-checked')).toBe('false')
+        }
+      })
+
+      expect(text).toContain('Management scopes')
+      expect(text).toContain('Bulk and structural operations. They are never part of the scope above')
+      expect(text).not.toContain('Only Administrators give management scopes.')
+      expect(body).toBeDefined()
+      expect(body).not.toHaveProperty('ManagementScopes')
+    })
+
+    it('sends the picked management scopes in the order of the API', async () => {
+      const { body } = await create(policy, async () => {
+        checkbox('Schema.Write').click()
+        await settle(4)
+        checkbox('Configuration.Transfer').click()
+        await settle(4)
+      })
+
+      expect(body).toMatchObject({ Scope: 'DefaultRead', ManagementScopes: ['ConfigurationTransfer', 'SchemaWrite'] })
+    })
+
+    it('forgets the picked management scopes when the dialog opens again', async () => {
+      const bodies: MachineAccessCreate[] = []
+      server.use(
+        http.post('*/api/v1/:org/:project/access/machines', async ({ request }) => {
+          bodies.push((await request.json()) as MachineAccessCreate)
+          return HttpResponse.json({ Id: 'm1', AccessKey: '' }, { status: 201 })
+        }),
+      )
+      const screen = await openDialog(ref(policy))
+      checkbox('Template.Write').click()
+      await settle(4)
+      expect(checkbox('Template.Write').getAttribute('aria-checked')).toBe('true')
+
+      screen.open.value = false
+      await settle(4)
+      screen.open.value = true
+      await settle(6)
+      expect(checkbox('Template.Write').getAttribute('aria-checked')).toBe('false')
+      ;[...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Create')!.click()
+      await settle(6)
+      expect(bodies[0]).not.toHaveProperty('ManagementScopes')
+      screen.host.unmount()
+    })
+
+    it('disables the management scopes below Administrator', async () => {
+      const { body, text } = await create(
+        policy,
+        async () => {
+          // A click on a disabled checkbox picks nothing.
+          checkbox('Annotation.Manage').click()
+          await settle(4)
+          expect(managementScopes.every((scope) => checkbox(managementScopeLabels[scope]).disabled)).toBe(true)
+        },
+        'Contributor',
+      )
+
+      expect(text).toContain('Only Administrators give management scopes.')
+      expect(body).toBeDefined()
+      expect(body).not.toHaveProperty('ManagementScopes')
     })
   })
 })
