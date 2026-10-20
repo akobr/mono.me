@@ -78,6 +78,11 @@ public class TemplateSetCommand : BaseContextCommand
                     content);
             }
         }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
+        {
+            // for example a machine without the management scope Template.Write: the server names it
+            return Console.WriteApiError(e);
+        }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {
             Console.WriteLine($"Error occurred: {e.Message}");

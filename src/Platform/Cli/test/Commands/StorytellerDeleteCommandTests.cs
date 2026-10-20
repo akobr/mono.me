@@ -46,6 +46,22 @@ public class StorytellerDeleteCommandTests
     }
 
     [Fact]
+    public async Task Delete_WithoutTheManagementScope_PrintsTheServerMessage()
+    {
+        _fixture.Api
+            .Setup(api => api.DeleteAnnotationAsync("org1", "proj1", "default", Key))
+            .ThrowsAsync(AnnotationCommandFixture.MissingManagementScope("Annotation.Manage"));
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
+        _fixture.Console.Lines.ShouldBe([
+            $"! {AnnotationCommandFixture.MissingManagementScopeMessage("Annotation.Manage")}",
+            "Error code: AccessDenied",
+        ]);
+    }
+
+    [Fact]
     public async Task Permanent_OfAnActiveKey_ConfirmsThenDeletesAndPurges()
     {
         ActiveKey(descendants: 3);

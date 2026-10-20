@@ -42,7 +42,8 @@ public class TemplateEditCommand : BaseContextCommand
     /// - <c>ExitCodes.SUCCESS</c> when the edited template was saved;
     /// - <c>ExitCodes.WARNING_NO_WORK_NEEDED</c> when no changes were made;
     /// - <c>ExitCodes.WARNING_ABORTED</c> when the user aborted the operation;
-    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code or the API rejected the change.
+    /// - <c>ExitCodes.WARNING_UNAUTHORIZED_ACCESS</c> when the API refused the change with 403, with the server's message;
+    /// - <c>ExitCodes.ERROR_CRASH</c> when the editor exited with a non-zero code or the API rejected the change otherwise.
     /// </returns>
     protected override async Task<int> ExecuteAsync()
     {
@@ -89,6 +90,11 @@ public class TemplateEditCommand : BaseContextCommand
 
             Console.WriteImportant($"Template for '{annotationType}' has been saved (version {saved.Version}).");
             return ExitCodes.SUCCESS;
+        }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
+        {
+            // for example a machine without the management scope Template.Write: the server names it
+            return Console.WriteApiError(e);
         }
         catch (ApiException e) when (e.StatusCode != (int)HttpStatusCode.Unauthorized)
         {

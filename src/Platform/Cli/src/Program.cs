@@ -8,6 +8,7 @@ using _42.CLI.Toolkit;
 using _42.Platform.Cli.Authentication;
 using _42.Platform.Cli.Commands;
 using _42.Platform.Cli.Configuration;
+using _42.Platform.Cli.Output;
 using _42.Platform.Cli.Telemetry;
 using _42.Platform.Storyteller.Sdk;
 using McMaster.Extensions.CommandLineUtils;
@@ -84,7 +85,7 @@ public class Program
                 [args])));
 
             Console.Write("! ", Color.Magenta);
-            Console.WriteLine("You are not authorized to execute the command or you don't have access to requested resources.");
+            Console.WriteLine(ApiRefusal.GeneralMessage);
             return ExitCodes.WARNING_UNAUTHORIZED_ACCESS;
         }
         catch (AuthenticationException exception)
@@ -113,10 +114,17 @@ public class Program
                 exception.StatusCode,
                 args)));
 
+            var refusal = ApiRefusal.Of(exception);
             Console.Write("! ", Color.Magenta);
-            Console.WriteLine("You are not authorized to execute the command or you don't have access to requested resources.");
+            Console.WriteLine(refusal.Message);
 
-            if (_machineSignIn is { IsConfigured: true })
+            if (refusal.ErrorCode is not null)
+            {
+                Console.WriteLine($"  Error code: {refusal.ErrorCode}", Color.DarkGray);
+            }
+
+            // A 403 with the server's message, for example a missing management scope, is not about the credentials.
+            if (refusal.MayBeTheCredentials && _machineSignIn is { IsConfigured: true })
             {
                 Console.WriteLine(
                     $"  sform signed in as a machine with {string.Join(", ", _machineSignIn.CredentialVariables)}. Check the credentials and the project; account, access point and machine management need a user sign-in.",

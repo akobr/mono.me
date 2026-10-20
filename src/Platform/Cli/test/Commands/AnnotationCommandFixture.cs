@@ -46,6 +46,17 @@ internal sealed class AnnotationCommandFixture
                 null);
     }
 
+    // The 403 of the API for a machine that was not created with the management scope.
+    public static ApiException MissingManagementScope(string scope)
+    {
+        return Error(403, "AccessDenied", MissingManagementScopeMessage(scope));
+    }
+
+    public static string MissingManagementScopeMessage(string scope)
+    {
+        return $"This operation needs the management scope {scope}, which the machine was not created with.";
+    }
+
     public static AnnotationDeletion Deletion(string rootKey, int? descendantCount = null, bool isRoot = true)
     {
         return new AnnotationDeletion

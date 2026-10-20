@@ -63,6 +63,11 @@ public class StorytellerDeleteCommand : BaseContextCommand
             Console.WriteLine($"The annotation '{annotationKey}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
+        {
+            // for example a machine without the management scope Annotation.Manage: the server names it
+            return Console.WriteApiError(e);
+        }
 
         // a repeated delete returns the existing deletion and deletes nothing
         if (result.DeletedKeys is not { Count: > 0 })

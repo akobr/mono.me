@@ -41,6 +41,11 @@ public class TemplateDeleteCommand : BaseContextCommand
             Console.WriteLine($"The template for '{annotationType}' has not been found.");
             return ExitCodes.ERROR_WRONG_INPUT;
         }
+        catch (ApiException e) when (e.StatusCode == (int)HttpStatusCode.Forbidden)
+        {
+            // for example a machine without the management scope Template.Write: the server names it
+            return Console.WriteApiError(e);
+        }
 
         Console.WriteImportant($"The template for '{annotationType}' has been deleted.");
         return ExitCodes.SUCCESS;
