@@ -72,7 +72,10 @@ const extensions = computed(() => {
   ]
 })
 
-/** Highlights the lines of the selected step; from the list, it scrolls the first one into view, the focus stays. */
+/**
+ * Highlights the lines of the selected step; from the list, it scrolls the first one into view, the focus stays. The
+ * scroll goes only as far as the line needs: CodeMirror scrolls the panel around the editor too.
+ */
 function applySelection(view: EditorView | undefined = editor.value?.view, scroll = false) {
   if (!view) {
     return
@@ -81,7 +84,7 @@ function applySelection(view: EditorView | undefined = editor.value?.view, scrol
   view.dispatch({
     effects: [
       setSelectedStep.of(selected.value),
-      ...(scroll && first ? [EditorView.scrollIntoView(view.state.doc.line(first).from, { y: 'center' })] : []),
+      ...(scroll && first ? [EditorView.scrollIntoView(view.state.doc.line(first).from, { y: 'nearest' })] : []),
     ],
   })
 }
@@ -128,35 +131,61 @@ function sourceLink(step: CompositionStepView) {
     : undefined
 }
 
+// Until the catalog of the view is loaded, an ancestor is neither linked nor marked as deleted.
 const notInCatalog = (step: CompositionStepView) =>
-  step.kind === 'Configuration' && !step.own && !!step.annotationKey && !catalog.byKey.has(step.annotationKey)
+  catalog.status === 'ready' &&
+  step.kind === 'Configuration' &&
+  !step.own &&
+  !!step.annotationKey &&
+  !catalog.byKey.has(step.annotationKey)
 
 // The Effective query keeps its 30-second staleTime, so a different hash is often an older Effective read: it is
-// read again once per composition, and only a difference that stays is reported.
+// read again once per composition, and only a difference that stays is reported. A composition being read again may
+// still show an older hash, so the hashes are compared once it is read.
 const hash = computed(() => composition.data.value?.Hash ?? undefined)
-const differs = computed(() => !!hash.value && !!props.effectiveHash && hash.value !== props.effectiveHash)
+const differs = computed(
+  () => !composition.isFetching.value && !!hash.value && !!props.effectiveHash && hash.value !== props.effectiveHash,
+)
 const configurationPath = computed(() => `/v1${base.value}/configuration/${props.annotationKey}`)
 const rechecked = ref<string>()
 let rechecking: string | undefined
 
+/** A difference that appears again, or on another configuration, reads the Effective document again. */
+function forgetRecheck() {
+  rechecking = undefined
+  rechecked.value = undefined
+}
+
+watch(() => props.annotationKey, forgetRecheck)
+
 watch(
-  [differs, hash],
-  async ([value, current]) => {
+  [differs, hash, () => props.effectiveHash],
+  async ([value, current, effectiveHash]) => {
+    if (current && current === effectiveHash) {
+      forgetRecheck()
+    }
     if (!value || !current || rechecking === current) {
       return
     }
+    const annotationKey = props.annotationKey
     rechecking = current
     await queryClient.refetchQueries({ queryKey: pathToQueryKey(configurationPath.value), exact: true })
-    rechecked.value = current
+    // the hashes agreed meanwhile, or another configuration is shown: its own recheck decides
+    if (rechecking === current && props.annotationKey === annotationKey) {
+      rechecked.value = current
+    }
   },
   { immediate: true },
 )
 
 const stale = computed(() => differs.value && rechecked.value === hash.value)
+const heading = useTemplateRef<HTMLElement>('heading')
 
 /** Reads both documents again: the Effective read, the composition and everything else under the configuration. */
 function refresh() {
   void invalidateByPath(queryClient, configurationPath.value)
+  // the warning and its button are hidden while the composition is read again: the focus goes on to the steps
+  heading.value?.focus()
 }
 
 const headingId = useId()
@@ -190,9 +219,15 @@ const tint = (step: CompositionStepView) => metaOf(step.code)?.bgClass
         description="The Effective document and the composition were read at different times, and a document changed in between. Refresh reads both again."
         :actions="[{ label: 'Refresh', color: 'warning', variant: 'outline', onClick: refresh }]"
       />
+      <!-- the warning comes after the background read: a status rendered beforehand announces it -->
+      <p class="sr-only" role="status">
+        {{ stale ? 'The Effective document and the composition were read at different times.' : '' }}
+      </p>
 
       <section class="ph-no-capture space-y-2" :aria-labelledby="headingId">
-        <h3 :id="headingId" class="text-xs font-semibold text-muted uppercase">Steps, in the order applied</h3>
+        <h3 :id="headingId" ref="heading" tabindex="-1" class="text-xs font-semibold text-muted uppercase outline-none">
+          Steps, in the order applied
+        </h3>
         <ol class="space-y-2">
           <li
             v-for="step in steps"
@@ -246,6 +281,7 @@ const tint = (step: CompositionStepView) => metaOf(step.code)?.bgClass
                   via <span class="font-mono break-all">{{ step.via }}</span>
                 </span>
                 <span v-if="step.version" class="font-mono text-xs text-muted">v{{ step.version }}</span>
+                <UBadge v-if="notInCatalog(step)" label="Deleted" color="neutral" variant="outline" size="sm" />
                 <UBadge
                   v-if="step.presence === 'Missing'"
                   label="No configuration"
@@ -284,18 +320,18 @@ const tint = (step: CompositionStepView) => metaOf(step.code)?.bgClass
       </section>
 
       <p v-if="empty" class="text-sm text-muted">The effective document is empty: no step sets a value.</p>
-      <template v-else>
-        <CodeEditor
-          ref="editor"
-          :model-value="text"
-          language="json"
-          readonly
-          :extensions="extensions"
-          aria-label="Effective configuration, by step"
-          @ready="(view: EditorView) => applySelection(view)"
-        />
-        <p class="ph-no-capture min-h-4 text-xs text-muted" aria-live="polite">{{ statusText }}</p>
-      </template>
+      <CodeEditor
+        v-else
+        ref="editor"
+        :model-value="text"
+        language="json"
+        readonly
+        :extensions="extensions"
+        aria-label="Effective configuration, by step"
+        @ready="(view: EditorView) => applySelection(view)"
+      />
+      <!-- also for an empty document: a toggle there names a step that sets no value -->
+      <p class="ph-no-capture min-h-4 text-xs text-muted" aria-live="polite">{{ statusText }}</p>
     </template>
   </div>
 </template>
