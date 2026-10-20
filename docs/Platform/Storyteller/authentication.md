@@ -64,7 +64,7 @@ Example `local.settings.json` values:
 
 An invalid token gets **401**. If the JWKS cannot be fetched, the response is **503** with `Retry-After: 5`, so clients keep their token and retry.
 
-Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens) of federated machines are the exception: their signature, issuer, audience and lifetime are always checked. For users, Debug builds also skip `CheckScope` and the project role check. The machine checks of `CheckAccessToAsync` (the machine document, the credential policy and the annotation restriction), including the per-call checks of federated machines, run in every build.
+Debug builds of the Functions app (`DEV_AUTH`) decode bearer tokens without checking them. They still run the configured provider's claim normalization. [Storyteller tokens](#storyteller-tokens) of federated machines are the exception: their signature, issuer, audience and lifetime are always checked. For users, Debug builds also skip `CheckScope` and the project role check. The machine checks of `CheckAccessToAsync` (the machine document, the credential policy, the annotation restriction and the [management scopes](#management-scopes-of-machines)), including the per-call checks of federated machines, run in every build.
 
 ## Claims seen by the API
 
@@ -98,7 +98,7 @@ Entra users get their scopes as delegated scopes requested by the CLI. AuthKit h
   "Auth:AuthKit:DefaultUserScopes:6": "Configuration.ReadWrite"
   ```
 
-  Leave `Configuration.Secrets` out, and grant it through a mapped WorkOS permission such as `storyteller:configuration-secrets`.
+  Leave `Configuration.Secrets` out, and grant it through a mapped WorkOS permission such as `storyteller:configuration-secrets`. Leave the [management scopes](#management-scopes-of-machines) (`Configuration.Transfer`, `Schema.Write`, `Template.Write`, `Annotation.Manage`, `KeyValue.Manage`) out too: they are for machines only, and the role of a user decides the same operations.
 
 * **Role-driven.** Leave `DefaultUserScopes` empty, define WorkOS permissions on organization roles, and map each one. Users need an organization membership with a role, or `permissions` is empty. Account registration and the other `v1/access` endpoints need `User.Impersonation`, so map a permission to it too.
 
@@ -196,7 +196,7 @@ The GitHub Actions variables `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKE
 
 Commands keep their own confirmations, for example before overwriting an `-e` export file or deleting without `--yes`; a pipeline should not depend on them.
 
-`sform account machine create` prints the variables for the new machine. The names match the `.env` snippet of the admin UI. The admin UI has no snippet for a `Federated` machine yet; use the variables `machine create` prints.
+`sform account machine create` prints the variables for the new machine. The names match the `.env` snippet of the admin UI. The admin UI has no snippet for a `Federated` machine yet; use the variables `machine create` prints. A job that exports or imports a view or key/values, writes schemas or templates, deletes, restores or bulk-creates annotations, or protects or restores key/values needs a machine with the matching [management scopes](#management-scopes-of-machines).
 
 | Variable | Meaning |
 |---|---|
@@ -209,7 +209,7 @@ Commands keep their own confirmations, for example before overwriting an `-e` ex
 | `STORYTELLER_CLIENT_ID` | The client ID of a `ClientCredentials` machine, or the machine id of a `Federated` one (the `client_id` of the exchange). |
 | `STORYTELLER_CLIENT_SECRET` | The client secret of a `ClientCredentials` machine. |
 | `STORYTELLER_TOKEN_URL` | The token URL `machine create` printed. |
-| `STORYTELLER_TOKEN_SCOPE` | For client credentials, the token scope `machine create` printed; Entra ID needs it. For a `Federated` machine, optional: Storyteller scopes separated by spaces, a subset of the machine's (the `scope` of the exchange). |
+| `STORYTELLER_TOKEN_SCOPE` | For client credentials, the token scope `machine create` printed; Entra ID needs it. For a `Federated` machine, optional: Storyteller scopes separated by spaces, a subset of the machine's, its management scopes included (the `scope` of the exchange). |
 | `STORYTELLER_SUBJECT_TOKEN_FILE` | A `Federated` machine: a file holding the platform token, read again before every exchange. |
 | `STORYTELLER_SUBJECT_TOKEN_TYPE` | A `Federated` machine, optional: `jwt` (default), `id_token` or `access_token`, in any case, or the full `urn:ietf:params:oauth:token-type:` URN. |
 | `STORYTELLER_TOKEN_FILE` | A file holding a bearer token, re-read before every request and sent as it is. |
@@ -403,15 +403,16 @@ PUT v1/access/points/acme.billing/machine-authentication
 The same with `sform`, which sets the whole policy (`-k` is required, the first `-k` is the default unless `-d` names another, and without `-l` the project follows the deployment default):
 
 ```
-sform machine machine-auth -k api-key -k certificate -d certificate -l 90
-sform machine machine-auth                 # prints the policy
-sform machine create -k api-key            # without -k: the project default
-sform machine create -s                    # CertificateAndApiKey with a shared certificate, no certificate of its own
+sform account machine machine-auth -k api-key -k certificate -d certificate -l 90
+sform account machine machine-auth                 # prints the policy
+sform account machine create -k api-key            # without -k: the project default
+sform account machine create -s                    # CertificateAndApiKey with a shared certificate, no certificate of its own
+sform account machine create -w -m configuration-transfer   # DefaultReadWrite and the management scope Configuration.Transfer (Administrator)
 ```
 
-**Creating a machine.** `MachineAccessCreate.CredentialKind` picks the kind; without it the project default is used. A kind the project does not enable fails with `400`. `MachineAccessCreate.UseSharedCertificate` creates a `CertificateAndApiKey` machine with no certificate of its own: it gets only its API key, `UsesSharedCertificate` is set, and it signs in with one of the project's shared certificates and that key. Any other kind with `UseSharedCertificate` fails with `400`. `MachineAccessCreate.FederationRules` is required for a `Federated` machine and fails with `400` on any other kind (see [Federation rules](#federation-rules)). A machine with a certificate of its own gets `MachineAccessCreate.CertificateLifetimeDays`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. The machine keeps its kind and its lifetime: reset and delete follow the kind, and a certificate renewal issues the new certificate with the same lifetime. Machines created before the lifetime was stored renew with `MachineAuth:CertificateLifetimeDays`.
+**Creating a machine.** `MachineAccessCreate.Scope` is the machine's runtime preset. `MachineAccessCreate.ManagementScopes` adds [management scopes](#management-scopes-of-machines), by their enum names in any case. A value that does not exist (also as a number, `[99]`) answers `400` with "The machine management scope 99 doesn't exist.", and no `ErrorCode`. Duplicates are dropped, and the list is stored in enum order. A list that is not empty needs `Administrator` on the project, or `403 AccessDenied` with "No Administrator access to 'acme.billing'."; a machine without management scopes needs `Contributor`, as before. `MachineAccessCreate.CredentialKind` picks the kind; without it the project default is used. A kind the project does not enable fails with `400`. `MachineAccessCreate.UseSharedCertificate` creates a `CertificateAndApiKey` machine with no certificate of its own: it gets only its API key, `UsesSharedCertificate` is set, and it signs in with one of the project's shared certificates and that key. Any other kind with `UseSharedCertificate` fails with `400`. `MachineAccessCreate.FederationRules` is required for a `Federated` machine and fails with `400` on any other kind (see [Federation rules](#federation-rules)). A machine with a certificate of its own gets `MachineAccessCreate.CertificateLifetimeDays`, or else the project's default lifetime, clamped to the deployment's minimum and maximum. The machine keeps its kind and its lifetime: reset and delete follow the kind, and a certificate renewal issues the new certificate with the same lifetime. Machines created before the lifetime was stored renew with `MachineAuth:CertificateLifetimeDays`.
 
-**Every machine call** is accepted only when the machine presents what its own kind requires, and the project still enables that kind. A `CertificateAndApiKey` machine that sends only its API key is rejected, even if the project also enables `ApiKey`. Likewise one that sends only its certificate is rejected, even if the project also enables `Certificate`: a machine certificate carries its machine's kind (`mcert.` documents stored before the kind was kept take it from the machine access document), and a machine certificate whose kind is unknown is refused. A `Federated` machine sends a Storyteller token, and each call reads the machine to compare its stored kind and scope with the token (see [Storyteller tokens](#storyteller-tokens)). Disabling a kind stops every machine of that kind at once (up to the 60-second cache of the policy); enable it again and they work again. To move a machine to another kind, create a new machine and delete the old one.
+**Every machine call** is accepted only when the machine presents what its own kind requires, and the project still enables that kind. A `CertificateAndApiKey` machine that sends only its API key is rejected, even if the project also enables `ApiKey`. Likewise one that sends only its certificate is rejected, even if the project also enables `Certificate`: a machine certificate carries its machine's kind (`mcert.` documents stored before the kind was kept take it from the machine access document), and a machine certificate whose kind is unknown is refused. The management scopes of the call come from the same record as its scope: the machine access document for an API key, alone or with a shared certificate, and the `mcert.` document for a machine certificate. An `mcert.` document stored before management scopes existed has none, as its machine has none. A `Federated` machine sends a Storyteller token, and each call reads the machine to compare its stored kind, scope and management scopes with the token (see [Storyteller tokens](#storyteller-tokens)). Disabling a kind stops every machine of that kind at once (up to the 60-second cache of the policy); enable it again and they work again. To move a machine to another kind, create a new machine and delete the old one.
 
 ## Machine access with client credentials
 
@@ -437,11 +438,11 @@ Every provider's tokens are checked for the same things:
 * that the project named by the request enables `ClientCredentials`;
 * that the project owns the machine.
 
-A token that fails any of these gets 401. API keys and certificates are accepted only for machines of the kinds the project enables, see [Machine authentication policy](#machine-authentication-policy). Scopes come only from what Storyteller put into the client; `roles` or `scp` claims from elsewhere in the provider are dropped.
+A token that fails any of these gets 401. API keys and certificates are accepted only for machines of the kinds the project enables, see [Machine authentication policy](#machine-authentication-policy). Scopes come only from what Storyteller put into the client; `roles` or `scp` claims from elsewhere in the provider are dropped. A [management scope](#management-scopes-of-machines) must also be stored on the machine, so a WorkOS permission or an Entra ID app role added in the provider later grants none.
 
 ### The `MachineAccess` object
 
-Create, get, list, reset and the federation rules `PUT` return a `MachineAccess`. Property names are PascalCase. `Scope` and `CredentialKind` are the enum names as strings. A null property is left out of the JSON.
+Create, get, list, reset and the federation rules `PUT` return a `MachineAccess`. Property names are PascalCase. `Scope`, `ManagementScopes` and `CredentialKind` are the enum names as strings. A null property is left out of the JSON.
 
 Create returns the secret once. Get and list read the stored record: the secret is masked, and the one-time fields are absent. Reset returns that stored record with the new secret in `AccessKey`. A `Federated` machine has no secret and cannot be reset (`400`); its `FederationRules` and `TokenEndpoint` come with create, get, list and the rules `PUT`.
 
@@ -450,7 +451,8 @@ Create returns the secret once. Get and list read the stored record: the secret 
 | `Id` | string | Machine id, and the `sub` / `azp` the API expects from that machine. An API key, a certificate or a federated machine uses a GUID; a federated machine sends it as `client_id` to the token endpoint. Client credentials use the identity provider's client id: the WorkOS application client id, the Entra appId, or the Keycloak client id `42.sform.{organization}.{project}.{guid}`. |
 | `ObjectId` | string | Id used to reset and delete the credential at its source. Same value as `Id` for an API key, a certificate or a federated machine. AuthKit uses the WorkOS application id, Entra ID the application object id, and Keycloak the client's internal id. |
 | `AccessKey` | string | Secret. Create and reset return it in full: the structured `2s.` API key, or the client secret for client credentials. A certificate-only or federated machine returns an empty string. Stored copies keep the first three characters and then `***`, or `***` when the value is shorter. |
-| `Scope` | `MachineAccessScope` | What the machine may call. `AnnotationRead` grants `Annotation.Read`. `AnnotationReadWrite` grants `Annotation.Read` and `Annotation.ReadWrite`. `ConfigurationRead` grants `Configuration.Read`. `ConfigurationReadWrite` grants `Configuration.Read` and `Configuration.ReadWrite`. `DefaultRead` grants `Default.Read`, `Annotation.Read` and `Configuration.Read`. `DefaultReadWrite` grants those three plus `Default.ReadWrite`, `Annotation.ReadWrite` and `Configuration.ReadWrite`. `SecretsRead` grants `Configuration.Read` and `Configuration.Secrets`, `SecretsReadWrite` adds `Configuration.ReadWrite`; such a machine receives [key/value secrets](key-values.md#secret-delivery) under the project's mTLS rule. Entra ID stores `DefaultReadWrite` for any `…ReadWrite` request and `DefaultRead` otherwise, and keeps the two secrets scopes as they are. |
+| `Scope` | `MachineAccessScope` | The runtime preset: the per-document reads and writes the machine may call. `AnnotationRead` grants `Annotation.Read`. `AnnotationReadWrite` grants `Annotation.Read` and `Annotation.ReadWrite`. `ConfigurationRead` grants `Configuration.Read`. `ConfigurationReadWrite` grants `Configuration.Read` and `Configuration.ReadWrite`. `DefaultRead` grants `Default.Read`, `Annotation.Read` and `Configuration.Read`. `DefaultReadWrite` grants those three plus `Default.ReadWrite`, `Annotation.ReadWrite` and `Configuration.ReadWrite`. `SecretsRead` grants `Configuration.Read` and `Configuration.Secrets`, `SecretsReadWrite` adds `Configuration.ReadWrite`; such a machine receives [key/value secrets](key-values.md#secret-delivery) under the project's mTLS rule. Entra ID stores `DefaultReadWrite` for any `…ReadWrite` request and `DefaultRead` otherwise, and keeps the two secrets scopes as they are. No preset includes a management scope. |
+| `ManagementScopes` | `MachineManagementScope[]` | The [management scopes](#management-scopes-of-machines) granted on top of `Scope`: `ConfigurationTransfer`, `SchemaWrite`, `TemplateWrite`, `AnnotationManage` and `KeyValueManage`. Stored without duplicates and in this order, and left out when the machine has none. Only an Administrator creates a machine with them, and they cannot change afterwards. Every provider keeps them as requested; Entra ID does not collapse them like `Scope`. |
 | `AnnotationKey` | string | Optional [annotation restriction](#annotation-restriction-of-machines): the machine reaches this annotation and its descendants only. Create stores it in canonical form (type code in lower case, empty segments dropped), turns a blank value into null, and answers `400` `InvalidKey` for a key that does not parse. Null means the whole project. |
 | `CredentialKind` | `MachineCredentialKind` | `ApiKey`, `Certificate`, `CertificateAndApiKey`, `ClientCredentials` or `Federated`. Chosen at creation from the kinds the project enables (the project default when the request names none) and kept when the policy later changes. |
 | `CertificateThumbprint` | string | Thumbprint of the machine's current certificate. Present for `Certificate` and `CertificateAndApiKey`, except a machine that uses a shared certificate, and updated when the certificate is renewed. |
@@ -475,10 +477,17 @@ Create returns the secret once. Get and list read the stored record: the secret 
    "Auth:AuthKit:PermissionMap:storyteller:configuration-read": "Configuration.Read",
    "Auth:AuthKit:PermissionMap:storyteller:configuration-write": "Configuration.ReadWrite",
    "Auth:AuthKit:PermissionMap:storyteller:default-read": "Default.Read",
-   "Auth:AuthKit:PermissionMap:storyteller:default-write": "Default.ReadWrite"
+   "Auth:AuthKit:PermissionMap:storyteller:default-write": "Default.ReadWrite",
+   "Auth:AuthKit:PermissionMap:storyteller:configuration-transfer": "Configuration.Transfer",
+   "Auth:AuthKit:PermissionMap:storyteller:schema-write": "Schema.Write",
+   "Auth:AuthKit:PermissionMap:storyteller:template-write": "Template.Write",
+   "Auth:AuthKit:PermissionMap:storyteller:annotation-manage": "Annotation.Manage",
+   "Auth:AuthKit:PermissionMap:storyteller:keyvalue-manage": "KeyValue.Manage"
    ```
 
-   A new M2M application gets every mapped permission whose scopes all fall within the machine's scope (`DefaultRead` gets the three read permissions, `DefaultReadWrite` all six). If no permission matches, creation fails with 400. A permission that also grants something outside the machine scope is never given to a machine: `Configuration.Secrets` reaches only machines created with `SecretsRead` or `SecretsReadWrite`, so map it from its own permission (for example `storyteller:configuration-secrets`).
+   A new M2M application gets every mapped permission whose scopes all fall within the machine's scope and its [management scopes](#management-scopes-of-machines) (`DefaultRead` gets the three read permissions, `DefaultReadWrite` the first six). If no permission covers a scope of the preset, creation fails with 400; a permission of management scopes alone does not count. A permission that also grants something outside the machine scope is never given to a machine: `Configuration.Secrets` reaches only machines created with `SecretsRead` or `SecretsReadWrite`, so map it from its own permission (for example `storyteller:configuration-secrets`), and a management scope reaches only machines created with it.
+
+   Every management scope of a new machine must be covered by a permission it gets. Otherwise creation fails with 400 before WorkOS is called, for example "No WorkOS permission in Auth:AuthKit:PermissionMap maps to the management scope Configuration.Transfer.". So map each management scope a deployment uses from a permission of its own. The description of the application names the management scopes after the scope, for example `organization=acme|project=billing|scope=DefaultReadWrite|manage=ConfigurationTransfer`.
 3. Set `Auth:AuthKit:ClientId`, `Auth:AuthKit:AuthKitDomain`, `Auth:AuthKit:MachineOrganizationId` and `Auth:AuthKit:ApiKey` (from Key Vault). `Program.cs` registers AuthKit machine access when the domain and the organization are set. The host then refuses to start without the other two. AuthKit users are not required.
 
 Tokens come from `{AuthKitDomain}/oauth2/token` and are checked as follows:
@@ -493,6 +502,8 @@ Reset mints a new secret and then revokes the old ones (WorkOS allows five per a
 ### Entra ID app registrations
 
 1. The Storyteller API app registration (`Auth:ClientId`) needs two application app roles. Their IDs go into `Auth:AppRoles:DefaultRead` and `Auth:AppRoles:DefaultReadWrite`. A role value is what the token's `roles` claim carries, so name the values after the API scopes; the API strips an `App.` prefix. A machine gets the read/write role for any `…ReadWrite` scope, and the read role otherwise. Two more roles are optional: `Auth:AppRoles:SecretsRead` and `Auth:AppRoles:SecretsReadWrite`, whose values carry `Configuration.Secrets` as well. Without them, creating a machine with the scope `SecretsRead` or `SecretsReadWrite` answers `400 ProtectionNotConfigured`.
+
+   The [management scopes](#management-scopes-of-machines) need one app role each, also optional. Their IDs go into `Auth:AppRoles:ConfigurationTransfer`, `Auth:AppRoles:SchemaWrite`, `Auth:AppRoles:TemplateWrite`, `Auth:AppRoles:AnnotationManage` and `Auth:AppRoles:KeyValueManage`, and their values are the scope strings (`Configuration.Transfer`, `Schema.Write`, `Template.Write`, `Annotation.Manage`, `KeyValue.Manage`; an `App.` prefix is allowed). A key that is set must be a GUID, or the host does not start. A machine gets its runtime role and one role per management scope: the application lists them all in `RequiredResourceAccess`, and admin consent assigns each, the runtime role first. When the key of a requested management scope is missing or not a GUID, creation answers `400` before anything is created in Graph, for example "Machines with the management scope Configuration.Transfer need the app role Auth:AppRoles:ConfigurationTransfer, which this deployment does not configure.". The `Notes` of the application name the management scopes (`|manage=ConfigurationTransfer`).
 2. Set `MachineAuth:AzureAd:TenantId` to the directory where machine app registrations are created. `Auth:TenantId` and `Auth:ClientId` must be set too, also when users sign in with AuthKit.
 3. The Functions identity (`DefaultAzureCredential`) needs Microsoft Graph permissions to create applications and service principals and to assign app roles.
 4. Use `services.AddAzureAdMachineAccess(context.Configuration)` in `Program.cs`.
@@ -510,7 +521,9 @@ The machine ID is the appId. Tokens come from `https://login.microsoftonline.com
 Each machine client has a service account and two protocol mappers:
 
 * an audience mapper adds `Audience` to `aud`;
-* a hardcoded claim mapper adds `storyteller_scope` with the machine's Storyteller scopes.
+* a hardcoded claim mapper adds `storyteller_scope` with the machine's Storyteller scopes: those of its preset, then its [management scopes](#management-scopes-of-machines).
+
+The description of the client names the management scopes (`|manage=ConfigurationTransfer`). Keycloak needs no setting for them.
 
 The machine ID is the `clientId` (`42.sform.…`). Tokens come from `{ServerUrl}/realms/{Realm}/protocol/openid-connect/token` and are checked as follows:
 
@@ -522,21 +535,110 @@ Reset regenerates the client secret.
 
 ## Annotation restriction of machines
 
-A machine created with an `AnnotationKey` K is restricted to K. It reaches K and the descendants of K, in every view of its project, with what its `Scope` allows. The rule is the one of the [inheritance graph](inheritance.md): a machine restricted to the execution `exe.northwind.invoicing.prod` reaches that execution and its units of execution `uxe.northwind.invoicing.prod.*`, and a machine restricted to the subject `sbt.northwind` reaches its contexts, usages, executions and units of execution.
+A machine created with an `AnnotationKey` K is restricted to K. It reaches K and the descendants of K, in every view of its project, with what its `Scope` and its [management scopes](#management-scopes-of-machines) allow. The rule is the one of the [inheritance graph](inheritance.md): a machine restricted to the execution `exe.northwind.invoicing.prod` reaches that execution and its units of execution `uxe.northwind.invoicing.prod.*`, and a machine restricted to the subject `sbt.northwind` reaches its contexts, usages, executions and units of execution.
 
 | Operation | Restricted machine |
 | --- | --- |
 | Annotations (with their history and descendants), configurations (raw, resolved, versions, diffs, the diff to another view), annotation schemas, descendant-type schemas and the combined schema definition of K or a descendant | Allowed |
 | The same for an ancestor, a sibling or another branch of K | `403` |
-| Bulk create (`POST …/annotations`), lookup and restore of deleted annotations | Allowed when every key of the body is K or a descendant, otherwise `403` |
+| Bulk create (`POST …/annotations`), lookup and restore of deleted annotations | Allowed when every key of the body is K or a descendant, otherwise `403`; bulk create and restore also need `Annotation.Manage` |
 | Lists of annotations, deleted annotations, configurations and schemas, compact bulk create (`…/annotations/simple`), type-level schemas, templates, export and import of a view, key/values, the key/value policy and recipients | `403`: the operation spans the whole project |
 | The views of the project (`GET …/views`) and the binding catalog | Allowed: they hold no annotation data |
 
 A refusal is `403` with `ErrorCode` `AnnotationRestricted`. It comes before any read, so it does not tell whether the annotation exists. A key that does not parse is outside of the restriction.
 
+Inside K, the management operations still need their management scope: a bulk create, a soft delete and a restore need `Annotation.Manage`, and an annotation or descendant-type schema write needs `Schema.Write`. The restriction is checked before the management scope, so a restricted machine gets `AnnotationRestricted` for an operation of the whole project, such as a transfer or a template write, whether or not it has the management scope.
+
 The ancestors of K, and the other parents of its descendants (the unit `unt.invoicing.export` of the unit of execution `uxe.northwind.invoicing.prod.export`, for example), still reach the machine through the effective and resolved configurations, and the resolved configuration is the only way a restricted machine gets key/values. Creating or restoring an annotation inside K also creates or restores its missing ancestors, as for every caller; the answers of a bulk create and of a restore leave the annotations outside K out.
 
 The restriction is read from the machine's document in the same point read that checks its membership, so it holds for every credential kind and costs nothing extra. Tokens and certificates carry no annotation claim. A stored key that does not parse (machines created before the key was validated) restricts the machine to nothing. A restricted machine that has a configuration write scope can still bind any key/value of the view into the configuration of K; give machines that only read a read scope (`ConfigurationRead` or `SecretsRead`).
+
+## Management scopes of machines
+
+A machine's `Scope` is a **runtime** preset: the per-document reads and writes of annotations, configurations and key/values, and every read. Bulk and structural operations need a **management scope** on top of it. Management scopes are a separate list on the machine (`ManagementScopes`). No preset includes one, and a machine without the list has none. Users have no management scopes: their role decides these operations, as before.
+
+| `MachineManagementScope` | Scope string | Operations |
+|---|---|---|
+| `ConfigurationTransfer` | `Configuration.Transfer` | The export and import of a view, with the reads of their jobs and the archive download ([export-import.md](export-import.md#access)); the export and import of key/values ([key-values.md](key-values.md#who-may-do-what)) |
+| `SchemaWrite` | `Schema.Write` | The writes and deletes of type, annotation and descendant-type schemas ([definitions.md](definitions.md#http)) |
+| `TemplateWrite` | `Template.Write` | The writes (`POST` and `PUT`), patches and deletes of templates ([templating.md](templating.md)) |
+| `AnnotationManage` | `Annotation.Manage` | The bulk create of annotations (`POST …/annotations` and `…/annotations/simple`), their soft delete and their restore ([annotation-lifecycle.md](annotation-lifecycle.md#api)) |
+| `KeyValueManage` | `KeyValue.Manage` | The protect and the bulk restore of key/values ([key-values.md](key-values.md#who-may-do-what)) |
+
+* **A management scope adds to the runtime scopes and never replaces them.** Each operation still needs its runtime scope, its secret rights and its mTLS rule, and the [annotation restriction](#annotation-restriction-of-machines) still applies. An export of a view needs the read scopes of the included kinds and `Configuration.Transfer`; a key/value protect needs a write scope, `Configuration.Secrets` and `KeyValue.Manage`.
+* **One transfer scope covers both directions.** The runtime scopes set the direction: `DefaultRead` with `ConfigurationTransfer` exports and cannot import.
+* **An import of a view needs no more than the transfer scope.** Its background job writes schemas, templates and annotations without `Schema.Write`, `Template.Write` or `Annotation.Manage`. An Administrator who grants `ConfigurationTransfer` opts in to that.
+
+**The check.** A management operation names its management scope in the project check it already makes (`CheckAccessToProjectAsync`, `CheckAccessToAnnotationAsync` or `CheckAccessToAnnotationsAsync` of `HttpRequestDataExtensions`), which reads the machine's document anyway. For a machine, the checks run in this order:
+
+1. the machine document (`401` without it; a federated machine also gets its kind and scope checks, `401`);
+2. the credential policy (`401`);
+3. the annotation restriction (`403 AnnotationRestricted`);
+4. the management scope (`403 AccessDenied`).
+
+Both of these must hold:
+
+* **Stored.** The machine's `ManagementScopes` contain the scope. Otherwise: "This operation needs the management scope Configuration.Transfer, which the machine was not created with."
+* **Carried.** The credentials of the request carry its scope string. Otherwise: "This operation needs the management scope Configuration.Transfer, which the credentials of the machine do not carry." This is a Storyteller token that asked for a subset, or a client-credentials token without the permission or app role.
+
+The machine document is the source of truth, and the credentials can only narrow it. The check runs in every build, Debug (`DEV_AUTH`) included, like the other machine checks. Users are not affected by it. The error code is `AccessDenied`, as for a missing scope of a transfer.
+
+**How the credentials carry them:**
+
+| Kind | Carried in |
+|---|---|
+| `ApiKey`, `Certificate`, `CertificateAndApiKey` | One `roles` claim per scope string, next to those of the preset. They come from the machine access document for an API key, alone or with a shared certificate, and from the `mcert.` document for a machine certificate. |
+| `ClientCredentials` | The provider's token, set up when the machine is created: an AuthKit permission mapped in [`PermissionMap`](#authkit-m2m-applications), an [Entra ID app role](#entra-id-app-registrations), or the [Keycloak](#keycloak-confidential-clients) `storyteller_scope` claim. A provider that cannot carry a requested management scope refuses the creation with `400`. |
+| `Federated` | The `scope` of the [Storyteller token](#storyteller-tokens). An exchange without `scope` gets every scope of the machine, management scopes included. A job that needs `Configuration.Transfer` on some runs only asks for it on those runs and leaves it out on the others. |
+
+**Who manages such a machine.** An Administrator decides on management scopes, so a Contributor must not reach them through the credentials of an existing machine either:
+
+| Operation | Machine without management scopes | Machine with management scopes |
+|---|---|---|
+| Create (`POST v1/{organization}/{project}/access/machines`) | `Contributor` | `Administrator` |
+| Reset (`PUT …/access/machines/{id}`), which returns a new secret | `Contributor` | `Administrator` |
+| Replace the federation rules (`PUT …/access/machines/{id}/federation-rules`), which decide which workload gets the machine's tokens | `Contributor` | `Administrator` |
+| Delete, get, list | `Contributor` | `Contributor` |
+
+Reset and the rules `PUT` read the stored machine first, in one point read; a machine that does not exist gets the usual answer of the route. A role below `Administrator` answers `403 AccessDenied` with "No Administrator access to 'acme.billing'.". These are role checks of users, so Debug builds (`DEV_AUTH`) skip them.
+
+**Typical machines:**
+
+| Machine | `Scope` | `ManagementScopes` |
+|---|---|---|
+| Runtime app | `DefaultRead`, or `SecretsRead` | none |
+| CI writer (per-document writes) | `DefaultReadWrite` | none |
+| Git sync of a view | `DefaultReadWrite` | `ConfigurationTransfer` |
+| Backup | `DefaultRead` | `ConfigurationTransfer` |
+| Schema and template deployer | `ConfigurationReadWrite` | `SchemaWrite`, `TemplateWrite` |
+| Annotation provisioning or clean-up | `AnnotationReadWrite` | `AnnotationManage` |
+| Key/value re-protection | `SecretsReadWrite` | `KeyValueManage` |
+
+```json
+POST v1/acme/billing/access/machines
+{ "Organization": "acme", "Project": "billing", "Scope": "DefaultRead", "ManagementScopes": [ "ConfigurationTransfer" ] }
+```
+
+`sform account machine create -m|--manage <scope>` grants them. The option is repeatable or takes values separated by commas, and accepts the enum name, the scope string or kebab case, in any case (`ConfigurationTransfer`, `Configuration.Transfer`, `configuration-transfer`). An unknown value prints the allowed names and exits with `2`. Without the option, no management scope is sent. The printed machine shows `ManagementScopes`, and `sform account machine list` has a last column `Management` with the scope strings.
+
+```
+sform account machine create -m configuration-transfer        # a backup machine: DefaultRead and Configuration.Transfer
+sform account machine create -w -m configuration-transfer     # a git sync machine: DefaultReadWrite and Configuration.Transfer
+```
+
+**Limits:**
+
+* The management scope of a bulk create limits what one call reaches, not what a runtime machine can do one key at a time. `SetAnnotation` (`PUT …/annotations/{key}`) stays a runtime write: it still creates keys one by one, with their missing ancestors, and re-creates deleted ones.
+* `ProtectKeyValues` only moves keys between the server-side levels. `SetKeyValue` with secret rights still changes the level of one key, and a write to a deleted key re-creates it. The soft delete of one key/value stays runtime too: it touches one key, while the delete of an annotation takes its descendants with it.
+* The management scopes of a machine cannot change once it is created.
+
+**Existing machines.** Machines created before management scopes existed, `DefaultReadWrite` included, have none and keep their runtime access only. Neither a migration nor a setting grants them any. They lose the export and import of a view and of key/values, the writes of schemas and templates, the bulk create, soft delete and restore of annotations, and the protect and bulk restore of key/values. Users keep what their role allows. To move a pipeline:
+
+1. An Administrator creates a new machine with the management scopes it needs. For `ClientCredentials`, the provider maps them first: the AuthKit `PermissionMap` or the Entra ID app roles.
+2. The pipeline switches to the credentials of the new machine.
+3. The old machine is deleted.
+
+No endpoint edits a machine, so the same steps change the management scopes of a machine, as they change its scope.
 
 ## Machine access with workload identity federation
 
@@ -554,7 +656,7 @@ workload ──(3) Authorization: Bearer <storyteller token>──▶ any machin
 Trust is split in two:
 
 * **Trusted issuers** belong to the project and are managed by its Administrators. Each names an OIDC issuer, where its keys come from, and claims every token of that issuer must carry (for example the id of the company's GitHub organization).
-* **Federation rules** belong to the machine and are managed by Contributors, like the machine itself. A rule picks a trusted issuer and pins the token's `aud`, `sub` and further claims.
+* **Federation rules** belong to the machine and are managed by Contributors, like the machine itself; the rules of a machine with [management scopes](#management-scopes-of-machines) need an Administrator. A rule picks a trusted issuer and pins the token's `aud`, `sub` and further claims.
 
 The platform token never reaches the regular API. Discovery, key retrieval and rule matching run once per exchange, not on every call. The request names its project and machine, so an issuer the project does not trust never causes a fetch. Azure managed identity tokens are Entra tokens; sent to the API directly, the Entra validator would take them for `ClientCredentials` machines, so they go through the exchange like every other platform token. Every call with a Storyteller token still reads the machine, so deleting the machine cuts it off at once.
 
@@ -562,7 +664,7 @@ Setting up a federated machine:
 
 1. An Administrator enables `Federated` in the [machine authentication policy](#machine-authentication-policy), next to other kinds if needed.
 2. An Administrator adds a [trusted issuer](#trusted-issuers).
-3. A Contributor creates the machine with `CredentialKind` `Federated` and its [federation rules](#federation-rules). The response carries the machine id and the `TokenEndpoint`, and no secret.
+3. A Contributor creates the machine with `CredentialKind` `Federated` and its [federation rules](#federation-rules), or an Administrator when it gets management scopes. The response carries the machine id and the `TokenEndpoint`, and no secret.
 4. The workload gets a platform token with the rule's audience, [exchanges it](#the-token-endpoint) with `client_id` = the machine id, and calls the API with the Storyteller token. [Setting up a platform](#setting-up-a-platform) shows each platform.
 
 ```json
@@ -601,7 +703,7 @@ sform account machine create --issuer github --audience https://api.example.com/
 | `GET v1/{organization}/{project}/access/issuers/{name}` | `Contributor` | `FederatedIssuer`; `404` |
 | `PUT v1/{organization}/{project}/access/issuers/{name}` | `Administrator` | `FederatedIssuer` (the route name wins over `Name`) → `200 FederatedIssuer`; `400`, `409` |
 | `DELETE v1/{organization}/{project}/access/issuers/{name}` | `Administrator` | `200`; `404` |
-| `PUT v1/{organization}/{project}/access/machines/{id}/federation-rules` | `Contributor` | `FederationRule[]` → `200 MachineAccess`; `400`, `404`, `409` (the machine changed concurrently twice) |
+| `PUT v1/{organization}/{project}/access/machines/{id}/federation-rules` | `Contributor`; `Administrator` for a machine with management scopes | `FederationRule[]` → `200 MachineAccess`; `400`, `404`, `409` (the machine changed concurrently twice) |
 | `POST v1/{organization}/{project}/access/token` | anonymous | [The token endpoint](#the-token-endpoint) |
 
 The management routes need `User.Impersonation` and the role on `{organization}.{project}`, like the machine routes; machine credentials get 401 or 403 there. Contributors read issuers to write rules, but only Administrators decide which issuers the project trusts.
@@ -690,7 +792,7 @@ PUT v1/acme/billing/access/machines/3f1c2a9e-5b7d-4c11-9e0a-2d4f6b8c1a07/federat
 | `subject_token_type` | Required: `urn:ietf:params:oauth:token-type:jwt`, `…:id_token` or `…:access_token` (Azure managed identity tokens are access tokens). The token must be a JWT either way. |
 | `client_id` | Required: the machine id. |
 | `audience`, `resource` | Optional and repeatable. Every value must equal `MachineAuth:Federation:Audience`, otherwise `invalid_target`. They name the Storyteller token's audience, not the platform token's; leave them out. |
-| `scope` | Optional: Storyteller scopes separated by spaces. It must be a subset of the machine's scopes (`invalid_scope` otherwise), and the token gets only that subset, for example `Annotation.Read` for a job that only reads. Without it, the token gets every scope of the machine. |
+| `scope` | Optional: Storyteller scopes separated by spaces. It must be a subset of the machine's scopes, which are those of its `Scope` and its [management scopes](#management-scopes-of-machines) (`invalid_scope` otherwise), and the token gets only that subset, for example `Annotation.Read` for a job that only reads. Without it, the token gets every scope of the machine, management scopes included. A pipeline that needs `Configuration.Transfer` on some runs only can ask for it on those runs and leave it out on the others. |
 | `requested_token_type` | Optional: `urn:ietf:params:oauth:token-type:access_token` (default) or `…:jwt`; anything else answers `invalid_request`. `issued_token_type` echoes it. |
 | `actor_token`, `actor_token_type` | Not supported (`invalid_request`). |
 
@@ -765,11 +867,11 @@ A Storyteller token is an [RFC 9068](https://www.rfc-editor.org/rfc/rfc9068) acc
 `BearerAuthenticationMiddleware` reads the unverified `iss` first. A Storyteller token goes only to the Storyteller validator, never to the user provider, and `DEV_AUTH` does not skip it. The validator requires `typ` `at+jwt` or `application/at+jwt`, RS256, the `kid` of the stored signing key, the exact issuer and audience, and a valid lifetime within `ClockSkewSeconds`. The API then sees `sub` and `azp` (the machine id), one `roles` claim per scope and `annotationKey`, as for an API key. `CheckAccessToAsync` point-reads the machine instead of only checking that it exists, and requires:
 
 * the machine in the route's project, with the stored kind `Federated`;
-* every scope of the token within the machine's stored `Scope`;
+* every scope of the token within the machine's stored `Scope` and `ManagementScopes`;
 * the token's `organization` and `project` equal to the route's (case-insensitive);
 * the project still enabling `Federated`.
 
-So a Storyteller token cannot act as an API key machine, outlive its machine, or exceed its machine's scope, even when it was signed with a stolen key. Any failure is 401 with an empty body. No `WWW-Authenticate` header is sent, as for every other token.
+So a Storyteller token cannot act as an API key machine, outlive its machine, or exceed its machine's scopes, even when it was signed with a stolen key. Any failure is 401 with an empty body. A management operation then also needs its [management scope](#management-scopes-of-machines) in the token: a token that asked for a subset without it gets `403 AccessDenied`. No `WWW-Authenticate` header is sent, as for every other token.
 
 The deployment signs with one RSA 2048 key, stored in the core container, partition `signing-keys`, id `tsk.1`, its `kid` being the RFC 7638 thumbprint. With `SigningKeyAutoBootstrap` the first exchange creates it; concurrent instances settle on one key through a create conflict. An instance signs with the stored key for 10 minutes before it reads the store again. If the store then has no key and `SigningKeyAutoBootstrap` is off, or holds a key that is not RS256, the exchange answers 503 instead of signing with the old key, and the next exchange reads the store again. A store that cannot be read keeps the loaded key in use. Validation never creates a key. A validating instance reads the store again after 10 minutes too, and at most once per 30 seconds for an unknown `kid` or while no key is stored; in between, such tokens are refused without I/O.
 
@@ -810,9 +912,9 @@ The settings live under `MachineAuth:Federation` and are validated at startup:
 * **Opaque refusals.** Every refused exchange looks the same to the caller (`400 invalid_request`), so it does not reveal projects, machines, scopes or rules. The `503` of a `Discovery` or `JwksUri` issuer is the exception. A key fetch failure answers `503` only once the project, its policy, the trusted issuer, a `Federated` machine with that id and a rule for that issuer have all matched, and a `kid` the issuer has not published only once the rule's audience has matched too. A caller who knows a machine id can therefore send tokens with a made-up `kid` and no valid signature, and learn whether the project trusts an issuer and which audience a rule uses. Such probes also make Storyteller fetch the issuer's keys again, at most once a minute per trusted issuer. A `Jwks` issuer has no such `503`. Machine ids are not secret: they appear in workflow files as `client_id`.
 * **Private networks.** Storyteller fetches discovery documents and key sets from URLs an Administrator enters. The fetch uses no proxy, follows no redirect, times out after 10 seconds (for the whole response, body included) and reads at most 512 KiB. It resolves the host and connects only to an address that the IANA special-purpose address registries mark globally reachable, so no loopback, private, CGNAT (`100.64.0.0/10`), link-local (including `169.254.169.254`), multicast, `fc00::/7` or `fe80::/10` address. IPv4 embedded in IPv6 (mapped, compatible, NAT64, 6to4, Teredo) is checked as IPv4, and other IPv6 addresses must be global unicast (`2000::/3`). It connects to the address it checked, so DNS rebinding cannot redirect it. `AllowPrivateNetworks` lifts all of this; never set it in production.
 * **The signing key in Cosmos.** The key is stored unprotected in the core container, like the machine CA. Whoever can read that container can mint Storyteller tokens. The per-call checks keep such tokens within existing `Federated` machines of projects that enable the kind, and within those machines' scopes; they cannot act as an API key, certificate or client-credentials machine. **Emergency rotation:** delete the document `tsk.1` (partition `signing-keys`) from the core container. Once each instance's next read of the store succeeds, about 10 minutes later, it stops signing with and accepting the old key, and the next exchange creates a new one (with `SigningKeyAutoBootstrap`; without it, exchanges answer 503 until a new key is stored); restarting the Function App makes it immediate. An instance that cannot read the store keeps the key it has loaded, so during a Cosmos read outage deleting `tsk.1` alone does not revoke the old key. When revocation comes first, restart the Function App right away: until Cosmos recovers, the restarted instances can neither issue nor validate Storyteller tokens. Workloads exchange again after their next 401.
-* **Long-lived managed identity tokens.** An Azure managed identity token is cached by the platform for about 24 hours, so its issuer needs `MaxTokenLifetimeSeconds` 86,400, and a leaked token can be exchanged for that long. There is no replay store: managed identity, Vercel and Kubernetes tokens are reused by design, and single use would break them. Keep the subject exact and the machine's scope small.
+* **Long-lived managed identity tokens.** An Azure managed identity token is cached by the platform for about 24 hours, so its issuer needs `MaxTokenLifetimeSeconds` 86,400, and a leaked token can be exchanged for that long. There is no replay store: managed identity, Vercel and Kubernetes tokens are reused by design, and single use would break them. Keep the subject exact and the machine's scopes small: give it management scopes only when its jobs need them, and let the jobs that do not need them leave them out of `scope`.
 * **Secret delivery.** A federated machine never presents a certificate, so [secret delivery](key-values.md#secret-delivery) treats it as a token caller: under `RequireMtlsForSecretDelivery` (the default) it gets no secret values, whatever its scope.
-* **Who writes rules.** Contributors create machines of any scope, so they also write the rules of federated machines. Administrators bound what those rules can admit with the issuers they trust and their `RequiredClaims`.
+* **Who writes rules.** Contributors create machines of any runtime scope, so they also write the rules of those federated machines. A machine with [management scopes](#management-scopes-of-machines) is created, reset and given new rules by an Administrator only, so a Contributor cannot point its tokens at another workload. Administrators bound what all rules can admit with the issuers they trust and their `RequiredClaims`.
 
 ### Setting up a platform
 
@@ -982,7 +1084,7 @@ A deployment has five machine credential kinds. `ClientCredentials` with AuthKit
 
 ### What each call does
 
-A machine call that names a project goes through one of the `CheckAccessTo*Async` checks of `HttpRequestDataExtensions` (the project, one annotation, the annotations of a bulk body, or the project metadata), which share one core. That point-reads the `MachineAccessEntity` whose id is the machine id, in partition `{project}.access`, in the organization container. A missing document (or a missing container) is rejected with `401`, and the document's `AnnotationKey` decides the [annotation restriction](#annotation-restriction-of-machines); for a `Federated` machine the same read also compares the stored kind and scope with the token. Every machine call also reads the project policy (`IMachineAuthenticationPolicyStore`, cached for 60 seconds): an API key or certificate call checks that the machine's own kind is enabled, and a bearer call that its kind (`ClientCredentials` or `Federated`) is enabled.
+A machine call that names a project goes through one of the `CheckAccessTo*Async` checks of `HttpRequestDataExtensions` (the project, one annotation, the annotations of a bulk body, or the project metadata), which share one core. That point-reads the `MachineAccessEntity` whose id is the machine id, in partition `{project}.access`, in the organization container. A missing document (or a missing container) is rejected with `401`, and the document's `AnnotationKey` decides the [annotation restriction](#annotation-restriction-of-machines), and its `ManagementScopes` the [management operations](#management-scopes-of-machines); for a `Federated` machine the same read also compares the stored kind, scope and management scopes with the token. Every machine call also reads the project policy (`IMachineAuthenticationPolicyStore`, cached for 60 seconds): an API key or certificate call checks that the machine's own kind is enabled, and a bearer call that its kind (`ClientCredentials` or `Federated`) is enabled.
 
 | Kind | Sent on each call | Work beside the membership read |
 |---|---|---|
@@ -1006,7 +1108,7 @@ Reset lists the secrets, mints a new one, and revokes the previous ones. At five
 
 Machines call the token endpoint with their own client id and secret, so those calls do not spend the management key's 6,000 requests. The client-credentials example in the WorkOS token reference expires 300 seconds after it is issued. Storyteller does not choose that lifetime. If tokens in the environment match the example, 100,000 machines refreshing as each token expires send about 330 token requests a second to the AuthKit domain, and 500,000 send about 1,700, before any of them calls Storyteller. Read `expires_in` on a token from the environment before planning that load. Storyteller keeps no revocation list. A token that has already been issued stays valid until `exp`, and the Cosmos membership read still accepts it while the document exists.
 
-`PermissionMap` is copied onto the application at create. A later edit of the map leaves existing applications as they were. A map that only partly covers the requested `Scope` still creates the application and writes a warning; the stored `Scope` then describes more access than the token carries. `AnnotationKey` is stored on the document and is absent from the token; the [annotation restriction](#annotation-restriction-of-machines) is read from the document.
+`PermissionMap` is copied onto the application at create. A later edit of the map leaves existing applications as they were. A map that only partly covers the requested `Scope` still creates the application and writes a warning; the stored `Scope` then describes more access than the token carries. Management scopes are never partly covered: one without a permission fails the create. `AnnotationKey` is stored on the document and is absent from the token; the [annotation restriction](#annotation-restriction-of-machines) is read from the document.
 
 Every application shares one WorkOS organization and one audience, `Auth:AuthKit:ClientId`. `org_id` is that organization for every Storyteller organization and project. The project in the request URL is what the Cosmos read checks, so a token minted for one project fails in another project where that client id has no document. An application created in the WorkOS dashboard, rather than through Storyteller, receives a token that passes the signature checks and then fails the Cosmos read.
 
@@ -1032,7 +1134,7 @@ When the Cosmos write after a successful create fails, Storyteller asks WorkOS t
 
 The thumbprint of a validated certificate is kept in the invocation (`PresentingCertificateThumbprint`), and the [key/value secret delivery](key-values.md#secret-delivery) uses it: a project whose policy has `RequireMtlsForSecretDelivery` (the default) hands secret values to a machine only when it authenticated with a certificate, whatever scopes its token or API key carries. A federated machine never presents one.
 
-Entra ID and Keycloak `ClientCredentials` follow the same Storyteller shape as AuthKit: one external object per machine, a JWT checked locally, and the Cosmos document as the allow list. Entra provisioning is Microsoft Graph (application, service principal, and app-role assignment) in one tenant, so the tenant's directory-object quota and Graph throttling are the figures to confirm before a large rollout. Keycloak provisioning is the admin API of one realm; how many clients that realm can hold is a property of that Keycloak deployment.
+Entra ID and Keycloak `ClientCredentials` follow the same Storyteller shape as AuthKit: one external object per machine, a JWT checked locally, and the Cosmos document as the allow list. Entra provisioning is Microsoft Graph (application, service principal, and one app-role assignment per role: the runtime role and each management role) in one tenant, so the tenant's directory-object quota and Graph throttling are the figures to confirm before a large rollout. Keycloak provisioning is the admin API of one realm; how many clients that realm can hold is a property of that Keycloak deployment.
 
 ## 401 and 403
 
@@ -1043,8 +1145,9 @@ The two status codes mean different things, so a client knows whether signing in
 | `401` | The credentials are missing, invalid or expired, or the token lacks the required scope. Machine credentials that fail their checks also get 401, among them a Storyteller token whose machine is gone or no longer `Federated`, whose scopes exceed the machine's, or whose project is not the route's. | none |
 | `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 | `403` | A machine restricted to an annotation addressed another annotation, or an operation of the whole project (see [Annotation restriction of machines](#annotation-restriction-of-machines)). | `ErrorResponse` with `ErrorCode` `AnnotationRestricted` |
+| `403` | A machine called a bulk or structural operation without its management scope: the machine was not created with it ("This operation needs the management scope Schema.Write, which the machine was not created with."), or its credentials do not carry it ("…, which the credentials of the machine do not carry."). See [Management scopes of machines](#management-scopes-of-machines). | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 
-A user role check runs on every project endpoint (`CheckAccessToProjectAsync`, `CheckAccessToAnnotationAsync`, `CheckAccessToAnnotationsAsync` and `CheckAccessToProjectMetadataAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`, and so do reading the machine authentication policy, reading trusted issuers and replacing federation rules. Shared certificates, access points, setting the machine authentication policy and writing trusted issuers need `Administrator`, and so do the export and the import of a view, with the reads of their jobs ([export-import.md](export-import.md#access)); machines have no role and need the scopes of the included kinds there. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check of users. The checks of machines (their document, the credential policy and the annotation restriction) run in every build.
+A user role check runs on every project endpoint (`CheckAccessToProjectAsync`, `CheckAccessToAnnotationAsync`, `CheckAccessToAnnotationsAsync` and `CheckAccessToProjectMetadataAsync`) and inside the access-management operations. Reads need `Reader`. Writes to annotations, configurations, templates, schemas and machines need `Contributor`, and so do reading the machine authentication policy, reading trusted issuers and replacing federation rules. Shared certificates, access points, setting the machine authentication policy and writing trusted issuers need `Administrator`, and so do creating a machine with management scopes, resetting one and replacing its federation rules, and the export and the import of a view, with the reads of their jobs ([export-import.md](export-import.md#access)); machines have no role and need the scopes of the included kinds and `Configuration.Transfer` there. Machines need a [management scope](#management-scopes-of-machines) for every bulk or structural operation: `Configuration.Transfer` for the export and import of a view or of key/values, `Schema.Write` for schema writes, `Template.Write` for template writes, `Annotation.Manage` for the bulk create, soft delete and restore of annotations, and `KeyValue.Manage` for the protect and bulk restore of key/values. Granting or revoking `Owner` needs `Owner`. Debug builds (`DEV_AUTH`) skip the project role check of users. The checks of machines (their document, the credential policy, the annotation restriction and the management scopes) run in every build.
 
 Other access-management errors use the same `ErrorResponse` shape, without exception details:
 
@@ -1053,7 +1156,7 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | `400` | none | Grant or revoke with a missing account, a missing access point key, or the role `None`. |
 | `400` | none | An empty body or `null` where an account, an access point, a machine, a permission, a machine authentication policy or a shared certificate is required: `The account is missing.`, `The permission is missing.` and so on. |
 | `400` | none | An account, access point, machine, permission, machine authentication policy or shared certificate body that does not fit its type: invalid JSON, another shape, or a required member left out. The message names the expected body and the JSON path, for example `The request body is not a shared certificate (at $).` |
-| `400` | none | A machine of a kind the project does not enable or the deployment does not configure, or a reset of a `Federated` machine. |
+| `400` | none | A machine of a kind the project does not enable or the deployment does not configure, a management scope that does not exist or that the identity provider cannot carry (no AuthKit permission, no Entra ID app role), or a reset of a `Federated` machine. |
 | `400` | `InvalidFederation` | A trusted issuer or a federation rule fails [validation](#federation-rules), a `PUT` changes the `Issuer` of a trusted issuer, or the body of a federation `PUT` is not a trusted issuer or a list of federation rules. |
 | `400` | `MachineNotFederated` | Federation rules for a machine of another kind. |
 | `404` | `NotFound` | The target account, the access point or the machine access does not exist. `GET` and `DELETE` of a machine or a trusted issuer that does not exist answer `404` without a body. |
@@ -1083,6 +1186,7 @@ az functionapp cors add --name <function-app> --resource-group <group> --allowed
 
 * User tokens issued by the AuthKit domain (Swagger UI sign-in) are not accepted alongside device-flow tokens. M2M tokens from the AuthKit domain are. See [OpenAPI and Swagger UI](#openapi-and-swagger-ui).
 * A combination of an mTLS certificate and client credentials (`CertificateAndClientCredentials`) is not available.
+* The scope and the management scopes of an existing machine cannot be edited. Create a new machine and delete the old one (see [Management scopes of machines](#management-scopes-of-machines)).
 * The C# SDK has no helper that exchanges and caches the Storyteller token (the TypeScript SDK has `createFederatedTokenProvider`). Trusted issuers, federation rules and `Federated` machines are managed in the admin UI, with `sform` (see [Machine access with workload identity federation](#machine-access-with-workload-identity-federation)), the API or the SDKs.
 * The Storyteller signing key cannot be rotated except by the [emergency procedure](#security-notes), and it cannot live in Key Vault. Storyteller publishes no JWKS or RFC 8414 metadata for its tokens.
 * The token endpoint has no replay protection and no rate limit. Rules know only exact values and a separator-anchored subject prefix; there are no glob, regex or CEL conditions.

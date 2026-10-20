@@ -199,18 +199,34 @@ An import writes the annotations first, ancestors before their descendants, then
 
 **The result** counts the documents per kind and in total, with the files left out by the kinds and the ignored files. Chips filter the documents by kind, and by **Failed**, **Skipped** and **Warnings**. Every document that was not unchanged is listed with its kind, outcome, version, code, message and warnings, and links to its page when the view has it. On a phone, the table becomes a list. After a reload, the page shows the view's latest import again.
 
-The CLI does the same with `sform story export` and `sform story import` (see [Configuration](configuration#export-and-import)). The API and the CLI follow the same rule: a user needs the Administrator role, and a machine, which has no role, the scopes of the kinds it exports or imports.
+The CLI does the same with `sform story export` and `sform story import` (see [Configuration](configuration#export-and-import)). The API and the CLI follow the same rule: a user needs the Administrator role, and a machine, which has no role, the scopes of the kinds it exports or imports and the management scope `Configuration.Transfer`.
 
 ## People, machines and settings
 
 | Screen | Who | What |
 | --- | --- | --- |
 | Members | Administrator | Roles of the organization and of each project. Organization and project roles are independent. Only Owners grant Owner, and the last Owner stays. **Invite** in the top bar invites several people at once: type their addresses with spaces or commas between them, or paste a list (also one copied from a mail client). Everyone gets the same role and expiry. Below the members, **Invitations**: resend, revoke or copy the link. |
-| Machines | Contributor (shared certificates and trusted issuers: Administrator) | Credentials for services: scope, an optional annotation restriction (the machine then reaches only that annotation and its descendants), the credential kind and certificate lifetime (or, for a federated machine, its federation rules), reset and delete. Below the machines, **Shared certificates**: issue, revoke, expiry warnings; and **Trusted issuers**: the platforms whose tokens federated machines exchange. |
+| Machines | Contributor (management scopes, shared certificates and trusted issuers: Administrator) | Credentials for services: scope, management scopes, an optional annotation restriction (the machine then reaches only that annotation and its descendants), the credential kind and certificate lifetime (or, for a federated machine, its federation rules), reset and delete. Below the machines, **Shared certificates**: issue, revoke, expiry warnings; and **Trusted issuers**: the platforms whose tokens federated machines exchange. |
 | Settings | Everyone (policies: Administrator, time zone, date format and types: Contributor) | The default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy, the CA certificate download and, in the **Secrets** section, how the key values of the project are protected. |
 | Monitor | Administrator | The **Usage** of the key values (totals, estimated charges, a daily chart) and the **Audit** trail of secrets, one tab each. |
 
 **Machine authentication** on Settings (Administrator) enables the credential kinds the project's machines may use: API keys, client certificates (mTLS), both together, client credentials of the identity provider, or federated tokens. It also sets the default kind and the default certificate lifetime of new machines. **New machine** on Machines preselects both, and lets you pick any other enabled kind and lifetime. Machines keep the kind they were created with; disabling a kind stops every machine that uses it until it is enabled again. The machine list and detail name the kind in words (`API key`, `Certificate and API key`, `Federated`), and the detail shows the certificate lifetime and when the certificate expires.
+
+**Management scopes** on **New machine** give a machine bulk and structural work on top of its scope:
+
+| Management scope | Opens |
+| --- | --- |
+| `Configuration.Transfer` | Exporting and importing a view, and exporting and importing key values |
+| `Schema.Write` | Writing and deleting schemas |
+| `Template.Write` | Writing and deleting templates |
+| `Annotation.Manage` | Creating many annotations at once, deleting them and restoring them |
+| `KeyValue.Manage` | Protecting key values and restoring many at once |
+
+None is picked by default, and no scope includes them: give them only to machines that need them, such as a pipeline that syncs a view with a git repository (`Configuration.Transfer`). Only Administrators give them; below Administrator the group is disabled. Resetting a machine with management scopes, or editing its rules, needs an Administrator too. The machine list shows a badge per management scope next to the scope, and the detail lists them with what each opens, or **None**.
+
+::: warning
+Machines created before management scopes existed have none, also those with read and write access. A pipeline that exports or imports, writes schemas or templates, or deletes and restores annotations with such a machine gets `403`. A machine's scopes cannot be edited: create a new machine with the management scopes it needs, switch the pipeline to it, and delete the old one.
+:::
 
 **Federated machines** have no secret. A workload that already has a token of its platform (GitHub Actions, Kubernetes, Vercel, an Azure managed identity, AWS or Google Cloud) exchanges it at the project's token endpoint for a short-lived Storyteller token. Trust comes in two parts:
 

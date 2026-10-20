@@ -82,6 +82,22 @@ volumes:
 
 `sform account` checks the variables without calling the account API, which is a good first step of a job. For client credentials and a federated machine it also gets a token; a federated machine needs `STORYTELLER_PROJECT` for that, as `sform account` has no `-p`. A wrong setting or a missing platform token file stops the job with exit code `2`, a token endpoint or GitHub request that fails with `3`, rejected credentials or a refused exchange with `44`.
 
+A machine reads, and with `-w` writes, single documents with its scope. Bulk and structural work needs a **management scope** on top of it, which only an Administrator gives, with `-m` when the machine is created. No scope includes one.
+
+| Management scope | Needed by |
+|---|---|
+| `configuration-transfer` | `sform story export` and `import`, `sform story kv export` and `import` |
+| `schema-write` | the writes and deletes of `sform story schema` |
+| `template-write` | `sform story template set`, `edit` and `delete` |
+| `annotation-manage` | `sform story delete` and `restore`, and `sform story set --restore-deleted` |
+| `keyvalue-manage` | `sform story kv protect` and `restore` |
+
+``` powershell
+sform account machine create -w -m configuration-transfer   # a pipeline that keeps a view in a git repository
+```
+
+`-m` takes several values separated by commas, or repeats. Without the management scope, the API answers `403` with a message that names the scope, and `sform` prints it. Machines created before management scopes existed have none, and a machine cannot be edited: create a new one for such a job.
+
 ::: warning
 Commands print what they read or write. A step that reads a resolved configuration with secrets puts those values into the job log, so prefer steps that write configuration, or keep such output out of the log.
 :::
