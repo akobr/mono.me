@@ -3,14 +3,18 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.42.14388
+ * OpenAPI spec version: 0.9.44.51111
  */
 import { faker } from "@faker-js/faker";
 
 import { HttpResponse, http } from "msw";
 import type { RequestHandlerOptions } from "msw";
 
-import { AccountRole, MachineCredentialKind } from "../../model";
+import {
+  AccountRole,
+  MachineCredentialKind,
+  MachineManagementScope,
+} from "../../model";
 import type {
   AccessPoint,
   AccessPointMember,
@@ -386,6 +390,10 @@ export const getGetMachineAccessesResponseMock = (): MachineAccess[] =>
       })),
       undefined,
     ]),
+    ManagementScopes: faker.helpers.arrayElement([
+      faker.helpers.arrayElements(Object.values(MachineManagementScope)),
+      undefined,
+    ]),
   }));
 
 export const getCreateMachineAccessResponseMock = (
@@ -487,6 +495,10 @@ export const getCreateMachineAccessResponseMock = (
         undefined,
       ]),
     })),
+    undefined,
+  ]),
+  ManagementScopes: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineManagementScope)),
     undefined,
   ]),
   ...overrideResponse,
@@ -593,6 +605,10 @@ export const getGetMachineAccessResponseMock = (
     })),
     undefined,
   ]),
+  ManagementScopes: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineManagementScope)),
+    undefined,
+  ]),
   ...overrideResponse,
 });
 
@@ -695,6 +711,10 @@ export const getResetMachineAccessResponseMock = (
         undefined,
       ]),
     })),
+    undefined,
+  ]),
+  ManagementScopes: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineManagementScope)),
     undefined,
   ]),
   ...overrideResponse,
@@ -1110,6 +1130,10 @@ export const getSetMachineFederationRulesResponseMock = (
         undefined,
       ]),
     })),
+    undefined,
+  ]),
+  ManagementScopes: faker.helpers.arrayElement([
+    faker.helpers.arrayElements(Object.values(MachineManagementScope)),
     undefined,
   ]),
   ...overrideResponse,

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.42.14388
+ * OpenAPI spec version: 0.9.44.51111
  */
 import * as zod from "zod";
 
@@ -371,6 +371,17 @@ export const GetMachineAccessesResponseItem = zod.object({
       }),
     )
     .optional(),
+  ManagementScopes: zod
+    .array(
+      zod.enum([
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
+    )
+    .optional(),
 });
 export const GetMachineAccessesResponse = zod.array(
   GetMachineAccessesResponseItem,
@@ -421,6 +432,17 @@ export const CreateMachineAccessBody = zod.object({
       }),
     )
     .optional(),
+  ManagementScopes: zod
+    .array(
+      zod.enum([
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
+    )
+    .optional(),
 });
 
 export const createMachineAccessResponseScopeDefault = `AnnotationRead`;
@@ -469,6 +491,17 @@ export const CreateMachineAccessResponse = zod.object({
         Subject: zod.string().optional(),
         Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
       }),
+    )
+    .optional(),
+  ManagementScopes: zod
+    .array(
+      zod.enum([
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
     )
     .optional(),
 });
@@ -527,6 +560,17 @@ export const GetMachineAccessResponse = zod.object({
       }),
     )
     .optional(),
+  ManagementScopes: zod
+    .array(
+      zod.enum([
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
+    )
+    .optional(),
 });
 
 export const ResetMachineAccessParams = zod.object({
@@ -581,6 +625,17 @@ export const ResetMachineAccessResponse = zod.object({
         Subject: zod.string().optional(),
         Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
       }),
+    )
+    .optional(),
+  ManagementScopes: zod
+    .array(
+      zod.enum([
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
     )
     .optional(),
 });
@@ -876,7 +931,7 @@ export const DeleteFederatedIssuerParams = zod.object({
 export const DeleteFederatedIssuerResponse = zod.unknown();
 
 /**
- * Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor.
+ * Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; Administrator for a machine with management scopes.
  */
 export const SetMachineFederationRulesParams = zod.object({
   organization: zod.string().describe("Target organization name."),
@@ -940,6 +995,17 @@ export const SetMachineFederationRulesResponse = zod.object({
         Subject: zod.string().optional(),
         Claims: zod.record(zod.string(), zod.array(zod.string())).optional(),
       }),
+    )
+    .optional(),
+  ManagementScopes: zod
+    .array(
+      zod.enum([
+        "ConfigurationTransfer",
+        "SchemaWrite",
+        "TemplateWrite",
+        "AnnotationManage",
+        "KeyValueManage",
+      ]),
     )
     .optional(),
 });
