@@ -11,7 +11,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.IMPORT, Description = "Import a zip or a folder into the view (Administrator): annotations, schemas, templates and configurations, each recognized by its file name. Only current documents are imported, never versions, and nothing is deleted. A machine needs the scopes of the included kinds instead of a role.")]
+[Command(CommandNames.IMPORT, Description = "Import a zip or a folder into the view (Administrator): annotations, schemas, templates and configurations, each recognized by its file name. Only current documents are imported, never versions, and nothing is deleted. A machine needs the scopes of the included kinds and the management scope Configuration.Transfer instead of a role.")]
 public class StorytellerImportCommand : BaseContextCommand
 {
     private readonly ITransfersApiClient _transfersApi;

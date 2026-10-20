@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Threading.Tasks;
 using _42.CLI.Toolkit.Output;
 using _42.Platform.Storyteller.Sdk;
@@ -42,11 +43,18 @@ public class MachineListCommand : BaseContextCommand
             return ExitCodes.SUCCESS;
         }
 
+        // Management is last, so the earlier columns keep their positions.
         Console.WriteTable(
             accesses,
-            machine => new[] { machine.Id, $"{machine.Scope:G}", $"{machine.CredentialKind:G}", DescribeSecret(machine), machine.AnnotationKey },
-            new[] { "Id", "Role", "Kind", "Secret", "RestrictionTo" });
+            machine => new[] { machine.Id, $"{machine.Scope:G}", $"{machine.CredentialKind:G}", DescribeSecret(machine), machine.AnnotationKey, DescribeManagementScopes(machine) },
+            new[] { "Id", "Role", "Kind", "Secret", "RestrictionTo", "Management" });
         return ExitCodes.SUCCESS;
+    }
+
+    // The scope strings, as the credentials of the machine carry them; empty for a machine without management scopes.
+    private static string DescribeManagementScopes(_42.Platform.Storyteller.Sdk.MachineAccess machine)
+    {
+        return string.Join(", ", (machine.ManagementScopes ?? []).Select(ManagementScopes.ToScopeString));
     }
 
     // A federated machine has no secret, nor does a certificate machine (an empty access key).

@@ -61,7 +61,7 @@ public class StorytellerTransferCommandTests
 
         description.ShouldNotBeNull();
         description.ShouldContain("(Administrator)", Case.Sensitive);
-        description.ShouldEndWith(" A machine needs the scopes of the included kinds instead of a role.");
+        description.ShouldEndWith(" A machine needs the scopes of the included kinds and the management scope Configuration.Transfer instead of a role.");
     }
 
     [Fact]
