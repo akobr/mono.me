@@ -4,12 +4,6 @@ import { goto, openApp, replaceEditorText } from './support'
 const key = 'exe.northwind.invoicing.prod'
 const path = `/acme/billing/default/configurations/${key}`
 
-declare global {
-  interface Window {
-    storytellerMock?: { changeConfiguration: (key: string, changes: Record<string, unknown>) => void }
-  }
-}
-
 /** The execution has no own configuration in the seed: it is created from the type template. */
 async function openFromTemplate(page: Page) {
   await openApp(page, path)

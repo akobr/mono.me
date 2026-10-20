@@ -10,18 +10,21 @@ import {
   isFederated,
   managementScopeDescriptions,
   managementScopeLabels,
+  needsAdministrator,
   scopeDescriptions,
 } from '@/utils/machines'
 
 // One machine access: scope, management scopes (424-57), restriction, credential kind and certificate (with its
 // lifetime and expiry). Reset and delete live in the list. A Federated machine (424-46) shows its token endpoint and
 // federation rules instead of a certificate; Contributors edit the rules here (FederationRulesDialog) and can show the
-// setup again. A rule whose issuer was deleted, or whose audience is not the token endpoint (the UI presets it from the
-// address it calls the API at, which a proxy or the API's public base URL can change), is flagged.
+// setup again, but only Administrators edit the rules of a machine with management scopes, as the API refuses them
+// otherwise (424-57). A rule whose issuer was deleted, or whose audience is not the token endpoint (the UI presets it
+// from the address it calls the API at, which a proxy or the API's public base URL can change), is flagged.
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
 const canManage = useCan('machines')
+const canAdmin = useCan('manageAccess')
 
 const id = computed(() => String((route.params as { id: string }).id))
 const machine = useGetMachineAccess(
@@ -31,6 +34,7 @@ const machine = useGetMachineAccess(
   { query: { meta: { silent: true } } },
 )
 const federated = computed(() => isFederated(machine.data.value?.CredentialKind))
+const canEditRules = computed(() => canManage.value && (canAdmin.value || !needsAdministrator(machine.data.value)))
 
 // The trusted issuers tell which rules name an issuer that was deleted (those rules match no token), and the platform
 // of the others: all but Azure's request their tokens for the token endpoint.
@@ -131,7 +135,7 @@ function close() {
                 @click="setup = machine.data.value"
               />
               <UButton
-                v-if="canManage"
+                v-if="canEditRules"
                 label="Edit rules"
                 icon="i-lucide-pencil"
                 size="xs"

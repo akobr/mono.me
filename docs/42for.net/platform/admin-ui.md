@@ -222,7 +222,7 @@ The CLI does the same with `sform story export` and `sform story import` (see [C
 | `Annotation.Manage` | Creating many annotations at once, deleting them and restoring them |
 | `KeyValue.Manage` | Protecting key values and restoring many at once |
 
-None is picked by default, and no scope includes them: give them only to machines that need them, such as a pipeline that syncs a view with a git repository (`Configuration.Transfer`). Only Administrators give them; below Administrator the group is disabled. Resetting a machine with management scopes, or editing its rules, needs an Administrator too. The machine list shows a badge per management scope next to the scope, and the detail lists them with what each opens, or **None**.
+None is picked by default, and no scope includes them: give them only to machines that need them, such as a pipeline that syncs a view with a git repository (`Configuration.Transfer`). Only Administrators give them; below Administrator the group is disabled. Resetting a machine with management scopes, or editing its rules, needs an Administrator too: below Administrator such a machine has no **Reset** and no **Edit rules**, but Contributors still delete it. The machine list shows a badge per management scope next to the scope, and the detail lists them with what each opens, or **None**.
 
 ::: warning
 Machines created before management scopes existed have none, also those with read and write access. A pipeline that exports or imports, writes schemas or templates, or deletes and restores annotations with such a machine gets `403`. A machine's scopes cannot be edited: create a new machine with the management scopes it needs, switch the pipeline to it, and delete the old one.

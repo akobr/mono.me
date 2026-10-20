@@ -46,7 +46,7 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 `npm run dev:mock` starts the app with `vite --mode e2e`. `app/main.ts` then starts MSW in the browser with the hand-written handlers of `app/mock/handlers.ts` (a coherent in-memory data set, kept in `sessionStorage`) in front of the Orval-generated Faker handlers, and signs in a fake user. The mock modules are loaded through static `import.meta.env.MODE === 'e2e'` checks and dynamic imports, so production builds do not contain them.
 
 - `?mock-scenario=new-user` starts without an account (onboarding); `?mock-scenario=invited` starts without an account but with a pending invitation; `?mock-scenario=large` puts 16,317 annotations into `acme/billing/default` (performance of the grid and the graph); `?mock-scenario=default` returns to the seeded data.
-- `window.storytellerMock.reset()` resets the data of the current scenario.
+- `window.storytellerMock.reset()` resets the data of the current scenario; `window.storytellerMock.addMachine(projectKey, machine)` adds a machine as the Owner of the project would, for what a lower role may do with it.
 - The mock API keeps deleted annotations restorable and records a change history per key, like the API (`app/mock/annotation-handlers.ts`, `app/mock/audit.ts`). A re-created key starts without its configuration.
 - `POST …/annotations/simple` (bulk create) reads its lines as the API does (`app/mock/simple-lines.ts`): it creates the keys with their missing ancestors, skips existing keys, and answers `400` above 100 lines.
 - `GET …/configuration/{key}/composition` (`compositionOf` in `app/mock/configuration-handlers.ts`) follows the mock Effective read, not the server: the ancestors' own documents at depth 1, the template of the key's type, then its own document, merged with `deepMerge` (arrays replaced, `null` overwrites). Its `Content` and hash are those of the mock Effective read, so the mock never warns of a stale view. It has no repeated source and no depth above 1; unit tests serve a fixture shaped like the server's composition of an execution for those.
@@ -62,7 +62,7 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - a version comparison, and **Compare views** of two views: the only other view preselected, and never a view compared with itself, nor any request for it;
 - invitations from the top bar of the project and organization Members pages, to addresses typed with spaces and commas or pasted as a list, and axe on the invite dialog with an invalid address;
 - a machine with a `.pfx` download;
-- a machine with a management scope, created by an Owner and shown after its scope in the list and on its detail, and the management scopes disabled for a Contributor;
+- a machine with a management scope, created by an Owner and shown after its scope in the list and on its detail, and the management scopes disabled for a Contributor, who also gets no Reset and no Edit rules on such a machine (added by its Owner through `window.storytellerMock.addMachine`), but deletes it;
 - a trusted issuer from a template (what the templates fill in), and one deleted: its rules flagged on the machine detail, and New machine's link to the section, which keeps the focus;
 - a federated machine created by a Contributor (its setup instead of a secret, no Reset) and its rules edited on the detail, where an audience other than the token endpoint is flagged and kept by new rules;
 - a graph node opened by mouse and by keyboard;

@@ -3,6 +3,16 @@ import { AxeBuilder } from '@axe-core/playwright'
 
 export type MockScenario = 'default' | 'new-user' | 'invited' | 'large'
 
+declare global {
+  interface Window {
+    /** The hooks of the mock API (app/mock/browser.ts) that the tests call from the page. */
+    storytellerMock?: {
+      changeConfiguration: (key: string, changes: Record<string, unknown>) => void
+      addMachine: (projectKey: string, machine: Record<string, unknown>) => void
+    }
+  }
+}
+
 /**
  * Opens a path of the app with a fresh mock data set. Every test has its own browser context, so the
  * sessionStorage-backed mock API starts from the scenario's seed. The scenario goes before the hash of a path with an
