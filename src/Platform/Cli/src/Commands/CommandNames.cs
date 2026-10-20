@@ -48,6 +48,7 @@ public static class CommandNames
     public const string RESET = "reset";
     public const string DIFF = "diff";
     public const string VERSIONS = "versions";
+    public const string COMPOSITION = "composition";
     public const string RESTORE = "restore";
     public const string HISTORY = "history";
     public const string DELETED = "deleted";
