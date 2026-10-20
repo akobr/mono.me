@@ -88,6 +88,10 @@
       "commandName": "Project",
       "commandLineArgs": "story config versions exe.42.storyteller.system"
     },
+    "story-config-composition": {
+      "commandName": "Project",
+      "commandLineArgs": "story config composition exe.42.storyteller.system"
+    },
     "assist-key": {
       "commandName": "Project",
       "commandLineArgs": "assist key"
