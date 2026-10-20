@@ -17,7 +17,11 @@ namespace _42.Platform.Storyteller.Api.ConditionalReads;
 //   e  the effective read: full key, Version, Hash and Content.
 //   r  a resolved read of a document without bindings, which is the effective document: the same plus the secret rights.
 //   b  a resolved read with bindings: the same over the resolved Content, keyed (HMAC-SHA256), because it can carry secrets.
-// Modified is left out: past version 0 it changes only with Version, and a configuration without an item stamps every read.
+//   c  the composition read: full key and the whole composition (every source with its version, presence and content, the
+//      nodes, steps and origins), so a change of any source changes the tag, even one that leaves Content as it was.
+// Modified is left out of e, r and b: past version 0 it changes only with Version, and a configuration without an item
+// stamps every read. c keeps the stamps of the sources: a stored document's changes only with its version, and a Missing
+// source has none.
 public static class ConfigurationEntityTags
 {
     public const string EffectivePrefix = "e";
@@ -25,6 +29,8 @@ public static class ConfigurationEntityTags
     public const string ResolvedPrefix = "r";
 
     public const string BoundPrefix = "b";
+
+    public const string CompositionPrefix = "c";
 
     private const int DigestBytes = 16;
 
@@ -46,6 +52,15 @@ public static class ConfigurationEntityTags
         return Create(hash, BoundPrefix, key, rights, resolved);
     }
 
+    public static EntityTagHeaderValue ForComposition(FullKey key, ConfigurationComposition composition)
+    {
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        Append(hash, CompositionPrefix);
+        Append(hash, key.ToString());
+        Append(hash, JsonConvert.SerializeObject(composition, Formatting.None));
+        return Finish(hash, CompositionPrefix);
+    }
+
     // s: the caller may read secrets; w: secrets are withheld from a machine without mTLS; p: neither.
     // w and p get the same body, but only w gets the withheld header, so they don't share a tag either.
     private static string RightsCode(SecretRights rights)
@@ -61,7 +76,11 @@ public static class ConfigurationEntityTags
         Append(hash, configuration.Version.ToString(CultureInfo.InvariantCulture));
         Append(hash, configuration.Hash);
         Append(hash, configuration.Content.ToString(Formatting.None));
+        return Finish(hash, prefix);
+    }
 
+    private static EntityTagHeaderValue Finish(IncrementalHash hash, string prefix)
+    {
         Span<byte> digest = stackalloc byte[hash.HashLengthInBytes];
         hash.GetHashAndReset(digest);
         return new EntityTagHeaderValue($"\"{prefix}.{Base64Url.EncodeToString(digest[..DigestBytes])}\"", isWeak: true);

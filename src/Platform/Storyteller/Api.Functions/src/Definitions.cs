@@ -102,6 +102,9 @@ public static class Definitions
                 public const string Configuration = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}";
                 public const string ConfigurationResolved = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/resolved";
 
+                // Under the configuration's own path, so a client that invalidates the configuration covers it too.
+                public const string ConfigurationComposition = $"{Configuration}/composition";
+
                 public const string Versions = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions";
                 public const string Version = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}";
                 public const string VersionDiff = $"v1/{{{Parameters.Organization}}}/{{{Parameters.Project}}}/{{{Parameters.View}}}/configuration/{{{Parameters.Key}}}/versions/{{{Parameters.Version}}}/diff";
@@ -293,6 +296,7 @@ public static class Definitions
             public const string GetConfigurations = nameof(GetConfigurations);
             public const string GetConfiguration = nameof(GetConfiguration);
             public const string GetResolvedConfiguration = nameof(GetResolvedConfiguration);
+            public const string GetConfigurationComposition = nameof(GetConfigurationComposition);
             public const string SetConfiguration = nameof(SetConfiguration);
             public const string PatchConfiguration = nameof(PatchConfiguration);
             public const string DeleteConfiguration = nameof(DeleteConfiguration);
@@ -471,6 +475,7 @@ public static class Definitions
         public const string Key = "The key of the requested annotation.";
         public const string ConditionalRead = "The response carries a weak ETag. Send it back in If-None-Match to get 304 Not Modified without a body while the configuration stays the same.";
         public const string ConditionalResolvedRead = "A document with bindings is resolved for every read, so a 304 saves the transfer, not the evaluation; a document without bindings is not evaluated.";
+        public const string ConfigurationComposition = "How the effective configuration is composed, read from the stored documents. Sources lists every merged document once: the configurations of the annotation and its ancestors (Missing when there is none) and the view's templates of their types. Nodes are the calculations of the inheritance graph in the order they finish, the annotation last; a shared ancestor is calculated once per branch, so it has a node per branch. Steps are the merges of the sources in the order of application, and Origins give the step that set each value of Content, by RFC 6901 pointer. Content and Hash are those of the effective read while its cache matches the stored documents. Bindings are not evaluated. The read shows the ancestors' documents and the templates in full, so it needs the whole project: a machine restricted to an annotation is refused (ErrorCode AnnotationRestricted), even for its own annotation.";
         public const string ResponseNotModified = "The configuration is unchanged since the ETag sent in If-None-Match.";
         public const string EntityTag = "Weak entity tag of the configuration, for If-None-Match.";
         public const string AnnotationType = "The annotation type code (e.g. rst, sbt, usg, cnt, exe, unt, uxe).";

@@ -149,6 +149,26 @@ public partial class RouteTableTests
         routes.ShouldContain(expected);
     }
 
+    // Under the configuration's own path, which a client's invalidation of the configuration covers.
+    [Fact]
+    public void ConfigurationCompositionRoute_IsRegisteredOnce()
+    {
+        var functions = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters()
+                .Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>())
+                .Where(trigger => trigger?.Route is not null)
+                .SelectMany(trigger => trigger!.Methods!.Select(verb => (
+                    Function: method.Name,
+                    Key: $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"))))
+            .Where(route => route.Key == "GET v1/{}/{}/{}/configuration/{}/composition")
+            .Select(route => route.Function);
+
+        functions.ShouldHaveSingleItem().ShouldBe(nameof(ConfigurationHttp.GetConfigurationComposition));
+        Definitions.Routes.Configuration.V1.ConfigurationComposition.ShouldBe($"{Definitions.Routes.Configuration.V1.Configuration}/composition");
+    }
+
     // The token endpoint is anonymous: it authorizes nothing itself and publishes no security scheme.
     [Fact]
     public void TokenEndpoint_IsAnonymousAndPublishesNoSecurity()

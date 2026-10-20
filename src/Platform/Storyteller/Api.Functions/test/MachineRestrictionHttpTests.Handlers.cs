@@ -11,8 +11,9 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // The handlers in tables. Every handler of one annotation refuses an ancestor and a sibling of the restriction before
 // any service is called, and passes the key of its route to the service for the restriction and its descendants. The
-// project-wide handlers next to them (type-level schemas, templates, deleted annotations, simple create) refuse the
-// restricted machine before any service is called. A new handler of one annotation belongs in KeyedHandlers.
+// project-wide handlers next to them (type-level schemas, templates, the composition of a configuration, deleted
+// annotations, simple create) refuse the restricted machine before any service is called. A new handler of one
+// annotation belongs in KeyedHandlers.
 public partial class MachineRestrictionHttpTests
 {
     private const string RestrictionType = AnnotationTypeCodes.Execution;
@@ -71,6 +72,7 @@ public partial class MachineRestrictionHttpTests
         new(nameof(ConfigurationSchemaHttp.SetConfigurationSchema), http => http.Schemas.SetConfigurationSchema(MachineRequest("PUT", "{}"), Org, Project, DefaultView, RestrictionType)),
         new(nameof(ConfigurationSchemaHttp.DeleteConfigurationSchema), http => http.Schemas.DeleteConfigurationSchema(MachineRequest("DELETE"), Org, Project, DefaultView, RestrictionType)),
         new(nameof(TemplateHttp.GetTemplate), http => http.Templates.GetTemplate(MachineRequest(), Org, Project, DefaultView, RestrictionType)),
+        new(nameof(ConfigurationHttp.GetConfigurationComposition), http => http.Configuration.GetConfigurationComposition(MachineRequest(), Org, Project, DefaultView, Restriction)),
         new(nameof(AnnotationsHttp.GetDeletedAnnotations), http => http.Annotations.GetDeletedAnnotations(MachineRequest(), Org, Project, DefaultView)),
         new(nameof(AnnotationsHttp.SetAnnotationsSimple), http => http.Annotations.SetAnnotationsSimple(MachineRequest("POST", FunctionTestDoubles.ToJsonBody<List<string>>([Restriction])), Org, Project, DefaultView)),
     ];
