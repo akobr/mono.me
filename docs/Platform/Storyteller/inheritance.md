@@ -273,7 +273,7 @@ In the execution example of "What an ancestor changes", `currency` comes from th
 
 A client can rebuild `Content` from the response. For each node in order: start from `{}`, merge the result of every node whose `MergedInto` is this node, in order, then merge the `Content` of this node's steps, in order, skipping `Missing`. The result of the last node is `Content`.
 
-A flat replay of the steps is not the same. Merging a finished document is not the same as merging its parts one after the other. If the target holds `a: {x: 1}` and an ancestor is composed of a template `a: 5` and its own `a: {y: 2}`, the ancestor's document is `a: {y: 2}`, and merging it gives `a: {x: 1, y: 2}`. Merging the template and then the own document gives `a: {y: 2}`, because `5` replaces the object first.
+A flat replay of the steps is not the same. Merging a finished document is not the same as merging its parts one after the other. On an execution, if the usage branch has already put `a: {x: 1}` into the execution's document, and the context is composed of a template `a: 5` and its own `a: {y: 2}`, the context's document is `a: {y: 2}`, and merging it gives `a: {x: 1, y: 2}`. Merging the context's template and then its own document gives `a: {y: 2}`, because `5` replaces the object first.
 
 ### Access and tags
 
@@ -354,6 +354,6 @@ The admin UI calls the API cross-origin. It cannot read the `ETag`, but the brow
 ### Limits
 
 - **Writes ignore `If-Match`.** The tags are weak, and `If-Match` needs a strong tag. A JSON Patch `test` operation guards a write instead.
-- **The tag follows the effective cache.** A descendant whose `CalculatedContent` is stale (see "Cache and descendant freshness") keeps its tag until the cache is cleared.
+- **The `e`, `r` and `b` tags follow the effective cache.** A descendant whose `CalculatedContent` is stale (see "Cache and descendant freshness") keeps its tag until the cache is cleared. The `c` tag follows the stored documents, so it changes at once, and the composition's `Hash` can then differ from the effective `Hash` (see "Consistency").
 - **The SDKs do not send `If-None-Match` yet.** The TypeScript SDK returns only the body, so it cannot see the `ETag`, and it throws on a 304 that the script asked for itself. A polling client uses plain HTTP for now.
 - **Not covered:** `HEAD`, `If-Modified-Since` and the listings.
