@@ -12,9 +12,9 @@ using Microsoft.IdentityModel.Tokens;
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // The access checks of machine requests: the machine document of the project (401 without it), the credential policy,
-// and what the operation reaches against the annotation restriction of the machine (403 AnnotationRestricted). The
-// machine branch runs in every build, so these tests run in Debug (DEV_AUTH) too. The role check of users (the User_
-// tests) runs in Release only.
+// what the operation reaches against the annotation restriction of the machine (403 AnnotationRestricted), and the
+// management scope of a management operation (403 AccessDenied). The machine branch runs in every build, so these tests
+// run in Debug (DEV_AUTH) too. The role check of users (the User_ tests) runs in Release only.
 public class MachineAccessCheckTests
 {
     private const string Organization = "acme";
@@ -41,6 +41,13 @@ public class MachineAccessCheckTests
         Reach.Annotation,
         Reach.Annotations,
         Reach.Metadata,
+    };
+
+    public static TheoryData<Reach> EveryManagementReach => new()
+    {
+        Reach.Project,
+        Reach.Annotation,
+        Reach.Annotations,
     };
 
     // A user role one step below the minimal role of the operation.
@@ -244,6 +251,114 @@ public class MachineAccessCheckTests
         await ShouldBeRestricted(() => request.CheckAccessToAnnotationAsync(Restricted(), Organization, Project, "usg.S.R"));
     }
 
+    // A management operation names its management scope (424-57): a machine needs it stored on its document and carried
+    // by its credentials, on top of everything else, in every build.
+    [Theory]
+    [MemberData(nameof(EveryManagementReach))]
+    public async Task Machine_WithTheManagementScopeStoredAndCarried_Passes(Reach reach)
+    {
+        var access = new RoleAccess(AccountRole.Reader, managementScopes: [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite]);
+
+        await CheckManagement(reach, MachineRequest(managementScopes: [MachineManagementScope.SchemaWrite]), access, MachineManagementScope.SchemaWrite);
+    }
+
+    [Theory]
+    [MemberData(nameof(EveryManagementReach))]
+    public async Task Machine_WithoutTheStoredManagementScope_IsAccessDenied(Reach reach)
+    {
+        var access = new RoleAccess(AccountRole.Reader, managementScopes: [MachineManagementScope.ConfigurationTransfer]);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => CheckManagement(reach, MachineRequest(managementScopes: [MachineManagementScope.SchemaWrite]), access, MachineManagementScope.SchemaWrite));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the management scope Schema.Write, which the machine was not created with.");
+    }
+
+    // The token only narrows the machine document: a federated token that asked for a subset, or a provider token without
+    // the permission or the app role.
+    [Theory]
+    [MemberData(nameof(EveryManagementReach))]
+    public async Task Machine_WithoutTheCarriedManagementScope_IsAccessDenied(Reach reach)
+    {
+        var access = new RoleAccess(AccountRole.Reader, managementScopes: [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite]);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => CheckManagement(reach, MachineRequest(managementScopes: [MachineManagementScope.ConfigurationTransfer]), access, MachineManagementScope.SchemaWrite));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the management scope Schema.Write, which the credentials of the machine do not carry.");
+    }
+
+    // The runtime scopes of a preset never stand in for a management scope.
+    [Theory]
+    [MemberData(nameof(EveryManagementReach))]
+    public async Task Machine_WithTheRuntimeScopesOnly_IsAccessDenied(Reach reach)
+    {
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => CheckManagement(reach, MachineRequest(), new RoleAccess(AccountRole.Reader), MachineManagementScope.ConfigurationTransfer));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the management scope Configuration.Transfer, which the machine was not created with.");
+    }
+
+    // The restriction comes first, so a restricted machine learns that the operation is out of its reach; inside of it,
+    // the missing management scope is AccessDenied.
+    [Fact]
+    public async Task RestrictedMachine_WithoutTheManagementScope_IsRestrictedFirst()
+    {
+        const MachineManagementScope scope = MachineManagementScope.AnnotationManage;
+        var access = Restricted();
+
+        await ShouldBeRestricted(() => MachineRequest().CheckAccessToProjectAsync(access, Organization, Project, managementScope: scope));
+        await ShouldBeRestricted(() => MachineRequest().CheckAccessToAnnotationAsync(access, Organization, Project, "usg.S.R", managementScope: scope));
+        await ShouldBeRestricted(() => MachineRequest().CheckAccessToAnnotationsAsync(access, Organization, Project, [Restriction, "usg.S.R"], managementScope: scope));
+
+        var inside = await Should.ThrowAsync<AccessDeniedException>(() => MachineRequest().CheckAccessToAnnotationAsync(access, Organization, Project, Descendant, managementScope: scope));
+        var insideBulk = await Should.ThrowAsync<AccessDeniedException>(() => MachineRequest().CheckAccessToAnnotationsAsync(access, Organization, Project, [Restriction, Descendant], managementScope: scope));
+        inside.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        insideBulk.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+    }
+
+    [Fact]
+    public async Task RestrictedMachine_WithTheManagementScope_PassesInsideItsRestriction()
+    {
+        var access = new RoleAccess(AccountRole.Reader, Restriction, [MachineManagementScope.AnnotationManage]);
+        var request = MachineRequest(managementScopes: [MachineManagementScope.AnnotationManage]);
+
+        await request.CheckAccessToAnnotationAsync(access, Organization, Project, Descendant, managementScope: MachineManagementScope.AnnotationManage);
+        await request.CheckAccessToAnnotationsAsync(access, Organization, Project, [Restriction, Descendant], managementScope: MachineManagementScope.AnnotationManage);
+    }
+
+    // An unknown machine gets 401 before any 403.
+    [Theory]
+    [MemberData(nameof(EveryManagementReach))]
+    public async Task MissingMachine_OfAManagementOperation_IsUnauthorized(Reach reach)
+    {
+        var (access, _) = MachineDocuments.Create(machine: null);
+
+        await Should.ThrowAsync<SecurityTokenException>(() => CheckManagement(reach, MachineRequest(managementScopes: [MachineManagementScope.SchemaWrite]), access, MachineManagementScope.SchemaWrite));
+    }
+
+    // Users never need a management scope; their role decides, as before.
+    [Theory]
+    [MemberData(nameof(EveryManagementReach))]
+    public async Task User_OfAManagementOperation_PassesWithoutAManagementScope(Reach reach)
+    {
+        await CheckManagement(reach, KeyValueRequests.User(), new RoleAccess(AccountRole.Administrator), MachineManagementScope.ConfigurationTransfer, AccountRole.Administrator);
+    }
+
+    [Theory]
+    [MemberData(nameof(EveryManagementReach))]
+    public async Task User_OfAManagementOperation_BelowTheMinimalRole_IsStillDenied(Reach reach)
+    {
+        if (DevAuth)
+        {
+            return;
+        }
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => CheckManagement(reach, KeyValueRequests.User(), new RoleAccess(AccountRole.Contributor), MachineManagementScope.ConfigurationTransfer, AccountRole.Administrator));
+
+        exception.Message.ShouldBe($"No Administrator access to '{Organization}.{Project}'.");
+    }
+
     // Users: every entry point hands its minimal role to the role check of Release builds (403 AccessDenied below it).
     [Theory]
     [MemberData(nameof(UserBelowTheMinimalRole))]
@@ -280,6 +395,24 @@ public class MachineAccessCheckTests
         };
     }
 
+    // The entry points that take a management scope: the whole project, one annotation and several. The keys are inside
+    // Restriction.
+    private static Task CheckManagement(
+        Reach reach,
+        TestHttpRequestData request,
+        IAccessService access,
+        MachineManagementScope managementScope,
+        AccountRole minimalRole = AccountRole.Reader)
+    {
+        return reach switch
+        {
+            Reach.Project => request.CheckAccessToProjectAsync(access, Organization, Project, minimalRole, managementScope),
+            Reach.Annotation => request.CheckAccessToAnnotationAsync(access, Organization, Project, Restriction, minimalRole, managementScope),
+            Reach.Annotations => request.CheckAccessToAnnotationsAsync(access, Organization, Project, [Restriction, Descendant], minimalRole, managementScope),
+            _ => throw new ArgumentOutOfRangeException(nameof(reach), reach, null),
+        };
+    }
+
     private static TheoryData<Reach, AccountRole, AccountRole> Users(params (AccountRole Role, AccountRole MinimalRole)[] roles)
     {
         var cases = new TheoryData<Reach, AccountRole, AccountRole>();
@@ -304,13 +437,17 @@ public class MachineAccessCheckTests
 
     private static RoleAccess Restricted() => new(AccountRole.Reader, Restriction);
 
+    // The credentials carry the runtime scope Configuration.Read and the given management scopes as roles.
     private static TestHttpRequestData MachineRequest(
         string machineId = MachineId,
         IServiceProvider? services = null,
-        MachineCredentialKind? credentialKind = null)
+        MachineCredentialKind? credentialKind = null,
+        IReadOnlyList<MachineManagementScope>? managementScopes = null)
     {
         var (context, request) = FunctionTestDoubles.CreateRequest(services ?? new ServiceCollection().BuildServiceProvider());
-        context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim> { new("sub", machineId), new("roles", Scopes.Configuration.Read) };
+        var claims = new List<Claim> { new("sub", machineId), new("roles", Scopes.Configuration.Read) };
+        claims.AddRange((managementScopes ?? []).Select(scope => new Claim("roles", MachineAccessScopes.Get(scope)!)));
+        context.Items[FunctionContextItemKeys.CachedClaims] = claims;
         context.Items[FunctionContextItemKeys.MachineIdentity] = machineId;
 
         if (credentialKind is not null)

@@ -244,6 +244,7 @@ public class KeyValuesHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueBulkResult), Description = "The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementKeyValueManage)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> RestoreKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Restore)]
@@ -253,7 +254,7 @@ public class KeyValuesHttp
         string view)
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.KeyValueManage);
         var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request", RequestBodyLimits.KeyValueBulk);
 
         if (invalidBody is not null)
@@ -318,7 +319,7 @@ public class KeyValuesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueBulkRequest), Required = true, Description = "Keys or a key prefix, and the target Protection.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueBulkResult), Description = "The outcome per key: Done (with the new version), Unchanged, NotFound, Forbidden, NotAllowed or Failed.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredKeyValueManage)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The target level is not allowed in the project (ProtectionNotAllowed).")]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
     [OpenApiResponseWithBody(HttpStatusCode.NotImplemented, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseNotImplemented)]
@@ -333,7 +334,7 @@ public class KeyValuesHttp
         string view)
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.KeyValueManage);
         var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request", RequestBodyLimits.KeyValueBulk);
 
         if (invalidBody is not null)
@@ -503,7 +504,7 @@ public class KeyValuesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueExportRequest), Required = false, Description = "An optional key prefix, protection levels and IncludeSecrets.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueDocument), Description = "The document.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer)]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
     [OpenApiResponseWithBody(HttpStatusCode.ServiceUnavailable, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseServiceUnavailable)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
@@ -516,7 +517,7 @@ public class KeyValuesHttp
         string view)
     {
         request.CheckScope(KeyValueAuthorization.ReadScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, managementScope: MachineManagementScope.ConfigurationTransfer);
         var (export, invalidBody) = await request.ReadJsonBodyAsync<KeyValueExportRequest>(_bodyJsonOptions, "a key/value export request", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
@@ -551,7 +552,7 @@ public class KeyValuesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueDocument), Required = true, Description = "The document.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueImportResult), Description = "The action per item: Create, Update, Unchanged or Delete, with the version after a write.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The document is invalid (ImportInvalid, with the failing items in Details); nothing was written.")]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A level is not allowed in the project (ProtectionNotAllowed).")]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
     [OpenApiResponseWithBody(HttpStatusCode.NotImplemented, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseNotImplemented)]
@@ -566,7 +567,7 @@ public class KeyValuesHttp
         string view)
     {
         request.CheckScope(KeyValueAuthorization.WriteScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.ConfigurationTransfer);
         var (document, invalidBody) = await request.ReadJsonBodyAsync<KeyValueDocument>(_bodyJsonOptions, "a key/value document", RequestBodyLimits.KeyValueImport, ErrorCodes.ImportInvalid);
 
         if (invalidBody is not null)

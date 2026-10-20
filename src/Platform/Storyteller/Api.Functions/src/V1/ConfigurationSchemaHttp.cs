@@ -85,6 +85,7 @@ public partial class ConfigurationSchemaHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetConfigurationSchema(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.ConfigurationSchema.V1.SchemaType)]
@@ -95,7 +96,7 @@ public partial class ConfigurationSchemaHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.SchemaWrite);
 
         if (!TryValidateAnnotationType(annotationType, out var badRequestResult))
         {
@@ -155,6 +156,7 @@ public partial class ConfigurationSchemaHttp
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A concurrent modification prevented the deletion.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteConfigurationSchema(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.ConfigurationSchema.V1.SchemaType)]
@@ -165,7 +167,7 @@ public partial class ConfigurationSchemaHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.SchemaWrite);
 
         if (!TryValidateAnnotationType(annotationType, out var badRequestResult))
         {
@@ -236,6 +238,7 @@ public partial class ConfigurationSchemaHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetAnnotationSchema(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.ConfigurationSchema.V1.SchemaAnnotation)]
@@ -246,7 +249,7 @@ public partial class ConfigurationSchemaHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor, MachineManagementScope.SchemaWrite);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {
@@ -306,6 +309,7 @@ public partial class ConfigurationSchemaHttp
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A concurrent modification prevented the deletion.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteAnnotationSchema(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.ConfigurationSchema.V1.SchemaAnnotation)]
@@ -316,7 +320,7 @@ public partial class ConfigurationSchemaHttp
         string key)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor, MachineManagementScope.SchemaWrite);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {
@@ -395,6 +399,7 @@ public partial class ConfigurationSchemaHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequestDescendantType)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(SchemaValidationErrorResponse), Description = "Existing configurations are not compliant with the provided schema. A concurrent modification is returned as ErrorResponse.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetDescendantTypeSchema(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.ConfigurationSchema.V1.SchemaDescendantType)]
@@ -406,7 +411,7 @@ public partial class ConfigurationSchemaHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor, MachineManagementScope.SchemaWrite);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {
@@ -474,6 +479,7 @@ public partial class ConfigurationSchemaHttp
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A concurrent modification prevented the deletion.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteDescendantTypeSchema(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.ConfigurationSchema.V1.SchemaDescendantType)]
@@ -485,7 +491,7 @@ public partial class ConfigurationSchemaHttp
         string annotationType)
     {
         request.CheckScope(Scopes.Configuration.Write, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Contributor, MachineManagementScope.SchemaWrite);
 
         if (!TryValidateAnnotationKey(key, out var badRequestResult))
         {

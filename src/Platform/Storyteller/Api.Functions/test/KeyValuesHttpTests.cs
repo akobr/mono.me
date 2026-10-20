@@ -17,6 +17,17 @@ public class KeyValuesHttpTests
     private const string Project = "billing";
     private const string View = "default";
 
+    // The key/value operations a machine needs a management scope for, with that scope.
+    public static TheoryData<string, MachineManagementScope> ManagementOperations => new()
+    {
+        { nameof(KeyValuesHttp.ExportKeyValues), MachineManagementScope.ConfigurationTransfer },
+        { nameof(KeyValuesHttp.ImportKeyValues), MachineManagementScope.ConfigurationTransfer },
+        { nameof(KeyValuesHttp.ProtectKeyValues), MachineManagementScope.KeyValueManage },
+        { nameof(KeyValuesHttp.RestoreKeyValues), MachineManagementScope.KeyValueManage },
+    };
+
+    public static TheoryData<string> ManagementOperationNames => new(ManagementOperations.Select(row => (string)row[0]));
+
     private static bool DevAuth => HttpRequestDataExtensions.IsDevelopmentAuthentication;
 
     [Fact]
@@ -191,14 +202,41 @@ public class KeyValuesHttpTests
         service.Calls.ShouldBe(["restore:db.", "protect:a|b"]);
     }
 
+    // The management scope adds to the rules of protect and replaces none of them: the mTLS rule still applies.
     [Fact]
     public async Task Protect_ByAMachineWithoutMtls_IsMtlsRequired()
     {
-        var (http, _) = Create(AccountRole.None, requireMtls: true);
+        var (http, service) = Create(AccountRole.None, requireMtls: true, managementScopes: [MachineManagementScope.KeyValueManage]);
 
-        var act = () => http.ProtectKeyValues(KeyValueRequests.Machine(mtls: false, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["a"], Protection = KeyValueProtection.Hsm })), Org, Project, View);
+        var act = () => http.ProtectKeyValues(KeyValueRequests.Machine(mtls: false, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["a"], Protection = KeyValueProtection.Hsm }), managementScopes: [MachineManagementScope.KeyValueManage]), Org, Project, View);
 
         (await act.ShouldThrowAsync<AccessDeniedException>()).ErrorCode.ShouldBe(ErrorCodes.MtlsRequired);
+        service.Calls.ShouldBeEmpty();
+    }
+
+    // And the secret rights still apply: KeyValue.Manage does not stand in for Configuration.Secrets. Debug builds
+    // (DEV_AUTH) give every machine the secret scope.
+    [Fact]
+    public async Task Protect_ByAMachineWithKeyValueManageButWithoutSecretRights_IsStillAccessDenied()
+    {
+        if (DevAuth)
+        {
+            return;
+        }
+
+        var (http, service) = Create(AccountRole.None, requireMtls: false, managementScopes: [MachineManagementScope.KeyValueManage]);
+        var request = KeyValueRequests.Machine(
+            mtls: true,
+            "POST",
+            body: FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["a"], Protection = KeyValueProtection.Hsm }),
+            managementScopes: [MachineManagementScope.KeyValueManage],
+            roles: [Scopes.Configuration.Read, Scopes.Configuration.Write]);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.ProtectKeyValues(request, Org, Project, View));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("The caller has no rights to the secrets of the project.");
+        service.Calls.ShouldBeEmpty();
     }
 
     [Fact]
@@ -215,11 +253,12 @@ public class KeyValuesHttpTests
     [Fact]
     public async Task Export_WithSecrets_NeedsTheRights()
     {
-        var (http, service) = Create(AccountRole.None, requireMtls: true);
+        MachineManagementScope[] transfer = [MachineManagementScope.ConfigurationTransfer];
+        var (http, service) = Create(AccountRole.None, requireMtls: true, managementScopes: transfer);
 
-        var withoutSecrets = await http.ExportKeyValues(KeyValueRequests.Machine(mtls: false, "POST"), Org, Project, View);
-        var withMtls = await http.ExportKeyValues(KeyValueRequests.Machine(mtls: true, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true })), Org, Project, View);
-        var act = () => http.ExportKeyValues(KeyValueRequests.Machine(mtls: false, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true })), Org, Project, View);
+        var withoutSecrets = await http.ExportKeyValues(KeyValueRequests.Machine(mtls: false, "POST", managementScopes: transfer), Org, Project, View);
+        var withMtls = await http.ExportKeyValues(KeyValueRequests.Machine(mtls: true, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true }), managementScopes: transfer), Org, Project, View);
+        var act = () => http.ExportKeyValues(KeyValueRequests.Machine(mtls: false, "POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true }), managementScopes: transfer), Org, Project, View);
 
         withoutSecrets.ShouldBeOfType<OkObjectResult>();
         withMtls.ShouldBeOfType<OkObjectResult>();
@@ -241,6 +280,62 @@ public class KeyValuesHttpTests
         var act = () => http.ExportKeyValues(KeyValueRequests.User("POST", body: FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest { IncludeSecrets = true })), Org, Project, View);
 
         (await act.ShouldThrowAsync<AccessDeniedException>()).ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+    }
+
+    // A machine needs the management scope of the export and import (Configuration.Transfer) and of protect and the bulk
+    // restore (KeyValue.Manage) on top of its runtime scopes, in every build. Without it, the call is refused before the
+    // body is read and before any service call, and the AccessDenied of the missing scope is not taken for a missing
+    // mTLS certificate.
+    [Theory]
+    [MemberData(nameof(ManagementOperations))]
+    public async Task ManagementOperation_ByAMachineWithTheRuntimeScopesOnly_IsAccessDeniedBeforeTheService(string operation, MachineManagementScope scope)
+    {
+        var (http, service) = Create(AccountRole.None, requireMtls: true);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Call(http, operation, KeyValueRequests.Machine(mtls: false, "POST", body: BodyOf(operation))));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe($"This operation needs the management scope {MachineAccessScopes.Get(scope)}, which the machine was not created with.");
+        service.Calls.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [MemberData(nameof(ManagementOperations))]
+    public async Task ManagementOperation_ByAMachineWithTheManagementScope_ReachesTheService(string operation, MachineManagementScope scope)
+    {
+        var (http, service) = Create(AccountRole.None, requireMtls: true, managementScopes: [scope]);
+
+        var result = await Call(http, operation, KeyValueRequests.Machine(mtls: true, "POST", body: BodyOf(operation), managementScopes: [scope]));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        service.Calls.ShouldHaveSingleItem();
+    }
+
+    // The other management scope of the key/values does not stand in for it.
+    [Theory]
+    [MemberData(nameof(ManagementOperations))]
+    public async Task ManagementOperation_ByAMachineWithTheOtherManagementScope_IsAccessDenied(string operation, MachineManagementScope scope)
+    {
+        MachineManagementScope[] other = [scope == MachineManagementScope.KeyValueManage ? MachineManagementScope.ConfigurationTransfer : MachineManagementScope.KeyValueManage];
+        var (http, service) = Create(AccountRole.None, requireMtls: true, managementScopes: other);
+
+        var act = () => Call(http, operation, KeyValueRequests.Machine(mtls: true, "POST", body: BodyOf(operation), managementScopes: other));
+
+        (await act.ShouldThrowAsync<AccessDeniedException>()).ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        service.Calls.ShouldBeEmpty();
+    }
+
+    // Users never need a management scope; their role decides, as before.
+    [Theory]
+    [MemberData(nameof(ManagementOperationNames))]
+    public async Task ManagementOperation_ByAUser_NeedsNoManagementScope(string operation)
+    {
+        var (http, service) = Create(AccountRole.ContributorWithSecrets);
+
+        var result = await Call(http, operation, KeyValueRequests.User("POST", secretsScope: true, body: BodyOf(operation)));
+
+        result.ShouldBeOfType<OkObjectResult>();
+        service.Calls.ShouldHaveSingleItem();
     }
 
     [Fact]
@@ -664,11 +759,37 @@ public class KeyValuesHttpTests
         usage.LastRange.ShouldBe((new DateOnly(2026, 9, 13), new DateOnly(2026, 10, 13)));
     }
 
-    private static (KeyValuesHttp Http, RecordingKeyValueService Service) Create(AccountRole role, bool requireMtls = true)
+    // The machine of the access double has the given management scopes (none by default).
+    private static (KeyValuesHttp Http, RecordingKeyValueService Service) Create(AccountRole role, bool requireMtls = true, IReadOnlyList<MachineManagementScope>? managementScopes = null)
     {
         var service = new RecordingKeyValueService();
-        var http = new KeyValuesHttp(service, new RoleAccess(role), new FixedKeyValuePolicies(requireMtls), FunctionTestDoubles.ApiJsonOptions, NullLogger<KeyValuesHttp>.Instance);
+        var http = new KeyValuesHttp(service, new RoleAccess(role, managementScopes: managementScopes), new FixedKeyValuePolicies(requireMtls), FunctionTestDoubles.ApiJsonOptions, NullLogger<KeyValuesHttp>.Instance);
         return (http, service);
+    }
+
+    private static Task<IActionResult> Call(KeyValuesHttp http, string operation, TestHttpRequestData request)
+    {
+        return operation switch
+        {
+            nameof(KeyValuesHttp.ExportKeyValues) => http.ExportKeyValues(request, Org, Project, View),
+            nameof(KeyValuesHttp.ImportKeyValues) => http.ImportKeyValues(request, Org, Project, View),
+            nameof(KeyValuesHttp.ProtectKeyValues) => http.ProtectKeyValues(request, Org, Project, View),
+            nameof(KeyValuesHttp.RestoreKeyValues) => http.RestoreKeyValues(request, Org, Project, View),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null),
+        };
+    }
+
+    // A valid body of each management operation.
+    private static string BodyOf(string operation)
+    {
+        return operation switch
+        {
+            nameof(KeyValuesHttp.ExportKeyValues) => FunctionTestDoubles.ToJsonBody(new KeyValueExportRequest()),
+            nameof(KeyValuesHttp.ImportKeyValues) => FunctionTestDoubles.ToJsonBody(new KeyValueDocument { Items = [new KeyValueDocumentItem { Key = "a", Protection = KeyValueProtection.Public, Value = "1" }] }),
+            nameof(KeyValuesHttp.ProtectKeyValues) => FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["a"], Protection = KeyValueProtection.Hsm }),
+            nameof(KeyValuesHttp.RestoreKeyValues) => FunctionTestDoubles.ToJsonBody(new KeyValueBulkRequest { Keys = ["a"] }),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, null),
+        };
     }
 
     private static KeyValuePolicyHttp CreatePolicy(RecordingPolicyService policies)

@@ -209,15 +209,17 @@ public static class HttpRequestDataExtensions
     }
 
     // An operation of the whole project (lists, key/values, templates, type-level schemas, transfers). A machine
-    // restricted to an annotation is refused.
+    // restricted to an annotation is refused. A management operation names its management scope, which a machine
+    // needs on top of its runtime scopes (403 AccessDenied); users are not affected by it.
     public static Task CheckAccessToProjectAsync(
         this HttpRequestData @this,
         IAccessService accessService,
         string organization,
         string project,
-        AccountRole minimalRole = AccountRole.Reader)
+        AccountRole minimalRole = AccountRole.Reader,
+        MachineManagementScope? managementScope = null)
     {
-        return CheckAccessToAsync(@this, accessService, $"{organization}.{project}", minimalRole);
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, static restriction => restriction.EnsureUnrestricted(), managementScope);
     }
 
     // Project metadata without annotation data (the views, the binding catalog): every machine of the project reads it,
@@ -241,9 +243,10 @@ public static class HttpRequestDataExtensions
         string organization,
         string project,
         string annotationKey,
-        AccountRole minimalRole = AccountRole.Reader)
+        AccountRole minimalRole = AccountRole.Reader,
+        MachineManagementScope? managementScope = null)
     {
-        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows([annotationKey]));
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows([annotationKey]), managementScope);
     }
 
     // An operation on several annotations (the keys of a bulk body): a restricted machine needs every key in its scope.
@@ -254,9 +257,10 @@ public static class HttpRequestDataExtensions
         string organization,
         string project,
         IEnumerable<string?> annotationKeys,
-        AccountRole minimalRole = AccountRole.Reader)
+        AccountRole minimalRole = AccountRole.Reader,
+        MachineManagementScope? managementScope = null)
     {
-        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows(annotationKeys));
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows(annotationKeys), managementScope);
     }
 
     public static string GetIdentityUniqueName(this HttpRequestData @this)
@@ -346,15 +350,17 @@ public static class HttpRequestDataExtensions
         throw new SecurityTokenException($"Missing {claimTypes[0]} claim.");
     }
 
-    // Machines: the machine document of the project (401 without it), the credential policy, and then what the operation
-    // reaches against the annotation restriction of the machine (403). Machine credentials are checked for real in every
-    // build, so this runs in Debug (DEV_AUTH) too; Debug builds skip only the role check of users.
+    // Machines: the machine document of the project (401 without it), the credential policy, what the operation reaches
+    // against the annotation restriction of the machine (403 AnnotationRestricted), and then the management scope of a
+    // management operation (403 AccessDenied). Machine credentials are checked for real in every build, so this runs in
+    // Debug (DEV_AUTH) too; Debug builds skip only the role check of users, who never need a management scope.
     private static async Task<MachineAnnotationRestriction> CheckAccessAsync(
         HttpRequestData request,
         IAccessService accessService,
         string accessPointKey,
         AccountRole minimalRole,
-        Action<MachineAnnotationRestriction> ensureReach)
+        Action<MachineAnnotationRestriction> ensureReach,
+        MachineManagementScope? managementScope = null)
     {
         if (request.TryGetApplicationIdentity(out var appId))
         {
@@ -374,6 +380,12 @@ public static class HttpRequestDataExtensions
             await MachineCredentialPolicy.EnsureAllowedAsync(request.FunctionContext, segments[0], segments[1]);
             var restriction = MachineAnnotationRestriction.From(machine.AnnotationKey);
             ensureReach(restriction);
+
+            if (managementScope is { } required)
+            {
+                EnsureManagementScope(request, machine, required);
+            }
+
             return restriction;
         }
 
@@ -383,5 +395,24 @@ public static class HttpRequestDataExtensions
         EnsureRole(accessRole, minimalRole, accessPointKey);
 #endif
         return MachineAnnotationRestriction.None;
+    }
+
+    // The machine document is the source of truth and the credentials can only narrow it: the scope must be stored on the
+    // machine, so an app role or a provider permission added outside Storyteller grants nothing, and carried by the
+    // request, so a federated token that asked for a subset stays within it.
+    private static void EnsureManagementScope(HttpRequestData request, IMachineAccess machine, MachineManagementScope managementScope)
+    {
+        var scope = MachineAccessScopes.Get(managementScope)
+            ?? throw new ArgumentOutOfRangeException(nameof(managementScope), managementScope, "Not a management scope.");
+
+        if (machine.ManagementScopes?.Contains(managementScope) != true)
+        {
+            throw new AccessDeniedException($"This operation needs the management scope {scope}, which the machine was not created with.");
+        }
+
+        if (!request.GetScopes().Contains(scope))
+        {
+            throw new AccessDeniedException($"This operation needs the management scope {scope}, which the credentials of the machine do not carry.");
+        }
     }
 }
