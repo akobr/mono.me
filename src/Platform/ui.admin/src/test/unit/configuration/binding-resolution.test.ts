@@ -58,11 +58,14 @@ describe('the bindings of the mock Resolved read', () => {
     expect((await resolve()).Content).toMatchObject({ password: '@(db.password, primaryVault)' })
   })
 
-  it('answers 422 for a binding it cannot resolve', async () => {
-    configure({ owner: '@annotation("/owner")' })
-    const failure = await resolve().catch((error: unknown) => error)
-    expect(failure).toBeInstanceOf(StorytellerError)
-    expect((failure as StorytellerError).status).toBe(422)
-    expect((failure as StorytellerError).errorCode).toBe('BindingFailed')
-  })
+  it.each(['@annotation("/owner")', '@config("/rate%")'])(
+    'answers 422 for a binding it cannot resolve: %s',
+    async (binding) => {
+      configure({ owner: binding })
+      const failure = await resolve().catch((error: unknown) => error)
+      expect(failure).toBeInstanceOf(StorytellerError)
+      expect((failure as StorytellerError).status).toBe(422)
+      expect((failure as StorytellerError).errorCode).toBe('BindingFailed')
+    },
+  )
 })
