@@ -13,9 +13,9 @@ public class ApiRefusalTests
     [Fact]
     public void Forbidden_WithTheServerMessage_PrintsItWithoutTheCredentialHint()
     {
-        var refusal = ApiRefusal.Of(AnnotationCommandFixture.MissingManagementScope("Annotation.Manage"));
+        var refusal = ApiRefusal.Of(AnnotationCommandFixture.MissingScope("Annotation.Manage"));
 
-        refusal.Message.ShouldBe("This operation needs the management scope Annotation.Manage, which the machine was not created with.");
+        refusal.Message.ShouldBe("This operation needs the scope Annotation.Manage, which the machine was not created with.");
         refusal.ErrorCode.ShouldBe("AccessDenied");
         refusal.MayBeTheCredentials.ShouldBeFalse();
     }

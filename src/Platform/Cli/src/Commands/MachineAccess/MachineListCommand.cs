@@ -46,15 +46,15 @@ public class MachineListCommand : BaseContextCommand
         // Management is last, so the earlier columns keep their positions.
         Console.WriteTable(
             accesses,
-            machine => new[] { machine.Id, $"{machine.Scope:G}", $"{machine.CredentialKind:G}", DescribeSecret(machine), machine.AnnotationKey, DescribeManagementScopes(machine) },
-            new[] { "Id", "Role", "Kind", "Secret", "RestrictionTo", "Management" });
+            machine => new[] { machine.Id, DescribeScopes(machine, isManagement: false), $"{machine.CredentialKind:G}", DescribeSecret(machine), machine.AnnotationKey, DescribeScopes(machine, isManagement: true) },
+            new[] { "Id", "Scopes", "Kind", "Secret", "RestrictionTo", "Management" });
         return ExitCodes.SUCCESS;
     }
 
-    // The scope strings, as the credentials of the machine carry them; empty for a machine without management scopes.
-    private static string DescribeManagementScopes(_42.Platform.Storyteller.Sdk.MachineAccess machine)
+    // The runtime or the management scope strings, as the credentials of the machine carry them; empty for none.
+    private static string DescribeScopes(_42.Platform.Storyteller.Sdk.MachineAccess machine, bool isManagement)
     {
-        return string.Join(", ", (machine.ManagementScopes ?? []).Select(ManagementScopes.ToScopeString));
+        return string.Join(", ", (machine.Scopes ?? []).Where(scope => MachineScopes.IsManagement(scope) == isManagement).Select(MachineScopes.ToScopeString));
     }
 
     // A federated machine has no secret, nor does a certificate machine (an empty access key).

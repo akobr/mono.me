@@ -9,7 +9,7 @@ using McMaster.Extensions.CommandLineUtils;
 
 namespace _42.Platform.Cli.Commands.Storyteller;
 
-[Command(CommandNames.EXPORT, Description = "Export the view as a zip (Administrator): its annotations, schemas, templates and configurations, as a folder of JSON files with the versions, or as a git repository with every version as a commit. A machine needs the scopes of the included kinds and the management scope Configuration.Transfer instead of a role.")]
+[Command(CommandNames.EXPORT, Description = "Export the view as a zip (Administrator): its annotations, schemas, templates and configurations, as a folder of JSON files with the versions, or as a git repository with every version as a commit. A machine needs the read scopes of the included kinds and Configuration.Transfer instead of a role.")]
 public class StorytellerExportCommand : BaseContextCommand
 {
     private const string ZipExtension = ".zip";

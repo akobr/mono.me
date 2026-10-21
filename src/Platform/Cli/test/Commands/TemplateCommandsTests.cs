@@ -22,14 +22,14 @@ public class TemplateCommandsTests
     private readonly AnnotationCommandFixture _fixture = new();
     private readonly Mock<ITemplatesApiClient> _templates = new(MockBehavior.Strict);
 
-    private static string Refusal => AnnotationCommandFixture.MissingManagementScopeMessage("Template.Write");
+    private static string Refusal => AnnotationCommandFixture.MissingScopeMessage("Template.Write");
 
     [Fact]
     public async Task Delete_WithoutTheManagementScope_PrintsTheServerMessage()
     {
         _templates
             .Setup(api => api.DeleteTemplateAsync("org1", "proj1", "default", Type))
-            .ThrowsAsync(AnnotationCommandFixture.MissingManagementScope("Template.Write"));
+            .ThrowsAsync(AnnotationCommandFixture.MissingScope("Template.Write"));
 
         var exitCode = await new TemplateDeleteCommand(_fixture.Console.Object, _fixture.Context.Object, _templates.Object)
         {
@@ -45,7 +45,7 @@ public class TemplateCommandsTests
     {
         _templates
             .Setup(api => api.SetTemplateAsync("org1", "proj1", "default", Type, It.IsAny<object>()))
-            .ThrowsAsync(AnnotationCommandFixture.MissingManagementScope("Template.Write"));
+            .ThrowsAsync(AnnotationCommandFixture.MissingScope("Template.Write"));
 
         var exitCode = await new TemplateSetCommand(_fixture.Console.Object, _fixture.Context.Object, _templates.Object, Mock.Of<IFileSystem>())
         {
@@ -65,7 +65,7 @@ public class TemplateCommandsTests
             .ReturnsAsync(new ConfigurationTemplate { Content = new JObject { ["owner"] = "billing" } });
         _templates
             .Setup(api => api.PatchTemplateAsync("org1", "proj1", "default", Type, It.IsAny<object>()))
-            .ThrowsAsync(AnnotationCommandFixture.MissingManagementScope("Template.Write"));
+            .ThrowsAsync(AnnotationCommandFixture.MissingScope("Template.Write"));
         var editor = new Mock<IEditorService>();
         editor
             .Setup(service => service.EditJsonAsync(

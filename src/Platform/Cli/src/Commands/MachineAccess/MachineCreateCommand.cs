@@ -39,13 +39,16 @@ public class MachineCreateCommand : BaseContextCommand
     [Option("-a|--annotation", CommandOptionType.SingleValue, Description = "An annotation key where the access is restricted.")]
     public string? AnnotationKey { get; set; }
 
-    [Option("-r|--read-only", CommandOptionType.NoValue, Description = "Scope will be read-only. (default)")]
+    [Option("-r|--read-only", CommandOptionType.NoValue, Description = "Read annotations and configurations: AnnotationRead and ConfigurationRead. The default when no other option gives a runtime scope.")]
     public bool IsScopeReadOnly { get; set; }
 
-    [Option("-w|--write", CommandOptionType.NoValue, Description = "Scope will be read and write.")]
-    public bool IsScopeReadWrite { get; set; }
+    [Option("-w|--write", CommandOptionType.NoValue, Description = "Read and write annotations and configurations: AnnotationRead, AnnotationWrite, ConfigurationRead and ConfigurationWrite.")]
+    public bool IsScopeWrite { get; set; }
 
-    [Option("-m|--manage", CommandOptionType.MultipleValue, ValueName = "scope", Description = "A management scope to grant: " + ManagementScopes.Names + ". Repeat it or separate the values with commas. Needs the Administrator role; never part of -r or -w.")]
+    [Option("--scope", CommandOptionType.MultipleValue, ValueName = "scope", Description = "A scope to grant: " + MachineScopes.Names + ", also as the scope string (Secrets.Read) or in kebab case (secrets-read). Repeat it or separate the values with commas; it adds to -r and -w. The server adds the read scope of a write scope. A secrets scope needs the ContributorWithSecrets role, a management scope the Administrator role.")]
+    public string[]? Scope { get; set; }
+
+    [Option("-m|--manage", CommandOptionType.MultipleValue, ValueName = "scope", Description = "A management scope to grant: " + MachineScopes.ManagementNames + ". Repeat it or separate the values with commas. Needs the Administrator role; never part of -r or -w.")]
     public string[]? ManagementScope { get; set; }
 
     [Option("-k|--credential-kind", CommandOptionType.SingleValue, Description = "One of the kinds the project enables: " + CredentialKinds.Names + ". Default: the project's default kind.")]
@@ -76,7 +79,7 @@ public class MachineCreateCommand : BaseContextCommand
     public string? RulesFile { get; set; }
 
     // The created machine as it is printed, without the certificate and its password. The anonymous object loses the SDK's
-    // StringEnumConverter, so the management scopes are turned into their names here.
+    // StringEnumConverter, so the scopes and the credential kind are turned into their names here.
     internal static object Describe(_42.Platform.Storyteller.Sdk.MachineAccess machine)
     {
         return new
@@ -84,10 +87,9 @@ public class MachineCreateCommand : BaseContextCommand
             machine.Id,
             machine.ObjectId,
             machine.AccessKey,
-            machine.Scope,
-            ManagementScopes = machine.ManagementScopes?.Select(scope => scope.ToString()).ToList(),
+            Scopes = machine.Scopes?.Select(scope => scope.ToString()).ToList(),
             machine.AnnotationKey,
-            machine.CredentialKind,
+            CredentialKind = machine.CredentialKind.ToString(),
             machine.CertificateThumbprint,
             machine.CertificateLifetimeDays,
             machine.CertificateNotAfter,
@@ -118,10 +120,43 @@ public class MachineCreateCommand : BaseContextCommand
             credentialKind = kind;
         }
 
-        if (!ManagementScopes.TryParse(ManagementScope, out var managementScopes, out var unknownScope))
+        if (!MachineScopes.TryParse(Scope, out var scopes, out var unknownScope))
         {
-            Console.WriteImportant($"Unknown management scope '{unknownScope}'. Use {ManagementScopes.Names}.");
+            Console.WriteImportant($"Unknown machine scope '{unknownScope}'. Use {MachineScopes.Names}.");
             return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
+        if (!MachineScopes.TryParse(ManagementScope, out var managementScopes, out var unknownManagementScope))
+        {
+            Console.WriteImportant($"Unknown management scope '{unknownManagementScope}'. Use {MachineScopes.ManagementNames}.");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
+        var runtimeScopes = managementScopes.Where(scope => !MachineScopes.IsManagement(scope)).ToList();
+
+        if (runtimeScopes.Count > 0)
+        {
+            Console.WriteImportant($"{MachineScopes.ToScopeString(runtimeScopes[0])} is not a management scope; give it with --scope. --manage takes {MachineScopes.ManagementNames}.");
+            return ExitCodes.ERROR_WRONG_INPUT;
+        }
+
+        // The union of the options. Without a runtime scope the machine reads, as with -r, so no option, or -m alone,
+        // behaves as before. The server adds the read scope of every write scope.
+        scopes.UnionWith(managementScopes);
+
+        if (IsScopeReadOnly)
+        {
+            scopes.UnionWith(MachineScopes.ReadOnly);
+        }
+
+        if (IsScopeWrite)
+        {
+            scopes.UnionWith(MachineScopes.Write);
+        }
+
+        if (scopes.All(MachineScopes.IsManagement))
+        {
+            scopes.UnionWith(MachineScopes.ReadOnly);
         }
 
         var ruleOptions = new FederationRuleOptions(FederationIssuer, FederationAudience, FederationSubject, FederationClaims, RulesFile);
@@ -179,18 +214,15 @@ public class MachineCreateCommand : BaseContextCommand
                     Organization = Context.OrganizationName,
                     Project = Context.ProjectName,
                     AnnotationKey = AnnotationKey,
-                    Scope = IsScopeReadWrite
-                        ? MachineAccessCreateScope.DefaultReadWrite
-                        : MachineAccessCreateScope.DefaultRead,
+
+                    // In enum order, as the server stores them.
+                    Scopes = scopes.ToList(),
 
                     // Null: the project's default kind and lifetime.
                     CredentialKind = credentialKind,
                     CertificateLifetimeDays = UseSharedCertificate || federationRules is not null ? null : LifetimeDays,
                     UseSharedCertificate = UseSharedCertificate ? true : null,
                     FederationRules = federationRules,
-
-                    // Null without --manage: the member is left out and the machine gets no management scope.
-                    ManagementScopes = managementScopes,
                 });
         }
         catch (ApiException exception)

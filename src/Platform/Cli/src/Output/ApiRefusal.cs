@@ -15,7 +15,7 @@ internal sealed record ApiRefusal(string Message, string? ErrorCode, bool MayBeT
 
     public static ApiRefusal Of(ApiException exception)
     {
-        // A 403 with the server's message names what is missing, for example a management scope the machine was not
+        // A 403 with the server's message names what is missing, for example a scope the machine was not
         // created with: the credentials were accepted. A 401, or a 403 without a message, says nothing more.
         // An operation that does not declare 403 leaves the body as text, so read both shapes.
         if (exception.StatusCode == (int)HttpStatusCode.Forbidden)

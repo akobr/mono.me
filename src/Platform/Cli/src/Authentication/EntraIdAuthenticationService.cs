@@ -24,9 +24,7 @@ public class EntraIdAuthenticationService : IAuthenticationService
         _settings = settings;
         _publicClientApp = new AsyncLazy<IPublicClientApplication>(BuildPublicClientApplication);
 
-        _scopes = settings.Scopes.Count > 0
-            ? settings.Scopes.ToArray()
-            : [$"api://{settings.ClientId}/User.Impersonation", $"api://{settings.ClientId}/Default.ReadWrite"];
+        _scopes = GetScopes(settings);
     }
 
     public async Task<SignedInUser?> GetSignedInUserAsync(CancellationToken cancellationToken = default)
@@ -92,6 +90,14 @@ public class EntraIdAuthenticationService : IAuthenticationService
         {
             await pca.RemoveAsync(account);
         }
+    }
+
+    // The scopes of the discovery, or sform's own: User.Impersonation marks a user, whose rights come from the role.
+    internal static string[] GetScopes(ResolvedAuthentication settings)
+    {
+        return settings.Scopes.Count > 0
+            ? settings.Scopes.ToArray()
+            : [$"api://{settings.ClientId}/User.Impersonation"];
     }
 
     private static SignedInUser ToUser(AuthenticationResult result)
