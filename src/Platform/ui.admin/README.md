@@ -16,7 +16,7 @@ The npm package lives in `src/`. Node 22.18 or newer is required; Node 24 LTS is
 cd src/Platform/Storyteller/sdk.typescript/src && npm ci && npm run build
 cd ../../../ui.admin/src && npm ci
 
-npm run dev:mock   # http://localhost:5174, API served by MSW in the browser, fake signed-in user
+npm run dev:mock   # http://localhost:5174, API served by MSW in the browser, fake signed-in user, showcase data
 npm run dev        # http://localhost:5173, real API (VITE_API_BASE_URL) and AuthKit
 ```
 
@@ -27,7 +27,8 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 | Script | Command |
 | --- | --- |
 | `dev` | Vite dev server on port 5173 against the API in `.env.development` / `.env.local` |
-| `dev:mock` | Vite in the `e2e` mode on port 5174: MSW mock API (`app/mock`) and a fake user |
+| `dev:mock` | `build/dev-mock.ts`: Vite in the `e2e` mode on port 5174 with the MSW mock API (`app/mock`), a fake user and the showcase dataset; `-- --legacy`, `-- --large` or `-- --scenario=<name>` pick another (see Mock mode) |
+| `dev:mock:legacy` / `dev:mock:large` | `dev:mock` with the previous standard dataset / with the large one |
 | `dev:aspire` | Vite without a fixed port; used by the Aspire host, which passes `--port 5173` |
 | `build` | `vue-tsc --build` and `vite build` → `dist/` |
 | `build:e2e` | Build with the mock API, for Playwright |
@@ -43,13 +44,43 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 
 ### Mock mode
 
-`npm run dev:mock` starts the app with `vite --mode e2e`. `app/main.ts` then starts MSW in the browser with the hand-written handlers of `app/mock/handlers.ts` (a coherent in-memory data set, kept in `sessionStorage`) in front of the Orval-generated Faker handlers, and signs in a fake user. The mock modules are loaded through static `import.meta.env.MODE === 'e2e'` checks and dynamic imports, so production builds do not contain them.
+`npm run dev:mock` runs `build/dev-mock.ts`, which starts `vite --mode e2e` on port 5174 and passes the chosen dataset as `VITE_MOCK_DATASET`. `app/main.ts` then starts MSW in the browser with the hand-written handlers of `app/mock/handlers.ts` (a coherent in-memory data set, kept in `sessionStorage`) in front of the Orval-generated Faker handlers, and signs in a fake user, Ada Lovelace. The mock modules are loaded through static `import.meta.env.MODE === 'e2e'` checks and dynamic imports, so production builds do not contain them.
 
-- `?mock-scenario=new-user` starts without an account (onboarding); `?mock-scenario=invited` starts without an account but with a pending invitation; `?mock-scenario=large` puts 16,317 annotations into `acme/billing/default` (performance of the grid and the graph); `?mock-scenario=default` returns to the seeded data.
-- `window.storytellerMock.reset()` resets the data of the current scenario; `window.storytellerMock.addMachine(projectKey, machine)` adds a machine as the Owner of the project would, for what a lower role may do with it.
+| Option (`npm run dev:mock -- <option>`) | Dataset | Content |
+| --- | --- | --- |
+| *(none)* | `showcase` | Fourteen projects that model the platform's examples (below) |
+| `--legacy` | `default` | The previous standard dataset: `acme/billing`, `acme/shipping`, `northwind/portal`; the tests run on it |
+| `--large` | `large` | 16,317 annotations in `acme/billing/default` (performance of the grid and the graph) |
+| `--scenario=<name>` | any | `default`, `new-user` (no account, onboarding), `invited` (no account, a pending invitation), `large`, `showcase` |
+
+Other arguments go to Vite (`npm run dev:mock -- --legacy --open`); two dataset options or an unknown name stop with the usage. A page load picks the dataset once (`applyStartScenario` in `app/mock/db.ts`): a valid `?mock-scenario=<name>` first, then the dataset of the launch when it differs from the one the tab last started with (a restart with another option takes effect at the next reload), else the tab's own dataset with its edits. A dataset that starts fresh is stored at once, clears the catalog snapshots in IndexedDB, and, for the showcase, writes the type names, colors, icons, time zone and date format of its projects into the project settings of this browser (`app/mock/showcase/settings.ts`). Changes in Settings stay until the dataset starts fresh again. Playwright builds with `VITE_MOCK_DATASET=default` (`playwright.config.ts`), and Vitest uses the `default` dataset too.
+
+The showcase (`app/mock/showcase/`) follows the examples of the [documentation](../../../docs/42for.net/platform/examples/index.md) and of the Miro board of 424-77, plus three new ones; the plan is [Showcase Mock Data for the Admin UI](../../../docs/Platform/ui.admin/specs/2026-10-21%20Showcase%20Mock%20Data%20for%20the%20Admin%20UI.md). Every project registers the views `default` (production), `development`, `staging`, `release-candidate` and `feature-delivery1`, and its default view has active, scheduled, expired, disabled and deleted annotations, histories of one, a few and many versions, templates and schemas. Ada is Reader only in `meridian-health/clinical-integrations`:
+
+| Project | Models | Type names (rst, unt, sbt, usg, cnt, exe, uxe) | Ada |
+| --- | --- | --- | --- |
+| `fabrikam/finance-cloud` | Single-tenant B2B SaaS, about 200 annotations | Application, Job, Customer, Usage, Instance, AppRun, JobRun | Owner |
+| `fabrikam/fitness-cloud` | Multi-tenant B2B SaaS with ~550 end customers, about 1,000 | Application, —, Tenant, App enablement, Member, App assignment, — | Administrator |
+| `fabrikam/invoicing-suite` | [B2B SaaS](../../../docs/42for.net/platform/examples/b2b-saas.md) | Module, Job, Customer, Contract, Environment, Deployment, JobRun | ContributorWithSecrets |
+| `bluefin/money-suite` | [Consumer finance suite](../../../docs/42for.net/platform/examples/b2c-finance.md) | Product, Batch, Person, Entitlement, Legal entity, Product use, BatchRun | Contributor |
+| `streamwave/streaming-platform` | [Distributed platform](../../../docs/42for.net/platform/examples/distributed-platform.md), with the view `playback-14` | Service, Pipeline, Market, License, Cell, Deployment, PipelineRun | Administrator |
+| `ledgerline/erp` | [Versioned monolith](../../../docs/42for.net/platform/examples/versioned-monolith.md) | Module, Job, Version, Build, Channel, Rollout, JobRun | Owner |
+| `aurora-motors/vehicle-platform` | [Physical product](../../../docs/42for.net/platform/examples/physical-product.md) | Subsystem, Firmware, Model, Fitment, Build, Fitted part, Firmware pin | Contributor |
+| `harbor-industrial/plant-fleet` | [Device fleet](../../../docs/42for.net/platform/examples/device-fleet.md), with the view `campaign-march` | Capability, Job, Site, Enablement, Device, Assignment, JobRun | ContributorWithSecrets |
+| `meridian-health/clinical-integrations` | Hospital network integrations | Clinical system, Interface, Hospital, License, Department, Integration, Feed | Reader |
+| `appforge/white-label-app` | White-label mobile app | Feature, Campaign, Brand, Feature license, Platform, App feature, CampaignRun | Contributor |
+| `gatherly/conferences` | A conference series and its editions | Event service, Job, Event series, Booking, Edition, Edition service, JobRun | Owner |
+| `pixel-forge/live-ops` | Game live operations | Backend service, Live event, Game, Service plan, Platform region, Service deployment, Event run | Administrator |
+| `velvet-retail/storefronts` | Multi-brand storefronts | Capability, Feed, Storefront, Subscription, Market, Market setup, Feed run | Contributor |
+| `seabreeze-hotels/guest-platform` | Hotel distribution | Module, Sync job, Hotel, License, Channel, Channel setup, Sync run | ContributorWithSecrets |
+
+To add a showcase project, write `app/mock/showcase/projects/<project>.ts` (a `ShowcaseProject`: members, settings, views and a `build(builder)` that fills each view through the `ScopeBuilder` of `builder.ts`, like `invoicing-suite.ts`), add it to `showcaseProjects` in `app/mock/showcase/index.ts` (and its organization to `showcaseOrganizations`), and add `test/unit/mock/showcase/<project>.test.ts`. `test/unit/mock/showcase.test.ts` checks the rules every project follows: canonical keys with every ancestor, all statuses and deletions, the history lengths, configurations that satisfy their combined schema, the appearance, the views and the roles.
+
+- `window.storytellerMock.reset(scenario?)` resets the data of the current (or the given) dataset, as a fresh start; `window.storytellerMock.addMachine(projectKey, machine)` adds a machine as the Owner of the project would, for what a lower role may do with it.
 - The mock API keeps deleted annotations restorable and records a change history per key, like the API (`app/mock/annotation-handlers.ts`, `app/mock/audit.ts`). A re-created key starts without its configuration.
 - `POST …/annotations/simple` (bulk create) reads its lines as the API does (`app/mock/simple-lines.ts`): it creates the keys with their missing ancestors, skips existing keys, and answers `400` above 100 lines.
 - `GET …/configuration/{key}/composition` (`compositionOf` in `app/mock/configuration-handlers.ts`) follows the mock Effective read, not the server: the ancestors' own documents at depth 1, the template of the key's type, then its own document, merged with `deepMerge` (arrays replaced, `null` overwrites). Its `Content` and hash are those of the mock Effective read, so the mock never warns of a stale view. It has no repeated source and no depth above 1; unit tests serve a fixture shaped like the server's composition of an execution for those.
+- `GET …/configuration/{key}/resolved` evaluates `@config("…")` (the configuration being resolved), `@annotation("…"[, "<Type>"])` (the `Values` of the annotation or of its ancestor of that type), each with a JSON Pointer or a dotted JSONPath, and `@<key>/<path>`; sourced values (secrets), interpolation and math stay as written, and anything else unresolved answers `422 BindingFailed`.
 
 ### End-to-end and visual tests
 
@@ -75,9 +106,10 @@ The dev server pre-bundles every package imported in `app/` when it starts (`opt
 - Modeling: the entry of the View section per role, locked for a Reader; its tabs by click, by direct link and by a link to a detail; **Compare views** enabled with another view and disabled without, and the view switcher keeping it with the other view selected; **Compare** on the Views page disabled on the row of the default view, with its tooltip, and following the link of another view; the four tabs of a Contributor, without Export & Import, also in the command palette; the redirects of the old view pages to their tabs, with the query; "Contributors only" without tabs for a Reader on every Modeling URL; the "Discard changes?" prompt of a dirty template when a tab is clicked (**Keep editing** and **Discard**); and the return from the menu to the last tab, detail and query of Modeling, and to **Schemas** when Modeling is selected again;
 - the Export & Import tab from the sidebar (**Modeling**, then **Export & Import**) and with `g e`: an export of some kinds, a git export, a check of an edited archive with its result per kind and **Import now**, an import with **Skip** shown again after a reload, the Modeling lock of a Reader, and "Administrators only" under the four other tabs for a Contributor;
 - the `prod` badge of the default view in the menu, the switcher and its list of views, and its absence on another view;
-- axe (WCAG 2.1 AA) on the main screens, Compare views, the Views page of a project with one view and the locked Modeling page of a Reader among them, on the locked Export & Import page of a Contributor, on Deleted, on the bulk create dialog, on the result of an import, on the new configuration dialog, on the Composition view of a configuration, on the new machine dialog of an Owner (a management scope picked) and of a Contributor (the management scopes disabled), and on the dialogs of trusted issuers and federated machines.
+- the showcase dataset: every project on `/orgs` with Ada as a project member of four organizations, the type names of two projects in the grid, the five environment views with the default one as production, the seeded deletions in Deleted, and the read-only `clinical-integrations` (no New, the Modeling lock);
+- axe (WCAG 2.1 AA) on the main screens, on the grid of a showcase project, Compare views, the Views page of a project with one view and the locked Modeling page of a Reader among them, on the locked Export & Import page of a Contributor, on Deleted, on the bulk create dialog, on the result of an import, on the new configuration dialog, on the Composition view of a configuration, on the new machine dialog of an Owner (a management scope picked) and of a Contributor (the management scopes disabled), and on the dialogs of trusted issuers and federated machines.
 
-Each test gets a fresh context, so the mock data starts from the scenario's seed. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of `npx playwright install chromium`.
+Each test gets a fresh context, so the mock data starts from the scenario's seed. The suites run on the `default` dataset: `openApp` sets `?mock-scenario=default` unless a test asks for another, and the e2e build gets `VITE_MOCK_DATASET=default`. Set `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome instead of `npx playwright install chromium`.
 
 Fonts render differently per platform, so the visual baselines in `test/e2e/__screenshots__` come from the Playwright Linux image. `npm run test:visual:docker` (Docker required) copies the SDK and the app into the container, installs, and compares. Add `-- --update` after an intended UI change, and review the new PNGs. CI runs both suites in the same image.
 
