@@ -178,7 +178,8 @@ npm run build
 # Admin UI (see src/Platform/ui.admin/README.md)
 cd src/Platform/ui.admin/src
 npm ci
-npm run dev:mock  # dev server with the MSW mock API and a fake user (port 5174)
+npm run dev:mock  # dev server with the MSW mock API and a fake user (port 5174), showcase data
+npm run dev:mock -- --legacy  # the same with the previous standard dataset (--large: the large one)
 npm run dev       # dev server against the real API and AuthKit (port 5173)
 npm run build     # vue-tsc + vite build
 npm run lint      # oxlint, then ESLint
