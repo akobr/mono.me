@@ -10,7 +10,8 @@ import { environmentViews } from '../views'
 const docs = 'https://docs.fabrikam.example/invoicing-suite'
 const host = (customer: string, environment: string) => `${customer}.${environment}.invoicing.fabrikam.example`
 
-type Plan = 'enterprise' | 'standard' | 'starter'
+/** The two plans of the documentation. */
+type Plan = 'enterprise' | 'standard'
 
 interface Customer {
   name: string
@@ -26,7 +27,7 @@ interface Customer {
   since: number
 }
 
-const seats: Record<Plan, number> = { enterprise: 250, standard: 40, starter: 10 }
+const seats: Record<Plan, number> = { enterprise: 250, standard: 40 }
 
 /** The customers besides Northwind and Contoso, whose setup the documentation spells out. */
 const customers: Customer[] = [
@@ -68,7 +69,7 @@ const customers: Customer[] = [
     title: 'Wingtip Toys',
     residency: 'us',
     region: 'westus2',
-    plan: 'starter',
+    plan: 'standard',
     modules: ['invoicing'],
     environments: [],
     tier: 'standard',
@@ -123,7 +124,7 @@ const customers: Customer[] = [
     title: 'Graphic Design Institute',
     residency: 'eu',
     region: 'francecentral',
-    plan: 'starter',
+    plan: 'standard',
     modules: ['invoicing'],
     environments: [],
     tier: 'standard',
@@ -134,7 +135,7 @@ const customers: Customer[] = [
     title: 'School of Fine Art',
     residency: 'eu',
     region: 'westeurope',
-    plan: 'starter',
+    plan: 'standard',
     modules: ['invoicing', 'portal'],
     environments: [],
     tier: 'standard',
@@ -167,7 +168,7 @@ const customers: Customer[] = [
     title: 'Liberty’s Delightful Sinful Bakery',
     residency: 'us',
     region: 'southcentralus',
-    plan: 'starter',
+    plan: 'standard',
     modules: ['invoicing'],
     environments: [],
     tier: 'standard',
@@ -200,7 +201,7 @@ const customers: Customer[] = [
     title: 'Fincher Architects',
     residency: 'uk',
     region: 'uksouth',
-    plan: 'starter',
+    plan: 'standard',
     modules: ['invoicing'],
     environments: [],
     tier: 'standard',
@@ -503,13 +504,13 @@ function production(b: ScopeBuilder, next: boolean) {
   moduleDocuments(b, next)
   // A new customer of invoicing cannot be saved without a plan (b2b-saas.md); the release candidate adds seats.
   b.descendantSchema('rst.invoicing', 'usg', [
-    { type: 'object', properties: { plan: { enum: ['starter', 'standard', 'enterprise'] } }, required: ['plan'] },
+    { type: 'object', properties: { plan: { enum: ['standard', 'enterprise'] } }, required: ['plan'] },
     ...(next
       ? [
           {
             type: 'object',
             properties: {
-              plan: { enum: ['starter', 'standard', 'enterprise'] },
+              plan: { enum: ['standard', 'enterprise'] },
               seats: { type: 'integer', minimum: 1 },
             },
             required: ['plan', 'seats'],
