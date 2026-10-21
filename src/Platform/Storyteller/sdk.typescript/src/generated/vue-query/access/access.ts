@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.44.51111
+ * OpenAPI spec version: 0.9.45.54704
  */
 import { useMutation, useQuery } from "@tanstack/vue-query";
 import type {
@@ -25,6 +25,7 @@ import type {
   AccessPoint,
   AccessPointCreate,
   AccessPointMember,
+  AccessPointUpdate,
   Account,
   AccountCreate,
   AuthConfiguration,
@@ -42,6 +43,7 @@ import type {
   MemberRoleUpdate,
   OAuthErrorResponse,
   Permission,
+  ProjectSummary,
   SharedCertificate,
   SharedCertificateCreate,
 } from "../../model";
@@ -502,6 +504,203 @@ export function useGetAccessPoint<
   queryKey: DataTag<QueryKey, TData, TError>;
 } {
   const queryOptions = getGetAccessPointQueryOptions(key, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
+    TData,
+    TError
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  query.queryKey = unref(queryOptions).queryKey as DataTag<
+    QueryKey,
+    TData,
+    TError
+  >;
+
+  return query;
+}
+
+export const getUpdateAccessPointUrl = (key: string) => {
+  return `/v1/access/points/${encodeURIComponent(String(key))}`;
+};
+
+/**
+ * Sets the description of a project, trimmed; a blank one clears it. Needs a user with the Administrator role.
+ */
+export const updateAccessPoint = async (
+  key: string,
+  accessPointUpdate?: AccessPointUpdate,
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<AccessPoint> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<
+      string | readonly string[] | undefined
+    >(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return storytellerFetch<AccessPoint>(getUpdateAccessPointUrl(key), {
+    ...options,
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      ...getHeaders(options?.headers),
+    },
+    body: JSON.stringify(accessPointUpdate),
+  });
+};
+
+export const getUpdateAccessPointMutationKey = () =>
+  ["updateAccessPoint"] as const;
+
+export const getUpdateAccessPointMutationOptions = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAccessPoint>>,
+    TError,
+    UpdateAccessPointMutationVariables,
+    TContext
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAccessPoint>>,
+  TError,
+  UpdateAccessPointMutationVariables,
+  TContext
+> => {
+  const mutationKey = getUpdateAccessPointMutationKey();
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAccessPoint>>,
+    UpdateAccessPointMutationVariables
+  > = (props) => {
+    const { key, data } = props ?? {};
+
+    return updateAccessPoint(key, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAccessPointMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAccessPoint>>
+>;
+export type UpdateAccessPointMutationBody =
+  BodyType<AccessPointUpdate> | undefined;
+export type UpdateAccessPointMutationError = ErrorType<ErrorResponse | void>;
+export type UpdateAccessPointMutationVariables = {
+  key: string;
+  data?: BodyType<AccessPointUpdate>;
+};
+
+export const useUpdateAccessPoint = <
+  TError = ErrorType<ErrorResponse | void>,
+  TContext = unknown,
+>(
+  options?: {
+    mutation?: UseMutationOptions<
+      Awaited<ReturnType<typeof updateAccessPoint>>,
+      TError,
+      UpdateAccessPointMutationVariables,
+      TContext
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseMutationReturnType<
+  Awaited<ReturnType<typeof updateAccessPoint>>,
+  TError,
+  UpdateAccessPointMutationVariables,
+  TContext
+> => {
+  return useMutation(getUpdateAccessPointMutationOptions(options), queryClient);
+};
+export const getGetProjectsUrl = () => {
+  return `/v1/access/projects`;
+};
+
+/**
+ * Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.
+ */
+export const getProjects = async (
+  options?: Parameters<typeof storytellerFetch>[1],
+): Promise<ProjectSummary[]> => {
+  return storytellerFetch<ProjectSummary[]>(getGetProjectsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetProjectsQueryKey = () => {
+  return ["v1", "access", "projects"] as const;
+};
+
+export const getGetProjectsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProjects>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(options?: {
+  query?: Partial<
+    UseQueryOptions<Awaited<ReturnType<typeof getProjects>>, TError, TData>
+  >;
+  request?: SecondParameter<typeof storytellerFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = getGetProjectsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getProjects>>> = ({
+    signal,
+  }) => getProjects({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProjects>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetProjectsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProjects>>
+>;
+export type GetProjectsQueryError = ErrorType<void | ErrorResponse>;
+
+export function useGetProjects<
+  TData = Awaited<ReturnType<typeof getProjects>>,
+  TError = ErrorType<void | ErrorResponse>,
+>(
+  options?: {
+    query?: Partial<
+      UseQueryOptions<Awaited<ReturnType<typeof getProjects>>, TError, TData>
+    >;
+    request?: SecondParameter<typeof storytellerFetch>;
+  },
+  queryClient?: QueryClient,
+): UseQueryReturnType<TData, TError> & {
+  queryKey: DataTag<QueryKey, TData, TError>;
+} {
+  const queryOptions = getGetProjectsQueryOptions(options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryReturnType<
     TData,

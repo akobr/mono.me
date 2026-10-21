@@ -4,10 +4,14 @@ import { invalidateByPath, pathToQueryKey, queryKeyStartsWith, removeByPath } fr
 import { collectAll, paginate } from '../lib/paging'
 import { getRole, hasRole, roleOrder, roleRank } from '../lib/roles'
 import {
+  getGetAccessPointQueryKey,
+  getGetAccessPointsQueryKey,
   getGetConfigurationCompositionQueryKey,
   getGetConfigurationQueryKey,
   getGetConfigurationsQueryKey,
+  getGetProjectsQueryKey,
   getGetResolvedConfigurationQueryKey,
+  getUpdateAccessPointUrl,
 } from '../generated/vue-query'
 
 describe('invalidation', () => {
@@ -28,6 +32,15 @@ describe('invalidation', () => {
     expect(queryKeyStartsWith(getGetConfigurationCompositionQueryKey('acme', 'billing', 'default', 'exe.a.b.c'), path)).toBe(true)
     expect(queryKeyStartsWith(getGetConfigurationsQueryKey('acme', 'billing', 'default'), path)).toBe(false)
     expect(queryKeyStartsWith(getGetConfigurationQueryKey('acme', 'billing', 'default', 'exe.a.b.d'), path)).toBe(false)
+  })
+
+  it('matches the access point of a project update and the projects list, but not the access point listing', () => {
+    const path = getUpdateAccessPointUrl('acme.billing')
+
+    expect(queryKeyStartsWith(getGetAccessPointQueryKey('acme.billing'), path)).toBe(true)
+    expect(queryKeyStartsWith(getGetAccessPointsQueryKey(), path)).toBe(false)
+    expect(queryKeyStartsWith(getGetProjectsQueryKey(), path)).toBe(false)
+    expect(getGetProjectsQueryKey()).toEqual(pathToQueryKey('/v1/access/projects'))
   })
 
   it('invalidates and removes cached queries by path prefix', async () => {
