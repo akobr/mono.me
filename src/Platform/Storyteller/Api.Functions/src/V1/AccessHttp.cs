@@ -75,9 +75,9 @@ public class AccessHttp
     [OpenApiOperation(Definitions.RouteIds.Access.CreateAccount, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
-    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Models.AccountCreate), Description = "Organization and project for the new account.")]
+    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Models.AccountCreate), Description = "Organization and project for the new account, and the description of the project.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Account), Description = "Newly created account.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "The account already exists.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "The account already exists, only one of the organization and the project is given, or a project description is given without them.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostAccount(
@@ -112,6 +112,12 @@ public class AccessHttp
             return new BadRequestObjectResult(new ErrorResponse("The organization and the project are given together, or not at all."));
         }
 
+        // The description goes to the project the account creates; without one, it has nowhere to go.
+        if (!string.IsNullOrWhiteSpace(accountModel.ProjectDescription) && string.IsNullOrWhiteSpace(accountModel.Project))
+        {
+            return new BadRequestObjectResult(new ErrorResponse("A project description needs an organization and a project."));
+        }
+
         var (userName, name) = await request.GetIdentityProfileAsync(_profileResolver);
         var internalAccountModel = new AccountCreate
         {
@@ -120,6 +126,7 @@ public class AccessHttp
             Name = name,
             Organization = accountModel.Organization,
             Project = accountModel.Project,
+            ProjectDescription = accountModel.ProjectDescription,
         };
         account = await _accessService.CreateAccountAsync(internalAccountModel);
 
@@ -169,7 +176,7 @@ public class AccessHttp
     [OpenApiOperation(Definitions.RouteIds.Access.CreateAccessPoint, Definitions.Tags.Access)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
-    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AccessPointCreate), Description = "An organization or project to create.")]
+    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AccessPointCreate), Description = "An organization or project to create, and the description of the project.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The created access point (organization or project).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -196,6 +203,65 @@ public class AccessHttp
         pointModel = pointModel with { OwnerId = accountId };
         var point = await _accessService.CreateAccessPointAsync(pointModel);
         return new OkObjectResult(point);
+    }
+
+    [Function(nameof(PutAccessPoint))]
+    [OpenApiOperation(Definitions.RouteIds.Access.UpdateAccessPoint, Definitions.Tags.Access, Description = "Sets the description of a project, trimmed; a blank one clears it. Needs a user with the Administrator role.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The key of the project (organization.project).")]
+    [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AccessPointUpdate), Description = "The new description; empty or no body clears it.")]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The updated project.")]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key is not organization.project, or the body is not a project update.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The project doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The project changed concurrently twice in a row (Conflict); try again.")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> PutAccessPoint(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.AccessPoint)]
+        HttpRequestData request,
+        string key)
+    {
+        EnsureNotMachine(request, "Describing a project needs a user with the Administrator role.");
+        request.CheckScope(Scopes.User.Impersonation);
+        var pointKey = key.Trim().ToLowerInvariant();
+        await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
+
+        // Only a project has a description.
+        if (!TrySplitProjectKey(pointKey, out _, out _, out var badRequestResult))
+        {
+            return badRequestResult;
+        }
+
+        var (model, invalidBody) = await request.ReadJsonBodyAsync<AccessPointUpdate>(_bodyJsonOptions, "a project update", RequestBodyLimits.Control);
+
+        if (invalidBody is not null)
+        {
+            return invalidBody;
+        }
+
+        // Without a body, the description is cleared, as for views.
+        var point = await _accessService.UpdateAccessPointAsync(pointKey, model ?? new AccessPointUpdate());
+        return new OkObjectResult(point);
+    }
+
+    [Function(nameof(GetProjects))]
+    [OpenApiOperation(Definitions.RouteIds.Access.GetProjects, Definitions.Tags.Access, Description = "Every project where the caller has a role, with the role and the description, ordered by key. The members and the policies of a project are not included.")]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
+    [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
+    [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<ProjectSummary>), Description = "The caller's projects.")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The account doesn't exist.")]
+    [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
+    public async Task<IActionResult> GetProjects(
+        [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.Projects)]
+        HttpRequestData request)
+    {
+        EnsureNotMachine(request, "Listing projects needs a user.");
+        request.CheckScope(Scopes.User.Impersonation);
+        var accountId = request.GetIdentityUniqueId();
+        var projects = await _accessService.GetProjectsAsync(accountId);
+        return new OkObjectResult(projects);
     }
 
     [Function(nameof(PostGrantPermission))]
@@ -582,6 +648,16 @@ public class AccessHttp
         if (machine?.ManagementScopes is { Count: > 0 })
         {
             await request.CheckAccessToProjectAsync(accessService, organization, project, AccountRole.Administrator);
+        }
+    }
+
+    // Machine access is checked per project without roles, so these operations are for users only. A machine is refused
+    // before the scope check, which it would fail with a 401 in every build but a DEV_AUTH one.
+    private static void EnsureNotMachine(HttpRequestData request, string message)
+    {
+        if (request.TryGetApplicationIdentity(out _))
+        {
+            throw new AccessDeniedException(message);
         }
     }
 

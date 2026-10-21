@@ -2,16 +2,17 @@ namespace _42.Platform.Storyteller.Api.V1;
 
 // The most bytes a handler reads of its JSON body (RequestBodyExtensions.ReadJsonBodyAsync); a larger body is a 413.
 // Where the domain bounds a body, its limit is above the largest one, serialized as a System.Text.Json client does by
-// default (a quote, '<' or a non-ASCII character as \uXXXX: 6 bytes). Where it does not, as for a view description,
-// the labels and values of annotations or a whole import, the limit is a cap above what the clients send, and refuses
-// some bodies the route took before. All are below the 30 MB request limit of Kestrel, which answers 500, even for a
-// chunked body. The 32 KiB of the token endpoint (FederationHttp.MaxTokenRequestBytes) is for a form body: it would
-// refuse valid issuers, rules, key/values and annotations.
+// default (a quote, '<' or a non-ASCII character as \uXXXX: 6 bytes). Where it does not, as for a view or project
+// description, the labels and values of annotations or a whole import, the limit is a cap above what the clients send,
+// and refuses some bodies the route took before. All are below the 30 MB request limit of Kestrel, which answers 500,
+// even for a chunked body. The 32 KiB of the token endpoint (FederationHttp.MaxTokenRequestBytes) is for a form body:
+// it would refuse valid issuers, rules, key/values and annotations.
 internal static class RequestBodyLimits
 {
-    // Names, keys, roles, flags and short lists: an account, an access point, a permission, a member role, an
-    // invitation, a shared certificate, a machine authentication policy, a key/value policy, a key rotation, a
-    // recipient update and a key/value export request.
+    // Names, keys, roles, flags, short lists and the description of a project (the admin UI takes 500 characters): an
+    // account, an access point, a project update, a permission, a member role, an invitation, a shared certificate, a
+    // machine authentication policy, a key/value policy, a key rotation, a recipient update and a key/value export
+    // request.
     public const int Control = 8 * 1024;
 
     // A view and its description, which has no limit of its own (the admin UI takes 500 characters).

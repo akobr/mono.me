@@ -28,7 +28,7 @@ public class OpenApiDocumentTests
         var schemas = helper.GetOpenApiSchemas(methods, new DefaultNamingStrategy(), VisitorCollection.CreateInstance());
 
         schemas.Keys.Count(key => key == "AccountCreate").ShouldBe(1);
-        schemas["AccountCreate"].Properties.Keys.ShouldBe(["Organization", "Project"], ignoreOrder: true);
+        schemas["AccountCreate"].Properties.Keys.ShouldBe(["Organization", "Project", "ProjectDescription"], ignoreOrder: true);
     }
 
     [Fact]
