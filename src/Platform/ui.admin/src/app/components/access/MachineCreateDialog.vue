@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import {
   createMachineAccess,
   type MachineAccess,
-  type MachineAccessCreateScope,
   type MachineAuthenticationPolicy,
   type MachineCredentialKind,
-  type MachineManagementScope,
+  type MachineScope,
 } from '@42for.net/2splatform.sdk'
 import { useGetFederatedIssuers } from '@42for.net/2splatform.sdk/vue-query'
 import { useCatalogStore } from '@/stores/catalog'
@@ -17,25 +16,35 @@ import {
   apiBaseUrl,
   credentialKindDescriptions,
   credentialKinds,
+  impliedReads,
+  inApiOrder,
   isFederated,
+  isManagementScope,
+  isSecretsScope,
   issuesCertificates,
-  managementScopeDescriptions,
-  managementScopeLabels,
   managementScopes,
+  requiredRoleFor,
+  runtimeScopes,
   scopeDescriptions,
+  scopeLabels,
+  scopePresets,
+  withImpliedReads,
+  type ScopePreset,
 } from '@/utils/machines'
 
 /**
- * New machine access (spec section 13): scope, an optional annotation restriction, the credential kind (one of the
- * kinds the project enables, 424-14) and the certificate lifetime. The project policy preselects the kind and the
+ * New machine access (spec section 13): its scopes, an optional annotation restriction, the credential kind (one of
+ * the kinds the project enables, 424-14) and the certificate lifetime. The project policy preselects the kind and the
  * lifetime; without it (still loading) the server applies the project defaults. A CertificateAndApiKey machine can use
  * a shared certificate of the project instead of its own: then no certificate (and no lifetime) is issued for it.
  * A Federated machine (424-46) gets federation rules instead: a trusted issuer of the project, the audience (prefilled
  * with the project's token endpoint at the address the UI calls the API at; the API may name it differently behind a
  * proxy, and the machine detail flags such a rule), the subject and claim pins; Create waits until every rule is
  * complete. Without a trusted issuer, Administrators are sent to the Trusted issuers section and Contributors are told
- * to ask one. Management scopes (424-57) add bulk and structural operations to the scope. None is picked when the
- * dialog opens, and only Administrators give them, as in the API: below Administrator the group is disabled.
+ * to ask one. The scopes (424-79) come in two groups: runtime scopes, of which Create needs one, and management scopes
+ * (424-57), bulk and structural operations. A preset replaces the picked scopes and is never sent; every open starts
+ * from Runtime reader. A write scope comes with its read scope, as the API stores it. As in the API, management scopes
+ * are disabled below Administrator and secrets scopes below ContributorWithSecrets, and so are the presets with one.
  */
 const props = defineProps<{ policy?: MachineAuthenticationPolicy }>()
 const open = defineModel<boolean>('open', { default: false })
@@ -43,10 +52,12 @@ const emit = defineEmits<{ created: [machine: MachineAccess] }>()
 
 const context = useContextStore()
 const catalog = useCatalogStore()
+const role = useRole()
 const canAdmin = useCan('manageAccess')
+const canGiveSecrets = useCan('secrets')
 
-const scope = ref<MachineAccessCreateScope>('DefaultRead')
-const management = ref<MachineManagementScope[]>([])
+const runtime = ref<MachineScope[]>([])
+const management = ref<MachineScope[]>([])
 const annotationKey = ref('')
 const kind = ref<MachineCredentialKind>()
 const lifetime = ref<number>(365)
@@ -74,8 +85,8 @@ watch(open, (value) => {
   if (value) {
     failure.value = undefined
     followingIssuersLink = false
-    // A grant of the previous machine must not carry over to the next one.
-    management.value = []
+    // Every open starts from Runtime reader: a grant of the previous machine must not carry over to the next one.
+    applyPreset(scopePresets[0]!)
     kind.value = props.policy?.CredentialKind ?? kindItems.value[0]
     lifetime.value = props.policy?.CertificateLifetimeDays ?? 365
     useSharedCertificate.value = false
@@ -119,7 +130,9 @@ const sharedCertificate = computed(() => kind.value === 'CertificateAndApiKey' &
 const ownCertificate = computed(() => issuesCertificates(kind.value) && !sharedCertificate.value)
 const noIssuers = computed(() => federated.value && issuers.isSuccess.value && !issuers.data.value?.length)
 const canCreate = computed(
-  () => !federated.value || (!noIssuers.value && rules.value.length > 0 && rules.value.every(isRuleComplete)),
+  () =>
+    runtime.value.length > 0 &&
+    (!federated.value || (!noIssuers.value && rules.value.length > 0 && rules.value.every(isRuleComplete))),
 )
 const trustedIssuers = computed(() => ({
   path: `/${context.org}/${context.project}/machines`,
@@ -149,13 +162,27 @@ function closeAutoFocus(event: Event) {
   }
 }
 
-const scopes = Object.entries(scopeDescriptions).map(([value, description]) => ({ label: value, value, description }))
-const managementItems = managementScopes.map((value) => ({
-  label: managementScopeLabels[value],
-  value,
-  description: managementScopeDescriptions[value],
-}))
+const scopeItem = (value: MachineScope) => ({ label: scopeLabels[value], value, description: scopeDescriptions[value] })
+const runtimeItems = computed(() =>
+  runtimeScopes.map((value) => ({ ...scopeItem(value), disabled: isSecretsScope(value) && !canGiveSecrets.value })),
+)
+const managementItems = managementScopes.map(scopeItem)
+const presetsId = useId()
 const keys = computed(() => [...catalog.byKey.keys()].toSorted())
+
+/** Whether the user may give every scope of the preset (the API refuses the machine otherwise). */
+const canApply = (preset: ScopePreset) => role.can(requiredRoleFor(preset.scopes))
+
+function applyPreset(preset: ScopePreset) {
+  runtime.value = preset.scopes.filter((scope) => !isManagementScope(scope))
+  management.value = preset.scopes.filter(isManagementScope)
+}
+
+// Picking X.Write picks X.Read as well, and dropping X.Read drops X.Write: the pick is what the API stores.
+function pickRuntime(next: MachineScope[]) {
+  const dropped = runtime.value.filter((scope) => !next.includes(scope))
+  runtime.value = withImpliedReads(next.filter((scope) => !dropped.some((read) => impliedReads[scope] === read)))
+}
 
 async function create() {
   saving.value = true
@@ -164,11 +191,7 @@ async function create() {
     const machine = await createMachineAccess(context.org!, context.project!, {
       Organization: context.org,
       Project: context.project,
-      Scope: scope.value,
-      // In the order of the API; without a pick the member is left out, as for older clients.
-      ManagementScopes: management.value.length
-        ? managementScopes.filter((value) => management.value.includes(value))
-        : undefined,
+      Scopes: inApiOrder([...runtime.value, ...management.value]),
       AnnotationKey: annotationKey.value.trim() || undefined,
       CredentialKind: kind.value,
       CertificateLifetimeDays: ownCertificate.value ? lifetime.value : null,
@@ -197,13 +220,36 @@ async function create() {
   >
     <template #body>
       <div class="space-y-4">
-        <UFormField label="Scope" required>
-          <USelect v-model="scope" :items="scopes" class="w-full" />
-          <template #help>{{ scopeDescriptions[scope] }}</template>
+        <div role="group" :aria-labelledby="`${presetsId}-label`" class="space-y-2">
+          <div>
+            <p :id="`${presetsId}-label`" class="text-sm font-medium text-default">Presets</p>
+            <p class="text-sm text-muted">Replace the scopes below with those of a typical machine.</p>
+          </div>
+          <div class="flex flex-wrap gap-1">
+            <UButton
+              v-for="preset in scopePresets"
+              :key="preset.name"
+              :label="preset.name"
+              size="xs"
+              color="neutral"
+              variant="outline"
+              :disabled="!canApply(preset)"
+              @click="applyPreset(preset)"
+            />
+          </div>
+        </div>
+        <UFormField
+          label="Runtime scopes"
+          description="Reads and writes of single documents. A write scope comes with its read scope."
+          :help="canGiveSecrets ? undefined : 'Only users with secret rights give secrets scopes.'"
+          :error="runtime.length === 0 ? 'Pick at least one runtime scope.' : undefined"
+          required
+        >
+          <UCheckboxGroup :model-value="runtime" :items="runtimeItems" @update:model-value="pickRuntime" />
         </UFormField>
         <UFormField
           label="Management scopes"
-          description="Bulk and structural operations. They are never part of the scope above; give them only to machines that need them."
+          description="Bulk and structural operations. Each also needs the runtime scope of its operation; give them only to machines that need them."
           :help="canAdmin ? undefined : 'Only Administrators give management scopes.'"
           :ui="{ description: 'text-warning' }"
         >

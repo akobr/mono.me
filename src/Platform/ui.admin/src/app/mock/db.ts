@@ -71,7 +71,9 @@ export type MockScenario = 'default' | 'new-user' | 'invited' | 'large' | 'showc
 
 /** The datasets; build/mock-dataset.ts repeats the list for `npm run dev:mock` (a unit test keeps them equal). */
 export const scenarios: MockScenario[] = ['default', 'new-user', 'invited', 'large', 'showcase']
-const storageKey = '2s-admin:mock-db'
+// Versioned with the shape of the data, so a tab opened before a change starts from the new seed (2: the Scopes of
+// machines, 424-79).
+const storageKey = '2s-admin:mock-db:2'
 const scenarioKey = '2s-admin:mock-scenario'
 /** The dataset the build was started with when the session last started (VITE_MOCK_DATASET). */
 const launchKey = '2s-admin:mock-launch'
@@ -242,14 +244,15 @@ export function createSeed(scenario: MockScenario): MockDb {
         {
           Id: 'mach-invoicing-worker',
           ObjectId: 'obj_01',
-          Scope: 'DefaultRead',
+          Scopes: ['AnnotationRead', 'ConfigurationRead'],
           CredentialKind: 'ApiKey',
           LastRenewalAt: new Date(Date.now() - 20 * 86_400_000).toISOString(),
         },
         {
           Id: 'mach-billing-sync',
           ObjectId: 'obj_02',
-          Scope: 'ConfigurationReadWrite',
+          // It reads db.password over mTLS in the secret audit trail (key-values.ts).
+          Scopes: ['ConfigurationRead', 'ConfigurationWrite', 'SecretsRead'],
           AnnotationKey: 'exe.northwind.invoicing.prod',
           CredentialKind: 'Certificate',
           CertificateThumbprint: 'A1B2C3D4E5F60718293A4B5C6D7E8F9012345678',
@@ -261,7 +264,7 @@ export function createSeed(scenario: MockScenario): MockDb {
           Id: 'mach-release-pipeline',
           ObjectId: 'mach-release-pipeline',
           AccessKey: '',
-          Scope: 'AnnotationReadWrite',
+          Scopes: ['AnnotationRead', 'AnnotationWrite'],
           CredentialKind: 'Federated',
           FederationRules: [
             {

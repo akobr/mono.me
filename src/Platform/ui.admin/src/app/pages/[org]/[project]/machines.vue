@@ -17,9 +17,10 @@ import {
   credentialKindLabel,
   hasSecret,
   isFederated,
+  isManagementScope,
   machineSecret,
-  managementScopeLabels,
-  needsAdministrator,
+  requiredRoleFor,
+  scopeLabel,
 } from '@/utils/machines'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
@@ -28,11 +29,13 @@ import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 // default certificate lifetime of new machines (424-14). Administrators also see the shared certificates (424-35) and
 // the trusted issuers of Federated machines (424-46) below the machines; Contributors don't, the API answers 403 to the
 // certificates and only Administrators change issuers. A Federated machine has no secret: creating one shows how a
-// workload exchanges its platform token (FederatedSetupDialog), and it has no Reset. Neither has a machine with
-// management scopes below Administrator, as the API refuses the reset (424-57); Contributors still delete it.
+// workload exchanges its platform token (FederatedSetupDialog), and it has no Reset. Neither has a machine whose scopes
+// need a higher role than the user's (management scopes an Administrator, secrets scopes ContributorWithSecrets), as
+// the API refuses the reset (424-79); Contributors still delete it.
 const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
+const role = useRole()
 const canManage = useCan('machines')
 const canAdmin = useCan('manageAccess')
 const boot = useBootState()
@@ -145,7 +148,7 @@ useHashScroll(
               <thead class="bg-elevated/50 text-xs text-muted">
                 <tr>
                   <th class="px-3 py-2 text-start font-medium">Id</th>
-                  <th class="px-3 py-2 text-start font-medium">Scope</th>
+                  <th class="px-3 py-2 text-start font-medium">Scopes</th>
                   <th class="px-3 py-2 text-start font-medium">Annotation</th>
                   <th class="px-3 py-2 text-start font-medium">Credentials</th>
                   <th class="px-3 py-2 text-start font-medium">Certificate</th>
@@ -164,17 +167,19 @@ useHashScroll(
                     </RouterLink>
                   </td>
                   <td class="px-3 py-2">
-                    <UBadge :label="machine.Scope" color="neutral" variant="outline" size="sm" />
-                    <!-- Only machines with management scopes get more badges; the others look as before (424-57). -->
-                    <UBadge
-                      v-for="managementScope in machine.ManagementScopes ?? []"
-                      :key="managementScope"
-                      :label="managementScopeLabels[managementScope] ?? managementScope"
-                      color="neutral"
-                      variant="subtle"
-                      size="sm"
-                      class="ms-1"
-                    />
+                    <!-- One badge per scope, in the order of the API: runtime scopes outlined, management scopes
+                      filled (424-79). -->
+                    <span v-if="machine.Scopes?.length" class="flex flex-wrap gap-1">
+                      <UBadge
+                        v-for="scope in machine.Scopes"
+                        :key="scope"
+                        :label="scopeLabel(scope)"
+                        color="neutral"
+                        :variant="isManagementScope(scope) ? 'subtle' : 'outline'"
+                        size="sm"
+                      />
+                    </span>
+                    <span v-else class="text-dimmed">–</span>
                   </td>
                   <td class="px-3 py-2 font-mono text-xs">{{ machine.AnnotationKey ?? 'any' }}</td>
                   <td class="px-3 py-2 text-xs">{{ credentialKindLabel(machine.CredentialKind) }}</td>
@@ -204,10 +209,10 @@ useHashScroll(
                   <td class="px-3 py-2"><RelativeTime :value="machine.LastRenewalAt" /></td>
                   <td class="px-3 py-2 text-end">
                     <span v-if="canManage" class="flex justify-end gap-1">
-                      <!-- A Federated machine has no secret to reset; its rules change on its detail. Only
-                        Administrators reset a machine with management scopes (424-57). -->
+                      <!-- A Federated machine has no secret to reset; its rules change on its detail. A reset needs
+                        the role the scopes of the machine need (424-79). -->
                       <UButton
-                        v-if="hasSecret(machine.CredentialKind) && (canAdmin || !needsAdministrator(machine))"
+                        v-if="hasSecret(machine.CredentialKind) && role.can(requiredRoleFor(machine))"
                         label="Reset"
                         size="xs"
                         color="neutral"

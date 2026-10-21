@@ -63,7 +63,7 @@ async function save() {
   if (!requireMtls.value && (props.policy.RequireMtlsForSecretDelivery ?? true)) {
     const confirmed = await confirm({
       title: 'Deliver secrets to machines without mTLS?',
-      description: 'Machines with an API key or a bearer token alone will receive secret values when they hold the Configuration.Secrets scope.',
+      description: 'Machines with an API key or a bearer token alone will receive secret values when they hold the Secrets.Read scope.',
       confirmLabel: 'Turn off the mTLS rule',
       color: 'warning',
     })

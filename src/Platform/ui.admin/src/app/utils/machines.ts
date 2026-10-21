@@ -1,10 +1,10 @@
 import {
   getStorytellerConfig,
+  type AccountRoleName,
   type MachineAccess,
-  type MachineAccessCreateScope,
   type MachineAuthenticationPolicy,
   type MachineCredentialKind,
-  type MachineManagementScope,
+  type MachineScope,
 } from '@42for.net/2splatform.sdk'
 import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 
@@ -17,23 +17,40 @@ export function apiBaseUrl(): string {
   }
 }
 
-/** What each machine scope allows (spec section 13: "a select with an explanation per scope"). */
-export const scopeDescriptions: Record<MachineAccessCreateScope, string> = {
-  AnnotationRead: 'Reads annotations.',
-  ConfigurationRead: 'Reads configurations (resolved, with bindings evaluated).',
-  DefaultRead: 'Reads annotations and configurations.',
-  AnnotationReadWrite: 'Reads and writes annotations.',
-  ConfigurationReadWrite: 'Reads and writes configurations.',
-  DefaultReadWrite: 'Reads and writes annotations and configurations.',
-  SecretsRead: 'Reads configurations and receives key/value secrets (over mTLS when the project requires it).',
-  SecretsReadWrite: 'Reads and writes configurations and key/value secrets (over mTLS when the project requires it).',
+/**
+ * The scope strings of the machine scopes (424-79), as the credentials of a machine carry them and messages name them;
+ * the API, and with it the SDK, uses the enum names.
+ */
+export const scopeLabels: Record<MachineScope, string> = {
+  AnnotationRead: 'Annotation.Read',
+  AnnotationWrite: 'Annotation.Write',
+  ConfigurationRead: 'Configuration.Read',
+  ConfigurationWrite: 'Configuration.Write',
+  SecretsRead: 'Secrets.Read',
+  SecretsWrite: 'Secrets.Write',
+  ConfigurationTransfer: 'Configuration.Transfer',
+  SchemaWrite: 'Schema.Write',
+  TemplateWrite: 'Template.Write',
+  AnnotationManage: 'Annotation.Manage',
+  KeyValueManage: 'KeyValue.Manage',
 }
 
+/** The scope string of a scope; an unknown value (a newer API) as it is. */
+export const scopeLabel = (scope: MachineScope) => scopeLabels[scope] ?? scope
+
 /**
- * What each management scope opens (424-57): bulk and structural operations that no scope includes. Each adds to the
- * scope of the machine, which still decides what the operation may read and write.
+ * What each machine scope allows. The runtime scopes read and write single documents, the secrets scopes on top of the
+ * configuration scopes, which they do not include; the management scopes (424-57) open bulk and structural operations,
+ * each on top of the runtime scope of its operation, which still decides what it may read and write.
  */
-export const managementScopeDescriptions: Record<MachineManagementScope, string> = {
+export const scopeDescriptions: Record<MachineScope, string> = {
+  AnnotationRead: 'Reads annotations.',
+  AnnotationWrite: 'Creates and changes annotations, one at a time.',
+  ConfigurationRead: 'Reads configurations (resolved, with bindings evaluated), schemas, templates and key/values.',
+  ConfigurationWrite: 'Writes configurations and key/values.',
+  SecretsRead:
+    'Receives the values of key/value secrets (over mTLS when the project requires it). Needs Configuration.Read as well.',
+  SecretsWrite: 'Writes key/value secrets. Needs Configuration.Write as well.',
   ConfigurationTransfer: 'Exports and imports the views and the key/values of the project.',
   SchemaWrite: 'Writes and deletes type, annotation and descendant-type schemas.',
   TemplateWrite: 'Writes and deletes the templates of a view.',
@@ -41,17 +58,60 @@ export const managementScopeDescriptions: Record<MachineManagementScope, string>
   KeyValueManage: 'Moves key/values between protection levels in bulk, and restores them in bulk.',
 }
 
-/** Every management scope, in the order of the API. */
-export const managementScopes = Object.keys(managementScopeDescriptions) as MachineManagementScope[]
+/** Every machine scope, in the order of the API. */
+export const machineScopes = Object.keys(scopeLabels) as MachineScope[]
 
-/** The scope strings of the management scopes, as the credentials of a machine carry them. */
-export const managementScopeLabels: Record<MachineManagementScope, string> = {
-  ConfigurationTransfer: 'Configuration.Transfer',
-  SchemaWrite: 'Schema.Write',
-  TemplateWrite: 'Template.Write',
-  AnnotationManage: 'Annotation.Manage',
-  KeyValueManage: 'KeyValue.Manage',
+/** The management scopes, in the order of the API: only Administrators give them (424-57). */
+export const managementScopes: MachineScope[] = [
+  'ConfigurationTransfer',
+  'SchemaWrite',
+  'TemplateWrite',
+  'AnnotationManage',
+  'KeyValueManage',
+]
+
+export const isManagementScope = (scope: MachineScope) => managementScopes.includes(scope)
+
+/** The secrets scopes: only users with secret rights (ContributorWithSecrets) give them. */
+export const isSecretsScope = (scope: MachineScope) => scope === 'SecretsRead' || scope === 'SecretsWrite'
+
+/** The runtime scopes, in the order of the API: a machine needs at least one of them. */
+export const runtimeScopes = machineScopes.filter((scope) => !isManagementScope(scope))
+
+/** The read scope each write scope comes with: the API stores X.Read with X.Write. */
+export const impliedReads: Partial<Record<MachineScope, MachineScope>> = {
+  AnnotationWrite: 'AnnotationRead',
+  ConfigurationWrite: 'ConfigurationRead',
+  SecretsWrite: 'SecretsRead',
 }
+
+/** The scopes distinct and in the order of the API (UCheckboxGroup emits its values in click order). */
+export const inApiOrder = (scopes: readonly MachineScope[]) => machineScopes.filter((scope) => scopes.includes(scope))
+
+/** The scopes with the read scope of every write scope, in the order of the API, as the API completes them. */
+export const withImpliedReads = (scopes: readonly MachineScope[]) =>
+  inApiOrder([...scopes, ...scopes.flatMap((scope) => impliedReads[scope] ?? [])])
+
+export interface ScopePreset {
+  name: string
+  scopes: MachineScope[]
+}
+
+const runtimeReader: MachineScope[] = ['AnnotationRead', 'ConfigurationRead']
+const ciWriter: MachineScope[] = ['AnnotationRead', 'AnnotationWrite', 'ConfigurationRead', 'ConfigurationWrite']
+
+/**
+ * Typical machines, as a start for the scopes of a new one (424-79). They exist in the UI only: a preset replaces the
+ * picked scopes, and the API gets and stores the scopes alone.
+ */
+export const scopePresets: ScopePreset[] = [
+  { name: 'Runtime reader', scopes: runtimeReader },
+  { name: 'Runtime with secrets', scopes: [...runtimeReader, 'SecretsRead'] },
+  { name: 'CI writer', scopes: ciWriter },
+  { name: 'Git sync', scopes: [...ciWriter, 'ConfigurationTransfer'] },
+  { name: 'Backup', scopes: [...runtimeReader, 'ConfigurationTransfer'] },
+  { name: 'Schema deployer', scopes: ['ConfigurationRead', 'ConfigurationWrite', 'SchemaWrite', 'TemplateWrite'] },
+]
 
 export const credentialKindDescriptions: Record<MachineCredentialKind, string> = {
   ApiKey: 'An API key per machine (Authorization: ApiKey …).',
@@ -86,10 +146,17 @@ export const credentialKindLabel = (kind?: MachineCredentialKind | null) =>
 export const hasSecret = (kind?: MachineCredentialKind | null) => kind !== 'Federated'
 
 /**
- * Whether a reset of the machine, and new federation rules, need an Administrator: the machine has management scopes,
- * which only Administrators give out (424-57). Contributors reset the other machines, and delete any machine.
+ * The role that gives these scopes, or the credentials of this machine: its creation, a reset and new federation rules
+ * (424-79). The creator of a machine can use its credentials, so an Administrator gives management scopes,
+ * ContributorWithSecrets secrets scopes, and a Contributor the rest. Contributors delete any machine.
  */
-export const needsAdministrator = (machine?: MachineAccess | null) => !!machine?.ManagementScopes?.length
+export function requiredRoleFor(machine?: MachineAccess | readonly MachineScope[] | null): AccountRoleName {
+  const scopes = Array.isArray(machine) ? machine : ((machine as MachineAccess | null | undefined)?.Scopes ?? [])
+  if (scopes.some(isManagementScope)) {
+    return 'Administrator'
+  }
+  return scopes.some(isSecretsScope) ? 'ContributorWithSecrets' : 'Contributor'
+}
 
 /** Whether machines of this kind exchange a token of a trusted issuer instead of holding a secret (424-46). */
 export const isFederated = (kind?: MachineCredentialKind | null) => kind === 'Federated'

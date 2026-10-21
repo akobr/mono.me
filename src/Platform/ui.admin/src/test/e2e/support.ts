@@ -1,5 +1,6 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { AxeBuilder } from '@axe-core/playwright'
+import type { MachineAccess } from '@42for.net/2splatform.sdk'
 
 export type MockScenario = 'default' | 'new-user' | 'invited' | 'large' | 'showcase'
 
@@ -8,7 +9,8 @@ declare global {
     /** The hooks of the mock API (app/mock/browser.ts) that the tests call from the page. */
     storytellerMock?: {
       changeConfiguration: (key: string, changes: Record<string, unknown>) => void
-      addMachine: (projectKey: string, machine: Record<string, unknown>) => void
+      /** Typed as the API's machines, so the machines of a test follow the SDK. */
+      addMachine: (projectKey: string, machine: MachineAccess) => void
     }
   }
 }
