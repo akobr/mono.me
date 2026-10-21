@@ -59,6 +59,15 @@ interface Snapshot {
 }
 
 const snapshotStore = () => createStore('2s-admin', 'catalog')
+
+/** Removes every catalog snapshot; on sign-out, and when the mock API starts a new dataset. */
+export async function clearCatalogSnapshots(): Promise<void> {
+  try {
+    await clearSnapshots(snapshotStore())
+  } catch {
+    // IndexedDB unavailable
+  }
+}
 const scopeId = (scope: Scope) => `${scope.org}/${scope.project}/${scope.view}`
 
 /**
@@ -385,10 +394,4 @@ export const useCatalogStore = defineStore('catalog', () => {
 })
 
 // Sign-out clears the snapshots: they hold annotations of projects the next user may not see.
-onSignOut(async () => {
-  try {
-    await clearSnapshots(snapshotStore())
-  } catch {
-    // IndexedDB unavailable
-  }
-})
+onSignOut(clearCatalogSnapshots)

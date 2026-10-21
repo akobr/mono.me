@@ -40,7 +40,7 @@ const labelPool = ['eu', 'us', 'pci', 'beta', 'legacy', 'critical', 'gdpr', 'int
 const timeZones = ['Europe/Prague', 'Europe/London', 'America/New_York', 'UTC', 'Asia/Tokyo']
 
 /** Small deterministic PRNG (mulberry32). */
-function random(seed: number) {
+export function random(seed: number) {
   let state = seed >>> 0
   return () => {
     state = (state + 0x6d2b79f5) >>> 0
@@ -51,7 +51,8 @@ function random(seed: number) {
   }
 }
 
-function hash(text: string): number {
+/** FNV-1a, the seed of a generated scope. */
+export function hash(text: string): number {
   let value = 2166136261
   for (const char of text) {
     value = Math.imul(value ^ char.charCodeAt(0), 16777619)

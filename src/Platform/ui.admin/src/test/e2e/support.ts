@@ -1,7 +1,7 @@
 import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { AxeBuilder } from '@axe-core/playwright'
 
-export type MockScenario = 'default' | 'new-user' | 'invited' | 'large'
+export type MockScenario = 'default' | 'new-user' | 'invited' | 'large' | 'showcase'
 
 declare global {
   interface Window {

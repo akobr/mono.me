@@ -15,10 +15,14 @@ import type {
 } from '@42for.net/2splatform.sdk'
 import type { KeyValueScopeStore } from './key-values'
 import { generateAnnotations, type ScopeSeed } from './annotations'
+import { showcaseScope } from './showcase'
+import { peopleDirectory } from './showcase/people'
+import { createShowcaseSeed } from './showcase/seed'
 
 // In-memory data of the mock API (vite --mode e2e). It is kept in sessionStorage, so it survives the full-page
 // navigations of the mock sign-in, and it is reset by closing the tab or by calling window.storytellerMock.reset().
-// Annotations are generated from seeds per scope; only their changes (overrides) are stored.
+// Annotations are generated from seeds per scope, or built from the showcase projects (showcase/); only their changes
+// (overrides) are stored.
 
 export interface MockUser {
   id: string
@@ -63,20 +67,21 @@ export interface MockDb {
   keyValueAudit?: Record<string, KeyValueAuditEvent[]>
 }
 
-export type MockScenario = 'default' | 'new-user' | 'invited' | 'large'
+export type MockScenario = 'default' | 'new-user' | 'invited' | 'large' | 'showcase'
 
-const scenarios: MockScenario[] = ['default', 'new-user', 'invited', 'large']
+/** The datasets; build/mock-dataset.ts repeats the list for `npm run dev:mock` (a unit test keeps them equal). */
+export const scenarios: MockScenario[] = ['default', 'new-user', 'invited', 'large', 'showcase']
 const storageKey = '2s-admin:mock-db'
 const scenarioKey = '2s-admin:mock-scenario'
+/** The dataset the build was started with when the session last started (VITE_MOCK_DATASET). */
+const launchKey = '2s-admin:mock-launch'
+
+const isScenario = (value: string): value is MockScenario => (scenarios as string[]).includes(value)
 
 export const mockUser: MockUser = { id: 'user_01MOCKADA', name: 'Ada Lovelace', email: 'ada@example.com' }
 
-/** Accounts of the mock data, for member names. */
-export const mockDirectory: Record<string, { name: string; email: string }> = {
-  user_01MOCKADA: { name: 'Ada Lovelace', email: 'ada@example.com' },
-  user_01MOCKGRACE: { name: 'Grace Hopper', email: 'grace@example.com' },
-  user_01MOCKALAN: { name: 'Alan Turing', email: 'alan@example.com' },
-}
+/** Accounts of the mock data, for member names: Ada, Grace and Alan, and the people of the showcase. */
+export const mockDirectory: Record<string, { name: string; email: string }> = peopleDirectory
 
 const now = () => new Date().toISOString()
 
@@ -122,6 +127,9 @@ export function scopeSeed(scenario: MockScenario, org: string, project: string, 
 }
 
 export function createSeed(scenario: MockScenario): MockDb {
+  if (scenario === 'showcase') {
+    return createShowcaseSeed(mockUser)
+  }
   if (scenario === 'new-user' || scenario === 'invited') {
     const seed = createSeed('default')
     // The same organizations exist, but the user is a member of none of them.
@@ -272,18 +280,36 @@ export function createSeed(scenario: MockScenario): MockDb {
   }
 }
 
-/**
- * Applies `?mock-scenario=` of the page load: selects the scenario and resets its data. It runs once at start-up,
- * not per request, so the parameter does not wipe edits while it stays in the URL, and a redirect (for example to
- * /login) before the first request does not lose it.
- */
-export function applyScenarioFromUrl(): void {
-  const fromUrl = new URLSearchParams(location.search).get('mock-scenario') as MockScenario | null
+/** The dataset of the build: VITE_MOCK_DATASET, which `npm run dev:mock` sets; the showcase without one. */
+export function launchScenario(value: string | undefined): MockScenario {
+  if (!value) {
+    return 'showcase'
+  }
+  if (isScenario(value)) {
+    return value
+  }
+  console.warn(`Unknown mock dataset '${value}'; the showcase starts instead.`)
+  return 'showcase'
+}
 
-  if (fromUrl && scenarios.includes(fromUrl)) {
-    sessionStorage.setItem(scenarioKey, fromUrl)
+/**
+ * Picks the dataset of the page load and resets its data when it changes: a valid `?mock-scenario=` first, then the
+ * dataset of the build when it differs from the one the session last started with (a restart with another option,
+ * or a new tab), else the session's own dataset with its edits. It runs once at start-up, not per request, so the
+ * parameter does not wipe edits while it stays in the URL, and a redirect (for example to /login) before the first
+ * request does not lose it. Returns whether the dataset starts fresh (nothing stored yet).
+ */
+export function applyStartScenario(launch: MockScenario): boolean {
+  const fromUrl = new URLSearchParams(location.search).get('mock-scenario')
+  const picked =
+    fromUrl && isScenario(fromUrl) ? fromUrl : sessionStorage.getItem(launchKey) === launch ? undefined : launch
+
+  if (picked) {
+    sessionStorage.setItem(scenarioKey, picked)
     sessionStorage.removeItem(storageKey)
   }
+  sessionStorage.setItem(launchKey, launch)
+  return sessionStorage.getItem(storageKey) === null
 }
 
 export function currentScenario(): MockScenario {
@@ -319,11 +345,15 @@ const merged = new Map<string, { signature: string; result: ReadonlyMap<string, 
  */
 export function annotationsOf(db: MockDb, org: string, project: string, view: string): ReadonlyMap<string, Annotation> {
   const id = `${org}/${project}/${view}`
-  const seed = scopeSeed(db.scenario, org, project, view)
   const cacheKey = `${db.scenario}:${id}`
 
-  if (seed && !generated.has(cacheKey)) {
-    generated.set(cacheKey, generateAnnotations(seed))
+  if (!generated.has(cacheKey)) {
+    const seed = db.scenario === 'showcase' ? undefined : scopeSeed(db.scenario, org, project, view)
+    const base =
+      db.scenario === 'showcase' ? showcaseScope(org, project, view)?.annotations : seed && generateAnnotations(seed)
+    if (base) {
+      generated.set(cacheKey, base)
+    }
   }
 
   const overrides = db.annotations[id]
