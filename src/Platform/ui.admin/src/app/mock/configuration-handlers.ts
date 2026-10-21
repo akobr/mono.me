@@ -9,6 +9,7 @@ import type {
   ConfigurationSummary,
 } from '@42for.net/2splatform.sdk'
 import { codeOfKey, getAllAncestors, metaOf, typeMeta, type AnnotationTypeCode } from '@/utils/annotation-key'
+import { ancestorKeyOf } from '@/utils/binding-language'
 import { escapeSegment, getAt, parsePointer } from '@/utils/json-pointer'
 import { validateAgainst } from '@/utils/schema-validation'
 import { appendAudit, newEntry } from './audit'
@@ -215,21 +216,64 @@ export function combinedSchema(db: MockDb, scope: ScopeRef, key: string) {
 
 class BindingError extends Error {}
 
-/** Evaluates "@key/path" references against the effective documents (no JSON Logic in the mock). */
-function resolveBindings(value: unknown, db: MockDb, scope: ScopeRef): unknown {
+const configCall = /^@config\(\s*"([^"]*)"\s*\)$/
+const annotationCall = /^@annotation\(\s*"([^"]*)"\s*(?:,\s*"([^"]*)"\s*)?\)$/
+
+/** The segments of a JSON Pointer ("/a/b") or of a dotted JSONPath ("$.a.b"), the two forms the functions take. */
+function segmentsOf(expression: string): string[] {
+  return expression.startsWith('$')
+    ? expression
+        .replace(/^\$\.?/, '')
+        .split('.')
+        .filter(Boolean)
+    : parsePointer(expression)
+}
+
+/**
+ * The value of one binding of the configuration of `key`: `@config("…")` reads its effective document before the
+ * evaluation, `@annotation("…"[, "<Type>"])` the Values of the annotation or of its ancestor of that type, and
+ * "@<key>/<path>" the effective document of another annotation.
+ */
+function bindingValue(value: string, db: MockDb, scope: ScopeRef, key: string): unknown {
+  const config = configCall.exec(value)
+  if (config) {
+    return getAt(effectiveContent(db, scope, key), segmentsOf(config[1]!))
+  }
+  const annotation = annotationCall.exec(value)
+  if (annotation) {
+    const [, expression, type] = annotation
+    const target = type ? ancestorKeyOf(key, type) : key
+    const values = target ? annotationsOf(db, scope.org, scope.project, scope.view).get(target)?.Values : undefined
+    return getAt(values, segmentsOf(expression!))
+  }
+  const [reference, ...path] = value.slice(1).split('/')
+  return getAt(effectiveContent(db, scope, reference!), path)
+}
+
+/** Sourced values (secrets), interpolation and math need the server; they stay as written. */
+function resolveBinding(value: string, db: MockDb, scope: ScopeRef, key: string): unknown {
+  if (/^@[([{]/.test(value)) {
+    return value
+  }
+  const resolved = bindingValue(value, db, scope, key)
+  if (resolved === undefined) {
+    throw new BindingError(`The binding ${value} could not be resolved.`)
+  }
+  return resolved
+}
+
+/** Evaluates the bindings of the configuration of `key` against the effective documents (no JSON Logic in the mock). */
+function resolveBindings(value: unknown, db: MockDb, scope: ScopeRef, key: string): unknown {
   if (typeof value === 'string' && value.startsWith('@')) {
-    const [reference, ...path] = value.slice(1).split('/')
-    const resolved = getAt(effectiveContent(db, scope, reference!), path)
-    if (resolved === undefined) {
-      throw new BindingError(`The binding ${value} could not be resolved.`)
-    }
-    return resolved
+    return resolveBinding(value, db, scope, key)
   }
   if (Array.isArray(value)) {
-    return value.map((entry) => resolveBindings(entry, db, scope))
+    return value.map((entry) => resolveBindings(entry, db, scope, key))
   }
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, resolveBindings(entry, db, scope)]))
+    return Object.fromEntries(
+      Object.entries(value).map(([name, entry]) => [name, resolveBindings(entry, db, scope, key)]),
+    )
   }
   return value
 }
@@ -435,7 +479,10 @@ export const configurationHandlers: HttpHandler[] = [
         return errorResponse(404, `There is no configuration for ${params.key}.`, 'NotFound')
       }
       try {
-        const resolved = resolveBindings(effectiveContent(db, scope, params.key), db, scope) as Record<string, unknown>
+        const resolved = resolveBindings(effectiveContent(db, scope, params.key), db, scope, params.key) as Record<
+          string,
+          unknown
+        >
         return HttpResponse.json(configurationResponse(db, scope, params.key, resolved))
       } catch (error) {
         if (error instanceof BindingError) {
@@ -454,7 +501,11 @@ export const configurationHandlers: HttpHandler[] = [
       return (
         denied ??
         HttpResponse.json(
-          (document?.versions ?? []).map(({ Version, Modified, ExpirationTime }) => ({ Version, Modified, ExpirationTime })),
+          (document?.versions ?? []).map(({ Version, Modified, ExpirationTime }) => ({
+            Version,
+            Modified,
+            ExpirationTime,
+          })),
         )
       )
     }),
