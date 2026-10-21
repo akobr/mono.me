@@ -8,9 +8,11 @@ import {
 } from 'msw'
 import type {
   AccessPointCreate,
+  AccessPointUpdate,
   AccountCreate,
   AccountRole,
   BindingCatalog,
+  ProjectSummary,
   View,
   ViewCreate,
   ViewUpdate,
@@ -58,6 +60,30 @@ export const withDb =
 
 const namePattern = /^[a-z0-9][a-z0-9-]{1,62}$/
 
+/** The description of a project as the API stores it: trimmed, and a blank one is none. */
+const normalizeDescription = (description: string | undefined | null) => description?.trim() || undefined
+
+/**
+ * The body of PUT /access/points/:key as the API reads it: no body, a blank one or null clears the description, and
+ * anything but a project update is undefined (a 400). request.json() would throw on an empty body.
+ */
+async function readAccessPointUpdate(request: Request): Promise<AccessPointUpdate | undefined> {
+  const text = await request.text()
+  let body: unknown
+  try {
+    body = text.trim() ? JSON.parse(text) : null
+  } catch {
+    return undefined
+  }
+  if (body === null) {
+    return {}
+  }
+  const description = (body as AccessPointUpdate).Description
+  const isUpdate =
+    typeof body === 'object' && !Array.isArray(body) && (description == null || typeof description === 'string')
+  return isUpdate ? (body as AccessPointUpdate) : undefined
+}
+
 export const accessHandlers: HttpHandler[] = [
   http.get(`${api}/auth/configuration`, () =>
     HttpResponse.json({ Provider: 'AuthKit', ClientId: 'client_mock', Scopes: [] }),
@@ -89,7 +115,12 @@ export const accessHandlers: HttpHandler[] = [
         AccessMap: { [body.Organization!]: 'Owner', [projectKey]: 'Owner' },
       }
       db.accessPoints[body.Organization!] = { Key: body.Organization, AccessMap: { [db.user.id]: 'Owner' } }
-      db.accessPoints[projectKey] = { Key: projectKey, AccessMap: { [db.user.id]: 'Owner' } }
+      // Only the project gets the description.
+      db.accessPoints[projectKey] = {
+        Key: projectKey,
+        AccessMap: { [db.user.id]: 'Owner' },
+        Description: normalizeDescription(body.ProjectDescription),
+      }
       return HttpResponse.json(db.account, { status: 201 })
     }),
   ),
@@ -123,7 +154,12 @@ export const accessHandlers: HttpHandler[] = [
       }
 
       db.accessPoints[org] ??= { Key: org, AccessMap: { [db.user.id]: 'Owner' } }
-      db.accessPoints[projectKey] = { Key: projectKey, AccessMap: { [db.user.id]: 'Owner' } }
+      // Only the project gets the description.
+      db.accessPoints[projectKey] = {
+        Key: projectKey,
+        AccessMap: { [db.user.id]: 'Owner' },
+        Description: normalizeDescription(body.ProjectDescription),
+      }
       db.account!.AccessMap = {
         ...db.account!.AccessMap,
         [org]: db.account!.AccessMap?.[org] ?? 'Owner',
@@ -140,6 +176,47 @@ export const accessHandlers: HttpHandler[] = [
       return (
         requireRole(db, key, 'Administrator') ?? HttpResponse.json(db.accessPoints[key] ?? { Key: key, AccessMap: {} })
       )
+    }),
+  ),
+
+  http.put(
+    `${api}/access/points/:key`,
+    withDb(async (db, { params, request }) => {
+      const key = String(params.key)
+      const denied = requireRole(db, key, 'Administrator')
+      if (denied) {
+        return denied
+      }
+      // Only a project has a description.
+      if (!key.includes('.')) {
+        return errorResponse(400, 'Access point key must be in organization.project format.')
+      }
+      const body = await readAccessPointUpdate(request)
+      if (!body) {
+        return errorResponse(400, 'The request body is not a project update.')
+      }
+      const point = db.accessPoints[key]
+      if (!point) {
+        return errorResponse(404, `The project '${key}' doesn't exist.`, 'NotFound')
+      }
+      point.Description = normalizeDescription(body.Description)
+      return HttpResponse.json(point)
+    }),
+  ),
+
+  http.get(
+    `${api}/access/projects`,
+    withDb((db) => {
+      if (!db.account) {
+        return errorResponse(404, 'The account does not exist.', 'NotFound')
+      }
+      // A project key has a dot, an organization key has none; a key without its access point is left out, as in
+      // the API.
+      const projects: ProjectSummary[] = Object.entries(db.account.AccessMap ?? {})
+        .filter(([key, role]) => key.includes('.') && roleRank(role) > roleRank('None') && db.accessPoints[key])
+        .toSorted(([left], [right]) => (left < right ? -1 : 1))
+        .map(([key, role]) => ({ Key: key, Role: role, Description: db.accessPoints[key]?.Description }))
+      return HttpResponse.json(projects)
     }),
   ),
 ]

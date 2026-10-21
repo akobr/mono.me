@@ -627,7 +627,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const invoicingSuite: ShowcaseProject = {
   org: 'fabrikam',
   project: 'invoicing-suite',
-  summary: 'The B2B SaaS of the documentation: Northwind and Contoso, their environments, modules and contracts.',
+  description:
+    'The B2B SaaS of the documentation: Northwind and Contoso, with their environments, the invoicing, payments and portal modules, their contracts and their nightly exports.',
   members: { grace: 'Owner', edsger: 'Administrator', ada: 'ContributorWithSecrets', alan: 'Contributor' },
   settings: {
     types: {

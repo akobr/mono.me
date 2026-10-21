@@ -135,7 +135,8 @@ export function createShowcaseSeed(user: MockUser): MockDb {
     const kinds: MachineCredentialKind[] = ['fitness-cloud', 'streaming-platform'].includes(project.project)
       ? ['ApiKey', 'Certificate', 'Federated']
       : ['ApiKey', 'Federated']
-    accessPoints[key] = accessPoint(key, project.members, kinds)
+    // Only a project has a description.
+    accessPoints[key] = { ...accessPoint(key, project.members, kinds), Description: project.description }
   }
 
   // The account's map is derived from the access points, as syncAccount keeps it (access-handlers.ts).

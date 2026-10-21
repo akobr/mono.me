@@ -1204,7 +1204,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const plantFleet: ShowcaseProject = {
   org: 'harbor-industrial',
   project: 'plant-fleet',
-  summary: 'The device fleet of the documentation: five sites, their devices and the capabilities each device runs.',
+  description:
+    'Industrial device fleet. Sites run compressors, pumps and gateways, with telemetry, control loops and maintenance tuned per device.',
   members: { radia: 'Owner', ada: 'ContributorWithSecrets', ken: 'Contributor', margaret: 'Reader' },
   settings: {
     types: {

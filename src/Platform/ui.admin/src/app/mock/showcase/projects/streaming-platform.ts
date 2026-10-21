@@ -1495,8 +1495,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const streamingPlatform: ShowcaseProject = {
   org: 'streamwave',
   project: 'streaming-platform',
-  summary:
-    'The distributed platform of the documentation: markets, their cells and the services deployed in each cell.',
+  description:
+    'Streaming platform across markets. Each market has production and canary cells, and services such as playback, recommendations and search are deployed per cell.',
   members: { ken: 'Owner', ada: 'Administrator', radia: 'Administrator', donald: 'Contributor', grace: 'Reader' },
   settings: {
     types: {

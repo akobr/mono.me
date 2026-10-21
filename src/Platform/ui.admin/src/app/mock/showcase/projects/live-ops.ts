@@ -1019,7 +1019,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const liveOps: ShowcaseProject = {
   org: 'pixel-forge',
   project: 'live-ops',
-  summary: 'Game live operations: games, platform regions, backend services and seasonal live events.',
+  description:
+    'Live operations of game titles. Backend services run per platform and region, and seasonal live events are scheduled per region.',
   members: { alan: 'Owner', ada: 'Administrator', ken: 'ContributorWithSecrets', barbara: 'Contributor' },
   settings: {
     types: {

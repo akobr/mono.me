@@ -1345,7 +1345,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const vehiclePlatform: ShowcaseProject = {
   org: 'aurora-motors',
   project: 'vehicle-platform',
-  summary: 'The physical product of the documentation: vehicle models, trims and VINs, and the parts fitted to them.',
+  description:
+    'Electric vehicle models, their trims and individual VINs, with the subsystems, parts and firmware fitted to each build.',
   members: { hedy: 'Owner', annie: 'ContributorWithSecrets', ada: 'Contributor', frances: 'Reader' },
   settings: {
     types: {

@@ -1460,8 +1460,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const financeCloud: ShowcaseProject = {
   org: 'fabrikam',
   project: 'finance-cloud',
-  summary:
-    'Single-tenant B2B SaaS: customers, their instances, the applications they bought and the jobs that run in each instance.',
+  description:
+    'Single-tenant finance back-office SaaS. Each B2B customer runs its own instances (demo, UAT, production), with the applications it bought and the jobs that run in each instance.',
   members: {
     ada: 'Owner',
     grace: 'Administrator',
