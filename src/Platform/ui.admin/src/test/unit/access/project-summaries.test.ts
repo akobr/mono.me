@@ -1,8 +1,10 @@
 /* eslint-disable vue/one-component-per-file -- a page with the list, and a parent that leaves and opens it again */
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, ref } from 'vue'
+import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import { createAccessPoint, getAccount } from '@42for.net/2splatform.sdk'
+import { getGetProjectsQueryKey } from '@42for.net/2splatform.sdk/vue-query'
 import { mockHandlers } from '@/mock/all-handlers'
 import { createSeed } from '@/mock/db'
 import { useProjectSummaries } from '@/queries/projects'
@@ -58,7 +60,7 @@ async function mountPages() {
   view.queryClient.setDefaultOptions({ queries: { retry: false, staleTime: 30_000 } })
   shown.value = true
   await settle()
-  return { shown }
+  return { shown, queryClient: view.queryClient }
 }
 
 const description = (key: string) => document.body.querySelector(`[data-key="${key}"]`)?.textContent
@@ -100,14 +102,43 @@ describe('useProjectSummaries', () => {
     expect(lists).toHaveLength(2)
   })
 
+  it('waits for the fetch of a page that opens with a stale list after the projects changed', async () => {
+    const lists = recordLists()
+    const { shown, queryClient } = await mountPages()
+    shown.value = false
+    await settle()
+
+    // More than 30 s later: the page fetches the stale list when it opens, after the projects changed.
+    await queryClient.invalidateQueries({ queryKey: getGetProjectsQueryKey(), refetchType: 'none' })
+    await createProject()
+    shown.value = true
+    await vi.waitFor(() => expect(description('acme.returns')).toBe('Returns of Acme.'))
+    await settle()
+    expect(lists).toHaveLength(2)
+  })
+
   it('asks once for a project the list leaves out', async () => {
+    // Every answer differs, as when someone changes a description meanwhile.
+    let answers = 0
+    server.use(
+      http.get('*/api/v1/access/projects', () =>
+        HttpResponse.json([
+          { Key: 'acme.billing', Role: 'Owner', Description: `Answer ${answers++}.` },
+          { Key: 'acme.shipping', Role: 'Contributor' },
+          { Key: 'northwind.portal', Role: 'Reader' },
+        ]),
+      ),
+    )
     const lists = recordLists()
     await mountPages()
+    expect(description('acme.billing')).toBe('Answer 0.')
 
     // A key without its access point is not listed.
     const session = useSessionStore()
     session.setAccount({ ...session.account!, AccessMap: { ...accessMap, 'acme.gone': 'Reader' } })
     await settle(8)
+    expect(description('acme.billing')).toBe('Answer 1.')
     expect(lists).toHaveLength(2)
+    expect(answers).toBe(2)
   })
 })

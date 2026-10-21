@@ -22,7 +22,9 @@ const listedKeysOf = (projects: ProjectSummary[]) =>
  * The caller's projects with their descriptions, for every role (GET v1/access/projects, 424-78). The list is cached
  * like any read, so it is fetched again when the projects of the session's AccessMap differ from the listed ones:
  * onboarding, a new project or organization, an accepted invitation, a reloaded account, a project left. The check
- * also runs when a page mounts, because the account may have changed while no page showed the list.
+ * also runs when a page mounts, because the account may have changed while no page showed the list. It waits for a
+ * fetch under way (a stale list fetched on mount, a refetch after a save) and compares its answer, so it never
+ * cancels that fetch for another one.
  */
 export function useProjectSummaries() {
   const session = useSessionStore()
@@ -34,9 +36,9 @@ export function useProjectSummaries() {
   // A key without its access point is never listed, so each set of keys asks once.
   let requested: string | undefined
   watch(
-    [() => projectKeysOf(session.accessMap), () => projects.data.value] as const,
-    ([keys, listed]) => {
-      if (listed && keys !== requested && keys !== listedKeysOf(listed)) {
+    [() => projectKeysOf(session.accessMap), () => projects.data.value, () => projects.isFetching.value] as const,
+    ([keys, listed, fetching]) => {
+      if (listed && !fetching && keys !== requested && keys !== listedKeysOf(listed)) {
         requested = keys
         void invalidateByPath(queryClient, '/v1/access/projects')
       }
