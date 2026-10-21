@@ -63,7 +63,7 @@ public sealed class FederatedTokenExchangeServiceTests : IDisposable
         result.Succeeded.ShouldBeTrue();
         result.IssuedTokenType.ShouldBe(OAuthTokenExchange.TokenTypes.AccessToken);
         result.ExpiresIn.ShouldBe(900);
-        result.Scope.ShouldBe("Default.Read Annotation.Read Configuration.Read");
+        result.Scope.ShouldBe("Annotation.Read Configuration.Read");
 
         var token = new JsonWebToken(result.AccessToken);
         token.Subject.ShouldBe(MachineId);
@@ -100,32 +100,53 @@ public sealed class FederatedTokenExchangeServiceTests : IDisposable
     [Fact]
     public async Task ScopeBeyondTheMachine_IsInvalidScope_AfterVerification()
     {
-        var result = await _exchange.ExchangeAsync(Request() with { Scopes = ["Default.Read", "Configuration.Secrets"] });
+        var result = await _exchange.ExchangeAsync(Request() with { Scopes = ["Annotation.Read", "Annotation.Write"] });
 
         result.Error.ShouldBe(OAuthTokenExchange.Errors.InvalidScope);
         result.ErrorDescription.ShouldBe(FederatedTokenExchangeService.ScopeExceedsMachineDescription);
         _signingKeys.Creates.ShouldBe(0);
     }
 
-    // The management scopes of the machine are its scopes too, so a job may ask for one it needs.
+    // The old presets and their strings are gone: they are no scopes of any machine, even one with every scope.
+    [Theory]
+    [InlineData("Default.Read")]
+    [InlineData("Default.ReadWrite")]
+    [InlineData("Annotation.ReadWrite")]
+    [InlineData("Configuration.ReadWrite")]
+    [InlineData("Configuration.Secrets")]
+    [InlineData("AnnotationRead")]
+    [InlineData("annotation.read")]
+    [InlineData("User.Impersonation")]
+    public async Task UnknownScopeString_IsInvalidScope(string scope)
+    {
+        WithScopes([.. MachineScopes.All]);
+
+        var result = await _exchange.ExchangeAsync(Request() with { Scopes = ["Annotation.Read", scope] });
+
+        result.Error.ShouldBe(OAuthTokenExchange.Errors.InvalidScope);
+        result.ErrorDescription.ShouldBe(FederatedTokenExchangeService.ScopeExceedsMachineDescription);
+        _signingKeys.Creates.ShouldBe(0);
+    }
+
+    // A management scope that is stored is a scope of the machine like any other, so a job may ask for one it needs.
     [Fact]
     public async Task ManagementScopeOfTheMachine_CanBeRequested()
     {
-        WithManagementScopes(MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite);
+        WithScopes(MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.ConfigurationTransfer, MachineScope.SchemaWrite);
 
-        var result = await _exchange.ExchangeAsync(Request() with { Scopes = ["Default.Read", "Configuration.Transfer"] });
+        var result = await _exchange.ExchangeAsync(Request() with { Scopes = ["Configuration.Read", "Configuration.Transfer"] });
 
         result.Succeeded.ShouldBeTrue();
-        result.Scope.ShouldBe("Default.Read Configuration.Transfer");
-        new JsonWebToken(result.AccessToken).GetPayloadValue<string>("scope").ShouldBe("Default.Read Configuration.Transfer");
+        result.Scope.ShouldBe("Configuration.Read Configuration.Transfer");
+        new JsonWebToken(result.AccessToken).GetPayloadValue<string>("scope").ShouldBe("Configuration.Read Configuration.Transfer");
     }
 
     [Fact]
     public async Task ManagementScopeTheMachineDoesNotHave_IsInvalidScope()
     {
-        WithManagementScopes(MachineManagementScope.SchemaWrite);
+        WithScopes(MachineScope.ConfigurationRead, MachineScope.SchemaWrite);
 
-        var result = await _exchange.ExchangeAsync(Request() with { Scopes = ["Default.Read", "Configuration.Transfer"] });
+        var result = await _exchange.ExchangeAsync(Request() with { Scopes = ["Configuration.Read", "Configuration.Transfer"] });
 
         result.Error.ShouldBe(OAuthTokenExchange.Errors.InvalidScope);
         result.ErrorDescription.ShouldBe(FederatedTokenExchangeService.ScopeExceedsMachineDescription);
@@ -140,24 +161,51 @@ public sealed class FederatedTokenExchangeServiceTests : IDisposable
         result.Error.ShouldBe(OAuthTokenExchange.Errors.InvalidScope);
     }
 
-    // Without scope, the token gets every scope of the machine: the preset's, then its management scopes in enum order.
+    // Without scope, the token gets every stored scope, management ones included, in enum order.
     [Fact]
-    public async Task WithoutScope_TheTokenCarriesTheManagementScopesToo()
+    public async Task WithoutScope_TheTokenCarriesEveryStoredScope_InEnumOrder()
     {
-        WithManagementScopes(MachineManagementScope.KeyValueManage, MachineManagementScope.ConfigurationTransfer);
+        WithScopes(MachineScope.KeyValueManage, MachineScope.SecretsRead, MachineScope.AnnotationWrite, MachineScope.AnnotationRead, MachineScope.ConfigurationTransfer);
 
         var result = await _exchange.ExchangeAsync(Request());
 
         result.Succeeded.ShouldBeTrue();
-        result.Scope.ShouldBe("Default.Read Annotation.Read Configuration.Read Configuration.Transfer KeyValue.Manage");
+        result.Scope.ShouldBe("Annotation.Read Annotation.Write Secrets.Read Configuration.Transfer KeyValue.Manage");
         new JsonWebToken(result.AccessToken).GetPayloadValue<string>("scope").ShouldBe(result.Scope);
+    }
+
+    [Fact]
+    public async Task WithoutScope_AMachineWithEveryScope_GetsAllEleven()
+    {
+        WithScopes([.. MachineScopes.All]);
+
+        var result = await _exchange.ExchangeAsync(Request());
+
+        result.Succeeded.ShouldBeTrue();
+        result.Scope.ShouldBe(
+            "Annotation.Read Annotation.Write Configuration.Read Configuration.Write Secrets.Read Secrets.Write "
+            + "Configuration.Transfer Schema.Write Template.Write Annotation.Manage KeyValue.Manage");
+    }
+
+    // A document written before the flat scopes reads as a machine without scopes: it gets no token at all.
+    [Fact]
+    public async Task MachineWithoutScopes_IsInvalidScope_WithOrWithoutARequestedScope()
+    {
+        WithScopes();
+
+        var withoutScope = await _exchange.ExchangeAsync(Request());
+        var withScope = await _exchange.ExchangeAsync(Request() with { Scopes = ["Annotation.Read"] });
+
+        withoutScope.Error.ShouldBe(OAuthTokenExchange.Errors.InvalidScope);
+        withScope.Error.ShouldBe(OAuthTokenExchange.Errors.InvalidScope);
+        _signingKeys.Creates.ShouldBe(0);
     }
 
     [Fact]
     public async Task ScopeBeyondTheMachine_WithAMismatchedToken_IsNotAccepted()
     {
         // The scope is compared only after the token matched, so it reveals nothing about the machine.
-        var result = await _exchange.ExchangeAsync(Request(Sign(owner: "666")) with { Scopes = ["Configuration.Secrets"] });
+        var result = await _exchange.ExchangeAsync(Request(Sign(owner: "666")) with { Scopes = ["Secrets.Read"] });
 
         ShouldBeNotAccepted(result);
     }
@@ -328,7 +376,7 @@ public sealed class FederatedTokenExchangeServiceTests : IDisposable
         (await _exchange.ExchangeAsync(Request() with { MachineId = string.Empty })).ErrorDescription.ShouldBe("The parameter client_id is missing.");
         (await _exchange.ExchangeAsync(Request() with { SubjectTokenType = "urn:ietf:params:oauth:token-type:saml2" })).ErrorDescription.ShouldBe("The subject token type is not supported.");
         (await _exchange.ExchangeAsync(Request() with { RequestedTokenType = OAuthTokenExchange.TokenTypes.IdToken })).ErrorDescription.ShouldBe("The requested token type is not supported.");
-        (await _exchange.ExchangeAsync(Request() with { Scopes = ["Default.Read Annotation.Read"] })).ErrorDescription.ShouldBe("The parameter scope is not valid.");
+        (await _exchange.ExchangeAsync(Request() with { Scopes = ["Annotation.Read Configuration.Read"] })).ErrorDescription.ShouldBe("The parameter scope is not valid.");
 
         var result = await _exchange.ExchangeAsync(Request() with { Organization = "org1.other" });
         ShouldBeNotAccepted(result);
@@ -364,17 +412,17 @@ public sealed class FederatedTokenExchangeServiceTests : IDisposable
             Id = MachineId,
             ObjectId = MachineId,
             AccessKey = string.Empty,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             AnnotationKey = "unit.service",
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = [new FederationRule { Issuer = "github", Audience = Audience, Subject = "repo:acme/app:*" }],
         };
     }
 
-    private void WithManagementScopes(params MachineManagementScope[] managementScopes)
+    private void WithScopes(params MachineScope[] scopes)
     {
         _access.Setup(service => service.GetMachineAccessAsync(Organization, Project, MachineId))
-            .ReturnsAsync(Machine() with { ManagementScopes = managementScopes });
+            .ReturnsAsync(Machine() with { Scopes = scopes });
     }
 
     private FederatedIssuer GitHubIssuer()

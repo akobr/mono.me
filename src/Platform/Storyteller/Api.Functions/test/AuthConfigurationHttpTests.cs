@@ -25,7 +25,7 @@ public class AuthConfigurationHttpTests
         configuration.Provider.ShouldBe("EntraId");
         configuration.ClientId.ShouldBe("client-id");
         configuration.TenantId.ShouldBe("common");
-        configuration.Scopes.ShouldBe(["api://client-id/User.Impersonation", "api://client-id/Default.ReadWrite"]);
+        configuration.Scopes.ShouldBe(["api://client-id/User.Impersonation"]);
         configuration.AuthKitDomain.ShouldBeNull();
     }
 
@@ -75,7 +75,7 @@ public class AuthConfigurationHttpTests
                 ApiKey = "sk_test_secret",
                 AuthKitDomain = "https://example.authkit.app",
                 MachineOrganizationId = "org_machines",
-                PermissionMap = new Dictionary<string, string> { ["storyteller:admin"] = "Configuration.Secrets" },
+                PermissionMap = new Dictionary<string, string> { ["storyteller:admin"] = "Secrets.Read" },
             },
         });
 

@@ -17,7 +17,9 @@ public record class MachineAccessEntity
 
     public required string AccessKey { get; init; }
 
-    public required MachineAccessScope Scope { get; init; }
+    // The scopes of the machine, as created. Not required: a document stored before it was kept has none, and reads
+    // as a machine without scopes instead of failing every point read.
+    public List<MachineScope>? Scopes { get; init; }
 
     public string? AnnotationKey { get; init; }
 
@@ -48,9 +50,6 @@ public record class MachineAccessEntity
 
     // Federated only: the rules a platform token must match.
     public List<FederationRule>? FederationRules { get; init; }
-
-    // Granted on top of Scope, distinct and in enum order. Null for none, and on machines created before it was stored.
-    public List<MachineManagementScope>? ManagementScopes { get; init; }
 
     [JsonProperty("_etag")]
     [JsonPropertyName("_etag")]

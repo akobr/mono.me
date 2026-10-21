@@ -459,7 +459,7 @@ public sealed class SubjectTokenVerifierTests : IDisposable
             Id = id,
             ObjectId = id,
             AccessKey = string.Empty,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = rules,
         };

@@ -7,7 +7,7 @@ internal sealed class RecordingTokenExchange : IFederatedTokenExchange
     public List<FederatedTokenExchangeRequest> Requests { get; } = [];
 
     public FederatedTokenExchangeResult Result { get; set; } =
-        FederatedTokenExchangeResult.Success("storyteller-token", OAuthTokenExchange.TokenTypes.AccessToken, 900, "Default.Read Annotation.Read");
+        FederatedTokenExchangeResult.Success("storyteller-token", OAuthTokenExchange.TokenTypes.AccessToken, 900, "Annotation.Read Configuration.Read");
 
     public Task<FederatedTokenExchangeResult> ExchangeAsync(FederatedTokenExchangeRequest request, CancellationToken cancellationToken = default)
     {

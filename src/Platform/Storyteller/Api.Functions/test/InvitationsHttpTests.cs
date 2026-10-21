@@ -173,6 +173,28 @@ public class InvitationsHttpTests
         service.LastCreated.ShouldBe(new InvitationCreate { Email = "ada@example.com", Role = AccountRole.Contributor, ExpiresInDays = 3 });
     }
 
+    // Invitations are for users (spec 7.4): a machine is refused in every build, also one whose credentials carry every
+    // scope and User.Impersonation, before the service is asked.
+    [Fact]
+    public async Task InvitationRoutes_Machine_IsAccessDeniedInEveryBuild()
+    {
+        var service = new RecordingInvitations();
+        var http = CreateHttp(service);
+        var body = FunctionTestDoubles.ToJsonBody(new InvitationCreate { Email = "ada@example.com", Role = AccountRole.Owner });
+
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetInvitations(UserOnlyRoutes.Machine(), "acme.billing"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.CreateInvitation(UserOnlyRoutes.Machine("POST", body), "acme.billing"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.ResendInvitation(UserOnlyRoutes.Machine("POST"), "acme.billing", "inv-1"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.RevokeInvitation(UserOnlyRoutes.Machine("DELETE"), "acme.billing", "inv-1"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetMyInvitations(UserOnlyRoutes.Machine()));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.AcceptInvitation(UserOnlyRoutes.Machine("POST"), "inv-1"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.DeclineInvitation(UserOnlyRoutes.Machine("POST"), "inv-1"));
+
+        service.Calls.ShouldBeEmpty();
+        service.LastCreated.ShouldBeNull();
+        service.LastInvitee.ShouldBeNull();
+    }
+
     private static InvitationsHttp CreateHttp(RecordingInvitations service)
     {
         return new InvitationsHttp(service, Options.Create(new UserAuthenticationOptions()), FunctionTestDoubles.ApiJsonOptions);

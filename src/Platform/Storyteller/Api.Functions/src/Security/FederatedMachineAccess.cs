@@ -7,8 +7,10 @@ using Microsoft.IdentityModel.Tokens;
 namespace _42.Platform.Storyteller.Api.Security;
 
 // A Storyteller token is only a signature over the machine id, its project and scopes. Every call also reads the
-// stored machine, so deleting it cuts the machine off at once, and a token signed with a stolen key can neither act
-// as a machine of another kind nor exceed the stored scope. The project policy is MachineCredentialPolicy's part.
+// stored machine, so deleting it cuts the machine off at once, and a token signed with a stolen key cannot act as a
+// machine of another kind. Its scopes can only narrow the stored ones: every operation checks its scopes stored on the
+// machine and carried by the token (HttpRequestDataExtensions), so a carried scope that is not stored grants nothing.
+// The project policy is MachineCredentialPolicy's part.
 public static class FederatedMachineAccess
 {
     public static bool IsFederated(FunctionContext context)
@@ -44,18 +46,6 @@ public static class FederatedMachineAccess
         if (machine.CredentialKind != MachineCredentialKind.Federated)
         {
             throw new SecurityTokenException($"The machine {machineId} of the project {organization}.{project} is {machine.CredentialKind:G}, not Federated.");
-        }
-
-        // The same scopes the exchange gives out: the preset's and the management scopes of the machine.
-        var granted = MachineAccessScopes.Get(machine.Scope, machine.ManagementScopes);
-        var excess = request.GetScopes()
-            .Where(scope => !granted.Contains(scope, StringComparer.Ordinal))
-            .Order(StringComparer.Ordinal)
-            .ToList();
-
-        if (excess.Count > 0)
-        {
-            throw new SecurityTokenException($"The Storyteller token of the machine {machineId} carries scopes the machine doesn't have ({string.Join(", ", excess)}).");
         }
 
         return machine;

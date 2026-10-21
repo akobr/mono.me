@@ -15,8 +15,8 @@ public class AzureAdMachineAccessRegistrationTests
         ["Auth:AuthKit:ClientId"] = "client_123",
         ["Auth:TenantId"] = "tenant-id",
         ["Auth:ClientId"] = "api-client",
-        ["Auth:AppRoles:DefaultRead"] = "008029ec-407f-48b2-8618-f38b8e03eebf",
-        ["Auth:AppRoles:DefaultReadWrite"] = "6eb2cfb3-a936-4077-8a58-620896871d32",
+        ["Auth:AppRoles:AnnotationRead"] = "008029ec-407f-48b2-8618-f38b8e03eebf",
+        ["Auth:AppRoles:AnnotationWrite"] = "6eb2cfb3-a936-4077-8a58-620896871d32",
         ["MachineAuth:AzureAd:TenantId"] = "machine-tenant",
     };
 
@@ -36,34 +36,95 @@ public class AzureAdMachineAccessRegistrationTests
     }
 
     [Fact]
+    public async Task AddAzureAdMachineAccess_WithoutAnyAppRole_Starts()
+    {
+        // Creation checks the roles of the requested scopes; the start needs none.
+        var settings = Settings
+            .Where(setting => !setting.Key.StartsWith("Auth:AppRoles:", StringComparison.Ordinal))
+            .ToDictionary(setting => setting.Key, setting => setting.Value);
+        using var host = BuildHost(settings);
+
+        await host.StartAsync();
+
+        host.Services.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value.AppRoles.ShouldBeEmpty();
+
+        await host.StopAsync();
+    }
+
+    [Fact]
     public async Task AddAzureAdMachineAccess_MissingSettings_FailsWhenTheHostStarts()
     {
         var settings = new Dictionary<string, string?>(Settings)
         {
             ["MachineAuth:AzureAd:TenantId"] = string.Empty,
-            ["Auth:AppRoles:DefaultReadWrite"] = "not-a-guid",
+            ["Auth:AppRoles:AnnotationWrite"] = "not-a-guid",
         };
         using var host = BuildHost(settings);
 
         var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
 
         exception.Message.ShouldContain("MachineAuth:AzureAd:TenantId");
-        exception.Message.ShouldContain("Auth:AppRoles:DefaultReadWrite");
+        exception.Message.ShouldContain("Auth:AppRoles:AnnotationWrite");
     }
 
     [Fact]
-    public async Task AddAzureAdMachineAccess_ManagementRoles_AreOptionalButMustBeIdsWhenSet()
+    public async Task AddAzureAdMachineAccess_ScopeRoles_AreOptionalButMustBeIdsWhenSet()
     {
         var settings = new Dictionary<string, string?>(Settings)
         {
             ["Auth:AppRoles:ConfigurationTransfer"] = "1b2c3d4e-5f60-4718-892a-0b1c2d3e4f50",
             ["Auth:AppRoles:SchemaWrite"] = "not-a-guid",
+            ["Auth:AppRoles:SecretsWrite"] = "secrets-write",
+            ["Auth:AppRoles:TemplateWrite"] = string.Empty,
         };
         using var host = BuildHost(settings);
 
         var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
 
-        exception.Failures.ShouldBe(["Auth:AppRoles:SchemaWrite must be the ID of the API app role Schema.Write when it is set."]);
+        exception.Failures.ShouldBe(
+            [
+                "Auth:AppRoles:SecretsWrite must be the ID of the API app role Secrets.Write when it is set.",
+                "Auth:AppRoles:SchemaWrite must be the ID of the API app role Schema.Write when it is set.",
+            ]);
+    }
+
+    [Fact]
+    public async Task AddAzureAdMachineAccess_TwoScopesWithOneRole_FailsWhenTheHostStarts()
+    {
+        // The same ID in another spelling is still the same role.
+        var settings = new Dictionary<string, string?>(Settings)
+        {
+            ["Auth:AppRoles:AnnotationWrite"] = "008029EC-407F-48B2-8618-F38B8E03EEBF",
+            ["Auth:AppRoles:ConfigurationRead"] = "1b2c3d4e-5f60-4718-892a-0b1c2d3e4f50",
+            ["Auth:AppRoles:KeyValueManage"] = "1b2c3d4e-5f60-4718-892a-0b1c2d3e4f50",
+        };
+        using var host = BuildHost(settings);
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
+
+        exception.Failures.ShouldBe(
+            [
+                "Auth:AppRoles:AnnotationRead and Auth:AppRoles:AnnotationWrite share the role ID 008029ec-407f-48b2-8618-f38b8e03eebf; every scope needs an app role of its own.",
+                "Auth:AppRoles:ConfigurationRead and Auth:AppRoles:KeyValueManage share the role ID 1b2c3d4e-5f60-4718-892a-0b1c2d3e4f50; every scope needs an app role of its own.",
+            ]);
+    }
+
+    [Theory]
+    [InlineData("DefaultRead", "Auth:AppRoles:AnnotationRead, Auth:AppRoles:ConfigurationRead")]
+    [InlineData("DefaultReadWrite", "Auth:AppRoles:AnnotationRead, Auth:AppRoles:AnnotationWrite, Auth:AppRoles:ConfigurationRead, Auth:AppRoles:ConfigurationWrite")]
+    [InlineData("SecretsReadWrite", "Auth:AppRoles:SecretsRead, Auth:AppRoles:SecretsWrite")]
+    public async Task AddAzureAdMachineAccess_RemovedPresetRole_FailsWhenTheHostStarts(string key, string replacements)
+    {
+        var settings = new Dictionary<string, string?>(Settings)
+        {
+            [$"Auth:AppRoles:{key}"] = "9a8b7c6d-5e4f-4321-8fed-cba987654321",
+        };
+        using var host = BuildHost(settings);
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
+
+        exception.Failures.ShouldBe(
+            [$"Auth:AppRoles:{key} was removed: Entra ID machines get one app role per scope. Set {replacements} instead."]);
     }
 
     [Fact]

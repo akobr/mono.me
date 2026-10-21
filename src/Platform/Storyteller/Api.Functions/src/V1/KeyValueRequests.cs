@@ -8,46 +8,67 @@ namespace _42.Platform.Storyteller.Api.V1;
 // The authorization rules shared by the key/value endpoints (spec section 24).
 internal static class KeyValueAuthorization
 {
-    public static readonly string[] ReadScopes = [Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write];
-
-    public static readonly string[] WriteScopes = [Scopes.Configuration.Write, Scopes.Default.Write];
-
     // Administrators only, and never a machine: the policy, purges, permanent deletes, the audit trail and usage.
     public static async Task CheckAdministratorAsync(HttpRequestData request, IAccessService access, string organization, string project)
     {
-        if (request.IsApplicationIdentity())
-        {
-            throw new AccessDeniedException("Only a user with the Administrator role may call this operation; machines cannot.");
-        }
-
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(access, organization, project, AccountRole.Administrator);
+        request.EnsureUser("Only a user with the Administrator role may call this operation; machines cannot.");
+        await request.CheckUserAccessToProjectAsync(access, organization, project, AccountRole.Administrator);
     }
 
-    // An explicit request for secret values (a reveal, an export with secrets) by a caller without the rights.
-    public static void EnsureSecretRights(SecretRights rights)
+    // An explicit request for secret values (a reveal, an export with secrets) by a caller without the read rights.
+    public static void EnsureSecretReadRights(SecretRights rights)
     {
         if (rights.CanReadSecrets)
         {
             return;
         }
 
-        throw rights.IsWithheldByMtls
-            ? KeyValueErrors.MtlsRequired()
-            : new AccessDeniedException("The caller has no rights to the secrets of the project.");
+        throw Refused(rights.IsReadWithheldByMtls);
+    }
+
+    // A write that is all about secrets (protect) by a caller without the write rights; the service checks the same bit.
+    public static void EnsureSecretWriteRights(SecretRights rights)
+    {
+        if (rights.CanWriteSecrets)
+        {
+            return;
+        }
+
+        throw Refused(rights.IsWriteWithheldByMtls);
+    }
+
+    // A read the service may refuse for a secret it would reveal (the diff of a secret's text).
+    public static Task<T> UnderMtlsReadRuleAsync<T>(SecretRights rights, Func<Task<T>> action)
+    {
+        return UnderMtlsRuleAsync(rights.IsReadWithheldByMtls, action);
+    }
+
+    // A write the service may refuse for a secret key or item (set, delete, import).
+    public static Task<T> UnderMtlsWriteRuleAsync<T>(SecretRights rights, Func<Task<T>> action)
+    {
+        return UnderMtlsRuleAsync(rights.IsWriteWithheldByMtls, action);
     }
 
     // The service refuses a secret with AccessDenied; when the only reason is the missing mTLS, the client learns that.
-    public static async Task<T> UnderMtlsRuleAsync<T>(SecretRights rights, Func<Task<T>> action)
+    // Only the right of the direction counts: a machine without it would not get it over mTLS either.
+    private static async Task<T> UnderMtlsRuleAsync<T>(bool isWithheldByMtls, Func<Task<T>> action)
     {
         try
         {
             return await action();
         }
-        catch (AccessDeniedException exception) when (rights.IsWithheldByMtls && exception.ErrorCode == ErrorCodes.AccessDenied)
+        catch (AccessDeniedException exception) when (isWithheldByMtls && exception.ErrorCode == ErrorCodes.AccessDenied)
         {
             throw KeyValueErrors.MtlsRequired();
         }
+    }
+
+    // When the right was withheld only for the missing mTLS, the client learns that.
+    private static AccessDeniedException Refused(bool isWithheldByMtls)
+    {
+        return isWithheldByMtls
+            ? KeyValueErrors.MtlsRequired()
+            : new AccessDeniedException("The caller has no rights to the secrets of the project.");
     }
 }
 

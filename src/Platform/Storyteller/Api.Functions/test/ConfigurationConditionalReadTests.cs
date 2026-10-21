@@ -211,12 +211,7 @@ public class ConfigurationConditionalReadTests
     [Fact]
     public async Task GetConfigurationResolved_NoSecretRights_IsPrivateWithoutTheWithheldHeader()
     {
-        // a DEV_AUTH build gives every caller the secrets scope, so only Release has a caller without secret rights
-        if (HttpRequestDataExtensions.IsDevelopmentAuthentication)
-        {
-            return;
-        }
-
+        // a machine without Secrets.Read has no secret rights in every build
         var (http, _) = Create(() => Stored(), Resolve("db-1"));
         var reading = Machine(mtls: true);
         var neither = WithHttpContext(KeyValueRequests.Machine(mtls: false, roles: [Scopes.Configuration.Read]), ifNoneMatch: null);
@@ -228,6 +223,27 @@ public class ConfigurationConditionalReadTests
         Headers(neither).CacheControl.ToString().ShouldBe("private, no-cache");
         Headers(neither).ContainsKey(SecretRights.WithheldHeader).ShouldBeFalse();
         Headers(neither).ETag.ToString().ShouldNotBe(Headers(reading).ETag.ToString());
+    }
+
+    // A read reports only the read right withheld: mTLS would not let a machine with Secrets.Write alone read secrets,
+    // so it gets no withheld header and the tag of a machine without the secrets scopes.
+    [Fact]
+    public async Task GetConfigurationResolved_OnlyTheWriteRightWithheld_IsPrivateWithoutTheWithheldHeader()
+    {
+        var (http, _) = Create(() => Stored());
+        var writing = WithHttpContext(KeyValueRequests.Machine(mtls: false, roles: [Scopes.Configuration.Read, Scopes.Secrets.Write]), ifNoneMatch: null);
+        var neither = WithHttpContext(KeyValueRequests.Machine(mtls: false, roles: [Scopes.Configuration.Read]), ifNoneMatch: null);
+        var withheld = Machine(mtls: false);
+
+        await http.GetConfigurationResolved(writing, Org, Project, View, Key);
+        await http.GetConfigurationResolved(neither, Org, Project, View, Key);
+        await http.GetConfigurationResolved(withheld, Org, Project, View, Key);
+
+        Headers(writing).ContainsKey(SecretRights.WithheldHeader).ShouldBeFalse();
+        Headers(writing).CacheControl.ToString().ShouldBe("private, no-cache");
+        Headers(writing).ETag.ToString().ShouldBe(Headers(neither).ETag.ToString());
+        Headers(withheld)[SecretRights.WithheldHeader].ToString().ShouldBe(SecretRights.WithheldByMtls);
+        Headers(withheld).ETag.ToString().ShouldNotBe(Headers(writing).ETag.ToString());
     }
 
     [Fact]
@@ -445,7 +461,7 @@ public class ConfigurationConditionalReadTests
         return WithHttpContext(KeyValueRequests.User(), ifNoneMatch);
     }
 
-    // Secret rights come from machines, because a DEV_AUTH build gives every user secret rights:
+    // Secret rights come from machines, because a DEV_AUTH build skips the role check that gives users secret rights:
     // with a certificate the machine reads secrets, without one they are withheld (the project requires mTLS).
     private static TestHttpRequestData Machine(bool mtls, string? ifNoneMatch = null)
     {
@@ -471,7 +487,7 @@ public class ConfigurationConditionalReadTests
 
     private static SecretRights Rights(bool canReadSecrets, bool withheld)
     {
-        return new SecretRights(new KeyValueCaller(AuditActor.System, canReadSecrets, canReadSecrets), withheld);
+        return new SecretRights(new KeyValueCaller(AuditActor.System, canReadSecrets, canReadSecrets), IsReadWithheldByMtls: withheld, IsWriteWithheldByMtls: withheld);
     }
 
     private static Configuration Stored(ulong version = 3, string? hash = "0badc0de", string sender = "billing@example.com", DateTimeOffset? modified = null)

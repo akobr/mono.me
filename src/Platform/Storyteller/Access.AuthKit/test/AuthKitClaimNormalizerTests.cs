@@ -75,17 +75,17 @@ public class AuthKitClaimNormalizerTests
             [
                 new("sub", "user_01"),
                 new("permissions", "storyteller:annotation-read"),
-                new("permissions", "storyteller:admin"),
+                new("permissions", "storyteller:configuration-write"),
                 new("permissions", "not-mapped"),
             ],
             defaultScopes: ["User.Impersonation", "Annotation.Read"],
             permissionMap: new Dictionary<string, string>
             {
                 ["storyteller:annotation-read"] = "Annotation.Read",
-                ["storyteller:admin"] = "Default.ReadWrite  Configuration.Secrets",
+                ["storyteller:configuration-write"] = " Configuration.Write ",
             });
 
-        Values(result, "scp").ShouldBe(["User.Impersonation Annotation.Read Default.ReadWrite Configuration.Secrets"]);
+        Values(result, "scp").ShouldBe(["User.Impersonation Annotation.Read Configuration.Write"]);
     }
 
     [Fact]
@@ -112,10 +112,10 @@ public class AuthKitClaimNormalizerTests
         var result = Normalize(
             [
                 new("sub", "user_01"),
-                new("scp", "Configuration.Secrets"),
-                new("roles", "Default.ReadWrite"),
-                new(ClaimTypes.Role, "Default.ReadWrite"),
-                new("http://schemas.microsoft.com/identity/claims/scope", "Configuration.Secrets"),
+                new("scp", "Secrets.Read"),
+                new("roles", "Annotation.Write"),
+                new(ClaimTypes.Role, "Annotation.Write"),
+                new("http://schemas.microsoft.com/identity/claims/scope", "Secrets.Write"),
                 new("azp", "client_01"),
             ],
             defaultScopes: ["User.Impersonation"]);

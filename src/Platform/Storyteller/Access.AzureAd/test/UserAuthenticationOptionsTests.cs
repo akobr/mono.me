@@ -35,27 +35,27 @@ public class UserAuthenticationOptionsTests
             ["Auth:Provider"] = "AuthKit",
             ["Auth:TenantId"] = "tenant",
             ["Auth:ClientId"] = "client",
-            ["Auth:AppRoles:DefaultRead"] = "role-read",
-            ["Auth:AppRoles:DefaultReadWrite"] = "role-write",
+            ["Auth:AppRoles:AnnotationRead"] = "role-read",
+            ["Auth:AppRoles:AnnotationWrite"] = "role-write",
             ["Auth:AuthKit:ClientId"] = "client_123",
             ["Auth:AuthKit:Issuer"] = "https://auth.example/",
             ["Auth:AuthKit:Audience"] = "https://storyteller.42for.net",
             ["Auth:AuthKit:AuthKitDomain"] = "https://auth.example",
             ["Auth:AuthKit:DefaultUserScopes:0"] = "User.Impersonation",
-            ["Auth:AuthKit:DefaultUserScopes:1"] = "Default.Read",
+            ["Auth:AuthKit:DefaultUserScopes:1"] = "Annotation.Read",
             ["Auth:AuthKit:PermissionMap:annotation-read"] = "Annotation.Read",
         });
 
         options.Provider.ShouldBe(IdentityProviderKind.AuthKit);
         options.TenantId.ShouldBe("tenant");
         options.ClientId.ShouldBe("client");
-        options.AppRoles["DefaultRead"].ShouldBe("role-read");
-        options.AppRoles["DefaultReadWrite"].ShouldBe("role-write");
+        options.AppRoles["AnnotationRead"].ShouldBe("role-read");
+        options.AppRoles["AnnotationWrite"].ShouldBe("role-write");
         options.AuthKit.ClientId.ShouldBe("client_123");
         options.AuthKit.Issuer.ShouldBe("https://auth.example/");
         options.AuthKit.Audience.ShouldBe("https://storyteller.42for.net");
         options.AuthKit.AuthKitDomain.ShouldBe("https://auth.example");
-        options.AuthKit.DefaultUserScopes.ShouldBe(["User.Impersonation", "Default.Read"]);
+        options.AuthKit.DefaultUserScopes.ShouldBe(["User.Impersonation", "Annotation.Read"]);
         options.AuthKit.PermissionMap["annotation-read"].ShouldBe("Annotation.Read");
     }
 
@@ -142,7 +142,7 @@ public class UserAuthenticationOptionsTests
             ["Auth:Provider"] = "EntraId",
             ["Auth:TenantId"] = "tenant-id",
             ["Auth:ClientId"] = "client-id",
-            ["Auth:AppRoles:DefaultRead"] = "role-read",
+            ["Auth:AppRoles:AnnotationRead"] = "role-read",
         });
 
         await host.StartAsync();
@@ -151,7 +151,7 @@ public class UserAuthenticationOptionsTests
         options.Provider.ShouldBe(IdentityProviderKind.EntraId);
         options.TenantId.ShouldBe("tenant-id");
         options.ClientId.ShouldBe("client-id");
-        options.AppRoles["DefaultRead"].ShouldBe("role-read");
+        options.AppRoles["AnnotationRead"].ShouldBe("role-read");
         host.Services.GetRequiredService<IBearerTokenValidator>().ShouldBeOfType<EntraIdBearerTokenValidator>();
         host.Services.GetRequiredService<IBearerClaimsNormalizer>().ShouldBeOfType<EntraIdClaimNormalizer>();
         host.Services.GetService<IUserProfileResolver>().ShouldBeNull();

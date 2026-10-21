@@ -26,7 +26,8 @@ public partial class AnnotationsHttp
     [OpenApiParameter(Definitions.Parameters.DeletionId, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = "Only what one delete removed.")]
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationsResponse), Description = "One page of deleted annotations.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenAnnotationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetDeletedAnnotations(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Annotations.V1.Deleted)]
@@ -38,8 +39,7 @@ public partial class AnnotationsHttp
         [FromQuery] string? deletionId = null,
         [FromQuery] string? continuationToken = null)
     {
-        request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Reader, MachineScope.AnnotationRead);
 
         var response = await _annotations.GetDeletedAnnotationsAsync(organization, project, view, roots, deletionId, continuationToken);
         return new OkObjectResult(response);
@@ -56,7 +56,8 @@ public partial class AnnotationsHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Annotation), Description = "The deleted annotation.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key is not valid (InvalidKey).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The annotation is not deleted, or does not exist.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenAnnotationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetDeletedAnnotation(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Annotations.V1.DeletedAnnotation)]
@@ -66,8 +67,7 @@ public partial class AnnotationsHttp
         string view,
         string key)
     {
-        request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Reader, MachineScope.AnnotationRead);
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {
@@ -88,7 +88,8 @@ public partial class AnnotationsHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AnnotationKeysRequest), Description = "Up to 100 annotation keys.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<Annotation>), Description = "The deleted annotations among the keys; active and unknown keys are left out.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No keys, more than 100 keys, or an invalid key (InvalidKey).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenAnnotationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> FindDeletedAnnotations(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Annotations.V1.DeletedLookup)]
@@ -97,11 +98,10 @@ public partial class AnnotationsHttp
         string project,
         string view)
     {
-        request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
         var (model, invalidBody) = await request.ReadJsonBodyAsync<AnnotationKeysRequest>(_bodyJsonOptions, "an annotation lookup request", RequestBodyLimits.AnnotationKeys, ErrorCodes.InvalidKey);
 
         // The keys of the body are authorized before any 400 of the body; a body that cannot be read names no key.
-        await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? []);
+        await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Reader, MachineScope.AnnotationRead);
 
         if (invalidBody is not null)
         {
@@ -127,7 +127,7 @@ public partial class AnnotationsHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AnnotationRestoreRequest), Description = "Up to 100 annotation keys, and whether their descendants are restored too.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationRestoreResult), Description = "The restored and created annotations, ancestors first, and the keys that failed.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No keys, more than 100 keys, or an invalid key (InvalidKey).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> RestoreAnnotations(
@@ -137,11 +137,10 @@ public partial class AnnotationsHttp
         string project,
         string view)
     {
-        request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
         var (model, invalidBody) = await request.ReadJsonBodyAsync<AnnotationRestoreRequest>(_bodyJsonOptions, "an annotation restore request", RequestBodyLimits.AnnotationKeys, ErrorCodes.InvalidKey);
 
         // The keys of the body are authorized before any 400 of the body; a body that cannot be read names no key.
-        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Contributor, MachineManagementScope.AnnotationManage);
+        var restriction = await request.CheckAccessToAnnotationsAsync(_access, organization, project, model?.Keys ?? [], AccountRole.Contributor, MachineScope.AnnotationWrite, MachineScope.AnnotationManage);
 
         if (invalidBody is not null)
         {
@@ -180,7 +179,8 @@ public partial class AnnotationsHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key is not valid (InvalidKey).")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The annotation does not exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The annotation is not deleted (AnnotationNotDeleted), or a descendant was restored meanwhile (Conflict).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PurgeAnnotation(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.Annotations.V1.DeletedAnnotation)]
@@ -190,15 +190,9 @@ public partial class AnnotationsHttp
         string view,
         string key)
     {
-        request.CheckScope(Scopes.Annotation.Write, Scopes.Default.Write);
-
-        // machine access is checked per project without roles, so a permanent delete is for users only
-        if (request.TryGetApplicationIdentity(out _))
-        {
-            throw new AccessDeniedException("A permanent delete needs a user with the Administrator role.");
-        }
-
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
+        // machines have no role, so a permanent delete is for users only
+        request.EnsureUser("A permanent delete needs a user with the Administrator role.");
+        await request.CheckUserAccessToProjectAsync(_access, organization, project, AccountRole.Administrator);
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {
@@ -220,7 +214,8 @@ public partial class AnnotationsHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AnnotationHistory), Description = "The history of the annotation.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key is not valid (InvalidKey).")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The annotation does not exist or was deleted permanently.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Annotation.Read}, {Scopes.Annotation.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenAnnotationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetAnnotationHistory(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Annotations.V1.History)]
@@ -230,8 +225,7 @@ public partial class AnnotationsHttp
         string view,
         string key)
     {
-        request.CheckScope(Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write);
-        await request.CheckAccessToAnnotationAsync(_access, organization, project, key);
+        await request.CheckAccessToAnnotationAsync(_access, organization, project, key, AccountRole.Reader, MachineScope.AnnotationRead);
 
         if (!AnnotationKey.TryParse(key, out var annotationKey))
         {

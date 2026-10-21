@@ -107,7 +107,8 @@ public class FederationHttp
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<FederatedIssuer>), Description = "The trusted issuers of the project, ordered by name.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetFederatedIssuers(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.FederatedIssuers)]
@@ -115,8 +116,7 @@ public class FederationHttp
         string organization,
         string project)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         var issuers = await _issuerStore.ListAsync(organization, project, request.FunctionContext.CancellationToken);
         return new OkObjectResult(issuers);
@@ -131,7 +131,8 @@ public class FederationHttp
     [OpenApiParameter(Definitions.Parameters.Name, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.FederatedIssuerName)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(FederatedIssuer), Description = "The trusted issuer.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The project has no trusted issuer of that name.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetFederatedIssuer(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.FederatedIssuer)]
@@ -140,8 +141,7 @@ public class FederationHttp
         string project,
         string name)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         var issuer = await _issuerStore.GetAsync(organization, project, name, request.FunctionContext.CancellationToken);
 
@@ -161,7 +161,8 @@ public class FederationHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(FederatedIssuer), Description = "The stored trusted issuer.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The issuer is not valid, its Issuer would change, or the project already has 20 trusted issuers (ErrorCode InvalidFederation).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "Federation rules of machines still reference the name of a deleted issuer (ErrorCode FederatedIssuerInUse); the message names up to 10 machines.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutFederatedIssuer(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.FederatedIssuer)]
@@ -170,8 +171,7 @@ public class FederationHttp
         string project,
         string name)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
         var cancellationToken = request.FunctionContext.CancellationToken;
         var (issuer, invalidBody) = await request.ReadJsonBodyAsync<FederatedIssuer>(_bodyJsonOptions, "a trusted issuer", RequestBodyLimits.FederatedIssuer, ErrorCodes.InvalidFederation);
 
@@ -229,7 +229,8 @@ public class FederationHttp
     [OpenApiParameter(Definitions.Parameters.Name, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.FederatedIssuerName)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The project has no trusted issuer of that name.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteFederatedIssuer(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.Access.V1.FederatedIssuer)]
@@ -238,8 +239,7 @@ public class FederationHttp
         string project,
         string name)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
 
         var deleted = await _issuerStore.DeleteAsync(organization, project, name, request.FunctionContext.CancellationToken);
 
@@ -249,7 +249,7 @@ public class FederationHttp
     }
 
     [Function(nameof(PutMachineFederationRules))]
-    [OpenApiOperation(Definitions.RouteIds.Access.SetMachineFederationRules, Definitions.Tags.Access, Description = "Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; Administrator for a machine with management scopes.")]
+    [OpenApiOperation(Definitions.RouteIds.Access.SetMachineFederationRules, Definitions.Tags.Access, Description = "Replaces the federation rules of a Federated machine; they apply to new token exchanges. Contributor; ContributorWithSecrets for a machine with a Secrets scope, Administrator for one with a management scope.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
@@ -260,8 +260,8 @@ public class FederationHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A rule is not valid (ErrorCode InvalidFederation), or the machine is not Federated (ErrorCode MachineNotFederated).")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine access doesn't exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The machine was changed concurrently while its rules were replaced (ErrorCode Conflict); reload it and retry.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineScopes)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutMachineFederationRules(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.MachineFederationRules)]
@@ -270,8 +270,7 @@ public class FederationHttp
         string project,
         string id)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
         var cancellationToken = request.FunctionContext.CancellationToken;
 
         if (!MachineIds.IsValid(id))
@@ -279,8 +278,8 @@ public class FederationHttp
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
 
-        // The rules decide which workload gets the machine's tokens, management scopes included.
-        await AccessHttp.EnsureAdministratorForManagementScopesAsync(request, _accessService, organization, project, id);
+        // The rules decide which workload gets the machine's tokens, and with them its scopes.
+        await AccessHttp.EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
 
         var (rules, invalidBody) = await request.ReadJsonBodyAsync<List<FederationRule>>(_bodyJsonOptions, "a list of federation rules", RequestBodyLimits.FederationRules, ErrorCodes.InvalidFederation);
 

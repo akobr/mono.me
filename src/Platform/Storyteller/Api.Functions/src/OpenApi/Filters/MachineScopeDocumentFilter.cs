@@ -8,16 +8,16 @@ namespace _42.Platform.Storyteller.Api.OpenApi.Filters;
 
 /// <summary>
 /// The OpenAPI generator inlines every enum and gives it its first value as the default. Inline, NSwag names an enum
-/// after each <c>ManagementScopes</c> list of <c>MachineAccess</c> and <c>MachineAccessCreate</c>, and Orval and Zod
-/// give every item <c>ConfigurationTransfer</c> as its default, although a management scope is only ever granted on
-/// purpose. The items reference a shared <c>MachineManagementScope</c> schema instead, without a default, as
+/// after each <c>Scopes</c> list of <c>MachineAccess</c> and <c>MachineAccessCreate</c>, and Orval and Zod give every
+/// item <c>AnnotationRead</c> as its default, although a scope is only ever granted on purpose. The items reference a
+/// shared <c>MachineScope</c> schema instead, with all its values and without a default, as
 /// <see cref="MachineCredentialKindDocumentFilter"/> does for <c>EnabledCredentialKinds</c>.
 /// </summary>
-public class MachineManagementScopeDocumentFilter : IDocumentFilter
+public class MachineScopeDocumentFilter : IDocumentFilter
 {
-    public const string SchemaName = nameof(MachineManagementScope);
+    public const string SchemaName = nameof(MachineScope);
 
-    private const string ManagementScopesProperty = nameof(MachineAccess.ManagementScopes);
+    private const string ScopesProperty = nameof(MachineAccess.Scopes);
 
     private static readonly string[] MachineSchemas = [nameof(MachineAccess), nameof(MachineAccessCreate)];
 
@@ -34,8 +34,8 @@ public class MachineManagementScopeDocumentFilter : IDocumentFilter
         {
             if (!schemas.TryGetValue(name, out var schema)
                 || schema.Properties is null
-                || !schema.Properties.TryGetValue(ManagementScopesProperty, out var managementScopes)
-                || managementScopes.Items is null)
+                || !schema.Properties.TryGetValue(ScopesProperty, out var scopes)
+                || scopes.Items is null)
             {
                 continue;
             }
@@ -43,10 +43,10 @@ public class MachineManagementScopeDocumentFilter : IDocumentFilter
             schemas.TryAdd(SchemaName, new OpenApiSchema
             {
                 Type = "string",
-                Enum = Enum.GetNames<MachineManagementScope>().Select(IOpenApiAny (value) => new OpenApiString(value)).ToList(),
+                Enum = Enum.GetNames<MachineScope>().Select(IOpenApiAny (value) => new OpenApiString(value)).ToList(),
             });
 
-            managementScopes.Items = new OpenApiSchema
+            scopes.Items = new OpenApiSchema
             {
                 Reference = new OpenApiReference { Type = ReferenceType.Schema, Id = SchemaName },
             };

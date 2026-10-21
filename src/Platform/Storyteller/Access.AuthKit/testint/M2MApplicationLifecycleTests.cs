@@ -55,7 +55,7 @@ public class M2MApplicationLifecycleTests
         {
             Organization = "integration",
             Project = "authkit",
-            Scope = MachineAccessScope.AnnotationRead,
+            Scopes = [MachineScope.AnnotationRead],
         });
         _output.WriteLine($"Created {access.ObjectId} ({access.Id}).");
 

@@ -27,17 +27,16 @@ public class KeycloakMachineAccessServiceTests
         {
             Organization = "org1",
             Project = "proj1",
-            Scope = MachineAccessScope.AnnotationReadWrite,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.AnnotationWrite],
             AnnotationKey = "sbt.payments",
         });
 
         access.Id.ShouldMatch("^42\\.sform\\.org1\\.proj1\\.[0-9a-f]{32}$");
         access.ObjectId.ShouldBe(InternalId);
         access.AccessKey.ShouldBe("kc-s3cret");
-        access.Scope.ShouldBe(MachineAccessScope.AnnotationReadWrite);
+        access.Scopes.ShouldBe([MachineScope.AnnotationRead, MachineScope.AnnotationWrite]);
         access.CredentialKind.ShouldBe(MachineCredentialKind.ClientCredentials);
         access.TokenEndpoint.ShouldBe("https://keycloak.example/realms/storyteller/protocol/openid-connect/token");
-        access.ManagementScopes.ShouldBeNull();
 
         _keycloak.Requests.Select(request => $"{request.Method} {request.Path}").ShouldBe(
             [
@@ -54,19 +53,21 @@ public class KeycloakMachineAccessServiceTests
         root.GetProperty("serviceAccountsEnabled").GetBoolean().ShouldBeTrue();
         root.GetProperty("publicClient").GetBoolean().ShouldBeFalse();
         root.GetProperty("standardFlowEnabled").GetBoolean().ShouldBeFalse();
-        root.GetProperty("description").GetString().ShouldBe("organization=org1|project=proj1|scope=AnnotationReadWrite|annotation=sbt.payments");
+        root.GetProperty("description").GetString().ShouldBe("organization=org1|project=proj1|scopes=AnnotationRead,AnnotationWrite|annotation=sbt.payments");
+        root.GetProperty("attributes").GetProperty("42.scopes").GetString().ShouldBe("AnnotationRead,AnnotationWrite");
         root.GetProperty("attributes").GetProperty("42.annotation").GetString().ShouldBe("sbt.payments");
+        root.GetProperty("attributes").TryGetProperty("42.scope", out _).ShouldBeFalse();
 
         var mappers = root.GetProperty("protocolMappers").EnumerateArray().ToDictionary(mapper => mapper.GetProperty("protocolMapper").GetString()!);
         mappers["oidc-audience-mapper"].GetProperty("config").GetProperty("included.custom.audience").GetString().ShouldBe("storyteller-api");
         var scopeConfig = mappers["oidc-hardcoded-claim-mapper"].GetProperty("config");
         scopeConfig.GetProperty("claim.name").GetString().ShouldBe("storyteller_scope");
-        scopeConfig.GetProperty("claim.value").GetString().ShouldBe("Annotation.Read Annotation.ReadWrite");
+        scopeConfig.GetProperty("claim.value").GetString().ShouldBe("Annotation.Read Annotation.Write");
         scopeConfig.GetProperty("access.token.claim").GetString().ShouldBe("true");
     }
 
     [Fact]
-    public async Task Create_WithManagementScopes_AddsThemToTheScopeClaim()
+    public async Task Create_WithManagementScopes_ClaimsEveryScopeInEnumOrder()
     {
         _keycloak.WithAdminToken()
             .On(HttpMethod.Post, ClientsPath, HttpStatusCode.Created, location: new Uri($"https://keycloak.example{ClientsPath}/{InternalId}"))
@@ -76,45 +77,64 @@ public class KeycloakMachineAccessServiceTests
         {
             Organization = "org1",
             Project = "proj1",
-            Scope = MachineAccessScope.AnnotationReadWrite,
+            Scopes = [MachineScope.AnnotationManage, MachineScope.AnnotationWrite, MachineScope.ConfigurationTransfer, MachineScope.AnnotationRead, MachineScope.AnnotationWrite],
             AnnotationKey = "sbt.payments",
-            ManagementScopes = [MachineManagementScope.AnnotationManage, MachineManagementScope.ConfigurationTransfer],
         });
 
-        access.Scope.ShouldBe(MachineAccessScope.AnnotationReadWrite);
-        access.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer, MachineManagementScope.AnnotationManage]);
+        access.Scopes.ShouldBe([MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationTransfer, MachineScope.AnnotationManage]);
 
         using var client = JsonDocument.Parse(_keycloak.Requests[1].Body!);
         var root = client.RootElement;
-        root.GetProperty("description").GetString().ShouldBe("organization=org1|project=proj1|scope=AnnotationReadWrite|manage=ConfigurationTransfer,AnnotationManage|annotation=sbt.payments");
-        root.GetProperty("attributes").GetProperty("42.scope").GetString().ShouldBe("AnnotationReadWrite");
+        root.GetProperty("description").GetString().ShouldBe("organization=org1|project=proj1|scopes=AnnotationRead,AnnotationWrite,ConfigurationTransfer,AnnotationManage|annotation=sbt.payments");
+        root.GetProperty("attributes").GetProperty("42.scopes").GetString().ShouldBe("AnnotationRead,AnnotationWrite,ConfigurationTransfer,AnnotationManage");
 
         var scopeConfig = root.GetProperty("protocolMappers").EnumerateArray()
             .Single(mapper => mapper.GetProperty("protocolMapper").GetString() == "oidc-hardcoded-claim-mapper")
             .GetProperty("config");
-        scopeConfig.GetProperty("claim.value").GetString().ShouldBe("Annotation.Read Annotation.ReadWrite Configuration.Transfer Annotation.Manage");
+        scopeConfig.GetProperty("claim.value").GetString().ShouldBe("Annotation.Read Annotation.Write Configuration.Transfer Annotation.Manage");
     }
 
     [Fact]
-    public void BuildClient_WithoutManagementScopes_ClaimsThePresetOnly()
+    public void BuildClient_OneScope_ClaimsThatScopeOnly()
     {
         var service = CreateService();
 
-        foreach (var scope in Enum.GetValues<MachineAccessScope>())
+        // Exactly the requested scope: write implies read when the handler completes the list, not here.
+        foreach (var scope in MachineScopes.All)
         {
             var client = service.BuildClient("42.sform.org1.proj1.abc", new MachineAccessCreate
             {
                 Organization = "org1",
                 Project = "proj1",
-                Scope = scope,
-                ManagementScopes = [],
+                Scopes = [scope],
             });
 
             var scopeConfig = client["protocolMappers"]!.AsArray()
                 .Single(mapper => (string?)mapper!["protocolMapper"] == "oidc-hardcoded-claim-mapper")!["config"]!;
-            ((string?)scopeConfig["claim.value"]).ShouldBe(string.Join(' ', MachineAccessScopes.Get(scope)), $"{scope}");
-            ((string?)client["description"]).ShouldBe($"organization=org1|project=proj1|scope={scope:G}");
+            ((string?)scopeConfig["claim.value"]).ShouldBe(MachineScopes.ToScopeString(scope), $"{scope}");
+            ((string?)client["attributes"]!["42.scopes"]).ShouldBe(scope.ToString("G"), $"{scope}");
+            ((string?)client["description"]).ShouldBe($"organization=org1|project=proj1|scopes={scope:G}");
         }
+    }
+
+    [Fact]
+    public void BuildClient_EveryScope_ClaimsTheScopeStrings()
+    {
+        var client = CreateService().BuildClient("42.sform.org1.proj1.abc", new MachineAccessCreate
+        {
+            Organization = "org1",
+            Project = "proj1",
+            Scopes = MachineScopes.All,
+        });
+
+        var scopeConfig = client["protocolMappers"]!.AsArray()
+            .Single(mapper => (string?)mapper!["protocolMapper"] == "oidc-hardcoded-claim-mapper")!["config"]!;
+        ((string?)scopeConfig["claim.value"]).ShouldBe(
+            "Annotation.Read Annotation.Write Configuration.Read Configuration.Write Secrets.Read Secrets.Write "
+            + "Configuration.Transfer Schema.Write Template.Write Annotation.Manage KeyValue.Manage");
+        ((string?)client["attributes"]!["42.scopes"]).ShouldBe(
+            "AnnotationRead,AnnotationWrite,ConfigurationRead,ConfigurationWrite,SecretsRead,SecretsWrite,"
+            + "ConfigurationTransfer,SchemaWrite,TemplateWrite,AnnotationManage,KeyValueManage");
     }
 
     [Fact]
@@ -129,7 +149,7 @@ public class KeycloakMachineAccessServiceTests
         {
             Organization = "org1",
             Project = "proj1",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
         }));
 
         _keycloak.Requests.Last().ShouldSatisfyAllConditions(
@@ -149,7 +169,7 @@ public class KeycloakMachineAccessServiceTests
         {
             Organization = "org1",
             Project = "proj1",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
         }));
 
         exception.Message.ShouldContain("500");
@@ -204,7 +224,7 @@ public class KeycloakMachineAccessServiceTests
             Id = "42.sform.org1.proj1.abc",
             ObjectId = InternalId,
             AccessKey = "kc-***",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.ClientCredentials,
         };
     }

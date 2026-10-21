@@ -27,7 +27,6 @@ public class LocalCertificateAuthority : IClientCertificateAuthority
         string organization,
         string project,
         string machineAccessId,
-        MachineAccessScope scope,
         int lifetimeDays)
     {
         var opts = _options.Value;

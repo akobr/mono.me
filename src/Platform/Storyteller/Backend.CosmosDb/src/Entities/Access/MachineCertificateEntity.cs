@@ -39,7 +39,9 @@ public record class MachineCertificateEntity
 
     public bool IsRevoked { get; init; }
 
-    public required MachineAccessScope Scope { get; init; }
+    // A copy of the machine's scopes. Not required: a record stored before it was kept has none, and its
+    // certificate grants nothing.
+    public List<MachineScope>? Scopes { get; init; }
 
     public string? AnnotationKey { get; init; }
 
@@ -47,9 +49,6 @@ public record class MachineCertificateEntity
 
     // The kind of the machine. Null on records stored before it was kept here.
     public MachineCredentialKind? CredentialKind { get; init; }
-
-    // Granted on top of Scope. Null for none; records stored before it was kept belong to machines without any.
-    public List<MachineManagementScope>? ManagementScopes { get; init; }
 
     public static string GetId(string thumbprint) => $"{IdPrefix}{thumbprint.ToUpperInvariant()}";
 
@@ -62,11 +61,10 @@ public record class MachineCertificateEntity
         NotBefore,
         NotAfter,
         IsRevoked,
-        Scope,
+        Scopes ?? [],
         AnnotationKey,
         LastRenewalAt,
-        CredentialKind,
-        ManagementScopes);
+        CredentialKind);
 
     public static MachineCertificateEntity FromRecord(string partitionKey, CertificateRecord record, DateTimeOffset now) => new()
     {
@@ -81,10 +79,9 @@ public record class MachineCertificateEntity
         NotBefore = record.NotBefore,
         NotAfter = record.NotAfter,
         IsRevoked = record.IsRevoked,
-        Scope = record.Scope,
+        Scopes = record.Scopes.ToList(),
         AnnotationKey = record.AnnotationKey,
         LastRenewalAt = record.LastRenewalAt,
         CredentialKind = record.CredentialKind,
-        ManagementScopes = record.ManagementScopes?.ToList(),
     };
 }

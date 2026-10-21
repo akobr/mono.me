@@ -38,12 +38,14 @@ public sealed class AuthKitMachineAccessService : IIdentityProviderMachineAccess
             throw new MachineAccessNotSupportedException("Auth:AuthKit:MachineOrganizationId is required for AuthKit machine access.");
         }
 
-        var managementScopes = MachineAccessScopes.Normalize(model.ManagementScopes);
+        // The slugs come first, so a scope without its permission fails before WorkOS is called.
+        var scopes = model.Scopes ?? [];
+        var slugs = GetPermissionSlugs(scopes);
         var application = await _client.CreateM2MApplicationAsync(new WorkOsM2MApplicationCreate(
             $"42.sform.{model.Organization}.{model.Project}.{Guid.NewGuid():N}",
-            BuildDescription(model, managementScopes),
+            BuildDescription(model, scopes),
             organizationId,
-            GetPermissionSlugs(model.Scope, managementScopes)));
+            slugs));
 
         try
         {
@@ -54,11 +56,10 @@ public sealed class AuthKitMachineAccessService : IIdentityProviderMachineAccess
                 Id = application.ClientId,
                 ObjectId = application.Id,
                 AccessKey = secret.Secret!,
-                Scope = model.Scope,
+                Scopes = scopes,
                 AnnotationKey = model.AnnotationKey,
                 CredentialKind = MachineCredentialKind.ClientCredentials,
                 TokenEndpoint = TokenEndpoint,
-                ManagementScopes = managementScopes,
             };
         }
         catch
@@ -97,52 +98,27 @@ public sealed class AuthKitMachineAccessService : IIdentityProviderMachineAccess
         return _client.DeleteApplicationAsync(existingAccess.ObjectId);
     }
 
-    // The inverse of PermissionMap: every WorkOS permission whose Storyteller scopes all fall within
-    // what the machine access scope and the management scopes grant. The M2M token then carries these
-    // slugs in its scope claim, so a management slug never reaches a machine without that management scope.
-    internal IReadOnlyList<string> GetPermissionSlugs(MachineAccessScope scope, IReadOnlyList<MachineManagementScope>? managementScopes)
+    // The inverse of PermissionMap, 1:1: for each scope the one WorkOS permission that maps its scope string.
+    // The M2M token carries these slugs in its scope claim, and the API needs every scope both stored and carried,
+    // so the application gets exactly the requested scopes or is not created at all.
+    internal IReadOnlyList<string> GetPermissionSlugs(IReadOnlyList<MachineScope> scopes)
     {
-        var runtime = MachineAccessScopes.Get(scope);
-        var granted = MachineAccessScopes.Get(scope, managementScopes).ToHashSet(StringComparer.Ordinal);
-        var covered = new HashSet<string>(StringComparer.Ordinal);
         var slugs = new List<string>();
 
-        foreach (var (slug, mapped) in _options.PermissionMap.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        foreach (var scope in scopes.Distinct())
         {
-            var scopes = AuthKitClaimNormalizer.SplitScopes(mapped).ToList();
+            var scopeString = MachineScopes.ToScopeString(scope) ?? scope.ToString();
 
-            if (scopes.Count > 0 && scopes.All(granted.Contains))
-            {
-                slugs.Add(slug);
-                covered.UnionWith(scopes);
-            }
-        }
+            // The startup validation allows one slug per machine scope; the order keeps an unvalidated map deterministic.
+            var slug = _options.PermissionMap
+                .Where(entry => string.Equals(entry.Value.Trim(), scopeString, StringComparison.Ordinal))
+                .Select(entry => entry.Key)
+                .Order(StringComparer.Ordinal)
+                .FirstOrDefault()
+                ?? throw new MachineAccessNotSupportedException(
+                    $"No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scope {scopeString}.");
 
-        // A permission for a management scope alone does not make up for a preset without any.
-        if (!runtime.Any(covered.Contains))
-        {
-            throw new MachineAccessNotSupportedException(
-                $"No WorkOS permission in Auth:AuthKit:PermissionMap maps to the scopes of {scope} ({string.Join(", ", runtime)}).");
-        }
-
-        // Unlike the preset, a management scope must reach the token in full: the API needs it both stored and carried.
-        foreach (var managementScope in MachineAccessScopes.Normalize(managementScopes) ?? [])
-        {
-            var scopeName = MachineAccessScopes.Get(managementScope)!;
-
-            if (!covered.Contains(scopeName))
-            {
-                throw new MachineAccessNotSupportedException(
-                    $"No WorkOS permission in Auth:AuthKit:PermissionMap maps to the management scope {scopeName}.");
-            }
-        }
-
-        if (!covered.SetEquals(granted))
-        {
-            _logger.LogWarning(
-                "Machine access scope {Scope} is only partly covered by Auth:AuthKit:PermissionMap; missing {MissingScopes}",
-                scope,
-                string.Join(", ", granted.Except(covered)));
+            slugs.Add(slug);
         }
 
         return slugs;
@@ -172,15 +148,10 @@ public sealed class AuthKitMachineAccessService : IIdentityProviderMachineAccess
         return created.Secret;
     }
 
-    // The same convention as the Entra ID and Keycloak machine services.
-    private static string BuildDescription(MachineAccessCreate model, IReadOnlyList<MachineManagementScope>? managementScopes)
+    // The same convention as the Entra ID and Keycloak machine services: the enum names, comma-joined.
+    private static string BuildDescription(MachineAccessCreate model, IReadOnlyList<MachineScope> scopes)
     {
-        var description = $"organization={model.Organization}|project={model.Project}|scope={model.Scope}";
-
-        if (managementScopes is { Count: > 0 })
-        {
-            description += $"|manage={string.Join(',', managementScopes)}";
-        }
+        var description = $"organization={model.Organization}|project={model.Project}|scopes={string.Join(',', scopes)}";
 
         return string.IsNullOrWhiteSpace(model.AnnotationKey)
             ? description

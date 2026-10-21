@@ -11,6 +11,7 @@ namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 public class ClientCertificateValidatorTests
 {
     private const string TrustDomain = TestCertificateHelper.TrustDomain;
+    private static readonly MachineScope[] ReadScopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead];
     private readonly MachineAuthenticationOptions _options = TestCertificateHelper.DefaultOptions;
     private readonly (X509Certificate2 CaCert, X509SignatureGenerator Generator, RSA CaKey) _ca;
 
@@ -51,7 +52,7 @@ public class ClientCertificateValidatorTests
     {
         var leaf = TestCertificateHelper.IssueMachineLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "m1");
         var record = new CertificateRecord("m1", leaf.Thumbprint, null, null, "serial", DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow.AddDays(365), false, MachineAccessScope.DefaultRead, null, null);
+            DateTimeOffset.UtcNow.AddDays(365), false, ReadScopes, null, null);
         var validator = CreateValidator(record);
 
         var result = await validator.ValidateAsync(leaf);
@@ -61,27 +62,28 @@ public class ClientCertificateValidatorTests
         result.Project.ShouldBe("proj1");
         result.MachineAccessId.ShouldBe("m1");
         result.Kind.ShouldBe(ClientCertificateKind.Machine);
-        result.Scope.ShouldBe(MachineAccessScope.DefaultRead);
+        result.Scopes.ShouldBe(ReadScopes);
     }
 
     [Fact]
-    public async Task ValidateAsync_MachineCert_ReturnsTheManagementScopesOfItsRecord()
+    public async Task ValidateAsync_MachineCert_ReturnsTheScopesOfItsRecord()
     {
+        MachineScope[] scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead, MachineScope.ConfigurationTransfer];
         var leaf = TestCertificateHelper.IssueMachineLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "m1");
         var record = new CertificateRecord("m1", leaf.Thumbprint, null, null, "serial", DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow.AddDays(365), false, MachineAccessScope.DefaultRead, null, null,
-            MachineCredentialKind.Certificate, [MachineManagementScope.ConfigurationTransfer]);
+            DateTimeOffset.UtcNow.AddDays(365), false, scopes, null, null, MachineCredentialKind.Certificate);
         var validator = CreateValidator(record);
 
         var result = await validator.ValidateAsync(leaf);
 
         result.ShouldNotBeNull();
-        result.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer]);
+        result.Scopes.ShouldBe(scopes);
+        result.CredentialKind.ShouldBe(MachineCredentialKind.Certificate);
     }
 
-    // A shared certificate is no machine: the API key it comes with supplies the scope and the management scopes.
+    // A shared certificate is no machine: the API key it comes with supplies the scopes.
     [Fact]
-    public async Task ValidateAsync_SharedCert_ReturnsNoManagementScopes()
+    public async Task ValidateAsync_SharedCert_ReturnsNoScopes()
     {
         var leaf = TestCertificateHelper.IssueSharedLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "svc");
         var validator = CreateValidator(sharedStore: SharedStoreWith(leaf));
@@ -90,7 +92,7 @@ public class ClientCertificateValidatorTests
 
         result.ShouldNotBeNull();
         result.Kind.ShouldBe(ClientCertificateKind.Shared);
-        result.ManagementScopes.ShouldBeNull();
+        result.Scopes.ShouldBeEmpty();
     }
 
     private static ISharedCertificateStore SharedStoreWith(X509Certificate2 leaf, bool isRevoked = false)
@@ -150,7 +152,7 @@ public class ClientCertificateValidatorTests
         var (foreignCa, foreignGen, _) = TestCertificateHelper.CreateCa();
         var leaf = TestCertificateHelper.IssueMachineLeaf(foreignCa, foreignGen, "org1", "proj1", "m1");
         var record = new CertificateRecord("m1", leaf.Thumbprint, null, null, "serial", DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow.AddDays(365), false, MachineAccessScope.DefaultRead, null, null);
+            DateTimeOffset.UtcNow.AddDays(365), false, ReadScopes, null, null);
         var validator = CreateValidator(record); // validator trusts _ca, not foreignCa
 
         var result = await validator.ValidateAsync(leaf);
@@ -167,7 +169,7 @@ public class ClientCertificateValidatorTests
             notAfter: DateTimeOffset.UtcNow.AddDays(-1));
         var record = new CertificateRecord("m1", leaf.Thumbprint, null, null, "serial",
             DateTimeOffset.UtcNow.AddDays(-400), DateTimeOffset.UtcNow.AddDays(-1),
-            false, MachineAccessScope.DefaultRead, null, null);
+            false, ReadScopes, null, null);
         var validator = CreateValidator(record);
 
         var result = await validator.ValidateAsync(leaf);
@@ -189,7 +191,7 @@ public class ClientCertificateValidatorTests
     {
         var leaf = TestCertificateHelper.IssueMachineLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "m1");
         var record = new CertificateRecord("m1", "WRONG_THUMBPRINT", null, null, "serial", DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow.AddDays(365), false, MachineAccessScope.DefaultRead, null, null);
+            DateTimeOffset.UtcNow.AddDays(365), false, ReadScopes, null, null);
         var validator = CreateValidator(record);
 
         var result = await validator.ValidateAsync(leaf);
@@ -201,7 +203,7 @@ public class ClientCertificateValidatorTests
     {
         var leaf = TestCertificateHelper.IssueMachineLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "m1");
         var record = new CertificateRecord("m1", leaf.Thumbprint, null, null, "serial", DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow.AddDays(365), true, MachineAccessScope.DefaultRead, null, null);
+            DateTimeOffset.UtcNow.AddDays(365), true, ReadScopes, null, null);
         var validator = CreateValidator(record);
 
         var result = await validator.ValidateAsync(leaf);
@@ -231,7 +233,7 @@ public class ClientCertificateValidatorTests
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow.AddDays(365),
             false,
-            MachineAccessScope.DefaultRead,
+            ReadScopes,
             null,
             DateTimeOffset.UtcNow);
         var validator = CreateValidator(record);
@@ -254,7 +256,7 @@ public class ClientCertificateValidatorTests
             DateTimeOffset.UtcNow,
             DateTimeOffset.UtcNow.AddDays(365),
             false,
-            MachineAccessScope.DefaultRead,
+            ReadScopes,
             null,
             DateTimeOffset.UtcNow);
         var validator = CreateValidator(record);
@@ -268,13 +270,13 @@ public class ClientCertificateValidatorTests
     {
         var leaf = TestCertificateHelper.IssueMachineLeaf(_ca.CaCert, _ca.Generator, "org1", "proj1", "m1");
         var record = new CertificateRecord("m1", leaf.Thumbprint, null, null, "serial", DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow.AddDays(365), false, MachineAccessScope.AnnotationRead, "my-annotation-key", null);
+            DateTimeOffset.UtcNow.AddDays(365), false, [MachineScope.AnnotationRead], "my-annotation-key", null);
         var validator = CreateValidator(record);
 
         var result = await validator.ValidateAsync(leaf);
 
         result.ShouldNotBeNull();
         result!.AnnotationKey.ShouldBe("my-annotation-key");
-        result.Scope.ShouldBe(MachineAccessScope.AnnotationRead);
+        result.Scopes.ShouldBe([MachineScope.AnnotationRead]);
     }
 }

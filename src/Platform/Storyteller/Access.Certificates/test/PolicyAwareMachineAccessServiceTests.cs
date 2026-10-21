@@ -64,7 +64,7 @@ public class PolicyAwareMachineAccessServiceTests
             Id = "existing-id",
             ObjectId = "existing-oid",
             AccessKey = "2s.xxx.yyy",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.ApiKey,
         };
 

@@ -11,7 +11,7 @@ public interface IMachineAccess
 
     string AccessKey { get; }
 
-    MachineAccessScope Scope { get; }
+    IReadOnlyList<MachineScope> Scopes { get; }
 
     string? AnnotationKey { get; }
 
@@ -36,6 +36,4 @@ public interface IMachineAccess
     string? TokenScope { get; }
 
     IReadOnlyList<FederationRule>? FederationRules { get; }
-
-    IReadOnlyList<MachineManagementScope>? ManagementScopes { get; }
 }

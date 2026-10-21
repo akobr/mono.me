@@ -41,7 +41,7 @@ internal static class AccessMappings
         Id = e.Id,
         ObjectId = e.ObjectId,
         AccessKey = e.AccessKey,
-        Scope = e.Scope,
+        Scopes = e.Scopes ?? [],
         AnnotationKey = e.AnnotationKey,
         CredentialKind = e.CredentialKind,
         CertificateThumbprint = e.CertificateThumbprint,
@@ -50,6 +50,5 @@ internal static class AccessMappings
         CertificateNotAfter = e.NotAfter,
         UsesSharedCertificate = e.UsesSharedCertificate,
         FederationRules = e.FederationRules,
-        ManagementScopes = e.ManagementScopes,
     };
 }

@@ -50,7 +50,7 @@ public class AuthConfigurationHttp
 
         var clientId = options.ClientId ?? string.Empty;
 
-        // The same scopes sform requests today.
+        // A user needs only User.Impersonation; the role decides the rest. sform requests the same.
         return new AuthConfiguration
         {
             Provider = nameof(IdentityProviderKind.EntraId),
@@ -59,7 +59,6 @@ public class AuthConfigurationHttp
             Scopes =
             [
                 $"api://{clientId}/{Scopes.User.Impersonation}",
-                $"api://{clientId}/{Scopes.Default.Write}",
             ],
         };
     }

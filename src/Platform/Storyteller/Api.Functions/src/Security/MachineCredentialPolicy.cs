@@ -7,7 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.Security;
 
-// A bearer token is checked against the policy of the project the request resolves (CheckAccessToAsync): an
+// A bearer token is checked against the policy of the project the request resolves (the access check): an
 // identity provider machine token only where ClientCredentials is enabled, a Storyteller token only where Federated
 // is. API key and certificate machines are checked by MachineAuthenticationMiddleware.
 public static class MachineCredentialPolicy

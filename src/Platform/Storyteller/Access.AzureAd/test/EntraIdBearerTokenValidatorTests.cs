@@ -26,7 +26,7 @@ public class EntraIdBearerTokenValidatorTests
                 new Claim("sub", "user-1"),
                 new Claim("name", "Ada Lovelace"),
                 new Claim("preferred_username", "ada@example.com"),
-                new Claim("scp", "User.Impersonation Default.ReadWrite"),
+                new Claim("scp", "User.Impersonation Annotation.Write"),
                 new Claim("azp", fixture.ClientId),
             ]);
 
@@ -39,7 +39,7 @@ public class EntraIdBearerTokenValidatorTests
         FindClaim(result, "name").ShouldBe("Ada Lovelace");
         FindClaim(result, "preferred_username").ShouldBe("ada@example.com");
         result.Claims.ShouldContain(claim => claim.Value.Contains("User.Impersonation", StringComparison.Ordinal));
-        result.Claims.ShouldContain(claim => claim.Value.Contains("Default.ReadWrite", StringComparison.Ordinal));
+        result.Claims.ShouldContain(claim => claim.Value.Contains("Annotation.Write", StringComparison.Ordinal));
         FindClaim(result, "azp").ShouldBe(fixture.ClientId);
     }
 
@@ -88,7 +88,7 @@ public class EntraIdBearerTokenValidatorTests
                 new Claim("sub", "machine-app"),
                 new Claim("azp", "machine-app"),
                 new Claim("appid", "ignored-app"),
-                new Claim("roles", "Default.ReadWrite"),
+                new Claim("roles", "Annotation.Write"),
             ]);
 
         var result = await fixture.Validator.ValidateAsync(rawToken);

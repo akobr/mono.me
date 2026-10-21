@@ -6,7 +6,9 @@ public record class MachineAccessCreate
 
     public required string Project { get; set; }
 
-    public required MachineAccessScope Scope { get; init; } = MachineAccessScope.DefaultRead;
+    // The requested scopes. Not required, so a missing list reaches the handler and gets its 400 instead of a body
+    // that cannot be read. Creation completes the list (write implies read) and needs one runtime scope at least.
+    public IReadOnlyList<MachineScope>? Scopes { get; init; }
 
     public string? AnnotationKey { get; init; }
 
@@ -21,8 +23,4 @@ public record class MachineAccessCreate
 
     // Federated only, and required for it: the rules a platform token must match.
     public IReadOnlyList<FederationRule>? FederationRules { get; init; }
-
-    // Granted on top of Scope; never part of a preset. Null (or empty): none. Not required, so older clients
-    // can leave it out.
-    public IReadOnlyList<MachineManagementScope>? ManagementScopes { get; init; }
 }

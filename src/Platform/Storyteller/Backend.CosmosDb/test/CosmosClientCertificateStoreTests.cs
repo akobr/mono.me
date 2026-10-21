@@ -8,6 +8,7 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace _42.Platform.Storyteller.Backend.CosmosDb.UnitTests;
@@ -17,6 +18,8 @@ public class CosmosClientCertificateStoreTests(Startup startup)
     : BaseTestsClass(startup)
 {
     private const string Org = TestConstants.Organization;
+
+    private static readonly MachineScope[] Granted = [MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.SecretsRead];
 
     private CosmosClientCertificateStore CreateStore()
     {
@@ -36,7 +39,7 @@ public class CosmosClientCertificateStoreTests(Startup startup)
         DateTimeOffset.UtcNow.AddMinutes(-1),
         DateTimeOffset.UtcNow.AddDays(90),
         false,
-        MachineAccessScope.DefaultRead,
+        Granted,
         "exe.a.b.c",
         previous is null ? null : DateTimeOffset.UtcNow);
 
@@ -57,7 +60,7 @@ public class CosmosClientCertificateStoreTests(Startup startup)
         var byThumbprint = await fresh.GetByThumbprintAsync(Org, project, thumbprint.ToLowerInvariant());
         byThumbprint.Should().NotBeNull();
         byThumbprint!.MachineAccessId.Should().Be(machine);
-        byThumbprint.Scope.Should().Be(MachineAccessScope.DefaultRead);
+        byThumbprint.Scopes.Should().Equal(Granted);
         byThumbprint.AnnotationKey.Should().Be("exe.a.b.c");
         (await fresh.GetByMachineAccessIdAsync(Org, project, machine))!.Thumbprint.Should().Be(thumbprint);
 
@@ -100,13 +103,37 @@ public class CosmosClientCertificateStoreTests(Startup startup)
                 Id = older,
                 ObjectId = older,
                 AccessKey = "***",
-                Scope = MachineAccessScope.DefaultRead,
+                Scopes = [.. Granted],
                 CredentialKind = MachineCredentialKind.CertificateAndApiKey,
             },
             new Microsoft.Azure.Cosmos.PartitionKey(CosmosClientCertificateStore.GetPartitionKey(project)));
 
         (await CreateStore().GetByMachineAccessIdAsync(Org, project, older))!.CredentialKind.Should().Be(MachineCredentialKind.CertificateAndApiKey);
         (await CreateStore().GetByThumbprintAsync(Org, project, olderThumbprint))!.CredentialKind.Should().Be(MachineCredentialKind.CertificateAndApiKey);
+    }
+
+    [Fact]
+    public async Task Scopes_AreStoredByName_AndAnOlderRecordWithoutThemGrantsNothing()
+    {
+        var project = $"certs-{Guid.NewGuid():N}"[..20];
+        var machine = Guid.NewGuid().ToString("D");
+        var thumbprint = Guid.NewGuid().ToString("N").ToUpperInvariant();
+        var container = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetOrganizationContainer(Org).Container;
+        var partitionKey = new Microsoft.Azure.Cosmos.PartitionKey(CosmosClientCertificateStore.GetPartitionKey(project));
+        var id = Entities.Access.MachineCertificateEntity.GetId(thumbprint);
+
+        await CreateStore().StoreAsync(Org, project, NewRecord(machine, thumbprint) with { CredentialKind = MachineCredentialKind.Certificate });
+        var stored = (await container.ReadItemAsync<JObject>(id, partitionKey)).Resource;
+        stored["Scopes"]!.Values<string>().Should().Equal("AnnotationRead", "AnnotationWrite", "SecretsRead");
+
+        // a record as stored before the flat scopes: a preset and management scopes, no Scopes
+        stored.Remove("Scopes");
+        stored["Scope"] = "DefaultReadWrite";
+        stored["ManagementScopes"] = new JArray("SchemaWrite");
+        await container.UpsertItemAsync(stored, partitionKey);
+
+        (await CreateStore().GetByThumbprintAsync(Org, project, thumbprint))!.Scopes.Should().BeEmpty();
+        (await CreateStore().GetByMachineAccessIdAsync(Org, project, machine))!.Scopes.Should().BeEmpty();
     }
 
     [Fact]

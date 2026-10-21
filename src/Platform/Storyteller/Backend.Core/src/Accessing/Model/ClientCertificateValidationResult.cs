@@ -4,9 +4,8 @@ public record ClientCertificateValidationResult(
     string Organization,
     string Project,
     string? MachineAccessId,
-    MachineAccessScope Scope,
+    IReadOnlyList<MachineScope> Scopes,
     string Thumbprint,
     ClientCertificateKind Kind,
     string? AnnotationKey,
-    MachineCredentialKind? CredentialKind = null,
-    IReadOnlyList<MachineManagementScope>? ManagementScopes = null);
+    MachineCredentialKind? CredentialKind = null);

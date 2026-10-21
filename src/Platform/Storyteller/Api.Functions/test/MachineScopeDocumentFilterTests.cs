@@ -13,29 +13,42 @@ using Newtonsoft.Json.Serialization;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
-public class MachineManagementScopeDocumentFilterTests
+public class MachineScopeDocumentFilterTests
 {
     [Fact]
-    public void Apply_ManagementScopesReferenceTheSharedScopeSchemaWithoutADefault()
+    public void Apply_ScopesReferenceTheSharedScopeSchemaWithoutADefault()
     {
         var document = Document();
         var schemas = document.Components.Schemas;
-        schemas["MachineAccessCreate"].Properties["ManagementScopes"].Items.Reference.ShouldBeNull("the generator inlines the enum");
+        schemas["MachineAccessCreate"].Properties["Scopes"].Items.Reference.ShouldBeNull("the generator inlines the enum");
 
-        new MachineManagementScopeDocumentFilter().Apply(null!, document);
+        new MachineScopeDocumentFilter().Apply(null!, document);
 
         foreach (var name in new[] { "MachineAccess", "MachineAccessCreate" })
         {
-            var items = schemas[name].Properties["ManagementScopes"].Items;
-            items.Reference.Id.ShouldBe("MachineManagementScope", name);
+            var items = schemas[name].Properties["Scopes"].Items;
+            items.Reference.Id.ShouldBe("MachineScope", name);
             items.Default.ShouldBeNull(name);
         }
 
-        var scope = schemas["MachineManagementScope"];
+        var scope = schemas["MachineScope"];
         scope.Type.ShouldBe("string");
-        scope.Default.ShouldBeNull("a management scope is only ever granted on purpose");
+        scope.Default.ShouldBeNull("a scope is only ever granted on purpose");
         scope.Enum.Cast<OpenApiString>().Select(value => value.Value)
-            .ShouldBe(["ConfigurationTransfer", "SchemaWrite", "TemplateWrite", "AnnotationManage", "KeyValueManage"]);
+            .ShouldBe(
+            [
+                "AnnotationRead",
+                "AnnotationWrite",
+                "ConfigurationRead",
+                "ConfigurationWrite",
+                "SecretsRead",
+                "SecretsWrite",
+                "ConfigurationTransfer",
+                "SchemaWrite",
+                "TemplateWrite",
+                "AnnotationManage",
+                "KeyValueManage",
+            ]);
     }
 
     [Fact]
@@ -43,7 +56,7 @@ public class MachineManagementScopeDocumentFilterTests
     {
         var document = new OpenApiDocument { Components = new OpenApiComponents { Schemas = new Dictionary<string, OpenApiSchema>() } };
 
-        new MachineManagementScopeDocumentFilter().Apply(null!, document);
+        new MachineScopeDocumentFilter().Apply(null!, document);
 
         document.Components.Schemas.ShouldBeEmpty();
     }

@@ -17,8 +17,8 @@ namespace _42.Platform.Storyteller.Api.V1;
 
 // Export and import of the documents of a view (annotations, schemas, templates and configurations), as jobs processed
 // in the background (export-import.md). Users need the Administrator role on the project on every route, also to read a
-// job (424-66); machines have no role and need the scopes of the included kinds (ViewTransferScopes), as user tokens do,
-// and the management scope Configuration.Transfer on every route, also to read a job (424-57).
+// job (424-66), and no scopes. Machines have no role: they need the management scope Configuration.Transfer on every
+// route, also to read a job (424-57), and then the scope of every included kind (ViewTransferScopes).
 public class ViewTransferHttp
 {
     private readonly IViewTransferService _transfers;
@@ -35,9 +35,6 @@ public class ViewTransferHttp
         _options = options.Value;
     }
 
-    // Debug builds skip the scope checks (DEV_AUTH), as CheckScope does; the tests turn them on to cover the rules per kind.
-    internal bool ChecksScopes { get; init; } = !Security.HttpRequestDataExtensions.IsDevelopmentAuthentication;
-
     [Function(nameof(StartViewExport))]
     [OpenApiOperation(Definitions.RouteIds.Transfers.StartViewExport, Definitions.Tags.Transfers, Description = "Starts an export of the view as a zip: its annotations, schemas, templates and configurations, or the kinds Include names. Folder (default) writes the current documents and the earlier versions as JSON files, Git a repository with every version as a commit. Secrets, effective documents, the audit and deleted annotations are never exported. Poll the export until it has succeeded, then download its archive.")]
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
@@ -49,7 +46,7 @@ public class ViewTransferHttp
     [OpenApiResponseWithBody(HttpStatusCode.Accepted, Definitions.ContentTypes.Json, typeof(ViewExport), Description = "The queued export, with its Include resolved; Location points to it.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The body is not a JSON object, or names an unknown format or kind.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTransferLimit)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthenticated)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTransferForbiddenExport)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> StartViewExport(
@@ -69,8 +66,9 @@ public class ViewTransferHttp
             return new BadRequestObjectResult(new ErrorResponse(error));
         }
 
-        CheckScopes(request, model.Include, ViewTransferKind.Export);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineManagementScope.ConfigurationTransfer);
+        EnsureCredentials(request);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineScope.ConfigurationTransfer);
+        EnsureKindScopes(request, model.Include, ViewTransferKind.Export);
 
         var export = await _transfers.StartExportAsync(
             organization,
@@ -94,7 +92,7 @@ public class ViewTransferHttp
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdExport)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ViewExport), Description = "The export.")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The export doesn't exist in this view, or has expired.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthenticated)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTransferForbiddenExport)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetViewExport(
@@ -105,7 +103,8 @@ public class ViewTransferHttp
         string view,
         string id)
     {
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineManagementScope.ConfigurationTransfer);
+        EnsureCredentials(request);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineScope.ConfigurationTransfer);
 
         var export = await GetExportAsync(request, organization, project, view, id);
         return new OkObjectResult(export);
@@ -122,7 +121,7 @@ public class ViewTransferHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Zip, typeof(byte[]), Description = "The archive.")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The export doesn't exist in this view, or it or its archive has expired.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The export is queued, running or failed (TransferNotReady).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthenticated)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTransferForbiddenExport)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetViewExportArchive(
@@ -133,7 +132,8 @@ public class ViewTransferHttp
         string view,
         string id)
     {
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineManagementScope.ConfigurationTransfer);
+        EnsureCredentials(request);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineScope.ConfigurationTransfer);
 
         // the scopes of the export's kinds are checked before its state or archive tells anything
         await GetExportAsync(request, organization, project, view, id);
@@ -159,7 +159,7 @@ public class ViewTransferHttp
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "An unknown kind in include or an unknown existing value (InvalidQuery), or the body is not a zip or breaks a limit of the archive (InvalidArchive).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTransferLimit)]
     [OpenApiResponseWithBody(HttpStatusCode.RequestEntityTooLarge, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The archive is larger than allowed (ArchiveTooLarge).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthenticated)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTransferForbiddenImport)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> StartViewImport(
@@ -176,8 +176,9 @@ public class ViewTransferHttp
         var include = ViewTransferRequests.ParseInclude(request.Query[Definitions.Parameters.Include]);
         var existing = ViewTransferRequests.ParseExisting(request.Query[Definitions.Parameters.Existing]);
 
-        CheckScopes(request, include, ViewTransferKind.Import);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineManagementScope.ConfigurationTransfer);
+        EnsureCredentials(request);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineScope.ConfigurationTransfer);
+        EnsureKindScopes(request, include, ViewTransferKind.Import);
 
         var cancellationToken = request.FunctionContext.CancellationToken;
         using var archive = new MemoryStream();
@@ -219,7 +220,7 @@ public class ViewTransferHttp
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdImport)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(ViewImport), Description = "The import.")]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The import doesn't exist in this view, or has expired.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthenticated)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseTransferForbiddenImport)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetViewImport(
@@ -230,11 +231,12 @@ public class ViewTransferHttp
         string view,
         string id)
     {
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineManagementScope.ConfigurationTransfer);
+        EnsureCredentials(request);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Administrator, MachineScope.ConfigurationTransfer);
 
         var import = await _transfers.GetImportAsync(organization, project, view, id, request.FunctionContext.CancellationToken)
                      ?? throw new NotFoundException($"The import '{id}' does not exist or has expired.");
-        CheckScopes(request, import.Include, ViewTransferKind.Import, isJob: true);
+        EnsureKindScopes(request, import.Include, ViewTransferKind.Import, isJob: true);
         return new OkObjectResult(import);
     }
 
@@ -254,30 +256,34 @@ public class ViewTransferHttp
                && ((bytes[2] == 3 && bytes[3] == 4) || (bytes[2] == 5 && bytes[3] == 6));
     }
 
-    // An export of this view that the caller may read: the scopes of the kinds it includes.
+    // An export of this view that the caller may read: a machine needs the scopes of the kinds it includes.
     private async Task<ViewExport> GetExportAsync(HttpRequestData request, string organization, string project, string view, string id)
     {
         var export = await _transfers.GetExportAsync(organization, project, view, id, request.FunctionContext.CancellationToken)
                      ?? throw new NotFoundException($"The export '{id}' does not exist or has expired.");
-        CheckScopes(request, export.Include, ViewTransferKind.Export, isJob: true);
+        EnsureKindScopes(request, export.Include, ViewTransferKind.Export, isJob: true);
         return export;
     }
 
-    // The scopes of every included kind (null or empty: all four); a stored job has its include resolved. A request
-    // without credentials has no scopes at all: it is 401, as on every route, not a 403 that asks it to change include.
-    private void CheckScopes(HttpRequestData request, IReadOnlyList<ViewArchiveContent>? include, ViewTransferKind kind, bool isJob = false)
+    // A request without credentials is 401 on every route, in every build, before anything else: never a 403 that asks
+    // it to change include, because clients sign in again only on a 401.
+    private static void EnsureCredentials(HttpRequestData request)
     {
-        if (!ChecksScopes)
-        {
-            return;
-        }
-
         if (request.GetClaims().Count == 0)
         {
             throw new SecurityTokenException("Missing credentials.");
         }
+    }
 
-        ViewTransferScopes.Ensure(request.GetScopes(), include, kind, isJob);
+    // A machine needs the scope of every included kind (null or empty: all four), stored on the machine and carried by
+    // its credentials; the access check before has read the machine. A stored job has its include resolved. Users need
+    // no scopes: their role decides.
+    private static void EnsureKindScopes(HttpRequestData request, IReadOnlyList<ViewArchiveContent>? include, ViewTransferKind kind, bool isJob = false)
+    {
+        if (request.IsApplicationIdentity())
+        {
+            ViewTransferScopes.Ensure(request.GetGrantedMachineScopes(), include, kind, isJob);
+        }
     }
 
     private ObjectResult TooLarge()

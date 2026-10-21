@@ -56,7 +56,8 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.ContinuationToken, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.ContinuationToken)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValuesResponse), Description = "One page of pairs.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenConfigurationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.KeyValues.V1.KeyValues)]
@@ -65,8 +66,7 @@ public class KeyValuesHttp
         string project,
         string view)
     {
-        request.CheckScope(KeyValueAuthorization.ReadScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Reader, MachineScope.ConfigurationRead);
 
         var listRequest = new KeyValueListRequest
         {
@@ -89,15 +89,15 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.View, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.View)]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.KeyValueKey)]
-    [OpenApiParameter(Definitions.Parameters.Reveal, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "Return the value of a secret (ContributorWithSecrets, or Configuration.Secrets under the project's mTLS rule).")]
+    [OpenApiParameter(Definitions.Parameters.Reveal, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "Return the value of a secret (ContributorWithSecrets, or " + Scopes.Secrets.Read + " under the project's mTLS rule).")]
     [OpenApiParameter(Definitions.Parameters.IncludeDeleted, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "Also find a soft-deleted key.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValue), Description = "The pair.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredConfigurationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key does not exist (ErrorCode KeyValueNotFound).")]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
     [OpenApiResponseWithBody(HttpStatusCode.ServiceUnavailable, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseServiceUnavailable)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetKeyValue(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.KeyValues.V1.KeyValue)]
@@ -107,8 +107,7 @@ public class KeyValuesHttp
         string view,
         string key)
     {
-        request.CheckScope(KeyValueAuthorization.ReadScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Reader, MachineScope.ConfigurationRead);
 
         var options = new KeyValueReadOptions
         {
@@ -118,7 +117,7 @@ public class KeyValuesHttp
 
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
 
-        if (options.Reveal && rights.IsWithheldByMtls)
+        if (options.Reveal && rights.IsReadWithheldByMtls)
         {
             throw KeyValueErrors.MtlsRequired();
         }
@@ -144,13 +143,13 @@ public class KeyValuesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueWrite), Required = true, Description = "The value, the content type, the protection level (required on create) and an optional expected version (0 = the key must not exist).")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValue), Description = "The new version, without a secret value.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "InvalidKey, ValueRequired, ValueTooLarge, InvalidContentType, ProtectionRequired, InvalidSecretReference, InvalidClientEncryptedValue or UnknownRecipient.")]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredConfigurationWrite)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The level is not allowed in the project (ProtectionNotAllowed), or the key changed concurrently too often (KeyValueBusy).")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The expected version does not match (KeyValueVersionMismatch).")]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
     [OpenApiResponseWithBody(HttpStatusCode.NotImplemented, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseNotImplemented)]
     [OpenApiResponseWithBody(HttpStatusCode.ServiceUnavailable, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseServiceUnavailable)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> SetKeyValue(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.KeyValues.V1.KeyValue)]
@@ -160,8 +159,7 @@ public class KeyValuesHttp
         string view,
         string key)
     {
-        request.CheckScope(KeyValueAuthorization.WriteScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineScope.ConfigurationWrite);
         var (write, invalidBody) = await request.ReadJsonBodyAsync<KeyValueWrite>(_bodyJsonOptions, "a key/value write", RequestBodyLimits.KeyValueWrite);
 
         if (invalidBody is not null)
@@ -175,7 +173,7 @@ public class KeyValuesHttp
         }
 
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
-        var pair = await KeyValueAuthorization.UnderMtlsRuleAsync(
+        var pair = await KeyValueAuthorization.UnderMtlsWriteRuleAsync(
             rights,
             () => _keyValues.SetAsync(organization, project, view, key, write, rights.Caller));
 
@@ -195,11 +193,11 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.ExpectedVersion, In = ParameterLocation.Query, Required = false, Type = typeof(long), Description = "Delete only when the key is at this version.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NoContent, Description = "Deleted.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredDeleteKeyValue)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key does not exist, or is already deleted (ErrorCode KeyValueNotFound).")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key changed concurrently too often (KeyValueBusy).")]
     [OpenApiResponseWithBody(HttpStatusCode.PreconditionFailed, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The expected version does not match (KeyValueVersionMismatch).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteKeyValue(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.KeyValues.V1.KeyValue)]
@@ -221,12 +219,11 @@ public class KeyValuesHttp
         }
         else
         {
-            request.CheckScope(KeyValueAuthorization.WriteScopes);
-            await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor);
+            await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineScope.ConfigurationWrite);
         }
 
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
-        var deleted = await KeyValueAuthorization.UnderMtlsRuleAsync(
+        var deleted = await KeyValueAuthorization.UnderMtlsWriteRuleAsync(
             rights,
             () => _keyValues.DeleteAsync(organization, project, view, key, options, rights.Caller));
 
@@ -243,7 +240,7 @@ public class KeyValuesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueBulkRequest), Required = true, Description = "Keys, or a key prefix.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueBulkResult), Description = "The outcome per key: Done, Unchanged, NotFound, Forbidden or Failed.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenManagementKeyValueManage)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> RestoreKeyValues(
@@ -253,8 +250,7 @@ public class KeyValuesHttp
         string project,
         string view)
     {
-        request.CheckScope(KeyValueAuthorization.WriteScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.KeyValueManage);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineScope.ConfigurationWrite, MachineScope.KeyValueManage);
         var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request", RequestBodyLimits.KeyValueBulk);
 
         if (invalidBody is not null)
@@ -282,7 +278,8 @@ public class KeyValuesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueBulkRequest), Required = true, Description = "Keys, or a key prefix.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueBulkResult), Description = "The outcome per key: Done, NotFound or Failed.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PurgeKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Purge)]
@@ -324,7 +321,7 @@ public class KeyValuesHttp
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
     [OpenApiResponseWithBody(HttpStatusCode.NotImplemented, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseNotImplemented)]
     [OpenApiResponseWithBody(HttpStatusCode.ServiceUnavailable, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseServiceUnavailable)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> ProtectKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Protect)]
@@ -333,8 +330,7 @@ public class KeyValuesHttp
         string project,
         string view)
     {
-        request.CheckScope(KeyValueAuthorization.WriteScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.KeyValueManage);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineScope.ConfigurationWrite, MachineScope.KeyValueManage);
         var (bulk, invalidBody) = await request.ReadJsonBodyAsync<KeyValueBulkRequest>(_bodyJsonOptions, "a key/value bulk request", RequestBodyLimits.KeyValueBulk);
 
         if (invalidBody is not null)
@@ -353,7 +349,7 @@ public class KeyValuesHttp
         }
 
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
-        KeyValueAuthorization.EnsureSecretRights(rights);
+        KeyValueAuthorization.EnsureSecretWriteRights(rights);
         var result = await _keyValues.ProtectAsync(organization, project, view, bulk, rights.Caller);
         return new OkObjectResult(result);
     }
@@ -369,7 +365,8 @@ public class KeyValuesHttp
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<KeyValueVersion>), Description = "The versions, oldest first.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key has no stored version (ErrorCode KeyValueNotFound).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenConfigurationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetKeyValueVersions(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.KeyValues.V1.Versions)]
@@ -379,8 +376,7 @@ public class KeyValuesHttp
         string view,
         string key)
     {
-        request.CheckScope(KeyValueAuthorization.ReadScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Reader, MachineScope.ConfigurationRead);
 
         var versions = await _keyValues.GetVersionsAsync(organization, project, view, key);
         return versions.Count == 0 ? NotFound(view, key) : new OkObjectResult(versions);
@@ -398,11 +394,11 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.Reveal, In = ParameterLocation.Query, Required = false, Type = typeof(bool), Description = "Return the value of a secret version.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValue), Description = "The version.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredConfigurationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The version does not exist (ErrorCode KeyValueNotFound).")]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
     [OpenApiResponseWithBody(HttpStatusCode.ServiceUnavailable, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseServiceUnavailable)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetKeyValueVersion(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.KeyValues.V1.Version)]
@@ -413,13 +409,12 @@ public class KeyValuesHttp
         string key,
         uint version)
     {
-        request.CheckScope(KeyValueAuthorization.ReadScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Reader, MachineScope.ConfigurationRead);
 
         var reveal = KeyValueQuery.GetBool(request, Definitions.Parameters.Reveal);
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
 
-        if (reveal && rights.IsWithheldByMtls)
+        if (reveal && rights.IsReadWithheldByMtls)
         {
             throw KeyValueErrors.MtlsRequired();
         }
@@ -446,10 +441,10 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.Format, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.DiffFormat)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(DiffResult), Description = "The diff between this and the previous version. When ?format=unified, returns text/plain instead.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredConfigurationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The version does not exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public Task<IActionResult> GetKeyValueVersionDiff(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.KeyValues.V1.VersionDiff)]
@@ -476,10 +471,10 @@ public class KeyValuesHttp
     [OpenApiParameter(Definitions.Parameters.Format, In = ParameterLocation.Query, Required = false, Type = typeof(string), Description = Definitions.Descriptions.DiffFormat)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(DiffResult), Description = "The diff between the two versions. When ?format=unified, returns text/plain instead.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequired)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredConfigurationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "One of the versions does not exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public Task<IActionResult> GetKeyValueVersionDiffCustom(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.KeyValues.V1.VersionDiffCustom)]
@@ -504,10 +499,10 @@ public class KeyValuesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueExportRequest), Required = false, Description = "An optional key prefix, protection levels and IncludeSecrets.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueDocument), Description = "The document.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredKeyValueExport)]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
     [OpenApiResponseWithBody(HttpStatusCode.ServiceUnavailable, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseServiceUnavailable)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> ExportKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Export)]
@@ -516,8 +511,7 @@ public class KeyValuesHttp
         string project,
         string view)
     {
-        request.CheckScope(KeyValueAuthorization.ReadScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project, managementScope: MachineManagementScope.ConfigurationTransfer);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Reader, MachineScope.ConfigurationRead, MachineScope.ConfigurationTransfer);
         var (export, invalidBody) = await request.ReadJsonBodyAsync<KeyValueExportRequest>(_bodyJsonOptions, "a key/value export request", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
@@ -531,7 +525,7 @@ public class KeyValuesHttp
 
         if (export.IncludeSecrets)
         {
-            KeyValueAuthorization.EnsureSecretRights(rights);
+            KeyValueAuthorization.EnsureSecretReadRights(rights);
             request.MarkNoStore();
         }
 
@@ -552,12 +546,12 @@ public class KeyValuesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(KeyValueDocument), Required = true, Description = "The document.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(KeyValueImportResult), Description = "The action per item: Create, Update, Unchanged or Delete, with the version after a write.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The document is invalid (ImportInvalid, with the failing items in Details); nothing was written.")]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseMtlsRequiredKeyValueImport)]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "A level is not allowed in the project (ProtectionNotAllowed).")]
     [OpenApiResponseWithBody(HttpStatusCode.FailedDependency, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseFailedDependency)]
     [OpenApiResponseWithBody(HttpStatusCode.NotImplemented, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseNotImplemented)]
     [OpenApiResponseWithBody(HttpStatusCode.ServiceUnavailable, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseServiceUnavailable)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Write}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> ImportKeyValues(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.KeyValues.V1.Import)]
@@ -566,8 +560,7 @@ public class KeyValuesHttp
         string project,
         string view)
     {
-        request.CheckScope(KeyValueAuthorization.WriteScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineManagementScope.ConfigurationTransfer);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Contributor, MachineScope.ConfigurationWrite, MachineScope.ConfigurationTransfer);
         var (document, invalidBody) = await request.ReadJsonBodyAsync<KeyValueDocument>(_bodyJsonOptions, "a key/value document", RequestBodyLimits.KeyValueImport, ErrorCodes.ImportInvalid);
 
         if (invalidBody is not null)
@@ -588,7 +581,7 @@ public class KeyValuesHttp
         };
 
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
-        var result = await KeyValueAuthorization.UnderMtlsRuleAsync(
+        var result = await KeyValueAuthorization.UnderMtlsWriteRuleAsync(
             rights,
             () => _keyValues.ImportAsync(organization, project, view, document, options, rights.Caller));
 
@@ -625,8 +618,7 @@ public class KeyValuesHttp
 
     private async Task<IActionResult> DiffAsync(HttpRequestData request, string organization, string project, string view, string key, ulong fromVersion, ulong toVersion)
     {
-        request.CheckScope(KeyValueAuthorization.ReadScopes);
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Reader, MachineScope.ConfigurationRead);
 
         var rights = (await request.GetSecretRightsAsync(_access, _policies, organization, project)).AsAmbient();
 
@@ -636,7 +628,7 @@ public class KeyValuesHttp
             request.MarkNoStore();
         }
 
-        return await KeyValueAuthorization.UnderMtlsRuleAsync(
+        return await KeyValueAuthorization.UnderMtlsReadRuleAsync(
             rights,
             () => _keyValues.GetVersionChangesAsync(organization, project, view, key, fromVersion, toVersion, rights.Caller).ToDiffResponseAsync(request));
     }

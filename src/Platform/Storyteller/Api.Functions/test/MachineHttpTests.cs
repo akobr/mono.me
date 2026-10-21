@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
@@ -16,8 +18,33 @@ public class MachineHttpTests
 {
     private const string KeycloakId = "42.sform.org1.proj1.0123456789abcdef0123456789abcdef";
 
+    private const string NoRuntimeScope = "A machine needs at least one runtime scope: AnnotationRead, AnnotationWrite, ConfigurationRead, ConfigurationWrite, SecretsRead or SecretsWrite.";
+
+    // The scopes of a new machine and the role they need (spec 4), each with every role of a user.
+    public static TheoryData<MachineScope[], AccountRole, AccountRole> RequestedScopes => WithEveryRole(
+        ([MachineScope.AnnotationRead], AccountRole.Contributor),
+        ([MachineScope.AnnotationWrite, MachineScope.ConfigurationWrite], AccountRole.Contributor),
+        ([MachineScope.ConfigurationRead, MachineScope.SecretsRead], AccountRole.ContributorWithSecrets),
+        ([MachineScope.SecretsWrite], AccountRole.ContributorWithSecrets),
+        ([MachineScope.ConfigurationRead, MachineScope.ConfigurationTransfer], AccountRole.Administrator),
+        ([MachineScope.ConfigurationWrite, MachineScope.SchemaWrite], AccountRole.Administrator),
+        ([MachineScope.ConfigurationWrite, MachineScope.TemplateWrite], AccountRole.Administrator),
+        ([MachineScope.AnnotationWrite, MachineScope.AnnotationManage], AccountRole.Administrator),
+        ([MachineScope.ConfigurationWrite, MachineScope.SecretsWrite, MachineScope.KeyValueManage], AccountRole.Administrator));
+
+    // The scopes of a stored machine and the role its reset needs, each with every role of a user.
+    public static TheoryData<MachineScope[], AccountRole, AccountRole> StoredScopes => WithEveryRole(
+        ([MachineScope.AnnotationRead, MachineScope.ConfigurationRead], AccountRole.Contributor),
+        ([MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite], AccountRole.Contributor),
+        ([MachineScope.ConfigurationRead, MachineScope.SecretsRead], AccountRole.ContributorWithSecrets),
+        ([MachineScope.SecretsRead, MachineScope.SecretsWrite], AccountRole.ContributorWithSecrets),
+        ([MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.ConfigurationTransfer], AccountRole.Administrator),
+        ([MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite, MachineScope.SecretsRead, MachineScope.KeyValueManage], AccountRole.Administrator),
+        ([.. MachineScopes.All], AccountRole.Administrator));
+
     private static bool DevAuth => HttpRequestDataExtensions.IsDevelopmentAuthentication;
 
+    // The role checks of users look up one role per check; Debug builds (DEV_AUTH) skip them.
     [Fact]
     public async Task GetMachine_StoredRecord_ReturnsIt()
     {
@@ -30,8 +57,11 @@ public class MachineHttpTests
         var ok = result.ShouldBeOfType<OkObjectResult>();
         ok.Value.ShouldBeSameAs(stored);
         access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}"]);
+        access.Roles.ShouldBe(RoleLookups("org1.proj1"));
     }
 
+    // The reset reads the stored machine once for its role rule; its runtime scopes need no more than the Contributor
+    // of the route, so no second role is looked up.
     [Fact]
     public async Task KeycloakId_GetResetAndDelete_ReachTheAccessService()
     {
@@ -50,6 +80,7 @@ public class MachineHttpTests
                 $"reset:org1/proj1/{KeycloakId}",
                 $"delete:org1/proj1/{KeycloakId}",
             ]);
+        access.Roles.ShouldBe(RoleLookups("org1.proj1", "org1.proj1", "org1.proj1"));
     }
 
     [Fact]
@@ -79,11 +110,12 @@ public class MachineHttpTests
         store.Reads.ShouldBe(["org1.proj1"]);
     }
 
+    // Setting the policy is for Administrators.
     [Fact]
     public async Task PutMachineAuthentication_StoresTheNormalizedPolicyAndReturnsTheEffectiveOne()
     {
         var store = new PolicyStore();
-        var http = CreateHttp(new RecordingAccess(Machine()), store);
+        var http = CreateHttp(Administrator(), store);
         var requested = new MachineAuthenticationPolicy
         {
             EnabledCredentialKinds = [MachineCredentialKind.ClientCredentials, MachineCredentialKind.ApiKey],
@@ -103,7 +135,7 @@ public class MachineHttpTests
     public async Task PutMachineAuthentication_InvalidPolicy_IsBadRequestAndNotStored()
     {
         var store = new PolicyStore();
-        var http = CreateHttp(new RecordingAccess(Machine()), store);
+        var http = CreateHttp(Administrator(), store);
         var requested = new MachineAuthenticationPolicy
         {
             EnabledCredentialKinds = [MachineCredentialKind.Certificate],
@@ -117,10 +149,30 @@ public class MachineHttpTests
         store.Stored.ShouldBeNull();
     }
 
+    // A user role check, so Debug builds (DEV_AUTH) skip it.
+    [Fact]
+    public async Task PutMachineAuthentication_ByAContributor_IsAccessDeniedAndNotStored()
+    {
+        if (DevAuth)
+        {
+            return;
+        }
+
+        var store = new PolicyStore();
+        var http = CreateHttp(new RecordingAccess(Machine()), store);
+        var policy = new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey };
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(
+            () => http.PutMachineAuthentication(ContributorRequest(FunctionTestDoubles.ToJsonBody(policy)), "org1.proj1"));
+
+        exception.Message.ShouldBe("No Administrator access to 'org1.proj1'.");
+        store.Stored.ShouldBeNull();
+    }
+
     [Fact]
     public async Task MachineAuthentication_OfAnOrganization_IsBadRequest()
     {
-        var http = CreateHttp(new RecordingAccess(Machine()), new PolicyStore());
+        var http = CreateHttp(Administrator(), new PolicyStore());
         var policy = new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey };
 
         (await http.GetMachineAuthentication(ContributorRequest(), "org1")).ShouldBeOfType<BadRequestObjectResult>();
@@ -159,7 +211,7 @@ public class MachineHttpTests
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>().AnnotationKey.ShouldBe(expected);
         access.Created.ShouldNotBeNull();
         access.Created.AnnotationKey.ShouldBe(expected);
-        access.Created.Scope.ShouldBe(MachineAccessScope.ConfigurationRead);
+        access.Created.Scopes.ShouldBe([MachineScope.ConfigurationRead]);
     }
 
     [Theory]
@@ -200,14 +252,20 @@ public class MachineHttpTests
         access.Created.ShouldBeNull();
     }
 
-    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran. A name that is not a
-    // management scope, also the dotted scope string that only sform accepts, is not a machine either.
+    // The worker's [FromBody] binding failed these bodies with a 500 before the handler ran. The API reads enum names:
+    // the scope strings and the kebab case that only sform accepts, and the names of the removed presets, are no
+    // machine scopes, so such a body is not a machine either.
     [Theory]
     [InlineData("", "The machine is missing.")]
     [InlineData("null", "The machine is missing.")]
     [InlineData("[1, 2]", "The request body is not a machine (at $).")]
-    [InlineData("""{ "Organization": "", "Project": "", "Scope": "DefaultRead", "ManagementScopes": ["Bogus"] }""", "The request body is not a machine (at $.ManagementScopes[0]).")]
-    [InlineData("""{ "Organization": "", "Project": "", "Scope": "DefaultRead", "ManagementScopes": ["Configuration.Transfer"] }""", "The request body is not a machine (at $.ManagementScopes[0]).")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": ["Bogus"] }""", "The request body is not a machine (at $.Scopes[0]).")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": ["Annotation.Read"] }""", "The request body is not a machine (at $.Scopes[0]).")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": ["Configuration.Transfer"] }""", "The request body is not a machine (at $.Scopes[0]).")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": ["annotation-read"] }""", "The request body is not a machine (at $.Scopes[0]).")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": ["DefaultRead"] }""", "The request body is not a machine (at $.Scopes[0]).")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": ["ConfigurationRead", "SecretsReadWrite"] }""", "The request body is not a machine (at $.Scopes[1]).")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": "AnnotationRead" }""", "The request body is not a machine (at $.Scopes).")]
     public async Task PostMachines_MissingOrInvalidBody_IsBadRequestAndNoMachineIsCreated(string body, string message)
     {
         var access = new RecordingAccess(Machine());
@@ -226,84 +284,105 @@ public class MachineHttpTests
     {
         var access = new RecordingAccess(Machine());
         var http = CreateHttp(access);
-        const string body = """{ "organization": "", "project": "", "scope": "configurationread" }""";
+        const string body = """{ "organization": "", "project": "", "scopes": ["configurationread"] }""";
 
         var result = await http.PostMachines(ContributorRequest(body), "org1", "proj1");
 
         result.ShouldBeOfType<OkObjectResult>();
         access.Created.ShouldNotBeNull();
-        access.Created.Scope.ShouldBe(MachineAccessScope.ConfigurationRead);
+        access.Created.Scopes.ShouldBe([MachineScope.ConfigurationRead]);
+    }
+
+    // The stored form, passed to the service and returned: the defined scopes, distinct, in enum order, completed once
+    // with X.Read for every X.Write. Secrets imply no Configuration scope and management scopes imply nothing. The JSON
+    // reads integers as enum values too. An Owner may give every scope, so the role rule does not get in the way.
+    [Theory]
+    [InlineData("""["AnnotationWrite"]""", new[] { MachineScope.AnnotationRead, MachineScope.AnnotationWrite })]
+    [InlineData("""["ConfigurationWrite"]""", new[] { MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite })]
+    [InlineData("""["SecretsWrite"]""", new[] { MachineScope.SecretsRead, MachineScope.SecretsWrite })]
+    [InlineData("""["SecretsRead", "ConfigurationWrite"]""", new[] { MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite, MachineScope.SecretsRead })]
+    [InlineData("""["ConfigurationTransfer", "AnnotationRead"]""", new[] { MachineScope.AnnotationRead, MachineScope.ConfigurationTransfer })]
+    [InlineData("""["SchemaWrite", "TemplateWrite", "ConfigurationWrite"]""", new[] { MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite, MachineScope.SchemaWrite, MachineScope.TemplateWrite })]
+    [InlineData("""["KeyValueManage", "ConfigurationWrite", "AnnotationRead", "KeyValueManage", "ConfigurationWrite"]""", new[] { MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite, MachineScope.KeyValueManage })]
+    [InlineData("""["annotationwrite", "CONFIGURATIONREAD", "annotationManage"]""", new[] { MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationRead, MachineScope.AnnotationManage })]
+    [InlineData("""[1, "ConfigurationRead"]""", new[] { MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationRead })]
+    public async Task PostMachines_Scopes_ArePassedDistinctInEnumOrderWithTheImpliedReads(string list, MachineScope[] expected)
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.Owner };
+        var http = CreateHttp(access);
+        var body = $$"""{ "Organization": "", "Project": "", "Scopes": {{list}} }""";
+
+        var result = await http.PostMachines(ContributorRequest(body), "org1", "proj1");
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>().Scopes.ShouldBe(expected);
+        access.Created.ShouldNotBeNull();
+        access.Created.Scopes.ShouldBe(expected);
     }
 
     [Fact]
-    public async Task PostMachines_ManagementScopes_ArePassedThrough()
+    public async Task PostMachines_EveryScopeInReverse_IsPassedInEnumOrder()
     {
-        var access = new RecordingAccess(Machine()) { Role = AccountRole.Administrator };
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.Owner };
         var http = CreateHttp(access);
-        var model = MachineCreate(null) with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite] };
+        var model = MachineCreate(null) with { Scopes = MachineScopes.All.Reverse().ToList() };
 
-        var result = await http.PostMachines(ContributorRequest(FunctionTestDoubles.ToJsonBody(model)), "org1", "proj1");
+        await http.PostMachines(ContributorRequest(FunctionTestDoubles.ToJsonBody(model)), "org1", "proj1");
 
-        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>()
-            .ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite]);
         access.Created.ShouldNotBeNull();
-        access.Created.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite]);
+        access.Created.Scopes.ShouldBe(MachineScopes.All);
     }
 
+    // The response carries the scopes as enum names, in enum order: the wire format of the SDKs.
+    [Fact]
+    public async Task PostMachines_Response_CarriesTheScopesAsEnumNames()
+    {
+        var access = new RecordingAccess(Machine());
+        var http = CreateHttp(access);
+        const string body = """{ "Organization": "", "Project": "", "Scopes": ["ConfigurationWrite", "AnnotationRead"] }""";
+
+        var result = await http.PostMachines(ContributorRequest(body), "org1", "proj1");
+
+        using var json = JsonDocument.Parse(FunctionTestDoubles.ToJsonBody(result.ShouldBeOfType<OkObjectResult>().Value));
+        json.RootElement.GetProperty("Scopes").EnumerateArray().Select(scope => scope.GetString())
+            .ShouldBe(["AnnotationRead", "ConfigurationRead", "ConfigurationWrite"]);
+    }
+
+    // A machine is exactly its scopes, so one without a runtime scope can do nothing: a missing list, an empty one and
+    // management scopes alone, which grant nothing without the runtime scope of their operation. A body of the old shape
+    // has no Scopes; its Scope and ManagementScopes are unknown properties. The 400 comes before the role rule, so a
+    // Contributor gets it for management scopes too.
     [Theory]
-    [InlineData("""{ "Organization": "", "Project": "", "Scope": "ConfigurationRead" }""")]
-    [InlineData("""{ "Organization": "", "Project": "", "Scope": "ConfigurationRead", "ManagementScopes": null }""")]
-    [InlineData("""{ "Organization": "", "Project": "", "Scope": "ConfigurationRead", "ManagementScopes": [] }""")]
-    public async Task PostMachines_WithoutManagementScopes_PassesNone(string body)
+    [InlineData("""{ "Organization": "", "Project": "" }""")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": null }""")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": [] }""")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": ["ConfigurationTransfer"] }""")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scopes": ["ConfigurationTransfer", "SchemaWrite", "TemplateWrite", "AnnotationManage", "KeyValueManage"] }""")]
+    [InlineData("""{ "Organization": "", "Project": "", "Scope": "DefaultReadWrite", "ManagementScopes": ["ConfigurationTransfer"] }""")]
+    public async Task PostMachines_WithoutARuntimeScope_IsBadRequestAndNoMachineIsCreated(string body)
     {
         var access = new RecordingAccess(Machine());
         var http = CreateHttp(access);
 
         var result = await http.PostMachines(ContributorRequest(body), "org1", "proj1");
 
-        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>().ManagementScopes.ShouldBeNull();
-        access.Created.ShouldNotBeNull();
-        access.Created.ManagementScopes.ShouldBeNull();
+        var error = result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<Models.ErrorResponse>();
+        error.Message.ShouldBe(NoRuntimeScope);
+        error.ErrorCode.ShouldBeNull();
+        access.Created.ShouldBeNull();
+        access.Roles.ShouldBe(RoleLookups("org1.proj1"));
     }
 
-    [Fact]
-    public async Task PostMachines_ManagementScopeNamesInAnyCase_AreRead()
-    {
-        var access = new RecordingAccess(Machine()) { Role = AccountRole.Administrator };
-        var http = CreateHttp(access);
-        const string body = """{ "organization": "", "project": "", "scope": "defaultreadwrite", "managementscopes": ["configurationtransfer", "KEYVALUEMANAGE"] }""";
-
-        var result = await http.PostMachines(ContributorRequest(body), "org1", "proj1");
-
-        result.ShouldBeOfType<OkObjectResult>();
-        access.Created.ShouldNotBeNull();
-        access.Created.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer, MachineManagementScope.KeyValueManage]);
-    }
-
-    // The stored form: distinct, in enum order.
-    [Fact]
-    public async Task PostMachines_DuplicateManagementScopes_AreDroppedAndOrdered()
-    {
-        var access = new RecordingAccess(Machine()) { Role = AccountRole.Administrator };
-        var http = CreateHttp(access);
-        const string body = """{ "Organization": "", "Project": "", "Scope": "DefaultRead", "ManagementScopes": ["KeyValueManage", "TemplateWrite", "KeyValueManage", "ConfigurationTransfer"] }""";
-
-        await http.PostMachines(ContributorRequest(body), "org1", "proj1");
-
-        access.Created.ShouldNotBeNull();
-        access.Created.ManagementScopes.ShouldBe(
-            [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.TemplateWrite, MachineManagementScope.KeyValueManage]);
-    }
-
-    // The JSON reads integers as enum values, so an undefined one reaches the handler.
+    // The JSON reads integers as enum values, so an undefined one reaches the handler; it is named before the list is
+    // checked for a runtime scope.
     [Theory]
-    [InlineData("[99]", "The machine management scope 99 doesn't exist.")]
-    [InlineData("""["SchemaWrite", 5]""", "The machine management scope 5 doesn't exist.")]
-    public async Task PostMachines_UndefinedManagementScope_IsBadRequestAndNoMachineIsCreated(string list, string message)
+    [InlineData("[99]", "The machine scope 99 doesn't exist.")]
+    [InlineData("""["SchemaWrite", 11]""", "The machine scope 11 doesn't exist.")]
+    [InlineData("""["AnnotationRead", -1]""", "The machine scope -1 doesn't exist.")]
+    public async Task PostMachines_UndefinedScope_IsBadRequestAndNoMachineIsCreated(string list, string message)
     {
         var access = new RecordingAccess(Machine()) { Role = AccountRole.Administrator };
         var http = CreateHttp(access);
-        var body = $$"""{ "Organization": "", "Project": "", "Scope": "DefaultRead", "ManagementScopes": {{list}} }""";
+        var body = $$"""{ "Organization": "", "Project": "", "Scopes": {{list}} }""";
 
         var result = await http.PostMachines(ContributorRequest(body), "org1", "proj1");
 
@@ -313,53 +392,150 @@ public class MachineHttpTests
         access.Created.ShouldBeNull();
     }
 
-    // Only an Administrator gives management scopes. Debug builds skip the role checks of users (DEV_AUTH).
-    [Fact]
-    public async Task PostMachines_ManagementScopesByAContributor_IsAccessDenied()
+    // Spec 4: the creator of a machine can use its credentials, so its scopes may not exceed what the creator may do or
+    // grant. Runtime scopes need the Contributor of the route, a secrets scope ContributorWithSecrets, a management scope
+    // Administrator; the highest one counts, and the implied reads are part of it (SecretsWrite brings SecretsRead).
+    // Below Contributor the route itself refuses. Debug builds (DEV_AUTH) skip the role checks of users, so there every
+    // creation passes.
+    [Theory]
+    [MemberData(nameof(RequestedScopes))]
+    public async Task PostMachines_TheScopes_NeedTheRoleOfTheirHighestGroup(MachineScope[] scopes, AccountRole needed, AccountRole role)
     {
-        if (DevAuth)
+        var access = new RecordingAccess(Machine()) { Role = role };
+        var http = CreateHttp(access);
+        var body = FunctionTestDoubles.ToJsonBody(MachineCreate(null) with { Scopes = scopes });
+
+        if (role >= needed || DevAuth)
         {
+            (await http.PostMachines(ContributorRequest(body), "org1", "proj1")).ShouldBeOfType<OkObjectResult>();
+            access.Created.ShouldNotBeNull();
             return;
         }
 
-        var access = new RecordingAccess(Machine());
-        var http = CreateHttp(access);
-        var model = MachineCreate(null) with { ManagementScopes = [MachineManagementScope.AnnotationManage] };
-
-        var exception = await Should.ThrowAsync<AccessDeniedException>(
-            () => http.PostMachines(ContributorRequest(FunctionTestDoubles.ToJsonBody(model)), "org1", "proj1"));
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.PostMachines(ContributorRequest(body), "org1", "proj1"));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
-        exception.Message.ShouldBe("No Administrator access to 'org1.proj1'.");
+        exception.Message.ShouldBe($"No {Refusing(role, needed):G} access to 'org1.proj1'.");
         access.Created.ShouldBeNull();
     }
 
-    // A new secret gives out what an Administrator granted: a Contributor resets machines without management scopes only.
-    // Debug builds skip the role checks of users (DEV_AUTH), so there every reset passes.
+    // A new secret gives out the scopes of the stored machine, so the reset needs the role they need (spec 4), from one
+    // point read of the stored machine. Debug builds (DEV_AUTH) skip the role checks of users, so there every reset passes.
     [Theory]
-    [InlineData(false, AccountRole.Contributor, true)]
-    [InlineData(true, AccountRole.Contributor, false)]
-    [InlineData(true, AccountRole.Administrator, true)]
-    [InlineData(true, AccountRole.Owner, true)]
-    public async Task PutMachine_OfAMachineWithManagementScopes_NeedsAnAdministrator(bool managed, AccountRole role, bool allowed)
+    [MemberData(nameof(StoredScopes))]
+    public async Task PutMachine_TheStoredScopes_NeedTheRoleOfTheirHighestGroup(MachineScope[] stored, AccountRole needed, AccountRole role)
     {
-        var machine = managed ? Machine() with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer] } : Machine();
-        var access = new RecordingAccess(machine) { Role = role };
+        var access = new RecordingAccess(Machine() with { Scopes = stored }) { Role = role };
         var http = CreateHttp(access);
 
-        if (allowed || DevAuth)
+        if (role >= needed || DevAuth)
         {
             var reset = await http.PutMachine(ContributorRequest(), "org1", "proj1", KeycloakId);
 
             reset.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<MachineAccess>().AccessKey.ShouldBe("new-secret");
-            access.Calls.ShouldContain($"reset:org1/proj1/{KeycloakId}");
+            access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"reset:org1/proj1/{KeycloakId}"]);
             return;
         }
 
         var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.PutMachine(ContributorRequest(), "org1", "proj1", KeycloakId));
 
-        exception.Message.ShouldBe("No Administrator access to 'org1.proj1'.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe($"No {Refusing(role, needed):G} access to 'org1.proj1'.");
         access.Calls.ShouldNotContain($"reset:org1/proj1/{KeycloakId}");
+    }
+
+    // A machine that is not stored has no scopes to check; the reset answers as it always did.
+    [Fact]
+    public async Task PutMachine_OfAnUnknownMachine_IsLeftToTheService()
+    {
+        var access = new RecordingAccess(null);
+        var http = CreateHttp(access);
+
+        await Should.ThrowAsync<NotFoundException>(() => http.PutMachine(ContributorRequest(), "org1", "proj1", KeycloakId));
+
+        access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"reset:org1/proj1/{KeycloakId}"]);
+    }
+
+    // Spec 4: reading, listing and deleting a machine stay at Contributor, whatever its scopes. Debug builds (DEV_AUTH)
+    // skip the role checks of users.
+    [Theory]
+    [InlineData(AccountRole.Reader, false)]
+    [InlineData(AccountRole.Contributor, true)]
+    public async Task GetListAndDelete_OfAMachineWithEveryScope_NeedOnlyAContributor(AccountRole role, bool allowed)
+    {
+        var access = new RecordingAccess(Machine() with { Scopes = MachineScopes.All }) { Role = role };
+        var http = CreateHttp(access);
+
+        if (allowed || DevAuth)
+        {
+            (await http.GetMachines(ContributorRequest(), "org1", "proj1")).ShouldBeOfType<OkObjectResult>();
+            (await http.GetMachine(ContributorRequest(), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkObjectResult>();
+            (await http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkResult>();
+
+            access.Calls.ShouldBe(["list:org1/proj1", $"get:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
+            access.Roles.ShouldBe(RoleLookups("org1.proj1", "org1.proj1", "org1.proj1"));
+            return;
+        }
+
+        foreach (var call in new Func<Task>[]
+                 {
+                     () => http.GetMachines(ContributorRequest(), "org1", "proj1"),
+                     () => http.GetMachine(ContributorRequest(), "org1", "proj1", KeycloakId),
+                     () => http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId),
+                 })
+        {
+            (await Should.ThrowAsync<AccessDeniedException>(call)).Message.ShouldBe("No Contributor access to 'org1.proj1'.");
+        }
+
+        access.Calls.ShouldBeEmpty();
+    }
+
+    // Machines are managed by users (spec 7.4): every machine route refuses a machine in every build, also one whose
+    // credentials carry every scope and User.Impersonation, before a machine or a policy is read.
+    [Fact]
+    public async Task MachineRoutes_Machine_IsAccessDeniedInEveryBuild()
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.Owner };
+        var store = new PolicyStore();
+        var http = CreateHttp(access, store);
+        var create = FunctionTestDoubles.ToJsonBody(MachineCreate(null));
+        var policy = FunctionTestDoubles.ToJsonBody(new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey });
+
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetMachines(UserOnlyRoutes.Machine(), "org1", "proj1"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetMachine(UserOnlyRoutes.Machine(), "org1", "proj1", KeycloakId));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.PostMachines(UserOnlyRoutes.Machine("POST", create), "org1", "proj1"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.PutMachine(UserOnlyRoutes.Machine("PUT"), "org1", "proj1", KeycloakId));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.DeleteMachine(UserOnlyRoutes.Machine("DELETE"), "org1", "proj1", KeycloakId));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetMachineAuthentication(UserOnlyRoutes.Machine(), "org1.proj1"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.PutMachineAuthentication(UserOnlyRoutes.Machine("PUT", policy), "org1.proj1"));
+
+        access.Calls.ShouldBeEmpty();
+        access.Roles.ShouldBeEmpty();
+        access.Created.ShouldBeNull();
+        store.Reads.ShouldBeEmpty();
+        store.Stored.ShouldBeNull();
+    }
+
+    // Data scopes in a user token do not stand in for User.Impersonation: 401 in Release builds. Debug builds (DEV_AUTH)
+    // skip the check and serve the request.
+    [Fact]
+    public async Task PostMachines_TokenThatDoesNotActForAUser_IsUnauthorized()
+    {
+        var access = new RecordingAccess(Machine()) { Role = AccountRole.Owner };
+        var http = CreateHttp(access);
+        var request = UserOnlyRoutes.NotActingForAUser("POST", FunctionTestDoubles.ToJsonBody(MachineCreate(null)));
+
+        if (DevAuth)
+        {
+            (await http.PostMachines(request, "org1", "proj1")).ShouldBeOfType<OkObjectResult>();
+            return;
+        }
+
+        var exception = await Should.ThrowAsync<SecurityTokenException>(() => http.PostMachines(request, "org1", "proj1"));
+
+        exception.Message.ShouldBe(UserOnlyRoutes.NotActingForAUserMessage);
+        access.Created.ShouldBeNull();
+        access.Roles.ShouldBeEmpty();
     }
 
     [Theory]
@@ -369,7 +545,7 @@ public class MachineHttpTests
     public async Task PutMachineAuthentication_MissingOrInvalidBody_IsBadRequestAndNotStored(string body, string message)
     {
         var store = new PolicyStore();
-        var http = CreateHttp(new RecordingAccess(Machine()), store);
+        var http = CreateHttp(Administrator(), store);
 
         var result = await http.PutMachineAuthentication(ContributorRequest(body), "org1.proj1");
 
@@ -390,7 +566,30 @@ public class MachineHttpTests
         return new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance, policyStore: policyStore, machineOptions: options);
     }
 
-    // A contributor's request; a body goes as JSON, with its content type.
+    private static RecordingAccess Administrator() => new(Machine()) { Role = AccountRole.Administrator };
+
+    private static TheoryData<MachineScope[], AccountRole, AccountRole> WithEveryRole(params (MachineScope[] Scopes, AccountRole Needed)[] rows)
+    {
+        var cases = new TheoryData<MachineScope[], AccountRole, AccountRole>();
+
+        foreach (var (scopes, needed) in rows)
+        {
+            foreach (var role in new[] { AccountRole.Reader, AccountRole.Contributor, AccountRole.ContributorWithSecrets, AccountRole.Administrator, AccountRole.Owner })
+            {
+                cases.Add(scopes, needed, role);
+            }
+        }
+
+        return cases;
+    }
+
+    // The role a refusal names: the Contributor of the route comes first, then the role of the scopes.
+    private static AccountRole Refusing(AccountRole role, AccountRole needed) => role < AccountRole.Contributor ? AccountRole.Contributor : needed;
+
+    // The role lookups of the user checks: Release builds make them, Debug builds (DEV_AUTH) skip them.
+    private static string[] RoleLookups(params string[] accessPointKeys) => DevAuth ? [] : accessPointKeys;
+
+    // A user's request (the role is the one of RecordingAccess); a body goes as JSON, with its content type.
     private static TestHttpRequestData ContributorRequest(string? body = null)
     {
         using var services = new ServiceCollection().BuildServiceProvider();
@@ -411,7 +610,7 @@ public class MachineHttpTests
             Id = KeycloakId,
             ObjectId = "6f1c2d3e-4a5b-4c6d-8e7f-901a2b3c4d5e",
             AccessKey = "kc-***",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.ClientCredentials,
         };
     }
@@ -423,7 +622,7 @@ public class MachineHttpTests
         {
             Organization = string.Empty,
             Project = string.Empty,
-            Scope = MachineAccessScope.ConfigurationRead,
+            Scopes = [MachineScope.ConfigurationRead],
             AnnotationKey = annotationKey,
         };
     }
@@ -447,9 +646,14 @@ public class MachineHttpTests
         }
     }
 
-    private sealed class RecordingAccess(MachineAccess machine) : IAccessService
+    // One stored machine, or none. The role lookups of the user checks are kept apart from the machine calls, so the
+    // calls compare alike in Debug and Release builds.
+    private sealed class RecordingAccess(MachineAccess? machine) : IAccessService
     {
         public List<string> Calls { get; } = [];
+
+        // The access points whose role the user checks looked up, one entry per check.
+        public List<string> Roles { get; } = [];
 
         // The role of every account; checked in Release builds only.
         public AccountRole Role { get; init; } = AccountRole.Contributor;
@@ -459,26 +663,43 @@ public class MachineHttpTests
 
         public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey)
         {
-            Calls.Add($"role:{accessPointKey}");
+            Roles.Add(accessPointKey);
             return Task.FromResult(Role);
         }
 
         public Task<MachineAccess?> GetMachineAccessAsync(string organization, string project, string id)
         {
             Calls.Add($"get:{organization}/{project}/{id}");
-            return Task.FromResult<MachineAccess?>(machine);
+            return Task.FromResult(machine);
         }
 
+        public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project)
+        {
+            Calls.Add($"list:{organization}/{project}");
+            return Task.FromResult<IEnumerable<MachineAccess>>(machine is null ? [] : [machine]);
+        }
+
+        // As the Cosmos service: an unknown machine is not found.
         public Task<MachineAccess> ResetMachineAccessAsync(string organization, string project, string appId)
         {
             Calls.Add($"reset:{organization}/{project}/{appId}");
-            return Task.FromResult(machine with { AccessKey = "new-secret" });
+            return machine is null
+                ? Task.FromException<MachineAccess>(new NotFoundException($"The machine access {appId} has not been found."))
+                : Task.FromResult(machine with { AccessKey = "new-secret" });
         }
 
         public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId)
         {
             Calls.Add($"delete:{organization}/{project}/{appId}");
             return Task.FromResult(true);
+        }
+
+        // Every service returns exactly the requested scopes (spec 3.5).
+        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
+        {
+            Calls.Add($"create:{model.Organization}/{model.Project}");
+            Created = model;
+            return Task.FromResult((machine ?? Machine()) with { Scopes = model.Scopes ?? [], AnnotationKey = model.AnnotationKey });
         }
 
         public Task<Account?> GetAccountAsync(string id) => throw new NotImplementedException();
@@ -494,15 +715,6 @@ public class MachineHttpTests
         public Task<bool> GrantPermissionAsync(Permission model) => throw new NotImplementedException();
 
         public Task<bool> RevokePermissionAsync(Permission model) => throw new NotImplementedException();
-
-        public Task<IEnumerable<MachineAccess>> GetMachineAccessesAsync(string organization, string project) => throw new NotImplementedException();
-
-        public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
-        {
-            Calls.Add($"create:{model.Organization}/{model.Project}");
-            Created = model;
-            return Task.FromResult(machine with { Scope = model.Scope, AnnotationKey = model.AnnotationKey, ManagementScopes = model.ManagementScopes });
-        }
 
         public Task<bool> VerifyAccessForMachineAsync(string organization, string project, string appId) => throw new NotImplementedException();
 

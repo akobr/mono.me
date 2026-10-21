@@ -13,7 +13,8 @@ namespace _42.Platform.Storyteller;
 public static class EntryPoint
 {
     // Entra ID app registrations for ClientCredentials machine access, with any user provider.
-    // Needs MachineAuth:AzureAd:TenantId, Auth:TenantId, Auth:ClientId and Auth:AppRoles (checked at startup).
+    // Needs MachineAuth:AzureAd:TenantId, Auth:TenantId and Auth:ClientId (checked at startup), and the
+    // Auth:AppRoles:<scope> of every scope its machines get (IDs checked at startup, presence at creation).
     public static IServiceCollection AddAzureAdMachineAccess(
         this IServiceCollection services,
         IConfiguration configuration)

@@ -38,15 +38,15 @@ public sealed class KeycloakMachineTokenValidatorTests : IDisposable
         {
             ["azp"] = "42.sform.org1.proj1.abc",
             ["sub"] = "b0c1d2e3-service-account",
-            ["storyteller_scope"] = "Annotation.Read Annotation.ReadWrite",
-            ["scp"] = "Configuration.Secrets",
-            ["roles"] = "Default.ReadWrite",
+            ["storyteller_scope"] = "Annotation.Read Annotation.Write",
+            ["scp"] = "Secrets.Read",
+            ["roles"] = "Configuration.Write",
         }));
 
         result.ShouldNotBeNull();
         result.IsMachine.ShouldBeTrue();
         result.MachineId.ShouldBe("42.sform.org1.proj1.abc");
-        Values(result, "scp").ShouldBe(["Annotation.Read Annotation.ReadWrite"]);
+        Values(result, "scp").ShouldBe(["Annotation.Read Annotation.Write"]);
         Values(result, "azp").ShouldBe(["42.sform.org1.proj1.abc"]);
         Values(result, "roles").ShouldBeEmpty();
         Values(result, "storyteller_scope").ShouldBeEmpty();

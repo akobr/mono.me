@@ -55,13 +55,14 @@ public class AccessHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Account), Description = Definitions.Descriptions.ResponseAccount)]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The account doesn't exist.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetAccount(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.Account)]
         HttpRequestData request)
     {
-        request.CheckScope(Scopes.User.Impersonation);
+        request.EnsureUser();
         var accountId = request.GetIdentityUniqueId();
         _logger.LogWarning("GET api/access/account call with accountId: {accountId}", accountId);
         var account = await _accessService.GetAccountAsync(accountId);
@@ -78,13 +79,14 @@ public class AccessHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Models.AccountCreate), Description = "Organization and project for the new account, and the description of the project.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(Account), Description = "Newly created account.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.BadRequest, Description = "The account already exists, only one of the organization and the project is given, or a project description is given without them.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostAccount(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Account)]
         HttpRequestData request)
     {
-        request.CheckScope(Scopes.User.Impersonation);
+        request.EnsureUser();
         var accountId = request.GetIdentityUniqueId();
         _logger.LogWarning("POST api/access/account call with accountId: {accountId}", accountId);
         var account = await _accessService.GetAccountAsync(accountId);
@@ -138,13 +140,14 @@ public class AccessHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<AccessPoint>), Description = "The list of all manageable organizations and projects. The access points where the account is Admin or Owner.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetAccessPoints(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.AccessPoints)]
         HttpRequestData request)
     {
-        request.CheckScope(Scopes.User.Impersonation);
+        request.EnsureUser();
         var accountId = request.GetIdentityUniqueId();
         _logger.LogWarning("GET api/access/points call with accountId: {accountId}", accountId);
         var points = await _accessService.GetAccessPointsAsync(accountId);
@@ -157,17 +160,17 @@ public class AccessHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The key of requested access point.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The access point (organization or project).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetAccessPoint(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.AccessPoint)]
         HttpRequestData request,
         string key)
     {
-        request.CheckScope(Scopes.User.Impersonation);
         var pointKey = key.Trim().ToLowerInvariant();
         // TODO: [P2] check if pointKey is valid and expected format
-        await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
+        await request.CheckUserAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
         var point = await _accessService.GetAccessPointAsync(pointKey);
         return new OkObjectResult(point);
     }
@@ -178,13 +181,14 @@ public class AccessHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AccessPointCreate), Description = "An organization or project to create, and the description of the project.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The created access point (organization or project).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostAccessPoints(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.AccessPoints)]
         HttpRequestData request)
     {
-        request.CheckScope(Scopes.User.Impersonation);
+        request.EnsureUser();
         var accountId = request.GetIdentityUniqueId();
         _logger.LogInformation("POST api/access/points call with accountId: {accountId}", accountId);
         var (pointModel, invalidBody) = await request.ReadJsonBodyAsync<AccessPointCreate>(_bodyJsonOptions, "an access point", RequestBodyLimits.Control);
@@ -213,7 +217,8 @@ public class AccessHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(AccessPointUpdate), Description = "The new description; empty or no body clears it.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The updated project.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key is not organization.project, or the body is not a project update.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The project doesn't exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.Conflict, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The project changed concurrently twice in a row (Conflict); try again.")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
@@ -222,10 +227,9 @@ public class AccessHttp
         HttpRequestData request,
         string key)
     {
-        EnsureNotMachine(request, "Describing a project needs a user with the Administrator role.");
-        request.CheckScope(Scopes.User.Impersonation);
+        request.EnsureUser("Describing a project needs a user with the Administrator role.");
         var pointKey = key.Trim().ToLowerInvariant();
-        await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
+        await request.CheckUserAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
 
         // Only a project has a description.
         if (!TrySplitProjectKey(pointKey, out _, out _, out var badRequestResult))
@@ -250,15 +254,15 @@ public class AccessHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Manual, SecuritySchemeType.Http, Scheme = OpenApiSecuritySchemeType.Bearer, BearerFormat = Definitions.Others.JWT, Description = Definitions.Descriptions.SecureManual)]
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<ProjectSummary>), Description = "The caller's projects.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The account doesn't exist.")]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetProjects(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.Projects)]
         HttpRequestData request)
     {
-        EnsureNotMachine(request, "Listing projects needs a user.");
-        request.CheckScope(Scopes.User.Impersonation);
+        request.EnsureUser("Listing projects needs a user.");
         var accountId = request.GetIdentityUniqueId();
         var projects = await _accessService.GetProjectsAsync(accountId);
         return new OkObjectResult(projects);
@@ -270,13 +274,14 @@ public class AccessHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Permission), Description = "The requested permission to grant.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The affected access point (organization or project).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostGrantPermission(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Grant)]
         HttpRequestData request)
     {
-        request.CheckScope(Scopes.User.Impersonation);
+        request.EnsureUser();
         var (permissionModel, invalidBody) = await request.ReadJsonBodyAsync<Permission>(_bodyJsonOptions, "a permission", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
@@ -302,13 +307,14 @@ public class AccessHttp
     [OpenApiSecurity(Definitions.SecuritySchemas.Integrated, SecuritySchemeType.OAuth2, Flows = typeof(OAuthFlows))]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(Permission), Description = "The requested permission to revoke.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(AccessPoint), Description = "The affected access point (organization or project).")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostRevokePermission(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Revoke)]
         HttpRequestData request)
     {
-        request.CheckScope(Scopes.User.Impersonation);
+        request.EnsureUser();
         var (permissionModel, invalidBody) = await request.ReadJsonBodyAsync<Permission>(_bodyJsonOptions, "a permission", RequestBodyLimits.Control);
 
         if (invalidBody is not null)
@@ -335,7 +341,8 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<MachineAccess>), Description = "The list of machine accesses for the project.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetMachines(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.Machines)]
@@ -343,8 +350,7 @@ public class AccessHttp
         string organization,
         string project)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         var machineAccesses = await _accessService.GetMachineAccessesAsync(organization, project);
         return new OkObjectResult(machineAccesses
@@ -360,7 +366,8 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdMachine)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAccess), Description = "The machine access.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetMachine(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.Machine)]
@@ -369,8 +376,7 @@ public class AccessHttp
         string project,
         string id)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         if (!MachineIds.IsValid(id))
         {
@@ -392,9 +398,9 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(MachineAccessCreate), Description = "An organization or project to create.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAccess), Description = "The created access point (organization or project).")]
-    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The annotation key is not valid (ErrorCode InvalidKey), a management scope doesn't exist, or the credential kind is not supported.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes)]
+    [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequestMachineAccessCreate)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineScopes)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PostMachines(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.Machines)]
@@ -402,8 +408,7 @@ public class AccessHttp
         string organization,
         string project)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
         var (machineModel, invalidBody) = await request.ReadJsonBodyAsync<MachineAccessCreate>(_bodyJsonOptions, "a machine", RequestBodyLimits.FederationRules);
 
         if (invalidBody is not null)
@@ -423,18 +428,23 @@ public class AccessHttp
         }
 
         // The JSON reads integers as enum values too, so [99] gets here.
-        if (MachineAccessScopes.FindUndefined(machineModel.ManagementScopes) is { } undefined)
+        if (MachineScopes.FindUndefined(machineModel.Scopes) is { } undefined)
         {
-            return new BadRequestObjectResult(new ErrorResponse($"The machine management scope {undefined:D} doesn't exist."));
+            return new BadRequestObjectResult(new ErrorResponse($"The machine scope {undefined:D} doesn't exist."));
         }
 
-        var managementScopes = MachineAccessScopes.Normalize(machineModel.ManagementScopes);
+        // Write implies read, completed once, here: the stored list holds both, so every check needs one scope.
+        var scopes = MachineScopes.WithImpliedReads(machineModel.Scopes);
 
-        // An Administrator decides on management scopes; a Contributor creates machines without them.
-        if (managementScopes is not null)
+        // A missing list, an empty one and management scopes alone are refused: a management scope grants nothing
+        // without the runtime scope of its operation.
+        if (!scopes.Any(MachineScopes.IsRuntime))
         {
-            await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
+            return new BadRequestObjectResult(new ErrorResponse("A machine needs at least one runtime scope: AnnotationRead, AnnotationWrite, ConfigurationRead, ConfigurationWrite, SecretsRead or SecretsWrite."));
         }
+
+        // Secrets scopes need ContributorWithSecrets and management scopes an Administrator; a Contributor gives the rest.
+        await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, scopes);
 
         // TODO: [P1] hide the model from the client
         machineModel = machineModel with
@@ -442,7 +452,7 @@ public class AccessHttp
             Organization = organization,
             Project = project,
             AnnotationKey = annotationKey,
-            ManagementScopes = managementScopes,
+            Scopes = scopes,
         };
 
         try
@@ -464,8 +474,8 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdMachine)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAccess), Description = "The restarted machine access.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineScopes)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutMachine(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.Machine)]
@@ -474,16 +484,15 @@ public class AccessHttp
         string project,
         string id)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         if (!MachineIds.IsValid(id))
         {
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
 
-        // A new secret gives out the machine's management scopes.
-        await EnsureAdministratorForManagementScopesAsync(request, _accessService, organization, project, id);
+        // A new secret gives out the machine's scopes, so the reset needs the role they need.
+        await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
 
         try
         {
@@ -505,7 +514,8 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Id, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.IdMachine)]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The machine access doesn't exist.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteMachine(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.Access.V1.Machine)]
@@ -514,8 +524,7 @@ public class AccessHttp
         string project,
         string id)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Contributor);
 
         if (!MachineIds.IsValid(id))
         {
@@ -564,18 +573,18 @@ public class AccessHttp
     [OpenApiParameter(Definitions.Parameters.Key, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The key of the access point (organization.project).")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The machine authentication policy of the project.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "The key is not organization.project.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetMachineAuthentication(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.MachineAuthentication)]
         HttpRequestData request,
         string key)
     {
-        request.CheckScope(Scopes.User.Impersonation);
         var pointKey = key.Trim().ToLowerInvariant();
 
         // Contributors create machines, so they read the kinds and the default lifetime too.
-        await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Contributor);
+        await request.CheckUserAccessToAsync(_accessService, pointKey, AccountRole.Contributor);
 
         if (!TrySplitProjectKey(pointKey, out var organization, out var project, out var badRequestResult))
         {
@@ -594,16 +603,16 @@ public class AccessHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The machine authentication policy to set: the enabled credential kinds, the default kind (one of them; the first enabled kind when null) and the default certificate lifetime (the deployment default when null). A policy with only CredentialKind enables that one kind.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(MachineAuthenticationPolicy), Description = "The updated machine authentication policy, with every property filled.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "No kind is enabled, a kind doesn't exist, the default kind is not enabled, or the certificate lifetime is out of the deployment's bounds.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> PutMachineAuthentication(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Put, Route = Definitions.Routes.Access.V1.MachineAuthentication)]
         HttpRequestData request,
         string key)
     {
-        request.CheckScope(Scopes.User.Impersonation);
         var pointKey = key.Trim().ToLowerInvariant();
-        await request.CheckAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
+        await request.CheckUserAccessToAsync(_accessService, pointKey, AccountRole.Administrator);
 
         if (_policyStore is null)
         {
@@ -633,10 +642,10 @@ public class AccessHttp
         return new OkObjectResult(MachineAuthenticationPolicies.Resolve(normalized, _machineOptions));
     }
 
-    // An Administrator decides on management scopes, so whatever gives out or redirects the credentials of a machine
-    // that has them (reset, the federation rules) needs an Administrator; a Contributor manages the other machines.
-    // One point read; a missing machine is left to the route, which answers as before.
-    internal static async Task EnsureAdministratorForManagementScopesAsync(
+    // The creator of a machine can use its credentials, so whatever gives them out or redirects them (reset, the
+    // federation rules) needs the role the stored scopes need. One point read; a missing machine is left to the route,
+    // which answers as before.
+    internal static async Task EnsureRoleForMachineScopesAsync(
         HttpRequestData request,
         IAccessService accessService,
         string organization,
@@ -645,20 +654,40 @@ public class AccessHttp
     {
         var machine = await accessService.GetMachineAccessAsync(organization, project, id);
 
-        if (machine?.ManagementScopes is { Count: > 0 })
+        if (machine is not null)
         {
-            await request.CheckAccessToProjectAsync(accessService, organization, project, AccountRole.Administrator);
+            await EnsureRoleForMachineScopesAsync(request, accessService, organization, project, machine.Scopes);
         }
     }
 
-    // Machine access is checked per project without roles, so these operations are for users only. A machine is refused
-    // before the scope check, which it would fail with a 401 in every build but a DEV_AUTH one.
-    private static void EnsureNotMachine(HttpRequestData request, string message)
+    // A machine's scopes may not exceed what its creator may do or grant: a management scope needs an Administrator,
+    // a secrets scope ContributorWithSecrets, and the Contributor check of the route covers the rest. A user role
+    // check, so Debug builds (DEV_AUTH) skip it.
+    internal static async Task EnsureRoleForMachineScopesAsync(
+        HttpRequestData request,
+        IAccessService accessService,
+        string organization,
+        string project,
+        IReadOnlyList<MachineScope> scopes)
     {
-        if (request.TryGetApplicationIdentity(out _))
+        var role = GetRoleForMachineScopes(scopes);
+
+        if (role > AccountRole.Contributor)
         {
-            throw new AccessDeniedException(message);
+            await request.CheckUserAccessToProjectAsync(accessService, organization, project, role);
         }
+    }
+
+    private static AccountRole GetRoleForMachineScopes(IReadOnlyList<MachineScope> scopes)
+    {
+        if (scopes.Any(MachineScopes.IsManagement))
+        {
+            return AccountRole.Administrator;
+        }
+
+        return scopes.Any(MachineScopes.IsSecrets)
+            ? AccountRole.ContributorWithSecrets
+            : AccountRole.Contributor;
     }
 
     private static bool TrySplitProjectKey(

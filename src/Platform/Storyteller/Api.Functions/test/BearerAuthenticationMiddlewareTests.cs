@@ -283,6 +283,75 @@ public class BearerAuthenticationMiddlewareTests
         });
     }
 
+    // The role-driven mode: no default user scopes, and a WorkOS permission that maps to User.Impersonation. Without the
+    // permission the token does not act for a user.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Invoke_DebugDecode_AuthKitUserPermission_GivesUserImpersonation(bool hasPermission)
+    {
+        await WithModeAsync(decodeWithoutValidation: true, async () =>
+        {
+            var validator = new RecordingBearerTokenValidator();
+            using var services = FunctionTestDoubles.CreateServices(validator, new UserAuthenticationOptions
+            {
+                Provider = IdentityProviderKind.AuthKit,
+                AuthKit = new AuthKitOptions
+                {
+                    ClientId = "client_123",
+                    PermissionMap = new Dictionary<string, string>
+                    {
+                        ["storyteller:user"] = Scopes.User.Impersonation,
+                        ["storyteller:annotation-read"] = Scopes.Annotation.Read,
+                    },
+                },
+            });
+            var permissions = hasPermission ? """["storyteller:user","storyteller:annotation-read"]""" : """["storyteller:annotation-read"]""";
+            var (context, request) = FunctionTestDoubles.CreateRequest(
+                services,
+                Bearer(UnsignedJwt($$"""{"sub":"user_01","email":"ada@example.com","permissions":{{permissions}}}""")));
+
+            await InvokeAsync(context);
+
+            request.GetScopes().Contains(Scopes.User.Impersonation).ShouldBe(hasPermission);
+            context.Items.ContainsKey(FunctionContextItemKeys.MachineIdentity).ShouldBeFalse();
+        });
+    }
+
+    // A WorkOS M2M token carries permission slugs in scope; the map turns each into its scope string, the carried half
+    // of the scope checks. Unmapped slugs give nothing.
+    [Fact]
+    public async Task Invoke_DebugDecode_AuthKitMachineToken_CarriesTheMappedScopeStrings()
+    {
+        await WithModeAsync(decodeWithoutValidation: true, async () =>
+        {
+            var validator = new RecordingBearerTokenValidator();
+            using var services = FunctionTestDoubles.CreateServices(validator, new UserAuthenticationOptions
+            {
+                Provider = IdentityProviderKind.AuthKit,
+                AuthKit = new AuthKitOptions
+                {
+                    ClientId = "client_123",
+                    PermissionMap = new Dictionary<string, string>
+                    {
+                        ["storyteller:annotation-read"] = Scopes.Annotation.Read,
+                        ["storyteller:configuration-write"] = Scopes.Configuration.Write,
+                    },
+                },
+            });
+            var (context, request) = FunctionTestDoubles.CreateRequest(
+                services,
+                Bearer(UnsignedJwt("""{"sub":"client_01M2M","client_id":"client_01M2M","scope":"storyteller:annotation-read storyteller:configuration-write storyteller:unknown"}""")));
+
+            var called = await InvokeAsync(context);
+
+            called.ShouldBeTrue();
+            context.Items[FunctionContextItemKeys.MachineIdentity].ShouldBe("client_01M2M");
+            context.Items[FunctionContextItemKeys.MachineCredentialKind].ShouldBe(MachineCredentialKind.ClientCredentials);
+            request.GetScopes().ShouldBe([Scopes.Annotation.Read, Scopes.Configuration.Write], ignoreOrder: true);
+        });
+    }
+
     [Fact]
     public async Task Invoke_CancellationDuringValidation_Propagates()
     {

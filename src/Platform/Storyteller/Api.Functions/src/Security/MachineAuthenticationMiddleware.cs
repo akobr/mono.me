@@ -104,8 +104,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
         string organization;
         string project;
         string machineAccessId;
-        MachineAccessScope scope;
-        IReadOnlyList<MachineManagementScope>? managementScopes;
+        IReadOnlyList<MachineScope> scopes;
 
         if (certResult is not null && apiKeyResult is not null)
         {
@@ -124,8 +123,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
                 organization = certResult.Organization;
                 project = certResult.Project;
                 machineAccessId = certResult.MachineAccessId!;
-                scope = certResult.Scope;
-                managementScopes = certResult.ManagementScopes;
+                scopes = certResult.Scopes;
             }
             else
             {
@@ -141,8 +139,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
                 organization = apiKeyResult.Organization;
                 project = apiKeyResult.Project;
                 machineAccessId = apiKeyResult.MachineAccessId;
-                scope = apiKeyResult.Scope;
-                managementScopes = apiKeyResult.ManagementScopes;
+                scopes = apiKeyResult.Scopes;
             }
         }
         else if (certResult is not null)
@@ -158,8 +155,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
             organization = certResult.Organization;
             project = certResult.Project;
             machineAccessId = certResult.MachineAccessId!;
-            scope = certResult.Scope;
-            managementScopes = certResult.ManagementScopes;
+            scopes = certResult.Scopes;
         }
         else
         {
@@ -167,8 +163,7 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
             organization = apiKeyResult!.Organization;
             project = apiKeyResult.Project;
             machineAccessId = apiKeyResult.MachineAccessId;
-            scope = apiKeyResult.Scope;
-            managementScopes = apiKeyResult.ManagementScopes;
+            scopes = apiKeyResult.Scopes;
         }
 
         // The machine presents what its own kind requires, and the project still enables that kind.
@@ -215,15 +210,15 @@ public class MachineAuthenticationMiddleware : IFunctionsWorkerMiddleware
             new("sub", machineAccessId),
         };
 
-        // A machine without runtime scopes is refused; management scopes only add to them.
-        if (MachineScopeClaims.GetRoleClaimsForScope(scope).Count == 0)
+        // The credentials carry the stored scopes of the machine, from the same record as its identity. A machine
+        // without scopes is refused; each operation checks its own scopes later (HttpRequestDataExtensions).
+        var roleClaims = MachineScopeClaims.GetRoleClaims(scopes);
+
+        if (roleClaims.Count == 0)
         {
             await RespondUnauthorizedAsync(context, httpReqData);
             return;
         }
-
-        // The management scopes come from the same record as the scope.
-        var roleClaims = MachineScopeClaims.GetRoleClaimsForScope(scope, managementScopes);
 
         foreach (var roleClaim in roleClaims)
         {

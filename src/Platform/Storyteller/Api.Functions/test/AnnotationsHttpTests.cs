@@ -41,6 +41,9 @@ public class AnnotationsHttpTests
         nameof(AnnotationsHttp.RestoreAnnotations),
     };
 
+    // Debug builds (DEV_AUTH) skip the role check of users.
+    private static bool DevAuth => Security.HttpRequestDataExtensions.IsDevelopmentAuthentication;
+
     [Theory]
     [InlineData("POST")]
     [InlineData("PUT")]
@@ -537,31 +540,53 @@ public class AnnotationsHttpTests
         annotations.Calls.ShouldBe(["restore:acme:billing:default:sbt.a:False"]);
     }
 
+    // A permanent delete is for users only: a machine is refused in every build, whatever its credentials carry,
+    // User.Impersonation and every machine scope included.
     [Fact]
     public async Task Purge_ByMachine_IsDenied()
     {
         var annotations = new RecordingAnnotations();
-        var request = Request("DELETE");
-        request.FunctionContext.Items[FunctionContextItemKeys.MachineIdentity] = "machine-1";
+        var request = TestRequests.MachineCarrying([Scopes.User.Impersonation, .. MachineScopes.ToScopeStrings(MachineScopes.All)], "DELETE");
 
-        await Should.ThrowAsync<AccessDeniedException>(() => Http(annotations).PurgeAnnotation(request, "acme", "billing", "default", "sbt.a"));
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Http(annotations, AccountRole.Administrator).PurgeAnnotation(request, "acme", "billing", "default", "sbt.a"));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("A permanent delete needs a user with the Administrator role.");
         annotations.Calls.ShouldBeEmpty();
     }
 
     [Fact]
-    public async Task Purge_ByUser_CallsTheService()
+    public async Task Purge_ByAnAdministrator_CallsTheService()
     {
         var annotations = new RecordingAnnotations();
 
-        var result = await Http(annotations).PurgeAnnotation(Request("DELETE"), "acme", "billing", "default", "sbt.a");
+        var result = await Http(annotations, AccountRole.Administrator).PurgeAnnotation(Request("DELETE"), "acme", "billing", "default", "sbt.a");
 
         result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<AnnotationPurgeResult>();
         annotations.Calls.ShouldBe(["purge:acme:sbt.a"]);
     }
 
+    // Release builds check the role of users; Debug builds (DEV_AUTH) skip it.
+    [Fact]
+    public async Task Purge_ByAContributor_IsDeniedInRelease()
+    {
+        if (DevAuth)
+        {
+            return;
+        }
+
+        var annotations = new RecordingAnnotations();
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Http(annotations).PurgeAnnotation(Request("DELETE"), "acme", "billing", "default", "sbt.a"));
+
+        exception.Message.ShouldBe("No Administrator access to 'acme.billing'.");
+        annotations.Calls.ShouldBeEmpty();
+    }
+
     // Bulk create, soft delete (it cascades to the descendants) and restore need the management scope Annotation.Manage
-    // from a machine (424-57), checked with the machine document in every build. Without it, the machine is refused
-    // (403 AccessDenied) before any service call; SetAnnotation, one annotation at a time, stays a runtime write.
+    // from a machine (424-57), on top of the runtime scope Annotation.Write, checked with the machine document in every
+    // build. Without it, the machine is refused (403 AccessDenied) before any service call; SetAnnotation, one
+    // annotation at a time, stays a runtime write.
     [Theory]
     [MemberData(nameof(ManagementOperations))]
     public async Task ManagementOperation_ByAMachineWithTheRuntimeScopesOnly_IsAccessDeniedBeforeTheService(string operation)
@@ -571,7 +596,7 @@ public class AnnotationsHttpTests
         var exception = await Should.ThrowAsync<AccessDeniedException>(() => CallManagement(MachineHttp(annotations, managementScopes: null), operation, MachineRequest(operation)));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
-        exception.Message.ShouldBe("This operation needs the management scope Annotation.Manage, which the machine was not created with.");
+        exception.Message.ShouldBe("This operation needs the scope Annotation.Manage, which the machine was not created with.");
         annotations.Calls.ShouldBeEmpty();
     }
 
@@ -580,12 +605,33 @@ public class AnnotationsHttpTests
     public async Task ManagementOperation_ByAMachineWithAnnotationManage_ReachesTheService(string operation)
     {
         var annotations = new RecordingAnnotations();
-        MachineManagementScope[] manage = [MachineManagementScope.AnnotationManage];
+        MachineScope[] manage = [MachineScope.AnnotationManage];
 
         var result = await CallManagement(MachineHttp(annotations, manage), operation, MachineRequest(operation, manage));
 
         result.ShouldBeOfType<OkObjectResult>();
         annotations.Calls.ShouldHaveSingleItem();
+    }
+
+    // The management scope grants nothing without the runtime scope of the operation, which is checked first.
+    [Theory]
+    [MemberData(nameof(ManagementOperations))]
+    public async Task ManagementOperation_ByAMachineWithAnnotationManageButWithoutAnnotationWrite_IsAccessDeniedBeforeTheService(string operation)
+    {
+        var annotations = new RecordingAnnotations();
+        var http = new AnnotationsHttp(
+            annotations,
+            new RoleAccess(AccountRole.None, scopes: [MachineScope.AnnotationRead, MachineScope.AnnotationManage]),
+            new FixedTime(Now),
+            FunctionTestDoubles.ApiJsonOptions,
+            NullLogger<AnnotationsHttp>.Instance);
+        var request = KeyValueRequests.Machine(mtls: false, ManagementMethod(operation), body: ManagementBody(operation), roles: [Scopes.Annotation.Read, Scopes.Annotation.Manage]);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => CallManagement(http, operation, request));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the scope Annotation.Write, which the machine was not created with.");
+        annotations.Calls.ShouldBeEmpty();
     }
 
     [Fact]
@@ -621,19 +667,19 @@ public class AnnotationsHttpTests
         result.ShouldBeOfType<NotFoundResult>();
     }
 
-    private static AnnotationsHttp Http(RecordingAnnotations annotations)
+    private static AnnotationsHttp Http(RecordingAnnotations annotations, AccountRole role = AccountRole.Contributor)
     {
-        return new AnnotationsHttp(annotations, new ContributorAccess(), new FixedTime(Now), FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
+        return new AnnotationsHttp(annotations, new UserAccess(role), new FixedTime(Now), FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
     }
 
     // The machine of the project has the given management scopes.
-    private static AnnotationsHttp MachineHttp(RecordingAnnotations annotations, IReadOnlyList<MachineManagementScope>? managementScopes)
+    private static AnnotationsHttp MachineHttp(RecordingAnnotations annotations, IReadOnlyList<MachineScope>? managementScopes)
     {
         return new AnnotationsHttp(annotations, new RoleAccess(AccountRole.None, managementScopes: managementScopes), new FixedTime(Now), FunctionTestDoubles.ApiJsonOptions, NullLogger<AnnotationsHttp>.Instance);
     }
 
     // A machine with the runtime scopes of annotations, and the given management scopes in its credentials.
-    private static TestHttpRequestData MachineRequest(string operation, IReadOnlyList<MachineManagementScope>? managementScopes = null)
+    private static TestHttpRequestData MachineRequest(string operation, IReadOnlyList<MachineScope>? managementScopes = null)
     {
         return KeyValueRequests.Machine(mtls: false, ManagementMethod(operation), body: ManagementBody(operation), managementScopes: managementScopes, roles: [Scopes.Annotation.Read, Scopes.Annotation.Write]);
     }
@@ -726,7 +772,7 @@ public class AnnotationsHttpTests
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "user_01"),
-            new("scp", $"{Scopes.Annotation.Read} {Scopes.Annotation.Write}"),
+            new("scp", Scopes.User.Impersonation),
         };
         return request;
     }
@@ -845,10 +891,10 @@ public class AnnotationsHttpTests
         public override DateTimeOffset GetUtcNow() => now;
     }
 
-    // The signed-in user is a Contributor of every project.
-    private sealed class ContributorAccess : IAccessService
+    // The signed-in user has the given role on every project.
+    private sealed class UserAccess(AccountRole role) : IAccessService
     {
-        public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey) => Task.FromResult(AccountRole.Contributor);
+        public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey) => Task.FromResult(role);
 
         public Task<Account?> GetAccountAsync(string id) => throw new NotImplementedException();
 

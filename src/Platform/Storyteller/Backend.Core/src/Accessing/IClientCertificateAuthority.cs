@@ -8,7 +8,6 @@ public interface IClientCertificateAuthority
         string organization,
         string project,
         string machineAccessId,
-        MachineAccessScope scope,
         int lifetimeDays);
 
     Task<IssuedCertificate> IssueSharedCertificateAsync(

@@ -29,7 +29,7 @@ public class LocalCertificateAuthorityTests
         var material = TestCertificateHelper.CreateCaMaterial();
         var authority = CreateAuthority(material);
 
-        var issued = await authority.IssueCertificateAsync("org1", "proj1", "machine-1", MachineAccessScope.DefaultRead, 365);
+        var issued = await authority.IssueCertificateAsync("org1", "proj1", "machine-1", 365);
 
         issued.ShouldNotBeNull();
         issued.Pkcs12.ShouldNotBeEmpty();
@@ -46,7 +46,7 @@ public class LocalCertificateAuthorityTests
         var material = TestCertificateHelper.CreateCaMaterial();
         var authority = CreateAuthority(material);
 
-        var issued = await authority.IssueCertificateAsync("org1", "proj1", "machine-1", MachineAccessScope.DefaultRead, 365);
+        var issued = await authority.IssueCertificateAsync("org1", "proj1", "machine-1", 365);
         var cert = X509CertificateLoader.LoadPkcs12(issued.Pkcs12, issued.Password);
         var identity = CertificateIdentity.TryParse(cert, _options.TrustDomain);
 
@@ -63,7 +63,7 @@ public class LocalCertificateAuthorityTests
         var material = TestCertificateHelper.CreateCaMaterial();
         var authority = CreateAuthority(material);
 
-        var issued = await authority.IssueCertificateAsync("org1", "proj1", "m1", MachineAccessScope.DefaultRead, 365);
+        var issued = await authority.IssueCertificateAsync("org1", "proj1", "m1", 365);
         var cert = X509CertificateLoader.LoadPkcs12(issued.Pkcs12, issued.Password);
 
         using var chain = new X509Chain();
@@ -80,7 +80,7 @@ public class LocalCertificateAuthorityTests
         var material = TestCertificateHelper.CreateCaMaterial();
         var authority = CreateAuthority(material);
 
-        var issued = await authority.IssueCertificateAsync("org1", "proj1", "m1", MachineAccessScope.DefaultRead, 365);
+        var issued = await authority.IssueCertificateAsync("org1", "proj1", "m1", 365);
         var cert = X509CertificateLoader.LoadPkcs12(issued.Pkcs12, issued.Password);
 
         var ekuExt = cert.Extensions.OfType<X509EnhancedKeyUsageExtension>().FirstOrDefault();
@@ -98,7 +98,7 @@ public class LocalCertificateAuthorityTests
         var authority = CreateAuthority(material);
 
         // Request 10-year leaf — should be clamped
-        var issued = await authority.IssueCertificateAsync("org1", "proj1", "m1", MachineAccessScope.DefaultRead, 3650);
+        var issued = await authority.IssueCertificateAsync("org1", "proj1", "m1", 3650);
 
         var daysDiff = (issued.NotAfter - issued.NotBefore).TotalDays;
         daysDiff.ShouldBeLessThan(366); // clamped to ~365
@@ -125,7 +125,7 @@ public class LocalCertificateAuthorityTests
         var material = TestCertificateHelper.CreateCaMaterial();
         var authority = CreateAuthority(material);
 
-        var issued = await authority.IssueCertificateAsync("org1", "proj1", "m1", MachineAccessScope.DefaultRead, 365);
+        var issued = await authority.IssueCertificateAsync("org1", "proj1", "m1", 365);
 
         var cert = X509CertificateLoader.LoadPkcs12(issued.Pkcs12, issued.Password);
         cert.ShouldNotBeNull();

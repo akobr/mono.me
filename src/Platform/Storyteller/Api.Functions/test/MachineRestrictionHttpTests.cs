@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Security.Claims;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Annotating;
@@ -11,7 +10,6 @@ using _42.Platform.Storyteller.Configuring;
 using _42.Platform.Storyteller.KeyValues;
 
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using Newtonsoft.Json.Linq;
@@ -21,7 +19,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 // A machine restricted to one execution, at the handlers: it reaches the execution and its descendants, and gets
 // 403 AnnotationRestricted before any service is called for an ancestor, a sibling or an operation that spans the
 // project. The machine branch of the access checks runs in every build, so these tests hold in Debug and Release.
-// MachineRestrictionHttpTests.Handlers.cs runs every handler of one annotation, and more project-wide ones, from tables.
+// MachineRestrictionHttpTests.Handlers.cs runs every handler of one annotation, the project-wide ones and the rest from
+// tables, also against the machine scopes of each handler.
 public partial class MachineRestrictionHttpTests
 {
     private const string Org = "acme";
@@ -35,9 +34,13 @@ public partial class MachineRestrictionHttpTests
     private const string Ancestor = "sbt.northwind";
     private const string Sibling = "exe.northwind.invoicing.dev";
 
+    // Why a machine is refused a scope.
+    private const string NotStored = "which the machine was not created with";
+    private const string NotCarried = "which the credentials of the machine do not carry";
+
     private static readonly AuditStamp Stamp = AuditStamp.Of(AuditActor.System, DateTimeOffset.UnixEpoch);
 
-    private static readonly MachineManagementScope[] EveryManagementScope = Enum.GetValues<MachineManagementScope>();
+    private static readonly MachineScope[] EveryManagementScope = [.. MachineScopes.Management];
 
     [Theory]
     [InlineData(Ancestor)]
@@ -208,7 +211,7 @@ public partial class MachineRestrictionHttpTests
     {
         var (annotations, recorder) = Recording<IAnnotationService>();
         recorder.Returns(nameof(IAnnotationService.CreateAnnotationsAsync), CreatedWithTheAncestors());
-        var http = CreateAnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor, managementScopes: [MachineManagementScope.AnnotationManage]));
+        var http = CreateAnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor, managementScopes: [MachineScope.AnnotationManage]));
         List<Annotation> body = [StoredAnnotation(Descendant)];
 
         var result = await http.SetAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(body)), Org, Project, DefaultView);
@@ -304,7 +307,7 @@ public partial class MachineRestrictionHttpTests
             Annotations = [StoredAnnotation(Ancestor), StoredAnnotation(Restriction)],
             CreatedKeys = [Ancestor],
         });
-        var http = CreateAnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor, managementScopes: [MachineManagementScope.AnnotationManage]));
+        var http = CreateAnnotationsHttp(annotations, new RoleAccess(AccountRole.Contributor, managementScopes: [MachineScope.AnnotationManage]));
         var model = new AnnotationRestoreRequest { Keys = [Restriction] };
 
         var result = await http.RestoreAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(model)), Org, Project, DefaultView);
@@ -334,8 +337,20 @@ public partial class MachineRestrictionHttpTests
         List<Annotation> created = [StoredAnnotation(Restriction), StoredAnnotation(Descendant)];
         var restored = new AnnotationRestoreRequest { Keys = [Restriction, Descendant] };
 
-        await ShouldNeedTheManagementScopeAsync(() => http.SetAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(created)), Org, Project, DefaultView), MachineManagementScope.AnnotationManage);
-        await ShouldNeedTheManagementScopeAsync(() => http.RestoreAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(restored)), Org, Project, DefaultView), MachineManagementScope.AnnotationManage);
+        await ShouldNeedTheScopeAsync(() => http.SetAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(created)), Org, Project, DefaultView), MachineScope.AnnotationManage);
+        await ShouldNeedTheScopeAsync(() => http.RestoreAnnotations(MachineRequest("POST", FunctionTestDoubles.ToJsonBody(restored)), Org, Project, DefaultView), MachineScope.AnnotationManage);
+    }
+
+    // The bulk handlers read the body before the access check, but a machine without the runtime scope of the
+    // operation gets its 403 before the 400 of a body that cannot be read.
+    [Fact]
+    public async Task Bulk_WithABodyThatCannotBeRead_ByAMachineWithoutTheRuntimeScope_IsAccessDeniedFirst()
+    {
+        var http = CreateAnnotationsHttp(Untouched<IAnnotationService>(), new RoleAccess(AccountRole.None, scopes: [MachineScope.ConfigurationRead, MachineScope.AnnotationManage]));
+
+        await ShouldNeedTheScopeAsync(() => http.SetAnnotations(MachineRequest("POST", "{"), Org, Project, DefaultView), MachineScope.AnnotationWrite);
+        await ShouldNeedTheScopeAsync(() => http.FindDeletedAnnotations(MachineRequest("POST", "{"), Org, Project, DefaultView), MachineScope.AnnotationRead);
+        await ShouldNeedTheScopeAsync(() => http.RestoreAnnotations(MachineRequest("POST", "{"), Org, Project, DefaultView), MachineScope.AnnotationWrite);
     }
 
     // A body that cannot be read names no key, so it passes the restriction and gets the 400 of the body.
@@ -429,30 +444,19 @@ public partial class MachineRestrictionHttpTests
         exception.ErrorCode.ShouldBe(ErrorCodes.AnnotationRestricted);
     }
 
-    private static async Task ShouldNeedTheManagementScopeAsync(Func<Task> act, MachineManagementScope scope)
+    // A scope of the operation that the machine document lacks (NotStored) or its credentials do (NotCarried).
+    private static async Task ShouldNeedTheScopeAsync(Func<Task> act, MachineScope scope, string reason = NotStored)
     {
         var exception = await Should.ThrowAsync<AccessDeniedException>(act);
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
-        exception.Message.ShouldBe($"This operation needs the management scope {MachineAccessScopes.Get(scope)}, which the machine was not created with.");
+        exception.Message.ShouldBe($"This operation needs the scope {MachineScopes.ToScopeString(scope)}, {reason}.");
     }
 
-    // The scopes pass the scope checks of a Release build, and the credentials carry every management scope; the
-    // restriction and the management scopes the machine has come from the machine document. A body goes as JSON, with
-    // its content type.
+    // The credentials carry every scope; the restriction and the scopes the machine has come from the machine document.
+    // A body goes as JSON, with its content type.
     private static TestHttpRequestData MachineRequest(string method = "GET", string? body = null)
     {
-        var headers = body is null ? null : FunctionTestDoubles.JsonContentType();
-        var (context, request) = FunctionTestDoubles.CreateRequest(new ServiceCollection().BuildServiceProvider(), headers, method, body);
-        var claims = new List<Claim>
-        {
-            new("sub", "machine-1"),
-            new("roles", Scopes.Default.Read),
-            new("roles", Scopes.Default.Write),
-        };
-        claims.AddRange(EveryManagementScope.Select(scope => new Claim("roles", MachineAccessScopes.Get(scope)!)));
-        context.Items[FunctionContextItemKeys.CachedClaims] = claims;
-        context.Items[FunctionContextItemKeys.MachineIdentity] = "machine-1";
-        return request;
+        return TestRequests.Machine(method: method, body: body);
     }
 
     // The restricted machine has every management scope, so the tests of the restriction keep testing the restriction

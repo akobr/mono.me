@@ -30,16 +30,16 @@ public class FederatedMachineAccessService : IFederatedMachineAccessService
 
         var id = Guid.NewGuid().ToString("D");
 
+        // Exactly the requested scopes: the handler completed them, and the access service stores what comes back.
         return new MachineAccess
         {
             Id = id,
             ObjectId = id,
             AccessKey = string.Empty,
-            Scope = model.Scope,
+            Scopes = model.Scopes ?? [],
             AnnotationKey = model.AnnotationKey,
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = model.FederationRules!.ToList(),
-            ManagementScopes = model.ManagementScopes,
         };
     }
 

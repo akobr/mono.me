@@ -9,8 +9,7 @@ public record CertificateRecord(
     DateTimeOffset NotBefore,
     DateTimeOffset NotAfter,
     bool IsRevoked,
-    MachineAccessScope Scope,
+    IReadOnlyList<MachineScope> Scopes,
     string? AnnotationKey,
     DateTimeOffset? LastRenewalAt,
-    MachineCredentialKind? CredentialKind = null,
-    IReadOnlyList<MachineManagementScope>? ManagementScopes = null);
+    MachineCredentialKind? CredentialKind = null);

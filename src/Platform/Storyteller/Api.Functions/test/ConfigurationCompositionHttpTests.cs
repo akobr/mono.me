@@ -230,7 +230,7 @@ public class ConfigurationCompositionHttpTests
         return Headers(request).ETag.ToString();
     }
 
-    // A user with the Default scopes, which pass the scope check of a Release build.
+    // A user, whose token carries only User.Impersonation; the Reader role of the double lets it in.
     private static TestHttpRequestData Read(string? ifNoneMatch = null)
     {
         return WithHttpContext(KeyValueRequests.User(), ifNoneMatch);

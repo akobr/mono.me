@@ -19,9 +19,8 @@ public sealed class RecordingIdentityProviderMachineAccessService : IIdentityPro
             Id = $"client_{suffix}",
             ObjectId = $"conn_app_{suffix}",
             AccessKey = $"secret-{suffix}",
-            Scope = model.Scope,
+            Scopes = model.Scopes ?? [],
             AnnotationKey = model.AnnotationKey,
-            ManagementScopes = model.ManagementScopes,
         });
     }
 

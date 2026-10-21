@@ -4,9 +4,9 @@ namespace _42.Platform.Storyteller.Api.Security;
 
 public static class MachineScopeClaims
 {
-    // One role claim per scope string: the preset's, then the management scopes granted on top of it.
-    public static IReadOnlyList<string> GetRoleClaimsForScope(MachineAccessScope scope, IEnumerable<MachineManagementScope>? managementScopes = null)
+    // One role claim per scope string of the stored list; a record without scopes gives none.
+    public static IReadOnlyList<string> GetRoleClaims(IEnumerable<MachineScope>? scopes)
     {
-        return MachineAccessScopes.Get(scope, managementScopes);
+        return scopes is null ? [] : MachineScopes.ToScopeStrings(scopes);
     }
 }

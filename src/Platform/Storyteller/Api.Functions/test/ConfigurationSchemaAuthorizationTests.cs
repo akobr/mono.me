@@ -11,9 +11,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // The six schema writes govern the validation of every configuration of their type, so a machine needs the management
-// scope Schema.Write for them on top of its runtime write scopes (424-57). The check reads the machine document in every
-// build: a machine without it is refused (403 AccessDenied) before the body is read and before any service call. Users
-// need no management scope; their role decides, as before (the role check runs in Release builds only).
+// scope Schema.Write for them on top of the runtime scope Configuration.Write (424-57), checked in that order. The check
+// reads the machine document in every build: a machine without either is refused (403 AccessDenied) before the body is
+// read and before any service call. Users need no scope; their role decides, as before (the role check runs in
+// Release builds only).
 public class ConfigurationSchemaAuthorizationTests
 {
     private const string Org = "acme";
@@ -50,7 +51,7 @@ public class ConfigurationSchemaAuthorizationTests
         var exception = await Should.ThrowAsync<AccessDeniedException>(() => write.Invoke(http, MachineRequest(write)));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
-        exception.Message.ShouldBe("This operation needs the management scope Schema.Write, which the machine was not created with.");
+        exception.Message.ShouldBe("This operation needs the scope Schema.Write, which the machine was not created with.");
     }
 
     // The other management scopes do not stand in for it, Template.Write included.
@@ -59,7 +60,7 @@ public class ConfigurationSchemaAuthorizationTests
     public async Task Write_ByAMachineWithEveryOtherManagementScope_IsAccessDenied(string name)
     {
         var write = Write(name);
-        var others = Enum.GetValues<MachineManagementScope>().Where(scope => scope != MachineManagementScope.SchemaWrite).ToList();
+        var others = MachineScopes.Management.Where(scope => scope != MachineScope.SchemaWrite).ToList();
         var http = Http(Untouched<IConfigurationSchemaService>(), new RoleAccess(AccountRole.None, managementScopes: others));
 
         var exception = await Should.ThrowAsync<AccessDeniedException>(() => write.Invoke(http, MachineRequest(write, others)));
@@ -73,12 +74,27 @@ public class ConfigurationSchemaAuthorizationTests
     {
         var write = Write(name);
         var (schemas, recorder) = Recording<IConfigurationSchemaService>();
-        var http = Http(schemas, new RoleAccess(AccountRole.None, managementScopes: [MachineManagementScope.SchemaWrite]));
+        var http = Http(schemas, new RoleAccess(AccountRole.None, managementScopes: [MachineScope.SchemaWrite]));
 
-        var result = await write.Invoke(http, MachineRequest(write, [MachineManagementScope.SchemaWrite]));
+        var result = await write.Invoke(http, MachineRequest(write, [MachineScope.SchemaWrite]));
 
         result.ShouldNotBeOfType<BadRequestObjectResult>();
         recorder.Calls.ShouldHaveSingleItem().Method.ShouldBe(write.Method);
+    }
+
+    // Schema.Write grants nothing without the runtime scope Configuration.Write, which is checked first.
+    [Theory]
+    [MemberData(nameof(WriteNames))]
+    public async Task Write_ByAMachineWithSchemaWriteButWithoutConfigurationWrite_IsAccessDenied(string name)
+    {
+        var write = Write(name);
+        var http = Http(Untouched<IConfigurationSchemaService>(), new RoleAccess(AccountRole.None, scopes: [MachineScope.ConfigurationRead, MachineScope.SchemaWrite]));
+        var request = KeyValueRequests.Machine(mtls: false, write.HttpMethod, body: write.Body, roles: [Scopes.Configuration.Read, Scopes.Schema.Write]);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => write.Invoke(http, request));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the scope Configuration.Write, which the machine was not created with.");
     }
 
     [Theory]
@@ -122,7 +138,7 @@ public class ConfigurationSchemaAuthorizationTests
     }
 
     // A machine with the runtime write scopes of configurations, and the given management scopes in its credentials.
-    private static TestHttpRequestData MachineRequest(SchemaWrite write, IReadOnlyList<MachineManagementScope>? managementScopes = null)
+    private static TestHttpRequestData MachineRequest(SchemaWrite write, IReadOnlyList<MachineScope>? managementScopes = null)
     {
         return KeyValueRequests.Machine(mtls: false, write.HttpMethod, body: write.Body, managementScopes: managementScopes, roles: [Scopes.Configuration.Read, Scopes.Configuration.Write]);
     }

@@ -30,8 +30,9 @@ public class CertificateMachineAccessService
         var lifetimeDays = ResolveLifetimeDays(model.CertificateLifetimeDays, opts);
 
         var id = Guid.NewGuid().ToString("D");
+        var scopes = model.Scopes ?? [];
         var issued = await _authority.IssueCertificateAsync(
-            model.Organization, model.Project, id, model.Scope, lifetimeDays);
+            model.Organization, model.Project, id, lifetimeDays);
 
         var record = new CertificateRecord(
             MachineAccessId: id,
@@ -42,11 +43,10 @@ public class CertificateMachineAccessService
             NotBefore: issued.NotBefore,
             NotAfter: issued.NotAfter,
             IsRevoked: false,
-            Scope: model.Scope,
+            Scopes: scopes,
             AnnotationKey: model.AnnotationKey,
             LastRenewalAt: null,
-            CredentialKind: MachineCredentialKind.Certificate,
-            ManagementScopes: model.ManagementScopes);
+            CredentialKind: MachineCredentialKind.Certificate);
 
         await _store.StoreAsync(model.Organization, model.Project, record);
 
@@ -55,7 +55,7 @@ public class CertificateMachineAccessService
             Id = id,
             ObjectId = id,
             AccessKey = string.Empty,
-            Scope = model.Scope,
+            Scopes = scopes,
             AnnotationKey = model.AnnotationKey,
             CredentialKind = MachineCredentialKind.Certificate,
             Certificate = Convert.ToBase64String(issued.Pkcs12),
@@ -63,18 +63,17 @@ public class CertificateMachineAccessService
             CertificateThumbprint = issued.Thumbprint,
             CertificateLifetimeDays = lifetimeDays,
             CertificateNotAfter = issued.NotAfter,
-            ManagementScopes = model.ManagementScopes,
         };
     }
 
-    // The result keeps what the API key half set, ManagementScopes included.
+    // The record carries the requested scopes; the result keeps what the API key half set, Scopes included.
     public async Task<MachineAccess> ExtendWithCertificateAsync(MachineAccess existingAccess, MachineAccessCreate model)
     {
         var opts = _options.Value;
         var lifetimeDays = ResolveLifetimeDays(model.CertificateLifetimeDays, opts);
 
         var issued = await _authority.IssueCertificateAsync(
-            model.Organization, model.Project, existingAccess.Id, model.Scope, lifetimeDays);
+            model.Organization, model.Project, existingAccess.Id, lifetimeDays);
 
         var record = new CertificateRecord(
             MachineAccessId: existingAccess.Id,
@@ -85,11 +84,10 @@ public class CertificateMachineAccessService
             NotBefore: issued.NotBefore,
             NotAfter: issued.NotAfter,
             IsRevoked: false,
-            Scope: model.Scope,
+            Scopes: model.Scopes ?? [],
             AnnotationKey: model.AnnotationKey,
             LastRenewalAt: null,
-            CredentialKind: MachineCredentialKind.CertificateAndApiKey,
-            ManagementScopes: model.ManagementScopes);
+            CredentialKind: MachineCredentialKind.CertificateAndApiKey);
 
         await _store.StoreAsync(model.Organization, model.Project, record);
 
