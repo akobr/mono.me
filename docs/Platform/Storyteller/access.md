@@ -58,7 +58,7 @@ The description is stored on the project's access point document (`apt.{organiza
 
 ## Roles
 
-Scopes describe machines, roles describe people. A user is authorized by the role on the access point only: the token must act for a user (the scope `User.Impersonation`, else `401` "The token does not act for a user: the scope User.Impersonation is missing."), and data scopes in a user token grant nothing. Debug builds (`DEV_AUTH`) skip these checks of users; the checks of machines run in every build. A machine has no role: its scopes decide, as described below the table.
+Scopes describe machines, roles describe people. A user is authorized by the role on the access point only: the token must act for a user (the scope `User.Impersonation`, else `401` with no body; the reason is only logged), and data scopes in a user token grant nothing. Debug builds (`DEV_AUTH`) skip these checks of users; the checks of machines run in every build. A machine has no role: its scopes decide, as described below the table.
 
 `None < Reader < Contributor < ContributorWithSecrets < Administrator < Owner`
 
@@ -72,7 +72,7 @@ Scopes describe machines, roles describe people. A user is authorized by the rol
 | Delete an annotation permanently (`DELETE …/annotations/deleted/{key}`) | `Administrator` on the project, users only: machine credentials get `403` |
 | Export a view, import into a view, and read those jobs | `Administrator` on the project for users, without data scopes. Machines have no role and need `Configuration.Transfer` and the scope of every included kind: to export, `Annotation.Read` for annotations and `Configuration.Read` for the other kinds; to import, `Annotation.Write` and `Configuration.Write`; a machine restricted to an annotation gets `403` `AnnotationRestricted` (see [export-import.md](export-import.md#access)) |
 | Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, and no scope gives it to a user; machines `Secrets.Read`, under the mTLS rule of the project (see [key-values.md](key-values.md#secret-delivery)) |
-| Write key/value secrets: set, delete, restore, protect, import with secrets | `ContributorWithSecrets` on the project; machines `Secrets.Write`, under the mTLS rule of the project |
+| Write key/value secrets: set, delete, restore, protect, import with secrets | `ContributorWithSecrets` on the project; machines `Secrets.Write`, under the mTLS rule of the project. A restore answers no `403` for a secret: it reports the key as `Forbidden` |
 | Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project, users only: machine credentials get `403` |
 | Set the [description of a project](#projects) | `Administrator` on the project, users only: machine credentials get `403` |
 
