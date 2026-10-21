@@ -308,61 +308,159 @@ public class MachineCreateCommandTests
         ]);
     }
 
+    [Fact]
+    public async Task WithoutAScopeOption_SendsTheReadScopes()
+    {
+        var bodies = CapturesTheBodies();
+
+        var exitCode = await Execute();
+
+        exitCode.ShouldBe(ExitCodes.SUCCESS);
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe([MachineScope.AnnotationRead, MachineScope.ConfigurationRead]);
+        Newtonsoft.Json.JsonConvert.SerializeObject(bodies[0]).ShouldContain("\"Scopes\":[\"AnnotationRead\",\"ConfigurationRead\"]");
+    }
+
+    [Fact]
+    public async Task ReadOnly_SendsTheReadScopes()
+    {
+        var bodies = CapturesTheBodies();
+
+        await Execute(readOnly: true);
+
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe([MachineScope.AnnotationRead, MachineScope.ConfigurationRead]);
+    }
+
+    [Fact]
+    public async Task Write_SendsTheReadAndWriteScopesOfAnnotationsAndConfigurations()
+    {
+        var bodies = CapturesTheBodies();
+
+        await Execute(write: true);
+
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe(
+            [MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite]);
+    }
+
     [Theory]
-    [InlineData("ConfigurationTransfer", MachineManagementScope.ConfigurationTransfer)]
-    [InlineData("Configuration.Transfer", MachineManagementScope.ConfigurationTransfer)]
-    [InlineData("configuration-transfer", MachineManagementScope.ConfigurationTransfer)]
-    [InlineData("CONFIGURATION.TRANSFER", MachineManagementScope.ConfigurationTransfer)]
-    [InlineData(" configurationtransfer ", MachineManagementScope.ConfigurationTransfer)]
-    [InlineData("schema.write", MachineManagementScope.SchemaWrite)]
-    [InlineData("template-write", MachineManagementScope.TemplateWrite)]
-    [InlineData("Annotation.Manage", MachineManagementScope.AnnotationManage)]
-    [InlineData("KeyValue.Manage", MachineManagementScope.KeyValueManage)]
-    [InlineData("key-value-manage", MachineManagementScope.KeyValueManage)]
-    [InlineData("keyvalue-manage", MachineManagementScope.KeyValueManage)]
-    public async Task ManagementScope_InEverySpelling_IsSentByItsName(string value, MachineManagementScope expected)
+    [InlineData("AnnotationRead", MachineScope.AnnotationRead)]
+    [InlineData("annotation.read", MachineScope.AnnotationRead)]
+    [InlineData("Annotation.Write", MachineScope.AnnotationWrite)]
+    [InlineData("annotation-write", MachineScope.AnnotationWrite)]
+    [InlineData("configuration-read", MachineScope.ConfigurationRead)]
+    [InlineData("ConfigurationWrite", MachineScope.ConfigurationWrite)]
+    [InlineData("SecretsRead", MachineScope.SecretsRead)]
+    [InlineData("Secrets.Read", MachineScope.SecretsRead)]
+    [InlineData("secrets-read", MachineScope.SecretsRead)]
+    [InlineData("SECRETS.READ", MachineScope.SecretsRead)]
+    [InlineData(" secretsread ", MachineScope.SecretsRead)]
+    [InlineData("secrets.write", MachineScope.SecretsWrite)]
+    public async Task RuntimeScope_InEverySpelling_IsSentAloneByItsName(string value, MachineScope expected)
     {
         var bodies = CapturesTheBodies();
 
-        var exitCode = await Execute(managementScopes: [value]);
+        var exitCode = await Execute(scopes: [value]);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        bodies.ShouldHaveSingleItem().ManagementScopes.ShouldBe([expected]);
-        Newtonsoft.Json.JsonConvert.SerializeObject(bodies[0]).ShouldContain($"\"ManagementScopes\":[\"{expected}\"]");
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe([expected]);
+        Newtonsoft.Json.JsonConvert.SerializeObject(bodies[0]).ShouldContain($"\"Scopes\":[\"{expected}\"]");
+    }
+
+    // Through --scope or -m alike; without a runtime scope the machine reads, as it did before --scope.
+    [Theory]
+    [InlineData("ConfigurationTransfer", MachineScope.ConfigurationTransfer)]
+    [InlineData("Configuration.Transfer", MachineScope.ConfigurationTransfer)]
+    [InlineData("configuration-transfer", MachineScope.ConfigurationTransfer)]
+    [InlineData("CONFIGURATION.TRANSFER", MachineScope.ConfigurationTransfer)]
+    [InlineData(" configurationtransfer ", MachineScope.ConfigurationTransfer)]
+    [InlineData("schema.write", MachineScope.SchemaWrite)]
+    [InlineData("template-write", MachineScope.TemplateWrite)]
+    [InlineData("Annotation.Manage", MachineScope.AnnotationManage)]
+    [InlineData("KeyValue.Manage", MachineScope.KeyValueManage)]
+    [InlineData("key-value-manage", MachineScope.KeyValueManage)]
+    [InlineData("keyvalue-manage", MachineScope.KeyValueManage)]
+    public async Task ManagementScope_InEverySpelling_IsSentWithTheReadScopes(string value, MachineScope expected)
+    {
+        var bodies = CapturesTheBodies();
+
+        (await Execute(scopes: [value])).ShouldBe(ExitCodes.SUCCESS);
+        (await Execute(managementScopes: [value])).ShouldBe(ExitCodes.SUCCESS);
+
+        bodies.Count.ShouldBe(2);
+        bodies.ShouldAllBe(body => body.Scopes.SequenceEqual(new[] { MachineScope.AnnotationRead, MachineScope.ConfigurationRead, expected }));
     }
 
     [Fact]
-    public async Task ManagementScopes_RepeatedOrCommaSeparated_AreSentOnceInEnumOrder()
+    public async Task Scopes_RepeatedOrCommaSeparated_AreSentOnceInEnumOrder()
     {
         var bodies = CapturesTheBodies();
 
-        var exitCode = await Execute(managementScopes: ["key-value-manage, Schema.Write", "ConfigurationTransfer,,", "schemawrite"]);
+        var exitCode = await Execute(scopes: ["key-value-manage, Secrets.Write", "ConfigurationRead,,", "secretswrite", "Annotation.Read"]);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        bodies.ShouldHaveSingleItem().ManagementScopes.ShouldBe(
-            [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.SchemaWrite, MachineManagementScope.KeyValueManage]);
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe(
+            [MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.SecretsWrite, MachineScope.KeyValueManage]);
     }
 
     [Fact]
-    public async Task WithoutManagementScopes_SendsNoMember()
+    public async Task RuntimeScope_WithManagementScopes_ReplacesTheReadScopes()
     {
         var bodies = CapturesTheBodies();
 
-        await Execute();
+        await Execute(scopes: ["configuration-write"], managementScopes: ["schema-write", "TemplateWrite"]);
 
-        bodies.ShouldHaveSingleItem().ManagementScopes.ShouldBeNull();
-        Newtonsoft.Json.JsonConvert.SerializeObject(bodies[0]).ShouldNotContain("ManagementScopes");
+        // The server adds Configuration.Read for Configuration.Write.
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe([MachineScope.ConfigurationWrite, MachineScope.SchemaWrite, MachineScope.TemplateWrite]);
     }
 
     [Fact]
-    public async Task ManagementScopeOption_NamingNoScope_SendsNoMember()
+    public async Task EveryOption_IsSentAsOneUnionInEnumOrder()
     {
         var bodies = CapturesTheBodies();
 
-        var exitCode = await Execute(managementScopes: [",", " "]);
+        await Execute(readOnly: true, write: true, scopes: ["KeyValueManage", "Secrets.Read", "annotation-read"], managementScopes: ["SchemaWrite", "Configuration.Transfer"]);
+
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe(
+        [
+            MachineScope.AnnotationRead,
+            MachineScope.AnnotationWrite,
+            MachineScope.ConfigurationRead,
+            MachineScope.ConfigurationWrite,
+            MachineScope.SecretsRead,
+            MachineScope.ConfigurationTransfer,
+            MachineScope.SchemaWrite,
+            MachineScope.KeyValueManage,
+        ]);
+    }
+
+    [Fact]
+    public async Task ScopeOptions_NamingNoScope_SendTheReadScopes()
+    {
+        var bodies = CapturesTheBodies();
+
+        var exitCode = await Execute(scopes: [",", " "], managementScopes: [","]);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
-        Newtonsoft.Json.JsonConvert.SerializeObject(bodies.ShouldHaveSingleItem()).ShouldNotContain("ManagementScopes");
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe([MachineScope.AnnotationRead, MachineScope.ConfigurationRead]);
+    }
+
+    [Theory]
+    [InlineData("read", "read")]
+    [InlineData("Secrets.Read,Secrets.Delete", "Secrets.Delete")]
+    [InlineData("0", "0")]
+    [InlineData("AnnotationRead;ConfigurationRead", "AnnotationRead;ConfigurationRead")]
+    [InlineData("Default.ReadWrite", "Default.ReadWrite")]
+    [InlineData("Annotation.ReadWrite", "Annotation.ReadWrite")]
+    [InlineData("Configuration.Secrets", "Configuration.Secrets")]
+    [InlineData("User.Impersonation", "User.Impersonation")]
+    public async Task UnknownScope_NamesTheScopesAndFailsWithoutCallingTheServer(string value, string unknown)
+    {
+        var exitCode = await Execute(scopes: [value]);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _console.Lines.ShouldContain(
+            $"! Unknown machine scope '{unknown}'. Use AnnotationRead, AnnotationWrite, ConfigurationRead, ConfigurationWrite, SecretsRead, SecretsWrite,"
+            + " ConfigurationTransfer, SchemaWrite, TemplateWrite, AnnotationManage or KeyValueManage.");
+        _accessApi.VerifyNoOtherCalls();
     }
 
     [Theory]
@@ -381,38 +479,106 @@ public class MachineCreateCommandTests
         _accessApi.VerifyNoOtherCalls();
     }
 
+    [Theory]
+    [InlineData("Secrets.Read", "Secrets.Read")]
+    [InlineData("annotation-write", "Annotation.Write")]
+    [InlineData("SchemaWrite,ConfigurationRead", "Configuration.Read")]
+    public async Task RuntimeScopeAsManagementScope_PointsAtScopeAndFailsWithoutCallingTheServer(string value, string scope)
+    {
+        var exitCode = await Execute(managementScopes: [value]);
+
+        exitCode.ShouldBe(ExitCodes.ERROR_WRONG_INPUT);
+        _console.Lines.ShouldContain(
+            $"! {scope} is not a management scope; give it with --scope. --manage takes ConfigurationTransfer, SchemaWrite, TemplateWrite, AnnotationManage or KeyValueManage.");
+        _accessApi.VerifyNoOtherCalls();
+    }
+
     [Fact]
-    public async Task ManagementScopeOption_ParsedFromTheArguments_IsSent()
+    public async Task ScopeOptions_ParsedFromTheArguments_AreSent()
     {
         var bodies = CapturesTheBodies();
         var app = Application();
 
-        var exitCode = await app.ExecuteAsync(["-m", "configuration-transfer,Template.Write", "--manage", "AnnotationManage", "-w"]);
+        var exitCode = await app.ExecuteAsync(
+            ["--scope", "secrets-read,Configuration.Write", "--scope", "AnnotationRead", "-m", "configuration-transfer,Template.Write", "--manage", "AnnotationManage", "-w"]);
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
+        app.Model.Scope.ShouldBe(["secrets-read,Configuration.Write", "AnnotationRead"]);
         app.Model.ManagementScope.ShouldBe(["configuration-transfer,Template.Write", "AnnotationManage"]);
-        var body = bodies.ShouldHaveSingleItem();
-        body.ManagementScopes.ShouldBe(
-            [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.TemplateWrite, MachineManagementScope.AnnotationManage]);
-        body.Scope.ShouldBe(MachineAccessCreateScope.DefaultReadWrite);
+        app.Model.IsScopeWrite.ShouldBeTrue();
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe(
+        [
+            MachineScope.AnnotationRead,
+            MachineScope.AnnotationWrite,
+            MachineScope.ConfigurationRead,
+            MachineScope.ConfigurationWrite,
+            MachineScope.SecretsRead,
+            MachineScope.ConfigurationTransfer,
+            MachineScope.TemplateWrite,
+            MachineScope.AnnotationManage,
+        ]);
+    }
+
+    [Theory]
+    [InlineData("-r")]
+    [InlineData("--read-only")]
+    public async Task ReadOnlyOption_ParsedFromTheArguments_AddsTheReadScopes(string option)
+    {
+        var bodies = CapturesTheBodies();
+        var app = Application();
+
+        await app.ExecuteAsync([option, "--scope", "secrets.read"]);
+
+        app.Model.IsScopeReadOnly.ShouldBeTrue();
+        bodies.ShouldHaveSingleItem().Scopes.ShouldBe([MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.SecretsRead]);
     }
 
     [Fact]
-    public void ManagementScopeOption_IsMissingByDefault()
+    public void ScopeOptions_AreMissingByDefault()
     {
         var app = Application();
 
         app.Parse();
 
+        app.Model.IsScopeReadOnly.ShouldBeFalse();
+        app.Model.IsScopeWrite.ShouldBeFalse();
+        app.Model.Scope.ShouldBeNull();
         app.Model.ManagementScope.ShouldBeNull();
+    }
+
+    [Fact]
+    public void ScopeHelp_NamesEveryScopeItsSpellingsAndTheRoles()
+    {
+        var option = OptionOf(nameof(MachineCreateCommand.Scope));
+
+        option.Template.ShouldBe("--scope");
+        option.OptionType.ShouldBe(CommandOptionType.MultipleValue);
+        option.Description.ShouldBe(
+            "A scope to grant: AnnotationRead, AnnotationWrite, ConfigurationRead, ConfigurationWrite, SecretsRead, SecretsWrite,"
+            + " ConfigurationTransfer, SchemaWrite, TemplateWrite, AnnotationManage or KeyValueManage,"
+            + " also as the scope string (Secrets.Read) or in kebab case (secrets-read)."
+            + " Repeat it or separate the values with commas; it adds to -r and -w. The server adds the read scope of a write scope."
+            + " A secrets scope needs the ContributorWithSecrets role, a management scope the Administrator role.");
+    }
+
+    [Fact]
+    public void ReadOnlyAndWriteHelp_NameTheirScopes()
+    {
+        var readOnly = OptionOf(nameof(MachineCreateCommand.IsScopeReadOnly));
+        var write = OptionOf(nameof(MachineCreateCommand.IsScopeWrite));
+
+        readOnly.Template.ShouldBe("-r|--read-only");
+        readOnly.Description.ShouldBe(
+            "Read annotations and configurations: AnnotationRead and ConfigurationRead. The default when no other option gives a runtime scope.");
+        write.Template.ShouldBe("-w|--write");
+        write.Description.ShouldBe(
+            "Read and write annotations and configurations: AnnotationRead, AnnotationWrite, ConfigurationRead and ConfigurationWrite.");
     }
 
     [Fact]
     public void ManagementScopeHelp_NamesTheScopesAndTheAdministratorRole()
     {
-        var option = typeof(MachineCreateCommand)
-            .GetProperty(nameof(MachineCreateCommand.ManagementScope))!
-            .GetCustomAttribute<OptionAttribute>()!;
+        var option = OptionOf(nameof(MachineCreateCommand.ManagementScope));
 
         option.Template.ShouldBe("-m|--manage");
         option.OptionType.ShouldBe(CommandOptionType.MultipleValue);
@@ -422,25 +588,35 @@ public class MachineCreateCommandTests
     }
 
     [Fact]
-    public void PrintedMachine_NamesItsManagementScopes()
+    public void PrintedMachine_NamesItsScopesAndItsCredentialKind()
     {
         var printed = MachineCreateCommand.Describe(new MachineAccess
         {
             Id = "m1",
-            ManagementScopes = [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.KeyValueManage],
+            Scopes = [MachineScope.AnnotationRead, MachineScope.SecretsRead, MachineScope.KeyValueManage],
+            CredentialKind = MachineAccessCredentialKind.CertificateAndApiKey,
         });
 
-        Newtonsoft.Json.JsonConvert.SerializeObject(printed).ShouldContain("\"ManagementScopes\":[\"ConfigurationTransfer\",\"KeyValueManage\"]");
+        // Without the SDK's StringEnumConverter, as sform's console prints it.
+        var json = Newtonsoft.Json.JsonConvert.SerializeObject(printed);
+
+        json.ShouldContain("\"Scopes\":[\"AnnotationRead\",\"SecretsRead\",\"KeyValueManage\"]");
+        json.ShouldContain("\"CredentialKind\":\"CertificateAndApiKey\"");
     }
 
     [Fact]
-    public void PrintedMachine_WithoutManagementScopes_LeavesTheMemberOut()
+    public void PrintedMachine_WithoutScopes_LeavesTheMemberOut()
     {
         var printed = MachineCreateCommand.Describe(new MachineAccess { Id = "m1" });
 
         // As sform's default settings print it (Startup.ConfigureApplication).
         Newtonsoft.Json.JsonConvert.SerializeObject(printed, new Newtonsoft.Json.JsonSerializerSettings { NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore })
-            .ShouldNotContain("ManagementScopes");
+            .ShouldNotContain("Scopes");
+    }
+
+    private static OptionAttribute OptionOf(string property)
+    {
+        return typeof(MachineCreateCommand).GetProperty(property)!.GetCustomAttribute<OptionAttribute>()!;
     }
 
     private List<string> PipelineVariables()
@@ -480,7 +656,10 @@ public class MachineCreateCommandTests
         int? lifetimeDays = null,
         bool useSharedCertificate = false,
         IFileSystem? fileSystem = null,
-        string[]? managementScopes = null)
+        string[]? managementScopes = null,
+        string[]? scopes = null,
+        bool readOnly = false,
+        bool write = false)
     {
         var command = new MachineCreateCommand(
             _console.Object,
@@ -494,6 +673,9 @@ public class MachineCreateCommandTests
             LifetimeDays = lifetimeDays,
             UseSharedCertificate = useSharedCertificate,
             ManagementScope = managementScopes,
+            Scope = scopes,
+            IsScopeReadOnly = readOnly,
+            IsScopeWrite = write,
         };
 
         return command.OnExecuteAsync();

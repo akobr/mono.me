@@ -53,15 +53,15 @@ public class StorytellerTransferCommandTests
     }
 
     [Theory]
-    [InlineData(typeof(StorytellerExportCommand))]
-    [InlineData(typeof(StorytellerImportCommand))]
-    public void Commands_NameTheAdministratorRole_AndWhatAMachineNeeds(Type command)
+    [InlineData(typeof(StorytellerExportCommand), "read")]
+    [InlineData(typeof(StorytellerImportCommand), "write")]
+    public void Commands_NameTheAdministratorRole_AndWhatAMachineNeeds(Type command, string scopes)
     {
         var description = command.GetCustomAttribute<CommandAttribute>()!.Description;
 
         description.ShouldNotBeNull();
         description.ShouldContain("(Administrator)", Case.Sensitive);
-        description.ShouldEndWith(" A machine needs the scopes of the included kinds and the management scope Configuration.Transfer instead of a role.");
+        description.ShouldEndWith($" A machine needs the {scopes} scopes of the included kinds and Configuration.Transfer instead of a role.");
     }
 
     [Fact]

@@ -120,7 +120,7 @@ public class StorytellerReadCommandsTests
         _fixture.Api
             .SetupSequence(api => api.RestoreAnnotationsAsync("org1", "proj1", "default", It.IsAny<AnnotationRestoreRequest>()))
             .ReturnsAsync(new AnnotationRestoreResult { Annotations = [AnnotationCommandFixture.Active("sbt.s0")], CreatedKeys = [], Failed = [] })
-            .ThrowsAsync(AnnotationCommandFixture.MissingManagementScope("Annotation.Manage"));
+            .ThrowsAsync(AnnotationCommandFixture.MissingScope("Annotation.Manage"));
 
         var command = new StorytellerRestoreCommand(_fixture.Console.Object, _fixture.Context.Object, _fixture.Api.Object)
         {
@@ -131,7 +131,7 @@ public class StorytellerReadCommandsTests
 
         exitCode.ShouldBe(ExitCodes.WARNING_UNAUTHORIZED_ACCESS);
         _fixture.Console.Lines.ShouldContain("- sbt.s0");
-        _fixture.Console.Lines.ShouldContain($"! {AnnotationCommandFixture.MissingManagementScopeMessage("Annotation.Manage")}");
+        _fixture.Console.Lines.ShouldContain($"! {AnnotationCommandFixture.MissingScopeMessage("Annotation.Manage")}");
         _fixture.Console.Lines.ShouldContain("Error code: AccessDenied");
     }
 

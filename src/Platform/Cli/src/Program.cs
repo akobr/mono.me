@@ -123,7 +123,7 @@ public class Program
                 Console.WriteLine($"  Error code: {refusal.ErrorCode}", Color.DarkGray);
             }
 
-            // A 403 with the server's message, for example a missing management scope, is not about the credentials.
+            // A 403 with the server's message, for example a missing machine scope, is not about the credentials.
             if (refusal.MayBeTheCredentials && _machineSignIn is { IsConfigured: true })
             {
                 Console.WriteLine(

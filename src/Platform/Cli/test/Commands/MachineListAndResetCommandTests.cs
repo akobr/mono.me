@@ -34,10 +34,10 @@ public class MachineListAndResetCommandTests
             .Setup(api => api.GetMachineAccessesAsync("org1", "proj1"))
             .ReturnsAsync(new List<MachineAccess>
             {
-                new() { Id = "m-key", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scope = MachineAccessScope.DefaultRead },
-                new() { Id = "m-cert", AccessKey = string.Empty, CredentialKind = MachineAccessCredentialKind.Certificate, Scope = MachineAccessScope.DefaultRead },
-                new() { Id = "m-fed", AccessKey = string.Empty, CredentialKind = MachineAccessCredentialKind.Federated, Scope = MachineAccessScope.DefaultReadWrite },
-                new() { Id = "m-fed-key", AccessKey = "unexpected", CredentialKind = MachineAccessCredentialKind.Federated, Scope = MachineAccessScope.DefaultRead },
+                new() { Id = "m-key", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scopes = [MachineScope.AnnotationRead] },
+                new() { Id = "m-cert", AccessKey = string.Empty, CredentialKind = MachineAccessCredentialKind.Certificate, Scopes = [MachineScope.AnnotationRead] },
+                new() { Id = "m-fed", AccessKey = string.Empty, CredentialKind = MachineAccessCredentialKind.Federated, Scopes = [MachineScope.AnnotationWrite] },
+                new() { Id = "m-fed-key", AccessKey = "unexpected", CredentialKind = MachineAccessCredentialKind.Federated, Scopes = [MachineScope.AnnotationRead] },
             });
         var rows = new List<string[]>();
         _console.Mock
@@ -61,43 +61,63 @@ public class MachineListAndResetCommandTests
     }
 
     [Fact]
-    public async Task List_ShowsTheManagementScopeStringsInTheLastColumn()
+    public async Task List_ShowsTheRuntimeScopeStringsSecondAndTheManagementScopeStringsLast()
     {
         _accessApi
             .Setup(api => api.GetMachineAccessesAsync("org1", "proj1"))
             .ReturnsAsync(new List<MachineAccess>
             {
-                new() { Id = "m-sync", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scope = MachineAccessScope.DefaultReadWrite, ManagementScopes = [MachineManagementScope.ConfigurationTransfer] },
+                new()
+                {
+                    Id = "m-sync",
+                    AccessKey = "2s.***",
+                    CredentialKind = MachineAccessCredentialKind.ApiKey,
+                    Scopes =
+                    [
+                        MachineScope.AnnotationRead,
+                        MachineScope.AnnotationWrite,
+                        MachineScope.ConfigurationRead,
+                        MachineScope.ConfigurationWrite,
+                        MachineScope.ConfigurationTransfer,
+                    ],
+                },
                 new()
                 {
                     Id = "m-all",
                     AccessKey = "2s.***",
                     CredentialKind = MachineAccessCredentialKind.ApiKey,
-                    Scope = MachineAccessScope.DefaultReadWrite,
-                    ManagementScopes =
+                    Scopes =
                     [
-                        MachineManagementScope.ConfigurationTransfer,
-                        MachineManagementScope.SchemaWrite,
-                        MachineManagementScope.TemplateWrite,
-                        MachineManagementScope.AnnotationManage,
-                        MachineManagementScope.KeyValueManage,
+                        MachineScope.AnnotationRead,
+                        MachineScope.AnnotationWrite,
+                        MachineScope.ConfigurationRead,
+                        MachineScope.ConfigurationWrite,
+                        MachineScope.SecretsRead,
+                        MachineScope.SecretsWrite,
+                        MachineScope.ConfigurationTransfer,
+                        MachineScope.SchemaWrite,
+                        MachineScope.TemplateWrite,
+                        MachineScope.AnnotationManage,
+                        MachineScope.KeyValueManage,
                     ],
                 },
-                new() { Id = "m-runtime", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scope = MachineAccessScope.DefaultRead },
-                new() { Id = "m-empty", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scope = MachineAccessScope.DefaultRead, ManagementScopes = [] },
+                new() { Id = "m-runtime", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scopes = [MachineScope.ConfigurationRead, MachineScope.SecretsRead] },
+                new() { Id = "m-empty", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey, Scopes = [] },
+                new() { Id = "m-missing", AccessKey = "2s.***", CredentialKind = MachineAccessCredentialKind.ApiKey },
             });
 
         var exitCode = await new MachineListCommand(_console.Object, _context.Object, _accessApi.Object).OnExecuteAsync();
 
         exitCode.ShouldBe(ExitCodes.SUCCESS);
         var table = _console.Tables.ShouldHaveSingleItem();
-        table.Headers.ShouldBe(["Id", "Role", "Kind", "Secret", "RestrictionTo", "Management"]);
+        table.Headers.ShouldBe(["Id", "Scopes", "Kind", "Secret", "RestrictionTo", "Management"]);
         table.Rows.Select(row => (row[0], row[1], row[^1])).ShouldBe(
         [
-            ("m-sync", "DefaultReadWrite", "Configuration.Transfer"),
-            ("m-all", "DefaultReadWrite", "Configuration.Transfer, Schema.Write, Template.Write, Annotation.Manage, KeyValue.Manage"),
-            ("m-runtime", "DefaultRead", string.Empty),
-            ("m-empty", "DefaultRead", string.Empty),
+            ("m-sync", "Annotation.Read, Annotation.Write, Configuration.Read, Configuration.Write", "Configuration.Transfer"),
+            ("m-all", "Annotation.Read, Annotation.Write, Configuration.Read, Configuration.Write, Secrets.Read, Secrets.Write", "Configuration.Transfer, Schema.Write, Template.Write, Annotation.Manage, KeyValue.Manage"),
+            ("m-runtime", "Configuration.Read, Secrets.Read", string.Empty),
+            ("m-empty", string.Empty, string.Empty),
+            ("m-missing", string.Empty, string.Empty),
         ]);
     }
 
