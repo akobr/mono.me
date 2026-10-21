@@ -255,7 +255,15 @@ function resolveBinding(value: string, db: MockDb, scope: ScopeRef, key: string)
   if (/^@[([{]/.test(value)) {
     return value
   }
-  const resolved = bindingValue(value, db, scope, key)
+  let resolved: unknown
+  try {
+    resolved = bindingValue(value, db, scope, key)
+  } catch (error) {
+    // A pointer with a stray "%" is not a binding the mock can read.
+    if (!(error instanceof URIError)) {
+      throw error
+    }
+  }
   if (resolved === undefined) {
     throw new BindingError(`The binding ${value} could not be resolved.`)
   }
