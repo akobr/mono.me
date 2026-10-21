@@ -201,14 +201,21 @@ An import writes the annotations first, ancestors before their descendants, then
 
 **The result** counts the documents per kind and in total, with the files left out by the kinds and the ignored files. Chips filter the documents by kind, and by **Failed**, **Skipped** and **Warnings**. Every document that was not unchanged is listed with its kind, outcome, version, code, message and warnings, and links to its page when the view has it. On a phone, the table becomes a list. After a reload, the page shows the view's latest import again.
 
-The CLI does the same with `sform story export` and `sform story import` (see [Configuration](configuration#export-and-import)). The API and the CLI follow the same rule: a user needs the Administrator role, and a machine, which has no role, the management scope `Configuration.Transfer` and, for each kind it includes, the read scope to export it or the write scope to import it (`Annotation.Read` or `Annotation.Write` for annotations, `Configuration.Read` or `Configuration.Write` for the other three).
+The CLI does the same with `sform story export` and `sform story import` (see [Configuration](configuration#export-and-import)). The API and the CLI follow the same rule: a user needs the Administrator role, and a machine, which has no role, the management scope `Configuration.Transfer` and, for each kind it includes, the read scope to export it or the scopes of writing it directly to import it:
+
+| Kind | Export | Import |
+| --- | --- | --- |
+| Annotations | `Annotation.Read` | `Annotation.Write` and `Annotation.Manage` |
+| Schemas | `Configuration.Read` | `Configuration.Write` and `Schema.Write` |
+| Templates | `Configuration.Read` | `Configuration.Write` and `Template.Write` |
+| Configurations | `Configuration.Read` | `Configuration.Write` |
 
 ## People, machines and settings
 
 | Screen | Who | What |
 | --- | --- | --- |
 | Members | Administrator | Roles of the organization and of each project. Organization and project roles are independent. Only Owners grant Owner, and the last Owner stays. **Invite** in the top bar invites several people at once: type their addresses with spaces or commas between them, or paste a list (also one copied from a mail client). Everyone gets the same role and expiry. Below the members, **Invitations**: resend, revoke or copy the link. |
-| Machines | Contributor (secrets scopes: ContributorWithSecrets; management scopes, shared certificates and trusted issuers: Administrator) | Credentials for services: runtime and management scopes, an optional annotation restriction (the machine then reaches only that annotation and its descendants), the credential kind and certificate lifetime (or, for a federated machine, its federation rules), reset and delete. Below the machines, **Shared certificates**: issue, revoke, expiry warnings; and **Trusted issuers**: the platforms whose tokens federated machines exchange. |
+| Machines | Contributor (machines with secrets scopes: ContributorWithSecrets; with management scopes, shared certificates and trusted issuers: Administrator) | Credentials for services: runtime and management scopes, an optional annotation restriction (the machine then reaches only that annotation and its descendants), the credential kind and certificate lifetime (or, for a federated machine, its federation rules), reset and delete. Below the machines, **Shared certificates**: issue, revoke, expiry warnings; and **Trusted issuers**: the platforms whose tokens federated machines exchange. |
 | Settings | Everyone (description and policies: Administrator, time zone, date format and types: Contributor) | The description of the project, the default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy, the CA certificate download and, in the **Secrets** section, how the key values of the project are protected. |
 | Monitor | Administrator | The **Usage** of the key values (totals, estimated charges, a daily chart) and the **Audit** trail of secrets, one tab each. |
 
@@ -226,10 +233,10 @@ The **Project** card on Settings shows the description of the project to every m
 | `Configuration.Write` | Runtime | Writing and deleting configurations and key values |
 | `Secrets.Read` | Runtime | Receiving the values of secrets: in resolved configurations, revealed key values and exported key values, with `Configuration.Read` |
 | `Secrets.Write` | Runtime | Writing secret key values, with `Configuration.Write` |
-| `Configuration.Transfer` | Management | Exporting and importing a view, and exporting and importing key values, with the read or write scopes of what they include |
-| `Schema.Write` | Management | Writing and deleting schemas, with `Configuration.Write` |
-| `Template.Write` | Management | Writing and deleting templates, with `Configuration.Write` |
-| `Annotation.Manage` | Management | Creating many annotations at once, deleting them and restoring them, with `Annotation.Write` |
+| `Configuration.Transfer` | Management | Exporting and importing a view, and exporting and importing key values, with the scopes of what they include (an import of a view also needs the management scopes below for its schemas, templates and annotations) |
+| `Schema.Write` | Management | Writing and deleting schemas, and importing them into a view, with `Configuration.Write` |
+| `Template.Write` | Management | Writing and deleting templates, and importing them into a view, with `Configuration.Write` |
+| `Annotation.Manage` | Management | Creating many annotations at once, deleting them and restoring them, and importing them into a view, with `Annotation.Write` |
 | `KeyValue.Manage` | Management | Protecting key values and restoring many at once, with `Configuration.Write` (protecting also needs `Secrets.Write`) |
 
 Either read scope also lists the views of the project. When the project delivers secrets only over mTLS, the two secrets scopes work only for calls with the machine's client certificate.
@@ -241,7 +248,7 @@ Either read scope also lists the views of the project. When the project delivers
 | Runtime reader | `Annotation.Read`, `Configuration.Read` |
 | Runtime with secrets | `Annotation.Read`, `Configuration.Read`, `Secrets.Read` |
 | CI writer | `Annotation.Read`, `Annotation.Write`, `Configuration.Read`, `Configuration.Write` |
-| Git sync | The scopes of CI writer and `Configuration.Transfer` |
+| Git sync | The scopes of CI writer, `Configuration.Transfer`, `Schema.Write`, `Template.Write` and `Annotation.Manage`: it imports every kind |
 | Backup | The scopes of Runtime reader and `Configuration.Transfer` |
 | Schema deployer | `Configuration.Read`, `Configuration.Write`, `Schema.Write`, `Template.Write` |
 
@@ -251,7 +258,7 @@ Picking a write scope also picks its read scope, and clearing a read scope clear
 - Only users with secret rights (ContributorWithSecrets or a higher role) give `Secrets.Read` and `Secrets.Write`; below that role, both are disabled.
 - A preset with a scope you cannot give is disabled too.
 
-Give management scopes only to machines that need them, such as a pipeline that syncs a view with a git repository (**Git sync**). Resetting a machine, or editing its rules, needs the role its scopes need: ContributorWithSecrets for a secrets scope, Administrator for a management scope. Below that role, such a machine has no **Reset** and no **Edit rules**, but Contributors still delete it. The machine list shows a badge per scope, outlined for runtime scopes and shaded for management scopes, and the detail lists the **Runtime scopes** and the **Management scopes** with what each opens, or **None**.
+Give management scopes only to machines that need them, such as a pipeline that syncs a view with a git repository (**Git sync**). Resetting a machine, editing its rules or deleting it needs the role its scopes need: ContributorWithSecrets for a secrets scope, Administrator for a management scope. Below that role, such a machine has no **Reset**, no **Edit rules** and no delete, as deleting it would stop whatever runs with its scopes. The machine list shows a badge per scope, outlined for runtime scopes and shaded for management scopes, and the detail lists the **Runtime scopes** and the **Management scopes** with what each opens, or **None**.
 
 ::: warning
 Machines created before these scopes existed have none: the API refuses their API keys and certificates with `401` and their client credentials with `403`, and a federated machine gets no token. Their detail shows **None** in both groups. A machine's scopes cannot be edited: create a new machine with the scopes it needs, switch the service or pipeline to it, and delete the old one.

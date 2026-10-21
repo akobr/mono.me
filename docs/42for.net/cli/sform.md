@@ -101,20 +101,20 @@ A machine can do what its scopes allow, and it gets them when it is created. **R
 | `configuration-write` | `Configuration.Write` | `ConfigurationWrite` | Runtime | the writes of `sform story config` and `kv`; with `schema-write` or `template-write`, those of `schema` and `template` |
 | `secrets-read` | `Secrets.Read` | `SecretsRead` | Runtime | the values of secrets: `sform story kv get --reveal`, `sform story config get --resolved`, `sform story kv export --include-secrets` |
 | `secrets-write` | `Secrets.Write` | `SecretsWrite` | Runtime | `sform story kv set` of a secret, and `sform story kv protect` |
-| `configuration-transfer` | `Configuration.Transfer` | `ConfigurationTransfer` | Management | `sform story export` and `import`, `sform story kv export` and `import` |
-| `schema-write` | `Schema.Write` | `SchemaWrite` | Management | the writes and deletes of `sform story schema` |
-| `template-write` | `Template.Write` | `TemplateWrite` | Management | `sform story template set`, `edit` and `delete` |
-| `annotation-manage` | `Annotation.Manage` | `AnnotationManage` | Management | `sform story delete` and `restore`, and `sform story set --restore-deleted` |
+| `configuration-transfer` | `Configuration.Transfer` | `ConfigurationTransfer` | Management | `sform story export` and `import`, `sform story kv export` and `import`; an import of a view also needs `schema-write`, `template-write` and `annotation-manage` for those kinds |
+| `schema-write` | `Schema.Write` | `SchemaWrite` | Management | the writes and deletes of `sform story schema`, and `sform story import` of schemas |
+| `template-write` | `Template.Write` | `TemplateWrite` | Management | `sform story template set`, `edit` and `delete`, and `sform story import` of templates |
+| `annotation-manage` | `Annotation.Manage` | `AnnotationManage` | Management | `sform story delete` and `restore`, `sform story set --restore-deleted`, and `sform story import` of annotations |
 | `keyvalue-manage` | `KeyValue.Manage` | `KeyValueManage` | Management | `sform story kv protect` and `restore` |
 
 ``` powershell
 sform account machine create                                    # Annotation.Read and Configuration.Read
 sform account machine create -r --scope secrets-read            # a service that also receives its secrets
-sform account machine create -w --scope configuration-transfer  # a pipeline that keeps a view in a git repository
+sform account machine create -w -m configuration-transfer,schema-write,template-write,annotation-manage   # a pipeline that keeps a view in a git repository
 sform account machine create --scope configuration-write -m schema-write,template-write   # a pipeline that deploys schemas and templates
 ```
 
-`--scope secrets-read` alone gives only `Secrets.Read`, because it is a runtime scope: add `-r` or `-w` for the documents themselves. Creating a machine needs the Contributor role, the `ContributorWithSecrets` role when it gets `Secrets.Read` or `Secrets.Write`, and the Administrator role when it gets a management scope; resetting it needs the same role. `sform account machine` lists the machines with the columns `Id`, `Scopes` (the runtime scopes), `Kind`, `Secret`, `RestrictionTo` and `Management` (the management scopes).
+`--scope secrets-read` alone gives only `Secrets.Read`, because it is a runtime scope: add `-r` or `-w` for the documents themselves. Creating a machine needs the Contributor role, the `ContributorWithSecrets` role when it gets `Secrets.Read` or `Secrets.Write`, and the Administrator role when it gets a management scope; resetting it, replacing its federation rules and deleting it (`sform account machine delete`) need the same role. `sform account machine` lists the machines with the columns `Id`, `Scopes` (the runtime scopes), `Kind`, `Secret`, `RestrictionTo` and `Management` (the management scopes).
 
 Without a scope it needs, the API answers `403` with a message that names the scope, such as "This operation needs the scope Annotation.Manage, which the machine was not created with.", and `sform` prints it. Machines created before these scopes existed have none: their API keys and certificates get `401`, their client credentials `403`, and a federated machine gets no token. A machine cannot be edited: create a new one with the scopes the job needs.
 
