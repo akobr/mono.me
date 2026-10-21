@@ -114,8 +114,8 @@ const mergeOrderOf = (key: string) => getAnnotationTypeInfo(key.slice(0, key.ind
 export const byDepthTypeKey = (a: string, b: string) =>
   depthOf(a) - depthOf(b) || mergeOrderOf(a) - mergeOrderOf(b) || (a < b ? -1 : a > b ? 1 : 0)
 
-/** Audit actions that leave the annotation's Created stamp as it was seeded. */
-const updates = new Set(['Updated', 'ConfigurationChanged', 'ConfigurationDeleted'])
+/** Audit actions that leave the annotation's Created stamp as it was seeded; a re-create replaces it. */
+const updates = new Set(['Updated', 'ConfigurationChanged', 'ConfigurationDeleted', 'Deleted', 'Restored'])
 
 const isDescendant = (candidate: string, key: string) => candidate !== key && getAllAncestors(candidate).includes(key)
 
@@ -696,8 +696,7 @@ export const annotationHandlers: HttpHandler[] = [
 
       const entries = [...(auditOf(db, scopeOf(params), params.key) ?? [])]
       // The seeded annotations were created before the mock recorded anything: by the system, or by a person of the
-      // showcase, whose stamp is the annotation's own while only updates were recorded (a restore or a re-create may
-      // have replaced it).
+      // showcase, whose stamp is the annotation's own until a re-create replaces it.
       if (entries[0]?.Action !== 'Created') {
         entries.unshift({
           Id: `adt_seed_${params.key}`,
