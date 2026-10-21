@@ -295,14 +295,20 @@ export function launchScenario(value: string | undefined): MockScenario {
 /**
  * Picks the dataset of the page load and resets its data when it changes: a valid `?mock-scenario=` first, then the
  * dataset of the build when it differs from the one the session last started with (a restart with another option,
- * or a new tab), else the session's own dataset with its edits. It runs once at start-up, not per request, so the
- * parameter does not wipe edits while it stays in the URL, and a redirect (for example to /login) before the first
- * request does not lose it. Returns whether the dataset starts fresh (nothing stored yet).
+ * or a new tab), else the session's own dataset with its edits. A parameter naming the session's dataset keeps the
+ * edits, so a reload with it still in the URL does not wipe them; it runs once at start-up, not per request, so a
+ * redirect (for example to /login) before the first request does not lose it. Returns whether the dataset starts fresh (nothing stored yet).
  */
 export function applyStartScenario(launch: MockScenario): boolean {
   const fromUrl = new URLSearchParams(location.search).get('mock-scenario')
   const picked =
-    fromUrl && isScenario(fromUrl) ? fromUrl : sessionStorage.getItem(launchKey) === launch ? undefined : launch
+    fromUrl && isScenario(fromUrl)
+      ? fromUrl === sessionStorage.getItem(scenarioKey)
+        ? undefined
+        : fromUrl
+      : sessionStorage.getItem(launchKey) === launch
+        ? undefined
+        : launch
 
   if (picked) {
     sessionStorage.setItem(scenarioKey, picked)

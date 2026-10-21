@@ -18,6 +18,9 @@ const ota = {
 }
 
 type Doc = Record<string, unknown>
+
+/** The calendar date `days` days ago, so a record's date matches the day its version was written. */
+const dateDaysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
 type Versions = Doc | Doc[]
 type Channel = 'stable' | 'beta' | 'nightly'
 type SubsystemName =
@@ -613,7 +616,7 @@ function documentedAurora(b: ScopeBuilder, next: boolean) {
         replacement: {
           partNumber: 'BPM-91N-HX-04',
           module: 4,
-          replacedOn: '2026-10-12',
+          replacedOn: dateDaysAgo(9),
           reason: 'cell-imbalance',
           workshop: markets.se.workshop,
         },
@@ -997,7 +1000,7 @@ const vinOf = (model: Model, build: Build, serial: string) =>
   `XAM${model.vinCode}1E4K0${modelYears[build.modelYear]}${plants[build.plant].code}${serial}`
 
 /** Borealis cars that, like VIN 4F2, had a battery module replaced; each stores its complete pack record. */
-const packRepairs: (Car & { module: number; partNumber: string; replacedOn: string })[] = [
+const packRepairs: (Car & { module: number; partNumber: string })[] = [
   {
     serial: '02A4D7',
     build: 'summit',
@@ -1005,7 +1008,6 @@ const packRepairs: (Car & { module: number; partNumber: string; replacedOn: stri
     daysAgo: 13,
     module: 7,
     partNumber: 'BPM-107N-HX-07',
-    replacedOn: '2026-10-08',
   },
   {
     serial: '0558K3',
@@ -1014,7 +1016,6 @@ const packRepairs: (Car & { module: number; partNumber: string; replacedOn: stri
     daysAgo: 20,
     module: 2,
     partNumber: 'BPM-82L-NC-02',
-    replacedOn: '2026-10-01',
   },
 ]
 
@@ -1095,7 +1096,7 @@ function divergedCars(b: ScopeBuilder) {
     const replacement = {
       partNumber: car.partNumber,
       module: car.module,
-      replacedOn: car.replacedOn,
+      replacedOn: dateDaysAgo(car.daysAgo),
       workshop: markets[car.market].workshop,
     }
     fitPart(b, at, 'battery-pack', { ...recipePart(build, 'battery-pack'), replacement }, serviced(car))
