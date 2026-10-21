@@ -50,6 +50,8 @@ export default defineConfig({
     command: `npm run build:e2e && npx vite preview --port ${port} --strictPort`,
     url: `http://localhost:${port}`,
     reuseExistingServer: !ci,
+    // The suites run on the previous standard dataset; `npm run dev:mock` starts the showcase without an option.
+    env: { VITE_MOCK_DATASET: 'default' },
     timeout: 240_000,
   },
 })

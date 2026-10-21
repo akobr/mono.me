@@ -15,6 +15,9 @@ export interface ProjectSettings {
   types: TypeAppearances
 }
 
+/** The localStorage key of every project's settings; the showcase mock dataset writes its projects' entries (424-77). */
+export const projectSettingsKey = '2s-admin:project-settings'
+
 export const defaultProjectSettings: ProjectSettings = {
   defaultTimeZone: 'UTC',
   dateFormat: defaultDateFormat,
@@ -28,7 +31,7 @@ export const defaultProjectSettings: ProjectSettings = {
 export const useProjectSettingsStore = defineStore('project-settings', () => {
   const context = useContextStore()
   // No storage argument: VueUse resolves localStorage itself and reports a blocked one to onError, keeping the defaults.
-  const state = useStorage<Record<string, Partial<ProjectSettings>>>('2s-admin:project-settings', {}, undefined, {
+  const state = useStorage<Record<string, Partial<ProjectSettings>>>(projectSettingsKey, {}, undefined, {
     onError: (error) => console.warn('Project settings: localStorage access failed.', error),
   })
 

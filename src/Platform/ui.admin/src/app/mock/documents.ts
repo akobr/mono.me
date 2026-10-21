@@ -3,6 +3,7 @@ import { codeOfKey, typeCodes, type AnnotationTypeCode } from '@/utils/annotatio
 import { accountActor, stamp } from './audit'
 import { annotationsOf, type MockDb } from './db'
 import { templates, typeSchemas } from './schemas'
+import { showcaseScope } from './showcase'
 
 // Versioned documents of the mock API: configurations, templates and the three schema kinds. The generated base
 // history is deterministic; edits copy the document into the stored overrides (db.documents) and append versions.
@@ -122,6 +123,10 @@ function configurationKeys(annotations: ReadonlyMap<string, Annotation>): Map<st
 }
 
 function baseDocument(db: MockDb, scope: ScopeRef, id: DocumentId): StoredDocument | undefined {
+  if (db.scenario === 'showcase') {
+    return showcaseScope(scope.org, scope.project, scope.view)?.documents.get(id)
+  }
+
   const [kind, ...rest] = id.split(':')
   const annotations = annotationsOf(db, scope.org, scope.project, scope.view)
 
@@ -197,38 +202,40 @@ export function deleteDocument(db: MockDb, scope: ScopeRef, id: DocumentId): voi
   storeOf(db, scope)[id] = null
 }
 
+/**
+ * The showcase's documents of a kind in the scope. A configuration is listed while its annotation is active, as the
+ * generated configurations are; a restore lists it again.
+ */
+function showcaseDocumentIds(db: MockDb, scope: ScopeRef, prefix: string): DocumentId[] {
+  const annotations = annotationsOf(db, scope.org, scope.project, scope.view)
+  const documents = showcaseScope(scope.org, scope.project, scope.view)?.documents
+  return [...(documents?.keys() ?? [])].filter(
+    (id) =>
+      id.startsWith(prefix) && (!id.startsWith('configuration:') || annotations.has(id.slice('configuration:'.length))),
+  )
+}
+
+/** The generated documents of a kind in the scope, for the other datasets. */
+function generatedDocumentIds(db: MockDb, scope: ScopeRef, prefix: string): DocumentId[] {
+  const annotations = annotationsOf(db, scope.org, scope.project, scope.view)
+  return prefix === 'configuration:'
+    ? [...configurationKeys(annotations).keys()].map((key) => `configuration:${key}` as const)
+    : prefix === 'template:'
+      ? typeCodes.map((code) => `template:${code}` as const)
+      : [
+          ...typeCodes.map((code) => `schema:type:${code}` as const),
+          'schema:annotation:exe.northwind.invoicing.prod' as const,
+          'schema:descendant:sbt.northwind:exe' as const,
+        ]
+}
+
 /** Ids of every existing document of a kind in the scope (base and stored). */
 export function documentIds(db: MockDb, scope: ScopeRef, prefix: string): DocumentId[] {
-  const annotations = annotationsOf(db, scope.org, scope.project, scope.view)
-  const base: DocumentId[] =
-    prefix === 'configuration:'
-      ? [...configurationKeys(annotations).keys()].map((key) => `configuration:${key}` as const)
-      : prefix === 'template:'
-        ? typeCodes.map((code) => `template:${code}` as const)
-        : [
-            ...typeCodes.map((code) => `schema:type:${code}` as const),
-            'schema:annotation:exe.northwind.invoicing.prod' as const,
-            'schema:descendant:sbt.northwind:exe' as const,
-          ]
+  const base =
+    db.scenario === 'showcase' ? showcaseDocumentIds(db, scope, prefix) : generatedDocumentIds(db, scope, prefix)
   const stored = Object.keys(storeOf(db, scope)).filter((id) => id.startsWith(prefix)) as DocumentId[]
   return [...new Set([...base, ...stored])].filter((id) => getDocument(db, scope, id) !== undefined)
 }
 
-/** Deep merge: objects merge key by key, everything else (arrays included) is replaced. */
-export function deepMerge(base: unknown, overlay: unknown): unknown {
-  if (
-    base &&
-    overlay &&
-    typeof base === 'object' &&
-    typeof overlay === 'object' &&
-    !Array.isArray(base) &&
-    !Array.isArray(overlay)
-  ) {
-    const result: Record<string, unknown> = { ...(base as Record<string, unknown>) }
-    for (const [key, value] of Object.entries(overlay as Record<string, unknown>)) {
-      result[key] = key in result ? deepMerge(result[key], value) : structuredClone(value)
-    }
-    return result
-  }
-  return structuredClone(overlay)
-}
+// The showcase builds its histories with it too, and must not import this module (it imports db.ts).
+export { deepMerge } from './merge'
