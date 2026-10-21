@@ -26,8 +26,8 @@ export interface ShowcaseSettings {
 export interface ShowcaseProject {
   org: string
   project: string
-  /** What the project models, one sentence, for the README and the tests. */
-  summary: string
+  /** The description of the project, shown in the admin UI. */
+  description: string
   /** The project's access point; Ada included. */
   members: Members
   settings: ShowcaseSettings

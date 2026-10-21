@@ -1105,8 +1105,8 @@ function featureDeliveryView(b: ScopeBuilder) {
 export const guestPlatform: ShowcaseProject = {
   org: 'seabreeze-hotels',
   project: 'guest-platform',
-  summary:
-    'Hotel distribution: four Portuguese hotels, their own and OTA sales channels, and the modules set up per channel.',
+  description:
+    'Hotel group distribution. Booking engine, rate manager and guest modules are set up for each hotel on its direct and OTA channels.',
   members: {
     grace: 'Owner',
     frances: 'Administrator',

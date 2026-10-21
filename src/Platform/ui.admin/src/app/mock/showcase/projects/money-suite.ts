@@ -1850,8 +1850,8 @@ function featureDeliveryView(b: ScopeBuilder) {
 export const moneySuite: ShowcaseProject = {
   org: 'bluefin',
   project: 'money-suite',
-  summary:
-    'The consumer finance suite of the documentation: people, the legal entities they act as, and the products they use.',
+  description:
+    'Consumer finance suite. People act as themselves or as the companies they represent, and use accounts, payments, cards and investments in each role.',
   members: { frances: 'Owner', hedy: 'ContributorWithSecrets', ada: 'Contributor', radia: 'Reader' },
   settings: {
     types: {

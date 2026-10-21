@@ -1163,7 +1163,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const whiteLabelApp: ShowcaseProject = {
   org: 'appforge',
   project: 'white-label-app',
-  summary: 'A white-label mobile app: retail brands, their platforms and the features licensed to each brand.',
+  description:
+    'White-label mobile app. Retail brands publish it under their own name, with the features they licensed set up per platform, and campaigns.',
   members: { edsger: 'Owner', hedy: 'Administrator', ada: 'Contributor', alan: 'Reader' },
   settings: {
     types: {
