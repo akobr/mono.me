@@ -10,6 +10,7 @@ export {}
 declare global {
   const capabilityRoles: typeof import('./composables/useRole').capabilityRoles
   const chunk: typeof import('./composables/useAnnotationActions').chunk
+  const clearCatalogSnapshots: typeof import('./stores/catalog').clearCatalogSnapshots
   const defaultPreferences: typeof import('./stores/preferences').defaultPreferences
   const defaultProjectSettings: typeof import('./stores/project-settings').defaultProjectSettings
   const defineLocale: typeof import('../node_modules/@nuxt/ui/dist/runtime/composables/defineLocale').defineLocale
@@ -21,6 +22,7 @@ declare global {
   const isRememberedSection: typeof import('./stores/page-memory').isRememberedSection
   const onSignOut: typeof import('./stores/session').onSignOut
   const pollDelays: typeof import('./stores/transfers').pollDelays
+  const projectSettingsKey: typeof import('./stores/project-settings').projectSettingsKey
   const provideBindingAssist: typeof import('./composables/useBindingAssist').provideBindingAssist
   const rememberedSections: typeof import('./stores/page-memory').rememberedSections
   const runLimited: typeof import('./composables/useAnnotationActions').runLimited
