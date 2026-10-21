@@ -25,7 +25,7 @@ const viewAges: Record<string, number> = {
   development: 200,
   staging: 150,
   'release-candidate': 30,
-  'feature-delivery1': 12,
+  'feature-delivery1': 21,
 }
 
 const ago = (days: number, now: number) => new Date(now - days * day).toISOString()
