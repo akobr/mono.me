@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { setupServer } from 'msw/node'
-import { getResolvedConfiguration, StorytellerError } from '@42for.net/2splatform.sdk'
+import { deleteAnnotation, getResolvedConfiguration, StorytellerError } from '@42for.net/2splatform.sdk'
 import { mockHandlers } from '@/mock/all-handlers'
 import { storeAnnotation } from '@/mock/annotation-handlers'
 import { annotationsOf, loadDb, saveDb } from '@/mock/db'
@@ -68,4 +68,22 @@ describe('the bindings of the mock Resolved read', () => {
       expect((failure as StorytellerError).errorCode).toBe('BindingFailed')
     },
   )
+
+  it('resolves the inherited content of an annotation without an own document, and refuses a deleted one', async () => {
+    const db = loadDb()
+    putVersion(db, params, 'configuration:cnt.northwind.prod', { baseUrl: 'https://prod.northwind.example' })
+    saveDb(db)
+    const usage = 'usg.northwind.invoicing'
+    expect(annotationsOf(loadDb(), params.org, params.project, params.view).has(usage)).toBe(true)
+    expect(
+      (await getResolvedConfiguration(params.org, params.project, params.view, usage)).Version,
+    ).toBeGreaterThanOrEqual(0)
+
+    await deleteAnnotation(params.org, params.project, params.view, usage)
+    const failure = await getResolvedConfiguration(params.org, params.project, params.view, usage).catch(
+      (error: unknown) => error,
+    )
+    expect((failure as StorytellerError).status).toBe(404)
+    expect((failure as StorytellerError).errorCode).toBe('AnnotationDeleted')
+  })
 })

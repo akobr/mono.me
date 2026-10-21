@@ -19,8 +19,8 @@ const ota = {
 
 type Doc = Record<string, unknown>
 
-/** The calendar date `days` days ago, so a record's date matches the day its version was written. */
-const dateDaysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10)
+/** The calendar date `days` days before `now` (the builder's clock), so a record's date matches its version's. */
+const dateDaysAgo = (now: number, days: number) => new Date(now - days * 86_400_000).toISOString().slice(0, 10)
 type Versions = Doc | Doc[]
 type Channel = 'stable' | 'beta' | 'nightly'
 type SubsystemName =
@@ -616,7 +616,7 @@ function documentedAurora(b: ScopeBuilder, next: boolean) {
         replacement: {
           partNumber: 'BPM-91N-HX-04',
           module: 4,
-          replacedOn: dateDaysAgo(9),
+          replacedOn: dateDaysAgo(b.now, 9),
           reason: 'cell-imbalance',
           workshop: markets.se.workshop,
         },
@@ -1096,7 +1096,7 @@ function divergedCars(b: ScopeBuilder) {
     const replacement = {
       partNumber: car.partNumber,
       module: car.module,
-      replacedOn: dateDaysAgo(car.daysAgo),
+      replacedOn: dateDaysAgo(b.now, car.daysAgo),
       workshop: markets[car.market].workshop,
     }
     fitPart(b, at, 'battery-pack', { ...recipePart(build, 'battery-pack'), replacement }, serviced(car))
