@@ -37,6 +37,23 @@ test('a Reader reads the description of the project without the form', async ({ 
   await expect(page.getByRole('button', { name: 'Save description' })).toHaveCount(0)
 })
 
+// A word longer than the card breaks over the two lines of the card, so the clamp ends with an ellipsis.
+test('a description without spaces fills two lines of the project card', async ({ page }) => {
+  const long = 'x'.repeat(500)
+  await openApp(page, '/acme/billing/settings')
+  await page.getByRole('textbox', { name: 'Description', exact: true }).fill(long)
+  await page.getByRole('button', { name: 'Save description' }).click()
+  await expect(page.getByText('Description saved', { exact: true })).toBeVisible()
+
+  await goto(page, '/acme')
+  const description = page.getByTitle(long, { exact: true })
+  await expect(description).toBeVisible()
+  const lines = await description.evaluate((element) =>
+    Math.round(element.getBoundingClientRect().height / parseFloat(getComputedStyle(element).lineHeight)),
+  )
+  expect(lines).toBe(2)
+})
+
 // Names, colors and icons of the annotation types (424-13): the project's Settings, overridden by Preferences.
 const templates = '/acme/billing/default/modeling/templates'
 
