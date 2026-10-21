@@ -1,6 +1,42 @@
 import { expect, test, type Page } from '@playwright/test'
 import { goto, isMobile, openApp } from './support'
 
+// The description of a project (424-78): an Administrator changes it in the Project card, every member reads it.
+test('an Administrator describes the project, and the overview shows the description', async ({ page }) => {
+  await openApp(page, '/acme/billing/settings')
+  const description = page.getByRole('textbox', { name: 'Description', exact: true })
+  const save = page.getByRole('button', { name: 'Save description' })
+  await expect(description).toHaveValue(/^Billing of Acme's B2B customers\./)
+  await expect(save).toBeDisabled()
+
+  await description.fill('Invoices and payments of Acme.')
+  await save.click()
+  await expect(page.getByText('Description saved', { exact: true })).toBeVisible()
+
+  await goto(page, '/acme/billing/settings')
+  await expect(description).toHaveValue('Invoices and payments of Acme.')
+  await expect(save).toBeDisabled()
+  await goto(page, '/acme')
+  await expect(page.getByText('Invoices and payments of Acme.', { exact: true })).toBeVisible()
+
+  await goto(page, '/acme/billing/settings')
+  await description.fill('')
+  await save.click()
+  await expect(page.getByText('Description saved', { exact: true })).toBeVisible()
+  await goto(page, '/acme/billing/settings')
+  await expect(description).toHaveValue('')
+  await expect(save).toBeDisabled()
+})
+
+test('a Reader reads the description of the project without the form', async ({ page }) => {
+  await openApp(page, '/northwind/portal/settings')
+  await expect(
+    page.getByText("Northwind's customer portal. A small catalog of customers and their responsibilities per context."),
+  ).toBeVisible()
+  await expect(page.getByRole('textbox', { name: 'Description', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Save description' })).toHaveCount(0)
+})
+
 // Names, colors and icons of the annotation types (424-13): the project's Settings, overridden by Preferences.
 const templates = '/acme/billing/default/modeling/templates'
 

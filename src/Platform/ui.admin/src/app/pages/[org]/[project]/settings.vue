@@ -4,10 +4,13 @@ import { useQueryClient } from '@tanstack/vue-query'
 import {
   getCertificateAuthority,
   setMachineAuthentication,
+  updateAccessPoint,
   type MachineCredentialKind,
 } from '@42for.net/2splatform.sdk'
 import { useGetAccessPoint, useGetMachineAuthentication } from '@42for.net/2splatform.sdk/vue-query'
-import { invalidateAccess } from '@/queries/invalidation'
+import { descriptionSchema } from '@/forms/names.schema'
+import { invalidateAccess, invalidateProject } from '@/queries/invalidation'
+import { useProjectSummaries } from '@/queries/projects'
 import { useKeyValuePolicy } from '@/queries/scope'
 import { useContextStore } from '@/stores/context'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -19,11 +22,12 @@ import { resolveTypeAppearances, type TypeAppearances } from '@/utils/type-appea
 
 // Project settings (spec section 13): the machine authentication policy (Administrator: the enabled credential
 // kinds, the default kind and certificate lifetime of new machines, 424-14), the CA certificate download (PEM; the
-// SDK fetcher returns non-JSON bodies as text) and project information. The default time zone of
-// new annotations (424-12), the date format (424-23) and the names, colors and icons of the annotation types (424-13)
-// are kept in this browser, so they apply at once, like Preferences. The secrets settings of the old Secrets page
-// (spec 29.6: allowed levels, the keys, the customer key and the recipients) are the last section since 424-35; every
-// reader sees them, Administrators change them.
+// SDK fetcher returns non-JSON bodies as text) and project information with the description of the project (every
+// member reads it, Administrators change it, 424-78). The default time zone of new annotations (424-12), the date
+// format (424-23) and the names, colors and icons of the annotation types (424-13) are kept in this browser, so they
+// apply at once, like Preferences. The secrets settings of the old Secrets page (spec 29.6: allowed levels, the keys,
+// the customer key and the recipients) are the last section since 424-35; every reader sees them, Administrators
+// change them.
 const context = useContextStore()
 const projectSettings = useProjectSettingsStore()
 const preferences = usePreferencesStore()
@@ -72,15 +76,50 @@ const machinePolicy = useGetMachineAuthentication(() => context.projectKey ?? ''
   query: { enabled: () => !!context.projectKey && canAdmin.value, meta: { silent: true } },
 })
 
+const projects = useProjectSummaries()
+const savedDescription = computed(() => projects.summaryOf(context.projectKey)?.Description ?? '')
+
 const secretsPolicy = useKeyValuePolicy()
 const recipients = computed(() => secretsPolicy.data.value?.Recipients ?? [])
 
 // #secrets (the old Secrets page and the BYOK banner link here) scrolls once the cards above it have their final size.
 useHashScroll(
   () =>
+    !projects.isPending.value &&
     !secretsPolicy.isPending.value &&
     !(canAdmin.value && (machinePolicy.isPending.value || accessPoint.isPending.value)),
 )
+
+// The text follows the loaded description until the user changes it; another project starts again from its own.
+const description = ref('')
+watch(
+  [() => context.projectKey, savedDescription] as const,
+  ([key, value], [previousKey, previous]) => {
+    if (key !== previousKey || description.value.trim() === (previous ?? '')) {
+      description.value = value
+    }
+  },
+  { immediate: true },
+)
+const descriptionError = computed(() => descriptionSchema.safeParse(description.value).error?.issues[0]?.message)
+const descriptionChanged = computed(() => description.value.trim() !== savedDescription.value)
+const savingDescription = ref(false)
+
+async function saveDescription() {
+  if (!descriptionChanged.value || descriptionError.value) {
+    return
+  }
+  savingDescription.value = true
+  try {
+    await updateAccessPoint(context.projectKey!, { Description: description.value.trim() || undefined })
+    await invalidateProject(queryClient, context.projectKey!)
+    toast.add({ title: 'Description saved', color: 'success', icon: 'i-lucide-check' })
+  } catch (error) {
+    toast.add({ title: 'The description was not saved', description: errorMessage(error), color: 'error' })
+  } finally {
+    savingDescription.value = false
+  }
+}
 
 const enabledKinds = ref<MachineCredentialKind[]>(['ApiKey'])
 const defaultKind = ref<MachineCredentialKind>('ApiKey')
@@ -166,6 +205,33 @@ async function downloadCa() {
               <dt class="text-muted">Members</dt>
               <dd>{{ Object.keys(accessPoint.data.value.AccessMap ?? {}).length }}</dd>
             </template>
+          </dl>
+          <!-- At full width under the list: its label column leaves little room on a phone. -->
+          <LoadingState v-if="projects.isPending.value" />
+          <ErrorState
+            v-else-if="projects.isError.value"
+            :error="projects.error.value"
+            class="mt-4"
+            compact
+            @retry="projects.refetch()"
+          />
+          <form v-else-if="canAdmin" class="mt-4 space-y-4" @submit.prevent="saveDescription">
+            <UFormField label="Description" :error="descriptionError">
+              <UTextarea v-model="description" class="w-full" autoresize />
+            </UFormField>
+            <div class="flex justify-end">
+              <UButton
+                type="submit"
+                label="Save description"
+                :loading="savingDescription"
+                :disabled="!descriptionChanged || !!descriptionError"
+              />
+            </div>
+          </form>
+          <dl v-else class="mt-2 space-y-1 text-sm">
+            <dt class="text-muted">Description</dt>
+            <dd v-if="savedDescription" class="break-words whitespace-pre-line">{{ savedDescription }}</dd>
+            <dd v-else class="text-muted">No description</dd>
           </dl>
         </UCard>
 

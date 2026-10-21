@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useProjectSummaries } from '@/queries/projects'
 import { useContextStore } from '@/stores/context'
 import { useSessionStore } from '@/stores/session'
 import { groupMemberships } from '@/utils/memberships'
@@ -8,6 +9,9 @@ const context = useContextStore()
 const session = useSessionStore()
 
 const organization = computed(() => groupMemberships(session.accessMap).find((entry) => entry.name === context.org))
+// The cards come from the AccessMap; the list adds the descriptions once it arrives (424-78).
+const projects = useProjectSummaries()
+const descriptionOf = (key: string) => projects.summaryOf(key)?.Description
 const creating = ref(false)
 </script>
 
@@ -56,6 +60,13 @@ const creating = ref(false)
                 <RoleBadge :role="project.role" />
               </div>
               <p class="mt-1 font-mono text-xs text-muted">{{ project.key }}</p>
+              <p
+                v-if="descriptionOf(project.key)"
+                class="mt-2 line-clamp-2 text-sm text-muted"
+                :title="descriptionOf(project.key)"
+              >
+                {{ descriptionOf(project.key) }}
+              </p>
             </UCard>
           </div>
         </section>

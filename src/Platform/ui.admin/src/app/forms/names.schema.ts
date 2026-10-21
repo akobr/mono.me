@@ -40,14 +40,19 @@ export const organizationNameSchema = nameSchema('organization', reservedOrganiz
 export const projectNameSchema = nameSchema('project', reservedProjectAndViewNames)
 export const viewNameSchema = nameSchema('view', reservedProjectAndViewNames)
 
+/** The description of a project, with the limit of view descriptions; the API trims it and has no limit. */
+export const descriptionSchema = z.string().max(500, 'At most 500 characters.')
+
 /** Onboarding and "New organization": the API creates an organization through its first project. */
 export const organizationSchema = z.object({
   organization: organizationNameSchema,
   project: projectNameSchema,
+  description: descriptionSchema.optional(),
 })
 
 export const projectSchema = z.object({
   project: projectNameSchema,
+  description: descriptionSchema.optional(),
 })
 
 export type OrganizationForm = z.infer<typeof organizationSchema>

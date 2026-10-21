@@ -10,7 +10,11 @@ const session = useSessionStore()
 const toast = useToast()
 
 async function submit(values: OrganizationForm) {
-  await createAccessPoint({ Organization: values.organization, Project: values.project })
+  await createAccessPoint({
+    Organization: values.organization,
+    Project: values.project,
+    ProjectDescription: values.description?.trim() || undefined,
+  })
   await session.loadAccount(true)
   open.value = false
   toast.add({ title: `Organization ${values.organization} created`, icon: 'i-lucide-building-2', color: 'success' })

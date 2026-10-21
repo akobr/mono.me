@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { openApp, signedOut } from './support'
+import { goto, openApp, signedOut } from './support'
 
 test('a new user is sent to sign in, creates an organization and lands in the project', async ({ page }) => {
   await signedOut(page)
@@ -15,6 +15,21 @@ test('a new user is sent to sign in, creates an organization and lands in the pr
 
   await expect(page).toHaveURL(/\/globex\/portal\/default\/annotations/)
   await expect(page.getByText('No annotations in this view')).toBeVisible()
+})
+
+// The description of a project (424-78): onboarding sends it trimmed, and the overview shows it on the project's card.
+test('the description of the first project shows on the organization overview', async ({ page }) => {
+  await openApp(page, '/onboarding', 'new-user')
+  await page.getByRole('textbox', { name: 'Organization' }).fill('globex')
+  await page.getByRole('textbox', { name: 'First project' }).fill('portal')
+  await page.getByRole('textbox', { name: 'Project description' }).fill('  The customer portal of Globex.  ')
+  await page.getByRole('button', { name: 'Create and continue' }).click()
+  await expect(page).toHaveURL(/\/globex\/portal\/default\/annotations/)
+
+  await goto(page, '/globex')
+  const description = page.getByText('The customer portal of Globex.', { exact: true })
+  await expect(description).toBeVisible()
+  await expect(description).toHaveAttribute('title', 'The customer portal of Globex.')
 })
 
 test('the sign-in page offers AuthKit after signing out', async ({ page }) => {
