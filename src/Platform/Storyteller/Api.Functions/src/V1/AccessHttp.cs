@@ -515,7 +515,7 @@ public class AccessHttp
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "Acknowledge of the deletion.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The machine access doesn't exist.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
-    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenMachineScopes)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> DeleteMachine(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.Access.V1.Machine)]
@@ -530,6 +530,9 @@ public class AccessHttp
         {
             return new BadRequestObjectResult(new ErrorResponse { Message = Definitions.Errors.InvalidMachineId });
         }
+
+        // Deleting a machine stops whatever runs with its scopes, so it needs the role they need, as the reset does.
+        await EnsureRoleForMachineScopesAsync(request, _accessService, organization, project, id);
 
         bool isSuccess;
 
@@ -643,8 +646,8 @@ public class AccessHttp
     }
 
     // The creator of a machine can use its credentials, so whatever gives them out or redirects them (reset, the
-    // federation rules) needs the role the stored scopes need. One point read; a missing machine is left to the route,
-    // which answers as before.
+    // federation rules) needs the role the stored scopes need, and so does the delete, which takes them away from what
+    // runs with them. One point read; a missing machine is left to the route, which answers as before.
     internal static async Task EnsureRoleForMachineScopesAsync(
         HttpRequestData request,
         IAccessService accessService,

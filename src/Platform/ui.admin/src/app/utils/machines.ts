@@ -51,7 +51,8 @@ export const scopeDescriptions: Record<MachineScope, string> = {
   SecretsRead:
     'Receives the values of key/value secrets (over mTLS when the project requires it). Needs Configuration.Read as well.',
   SecretsWrite: 'Writes key/value secrets. Needs Configuration.Write as well.',
-  ConfigurationTransfer: 'Exports and imports the views and the key/values of the project.',
+  ConfigurationTransfer:
+    'Exports and imports the views and the key/values of the project, with the scopes of the kinds they include: importing annotations, schemas or templates also needs their management scope.',
   SchemaWrite: 'Writes and deletes type, annotation and descendant-type schemas.',
   TemplateWrite: 'Writes and deletes the templates of a view.',
   AnnotationManage: 'Creates annotations in bulk, deletes them with their descendants and restores them.',
@@ -108,7 +109,11 @@ export const scopePresets: ScopePreset[] = [
   { name: 'Runtime reader', scopes: runtimeReader },
   { name: 'Runtime with secrets', scopes: [...runtimeReader, 'SecretsRead'] },
   { name: 'CI writer', scopes: ciWriter },
-  { name: 'Git sync', scopes: [...ciWriter, 'ConfigurationTransfer'] },
+  // it imports every kind, so it has the management scopes the import of schemas, templates and annotations needs
+  {
+    name: 'Git sync',
+    scopes: [...ciWriter, 'ConfigurationTransfer', 'SchemaWrite', 'TemplateWrite', 'AnnotationManage'],
+  },
   { name: 'Backup', scopes: [...runtimeReader, 'ConfigurationTransfer'] },
   { name: 'Schema deployer', scopes: ['ConfigurationRead', 'ConfigurationWrite', 'SchemaWrite', 'TemplateWrite'] },
 ]
@@ -148,7 +153,8 @@ export const hasSecret = (kind?: MachineCredentialKind | null) => kind !== 'Fede
 /**
  * The role that gives these scopes, or the credentials of this machine: its creation, a reset and new federation rules
  * (424-79). The creator of a machine can use its credentials, so an Administrator gives management scopes,
- * ContributorWithSecrets secrets scopes, and a Contributor the rest. Contributors delete any machine.
+ * ContributorWithSecrets secrets scopes, and a Contributor the rest. Deleting a machine stops whatever runs with its
+ * scopes, so it needs the same role.
  */
 export function requiredRoleFor(machine?: MachineAccess | readonly MachineScope[] | null): AccountRoleName {
   const scopes = Array.isArray(machine) ? machine : ((machine as MachineAccess | null | undefined)?.Scopes ?? [])

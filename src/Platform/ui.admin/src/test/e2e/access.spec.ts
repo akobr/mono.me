@@ -187,7 +187,11 @@ test('an Owner creates a machine with a management scope and sees it on its deta
   await expect(detail.getByText('Writes key/value secrets. Needs Configuration.Write as well.')).toBeVisible()
   await expect(detail).toContainText('Management scopes')
   await expect(detail.getByText('Configuration.Transfer', { exact: true })).toBeVisible()
-  await expect(detail.getByText('Exports and imports the views and the key/values of the project.')).toBeVisible()
+  await expect(
+    detail.getByText(
+      'Exports and imports the views and the key/values of the project, with the scopes of the kinds they include: importing annotations, schemas or templates also needs their management scope.',
+    ),
+  ).toBeVisible()
 })
 
 test('a Contributor gives a machine neither management scopes nor secrets scopes', async ({ page }) => {
@@ -216,11 +220,11 @@ test('a Contributor gives a machine neither management scopes nor secrets scopes
   await expect(row.getByRole('button', { name: 'Reset' })).toBeVisible()
 })
 
-test('a Contributor neither resets a machine with management or secrets scopes nor edits its rules, but deletes it', async ({
+test('a Contributor neither resets, deletes nor edits the rules of a machine with management or secrets scopes', async ({
   page,
 }) => {
-  // The user contributes to acme.shipping, whose Owner created these machines; the API refuses a Contributor the reset
-  // and new federation rules of a machine with management or secrets scopes.
+  // The user contributes to acme.shipping, whose Owner created these machines; the API refuses a Contributor the reset,
+  // the delete and new federation rules of a machine with management or secrets scopes.
   await openApp(page, '/acme/shipping/machines')
   await page.evaluate(() => {
     const mock = window.storytellerMock!
@@ -292,12 +296,17 @@ test('a Contributor neither resets a machine with management or secrets scopes n
     await page.locator('#machine-detail').getByRole('button', { name: 'Close' }).click()
   }
 
-  await managed.getByRole('button', { name: 'Delete mach-shipping-export' }).click()
-  const confirm = page.getByRole('dialog', { name: 'Delete mach-shipping-export?' })
-  await confirm.getByRole('textbox').fill('mach-shipping-export')
+  // A delete stops whatever runs with the scopes, so it needs their role too; the runtime machine stays deletable.
+  await expect(managed.getByRole('button', { name: 'Delete mach-shipping-export' })).toHaveCount(0)
+  await expect(secrets.getByRole('button', { name: 'Delete mach-shipping-secrets' })).toHaveCount(0)
+  const worker = page.getByRole('row').filter({ hasText: 'mach-shipping-worker' })
+  await worker.getByRole('button', { name: 'Delete mach-shipping-worker' }).click()
+  const confirm = page.getByRole('dialog', { name: 'Delete mach-shipping-worker?' })
+  await confirm.getByRole('textbox').fill('mach-shipping-worker')
   await confirm.getByRole('button', { name: 'Delete' }).click()
-  await expect(page.getByText('Machine mach-shipping-export deleted', { exact: true })).toBeVisible()
-  await expect(managed).toHaveCount(0)
+  await expect(page.getByText('Machine mach-shipping-worker deleted', { exact: true })).toBeVisible()
+  await expect(worker).toHaveCount(0)
+  await expect(managed).toHaveCount(1)
 })
 
 // Workload identity federation (424-46): Administrators trust issuers on the Machines page, Contributors create

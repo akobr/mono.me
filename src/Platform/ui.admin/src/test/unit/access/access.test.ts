@@ -4,6 +4,7 @@ import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 import {
   createMachineAccess,
+  deleteMachineAccess,
   getMachineAccess,
   getMachineAuthentication,
   issueSharedCertificate,
@@ -189,7 +190,16 @@ describe('machines', () => {
       ['CI writer', ['Annotation.Read', 'Annotation.Write', 'Configuration.Read', 'Configuration.Write']],
       [
         'Git sync',
-        ['Annotation.Read', 'Annotation.Write', 'Configuration.Read', 'Configuration.Write', 'Configuration.Transfer'],
+        [
+          'Annotation.Read',
+          'Annotation.Write',
+          'Configuration.Read',
+          'Configuration.Write',
+          'Configuration.Transfer',
+          'Schema.Write',
+          'Template.Write',
+          'Annotation.Manage',
+        ],
       ],
       ['Backup', ['Annotation.Read', 'Configuration.Read', 'Configuration.Transfer']],
       ['Schema deployer', ['Configuration.Read', 'Configuration.Write', 'Schema.Write', 'Template.Write']],
@@ -363,6 +373,39 @@ describe('machine scopes against the mock API', () => {
     await expect(setMachineFederationRules('acme', 'billing', federated.Id!, [rule])).resolves.toMatchObject({
       Scopes: ['AnnotationRead', 'AnnotationWrite', 'ConfigurationTransfer'],
     })
+  })
+
+  it('deletes a machine only for users with the role its scopes need', async () => {
+    const managed = await createMachineAccess('acme', 'billing', {
+      Scopes: ['ConfigurationRead', 'ConfigurationTransfer'],
+      CredentialKind: 'ApiKey',
+    })
+    const denied = (role: string) => ({
+      status: 403,
+      errorCode: 'AccessDenied',
+      message: `No ${role} access to 'acme.billing'.`,
+    })
+    const ids = () => (loadDb().machines?.['acme.billing'] ?? []).map((machine) => machine.Id)
+
+    setRole('Contributor')
+    await expect(deleteMachineAccess('acme', 'billing', managed.Id!)).rejects.toMatchObject(denied('Administrator'))
+    // The seeded mach-billing-sync reads secrets.
+    await expect(deleteMachineAccess('acme', 'billing', 'mach-billing-sync')).rejects.toMatchObject(
+      denied('ContributorWithSecrets'),
+    )
+    expect(ids()).toEqual(expect.arrayContaining([managed.Id, 'mach-billing-sync']))
+    // Runtime scopes without secrets stay with Contributors.
+    await deleteMachineAccess('acme', 'billing', 'mach-invoicing-worker')
+    expect(ids()).not.toContain('mach-invoicing-worker')
+
+    setRole('ContributorWithSecrets')
+    await deleteMachineAccess('acme', 'billing', 'mach-billing-sync')
+    await expect(deleteMachineAccess('acme', 'billing', managed.Id!)).rejects.toMatchObject(denied('Administrator'))
+
+    setRole('Administrator')
+    await deleteMachineAccess('acme', 'billing', managed.Id!)
+    expect(ids()).not.toContain(managed.Id)
+    expect(ids()).not.toContain('mach-billing-sync')
   })
 })
 
@@ -606,9 +649,12 @@ describe('MachineCreateDialog', () => {
           'Configuration.Read',
           'Configuration.Write',
           'Configuration.Transfer',
+          'Schema.Write',
+          'Template.Write',
+          'Annotation.Manage',
         ])
         await click(checkbox('KeyValue.Manage'))
-        await click(checkbox('Schema.Write'))
+        await click(checkbox('Template.Write'))
       })
 
       expect(body?.Scopes).toEqual([
@@ -618,6 +664,7 @@ describe('MachineCreateDialog', () => {
         'ConfigurationWrite',
         'ConfigurationTransfer',
         'SchemaWrite',
+        'AnnotationManage',
         'KeyValueManage',
       ])
       // Nothing about the preset.
