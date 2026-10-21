@@ -51,10 +51,17 @@ describe('the dataset of a page load', () => {
     expect(currentScenario()).toBe('large')
   })
 
-  it('ignores an unknown ?mock-scenario=', () => {
+  it('ignores an unknown ?mock-scenario=, and keeps the edits of the session', () => {
     open('?mock-scenario=nope')
-    applyStartScenario('default')
-    expect(currentScenario()).toBe('default')
+    expect(applyStartScenario('showcase')).toBe(true)
+    expect(currentScenario()).toBe('showcase')
+    const db = resetDb()
+    db.invitations = []
+    saveDb(db)
+
+    expect(applyStartScenario('showcase')).toBe(false)
+    expect(currentScenario()).toBe('showcase')
+    expect(loadDb().invitations).toEqual([])
   })
 
   it('reads the dataset of the build, the showcase without a valid one', () => {
