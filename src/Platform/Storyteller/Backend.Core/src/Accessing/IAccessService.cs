@@ -16,6 +16,16 @@ public interface IAccessService
 
     Task<AccessPoint> CreateAccessPointAsync(AccessPointCreate model);
 
+    // Every project where the account has a role, with its description, ordered by key.
+    // NotFoundException when the account doesn't exist.
+    Task<IReadOnlyList<ProjectSummary>> GetProjectsAsync(string accountId)
+        => throw new NotSupportedException("This access service does not support project summaries.");
+
+    // Replaces the description of a project. NotFoundException when the project doesn't exist,
+    // ArgumentException for an organization key.
+    Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate model)
+        => throw new NotSupportedException("This access service does not support updating access points.");
+
     Task<bool> GrantPermissionAsync(Permission model);
 
     Task<bool> RevokePermissionAsync(Permission model);
