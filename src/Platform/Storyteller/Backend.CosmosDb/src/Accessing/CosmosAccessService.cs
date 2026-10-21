@@ -77,6 +77,7 @@ public class CosmosAccessService : IAccessService
                 OwnerId = accountId,
                 Organization = model.Organization!,
                 Project = model.Project!,
+                ProjectDescription = model.ProjectDescription,
             });
             accessMap[model.Organization!] = AccountRole.Owner;
             accessMap[point.Key] = AccountRole.Owner;
@@ -205,6 +206,7 @@ public class CosmosAccessService : IAccessService
         {
             Key = accessPointKey,
             AccessMap = new() { { model.OwnerId, AccountRole.Owner } },
+            Description = NormalizeDescription(model.ProjectDescription),
         };
 
         var response = await repository.Container.CreateItemAsync(accessPointEntity, partitionKey);
@@ -224,6 +226,98 @@ public class CosmosAccessService : IAccessService
         }
 
         return response.Resource.ToAccessPoint();
+    }
+
+    public async Task<IReadOnlyList<ProjectSummary>> GetProjectsAsync(string accountId)
+    {
+        var account = await GetAccountAsync(accountId);
+
+        if (account is null)
+        {
+            throw new NotFoundException($"The account '{accountId}' doesn't exist.");
+        }
+
+        // A project key has a dot, an organization key has none.
+        var roles = account.AccessMap
+            .Where(pair => pair.Key.Contains('.') && pair.Value > AccountRole.None)
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+
+        if (roles.Count == 0)
+        {
+            return [];
+        }
+
+        // Only the key and the description: the members and the policies of the projects stay unread.
+        // A key whose access point is missing finds no document and is left out.
+        var repository = _repositoryProvider.GetCore();
+        var query = new QueryDefinition("SELECT ap.Key, ap.Description FROM ap WHERE ARRAY_CONTAINS(@ids, ap.id)")
+            .WithParameter("@ids", roles.Keys.Select(key => $"apt.{key}").ToList());
+        using var iterator = repository.Container.GetItemQueryIterator<ProjectDescriptionRow>(
+            query,
+            requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(MAIN_PARTITION_KEY) });
+
+        var projects = new List<ProjectSummary>();
+
+        while (iterator.HasMoreResults)
+        {
+            foreach (var project in await iterator.ReadNextAsync())
+            {
+                if (roles.TryGetValue(project.Key, out var role))
+                {
+                    projects.Add(new ProjectSummary { Key = project.Key, Role = role, Description = project.Description });
+                }
+            }
+        }
+
+        return projects
+            .OrderBy(project => project.Key, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public async Task<AccessPoint> UpdateAccessPointAsync(string key, AccessPointUpdate model)
+    {
+        if (!key.Contains('.'))
+        {
+            throw new ArgumentException($"The access point '{key}' is an organization, only a project has a description.", nameof(key));
+        }
+
+        var repository = _repositoryProvider.GetCore();
+        var partitionKey = new PartitionKey(MAIN_PARTITION_KEY);
+        var description = NormalizeDescription(model.Description);
+
+        // A concurrent write to the project (a membership, a policy) only moves the ETag, so one retry suffices.
+        // The stored entity is replaced with only the description changed, so the members and the policies stay.
+        for (var attempt = 1; ; attempt++)
+        {
+            var (entity, eTag) = await repository.Container.TryReadItemWithETagAsync(
+                $"apt.{key}",
+                partitionKey,
+                stream => stream.DeserializeSystemTextJson<AccessPointEntity>(_serializerOptions));
+
+            if (entity is null)
+            {
+                throw new NotFoundException($"The project '{key}' doesn't exist.");
+            }
+
+            var updated = entity with { Description = description };
+
+            try
+            {
+                await repository.Container.ReplaceItemAsync(
+                    updated,
+                    updated.Id,
+                    partitionKey,
+                    new ItemRequestOptions { IfMatchEtag = eTag });
+                return updated.ToAccessPoint();
+            }
+            catch (CosmosException exception) when (exception.StatusCode == HttpStatusCode.PreconditionFailed)
+            {
+                if (attempt > 1)
+                {
+                    throw new ConflictException($"The project '{key}' was changed concurrently, try again.", ErrorCodes.Conflict);
+                }
+            }
+        }
     }
 
     public async Task<bool> GrantPermissionAsync(Permission model)
@@ -645,6 +739,12 @@ public class CosmosAccessService : IAccessService
         return ids.Take(max).ToList();
     }
 
+    // The rule of view descriptions: trimmed, and a blank one is none. No length rule.
+    private static string? NormalizeDescription(string? description)
+    {
+        return string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+    }
+
     // Managing a role needs Administrator on the access point; only an Owner may grant or revoke Owner.
     // The access point's own map is the authority, read in the same optimistic transaction as the change.
     private static void EnsureCanManage(AccessPoint point, string actorId, AccountRole role)
@@ -793,5 +893,12 @@ public class CosmosAccessService : IAccessService
         public string? UserName { get; init; }
 
         public string? Name { get; init; }
+    }
+
+    private sealed record ProjectDescriptionRow
+    {
+        public required string Key { get; init; }
+
+        public string? Description { get; init; }
     }
 }

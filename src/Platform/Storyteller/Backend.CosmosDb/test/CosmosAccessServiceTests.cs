@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
 using _42.Platform.Storyteller.Entities.Access;
+using _42.Platform.Storyteller.KeyValues.Policy;
 using FluentAssertions;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 using Permission = _42.Platform.Storyteller.Accessing.Model.Permission;
@@ -22,6 +25,10 @@ public class CosmosAccessServiceTests(Startup startup)
     private const string OwnerId = "acc-tests-owner";
 
     private IAccessService Access => Context.Services.GetRequiredService<IAccessService>();
+
+    private IMachineAuthenticationPolicyStore MachinePolicies => Context.Services.GetRequiredService<IMachineAuthenticationPolicyStore>();
+
+    private IKeyValuePolicyStore KeyValuePolicies => Context.Services.GetRequiredService<IKeyValuePolicyStore>();
 
     [Fact]
     public async Task Grant_ByOwner_StoresMembershipInPointAndAccount()
@@ -534,6 +541,213 @@ public class CosmosAccessServiceTests(Startup startup)
         (await Access.GetAccessPointAsync(pointKey))!.AccessMap.Should().ContainKeys(firstId, secondId);
     }
 
+    [Fact]
+    public async Task CreateAccessPoint_NewOrganizationWithDescription_TrimsItOntoTheProjectOnly()
+    {
+        await EnsureOwnerAsync();
+        var organization = NewOrganizationName();
+
+        var point = await Access.CreateAccessPointAsync(new AccessPointCreate
+        {
+            Organization = organization,
+            Project = NewProjectName(),
+            ProjectDescription = "  Billing of the customers.\n",
+            OwnerId = OwnerId,
+        });
+
+        point.Description.Should().Be("Billing of the customers.");
+        (await Access.GetAccessPointAsync(point.Key))!.Description.Should().Be("Billing of the customers.");
+        (await Access.GetAccessPointAsync(organization))!.Description.Should().BeNull();
+        (await IsDescriptionStoredAsync(organization)).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" \t ")]
+    public async Task CreateAccessPoint_BlankDescription_IsNotStored(string description)
+    {
+        await EnsureOwnerAsync();
+
+        var point = await Access.CreateAccessPointAsync(new AccessPointCreate
+        {
+            Organization = Organization,
+            Project = NewProjectName(),
+            ProjectDescription = description,
+            OwnerId = OwnerId,
+        });
+
+        point.Description.Should().BeNull();
+        (await IsDescriptionStoredAsync(point.Key)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CreateAccount_WithProjectDescription_DescribesOnlyTheProject()
+    {
+        var id = $"acc-{Guid.NewGuid():N}";
+        var organization = NewOrganizationName();
+        var project = NewProjectName();
+        var pointKey = $"{organization}.{project}";
+
+        var account = await Access.CreateAccountAsync(new AccountCreate
+        {
+            IdentityId = id,
+            UserName = $"{id}@example.com",
+            Name = "Founder",
+            Organization = organization,
+            Project = project,
+            ProjectDescription = " Shipping of the orders. ",
+        });
+
+        account.AccessMap.Should().Contain(pointKey, AccountRole.Owner);
+        (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Shipping of the orders.");
+        (await Access.GetAccessPointAsync(organization))!.Description.Should().BeNull();
+        (await IsDescriptionStoredAsync(organization)).Should().BeFalse();
+        var accountDocument = await ReadDocumentAsync(id);
+        accountDocument.TryGetProperty("ProjectDescription", out _).Should().BeFalse();
+        accountDocument.TryGetProperty("Description", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpdateAccessPoint_SetsReplacesAndClearsTheDescription()
+    {
+        var pointKey = await CreateProjectAsync();
+
+        var set = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "  First.  " });
+        set.Description.Should().Be("First.");
+        (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("First.");
+
+        var replaced = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Second." });
+        replaced.Description.Should().Be("Second.");
+        (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Second.");
+
+        var cleared = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate());
+        cleared.Description.Should().BeNull();
+        (await IsDescriptionStoredAsync(pointKey)).Should().BeFalse();
+
+        await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Third." });
+        var blank = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = " \n " });
+        blank.Description.Should().BeNull();
+        (await IsDescriptionStoredAsync(pointKey)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpdateAccessPoint_KeepsTheMembersAndThePolicies()
+    {
+        var pointKey = await CreateProjectAsync();
+        var project = ProjectOf(pointKey);
+        var memberId = await CreateBareAccountAsync();
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.Certificate });
+        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 });
+
+        var point = await Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Described." });
+
+        point.AccessMap.Should().Contain(memberId, AccountRole.Reader);
+        var stored = await ReadPointEntityAsync(pointKey);
+        stored.Description.Should().Be("Described.");
+        stored.AccessMap.Should().Contain(OwnerId, AccountRole.Owner).And.Contain(memberId, AccountRole.Reader);
+        stored.MachineAuthentication!.CredentialKind.Should().Be(MachineCredentialKind.Certificate);
+        stored.KeyValues!.Version.Should().Be(1UL);
+        stored.KeyValues.RequireMtlsForSecretDelivery.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task UpdateAccessPoint_UnknownProject_ThrowsNotFound()
+    {
+        var act = () => Access.UpdateAccessPointAsync($"{Organization}.{NewProjectName()}", new AccessPointUpdate { Description = "Nowhere." });
+
+        await act.Should().ThrowAsync<NotFoundException>();
+    }
+
+    [Fact]
+    public async Task UpdateAccessPoint_OrganizationKey_ThrowsArgumentException()
+    {
+        await EnsureOwnerAsync();
+
+        var act = () => Access.UpdateAccessPointAsync(Organization, new AccessPointUpdate { Description = "An organization." });
+
+        await act.Should().ThrowAsync<ArgumentException>();
+        (await IsDescriptionStoredAsync(Organization)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task LaterWrites_KeepTheDescription()
+    {
+        // A grant, a key/value policy and a machine policy each replace the whole document.
+        var pointKey = await CreateProjectAsync("Kept.");
+        var project = ProjectOf(pointKey);
+        var memberId = await CreateBareAccountAsync();
+
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Contributor));
+        (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Kept.");
+
+        await KeyValuePolicies.SetAsync(Organization, project, new KeyValuePolicy { RequireMtlsForSecretDelivery = false, Version = 1 });
+        (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Kept.");
+
+        await MachinePolicies.SetAsync(Organization, project, new MachineAuthenticationPolicy { CredentialKind = MachineCredentialKind.ApiKey });
+        (await Access.GetAccessPointAsync(pointKey))!.Description.Should().Be("Kept.");
+    }
+
+    [Fact]
+    public async Task ConcurrentGrantAndDescription_BothLand()
+    {
+        // Both writes are guarded by the ETag of the project and retry once on a concurrent change.
+        var pointKey = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+
+        await Task.WhenAll(
+            Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader)),
+            Access.UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Raced." }));
+
+        var point = await Access.GetAccessPointAsync(pointKey);
+        point!.AccessMap.Should().ContainKey(memberId);
+        point.Description.Should().Be("Raced.");
+    }
+
+    [Fact]
+    public async Task GetProjects_ListsTheProjectsOfEveryRoleWithTheirDescriptions()
+    {
+        var memberId = await CreateBareAccountAsync();
+        var expected = new List<ProjectSummary>();
+
+        foreach (var role in new[] { AccountRole.Reader, AccountRole.Contributor, AccountRole.ContributorWithSecrets, AccountRole.Administrator, AccountRole.Owner })
+        {
+            // two of the projects have no description
+            var description = role is AccountRole.Contributor or AccountRole.Administrator ? null : $"A project of a {role}.";
+            var pointKey = await CreateProjectAsync(description);
+            await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, role));
+            expected.Add(new ProjectSummary { Key = pointKey, Role = role, Description = description });
+        }
+
+        // a role on the organization is not a project
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, Organization, AccountRole.Reader));
+
+        var projects = await Access.GetProjectsAsync(memberId);
+
+        projects.Should().Equal(expected.OrderBy(project => project.Key, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task GetProjects_MissingAccessPoint_IsLeftOut()
+    {
+        var pointKey = await CreateProjectAsync("Present.");
+        var memberId = await CreateBareAccountAsync(new() { [$"{Organization}.{NewProjectName()}"] = AccountRole.Reader });
+        await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+
+        var projects = await Access.GetProjectsAsync(memberId);
+
+        projects.Should().Equal(new ProjectSummary { Key = pointKey, Role = AccountRole.Reader, Description = "Present." });
+    }
+
+    [Fact]
+    public async Task GetProjects_UnknownAccount_ThrowsNotFound()
+    {
+        var act = () => Access.GetProjectsAsync($"missing-{Guid.NewGuid():N}");
+
+        await act.Should().ThrowAsync<NotFoundException>();
+    }
+
     private static Permission Permission(string creatorId, string accountId, string pointKey, AccountRole role)
     {
         return new Permission
@@ -546,6 +760,11 @@ public class CosmosAccessServiceTests(Startup startup)
     }
 
     private static string NewProjectName() => $"p-{Guid.NewGuid():N}"[..14];
+
+    // A new organization creates its own container, so the tests use few of them.
+    private static string NewOrganizationName() => $"o-{Guid.NewGuid():N}"[..14];
+
+    private static string ProjectOf(string pointKey) => pointKey[(Organization.Length + 1)..];
 
     private async Task EnsureOwnerAsync()
     {
@@ -564,20 +783,22 @@ public class CosmosAccessServiceTests(Startup startup)
         });
     }
 
-    private async Task<string> CreateProjectAsync()
+    private async Task<string> CreateProjectAsync(string description = null)
     {
         await EnsureOwnerAsync();
         var point = await Access.CreateAccessPointAsync(new AccessPointCreate
         {
             Organization = Organization,
             Project = NewProjectName(),
+            ProjectDescription = description,
             OwnerId = OwnerId,
         });
         return point.Key;
     }
 
-    // An account without memberships. Created directly, because CreateAccountAsync always creates an organization.
-    private async Task<string> CreateBareAccountAsync()
+    // An account without memberships, or with a map the access points don't know of.
+    // Created directly, because CreateAccountAsync always creates an organization.
+    private async Task<string> CreateBareAccountAsync(Dictionary<string, AccountRole> accessMap = null)
     {
         var id = $"acc-{Guid.NewGuid():N}";
         var repository = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetCore();
@@ -587,9 +808,35 @@ public class CosmosAccessServiceTests(Startup startup)
                 Id = id,
                 UserName = $"{id}@example.com",
                 Name = id,
-                AccessMap = new(),
+                AccessMap = accessMap ?? new(),
             },
             new PartitionKey("access"));
         return id;
+    }
+
+    // The stored document as written: the Cosmos client leaves out null values.
+    private async Task<JsonElement> ReadDocumentAsync(string id)
+    {
+        var repository = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetCore();
+        using var response = await repository.Container.ReadItemStreamAsync(id, new PartitionKey("access"));
+        response.EnsureSuccessStatusCode();
+        using var document = await JsonDocument.ParseAsync(response.Content);
+        return document.RootElement.Clone();
+    }
+
+    private async Task<bool> IsDescriptionStoredAsync(string pointKey)
+    {
+        return (await ReadDocumentAsync($"apt.{pointKey}")).TryGetProperty("Description", out _);
+    }
+
+    // The whole entity, with the key/value policy the AccessPoint model leaves out.
+    private async Task<AccessPointEntity> ReadPointEntityAsync(string pointKey)
+    {
+        var repository = Context.Services.GetRequiredService<IContainerRepositoryProvider>().GetCore();
+        var options = Context.Services.GetRequiredService<IOptions<JsonSerializerOptions>>().Value;
+        return await repository.Container.TryReadItemAsync(
+            $"apt.{pointKey}",
+            new PartitionKey("access"),
+            stream => stream.DeserializeSystemTextJson<AccessPointEntity>(options));
     }
 }

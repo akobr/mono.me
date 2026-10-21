@@ -25,6 +25,7 @@ internal static class AccessMappings
         Key = e.Key,
         AccessMap = e.AccessMap,
         MachineAuthentication = e.MachineAuthentication,
+        Description = e.Description,
     };
 
     public static AccessPointEntity ToEntity(this AccessPoint m) => new()
@@ -32,6 +33,7 @@ internal static class AccessMappings
         Key = m.Key,
         AccessMap = new(m.AccessMap),
         MachineAuthentication = m.MachineAuthentication,
+        Description = m.Description,
     };
 
     public static MachineAccess ToMachineAccess(this MachineAccessEntity e) => new()
