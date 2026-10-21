@@ -13,7 +13,15 @@ export function writeShowcaseSettings(storage: Storage = localStorage): void {
     for (const project of showcaseProjects) {
       entries[`${project.org}.${project.project}`] = structuredClone(project.settings)
     }
-    storage.setItem(projectSettingsKey, JSON.stringify(entries))
+    const value = JSON.stringify(entries)
+    storage.setItem(projectSettingsKey, value)
+    // A reset in an open page: the project settings store listens for storage events, which a write of the same page
+    // does not send.
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new StorageEvent('storage', { key: projectSettingsKey, newValue: value, storageArea: storage }),
+      )
+    }
   } catch (error) {
     console.warn('Showcase: the project settings could not be written.', error)
   }

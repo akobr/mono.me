@@ -18,7 +18,9 @@ import type { PersonaId } from './people'
 
 // Builds the annotations, documents and seeded deletions of one showcase scope (424-77). Every annotation goes through
 // the SDK's key builder and withRelations, so keys and relation members are those of the API; every method checks
-// that the ancestors exist, so an authoring mistake fails the unit tests instead of producing a broken tree.
+// that the ancestors exist, so an authoring mistake fails the unit tests instead of producing a broken tree. The
+// versions of a document are dated when the scope is built: never before its annotation was created, and never
+// after the annotation was deleted.
 
 const day = 86_400_000
 
@@ -80,6 +82,24 @@ export interface ScopeOptions {
 
 type Versions = Record<string, unknown> | readonly Record<string, unknown>[]
 
+interface DocumentSpec {
+  contents: readonly Record<string, unknown>[]
+  options: HistoryOptions
+}
+
+/** The annotation a document belongs to: the key of a configuration or an annotation schema, the ancestor of a
+ * descendant-type schema; none for templates and type schemas. */
+function ownerOf(id: DocumentId): string | undefined {
+  const [kind, ...rest] = id.split(':')
+  if (kind === 'configuration') {
+    return rest.join(':')
+  }
+  if (kind === 'schema' && (rest[0] === 'annotation' || rest[0] === 'descendant')) {
+    return rest[1]
+  }
+  return undefined
+}
+
 /** A seeded PRNG with the helpers the projects need for generated content. */
 export interface Rng {
   next(): number
@@ -127,7 +147,7 @@ export class ScopeBuilder {
   readonly rng: Rng
   private readonly now = Date.now()
   private readonly annotations = new Map<string, Annotation>()
-  private readonly documents = new Map<DocumentId, StoredDocument>()
+  private readonly documents = new Map<DocumentId, DocumentSpec>()
   private readonly deletions: { key: string; daysAgo: number; by: PersonaId }[] = []
 
   constructor(options: ScopeOptions) {
@@ -210,6 +230,7 @@ export class ScopeBuilder {
 
   build(): ScopeBuild {
     const active = new Map(this.annotations)
+    const deletedDaysAgo = new Map<string, number>()
     const trash: TrashedTree[] = this.deletions.map(({ key, daysAgo, by }) => {
       if (!active.has(key)) {
         throw new Error(`${this.scope}: ${key} is deleted twice.`)
@@ -218,11 +239,59 @@ export class ScopeBuilder {
       const keys = [...active.keys()]
         .filter((candidate) => candidate === key || getAllAncestors(candidate).includes(key))
         .toSorted((a, b) => depthOf(b) - depthOf(a) || a.localeCompare(b))
-      const annotations = keys.map((deleted) => active.get(deleted)!)
+      const deletedAt = this.at(-daysAgo)
+      const annotations = keys.map((deleted) => {
+        deletedDaysAgo.set(deleted, daysAgo)
+        return this.beforeDeletion(active.get(deleted)!, deletedAt)
+      })
       keys.forEach((deleted) => active.delete(deleted))
-      return { rootKey: key, annotations, deletedAt: this.at(-daysAgo), by }
+      return { rootKey: key, annotations, deletedAt, by }
     })
-    return { annotations: [...active.values()], documents: new Map(this.documents), trash }
+
+    const documents = new Map<DocumentId, StoredDocument>()
+    for (const [id, { contents, options }] of this.documents) {
+      const owner = ownerOf(id) ?? ''
+      const spacing = this.within(contents.length, options, this.annotations.get(owner), deletedDaysAgo.get(owner))
+      documents.set(id, versionHistory(contents, spacing, this.now))
+    }
+    return { annotations: [...active.values()], documents, trash }
+  }
+
+  /** A deleted annotation was last modified before its deletion. */
+  private beforeDeletion(annotation: Annotation, deletedAt: string): Annotation {
+    if (Date.parse(annotation.Created!.At!) > Date.parse(deletedAt)) {
+      throw new Error(`${this.scope}: ${annotation.AnnotationKey} is deleted before it was created.`)
+    }
+    return Date.parse(annotation.Modified!.At!) > Date.parse(deletedAt)
+      ? {
+          ...annotation,
+          Modified: { ...annotation.Modified, At: new Date(Date.parse(deletedAt) - day / 24).toISOString() },
+        }
+      : annotation
+  }
+
+  /**
+   * The spacing of a document's versions within its annotation's life: the newest version comes before a deletion,
+   * and the oldest not before the creation (the spacing shrinks when the history would start earlier).
+   */
+  private within(
+    count: number,
+    options: HistoryOptions,
+    annotation: Annotation | undefined,
+    deletedDaysAgo: number | undefined,
+  ): HistoryOptions & { authors: readonly PersonaId[] } {
+    const authors = options.authors ?? this.editors
+    const afterDeletion = deletedDaysAgo === undefined ? 0 : deletedDaysAgo + 1
+    const createdDaysAgo = annotation ? (this.now - Date.parse(annotation.Created!.At!)) / day : Infinity
+    const lastDaysAgo = Math.min(
+      Math.max(options.lastDaysAgo ?? 1, afterDeletion),
+      Math.max(createdDaysAgo, afterDeletion),
+    )
+    const every = options.every ?? 5
+    if (count === 1 || lastDaysAgo + (count - 1) * every <= createdDaysAgo) {
+      return { ...options, authors, lastDaysAgo }
+    }
+    return { ...options, authors, lastDaysAgo, every: Math.max(0, (createdDaysAgo - lastDaysAgo) / (count - 1)) }
   }
 
   private get scope() {
@@ -258,7 +327,7 @@ export class ScopeBuilder {
     if (contents.length === 0) {
       throw new Error(`${this.scope}: ${id} needs at least one version.`)
     }
-    this.documents.set(id, versionHistory(contents, { ...options, authors: options.authors ?? this.editors }, this.now))
+    this.documents.set(id, { contents, options })
   }
 
   private add(code: AnnotationTypeCode, parts: AnnotationKeyParts, meta: Meta = {}, members: object = {}): string {
