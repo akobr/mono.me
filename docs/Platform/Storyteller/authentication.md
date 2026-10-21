@@ -280,7 +280,7 @@ API https://api.example.com/api
 Token valid until 2026-10-18T14:15:00.0000000+00:00.
 ```
 
-`sform account logout` has nothing to do for a machine. Account, access point, machine and shared certificate management need a user sign-in; the API answers `401` to a machine.
+`sform account logout` has nothing to do for a machine. Account, access point, machine and shared certificate management need a user sign-in; the API answers `401` to a machine, and `403` when a machine sets the description of a project (`PUT v1/access/points/{key}`) or lists projects (`GET v1/access/projects`).
 
 | Exit code | Meaning |
 |---|---|
@@ -1144,6 +1144,7 @@ The two status codes mean different things, so a client knows whether signing in
 | --- | --- | --- |
 | `401` | The credentials are missing, invalid or expired, or the token lacks the required scope. Machine credentials that fail their checks also get 401, among them a Storyteller token whose machine is gone or no longer `Federated`, whose scopes exceed the machine's, or whose project is not the route's. | none |
 | `403` | The user is authenticated, but their account role on the organization or project is too low for the operation. Signing in again does not help. | `ErrorResponse` with `ErrorCode` `AccessDenied` |
+| `403` | A machine called an operation for users only: registering, describing or discovering views, a permanent delete of an annotation, setting the description of a project or listing projects ([Access points](access.md)), or an Administrator operation of key/values ([key-values.md](key-values.md)). | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 | `403` | A machine restricted to an annotation addressed another annotation, or an operation of the whole project (see [Annotation restriction of machines](#annotation-restriction-of-machines)). | `ErrorResponse` with `ErrorCode` `AnnotationRestricted` |
 | `403` | A machine called a bulk or structural operation without its management scope: the machine was not created with it ("This operation needs the management scope Schema.Write, which the machine was not created with."), or its credentials do not carry it ("…, which the credentials of the machine do not carry."). See [Management scopes of machines](#management-scopes-of-machines). | `ErrorResponse` with `ErrorCode` `AccessDenied` |
 
@@ -1155,7 +1156,7 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | --- | --- | --- |
 | `400` | none | Grant or revoke with a missing account, a missing access point key, or the role `None`. |
 | `400` | none | An empty body or `null` where an account, an access point, a machine, a permission, a machine authentication policy or a shared certificate is required: `The account is missing.`, `The permission is missing.` and so on. |
-| `400` | none | An account, access point, machine, permission, machine authentication policy or shared certificate body that does not fit its type: invalid JSON, another shape, or a required member left out. The message names the expected body and the JSON path, for example `The request body is not a shared certificate (at $).` |
+| `400` | none | An account, access point, project update, machine, permission, machine authentication policy or shared certificate body that does not fit its type: invalid JSON, another shape, or a required member left out. The message names the expected body and the JSON path, for example `The request body is not a shared certificate (at $).` |
 | `400` | none | A machine of a kind the project does not enable or the deployment does not configure, a management scope that does not exist or that the identity provider cannot carry (no AuthKit permission, no Entra ID app role), or a reset of a `Federated` machine. |
 | `400` | `InvalidFederation` | A trusted issuer or a federation rule fails [validation](#federation-rules), a `PUT` changes the `Issuer` of a trusted issuer, or the body of a federation `PUT` is not a trusted issuer or a list of federation rules. |
 | `400` | `MachineNotFederated` | Federation rules for a machine of another kind. |
@@ -1164,9 +1165,9 @@ Other access-management errors use the same `ErrorResponse` shape, without excep
 | `409` | `FederatedIssuerInUse` | Creating a trusted issuer whose name rules of machines still reference. |
 | `409` | `ElevatedRole` | Revoke names a lower role than the member holds. Revoke the stored role instead. |
 | `409` | `LastOwner` | The revoke would leave the access point without an `Owner`. |
-| `413` | `BodyTooLarge` | A body larger than its route reads: 8 KiB for an account, an access point, a permission, a machine authentication policy or a shared certificate, 1 MiB for a trusted issuer, and 4 MiB for a machine or its federation rules. |
+| `413` | `BodyTooLarge` | A body larger than its route reads: 8 KiB for an account, an access point, a project update, a permission, a machine authentication policy or a shared certificate, 1 MiB for a trusted issuer, and 4 MiB for a machine or its federation rules. |
 
-Grant only raises a role. To lower one, revoke the current role and grant the new one, or set the exact role through the members endpoint. Members and invitations, with their own error codes, are described in [Members and invitations](access.md).
+Grant only raises a role. To lower one, revoke the current role and grant the new one, or set the exact role through the members endpoint. Members, invitations and the description of a project, with their own error codes, are described in [Access points](access.md).
 
 The token endpoint of federated machines is anonymous and answers OAuth errors (`400` and `503`) instead of `ErrorResponse`; see [The token endpoint](#the-token-endpoint).
 
