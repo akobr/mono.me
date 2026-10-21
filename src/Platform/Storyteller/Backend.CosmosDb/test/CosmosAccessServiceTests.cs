@@ -30,6 +30,8 @@ public class CosmosAccessServiceTests(Startup startup)
 
     private IKeyValuePolicyStore KeyValuePolicies => Context.Services.GetRequiredService<IKeyValuePolicyStore>();
 
+    private CosmosDbOptions CosmosOptions => Context.Services.GetRequiredService<IOptions<CosmosDbOptions>>().Value;
+
     [Fact]
     public async Task Grant_ByOwner_StoresMembershipInPointAndAccount()
     {
@@ -692,7 +694,8 @@ public class CosmosAccessServiceTests(Startup startup)
     [Fact]
     public async Task ConcurrentGrantAndDescription_BothLand()
     {
-        // Both writes are guarded by the ETag of the project and retry once on a concurrent change.
+        // Whichever write commits second retries on the ETag of the project. That is mostly the grant, whose batch
+        // needs one round trip more; the next tests put a grant between the update's read and its replace.
         var pointKey = await CreateProjectAsync();
         var memberId = await CreateBareAccountAsync();
 
@@ -703,6 +706,49 @@ public class CosmosAccessServiceTests(Startup startup)
         var point = await Access.GetAccessPointAsync(pointKey);
         point!.AccessMap.Should().ContainKey(memberId);
         point.Description.Should().Be("Raced.");
+    }
+
+    [Fact]
+    public async Task UpdateAccessPoint_GrantBeforeReplace_RetriesAndKeepsTheMember()
+    {
+        // The replace fails on the ETag, and the retry reads the new member.
+        var pointKey = await CreateProjectAsync();
+        var memberId = await CreateBareAccountAsync();
+        var interceptor = new ReplaceInterceptor($"apt.{pointKey}", async replace =>
+        {
+            if (replace == 1)
+            {
+                await Access.GrantPermissionAsync(Permission(OwnerId, memberId, pointKey, AccountRole.Reader));
+            }
+        });
+        using var client = interceptor.CreateClient(CosmosOptions);
+
+        var updated = await AccessOn(client).UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Raced." });
+
+        interceptor.Replaces.Should().Be(2);
+        updated.AccessMap.Should().ContainKey(memberId);
+        var point = await Access.GetAccessPointAsync(pointKey);
+        point!.AccessMap.Should().Contain(memberId, AccountRole.Reader);
+        point.Description.Should().Be("Raced.");
+        (await Access.GetAccountAsync(memberId))!.AccessMap.Should().Contain(pointKey, AccountRole.Reader);
+    }
+
+    [Fact]
+    public async Task UpdateAccessPoint_ChangedBeforeEveryReplace_ThrowsConflict()
+    {
+        var pointKey = await CreateProjectAsync("Before.");
+        var memberIds = new[] { await CreateBareAccountAsync(), await CreateBareAccountAsync() };
+        var interceptor = new ReplaceInterceptor($"apt.{pointKey}", replace =>
+            Access.GrantPermissionAsync(Permission(OwnerId, memberIds[replace - 1], pointKey, AccountRole.Reader)));
+        using var client = interceptor.CreateClient(CosmosOptions);
+
+        var act = () => AccessOn(client).UpdateAccessPointAsync(pointKey, new AccessPointUpdate { Description = "Raced." });
+
+        (await act.Should().ThrowAsync<ConflictException>()).Which.ErrorCode.Should().Be(ErrorCodes.Conflict);
+        interceptor.Replaces.Should().Be(2);
+        var point = await Access.GetAccessPointAsync(pointKey);
+        point!.AccessMap.Should().ContainKeys(memberIds);
+        point.Description.Should().Be("Before.");
     }
 
     [Fact]
@@ -760,6 +806,15 @@ public class CosmosAccessServiceTests(Startup startup)
     }
 
     private static string NewProjectName() => $"p-{Guid.NewGuid():N}"[..14];
+
+    // The access service on a client of its own, for example one with a ReplaceInterceptor.
+    private CosmosAccessService AccessOn(CosmosClient client)
+    {
+        return new CosmosAccessService(
+            new ContainerRepositoryProvider(new FixedClientProvider(client)),
+            Context.Services.GetRequiredService<IContainerFactory>(),
+            Context.Services.GetRequiredService<IOptions<JsonSerializerOptions>>());
+    }
 
     // A new organization creates its own container, so the tests use few of them.
     private static string NewOrganizationName() => $"o-{Guid.NewGuid():N}"[..14];
@@ -838,5 +893,10 @@ public class CosmosAccessServiceTests(Startup startup)
             $"apt.{pointKey}",
             new PartitionKey("access"),
             stream => stream.DeserializeSystemTextJson<AccessPointEntity>(options));
+    }
+
+    private sealed class FixedClientProvider(CosmosClient client) : ICosmosClientProvider
+    {
+        public CosmosClient Client => client;
     }
 }
