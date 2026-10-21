@@ -1,25 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { effectiveContent } from '@/mock/configuration-handlers'
-import { annotationsOf, resetDb, type MockDb } from '@/mock/db'
-import { showcaseScope } from '@/mock/showcase'
 import { annotationStatus } from '@/utils/annotation-status'
+import { showcaseOf, unseededShowcaseDb } from './support'
 
 // fabrikam/invoicing-suite follows docs/42for.net/platform/examples/b2b-saas.md and example 3 of the Miro board.
 
-const [org, project] = ['fabrikam', 'invoicing-suite']
-const scope = (view: string) => ({ org, project, view })
-const keysOf = (view: string) => new Set(showcaseScope(org, project, view)!.annotations.map((a) => a.AnnotationKey))
-const own = (view: string, key: string) =>
-  showcaseScope(org, project, view)!.documents.get(`configuration:${key}`)?.versions.at(-1)?.Content
-
-let db: MockDb
-beforeEach(() => {
-  db = resetDb('showcase')
-})
+const showcase = showcaseOf('fabrikam', 'invoicing-suite')
 
 describe('fabrikam/invoicing-suite', () => {
   it('has the catalog of the documentation and of the board', () => {
-    const keys = keysOf('default')
+    const keys = showcase.keys('default')
     for (const key of [
       'sbt.northwind',
       'sbt.contoso',
@@ -51,40 +41,39 @@ describe('fabrikam/invoicing-suite', () => {
   })
 
   it('stores the plans on the usages and the one-off on the production execution', () => {
-    expect(own('default', 'usg.northwind.invoicing')).toMatchObject({ plan: 'enterprise' })
-    expect(own('default', 'usg.contoso.invoicing')).toMatchObject({ plan: 'standard' })
-    expect(own('default', 'exe.northwind.invoicing.production')).toMatchObject({ taxProfile: 'no-mva-custom' })
-    expect(own('default', 'cnt.northwind.production')).toMatchObject({ region: 'norwayeast' })
-    expect(own('default', 'sbt.northwind')).toMatchObject({ legalName: 'Northwind Traders AS', residency: 'eu' })
+    expect(showcase.own('default', 'usg.northwind.invoicing')).toMatchObject({ plan: 'enterprise' })
+    expect(showcase.own('default', 'usg.contoso.invoicing')).toMatchObject({ plan: 'standard' })
+    expect(showcase.own('default', 'exe.northwind.invoicing.production')).toMatchObject({ taxProfile: 'no-mva-custom' })
+    expect(showcase.own('default', 'cnt.northwind.production')).toMatchObject({ region: 'norwayeast' })
+    expect(showcase.own('default', 'sbt.northwind')).toMatchObject({
+      legalName: 'Northwind Traders AS',
+      residency: 'eu',
+    })
   })
 
   it('moves Northwind’s export to 02:00 in Oslo and switches off the sandbox one', () => {
-    expect(own('default', 'uxe.northwind.invoicing.production.nightly-export')).toEqual({
+    expect(showcase.own('default', 'uxe.northwind.invoicing.production.nightly-export')).toEqual({
       cron: '0 2 * * *',
       timeZone: 'Europe/Oslo',
     })
-    const sandbox = annotationsOf(db, org, project, 'default').get('uxe.northwind.invoicing.sandbox.nightly-export')!
+    const sandbox = showcase.annotations('default').get('uxe.northwind.invoicing.sandbox.nightly-export')!
     expect(annotationStatus(sandbox)).toBe('disabled')
     // Contoso keeps the module's schedule: its job run has no document of its own and inherits the template.
-    expect(own('default', 'uxe.contoso.invoicing.production.nightly-export')).toBeUndefined()
-    expect(effectiveContent(db, scope('default'), 'uxe.contoso.invoicing.production.nightly-export')).toMatchObject({
+    const contoso = 'uxe.contoso.invoicing.production.nightly-export'
+    expect(showcase.own('default', contoso)).toBeUndefined()
+    expect(effectiveContent(unseededShowcaseDb(), showcase.scope('default'), contoso)).toMatchObject({
       format: 'csv',
       retries: 2,
     })
   })
 
   it('requires a plan on invoicing contracts and a region on Northwind environments', () => {
-    const documents = showcaseScope(org, project, 'default')!.documents
-    expect(documents.get('schema:descendant:rst.invoicing:usg')?.versions.at(-1)?.Content).toMatchObject({
-      required: ['plan'],
-    })
-    expect(documents.get('schema:descendant:sbt.northwind:cnt')?.versions.at(-1)?.Content).toMatchObject({
-      required: ['region'],
-    })
+    expect(showcase.latest('default', 'schema:descendant:rst.invoicing:usg')).toMatchObject({ required: ['plan'] })
+    expect(showcase.latest('default', 'schema:descendant:sbt.northwind:cnt')).toMatchObject({ required: ['region'] })
   })
 
   it('follows the board in development: Northwind’s sandbox and a new QA environment', () => {
-    const keys = keysOf('development')
+    const keys = showcase.keys('development')
     expect([...keys].filter((key) => key.startsWith('sbt.'))).toEqual(['sbt.northwind'])
     expect(keys.has('cnt.northwind.qa')).toBe(true)
     expect(keys.has('exe.northwind.portal.qa')).toBe(true)
@@ -93,8 +82,17 @@ describe('fabrikam/invoicing-suite', () => {
   })
 
   it('brings PEPPOL and the e-archive module in the release candidate', () => {
-    expect(own('release-candidate', 'rst.invoicing')?.features).toContain('peppol')
-    expect(keysOf('release-candidate').has('exe.northwind.e-archive.production')).toBe(true)
-    expect(keysOf('default').has('rst.e-archive')).toBe(false)
+    expect(showcase.own('release-candidate', 'rst.invoicing')?.features).toContain('peppol')
+    expect(showcase.keys('release-candidate').has('exe.northwind.e-archive.production')).toBe(true)
+    expect(showcase.keys('default').has('rst.e-archive')).toBe(false)
+  })
+
+  it('starts with a deleted sandbox and its deployments, and a deployment deleted alone', () => {
+    expect(showcase.trash('default').get('cnt.trey-research.sandbox')).toEqual(
+      expect.arrayContaining(['exe.trey-research.invoicing.sandbox', 'cnt.trey-research.sandbox']),
+    )
+    expect(showcase.trash('default').get('exe.vanarsdel.portal.production')).toEqual([
+      'exe.vanarsdel.portal.production',
+    ])
   })
 })
