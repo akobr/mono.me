@@ -87,7 +87,7 @@ A second delete of the same key returns the existing deletion. A delete that did
 
 ## Re-create
 
-A create of a deleted key re-creates it, and so does a create below a deleted ancestor, which re-creates the ancestor. Four calls do it: `SetAnnotation`, `SetAnnotations`, `SetAnnotationsSimple`, and the import of an annotation file with `Existing` set to `Overwrite` ([Export and import](#export-and-import)). Any Contributor may do it with the first three; the import needs the Administrator role ([export-import.md](export-import.md#access)). A machine needs `Annotation.Write` for the first three, and also the management scope `Annotation.Manage` for the two bulk calls, so `SetAnnotation` re-creates one key without it; the import needs `Annotation.Write` and the management scope `Configuration.Transfer` instead (see [Scopes of machines](authentication.md#scopes-of-machines)). The API never asks; clients look up deleted keys first and offer a restore.
+A create of a deleted key re-creates it, and so does a create below a deleted ancestor, which re-creates the ancestor. Four calls do it: `SetAnnotation`, `SetAnnotations`, `SetAnnotationsSimple`, and the import of an annotation file with `Existing` set to `Overwrite` ([Export and import](#export-and-import)). Any Contributor may do it with the first three; the import needs the Administrator role ([export-import.md](export-import.md#access)). A machine needs `Annotation.Write` for the first three, and also the management scope `Annotation.Manage` for the two bulk calls, so `SetAnnotation` re-creates one key without it; the import needs `Annotation.Write` and `Annotation.Manage` too, and the management scope `Configuration.Transfer` (see [Scopes of machines](authentication.md#scopes-of-machines)). The API never asks; clients look up deleted keys first and offer a restore.
 
 - The item is replaced by the new content, with empty relation arrays and a new `Created` stamp.
 - The configuration is deleted after its content went to the versions. The first new configuration version continues the numbering, so the versions of the previous lifetime stay visible until they expire.
@@ -193,7 +193,7 @@ The `sform story` commands (`src/Platform/Cli/src/Commands/Storyteller/`) work o
 
 A machine without the management scope `Annotation.Manage` gets `403` from `sform story delete`, `sform story restore` and the restore of `sform story set --restore-deleted`. The command prints the server's message, for example "This operation needs the scope Annotation.Manage, which the machine was not created with.", and `Error code: AccessDenied`, and exits with `44`. `restore` first lists what its earlier requests restored.
 
-`sform story export` and `sform story import` move the documents of the view as a zip, annotations included, for an Administrator or an Owner of the project, or a machine with the management scope `Configuration.Transfer` and the read scopes of the included kinds for an export, their write scopes for an import ([export-import.md](export-import.md#cli)).
+`sform story export` and `sform story import` move the documents of the view as a zip, annotations included, for an Administrator or an Owner of the project, or a machine with the management scope `Configuration.Transfer` and the read scopes of the included kinds for an export, the scopes of their direct writes for an import (`Annotation.Write` and `Annotation.Manage` for annotations) ([export-import.md](export-import.md#cli)).
 
 ## Validation
 
