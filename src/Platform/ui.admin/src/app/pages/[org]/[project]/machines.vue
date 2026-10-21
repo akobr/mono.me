@@ -31,7 +31,8 @@ import type { OneTimeSecret } from '@/components/access/OneTimeSecretDialog.vue'
 // certificates and only Administrators change issuers. A Federated machine has no secret: creating one shows how a
 // workload exchanges its platform token (FederatedSetupDialog), and it has no Reset. Neither has a machine whose scopes
 // need a higher role than the user's (management scopes an Administrator, secrets scopes ContributorWithSecrets), as
-// the API refuses the reset (424-79); Contributors still delete it.
+// the API refuses the reset (424-79); such a machine has no Delete either, as the API refuses that too: a delete stops
+// whatever runs with its scopes.
 const context = useContextStore()
 const queryClient = useQueryClient()
 const toast = useToast()
@@ -209,8 +210,8 @@ useHashScroll(
                   <td class="px-3 py-2"><RelativeTime :value="machine.LastRenewalAt" /></td>
                   <td class="px-3 py-2 text-end">
                     <span v-if="canManage" class="flex justify-end gap-1">
-                      <!-- A Federated machine has no secret to reset; its rules change on its detail. A reset needs
-                        the role the scopes of the machine need (424-79). -->
+                      <!-- A Federated machine has no secret to reset; its rules change on its detail. A reset and a
+                        delete need the role the scopes of the machine need (424-79). -->
                       <UButton
                         v-if="hasSecret(machine.CredentialKind) && role.can(requiredRoleFor(machine))"
                         label="Reset"
@@ -220,6 +221,7 @@ useHashScroll(
                         @click="resetting = machine"
                       />
                       <UButton
+                        v-if="role.can(requiredRoleFor(machine))"
                         icon="i-lucide-trash-2"
                         size="xs"
                         color="neutral"

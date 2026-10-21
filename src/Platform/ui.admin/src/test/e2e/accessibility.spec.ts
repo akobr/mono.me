@@ -150,6 +150,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
         if (role === 'an Owner') {
           await dialog.getByRole('button', { name: 'Git sync' }).click()
           await expect(transfer).toBeChecked()
+          await expect(dialog.getByRole('checkbox', { name: 'Annotation.Manage' })).toBeChecked()
         } else {
           await expect(transfer).toBeDisabled()
           await expect(dialog.getByRole('checkbox', { name: 'Secrets.Read' })).toBeDisabled()

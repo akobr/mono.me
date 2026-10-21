@@ -130,8 +130,8 @@ function machineScopesOf(body: MachineAccessCreate): { scopes: MachineScope[]; i
 
 /**
  * The creator of a machine can use its credentials, so its creation, a reset and new federation rules need the role its
- * scopes need (424-79): an Administrator for a management scope, ContributorWithSecrets for a secrets scope; the route
- * checks the Contributor. With the message of the API.
+ * scopes need (424-79), and so does its delete: an Administrator for a management scope, ContributorWithSecrets for a
+ * secrets scope; the route checks the Contributor. With the message of the API.
  */
 function requireRoleForScopes(db: MockDb, key: string, scopes?: MachineScope[]) {
   const role = scopes?.some((scope) => managementScopes.includes(scope))
@@ -582,7 +582,9 @@ export const accessManagementHandlers: HttpHandler[] = [
     `${api}/:org/:project/access/machines/:id`,
     withDb((db, { params }) => {
       const key = machineScope(params)
-      const denied = requireRole(db, key, 'Contributor')
+      const machine = db.machines?.[key]?.find((entry) => entry.Id === params.id)
+      // A delete stops whatever runs with the machine's scopes, so it needs the role they need, as the reset does.
+      const denied = requireRole(db, key, 'Contributor') ?? requireRoleForScopes(db, key, machine?.Scopes)
       if (denied) {
         return denied
       }

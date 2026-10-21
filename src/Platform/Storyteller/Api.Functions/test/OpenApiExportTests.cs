@@ -349,7 +349,7 @@ public class OpenApiExportTests
     }
 
     // Spec 3 and 4: the 400 of a new machine names an undefined scope and a list without a runtime scope, and its 403
-    // and those of the reset and the federation rules name the role the scopes of the machine need.
+    // and those of the reset, the federation rules and the delete name the role the scopes of the machine need.
     [Fact]
     public async Task Document_MachineRoutes_NameTheScopeRulesInTheir400AndTheRoleRuleInTheir403()
     {
@@ -359,7 +359,7 @@ public class OpenApiExportTests
         Operation(document, Definitions.RouteIds.Access.CreateMachineAccess).GetProperty("responses").GetProperty("400").GetProperty("description").GetString()
             .ShouldBe("The annotation key is not valid (ErrorCode InvalidKey), a scope doesn't exist, the scopes have no runtime scope, or the credential kind is not supported or its identity provider cannot carry one of the scopes.");
 
-        foreach (var routeId in new[] { Definitions.RouteIds.Access.CreateMachineAccess, Definitions.RouteIds.Access.ResetMachineAccess, Definitions.RouteIds.Access.SetMachineFederationRules })
+        foreach (var routeId in new[] { Definitions.RouteIds.Access.CreateMachineAccess, Definitions.RouteIds.Access.ResetMachineAccess, Definitions.RouteIds.Access.SetMachineFederationRules, Definitions.RouteIds.Access.DeleteMachineAccess })
         {
             Operation(document, routeId).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
                 .ShouldBe(Definitions.Descriptions.ResponseForbiddenMachineScopes, routeId);
@@ -367,7 +367,7 @@ public class OpenApiExportTests
 
         Definitions.Descriptions.ResponseForbiddenMachineScopes.ShouldBe(
             Definitions.Descriptions.ResponseForbiddenUserOnly
-            + " Creating a machine, resetting it or replacing its federation rules needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).");
+            + " Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).");
     }
 
     // The description of a project (424-78): its update and the caller's projects, under the Access tag, for users, with
@@ -529,7 +529,7 @@ public class OpenApiExportTests
         var templateWrite = (Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite, new[] { Scopes.Configuration.Write, Scopes.Template.Write });
         var secretRead = (Definitions.Descriptions.ResponseMtlsRequiredConfigurationRead, new[] { Scopes.Configuration.Read, Scopes.Secrets.Read });
         var export = (Definitions.Descriptions.ResponseTransferForbiddenExport, new[] { Scopes.Configuration.Transfer, Scopes.Annotation.Read, Scopes.Configuration.Read });
-        var import = (Definitions.Descriptions.ResponseTransferForbiddenImport, new[] { Scopes.Configuration.Transfer, Scopes.Annotation.Write, Scopes.Configuration.Write });
+        var import = (Definitions.Descriptions.ResponseTransferForbiddenImport, new[] { Scopes.Configuration.Transfer, Scopes.Annotation.Write, Scopes.Annotation.Manage, Scopes.Configuration.Write, Scopes.Schema.Write, Scopes.Template.Write });
 
         return new Dictionary<string, (string Forbidden, string[] Scopes)>
         {

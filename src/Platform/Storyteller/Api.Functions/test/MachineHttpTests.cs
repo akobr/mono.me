@@ -32,7 +32,7 @@ public class MachineHttpTests
         ([MachineScope.AnnotationWrite, MachineScope.AnnotationManage], AccountRole.Administrator),
         ([MachineScope.ConfigurationWrite, MachineScope.SecretsWrite, MachineScope.KeyValueManage], AccountRole.Administrator));
 
-    // The scopes of a stored machine and the role its reset needs, each with every role of a user.
+    // The scopes of a stored machine and the role its reset and its delete need, each with every role of a user.
     public static TheoryData<MachineScope[], AccountRole, AccountRole> StoredScopes => WithEveryRole(
         ([MachineScope.AnnotationRead, MachineScope.ConfigurationRead], AccountRole.Contributor),
         ([MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite], AccountRole.Contributor),
@@ -60,8 +60,8 @@ public class MachineHttpTests
         access.Roles.ShouldBe(RoleLookups("org1.proj1"));
     }
 
-    // The reset reads the stored machine once for its role rule; its runtime scopes need no more than the Contributor
-    // of the route, so no second role is looked up.
+    // The reset and the delete read the stored machine once each for their role rule; its runtime scopes need no more
+    // than the Contributor of the route, so no second role is looked up.
     [Fact]
     public async Task KeycloakId_GetResetAndDelete_ReachTheAccessService()
     {
@@ -78,6 +78,7 @@ public class MachineHttpTests
                 $"get:org1/proj1/{KeycloakId}",
                 $"get:org1/proj1/{KeycloakId}",
                 $"reset:org1/proj1/{KeycloakId}",
+                $"get:org1/proj1/{KeycloakId}",
                 $"delete:org1/proj1/{KeycloakId}",
             ]);
         access.Roles.ShouldBe(RoleLookups("org1.proj1", "org1.proj1", "org1.proj1"));
@@ -486,12 +487,49 @@ public class MachineHttpTests
         access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"reset:org1/proj1/{KeycloakId}"]);
     }
 
-    // Spec 4: reading, listing and deleting a machine stay at Contributor, whatever its scopes. Debug builds (DEV_AUTH)
-    // skip the role checks of users.
+    // Deleting a machine stops whatever runs with its scopes, so it needs the role they need, as the reset does, from
+    // one point read of the stored machine. Debug builds (DEV_AUTH) skip the role checks of users, so there every
+    // delete passes.
+    [Theory]
+    [MemberData(nameof(StoredScopes))]
+    public async Task DeleteMachine_TheStoredScopes_NeedTheRoleOfTheirHighestGroup(MachineScope[] stored, AccountRole needed, AccountRole role)
+    {
+        var access = new RecordingAccess(Machine() with { Scopes = stored }) { Role = role };
+        var http = CreateHttp(access);
+
+        if (role >= needed || DevAuth)
+        {
+            (await http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkResult>();
+
+            access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
+            return;
+        }
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe($"No {Refusing(role, needed):G} access to 'org1.proj1'.");
+        access.Calls.ShouldNotContain($"delete:org1/proj1/{KeycloakId}");
+    }
+
+    // A machine that is not stored has no scopes to check; the delete answers as it always did.
+    [Fact]
+    public async Task DeleteMachine_OfAnUnknownMachine_IsNotFound()
+    {
+        var access = new RecordingAccess(null);
+        var http = CreateHttp(access);
+
+        (await http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId)).ShouldBeOfType<NotFoundResult>();
+
+        access.Calls.ShouldBe([$"get:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
+    }
+
+    // Spec 4: reading and listing a machine stay at Contributor, whatever its scopes; below Contributor the delete is
+    // refused by its route first, before the machine is read. Debug builds (DEV_AUTH) skip the role checks of users.
     [Theory]
     [InlineData(AccountRole.Reader, false)]
     [InlineData(AccountRole.Contributor, true)]
-    public async Task GetListAndDelete_OfAMachineWithEveryScope_NeedOnlyAContributor(AccountRole role, bool allowed)
+    public async Task GetAndList_OfAMachineWithEveryScope_NeedOnlyAContributor(AccountRole role, bool allowed)
     {
         var access = new RecordingAccess(Machine() with { Scopes = MachineScopes.All }) { Role = role };
         var http = CreateHttp(access);
@@ -500,10 +538,9 @@ public class MachineHttpTests
         {
             (await http.GetMachines(ContributorRequest(), "org1", "proj1")).ShouldBeOfType<OkObjectResult>();
             (await http.GetMachine(ContributorRequest(), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkObjectResult>();
-            (await http.DeleteMachine(ContributorRequest(), "org1", "proj1", KeycloakId)).ShouldBeOfType<OkResult>();
 
-            access.Calls.ShouldBe(["list:org1/proj1", $"get:org1/proj1/{KeycloakId}", $"delete:org1/proj1/{KeycloakId}"]);
-            access.Roles.ShouldBe(RoleLookups("org1.proj1", "org1.proj1", "org1.proj1"));
+            access.Calls.ShouldBe(["list:org1/proj1", $"get:org1/proj1/{KeycloakId}"]);
+            access.Roles.ShouldBe(RoleLookups("org1.proj1", "org1.proj1"));
             return;
         }
 
@@ -718,10 +755,11 @@ public class MachineHttpTests
                 : Task.FromResult(machine with { AccessKey = "new-secret" });
         }
 
+        // As the Cosmos service: an unknown machine is not deleted.
         public Task<bool> DeleteMachineAccessAsync(string organization, string project, string appId)
         {
             Calls.Add($"delete:{organization}/{project}/{appId}");
-            return Task.FromResult(true);
+            return Task.FromResult(machine is not null);
         }
 
         // Every service returns exactly the requested scopes (spec 3.5).
