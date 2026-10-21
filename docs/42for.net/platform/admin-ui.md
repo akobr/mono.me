@@ -7,7 +7,7 @@ The Administration UI is the browser application for the 2S Platform. Use it to 
 You sign in through AuthKit. When you sign in for the first time, the UI checks for invitations:
 
 - **You were invited:** the invitations page lists the projects you can join.
-- **You were not invited:** onboarding asks for an organization and a first project. You become their Owner.
+- **You were not invited:** onboarding asks for an organization and a first project, with an optional description of the project. You become their Owner.
 
 After that, the address bar always names the context, like GitHub:
 
@@ -20,6 +20,8 @@ The switcher at the top changes the organization, project or view and keeps the 
 The sidebar always lists the pages of the view, project and organization you last worked in. They stay there on project pages (Settings, Members, …), on the organization overview, and on Organizations and Account. Opening a page of another view, project or organization updates the sidebar. A project you have not opened a view of yet shows its `default` view.
 
 The browser remembers this context, and the address `/` opens it again.
+
+The overview of an organization has a card for each of its projects you are a member of: the name, your role, the key and the first two lines of the project's description. Hover the description for the whole text. **New project** there (Owner of the organization) asks for the name and an optional description, and **New organization** on Organizations asks for an optional project description with the first project. A description takes at most 500 characters.
 
 **Annotations**, **Configurations** and **Graph** remember, per view, how you left them. When you leave one of these screens and come back, through the sidebar, the switcher or the command palette, it looks the same as before. The screen keeps:
 
@@ -207,8 +209,10 @@ The CLI does the same with `sform story export` and `sform story import` (see [C
 | --- | --- | --- |
 | Members | Administrator | Roles of the organization and of each project. Organization and project roles are independent. Only Owners grant Owner, and the last Owner stays. **Invite** in the top bar invites several people at once: type their addresses with spaces or commas between them, or paste a list (also one copied from a mail client). Everyone gets the same role and expiry. Below the members, **Invitations**: resend, revoke or copy the link. |
 | Machines | Contributor (management scopes, shared certificates and trusted issuers: Administrator) | Credentials for services: scope, management scopes, an optional annotation restriction (the machine then reaches only that annotation and its descendants), the credential kind and certificate lifetime (or, for a federated machine, its federation rules), reset and delete. Below the machines, **Shared certificates**: issue, revoke, expiry warnings; and **Trusted issuers**: the platforms whose tokens federated machines exchange. |
-| Settings | Everyone (policies: Administrator, time zone, date format and types: Contributor) | The default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy, the CA certificate download and, in the **Secrets** section, how the key values of the project are protected. |
+| Settings | Everyone (description and policies: Administrator, time zone, date format and types: Contributor) | The description of the project, the default time zone of new annotations, the date format, the names, colors and icons of the annotation types, the machine authentication policy, the CA certificate download and, in the **Secrets** section, how the key values of the project are protected. |
 | Monitor | Administrator | The **Usage** of the key values (totals, estimated charges, a daily chart) and the **Audit** trail of secrets, one tab each. |
+
+The **Project** card on Settings shows the description of the project to every member, or **No description**. Administrators edit it there instead: **Save description** stores the text trimmed, and saving an empty text removes the description. The organization overview shows the same text.
 
 **Machine authentication** on Settings (Administrator) enables the credential kinds the project's machines may use: API keys, client certificates (mTLS), both together, client credentials of the identity provider, or federated tokens. It also sets the default kind and the default certificate lifetime of new machines. **New machine** on Machines preselects both, and lets you pick any other enabled kind and lifetime. Machines keep the kind they were created with; disabling a kind stops every machine that uses it until it is enabled again. The machine list and detail name the kind in words (`API key`, `Certificate and API key`, `Federated`), and the detail shows the certificate lifetime and when the certificate expires.
 

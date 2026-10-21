@@ -2,7 +2,7 @@
 
 Organizations and projects are **access points**. An organization has the key `{organization}` and a project the key `{organization}.{project}`. Each access point keeps a map of account IDs to roles, and each account keeps the same map from its side. Both documents live in the main partition (`access`) of the `core` container, so every membership change replaces them together in one transactional batch, guarded by their ETags. A concurrent change of either document makes the batch fail; the change is then evaluated once more on fresh data, and a second failure answers `409 Conflict`.
 
-An organization role does not grant access to the organization's projects. Each project has its own members.
+An organization role does not grant access to the organization's projects. Each project has its own members, and can have a [description](#projects).
 
 ## Names
 
@@ -31,6 +31,31 @@ A `View` has `Name`, `Description`, `Created` (the [audit stamp](audit-stamps.md
 
 `?discover=true` also lists every view that holds documents of the project (annotations, configurations, templates, schemas, and their history) with `IsRegistered = false`. It is a cross-partition `SELECT DISTINCT VALUE c.ViewName` over the organization container, so it is meant for an administrator's occasional check, not for every page load.
 
+## Projects
+
+A project can have a description, like a view. An organization has none.
+
+| Method | Route | Needs | Result |
+| --- | --- | --- | --- |
+| GET | `v1/access/points` | An account | `AccessPoint[]`: the organizations and projects where the caller is `Administrator` or `Owner` |
+| GET | `v1/access/points/{key}` | Administrator | `AccessPoint` of the organization or project |
+| POST | `v1/access/points` | Owner of the organization when it exists | `{ "Organization", "Project", "ProjectDescription" }` → `AccessPoint` of the new project |
+| PUT | `v1/access/points/{key}` | Administrator, users only | `{ "Description" }` → `AccessPoint` of the project |
+| GET | `v1/access/projects` | An account, users only | `ProjectSummary[]`: the caller's projects, ordered by key |
+
+Every route needs the scope `User.Impersonation`. An `AccessPoint` has `Key`, `AccessMap` (the members and their roles), `MachineAuthentication` and `Description`. POST creates the project, and the organization when it does not exist yet; the caller becomes the `Owner` of what it creates. In an existing organization it needs `Owner` of the organization (`403`), and an existing project answers `409 AccessPointExists`.
+
+An access point carries the members and the machine authentication policy, so reading one needs `Administrator`, and `GET v1/access/points` lists only the access points the caller administers. Every member reads the descriptions of their projects with `GET v1/access/projects` instead, as every member reads the descriptions of views. A `ProjectSummary` has `Key` (`{organization}.{project}`), `Role` (the caller's role) and `Description`, and nothing of the members or the policies. The list holds every project where the account has a role above `None`; organizations are not listed, and a key whose project does not exist is left out. Without an account, `GET v1/access/points` and `GET v1/access/projects` answer `404`.
+
+**The description.** It is trimmed, and a blank one is none: nothing is stored, and the project is returned without `Description`. The server has no length rule; the body limit of 8 KiB bounds it, and the admin UI takes 500 characters.
+
+* `ProjectDescription` of `POST v1/access/points` and [`POST v1/access/account`](#accounts) describes the new project. An organization created with it gets none.
+* PUT replaces the description of a project. A missing body (empty or `null`), `{}` or a blank `Description` clears it, as for views. The `Administrator` check comes first, so a key the caller does not administer answers `403`, also when the project does not exist. After it, an organization key answers `400` (`Access point key must be in organization.project format.`) and a body that is not a project update `400`. Debug builds (`DEV_AUTH`) skip the role check of users and answer `404` for a project that does not exist.
+* PUT and `GET v1/access/projects` are for users: machine credentials get `403`.
+* PUT changes only the description and keeps the members and the policies. It replaces the document guarded by its ETag; a concurrent change of the project (a member, a policy) makes it read the project again and retry once, and a second failure answers `409 Conflict`.
+
+The description is stored on the project's access point document (`apt.{organization}.{project}` in the `access` partition of `core`). `GET v1/access/projects` reads only the keys and the descriptions of the caller's projects, in one query.
+
 ## Roles
 
 `None < Reader < Contributor < ContributorWithSecrets < Administrator < Owner`
@@ -46,6 +71,7 @@ A `View` has `Name`, `Description`, `Created` (the [audit stamp](audit-stamps.md
 | Export a view, import into a view, and read those jobs | `Administrator` on the project for users, and the scopes of every included kind. Machines have no role and need the scopes and the management scope `Configuration.Transfer`; a machine restricted to an annotation gets `403` `AnnotationRestricted` (see [export-import.md](export-import.md#access)) |
 | Read key/value secrets, reveal them, export with secrets, resolve a configuration with secret bindings | `ContributorWithSecrets` on the project, or the scope `Configuration.Secrets` (see [key-values.md](key-values.md#secret-delivery)) |
 | Change the key/value policy of a project (levels, mTLS rule, customer key, recipients, rotation) | `Administrator` on the project |
+| Set the [description of a project](#projects) | `Administrator` on the project, users only: machine credentials get `403` |
 
 See [annotation-lifecycle.md](annotation-lifecycle.md#api) for the annotation routes.
 
@@ -96,7 +122,7 @@ Accepting the same invitation twice returns the account without changes.
 
 ## Accounts
 
-`POST v1/access/account` creates the caller's account. With `Organization` and `Project` it also creates them and makes the caller their owner. Without both (`{}`, or both `null`), it creates an account with no memberships, for a user who joins through invitations. Giving only one of them is rejected with `400`. The body is required: an empty body or `null` is rejected with `400` too (`The account is missing.`).
+`POST v1/access/account` creates the caller's account. With `Organization` and `Project` it also creates them and makes the caller their owner. Without both (`{}`, or both `null`), it creates an account with no memberships, for a user who joins through invitations. Giving only one of them is rejected with `400`. `ProjectDescription` is the [description](#projects) of the new project; the account and the organization get none, and a description that is not blank without `Organization` and `Project` is rejected with `400` (`A project description needs an organization and a project.`). The body is required: an empty body or `null` is rejected with `400` too (`The account is missing.`).
 
 ## Error codes
 
@@ -107,12 +133,13 @@ A route that takes a JSON body does not require a `Content-Type`, and answers `4
 | Status | `ErrorCode` | When |
 | --- | --- | --- |
 | `400` | `InvalidName` | A new organization, project, or view name breaks the [name rules](#names). |
-| `403` | `AccessDenied` | The caller's role on the access point is too low. |
+| `403` | `AccessDenied` | The caller's role on the access point is too low, or machine credentials call an operation of this page that is for users only: registering, describing or discovering views, a permanent delete, setting the description of a project or listing projects. |
 | `403` | `EmailMismatch`, `EmailNotVerified` | Accepting or declining with another or an unverified email. |
 | `404` | `NotFound` | The access point, account, or invitation does not exist. |
 | `404` | `MemberNotFound` | The account is not a member of the access point. |
 | `409` | `LastOwner`, `SelfRoleChange` | Member rules above. |
 | `409` | `InvitationExists`, `InvitationNotPending`, `InvitationExpired` | Invitation rules above. |
 | `409` | `ViewExists` | The view is already registered, or is `default`. |
-| `409` | `Conflict` | The membership or invitation changed concurrently twice; repeat the request. |
-| `413` | `BodyTooLarge` | The body is larger than its route reads: 64 KiB for a view, 8 KiB for an account, a member role or an invitation. |
+| `409` | `AccessPointExists` | The project already exists. |
+| `409` | `Conflict` | The membership, the invitation, or the project whose description is set changed concurrently twice; repeat the request. |
+| `413` | `BodyTooLarge` | The body is larger than its route reads: 64 KiB for a view, 8 KiB for an account, a new project, a project update, a member role or an invitation. |
