@@ -3,6 +3,7 @@ using _42.Platform.Storyteller;
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Api.ConditionalReads;
 using _42.Platform.Storyteller.Api.ErrorHandling;
+using _42.Platform.Storyteller.Api.Json;
 using _42.Platform.Storyteller.Api.OpenApi;
 using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Annotating;
@@ -52,6 +53,9 @@ var host = new HostBuilder()
         services.Configure<Microsoft.AspNetCore.Mvc.JsonOptions>(options =>
         {
             options.JsonSerializerOptions.PropertyNamingPolicy = new NoChangeNamingPolicy();
+
+            // Before the enum converter: a machine scope is one name, not names joined by commas and ORed.
+            options.JsonSerializerOptions.Converters.Add(new MachineScopeJsonConverter());
             options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()); // JsonNamingPolicy.CamelCase
             options.JsonSerializerOptions.Converters.Add(new JObjectConverter());
             options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;

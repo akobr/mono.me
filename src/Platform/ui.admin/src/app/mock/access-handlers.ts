@@ -90,9 +90,9 @@ const impliedReads: Partial<Record<MachineScope, MachineScope>> = {
 }
 
 /**
- * A value of the scope list as the API's JsonStringEnumConverter reads it: a name in any case, or an integer, also in a
- * string, as an enum value (the integer itself when no scope has it); undefined when it is neither. Names joined by
- * commas, which the converter ORs, are not read.
+ * A value of the scope list as the API's MachineScopeJsonConverter reads it: one name in any case, or an integer, also
+ * in a string, as an enum value (the integer itself when no scope has it); undefined when it is neither. Names joined
+ * by commas are not read, as the API refuses them too.
  */
 function readScope(value: unknown): MachineScope | number | undefined {
   if (typeof value === 'string') {
