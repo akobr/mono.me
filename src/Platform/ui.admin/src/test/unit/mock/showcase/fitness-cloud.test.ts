@@ -14,6 +14,11 @@ const views = fitnessCloud.views.map((view) => view.name)
 const ofType = (keys: Set<string>, code: string) => [...keys].filter((key) => key.startsWith(`${code}.`)).toSorted()
 /** The calendar day of an ISO timestamp or date, as a day number. */
 const dayOf = (date: string) => Math.floor(Date.parse(date.length === 10 ? `${date}T12:00:00Z` : date) / 86_400_000)
+/**
+ * The day of an annotation's date (Created, ExpiresAt follow the clock) on the calendar of the configurations, which
+ * are written for 21 October 2026, so the two compare on any day the tests run.
+ */
+const calendarDay = (date: string) => dayOf(date) - Math.floor(Date.now() / 86_400_000) + dayOf('2026-10-21')
 /** The assignments of one member: exe.<tenant>.<application>.<member>. */
 const assignmentsOf = (keys: Set<string>, tenant: string, member: string) =>
   ofType(keys, 'exe').filter((key) => key.startsWith(`exe.${tenant}.`) && key.endsWith(`.${member}`))
@@ -213,11 +218,11 @@ describe('fabrikam/fitness-cloud', () => {
         for (const ancestor of getAllAncestors(key).map((ancestorKey) => all.get(ancestorKey)!)) {
           expect(dayOf(ancestor.Created!.At!), `${view} ${key}`).toBeLessThanOrEqual(created)
           if (firstStart) {
-            expect(dayOf(ancestor.Created!.At!), `${view} ${key} starts ${firstStart}`).toBeLessThanOrEqual(
+            expect(calendarDay(ancestor.Created!.At!), `${view} ${key} starts ${firstStart}`).toBeLessThanOrEqual(
               dayOf(firstStart),
             )
             if (ancestor.ExpiresAt) {
-              expect(dayOf(firstStart), `${view} ${key}`).toBeLessThanOrEqual(dayOf(ancestor.ExpiresAt))
+              expect(dayOf(firstStart), `${view} ${key}`).toBeLessThanOrEqual(calendarDay(ancestor.ExpiresAt))
             }
           }
         }

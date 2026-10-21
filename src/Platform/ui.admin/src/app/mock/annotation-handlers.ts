@@ -692,13 +692,14 @@ export const annotationHandlers: HttpHandler[] = [
       }
 
       const entries = [...(auditOf(db, scopeOf(params), params.key) ?? [])]
-      // The seeded annotations were created before the mock recorded anything.
+      // The seeded annotations were created before the mock recorded anything: by the system, or by a person of the
+      // showcase, whose stamp is the annotation's own while nothing else was recorded.
       if (entries[0]?.Action !== 'Created') {
         entries.unshift({
           Id: `adt_seed_${params.key}`,
           At: annotation.Created?.At ?? new Date(Date.now() - 30 * day).toISOString(),
           Action: 'Created',
-          Actor: { Kind: 'System' },
+          Actor: (entries.length === 0 ? annotation.Created?.By : undefined) ?? { Kind: 'System' },
         })
       }
       return HttpResponse.json({

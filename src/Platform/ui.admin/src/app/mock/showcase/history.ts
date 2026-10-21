@@ -3,11 +3,14 @@ import type { StoredDocument } from '../documents'
 import { deepMerge } from '../merge'
 import { people, type PersonaId } from './people'
 
-// Version histories of the showcase documents, with the rule of documents.ts: a version keeps its content for 30
-// days, older versions show only who wrote them and when.
+// Version histories of the showcase documents. As in the API, the current version never expires
+// (ExpirationTime is DateTimeOffset.MaxValue); an older version keeps its content for 30 days, as in documents.ts, and
+// then shows only who wrote it and when.
 
 const day = 86_400_000
 const contentDays = 30
+/** DateTimeOffset.MaxValue, the ExpirationTime of a current version. */
+const never = '9999-12-31T23:59:59.999Z'
 
 export interface HistoryOptions {
   /** Days between two versions; 5 by default. */
@@ -36,14 +39,15 @@ export function versionHistory(
     versions: contents.map((content, index) => {
       const version = index + 1
       const created = now - ((contents.length - version) * every + last) * day
+      const current = version === contents.length
       return {
         Version: version,
         Modified: {
           At: new Date(created).toISOString(),
           By: personActor(options.authors[index % options.authors.length]!),
         },
-        ExpirationTime: new Date(created + contentDays * day).toISOString(),
-        Content: now - created > contentDays * day ? undefined : structuredClone(content),
+        ExpirationTime: current ? never : new Date(created + contentDays * day).toISOString(),
+        Content: !current && now - created > contentDays * day ? undefined : structuredClone(content),
       }
     }),
   }

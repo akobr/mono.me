@@ -1,6 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { setupServer } from 'msw/node'
 import {
+  getAnnotationHistory,
   getConfigurationSchemas,
   getConfigurations,
   getDeletedAnnotations,
@@ -19,12 +20,14 @@ import { documentIds, getDocument } from '@/mock/documents'
 import { buildShowcaseScope, showcaseOrganizations, showcaseProjects, showcaseScope } from '@/mock/showcase'
 import type { ScopeBuild } from '@/mock/showcase/builder'
 import { people, type PersonaId } from '@/mock/showcase/people'
+import { writeShowcaseSettings } from '@/mock/showcase/settings'
 import type { ShowcaseProject } from '@/mock/showcase/types'
 import { environmentViewNames } from '@/mock/showcase/views'
 import { codeOfKey, getAllAncestors, isValidAnnotationKey, typeCodes } from '@/utils/annotation-key'
 import { withRelations } from '@/utils/annotation-relations'
 import { annotationStatus, type AnnotationStatus } from '@/utils/annotation-status'
 import { isDateFormat } from '@/utils/dates'
+import { useProjectSettingsStore } from '@/stores/project-settings'
 import { sanitizeTypeAppearances } from '@/utils/type-appearance'
 import { mockDatasets } from '../../../build/mock-dataset.ts'
 import { unseededShowcaseDb } from './showcase/support'
@@ -177,6 +180,25 @@ describe('the showcase dataset', () => {
         (entry) => entry.AnnotationKey === 'exe.trey-research.invoicing.sandbox',
       ),
     ).toBe(true)
+
+    // The history of an annotation a person created starts with that person.
+    const history = await getAnnotationHistory(org, project, 'default', 'sbt.munson-pickles')
+    expect(history.Entries?.at(-1)).toMatchObject({
+      Action: 'Created',
+      Actor: { Kind: 'Account', Name: 'Grace Hopper' },
+    })
+  })
+
+  it('writes the settings of the showcase projects, keeps the others, and updates an open page', () => {
+    localStorage.setItem(
+      '2s-admin:project-settings',
+      JSON.stringify({ 'acme.billing': { defaultTimeZone: 'Asia/Tokyo' } }),
+    )
+    const settings = useProjectSettingsStore()
+    writeShowcaseSettings()
+
+    expect(settings.settingsOf('fabrikam.invoicing-suite').types.sbt?.label).toBe('Customer')
+    expect(settings.settingsOf('acme.billing').defaultTimeZone).toBe('Asia/Tokyo')
   })
 })
 
@@ -268,10 +290,36 @@ describe.each(showcaseProjects.map((project) => [project.project, project] as co
     )
   })
 
-  it('keeps the content of every latest version', () => {
+  it('keeps the content of every current version, which never expires', () => {
     for (const view of views) {
       for (const [id, document] of built(project, view).documents) {
         expect(document.versions.at(-1)?.Content, `${view} ${id}`).toBeDefined()
+        expect(document.versions.at(-1)?.ExpirationTime, `${view} ${id}`).toBe('9999-12-31T23:59:59.999Z')
+      }
+    }
+  })
+
+  it('dates every configuration within the life of its annotation', () => {
+    for (const view of views) {
+      const { annotations, trash, documents } = built(project, view)
+      const deletedAt = new Map(
+        trash.flatMap((tree) => tree.annotations.map((annotation) => [annotation.AnnotationKey, tree.deletedAt])),
+      )
+      for (const annotation of [...annotations, ...trash.flatMap((tree) => tree.annotations)]) {
+        const key = annotation.AnnotationKey
+        const versions = documents.get(`configuration:${key}`)?.versions ?? []
+        const end = deletedAt.get(key)
+        if (versions[0]) {
+          expect(Date.parse(versions[0].Modified.At!), `${view} ${key}`).toBeGreaterThanOrEqual(
+            Date.parse(annotation.Created!.At!) - 1000,
+          )
+        }
+        if (end) {
+          expect(Date.parse(annotation.Modified!.At!), `${view} ${key}`).toBeLessThanOrEqual(Date.parse(end))
+          for (const version of versions) {
+            expect(Date.parse(version.Modified.At!), `${view} ${key} v${version.Version}`).toBeLessThan(Date.parse(end))
+          }
+        }
       }
     }
   })
