@@ -3,7 +3,7 @@
  * Do not edit manually.
  * 2S-API
  * The 2S-API is a RESTful API for interacting with the 2S Platform.
- * OpenAPI spec version: 0.9.46.25482
+ * OpenAPI spec version: 0.9.48.17600
  */
 import type { AuditStamp } from "./auditStamp";
 import type { KeyValueSummaryProtection } from "./keyValueSummaryProtection";

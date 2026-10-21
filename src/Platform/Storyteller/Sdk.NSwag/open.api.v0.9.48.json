@@ -12,7 +12,7 @@
       "name": "MIT License",
       "url": "https://opensource.org/licenses/MIT"
     },
-    "version": "0.9.46.25482"
+    "version": "0.9.48.17600"
   },
   "servers": [
     {
@@ -759,7 +759,7 @@
             }
           },
           "403": {
-            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it or replacing its federation rules needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -923,7 +923,7 @@
             }
           },
           "403": {
-            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it or replacing its federation rules needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -994,7 +994,7 @@
         ],
         "responses": {
           "403": {
-            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).",
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -8778,7 +8778,7 @@
             }
           },
           "403": {
-            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it or replacing its federation rules needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
+            "description": "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied). Creating a machine, resetting it, replacing its federation rules or deleting it needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).",
             "content": {
               "application/json": {
                 "schema": {
@@ -14576,7 +14576,7 @@
             }
           },
           "403": {
-            "description": "The user's role on the project is below Administrator, or a scope of the machine is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine needs no role but the scope Configuration.Transfer and the write scope of every included kind (Annotation.Write for annotations, Configuration.Write for schemas, templates and configurations); reading an import needs the scopes of the kinds it includes. Users need no data scopes, only the Administrator role. The message names the missing role or scope.",
+            "description": "The user's role on the project is below Administrator, or a scope of the machine is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine needs no role but the scope Configuration.Transfer and the scopes of the direct writes of every included kind (Annotation.Write and Annotation.Manage for annotations, Configuration.Write and Schema.Write for schemas, Configuration.Write and Template.Write for templates and Configuration.Write for configurations); reading an import needs the scopes of the kinds it includes. Users need no data scopes, only the Administrator role. The message names the missing role or scope.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14679,7 +14679,7 @@
             }
           },
           "403": {
-            "description": "The user's role on the project is below Administrator, or a scope of the machine is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine needs no role but the scope Configuration.Transfer and the write scope of every included kind (Annotation.Write for annotations, Configuration.Write for schemas, templates and configurations); reading an import needs the scopes of the kinds it includes. Users need no data scopes, only the Administrator role. The message names the missing role or scope.",
+            "description": "The user's role on the project is below Administrator, or a scope of the machine is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine needs no role but the scope Configuration.Transfer and the scopes of the direct writes of every included kind (Annotation.Write and Annotation.Manage for annotations, Configuration.Write and Schema.Write for schemas, Configuration.Write and Template.Write for templates and Configuration.Write for configurations); reading an import needs the scopes of the kinds it includes. Users need no data scopes, only the Administrator role. The message names the missing role or scope.",
             "content": {
               "application/json": {
                 "schema": {
