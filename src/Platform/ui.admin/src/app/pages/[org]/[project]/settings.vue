@@ -110,14 +110,15 @@ async function saveDescription() {
     return
   }
   savingDescription.value = true
+  const key = context.projectKey!
   const text = description.value.trim()
   try {
-    await updateAccessPoint(context.projectKey!, { Description: text || undefined })
+    await updateAccessPoint(key, { Description: text || undefined })
     // The text shows what is stored, unless the user went on typing.
     if (description.value.trim() === text) {
       description.value = text
     }
-    await invalidateProject(queryClient, context.projectKey!)
+    await invalidateProject(queryClient, key)
     toast.add({ title: 'Description saved', color: 'success', icon: 'i-lucide-check' })
   } catch (error) {
     toast.add({ title: 'The description was not saved', description: errorMessage(error), color: 'error' })
