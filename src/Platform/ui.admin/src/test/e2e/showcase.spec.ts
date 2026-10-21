@@ -37,6 +37,20 @@ test('lists every showcase project, and Ada as a project member where she has no
   await expect(page.getByText('Project member', { exact: true })).toHaveCount(4)
 })
 
+// The descriptions of the projects (424-78), on the overview of an organization for every role: Ada owns
+// finance-cloud and only reads clinical-integrations.
+test('describes the projects on the overview of an organization', async ({ page }) => {
+  await openApp(page, '/fabrikam', 'showcase')
+  const financeCloud =
+    'Single-tenant finance back-office SaaS. Each B2B customer runs its own instances (demo, UAT, production), with ' +
+    'the applications it bought and the jobs that run in each instance.'
+  await expect(page.getByText(financeCloud, { exact: true })).toBeVisible()
+  await expect(page.getByText(financeCloud, { exact: true })).toHaveAttribute('title', financeCloud)
+
+  await goto(page, '/meridian-health')
+  await expect(page.getByText(/^Clinical integrations of a hospital network:/)).toBeVisible()
+})
+
 test('shows the type names of the project', async ({ page }, testInfo) => {
   await openApp(page, '/fabrikam/invoicing-suite/default/annotations?q=type:exe', 'showcase')
   await expect(typeLabel(page, testInfo, 'Deployment')).toBeVisible()

@@ -122,6 +122,14 @@ export async function invalidateAccess(
   ])
 }
 
+/** The description of a project: the caller's projects and the project's access point. */
+export async function invalidateProject(client: QueryClient, key: string): Promise<void> {
+  await Promise.all([
+    invalidateByPath(client, '/v1/access/projects'),
+    invalidateByPath(client, `/v1/access/points/${key}`),
+  ])
+}
+
 /** Every pair of the view, their versions and diffs. */
 export function invalidateKeyValues(client: QueryClient, scope: Scope): Promise<void> {
   return invalidateByPath(client, `${base(scope)}/key-values`)

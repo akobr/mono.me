@@ -18,15 +18,20 @@ const formError = ref<string>()
 
 const { defineField, errors, handleSubmit, isSubmitting, setFieldError, resetForm } = useForm({
   validationSchema: toTypedSchema(projectSchema),
-  initialValues: { project: '' },
+  initialValues: { project: '', description: '' },
 })
 const [project, projectAttrs] = defineField('project')
+const [description, descriptionAttrs] = defineField('description')
 
 const onSubmit = handleSubmit(async (values) => {
   formError.value = undefined
 
   try {
-    await createAccessPoint({ Organization: props.org, Project: values.project })
+    await createAccessPoint({
+      Organization: props.org,
+      Project: values.project,
+      ProjectDescription: values.description?.trim() || undefined,
+    })
     await session.loadAccount(true)
     open.value = false
     resetForm()
@@ -60,6 +65,9 @@ const onSubmit = handleSubmit(async (values) => {
           help="Lower-case letters, digits and hyphens."
         >
           <UInput v-model="project" v-bind="projectAttrs" class="w-full" autocomplete="off" autofocus />
+        </UFormField>
+        <UFormField label="Description" name="description" :error="errors.description">
+          <UTextarea v-model="description" v-bind="descriptionAttrs" class="w-full" autoresize />
         </UFormField>
         <UAlert v-if="formError" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="formError" />
         <div class="flex justify-end gap-2">

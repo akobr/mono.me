@@ -8,7 +8,7 @@ import { errorMessage } from '@/utils/errors'
 
 /**
  * Organization and first project. The API creates an organization through its first project, so both
- * names are asked for together (onboarding and "New organization").
+ * names are asked for together (onboarding and "New organization"), with the description of the project.
  */
 const props = withDefaults(
   defineProps<{ submitLabel?: string; submit: (values: OrganizationForm) => Promise<void> }>(),
@@ -19,11 +19,12 @@ const props = withDefaults(
 
 const { defineField, errors, handleSubmit, isSubmitting, setFieldError } = useForm({
   validationSchema: toTypedSchema(organizationSchema),
-  initialValues: { organization: '', project: '' },
+  initialValues: { organization: '', project: '', description: '' },
 })
 
 const [organization, organizationAttrs] = defineField('organization')
 const [project, projectAttrs] = defineField('project')
+const [description, descriptionAttrs] = defineField('description')
 const formError = ref<string>()
 
 const onSubmit = handleSubmit(async (values) => {
@@ -62,6 +63,9 @@ const onSubmit = handleSubmit(async (values) => {
       help="For example billing or web-shop."
     >
       <UInput v-model="project" v-bind="projectAttrs" class="w-full" autocomplete="off" />
+    </UFormField>
+    <UFormField label="Project description" name="description" :error="errors.description">
+      <UTextarea v-model="description" v-bind="descriptionAttrs" class="w-full" autoresize />
     </UFormField>
     <UAlert v-if="formError" color="error" variant="subtle" icon="i-lucide-circle-alert" :description="formError" />
     <div class="flex justify-end gap-2">
