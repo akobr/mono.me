@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createSeed, type MockScenario } from '@/mock/db'
+import { createSeed, scenarios, type MockScenario } from '@/mock/db'
 
 // The legacy datasets (--legacy, --large and the new-user and invited scenarios) share the access points of db.ts.
 
-const legacyScenarios: MockScenario[] = ['default', 'large', 'new-user', 'invited']
+const legacyScenarios = scenarios.filter((scenario) => scenario !== 'showcase')
 
 const descriptionsOf = (scenario: MockScenario) =>
   Object.fromEntries(Object.values(createSeed(scenario).accessPoints).map((point) => [point.Key, point.Description]))

@@ -23,7 +23,11 @@ test('the description of the first project shows on the organization overview', 
   await page.getByRole('textbox', { name: 'Organization' }).fill('globex')
   await page.getByRole('textbox', { name: 'First project' }).fill('portal')
   await page.getByRole('textbox', { name: 'Project description' }).fill('  The customer portal of Globex.  ')
+  const created = page.waitForRequest(
+    (request) => request.method() === 'POST' && new URL(request.url()).pathname.endsWith('/access/account'),
+  )
   await page.getByRole('button', { name: 'Create and continue' }).click()
+  expect((await created).postDataJSON()).toMatchObject({ ProjectDescription: 'The customer portal of Globex.' })
   await expect(page).toHaveURL(/\/globex\/portal\/default\/annotations/)
 
   await goto(page, '/globex')
