@@ -9,4 +9,7 @@ public interface IAccessPoint
     IReadOnlyDictionary<string, AccountRole> AccessMap { get; }
 
     MachineAuthenticationPolicy? MachineAuthentication { get; }
+
+    // Only a project has a description; always null for an organization.
+    string? Description { get; }
 }

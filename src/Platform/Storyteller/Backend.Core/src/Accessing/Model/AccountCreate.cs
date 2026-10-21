@@ -12,4 +12,7 @@ public record class AccountCreate
     public string? Organization { get; init; }
 
     public string? Project { get; init; }
+
+    // The description of the new project; the account and the organization get none.
+    public string? ProjectDescription { get; init; }
 }

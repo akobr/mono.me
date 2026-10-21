@@ -20,4 +20,7 @@ public record class AccessPointEntity
 
     // The key/value policy of a project; null means the defaults.
     public KeyValuePolicy? KeyValues { get; init; }
+
+    // The description of a project; absent for an organization and in documents stored before descriptions.
+    public string? Description { get; init; }
 }
