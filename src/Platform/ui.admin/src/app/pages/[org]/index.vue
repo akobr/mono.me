@@ -62,7 +62,7 @@ const creating = ref(false)
               <p class="mt-1 font-mono text-xs text-muted">{{ project.key }}</p>
               <p
                 v-if="descriptionOf(project.key)"
-                class="mt-2 line-clamp-2 text-sm text-muted"
+                class="mt-2 line-clamp-2 text-sm break-words text-muted"
                 :title="descriptionOf(project.key)"
               >
                 {{ descriptionOf(project.key) }}
