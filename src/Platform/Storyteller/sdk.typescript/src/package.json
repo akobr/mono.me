@@ -1,6 +1,6 @@
 {
   "name": "@42for.net/2splatform.sdk",
-  "version": "0.9.45",
+  "version": "0.9.46",
   "description": "TypeScript SDK for the 2S Platform Storyteller API: fetch functions, Vue Query composables, Zod schemas, MSW mocks, key/value helpers and client-side encryption.",
   "license": "MIT",
   "author": "Ales Kobr",
