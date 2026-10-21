@@ -85,10 +85,12 @@ export const mockDirectory: Record<string, { name: string; email: string }> = pe
 
 const now = () => new Date().toISOString()
 
+/** An access point; only a project has a description. */
 function accessPoint(
   key: string,
   members: Record<string, AccountRole>,
   kinds: MachineCredentialKind[] = ['ApiKey'],
+  description?: string,
 ): AccessPoint {
   return {
     Key: key,
@@ -98,6 +100,7 @@ function accessPoint(
       CredentialKind: 'ApiKey',
       CertificateLifetimeDays: 90,
     },
+    ...(description ? { Description: description } : {}),
   }
 }
 
@@ -179,18 +182,27 @@ export function createSeed(scenario: MockScenario): MockDb {
     accessPoints: {
       acme: accessPoint('acme', { [id]: 'Owner', user_01MOCKGRACE: 'Administrator' }),
       // Both acme projects let machines federate with GitHub Actions (424-46); the user administers billing and
-      // contributes to shipping.
+      // contributes to shipping. The generator gives every project the billing responsibilities (annotations.ts), so
+      // only billing's description names them.
       'acme.billing': accessPoint(
         'acme.billing',
         { [id]: 'Owner', user_01MOCKGRACE: 'Contributor', user_01MOCKALAN: 'Reader' },
         ['ApiKey', 'Federated'],
+        "Billing of Acme's B2B customers. Invoicing, payments, reporting, notifications, archiving and dunning are set up per customer and context.",
       ),
-      'acme.shipping': accessPoint('acme.shipping', { [id]: 'Contributor', user_01MOCKGRACE: 'Owner' }, [
-        'ApiKey',
-        'Federated',
-      ]),
+      'acme.shipping': accessPoint(
+        'acme.shipping',
+        { [id]: 'Contributor', user_01MOCKGRACE: 'Owner' },
+        ['ApiKey', 'Federated'],
+        "Shipping of Acme's orders. A small catalog of customers and their responsibilities per context.",
+      ),
       northwind: accessPoint('northwind', { user_01MOCKALAN: 'Owner' }),
-      'northwind.portal': accessPoint('northwind.portal', { [id]: 'Reader', user_01MOCKALAN: 'Owner' }),
+      'northwind.portal': accessPoint(
+        'northwind.portal',
+        { [id]: 'Reader', user_01MOCKALAN: 'Owner' },
+        ['ApiKey'],
+        "Northwind's customer portal. A small catalog of customers and their responsibilities per context.",
+      ),
     },
     views: {
       'acme.billing': [

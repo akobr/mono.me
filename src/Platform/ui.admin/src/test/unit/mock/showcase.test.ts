@@ -106,6 +106,18 @@ describe('the showcase dataset', () => {
     expect(new Set(showcaseProjects.map(projectKeyOf)).size).toBe(showcaseProjects.length)
   })
 
+  it('describes every project on its access point in at most 500 characters, and no organization', () => {
+    for (const project of showcaseProjects) {
+      expect(project.description.trim(), project.project).not.toBe('')
+      expect(project.description, project.project).toBe(project.description.trim())
+      expect(project.description.length, project.project).toBeLessThanOrEqual(500)
+      expect(db.accessPoints[projectKeyOf(project)]?.Description, project.project).toBe(project.description)
+    }
+    for (const organization of showcaseOrganizations) {
+      expect(db.accessPoints[organization.org], organization.org).not.toHaveProperty('Description')
+    }
+  })
+
   it('registers the views of every project and seeds the deletions of its default view', () => {
     for (const project of showcaseProjects) {
       expect(db.views[projectKeyOf(project)]?.map((view) => view.Name)).toEqual(project.views.map((view) => view.name))

@@ -1316,8 +1316,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const clinicalIntegrations: ShowcaseProject = {
   org: 'meridian-health',
   project: 'clinical-integrations',
-  summary:
-    'A hospital network: three hospitals license five clinical systems and integrate them department by department, with HL7, DICOM and FHIR feeds.',
+  description:
+    'Clinical integrations of a hospital network: lab, imaging, e-prescription and portal systems connected per department, under change control.',
   members: {
     annie: 'Owner',
     barbara: 'Administrator',

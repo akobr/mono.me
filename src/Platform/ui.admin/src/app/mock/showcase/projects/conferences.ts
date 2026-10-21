@@ -1089,8 +1089,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const conferences: ShowcaseProject = {
   org: 'gatherly',
   project: 'conferences',
-  summary:
-    'Gatherly’s conference series and their editions: the event services each series books, their setup per edition and the mail jobs around them.',
+  description:
+    'Conference series and their yearly editions, with ticketing, streaming, badges and the mail jobs booked for each edition.',
   members: { ada: 'Owner', donald: 'Administrator', frances: 'Contributor' },
   settings: {
     types: {

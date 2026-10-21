@@ -1490,7 +1490,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const fitnessCloud: ShowcaseProject = {
   org: 'fabrikam',
   project: 'fitness-cloud',
-  summary: 'Multi-tenant B2B SaaS: gym chains, their members and the applications each member is assigned.',
+  description:
+    'Multi-tenant platform for gym chains. Tenants enable applications and assign them to their members, the end customers of our customers.',
   members: { margaret: 'Owner', ada: 'Administrator', barbara: 'Contributor', annie: 'Reader' },
   settings: {
     types: {

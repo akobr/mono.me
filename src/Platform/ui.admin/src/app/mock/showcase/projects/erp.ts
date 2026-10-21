@@ -1286,8 +1286,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const erp: ShowcaseProject = {
   org: 'ledgerline',
   project: 'erp',
-  summary:
-    'The versioned monolith of the documentation: one ERP codebase with v2025 in long-term support and v2026 current, their channels, customer pins and modules.',
+  description:
+    'Monolithic ERP with several versions in production. It tracks the channels pinned to each version, the modules every build contains and the customer-specific rollouts.',
   members: { ada: 'Owner', barbara: 'Administrator', edsger: 'Contributor', alan: 'Reader' },
   settings: {
     types: {

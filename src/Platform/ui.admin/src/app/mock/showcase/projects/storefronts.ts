@@ -1022,7 +1022,8 @@ function featureDelivery(b: ScopeBuilder) {
 export const storefronts: ShowcaseProject = {
   org: 'velvet-retail',
   project: 'storefronts',
-  summary: 'Multi-brand storefronts: brand storefronts, their markets and the commerce capabilities set up per market.',
+  description:
+    'Multi-brand e-commerce storefronts across European markets. Checkout, payments, shipping, tax and search are set up per market.',
   members: { margaret: 'Owner', edsger: 'Administrator', ada: 'Contributor', radia: 'Reader' },
   settings: {
     types: {
