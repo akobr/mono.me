@@ -112,7 +112,7 @@ public class CertificateRenewalTests(CosmosFixture fixture)
         var opts = fixture.Services.GetRequiredService<IOptions<MachineAuthenticationOptions>>().Value;
 
         var machineId = Guid.NewGuid().ToString("D");
-        var issued = await authority.IssueCertificateAsync(Organization, Project, machineId, MachineAccessScope.DefaultRead, 30);
+        var issued = await authority.IssueCertificateAsync(Organization, Project, machineId, 30);
 
         // Write the entity directly into Cosmos with NotAfter set to 15 days from now.
         var repositoryProvider = fixture.Services.GetRequiredService<IContainerRepositoryProvider>();
@@ -126,7 +126,7 @@ public class CertificateRenewalTests(CosmosFixture fixture)
             Id = machineId,
             ObjectId = machineId,
             AccessKey = "***",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.Certificate,
             CertificateThumbprint = issued.Thumbprint,
             CertificateSerialNumber = issued.SerialNumber,
@@ -141,7 +141,7 @@ public class CertificateRenewalTests(CosmosFixture fixture)
         await certStore.StoreAsync(Organization, Project, new CertificateRecord(
             machineId, issued.Thumbprint, null, null, issued.SerialNumber,
             entity.NotBefore.Value, entity.NotAfter.Value, false,
-            MachineAccessScope.DefaultRead, null, null));
+            [MachineScope.AnnotationRead, MachineScope.ConfigurationRead], null, null));
 
         return (machineId, issued.Thumbprint);
     }
@@ -156,7 +156,7 @@ public class CertificateRenewalTests(CosmosFixture fixture)
         var authority = fixture.Services.GetRequiredService<IClientCertificateAuthority>();
 
         var machineId = Guid.NewGuid().ToString("D");
-        var issued = await authority.IssueCertificateAsync(Organization, Project, machineId, MachineAccessScope.DefaultRead, 365);
+        var issued = await authority.IssueCertificateAsync(Organization, Project, machineId, 365);
 
         var repositoryProvider = fixture.Services.GetRequiredService<IContainerRepositoryProvider>();
         var repository = repositoryProvider.GetOrganizationContainer(Organization);
@@ -169,7 +169,7 @@ public class CertificateRenewalTests(CosmosFixture fixture)
             Id = machineId,
             ObjectId = machineId,
             AccessKey = "***",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.Certificate,
             CertificateThumbprint = issued.Thumbprint,
             CertificateSerialNumber = issued.SerialNumber,

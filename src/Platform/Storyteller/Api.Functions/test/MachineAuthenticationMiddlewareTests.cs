@@ -24,6 +24,9 @@ public class MachineAuthenticationMiddlewareTests
 
     private static readonly string CertificateValue = CreateCertificateValue();
 
+    // The scopes of a reader machine, as its credential records store them.
+    private static readonly IReadOnlyList<MachineScope> ReaderScopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead];
+
     private readonly RecordingMiddleware _middleware = new();
     private readonly FakePolicyStore _policyStore = new();
     private readonly FakeApiKeyValidator _apiKeyValidator = new();
@@ -97,7 +100,7 @@ public class MachineAuthenticationMiddlewareTests
     public async Task UnknownMachineKind_UsesTheKindOfThePresentedCredentials(MachineCredentialKind enabled, bool accepted)
     {
         _policyStore.Policy = Enable(enabled);
-        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, MachineAccessScope.DefaultRead);
+        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, ReaderScopes);
 
         var (called, _) = await InvokeAsync(sendApiKey: true, sendCertificate: false);
 
@@ -181,7 +184,7 @@ public class MachineAuthenticationMiddlewareTests
     public async Task SharedCertificate_WithTheKeyOfAMachineOfUnknownKind_IsUnauthorized()
     {
         // The machine may be an ApiKey one: the shared certificate must not make it pass as CertificateAndApiKey.
-        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, MachineAccessScope.DefaultRead);
+        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, ReaderScopes);
         _certificateValidator.Result = SharedCertificateResult();
         _policyStore.Policy = Enable(MachineCredentialKind.ApiKey, MachineCredentialKind.CertificateAndApiKey);
 
@@ -192,65 +195,66 @@ public class MachineAuthenticationMiddlewareTests
         context.Items.ContainsKey(FunctionContextItemKeys.PresentingCertificateThumbprint).ShouldBeFalse();
     }
 
-    // The roles claims carry the management scopes of the record that also supplies the scope.
+    // The roles claims carry the scopes of one record: the certificate record for a machine certificate, the API key
+    // otherwise.
     [Fact]
-    public async Task RoleClaims_OfAnApiKey_HoldItsManagementScopes()
+    public async Task RoleClaims_OfAnApiKey_HoldItsScopes()
     {
         _policyStore.Policy = Enable(MachineCredentialKind.ApiKey);
         GiveMachine(MachineCredentialKind.ApiKey);
-        _apiKeyValidator.Result = _apiKeyValidator.Result! with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer] };
+        _apiKeyValidator.Result = _apiKeyValidator.Result! with { Scopes = [.. ReaderScopes, MachineScope.ConfigurationTransfer] };
 
         var (called, context) = await InvokeAsync(sendApiKey: true, sendCertificate: false);
 
         called.ShouldBeTrue();
-        Roles(context).ShouldBe([Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Configuration.Transfer]);
+        Roles(context).ShouldBe([Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Configuration.Transfer]);
     }
 
     [Fact]
-    public async Task RoleClaims_OfAMachineCertificateWithItsApiKey_HoldTheManagementScopesOfTheCertificate()
+    public async Task RoleClaims_OfAMachineCertificateWithItsApiKey_HoldTheScopesOfTheCertificate()
     {
         _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
         GiveMachine(MachineCredentialKind.CertificateAndApiKey);
-        _certificateValidator.Result = _certificateValidator.Result! with { ManagementScopes = [MachineManagementScope.SchemaWrite] };
-        _apiKeyValidator.Result = _apiKeyValidator.Result! with { ManagementScopes = [MachineManagementScope.KeyValueManage] };
+        _certificateValidator.Result = _certificateValidator.Result! with { Scopes = [.. ReaderScopes, MachineScope.SchemaWrite] };
+        _apiKeyValidator.Result = _apiKeyValidator.Result! with { Scopes = [.. ReaderScopes, MachineScope.KeyValueManage] };
 
         var (called, context) = await InvokeAsync(sendApiKey: true, sendCertificate: true);
 
         called.ShouldBeTrue();
-        Roles(context).ShouldBe([Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Schema.Write]);
+        Roles(context).ShouldBe([Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Schema.Write]);
     }
 
     [Fact]
-    public async Task RoleClaims_OfAMachineCertificate_HoldItsManagementScopes()
+    public async Task RoleClaims_OfAMachineCertificate_HoldItsScopes()
     {
         _policyStore.Policy = Enable(MachineCredentialKind.Certificate);
         GiveMachine(MachineCredentialKind.Certificate);
-        _certificateValidator.Result = _certificateValidator.Result! with { ManagementScopes = [MachineManagementScope.TemplateWrite] };
+        _certificateValidator.Result = _certificateValidator.Result! with { Scopes = [.. ReaderScopes, MachineScope.TemplateWrite] };
 
         var (called, context) = await InvokeAsync(sendApiKey: false, sendCertificate: true);
 
         called.ShouldBeTrue();
-        Roles(context).ShouldContain(Scopes.Template.Write);
+        Roles(context).ShouldBe([Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Template.Write]);
     }
 
     [Fact]
-    public async Task RoleClaims_OfASharedCertificateWithAnApiKey_HoldTheManagementScopesOfTheApiKey()
+    public async Task RoleClaims_OfASharedCertificateWithAnApiKey_HoldTheScopesOfTheApiKey()
     {
         _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
         GiveMachineWithSharedCertificate(MachineCredentialKind.CertificateAndApiKey);
-        _apiKeyValidator.Result = _apiKeyValidator.Result! with { ManagementScopes = [MachineManagementScope.AnnotationManage] };
+        _apiKeyValidator.Result = _apiKeyValidator.Result! with { Scopes = [.. ReaderScopes, MachineScope.AnnotationManage] };
 
         var (called, context) = await InvokeAsync(sendApiKey: true, sendCertificate: true);
 
         called.ShouldBeTrue();
-        Roles(context).ShouldBe([Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Annotation.Manage]);
+        Roles(context).ShouldBe([Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Annotation.Manage]);
     }
 
-    // A result of a store that does not keep management scopes gives the runtime scopes only.
+    // One roles claim per stored scope, nothing more.
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public async Task RoleClaims_OfAResultWithoutManagementScopes_AreTheRuntimeScopesOnly(bool sendApiKey, bool sendCertificate)
+    public async Task RoleClaims_AreTheStoredScopesOnly(bool sendApiKey, bool sendCertificate)
     {
         _policyStore.Policy = Enable(MachineCredentialKind.ApiKey, MachineCredentialKind.Certificate);
         GiveMachine(sendApiKey ? MachineCredentialKind.ApiKey : MachineCredentialKind.Certificate);
@@ -258,7 +262,82 @@ public class MachineAuthenticationMiddlewareTests
         var (called, context) = await InvokeAsync(sendApiKey, sendCertificate);
 
         called.ShouldBeTrue();
-        Roles(context).ShouldBe([Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read]);
+        Roles(context).ShouldBe([Scopes.Annotation.Read, Scopes.Configuration.Read]);
+    }
+
+    // The scope strings of the stored list, in its order, which is the enum order of MachineScopes.Normalize.
+    [Theory]
+    [InlineData(MachineCredentialKind.ApiKey, true, false)]
+    [InlineData(MachineCredentialKind.Certificate, false, true)]
+    [InlineData(MachineCredentialKind.CertificateAndApiKey, true, true)]
+    public async Task RoleClaims_OfEveryScope_AreTheScopeStringsInEnumOrder(MachineCredentialKind kind, bool sendApiKey, bool sendCertificate)
+    {
+        _policyStore.Policy = Enable(kind);
+        GiveMachine(kind, MachineScopes.All);
+
+        var (called, context) = await InvokeAsync(sendApiKey, sendCertificate);
+
+        called.ShouldBeTrue();
+        Roles(context).ShouldBe(
+        [
+            Scopes.Annotation.Read,
+            Scopes.Annotation.Write,
+            Scopes.Configuration.Read,
+            Scopes.Configuration.Write,
+            Scopes.Secrets.Read,
+            Scopes.Secrets.Write,
+            Scopes.Configuration.Transfer,
+            Scopes.Schema.Write,
+            Scopes.Template.Write,
+            Scopes.Annotation.Manage,
+            Scopes.KeyValue.Manage,
+        ]);
+    }
+
+    // A credential record without scopes, such as one written before the scopes were stored, authenticates nobody.
+    [Theory]
+    [InlineData(MachineCredentialKind.ApiKey, true, false)]
+    [InlineData(MachineCredentialKind.Certificate, false, true)]
+    [InlineData(MachineCredentialKind.CertificateAndApiKey, true, true)]
+    public async Task CredentialWithoutScopes_IsUnauthorized(MachineCredentialKind kind, bool sendApiKey, bool sendCertificate)
+    {
+        _policyStore.Policy = Enable(kind);
+        GiveMachine(kind, []);
+
+        var (called, context) = await InvokeAsync(sendApiKey, sendCertificate);
+
+        called.ShouldBeFalse();
+        _middleware.Response!.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        context.Items.ContainsKey(FunctionContextItemKeys.CachedClaims).ShouldBeFalse();
+        context.Items.ContainsKey(FunctionContextItemKeys.MachineIdentity).ShouldBeFalse();
+    }
+
+    // The certificate record decides for a machine certificate, so the scopes of its API key do not stand in for it.
+    [Fact]
+    public async Task MachineCertificateWithoutScopes_IsUnauthorizedAlsoWhenItsApiKeyHasSome()
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
+        GiveMachine(MachineCredentialKind.CertificateAndApiKey);
+        _certificateValidator.Result = _certificateValidator.Result! with { Scopes = [] };
+
+        var (called, _) = await InvokeAsync(sendApiKey: true, sendCertificate: true);
+
+        called.ShouldBeFalse();
+        _middleware.Response!.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+    }
+
+    // A shared certificate has no scopes; the API key brings them, or nothing does.
+    [Fact]
+    public async Task SharedCertificate_WithAnApiKeyWithoutScopes_IsUnauthorized()
+    {
+        _policyStore.Policy = Enable(MachineCredentialKind.CertificateAndApiKey);
+        GiveMachineWithSharedCertificate(MachineCredentialKind.CertificateAndApiKey);
+        _apiKeyValidator.Result = _apiKeyValidator.Result! with { Scopes = [] };
+
+        var (called, _) = await InvokeAsync(sendApiKey: true, sendCertificate: true);
+
+        called.ShouldBeFalse();
+        _middleware.Response!.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
     }
 
     private static List<string> Roles(TestFunctionContext context)
@@ -275,7 +354,7 @@ public class MachineAuthenticationMiddlewareTests
             "org1",
             "proj1",
             null,
-            default,
+            [],
             "SHARED",
             ClientCertificateKind.Shared,
             null);
@@ -294,14 +373,15 @@ public class MachineAuthenticationMiddlewareTests
         return Convert.ToBase64String(certificate.Export(X509ContentType.Cert));
     }
 
-    private void GiveMachine(MachineCredentialKind kind)
+    // Both credential records of the machine, with the reader scopes unless others are given.
+    private void GiveMachine(MachineCredentialKind kind, IReadOnlyList<MachineScope>? scopes = null)
     {
-        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, MachineAccessScope.DefaultRead, kind);
+        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, scopes ?? ReaderScopes, kind);
         _certificateValidator.Result = new ClientCertificateValidationResult(
             "org1",
             "proj1",
             MachineId,
-            MachineAccessScope.DefaultRead,
+            scopes ?? ReaderScopes,
             "THUMBPRINT",
             ClientCertificateKind.Machine,
             null,
@@ -310,7 +390,7 @@ public class MachineAuthenticationMiddlewareTests
 
     private void GiveMachineWithSharedCertificate(MachineCredentialKind kind)
     {
-        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, MachineAccessScope.DefaultRead, kind);
+        _apiKeyValidator.Result = new ApiKeyValidationResult("org1", "proj1", MachineId, ReaderScopes, kind);
         _certificateValidator.Result = SharedCertificateResult();
     }
 

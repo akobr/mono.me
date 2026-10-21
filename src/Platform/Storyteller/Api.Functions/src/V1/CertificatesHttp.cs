@@ -117,15 +117,15 @@ public class CertificatesHttp
     [OpenApiParameter(Definitions.Parameters.Organization, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Organization)]
     [OpenApiParameter(Definitions.Parameters.Project, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = Definitions.Descriptions.Project)]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(IEnumerable<SharedCertificate>), Description = "The list of shared certificates for the project.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     public async Task<IActionResult> GetSharedCertificates(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Access.V1.SharedCertificates)]
         HttpRequestData request,
         string organization,
         string project)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
 
         if (_sharedCertService is null)
         {
@@ -144,15 +144,15 @@ public class CertificatesHttp
     [OpenApiRequestBody(Definitions.ContentTypes.Json, typeof(SharedCertificateCreate), Description = "The label and optional lifetime for the shared certificate.")]
     [OpenApiResponseWithBody(HttpStatusCode.OK, Definitions.ContentTypes.Json, typeof(SharedCertificate), Description = "The issued shared certificate with PKCS#12 data.")]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = "An invalid label, or the project does not enable CertificateAndApiKey, which shared certificates belong to.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     public async Task<IActionResult> PostSharedCertificate(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Post, Route = Definitions.Routes.Access.V1.SharedCertificates)]
         HttpRequestData request,
         string organization,
         string project)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
 
         if (_sharedCertService is null)
         {
@@ -195,7 +195,8 @@ public class CertificatesHttp
     [OpenApiParameter(Definitions.Parameters.Thumbprint, In = ParameterLocation.Path, Required = true, Type = typeof(string), Description = "The thumbprint of the shared certificate to revoke.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.OK, Description = "The shared certificate was revoked.")]
     [OpenApiResponseWithoutBody(HttpStatusCode.NotFound, Description = "The shared certificate was not found.")]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + Scopes.User.Impersonation)]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorizedUserOnly)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenUserOnly)]
     public async Task<IActionResult> DeleteSharedCertificate(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Delete, Route = Definitions.Routes.Access.V1.SharedCertificate)]
         HttpRequestData request,
@@ -203,8 +204,7 @@ public class CertificatesHttp
         string project,
         string thumbprint)
     {
-        request.CheckScope(Scopes.User.Impersonation);
-        await request.CheckAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
+        await request.CheckUserAccessToProjectAsync(_accessService, organization, project, AccountRole.Administrator);
 
         if (_sharedCertService is null)
         {

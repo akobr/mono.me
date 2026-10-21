@@ -131,6 +131,21 @@ public class PermissionHttpTests
         access.Calls.ShouldBe(["revoke:user-1:user-2:Contributor", $"point:{PointKey}"]);
     }
 
+    // Permissions are granted by users (spec 7.4): a machine is refused in every build, also one whose credentials
+    // carry every scope and User.Impersonation, before the body is read or the service is asked.
+    [Fact]
+    public async Task GrantAndRevoke_Machine_IsAccessDeniedInEveryBuild()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var body = FunctionTestDoubles.ToJsonBody(Permission(AccountRole.Owner));
+
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.PostGrantPermission(UserOnlyRoutes.Machine("POST", body)));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.PostRevokePermission(UserOnlyRoutes.Machine("POST", body)));
+
+        access.Calls.ShouldBeEmpty();
+    }
+
     private static Permission Permission(AccountRole role)
     {
         return new Permission

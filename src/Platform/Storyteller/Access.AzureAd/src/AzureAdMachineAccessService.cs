@@ -12,18 +12,11 @@ using Microsoft.Graph.Models.ODataErrors;
 namespace _42.Platform.Storyteller;
 
 // Machine access as Entra ID app registrations with a client secret and app roles on the
-// Storyteller API application: one for the runtime scope, and one per management scope.
+// Storyteller API application: one per machine scope, so a machine gets exactly its scopes.
 // MachineAccess.Id is the appId (the token azp), ObjectId the application object ID.
 // TODO: [P2] add support of certificate for better security
 public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
 {
-    public const string ReadRoleKey = "DefaultRead";
-    public const string ReadWriteRoleKey = "DefaultReadWrite";
-
-    // Optional: machines that may receive key/value secrets. Without these roles such a machine cannot be created.
-    public const string SecretsReadRoleKey = "SecretsRead";
-    public const string SecretsReadWriteRoleKey = "SecretsReadWrite";
-
     private const int DefaultPasswordExpirationYears = 1000;
     private const string GeneratedSecretMarker = "42.sform.generated";
 
@@ -41,10 +34,10 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
         _machineOptions = machineOptions.Value;
     }
 
-    // Optional, like the secrets roles: the role ID of each management scope, keyed by its enum name
-    // (Auth:AppRoles:ConfigurationTransfer, ...). The value of that app role in Entra ID must be the scope string
-    // (Configuration.Transfer, ...; an App. prefix is allowed), so the token's roles claim carries that scope.
-    public static string GetManagementRoleKey(MachineManagementScope scope)
+    // The role ID of each scope, keyed by its enum name (Auth:AppRoles:AnnotationRead, ...). The value of that app role
+    // in Entra ID must be the scope string (Annotation.Read, ...; an App. prefix is allowed), so the token's roles claim
+    // carries that scope. Every key is optional; a machine needs the roles of its scopes.
+    public static string GetRoleKey(MachineScope scope)
     {
         return scope.ToString("G");
     }
@@ -52,37 +45,23 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
     public async Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model)
     {
         var clientId = _options.ClientId;
-        var isSecrets = model.Scope is MachineAccessScope.SecretsRead or MachineAccessScope.SecretsReadWrite;
-        var isReadWrite = model.Scope is MachineAccessScope.DefaultReadWrite
-            or MachineAccessScope.AnnotationReadWrite
-            or MachineAccessScope.ConfigurationReadWrite
-            or MachineAccessScope.SecretsReadWrite;
-
-        // TODO: [P2] Make support for all roles and make it configurable in easier way
-        var roleKey = model.Scope switch
-        {
-            MachineAccessScope.SecretsRead => SecretsReadRoleKey,
-            MachineAccessScope.SecretsReadWrite => SecretsReadWriteRoleKey,
-            _ => isReadWrite ? ReadWriteRoleKey : ReadRoleKey,
-        };
-
-        if (!_options.AppRoles.TryGetValue(roleKey, out var configuredRoleId))
-        {
-            throw isSecrets
-                ? new InvalidInputException(
-                    $"Machines with the scope {model.Scope:G} need the app role Auth:AppRoles:{roleKey}, which this deployment does not configure.",
-                    ErrorCodes.ProtectionNotConfigured)
-                : new InvalidOperationException($"Missing Auth:AppRoles:{roleKey}.");
-        }
-
-        var roleId = Guid.Parse(configuredRoleId);
 
         // Checked before the first Graph call, so a refused machine leaves no application behind.
-        var managementScopes = MachineAccessScopes.Normalize(model.ManagementScopes);
-        var managementRoleIds = GetManagementRoleIds(managementScopes);
+        // In enum order: one role, and one assignment, per scope.
+        var scopes = MachineScopes.Normalize(model.Scopes);
+        var roleIds = GetRoleIds(scopes);
 
-        // The runtime role first, then the management roles in enum order.
-        List<Guid> roleIds = [roleId, .. managementRoleIds];
+        // The app roles are assigned on the service principal of the Storyteller API. It does not depend on the new
+        // application, so it is looked up before the first write too: without it no role can be assigned, and the
+        // machine would be stored with scopes it was never given.
+        var resourceSpList = await _client.ServicePrincipals
+            .GetAsync(requestConfiguration =>
+            {
+                requestConfiguration.QueryParameters.Filter = $"appId eq '{clientId}'";
+            });
+        var resourceSpId = resourceSpList?.Value?.FirstOrDefault()?.Id
+            ?? throw new MachineAccessNotSupportedException(
+                $"The service principal of the Storyteller API application {clientId} was not found in the machine tenant, so no app role can be assigned.");
 
         var application = new Application
         {
@@ -90,7 +69,7 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
             DisplayName = $"42.sform.{model.Organization}.{model.Project}.{Guid.NewGuid():N}",
             SignInAudience = "AzureADMyOrg",
             Tags = ["42", "sform", "machine"],
-            Notes = $"organization={model.Organization}|project={model.Project}|scope={model.Scope:G}",
+            Notes = $"organization={model.Organization}|project={model.Project}|scopes={string.Join(',', scopes)}",
             RequiredResourceAccess =
             [
                 new RequiredResourceAccess
@@ -100,11 +79,6 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
                 },
             ],
         };
-
-        if (managementScopes is not null)
-        {
-            application.Notes += $"|manage={string.Join(',', managementScopes)}";
-        }
 
         if (model.AnnotationKey is not null)
         {
@@ -127,24 +101,20 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
         // Grant admin consent programmatically: a service principal with the app roles assigned.
         var createdSp = await _client.ServicePrincipals.PostAsync(new ServicePrincipal { AppId = appId });
 
-        var resourceSpList = await _client.ServicePrincipals
-            .GetAsync(requestConfiguration =>
-            {
-                requestConfiguration.QueryParameters.Filter = $"appId eq '{clientId}'";
-            });
-        var resourceSp = resourceSpList?.Value?.FirstOrDefault();
-
-        if (resourceSp?.Id is not null && createdSp?.Id is not null)
+        // Without its id no role can be assigned, so no scope is returned that the machine was not given.
+        if (createdSp?.Id is null)
         {
-            foreach (var assignedRoleId in roleIds)
+            throw new InvalidOperationException("The service principal of the machine registration in Azure AD was not created, so its app roles cannot be assigned.");
+        }
+
+        foreach (var assignedRoleId in roleIds)
+        {
+            await _client.ServicePrincipals[createdSp.Id].AppRoleAssignments.PostAsync(new AppRoleAssignment
             {
-                await _client.ServicePrincipals[createdSp.Id].AppRoleAssignments.PostAsync(new AppRoleAssignment
-                {
-                    PrincipalId = Guid.Parse(createdSp.Id),
-                    ResourceId = Guid.Parse(resourceSp.Id),
-                    AppRoleId = assignedRoleId,
-                });
-            }
+                PrincipalId = Guid.Parse(createdSp.Id),
+                ResourceId = Guid.Parse(resourceSpId),
+                AppRoleId = assignedRoleId,
+            });
         }
 
         return new MachineAccess
@@ -153,13 +123,12 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
             ObjectId = objectId,
             AccessKey = secret,
             AnnotationKey = model.AnnotationKey,
-            Scope = isSecrets ? model.Scope : isReadWrite ? MachineAccessScope.DefaultReadWrite : MachineAccessScope.DefaultRead,
+
+            // The assigned roles, nothing collapsed: each scope has a role of its own.
+            Scopes = scopes,
             CredentialKind = MachineCredentialKind.ClientCredentials,
             TokenEndpoint = _machineOptions.GetTokenEndpoint(),
             TokenScope = $"api://{clientId}/.default",
-
-            // Not collapsed like Scope: each management scope has a role of its own.
-            ManagementScopes = managementScopes,
         };
     }
 
@@ -206,19 +175,19 @@ public class AzureAdMachineAccessService : IIdentityProviderMachineAccessService
         return DeleteMachineAccessAsync(existingAccess.ObjectId, organization, project);
     }
 
-    private IReadOnlyList<Guid> GetManagementRoleIds(IReadOnlyList<MachineManagementScope>? managementScopes)
+    private IReadOnlyList<Guid> GetRoleIds(IReadOnlyList<MachineScope> scopes)
     {
         var roleIds = new List<Guid>();
 
-        foreach (var managementScope in managementScopes ?? [])
+        foreach (var scope in scopes)
         {
-            var roleKey = GetManagementRoleKey(managementScope);
+            var roleKey = GetRoleKey(scope);
 
             if (!_options.AppRoles.TryGetValue(roleKey, out var configuredRoleId)
                 || !Guid.TryParse(configuredRoleId, out var roleId))
             {
                 throw new MachineAccessNotSupportedException(
-                    $"Machines with the management scope {MachineAccessScopes.Get(managementScope)} need the app role Auth:AppRoles:{roleKey}, which this deployment does not configure.");
+                    $"Machines with the scope {MachineScopes.ToScopeString(scope)} need the app role Auth:AppRoles:{roleKey}, which this deployment does not configure.");
             }
 
             roleIds.Add(roleId);

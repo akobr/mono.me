@@ -53,6 +53,54 @@ public class HttpRequestDataExtensionsTests
         context.Items.ContainsKey(FunctionContextItemKeys.CachedClaims).ShouldBeFalse();
     }
 
+    // The scopes the credentials carry, from every claim a provider puts them in: scp (Entra delegated, AuthKit), roles
+    // (Entra app roles, machine credentials, Storyteller tokens), ClaimTypes.Role and the */scope claims, one value or
+    // several separated by spaces. The App. prefix of an app role is dropped; nothing else is changed.
+    [Theory]
+    [InlineData("scp", "User.Impersonation", new[] { "User.Impersonation" })]
+    [InlineData("scp", "Annotation.Read Configuration.Write", new[] { "Annotation.Read", "Configuration.Write" })]
+    [InlineData("roles", "Secrets.Read", new[] { "Secrets.Read" })]
+    [InlineData(ClaimTypes.Role, "Schema.Write", new[] { "Schema.Write" })]
+    [InlineData("http://schemas.microsoft.com/identity/claims/scope", "User.Impersonation Annotation.Read", new[] { "User.Impersonation", "Annotation.Read" })]
+    [InlineData("roles", "App.Annotation.Write", new[] { "Annotation.Write" })]
+    [InlineData("roles", "app.KeyValue.Manage", new[] { "KeyValue.Manage" })]
+    [InlineData("scp", "annotation.read", new[] { "annotation.read" })]
+    [InlineData("name", "Annotation.Read", new string[0])]
+    [InlineData("permissions", "storyteller:annotation-read", new string[0])]
+    public void GetScopes_ReadsTheScopeClaims(string claimType, string value, string[] expected)
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var (context, request) = FunctionTestDoubles.CreateRequest(services);
+        context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim> { new("sub", "caller"), new(claimType, value) };
+
+        request.GetScopes().ShouldBe(expected, ignoreOrder: true);
+    }
+
+    [Fact]
+    public void GetScopes_SeveralClaims_AreOneSet()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var (context, request) = FunctionTestDoubles.CreateRequest(services);
+        context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
+        {
+            new("scp", "Annotation.Read Configuration.Read"),
+            new("roles", "App.Annotation.Read"),
+            new("roles", "Configuration.Transfer"),
+            new(ClaimTypes.Role, "Secrets.Write"),
+        };
+
+        request.GetScopes().ShouldBe(["Annotation.Read", "Configuration.Read", "Configuration.Transfer", "Secrets.Write"], ignoreOrder: true);
+    }
+
+    [Fact]
+    public void GetScopes_WithoutAnIdentity_IsEmpty()
+    {
+        using var services = new ServiceCollection().BuildServiceProvider();
+        var (_, request) = FunctionTestDoubles.CreateRequest(services);
+
+        request.GetScopes().ShouldBeEmpty();
+    }
+
     [Fact]
     public void TryGetApplicationIdentity_MachineIdentity_ReturnsTheStoredId()
     {

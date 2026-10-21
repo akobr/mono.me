@@ -24,13 +24,15 @@ public class AuthKitOptions
     // org_… that owns M2M applications.
     public string? MachineOrganizationId { get; set; }
 
+    // Added to every user token. In practice only User.Impersonation: users are authorized by their role, and data
+    // scopes in a user token are ignored.
     public string[] DefaultUserScopes { get; set; } = [];
 
     // Accepting an invitation needs a verified email. Tokens without an email_verified claim
     // count as verified only when this is false; add email_verified to the JWT template instead.
     public bool RequireVerifiedEmail { get; set; } = true;
 
-    // WorkOS permission slug => Storyteller scope. A value can hold several scopes separated by spaces.
+    // WorkOS permission slug => exactly one scope string: a machine scope (Annotation.Read …) or User.Impersonation.
     // Slugs may contain ':'; AddUserAuthenticationOptions reads the section so they bind as one key.
     public Dictionary<string, string> PermissionMap { get; set; } = new();
 

@@ -18,7 +18,7 @@ public class AuthKitMachineClaimsTests
             PermissionMap = new Dictionary<string, string>
             {
                 ["storyteller:annotation-read"] = "Annotation.Read",
-                ["storyteller:configuration-write"] = "Configuration.Read Configuration.ReadWrite",
+                ["storyteller:configuration-write"] = "Configuration.Write",
             },
         },
     }));
@@ -31,14 +31,14 @@ public class AuthKitMachineClaimsTests
                 new Claim("sub", "client_m2m01"),
                 new Claim("client_id", "client_m2m01"),
                 new Claim("scope", "storyteller:annotation-read storyteller:configuration-write unmapped"),
-                new Claim("scp", "Configuration.Secrets"),
+                new Claim("scp", "Secrets.Read"),
                 new Claim("azp", "forged"),
             ],
             "client_m2m01");
 
         result.IsMachine.ShouldBeTrue();
         result.MachineId.ShouldBe("client_m2m01");
-        Values(result, "scp").ShouldBe(["Annotation.Read Configuration.Read Configuration.ReadWrite"]);
+        Values(result, "scp").ShouldBe(["Annotation.Read Configuration.Write"]);
         Values(result, "azp").ShouldBe(["client_m2m01"]);
         Values(result, "scope").ShouldBe(["storyteller:annotation-read storyteller:configuration-write unmapped"]);
     }

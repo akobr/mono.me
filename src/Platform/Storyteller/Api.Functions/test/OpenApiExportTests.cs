@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
 
+using _42.Platform.Storyteller.Accessing;
+using _42.Platform.Storyteller.Api.Security;
 using _42.Platform.Storyteller.Api.V1;
 
 using Microsoft.AspNetCore.Http;
@@ -22,6 +24,68 @@ public class OpenApiExportTests
 
     // The API assembly to render; by default the one in the API project's own output directory.
     public const string AssemblyVariable = "STORYTELLER_OPENAPI_ASSEMBLY";
+
+    // Spec 7.4: the routes that refuse machines whatever their credentials carry.
+    private static readonly string[] UserOnlyOperations =
+    [
+        Definitions.RouteIds.Access.GetAccount,
+        Definitions.RouteIds.Access.CreateAccount,
+        Definitions.RouteIds.Access.GetAccessPoints,
+        Definitions.RouteIds.Access.GetAccessPoint,
+        Definitions.RouteIds.Access.UpdateAccessPoint,
+        Definitions.RouteIds.Access.GetProjects,
+        Definitions.RouteIds.Access.CreateAccessPoint,
+        Definitions.RouteIds.Access.GrantUserAccess,
+        Definitions.RouteIds.Access.RevokeUserAccess,
+        Definitions.RouteIds.Access.GetMembers,
+        Definitions.RouteIds.Access.SetMemberRole,
+        Definitions.RouteIds.Access.RemoveMember,
+        Definitions.RouteIds.Access.GetInvitations,
+        Definitions.RouteIds.Access.CreateInvitation,
+        Definitions.RouteIds.Access.ResendInvitation,
+        Definitions.RouteIds.Access.RevokeInvitation,
+        Definitions.RouteIds.Access.GetMyInvitations,
+        Definitions.RouteIds.Access.AcceptInvitation,
+        Definitions.RouteIds.Access.DeclineInvitation,
+        Definitions.RouteIds.Access.GetMachineAccesses,
+        Definitions.RouteIds.Access.GetMachineAccess,
+        Definitions.RouteIds.Access.CreateMachineAccess,
+        Definitions.RouteIds.Access.ResetMachineAccess,
+        Definitions.RouteIds.Access.DeleteMachineAccess,
+        Definitions.RouteIds.Access.GetMachineAuthentication,
+        Definitions.RouteIds.Access.SetMachineAuthentication,
+        Definitions.RouteIds.Access.GetSharedCertificates,
+        Definitions.RouteIds.Access.IssueSharedCertificate,
+        Definitions.RouteIds.Access.RevokeSharedCertificate,
+        Definitions.RouteIds.Access.GetFederatedIssuers,
+        Definitions.RouteIds.Access.GetFederatedIssuer,
+        Definitions.RouteIds.Access.SetFederatedIssuer,
+        Definitions.RouteIds.Access.DeleteFederatedIssuer,
+        Definitions.RouteIds.Access.SetMachineFederationRules,
+        Definitions.RouteIds.Annotations.PurgeAnnotation,
+        Definitions.RouteIds.Views.CreateView,
+        Definitions.RouteIds.Views.UpdateView,
+        Definitions.RouteIds.KeyValues.PurgeKeyValues,
+        Definitions.RouteIds.KeyValues.SetKeyValuePolicy,
+        Definitions.RouteIds.KeyValues.GetByokSetup,
+        Definitions.RouteIds.KeyValues.VerifyByok,
+        Definitions.RouteIds.KeyValues.RotateKeyValueKey,
+        Definitions.RouteIds.KeyValues.AddRecipient,
+        Definitions.RouteIds.KeyValues.UpdateRecipient,
+        Definitions.RouteIds.KeyValues.RemoveRecipient,
+        Definitions.RouteIds.KeyValues.GetKeyValueAudit,
+        Definitions.RouteIds.KeyValues.GetKeyValueUsage,
+    ];
+
+    // Without a bearer token: the token exchange, the public CA certificate and the sign-in configuration are anonymous,
+    // and a machine renews its certificate with the certificate itself.
+    private static readonly string[] AnonymousOperations =
+    [
+        Definitions.RouteIds.Access.ExchangeMachineToken,
+        Definitions.RouteIds.Access.GetCertificateAuthority,
+        Definitions.RouteIds.Access.GetAuthConfiguration,
+        Definitions.RouteIds.Access.RenewMachineCertificate,
+    ];
 
     [Fact]
     public async Task Document_HasEveryKeyValueOperation_UnderTheKeyValuesTag()
@@ -179,10 +243,11 @@ public class OpenApiExportTests
         PropertyNames(schemas, "MachineAccess").ShouldContain("FederationRules");
     }
 
-    // The management scopes of a machine (424-57): an optional list on the create model and the machine, of one shared
-    // enum without a default, so both SDKs have one type for it and send nothing on their own.
+    // The scopes of a machine (424-79): one list on the create model and the machine, of one shared enum of the 11
+    // scopes without a default, so both SDKs have one type for it and send nothing on their own. The presets and the
+    // separate management list are gone, also from every description.
     [Fact]
-    public async Task Document_ManagementScopes_AreAnOptionalListOfTheSharedEnum()
+    public async Task Document_Scopes_AreAListOfTheSharedMachineScopeEnum()
     {
         var json = await RenderAsync();
         using var document = JsonDocument.Parse(json);
@@ -190,78 +255,119 @@ public class OpenApiExportTests
 
         foreach (var name in new[] { "MachineAccess", "MachineAccessCreate" })
         {
-            var property = schemas.GetProperty(name).GetProperty("properties").GetProperty("ManagementScopes");
+            PropertyNames(schemas, name).ShouldNotContain("Scope", name);
+            PropertyNames(schemas, name).ShouldNotContain("ManagementScopes", name);
+
+            var property = schemas.GetProperty(name).GetProperty("properties").GetProperty("Scopes");
             property.GetProperty("type").GetString().ShouldBe("array", name);
-            property.GetProperty("items").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/MachineManagementScope", name);
-            (schemas.GetProperty(name).TryGetProperty("required", out var required) ? required.EnumerateArray().Select(item => item.GetString()) : [])
-                .ShouldNotContain("ManagementScopes", name);
+            property.GetProperty("items").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/MachineScope", name);
+            property.TryGetProperty("default", out _).ShouldBeFalse(name);
         }
 
-        var scope = schemas.GetProperty("MachineManagementScope");
+        // Not required on the create model: a body without the list reaches the handler, whose 400 names the runtime scopes.
+        (schemas.GetProperty("MachineAccessCreate").TryGetProperty("required", out var required) ? required.EnumerateArray().Select(item => item.GetString()) : [])
+            .ShouldNotContain("Scopes");
+
+        var scope = schemas.GetProperty("MachineScope");
         scope.GetProperty("type").GetString().ShouldBe("string");
-        scope.GetProperty("enum").EnumerateArray().Select(value => value.GetString())
-            .ShouldBe(["ConfigurationTransfer", "SchemaWrite", "TemplateWrite", "AnnotationManage", "KeyValueManage"]);
-        scope.TryGetProperty("default", out _).ShouldBeFalse();
+        scope.GetProperty("enum").EnumerateArray().Select(value => value.GetString()).ShouldBe(
+            [
+                "AnnotationRead",
+                "AnnotationWrite",
+                "ConfigurationRead",
+                "ConfigurationWrite",
+                "SecretsRead",
+                "SecretsWrite",
+                "ConfigurationTransfer",
+                "SchemaWrite",
+                "TemplateWrite",
+                "AnnotationManage",
+                "KeyValueManage",
+            ]);
+        scope.TryGetProperty("default", out _).ShouldBeFalse("a scope is only ever granted on purpose");
+
+        // One scope type: no preset enum, no management enum and no enum per list.
+        schemas.EnumerateObject().Select(schema => schema.Name).Where(name => name.Contains("Scope", StringComparison.Ordinal)).ShouldBe(["MachineScope"]);
+
+        foreach (var stale in new[] { "DefaultRead", "SecretsReadWrite", "AnnotationReadWrite", "ConfigurationReadWrite", "Default.Read", "Annotation.ReadWrite", "Configuration.ReadWrite", "Configuration.Secrets" })
+        {
+            json.ShouldNotContain(stale, Case.Sensitive);
+        }
     }
 
-    // The 403 of every management operation names the management scope a machine needs; the key/value ones keep the
-    // secret rights and the mTLS rule. The machine routes name the Administrator role of machines with management scopes.
+    // Spec 7.5 and 8.2: every operation a machine may call documents a 403 that names exactly the machine scopes it
+    // needs (the key/value ones also the secret rights and the mTLS rule), and no 401 names a scope: a machine without
+    // one is authenticated and gets 403. The routes for users only document the 401 of User.Impersonation and a 403 for
+    // machines. Every operation of the document is in one of the tables, so a new one cannot forget its scopes.
     [Fact]
-    public async Task Document_ManagementOperations_NameTheManagementScopeInTheir403()
+    public async Task Document_EveryOperationForMachines_NamesItsScopesInIts403()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+        var operations = document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject())
+            .Select(operation => (Id: operation.Value.GetProperty("operationId").GetString()!, Responses: operation.Value.GetProperty("responses")))
+            .ToList();
+        var machineOperations = MachineOperations();
+
+        operations.Select(operation => operation.Id).Distinct()
+            .ShouldBe([.. machineOperations.Keys, .. UserOnlyOperations, .. AnonymousOperations], ignoreOrder: true);
+
+        foreach (var (id, responses) in operations)
+        {
+            var unauthorized = responses.TryGetProperty("401", out var response401) ? response401.GetProperty("description").GetString()! : string.Empty;
+            NamedScopes(unauthorized).ShouldBeEmpty(id);
+
+            if (machineOperations.TryGetValue(id, out var expected))
+            {
+                var forbidden = responses.GetProperty("403");
+                var description = forbidden.GetProperty("description").GetString()!;
+                description.ShouldBe(expected.Forbidden, id);
+                NamedScopes(description).ShouldBe(expected.Scopes, ignoreOrder: true, customMessage: id);
+                forbidden.GetProperty("content").GetProperty(Definitions.ContentTypes.Json).GetProperty("schema").GetProperty("$ref").GetString()
+                    .ShouldBe("#/components/schemas/ErrorResponse", id);
+            }
+            else if (UserOnlyOperations.Contains(id))
+            {
+                unauthorized.ShouldBe(Definitions.Descriptions.ResponseUnauthorizedUserOnly, id);
+                var description = responses.GetProperty("403").GetProperty("description").GetString()!;
+                description.ShouldStartWith(Definitions.Descriptions.ResponseForbiddenUserOnly, customMessage: id, caseSensitivity: Case.Sensitive);
+                NamedScopes(description).ShouldBeEmpty(id);
+            }
+            else
+            {
+                responses.TryGetProperty("403", out _).ShouldBeFalse(id);
+            }
+        }
+
+        // The texts of spec 8.2, as the clients read them.
+        Definitions.Descriptions.ResponseForbiddenAnnotationRead.ShouldBe(Definitions.Descriptions.ResponseForbidden + " A machine needs the scope Annotation.Read (AccessDenied).");
+        Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite.ShouldBe(Definitions.Descriptions.ResponseForbidden + " A machine needs the scopes Configuration.Write and Schema.Write (AccessDenied).");
+        Definitions.Descriptions.ResponseUnauthorized.ShouldBe("Authentication issues: missing or invalid credentials, a user token without User.Impersonation, or a machine the project does not know or whose credential kind it does not enable.");
+        Definitions.Descriptions.ResponseUnauthorizedUserOnly.ShouldContain(Scopes.User.Impersonation);
+        Definitions.Descriptions.ResponseForbiddenUserOnly.ShouldContain("a machine is refused (ErrorCode AccessDenied)");
+    }
+
+    // Spec 3 and 4: the 400 of a new machine names an undefined scope and a list without a runtime scope, and its 403
+    // and those of the reset and the federation rules name the role the scopes of the machine need.
+    [Fact]
+    public async Task Document_MachineRoutes_NameTheScopeRulesInTheir400AndTheRoleRuleInTheir403()
     {
         var json = await RenderAsync();
         using var document = JsonDocument.Parse(json);
 
-        var forbidden = new Dictionary<string, string>
-        {
-            [Definitions.RouteIds.ConfigurationSchema.SetConfigurationSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
-            [Definitions.RouteIds.ConfigurationSchema.DeleteConfigurationSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
-            [Definitions.RouteIds.ConfigurationSchema.SetAnnotationSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
-            [Definitions.RouteIds.ConfigurationSchema.DeleteAnnotationSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
-            [Definitions.RouteIds.ConfigurationSchema.SetDescendantTypeSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
-            [Definitions.RouteIds.ConfigurationSchema.DeleteDescendantTypeSchema] = Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite,
-            [Definitions.RouteIds.Template.SetTemplate] = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite,
-            [Definitions.RouteIds.Template.PatchTemplate] = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite,
-            [Definitions.RouteIds.Template.DeleteTemplate] = Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite,
-            [Definitions.RouteIds.Annotations.SetAnnotations] = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage,
-            [Definitions.RouteIds.Annotations.SetAnnotationsSimple] = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage,
-            [Definitions.RouteIds.Annotations.DeleteAnnotation] = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage,
-            [Definitions.RouteIds.Annotations.RestoreAnnotations] = Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage,
-            [Definitions.RouteIds.KeyValues.RestoreKeyValues] = Definitions.Descriptions.ResponseForbiddenManagementKeyValueManage,
-            [Definitions.RouteIds.KeyValues.ProtectKeyValues] = Definitions.Descriptions.ResponseMtlsRequiredKeyValueManage,
-            [Definitions.RouteIds.KeyValues.ExportKeyValues] = Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer,
-            [Definitions.RouteIds.KeyValues.ImportKeyValues] = Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer,
-            [Definitions.RouteIds.Access.CreateMachineAccess] = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes,
-            [Definitions.RouteIds.Access.ResetMachineAccess] = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes,
-            [Definitions.RouteIds.Access.SetMachineFederationRules] = Definitions.Descriptions.ResponseForbiddenMachineManagementScopes,
-        };
+        Operation(document, Definitions.RouteIds.Access.CreateMachineAccess).GetProperty("responses").GetProperty("400").GetProperty("description").GetString()
+            .ShouldBe("The annotation key is not valid (ErrorCode InvalidKey), a scope doesn't exist, the scopes have no runtime scope, or the credential kind is not supported or its identity provider cannot carry one of the scopes.");
 
-        foreach (var (operationId, expected) in forbidden)
+        foreach (var routeId in new[] { Definitions.RouteIds.Access.CreateMachineAccess, Definitions.RouteIds.Access.ResetMachineAccess, Definitions.RouteIds.Access.SetMachineFederationRules })
         {
-            var operations = Operations(document, operationId);
-            operations.ShouldNotBeEmpty(operationId);
-
-            foreach (var operation in operations)
-            {
-                var response = operation.GetProperty("responses").GetProperty("403");
-                response.GetProperty("description").GetString().ShouldBe(expected, operationId);
-                response.GetProperty("content").GetProperty(Definitions.ContentTypes.Json).GetProperty("schema").GetProperty("$ref").GetString()
-                    .ShouldBe("#/components/schemas/ErrorResponse", operationId);
-            }
+            Operation(document, routeId).GetProperty("responses").GetProperty("403").GetProperty("description").GetString()
+                .ShouldBe(Definitions.Descriptions.ResponseForbiddenMachineScopes, routeId);
         }
 
-        Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite.ShouldBe(Definitions.Descriptions.ResponseForbidden + " A machine also needs the management scope Schema.Write (AccessDenied).");
-        Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite.ShouldEndWith(" A machine also needs the management scope Template.Write (AccessDenied).");
-        Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage.ShouldEndWith(" A machine also needs the management scope Annotation.Manage (AccessDenied).");
-        Definitions.Descriptions.ResponseForbiddenManagementKeyValueManage.ShouldEndWith(" A machine also needs the management scope KeyValue.Manage (AccessDenied).");
-        Definitions.Descriptions.ResponseMtlsRequiredKeyValueManage.ShouldBe(Definitions.Descriptions.ResponseMtlsRequired + " A machine also needs the management scope KeyValue.Manage (AccessDenied).");
-        Definitions.Descriptions.ResponseMtlsRequiredConfigurationTransfer.ShouldBe(Definitions.Descriptions.ResponseMtlsRequired + " A machine also needs the management scope Configuration.Transfer (AccessDenied).");
-        Definitions.Descriptions.ResponseForbiddenMachineManagementScopes.ShouldStartWith(Definitions.Descriptions.ResponseForbidden);
-        Definitions.Descriptions.ResponseForbiddenMachineManagementScopes.ShouldContain("management scopes");
-        Definitions.Descriptions.ResponseForbiddenMachineManagementScopes.ShouldContain("Administrator role");
-
-        Operation(document, Definitions.RouteIds.Access.CreateMachineAccess).GetProperty("responses").GetProperty("400").GetProperty("description").GetString()
-            .ShouldBe("The annotation key is not valid (ErrorCode InvalidKey), a management scope doesn't exist, or the credential kind is not supported.");
+        Definitions.Descriptions.ResponseForbiddenMachineScopes.ShouldBe(
+            Definitions.Descriptions.ResponseForbiddenUserOnly
+            + " Creating a machine, resetting it or replacing its federation rules needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).");
     }
 
     // The description of a project (424-78): its update and the caller's projects, under the Access tag, for users, with
@@ -288,7 +394,7 @@ public class OpenApiExportTests
         {
             operation.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Access]);
             operation.GetProperty("security").GetArrayLength().ShouldBeGreaterThan(0);
-            operation.GetProperty("responses").GetProperty("403").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseForbidden);
+            operation.GetProperty("responses").GetProperty("403").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseForbiddenUserOnly);
         }
 
         var update = Operation(document, Definitions.RouteIds.Access.UpdateAccessPoint);
@@ -403,6 +509,115 @@ public class OpenApiExportTests
             .Select(operation => operation.Value)
             .Where(operation => operation.GetProperty("operationId").GetString() == operationId)
             .ToList();
+    }
+
+    // The machine scope strings a description names; none of them is a part of another.
+    private static List<string> NamedScopes(string description)
+    {
+        return MachineScopes.ToScopeStrings(MachineScopes.All).Where(scope => description.Contains(scope, StringComparison.Ordinal)).ToList();
+    }
+
+    // The operations machines call, by the table of spec 7.5: the 403 each documents and the machine scopes it names,
+    // with the secrets scopes of the key/value routes and the per-kind scopes of the view transfer.
+    private static Dictionary<string, (string Forbidden, string[] Scopes)> MachineOperations()
+    {
+        var annotationRead = (Definitions.Descriptions.ResponseForbiddenAnnotationRead, new[] { Scopes.Annotation.Read });
+        var annotationManage = (Definitions.Descriptions.ResponseForbiddenManagementAnnotationManage, new[] { Scopes.Annotation.Write, Scopes.Annotation.Manage });
+        var configurationRead = (Definitions.Descriptions.ResponseForbiddenConfigurationRead, new[] { Scopes.Configuration.Read });
+        var configurationWrite = (Definitions.Descriptions.ResponseForbiddenConfigurationWrite, new[] { Scopes.Configuration.Write });
+        var schemaWrite = (Definitions.Descriptions.ResponseForbiddenManagementSchemaWrite, new[] { Scopes.Configuration.Write, Scopes.Schema.Write });
+        var templateWrite = (Definitions.Descriptions.ResponseForbiddenManagementTemplateWrite, new[] { Scopes.Configuration.Write, Scopes.Template.Write });
+        var secretRead = (Definitions.Descriptions.ResponseMtlsRequiredConfigurationRead, new[] { Scopes.Configuration.Read, Scopes.Secrets.Read });
+        var export = (Definitions.Descriptions.ResponseTransferForbiddenExport, new[] { Scopes.Configuration.Transfer, Scopes.Annotation.Read, Scopes.Configuration.Read });
+        var import = (Definitions.Descriptions.ResponseTransferForbiddenImport, new[] { Scopes.Configuration.Transfer, Scopes.Annotation.Write, Scopes.Configuration.Write });
+
+        return new Dictionary<string, (string Forbidden, string[] Scopes)>
+        {
+            [Definitions.RouteIds.Annotations.GetAnnotations] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetAnnotation] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetDescendants] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetResponsibilities] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetSubjects] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetUsages] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetContexts] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetExecutions] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetUnits] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetUnitsOfExecution] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetDeletedAnnotations] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetDeletedAnnotation] = annotationRead,
+            [Definitions.RouteIds.Annotations.FindDeletedAnnotations] = annotationRead,
+            [Definitions.RouteIds.Annotations.GetAnnotationHistory] = annotationRead,
+            [Definitions.RouteIds.Annotations.SetAnnotation] = (Definitions.Descriptions.ResponseForbiddenAnnotationWrite, [Scopes.Annotation.Write]),
+            [Definitions.RouteIds.Annotations.SetAnnotations] = annotationManage,
+            [Definitions.RouteIds.Annotations.SetAnnotationsSimple] = annotationManage,
+            [Definitions.RouteIds.Annotations.DeleteAnnotation] = annotationManage,
+            [Definitions.RouteIds.Annotations.RestoreAnnotations] = annotationManage,
+            [Definitions.RouteIds.Configuration.GetConfigurations] = configurationRead,
+            [Definitions.RouteIds.Configuration.GetConfiguration] = configurationRead,
+            [Definitions.RouteIds.Configuration.GetResolvedConfiguration] = configurationRead,
+            [Definitions.RouteIds.Configuration.GetConfigurationVersions] = configurationRead,
+            [Definitions.RouteIds.Configuration.GetConfigurationVersion] = configurationRead,
+            [Definitions.RouteIds.Configuration.GetConfigurationVersionDiff] = configurationRead,
+            [Definitions.RouteIds.Configuration.GetConfigurationVersionDiffCustom] = configurationRead,
+            [Definitions.RouteIds.Configuration.GetConfigurationViewDiff] = configurationRead,
+            [Definitions.RouteIds.Configuration.GetConfigurationComposition] = configurationRead,
+            [Definitions.RouteIds.Configuration.SetConfiguration] = configurationWrite,
+            [Definitions.RouteIds.Configuration.PatchConfiguration] = configurationWrite,
+            [Definitions.RouteIds.Configuration.DeleteConfiguration] = configurationWrite,
+            [Definitions.RouteIds.ConfigurationSchema.GetConfigurationSchemas] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetConfigurationSchema] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetAnnotationSchema] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetDescendantTypeSchema] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetCombinedConfigurationSchema] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetSchemaVersions] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetSchemaVersion] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetSchemaVersionDiff] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetSchemaVersionDiffCustom] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetAnnotationSchemaVersions] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetAnnotationSchemaVersion] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetAnnotationSchemaVersionDiff] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetAnnotationSchemaVersionDiffCustom] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetDescendantTypeSchemaVersions] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetDescendantTypeSchemaVersion] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetDescendantTypeSchemaVersionDiff] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.GetDescendantTypeSchemaVersionDiffCustom] = configurationRead,
+            [Definitions.RouteIds.ConfigurationSchema.SetConfigurationSchema] = schemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.DeleteConfigurationSchema] = schemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.SetAnnotationSchema] = schemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.DeleteAnnotationSchema] = schemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.SetDescendantTypeSchema] = schemaWrite,
+            [Definitions.RouteIds.ConfigurationSchema.DeleteDescendantTypeSchema] = schemaWrite,
+            [Definitions.RouteIds.Template.GetTemplates] = configurationRead,
+            [Definitions.RouteIds.Template.GetTemplate] = configurationRead,
+            [Definitions.RouteIds.Template.GetTemplateVersions] = configurationRead,
+            [Definitions.RouteIds.Template.GetTemplateVersion] = configurationRead,
+            [Definitions.RouteIds.Template.GetTemplateVersionDiff] = configurationRead,
+            [Definitions.RouteIds.Template.GetTemplateVersionDiffCustom] = configurationRead,
+            [Definitions.RouteIds.Template.SetTemplate] = templateWrite,
+            [Definitions.RouteIds.Template.PatchTemplate] = templateWrite,
+            [Definitions.RouteIds.Template.DeleteTemplate] = templateWrite,
+            [Definitions.RouteIds.Bindings.GetBindingCatalog] = (Definitions.Descriptions.ResponseForbiddenBindingCatalog, [Scopes.Configuration.Read]),
+            [Definitions.RouteIds.Views.GetViews] = (Definitions.Descriptions.ResponseForbiddenViews, [Scopes.Annotation.Read, Scopes.Configuration.Read]),
+            [Definitions.RouteIds.KeyValues.GetKeyValues] = configurationRead,
+            [Definitions.RouteIds.KeyValues.GetKeyValue] = secretRead,
+            [Definitions.RouteIds.KeyValues.GetKeyValueVersions] = configurationRead,
+            [Definitions.RouteIds.KeyValues.GetKeyValueVersion] = secretRead,
+            [Definitions.RouteIds.KeyValues.GetKeyValueVersionDiff] = secretRead,
+            [Definitions.RouteIds.KeyValues.GetKeyValueVersionDiffCustom] = secretRead,
+            [Definitions.RouteIds.KeyValues.GetKeyValuePolicy] = configurationRead,
+            [Definitions.RouteIds.KeyValues.GetRecipients] = configurationRead,
+            [Definitions.RouteIds.KeyValues.SetKeyValue] = (Definitions.Descriptions.ResponseMtlsRequiredConfigurationWrite, [Scopes.Configuration.Write, Scopes.Secrets.Write]),
+            [Definitions.RouteIds.KeyValues.DeleteKeyValue] = (Definitions.Descriptions.ResponseMtlsRequiredDeleteKeyValue, [Scopes.Configuration.Write, Scopes.Secrets.Write]),
+            [Definitions.RouteIds.KeyValues.RestoreKeyValues] = (Definitions.Descriptions.ResponseForbiddenManagementKeyValueManage, [Scopes.Configuration.Write, Scopes.KeyValue.Manage, Scopes.Secrets.Write]),
+            [Definitions.RouteIds.KeyValues.ProtectKeyValues] = (Definitions.Descriptions.ResponseMtlsRequiredKeyValueManage, [Scopes.Configuration.Write, Scopes.KeyValue.Manage, Scopes.Secrets.Write]),
+            [Definitions.RouteIds.KeyValues.ExportKeyValues] = (Definitions.Descriptions.ResponseMtlsRequiredKeyValueExport, [Scopes.Configuration.Read, Scopes.Configuration.Transfer, Scopes.Secrets.Read]),
+            [Definitions.RouteIds.KeyValues.ImportKeyValues] = (Definitions.Descriptions.ResponseMtlsRequiredKeyValueImport, [Scopes.Configuration.Write, Scopes.Configuration.Transfer, Scopes.Secrets.Write]),
+            [Definitions.RouteIds.Transfers.StartViewExport] = export,
+            [Definitions.RouteIds.Transfers.GetViewExport] = export,
+            [Definitions.RouteIds.Transfers.GetViewExportArchive] = export,
+            [Definitions.RouteIds.Transfers.StartViewImport] = import,
+            [Definitions.RouteIds.Transfers.GetViewImport] = import,
+        };
     }
 
     // The extension looks for functions in every assembly next to the one it renders, as the host does in its bin folder.

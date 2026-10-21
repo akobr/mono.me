@@ -27,7 +27,8 @@ public partial class ConfigurationHttp
     [OpenApiResponseWithoutBody(HttpStatusCode.NotModified, CustomHeaderType = typeof(EntityTagResponseHeader), Description = Definitions.Descriptions.ResponseNotModified)]
     [OpenApiResponseWithBody(HttpStatusCode.BadRequest, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseBadRequest)]
     [OpenApiResponseWithBody(HttpStatusCode.NotFound, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseConfigurationNotFound)]
-    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized + $"{Scopes.Configuration.Read}, {Scopes.Configuration.Write}, {Scopes.Default.Read}, {Scopes.Default.Write}")]
+    [OpenApiResponseWithoutBody(HttpStatusCode.Unauthorized, Description = Definitions.Descriptions.ResponseUnauthorized)]
+    [OpenApiResponseWithBody(HttpStatusCode.Forbidden, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseForbiddenConfigurationRead)]
     [OpenApiResponseWithBody(HttpStatusCode.InternalServerError, Definitions.ContentTypes.Json, typeof(ErrorResponse), Description = Definitions.Descriptions.ResponseInternalServerError)]
     public async Task<IActionResult> GetConfigurationComposition(
         [HttpTrigger(AuthorizationLevel.Anonymous, Definitions.Methods.Get, Route = Definitions.Routes.Configuration.V1.ConfigurationComposition)]
@@ -37,11 +38,9 @@ public partial class ConfigurationHttp
         string view,
         string key)
     {
-        request.CheckScope(Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write);
-
         // the whole project, as the templates: the ancestors' documents and the templates are shown in full, also the
         // values the annotation overrides, so a machine restricted to an annotation is refused even for its own one
-        await request.CheckAccessToProjectAsync(_access, organization, project);
+        await request.CheckAccessToProjectAsync(_access, organization, project, AccountRole.Reader, MachineScope.ConfigurationRead);
 
         if (!TryParseAnnotationKey(key, out var annotationKey, out var badRequestResult))
         {

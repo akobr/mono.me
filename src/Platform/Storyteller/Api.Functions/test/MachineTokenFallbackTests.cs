@@ -41,6 +41,26 @@ public class MachineTokenFallbackTests
         });
     }
 
+    // The claims of a machine token stay as its validator gave them: they are the carried half of every scope check,
+    // and the stored machine decides what they grant (HttpRequestDataExtensions).
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MachineToken_CarriesTheScopesOfItsValidatorOnly(bool federated)
+    {
+        await WithValidationAsync(async () =>
+        {
+            var context = federated
+                ? CreateContext(new RecordingBearerTokenValidator(), StorytellerIssuer, new RecordingMachineTokenValidator(StorytellerIssuer) { Owns = true, Result = FederatedResult() })
+                : CreateContext(new RecordingBearerTokenValidator(), new RecordingMachineTokenValidator(MachineIssuer) { Result = MachineResult() });
+
+            (await InvokeAsync(context)).ShouldBeTrue();
+
+            var request = await context.GetHttpRequestDataAsync();
+            request.ShouldNotBeNull().GetScopes().ShouldBe([Scopes.Annotation.Read]);
+        });
+    }
+
     [Fact]
     public async Task UserValidatorAccepts_MachineValidatorIsNotAsked()
     {
@@ -239,7 +259,7 @@ public class MachineTokenFallbackTests
     private static BearerValidationResult FederatedResult()
     {
         return new BearerValidationResult(
-            [new Claim("azp", FederatedMachineId), new Claim("sub", FederatedMachineId), new Claim("roles", "Default.Read")],
+            [new Claim("azp", FederatedMachineId), new Claim("sub", FederatedMachineId), new Claim("roles", "Annotation.Read")],
             true,
             FederatedMachineId,
             MachineCredentialKind.Federated,

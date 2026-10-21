@@ -462,18 +462,35 @@ public static class Definitions
         public const string ResponseAccount = "Details about the log in account, contains all accessible access points.";
         public const string ResponseBadRequest = "The request is not well formed.";
         public const string ResponseBadRequestDescendantType = "The request is not well formed, or the descendant type cannot descend from the annotation key (ErrorCode InvalidKey).";
-        public const string ResponseUnauthorized = "Authentication issues: missing or invalid credentials, or a missing scope. Scope(s): ";
+        public const string ResponseBadRequestMachineAccessCreate = "The annotation key is not valid (ErrorCode InvalidKey), a scope doesn't exist, the scopes have no runtime scope, or the credential kind is not supported or its identity provider cannot carry one of the scopes.";
+
+        // The 401 of the routes machines and users call. Data scopes are no part of it: a machine without the scopes of
+        // the operation is authenticated and gets 403.
+        public const string ResponseUnauthorized = "Authentication issues: missing or invalid credentials, a user token without " + Scopes.User.Impersonation + ", or a machine the project does not know or whose credential kind it does not enable.";
+
+        // The 401 and 403 of the routes for users only: machines are refused whatever their credentials carry.
+        public const string ResponseUnauthorizedUserOnly = "Authentication issues: missing or invalid credentials, or a token that does not act for a user (the scope " + Scopes.User.Impersonation + " is missing).";
+        public const string ResponseForbiddenUserOnly = "Only users may call this operation: a machine is refused (ErrorCode AccessDenied), and so is a user whose role on the organization or project does not allow it (ErrorCode AccessDenied).";
+
         public const string ResponseForbidden = "The caller is authenticated, but its role on the organization or project does not allow the operation (ErrorCode AccessDenied), or it is a machine restricted to an annotation that addresses another annotation or the whole project (ErrorCode AnnotationRestricted).";
 
-        // The 403 of a management operation: a machine also needs the management scope, stored on it and carried by its
-        // credentials; users are not affected.
-        public const string ResponseForbiddenManagementSchemaWrite = ResponseForbidden + " " + MachineNeedsSchemaWrite;
-        public const string ResponseForbiddenManagementTemplateWrite = ResponseForbidden + " " + MachineNeedsTemplateWrite;
-        public const string ResponseForbiddenManagementAnnotationManage = ResponseForbidden + " " + MachineNeedsAnnotationManage;
-        public const string ResponseForbiddenManagementKeyValueManage = ResponseForbidden + " " + MachineNeedsKeyValueManage;
+        // The 403 of the routes machines call: a machine needs the scopes of the operation, stored on it and carried by
+        // its credentials, a management operation its runtime scope and its management scope; users need only the role.
+        public const string ResponseForbiddenAnnotationRead = ResponseForbidden + MachineNeedsScope + Scopes.Annotation.Read + MachineDenied;
+        public const string ResponseForbiddenAnnotationWrite = ResponseForbidden + MachineNeedsScope + Scopes.Annotation.Write + MachineDenied;
+        public const string ResponseForbiddenManagementAnnotationManage = ResponseForbidden + MachineNeedsScopes + Scopes.Annotation.Write + " and " + Scopes.Annotation.Manage + MachineDenied;
+        public const string ResponseForbiddenConfigurationRead = ResponseForbidden + MachineNeedsScope + Scopes.Configuration.Read + MachineDenied;
+        public const string ResponseForbiddenConfigurationWrite = ResponseForbidden + MachineNeedsScope + Scopes.Configuration.Write + MachineDenied;
+        public const string ResponseForbiddenManagementSchemaWrite = ResponseForbidden + MachineNeedsScopes + Scopes.Configuration.Write + " and " + Scopes.Schema.Write + MachineDenied;
+        public const string ResponseForbiddenManagementTemplateWrite = ResponseForbidden + MachineNeedsScopes + Scopes.Configuration.Write + " and " + Scopes.Template.Write + MachineDenied;
+        public const string ResponseForbiddenManagementKeyValueManage = ResponseForbidden + MachineNeedsScopes + Scopes.Configuration.Write + " and " + Scopes.KeyValue.Manage + " (AccessDenied); restoring a secret key also needs " + Scopes.Secrets.Write + ".";
 
-        // Create, reset and the federation rules: only an Administrator gives out the credentials of a machine with management scopes.
-        public const string ResponseForbiddenMachineManagementScopes = ResponseForbidden + " Creating a machine with management scopes, resetting it or replacing its federation rules needs the Administrator role (ErrorCode AccessDenied).";
+        // Project metadata: every machine of the project reads it, also one restricted to an annotation.
+        public const string ResponseForbiddenViews = MetadataForbidden + " A machine needs one of the scopes " + Scopes.Annotation.Read + " or " + Scopes.Configuration.Read + " (AccessDenied); discovering the views (discover=true) is for users only.";
+        public const string ResponseForbiddenBindingCatalog = MetadataForbidden + MachineNeedsScope + Scopes.Configuration.Read + MachineDenied;
+
+        // Create, reset and the federation rules: a machine's scopes may not exceed what its creator may do or grant.
+        public const string ResponseForbiddenMachineScopes = ResponseForbiddenUserOnly + " Creating a machine, resetting it or replacing its federation rules needs the Contributor role, ContributorWithSecrets when the machine has a Secrets scope and Administrator when it has a management scope (ErrorCode AccessDenied).";
         public const string ResponseConfigurationNotFound = "The configuration doesn't exist, or the annotation is deleted (ErrorCode AnnotationDeleted).";
         public const string ResponseConcurrentChange = "The annotations changed concurrently three times in a row (Conflict); try again.";
         public const string ResponsePreconditionFailed = "A JSON Patch test operation did not match the stored document (ErrorCode PatchTestFailed). Reload and retry.";
@@ -504,30 +521,34 @@ public static class Definitions
         public const string ResponseNotImplemented = "The protection level is not configured in this deployment (ErrorCode ProtectionNotConfigured).";
         public const string ResponseServiceUnavailable = "The key-encryption key is not reachable right now (ErrorCode KeyEncryptionUnavailable); Retry-After says when to try again.";
         public const string ResponseMtlsRequired = "Secret rights are missing (ErrorCode AccessDenied), the project delivers secrets to machines only over mTLS (ErrorCode MtlsRequired), or the machine is restricted to an annotation (ErrorCode AnnotationRestricted).";
-        public const string ResponseMtlsRequiredConfigurationTransfer = ResponseMtlsRequired + " " + MachineNeedsConfigurationTransfer;
-        public const string ResponseMtlsRequiredKeyValueManage = ResponseMtlsRequired + " " + MachineNeedsKeyValueManage;
+
+        // The 403 of the key/value routes with secret values: the secret rights and the mTLS rule, and the machine scopes.
+        public const string ResponseMtlsRequiredConfigurationRead = ResponseMtlsRequired + MachineNeedsScope + Scopes.Configuration.Read + ", and " + Scopes.Secrets.Read + " for secret values" + MachineDenied;
+        public const string ResponseMtlsRequiredConfigurationWrite = ResponseMtlsRequired + MachineNeedsScope + Scopes.Configuration.Write + ", and " + Scopes.Secrets.Write + " for secret levels" + MachineDenied;
+        public const string ResponseMtlsRequiredDeleteKeyValue = ResponseMtlsRequired + MachineNeedsScope + Scopes.Configuration.Write + ", and " + Scopes.Secrets.Write + " for a secret key" + MachineDenied + " A permanent delete is for users with the Administrator role only.";
+        public const string ResponseMtlsRequiredKeyValueManage = ResponseMtlsRequired + MachineNeedsScopes + Scopes.Configuration.Write + ", " + Scopes.KeyValue.Manage + " and " + Scopes.Secrets.Write + MachineDenied;
+        public const string ResponseMtlsRequiredKeyValueExport = ResponseMtlsRequired + MachineNeedsScopes + Scopes.Configuration.Read + " and " + Scopes.Configuration.Transfer + ", and " + Scopes.Secrets.Read + " to export secrets" + MachineDenied;
+        public const string ResponseMtlsRequiredKeyValueImport = ResponseMtlsRequired + MachineNeedsScopes + Scopes.Configuration.Write + " and " + Scopes.Configuration.Transfer + ", and " + Scopes.Secrets.Write + " for secret items" + MachineDenied;
         public const string NoStore = "Responses with a secret value are Cache-Control: no-store.";
         public const string IncludeInactive = "Also the annotations that are not active now: disabled (IsDisabled), scheduled (ValidFrom in the future) and expired (ExpiresAt passed). Default false: only active annotations.";
         public const string IncludeDeleted = "Also the soft-deleted annotations, each with its Deletion. Default false. A deleted annotation that is not active needs includeInactive too.";
         public const string IdExport = "The id of the export.";
         public const string IdImport = "The id of the import.";
         public const string ResponseTransferLimit = "The project already has the maximum of exports and imports in progress (TransferLimit).";
-        public const string ResponseUnauthenticated = "Missing or invalid credentials.";
-        public const string ResponseTransferForbiddenExport = TransferForbidden + " " + MachineNeedsConfigurationTransfer + " Annotations need Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite; schemas, templates and configurations need Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. Reading an export needs the scopes of the kinds it includes. " + TransferForbiddenNames;
-        public const string ResponseTransferForbiddenImport = TransferForbidden + " " + MachineNeedsConfigurationTransfer + " Annotations need Annotation.ReadWrite or Default.ReadWrite; schemas, templates and configurations need Configuration.ReadWrite or Default.ReadWrite. Reading an import needs the scopes of the kinds it includes. " + TransferForbiddenNames;
+        public const string ResponseTransferForbiddenExport = TransferForbidden + MachineNeedsTransfer + "the read scope of every included kind (" + Scopes.Annotation.Read + " for annotations, " + Scopes.Configuration.Read + " for schemas, templates and configurations); reading an export needs the scopes of the kinds it includes. " + TransferForbiddenNames;
+        public const string ResponseTransferForbiddenImport = TransferForbidden + MachineNeedsTransfer + "the write scope of every included kind (" + Scopes.Annotation.Write + " for annotations, " + Scopes.Configuration.Write + " for schemas, templates and configurations); reading an import needs the scopes of the kinds it includes. " + TransferForbiddenNames;
         public const string TransferInclude = "The kinds to import, comma-separated and case-insensitive: Annotations, Schemas, Templates, Configurations. Empty means all four. The files of the other kinds are counted as excluded.";
         public const string TransferExisting = "What happens to a document the view already has: Overwrite (default) writes the file as a new version, updates an annotation and re-creates a deleted one; Skip keeps the stored document. An equal document is Unchanged either way.";
         public const string FederatedIssuerName = "The name of the trusted issuer: 1 to 63 lower-case letters, digits or hyphens.";
 
         // The parts the 403 descriptions above are built from.
-        private const string MachineNeeds = "A machine also needs the management scope ";
-        private const string MachineNeedsConfigurationTransfer = MachineNeeds + Scopes.Configuration.Transfer + " (AccessDenied).";
-        private const string MachineNeedsSchemaWrite = MachineNeeds + Scopes.Schema.Write + " (AccessDenied).";
-        private const string MachineNeedsTemplateWrite = MachineNeeds + Scopes.Template.Write + " (AccessDenied).";
-        private const string MachineNeedsAnnotationManage = MachineNeeds + Scopes.Annotation.Manage + " (AccessDenied).";
-        private const string MachineNeedsKeyValueManage = MachineNeeds + Scopes.KeyValue.Manage + " (AccessDenied).";
-        private const string TransferForbidden = "The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted).";
-        private const string TransferForbiddenNames = "The message names the missing role or scope.";
+        private const string MachineNeedsScope = " A machine needs the scope ";
+        private const string MachineNeedsScopes = " A machine needs the scopes ";
+        private const string MachineDenied = " (AccessDenied).";
+        private const string MetadataForbidden = "The caller is authenticated, but its role on the project does not allow the operation (ErrorCode AccessDenied).";
+        private const string MachineNeedsTransfer = " A machine needs no role but the scope " + Scopes.Configuration.Transfer + " and ";
+        private const string TransferForbidden = "The user's role on the project is below Administrator, or a scope of the machine is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted).";
+        private const string TransferForbiddenNames = "Users need no data scopes, only the Administrator role. The message names the missing role or scope.";
     }
 
     public static class Errors

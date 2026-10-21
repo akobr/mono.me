@@ -9,6 +9,7 @@ using _42.Platform.Storyteller.Api.V1;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.IdentityModel.Tokens;
 
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
@@ -208,6 +209,45 @@ public class AccessPointHttpTests
         access.Calls.ShouldBeEmpty();
     }
 
+    // Accounts and access points belong to users (spec 7.4): a machine is refused in every build, also one whose
+    // credentials carry every scope and User.Impersonation, before the service is asked.
+    [Fact]
+    public async Task AccountAndAccessPointRoutes_Machine_IsAccessDeniedInEveryBuild()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        const string body = """{ "Organization": "acme", "Project": "billing" }""";
+
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetAccount(UserOnlyRoutes.Machine()));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.PostAccount(UserOnlyRoutes.Machine("POST", "{}")));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetAccessPoints(UserOnlyRoutes.Machine()));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetAccessPoint(UserOnlyRoutes.Machine(), "acme.billing"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.PostAccessPoints(UserOnlyRoutes.Machine("POST", body)));
+
+        access.Created.ShouldBeNull();
+    }
+
+    // Data scopes in a user token do not stand in for User.Impersonation: 401 in Release builds. Debug builds (DEV_AUTH)
+    // skip the check and serve the request.
+    [Fact]
+    public async Task PostAccessPoints_TokenThatDoesNotActForAUser_IsUnauthorized()
+    {
+        var access = new RecordingAccess();
+        var http = new AccessHttp(access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance);
+        var request = UserOnlyRoutes.NotActingForAUser("POST", """{ "Organization": "acme" }""");
+
+        if (DevAuth)
+        {
+            (await http.PostAccessPoints(request)).ShouldBeOfType<OkObjectResult>();
+            return;
+        }
+
+        var exception = await Should.ThrowAsync<SecurityTokenException>(() => http.PostAccessPoints(request));
+
+        exception.Message.ShouldBe(UserOnlyRoutes.NotActingForAUserMessage);
+        access.Created.ShouldBeNull();
+    }
+
     // A user's request; a body goes as JSON, with its content type.
     private static TestHttpRequestData UserRequest(string? body = null, string method = "POST")
     {
@@ -231,8 +271,8 @@ public class AccessPointHttpTests
         context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
         {
             new("sub", "machine-1"),
-            new("roles", Scopes.Default.Read),
-            new("roles", Scopes.Default.Write),
+            new("roles", Scopes.Annotation.Read),
+            new("roles", Scopes.Annotation.Write),
         };
         context.Items[FunctionContextItemKeys.MachineIdentity] = "machine-1";
         return request;

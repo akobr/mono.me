@@ -15,6 +15,10 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
     private const string Organization = "testorg";
     private const string Project = "testproj";
 
+    // The lists the API stores for a reader and for a writer: write implies read.
+    private static readonly MachineScope[] ReadScopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead];
+    private static readonly MachineScope[] ReadWriteScopes = [MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite];
+
     [Fact]
     public async Task IssueCertificate_ThenValidate_Succeeds()
     {
@@ -50,7 +54,7 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = certProject,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = ReadScopes,
         };
 
         var machine = await accessService.CreateMachineAccessAsync(model);
@@ -90,13 +94,13 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = mixedProject,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = ReadScopes,
         });
         var certificateMachine = await accessService.CreateMachineAccessAsync(new MachineAccessCreate
         {
             Organization = Organization,
             Project = mixedProject,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = ReadScopes,
             CredentialKind = MachineCredentialKind.Certificate,
         });
 
@@ -128,7 +132,7 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = sharedProject,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = ReadScopes,
             UseSharedCertificate = true,
         });
 
@@ -156,7 +160,7 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = Project,
-            Scope = MachineAccessScope.DefaultReadWrite,
+            Scopes = ReadWriteScopes,
         };
 
         var machine = await accessService.CreateMachineAccessAsync(model);
@@ -164,7 +168,7 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         machine.ShouldNotBeNull();
         machine.Id.ShouldNotBeNullOrEmpty();
         machine.AccessKey.ShouldNotBeNullOrEmpty();
-        machine.Scope.ShouldBe(MachineAccessScope.DefaultReadWrite);
+        machine.Scopes.ShouldBe(ReadWriteScopes);
 
         // Verify access.
         var hasAccess = await accessService.VerifyAccessForMachineAsync(Organization, Project, machine.Id);
@@ -181,7 +185,7 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = Project,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = ReadScopes,
         };
 
         var machine = await accessService.CreateMachineAccessAsync(model);
@@ -202,7 +206,7 @@ public class CertificateLifecycleTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = Project,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = ReadScopes,
         };
 
         var machine = await accessService.CreateMachineAccessAsync(model);

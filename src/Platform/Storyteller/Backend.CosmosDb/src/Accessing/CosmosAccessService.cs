@@ -537,13 +537,14 @@ public class CosmosAccessService : IAccessService
             partitionKey,
             stream => stream.DeserializeSystemTextJson<MachineAccessEntity>(_serializerOptions));
 
+        // Every provider returns exactly the requested scopes, so the stored list equals the request.
         var entity = new MachineAccessEntity
         {
             PartitionKey = partitionKeyValue,
             Id = machineAccess.Id,
             ObjectId = machineAccess.ObjectId,
             AccessKey = maskedKey,
-            Scope = machineAccess.Scope,
+            Scopes = machineAccess.Scopes.ToList(),
             AnnotationKey = machineAccess.AnnotationKey,
             CredentialKind = machineAccess.CredentialKind,
             CertificateThumbprint = machineAccess.CertificateThumbprint,
@@ -551,7 +552,6 @@ public class CosmosAccessService : IAccessService
             NotAfter = machineAccess.CertificateNotAfter,
             UsesSharedCertificate = machineAccess.UsesSharedCertificate,
             FederationRules = machineAccess.FederationRules?.ToList(),
-            ManagementScopes = machineAccess.ManagementScopes?.ToList(),
             HashedSecret = existing?.HashedSecret,
         };
 

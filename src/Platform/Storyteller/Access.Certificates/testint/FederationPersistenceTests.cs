@@ -148,7 +148,7 @@ public class FederationPersistenceTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = project,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = Rules,
         });
@@ -173,7 +173,7 @@ public class FederationPersistenceTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = project,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = [Rules[1]],
         });
@@ -191,7 +191,7 @@ public class FederationPersistenceTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = project,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.ApiKey,
         });
         var refused = await Should.ThrowAsync<InvalidInputException>(
@@ -214,7 +214,7 @@ public class FederationPersistenceTests(CosmosFixture fixture)
             {
                 Organization = Organization,
                 Project = project,
-                Scope = MachineAccessScope.DefaultRead,
+                Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
                 CredentialKind = MachineCredentialKind.Federated,
                 FederationRules = index == 0 ? [Rules[1]] : Rules,
             });
@@ -293,10 +293,9 @@ public class FederationPersistenceTests(CosmosFixture fixture)
                 Id = machineId,
                 ObjectId = machineId,
                 AccessKey = string.Empty,
-                Scope = model.Scope,
+                Scopes = model.Scopes ?? [],
                 CredentialKind = MachineCredentialKind.Federated,
                 FederationRules = model.FederationRules,
-                ManagementScopes = model.ManagementScopes,
             });
 
         return new CosmosAccessService(

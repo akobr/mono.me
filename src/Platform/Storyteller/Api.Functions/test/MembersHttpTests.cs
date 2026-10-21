@@ -208,6 +208,22 @@ public class MembersHttpTests
         access.Created.ShouldBeNull();
     }
 
+    // Members are managed by users (spec 7.4): a machine is refused in every build, also one whose credentials carry
+    // every scope and User.Impersonation, before the service is asked.
+    [Fact]
+    public async Task MemberRoutes_Machine_IsAccessDeniedInEveryBuild()
+    {
+        var access = new RecordingAccess();
+        var http = new MembersHttp(access, FunctionTestDoubles.ApiJsonOptions);
+        var body = FunctionTestDoubles.ToJsonBody(new MemberRoleUpdate { Role = AccountRole.Owner });
+
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetMembers(UserOnlyRoutes.Machine(), "acme"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.SetMemberRole(UserOnlyRoutes.Machine("PUT", body), "acme.billing", "user-2"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.RemoveMember(UserOnlyRoutes.Machine("DELETE"), "acme.billing", "user-2"));
+
+        access.Calls.ShouldBeEmpty();
+    }
+
     // A user's request; a body goes as JSON, with its content type unless contentType is false.
     private static TestHttpRequestData UserRequest(string? body = null, bool contentType = true)
     {

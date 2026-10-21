@@ -29,23 +29,33 @@ public class FederatedMachineAccessServiceTests
         Guid.TryParse(access.Id, out _).ShouldBeTrue();
         access.ObjectId.ShouldBe(access.Id);
         access.AccessKey.ShouldBeEmpty();
-        access.Scope.ShouldBe(MachineAccessScope.ConfigurationRead);
+        access.Scopes.ShouldBe([MachineScope.ConfigurationRead]);
         access.AnnotationKey.ShouldBe("unit.service");
         access.CredentialKind.ShouldBe(MachineCredentialKind.Federated);
         access.FederationRules.ShouldBe(rules);
         access.TokenScope.ShouldBeNull();
         access.Certificate.ShouldBeNull();
-        access.ManagementScopes.ShouldBeNull();
     }
 
-    // The access service stores what the service returns, so the management scopes have to come back.
+    // The access service stores what the service returns, so the requested scopes have to come back as they are,
+    // management scopes included.
     [Fact]
-    public async Task Create_ReturnsTheManagementScopes()
+    public async Task Create_ReturnsExactlyTheRequestedScopes()
     {
-        var access = await _service.CreateMachineAccessAsync(
-            Model([Rule()]) with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.TemplateWrite] });
+        MachineScope[] scopes = [MachineScope.AnnotationRead, MachineScope.SecretsRead, MachineScope.ConfigurationTransfer, MachineScope.TemplateWrite];
 
-        access.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer, MachineManagementScope.TemplateWrite]);
+        var access = await _service.CreateMachineAccessAsync(Model([Rule()]) with { Scopes = scopes });
+
+        access.Scopes.ShouldBe(scopes);
+    }
+
+    // The handler refuses a machine without scopes; the service still never returns a null list.
+    [Fact]
+    public async Task Create_WithoutScopes_ReturnsAnEmptyList()
+    {
+        var access = await _service.CreateMachineAccessAsync(Model([Rule()]) with { Scopes = null });
+
+        access.Scopes.ShouldBeEmpty();
     }
 
     [Fact]
@@ -115,7 +125,7 @@ public class FederatedMachineAccessServiceTests
         {
             Organization = "org1",
             Project = "proj1",
-            Scope = MachineAccessScope.ConfigurationRead,
+            Scopes = [MachineScope.ConfigurationRead],
             AnnotationKey = "unit.service",
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = rules,

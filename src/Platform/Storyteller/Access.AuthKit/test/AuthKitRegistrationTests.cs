@@ -21,16 +21,16 @@ public class AuthKitRegistrationTests
             ["Auth:Provider"] = "AuthKit",
             ["Auth:AuthKit:ClientId"] = "client_123",
             ["Auth:AuthKit:PermissionMap:storyteller:annotation-read"] = "Annotation.Read",
-            ["Auth:AuthKit:PermissionMap:storyteller:configuration:secrets"] = "Configuration.Secrets",
-            ["Auth:AuthKit:PermissionMap:annotation-write"] = "Annotation.ReadWrite",
+            ["Auth:AuthKit:PermissionMap:storyteller:secrets:read"] = "Secrets.Read",
+            ["Auth:AuthKit:PermissionMap:annotation-write"] = "Annotation.Write",
         }));
 
         options.AuthKit.PermissionMap.ShouldBe(
             new Dictionary<string, string>
             {
                 ["storyteller:annotation-read"] = "Annotation.Read",
-                ["storyteller:configuration:secrets"] = "Configuration.Secrets",
-                ["annotation-write"] = "Annotation.ReadWrite",
+                ["storyteller:secrets:read"] = "Secrets.Read",
+                ["annotation-write"] = "Annotation.Write",
             },
             ignoreOrder: true);
     }
@@ -47,7 +47,7 @@ public class AuthKitRegistrationTests
                   "DefaultUserScopes": [ "User.Impersonation" ],
                   "PermissionMap": {
                     "storyteller:annotation-read": "Annotation.Read",
-                    "storyteller:admin": "Default.ReadWrite Configuration.Secrets"
+                    "storyteller:impersonate": "User.Impersonation"
                   }
                 }
               }
@@ -60,7 +60,7 @@ public class AuthKitRegistrationTests
         options.AuthKit.DefaultUserScopes.ShouldBe(["User.Impersonation"]);
         options.AuthKit.PermissionMap.Count.ShouldBe(2);
         options.AuthKit.PermissionMap["storyteller:annotation-read"].ShouldBe("Annotation.Read");
-        options.AuthKit.PermissionMap["storyteller:admin"].ShouldBe("Default.ReadWrite Configuration.Secrets");
+        options.AuthKit.PermissionMap["storyteller:impersonate"].ShouldBe("User.Impersonation");
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public class AuthKitRegistrationTests
             ["Auth:AuthKit:AuthKitDomain"] = "https://example.authkit.app",
             ["Auth:AuthKit:MachineOrganizationId"] = "org_machines",
             ["Auth:AuthKit:DefaultUserScopes:0"] = "User.Impersonation",
-            ["Auth:AuthKit:DefaultUserScopes:1"] = "Default.Read",
+            ["Auth:AuthKit:DefaultUserScopes:1"] = "Annotation.Read",
         }).Build();
         var services = new ServiceCollection();
 
@@ -227,7 +227,7 @@ public class AuthKitRegistrationTests
         using var provider = services.BuildServiceProvider();
 
         provider.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value.AuthKit.DefaultUserScopes
-            .ShouldBe(["User.Impersonation", "Default.Read"]);
+            .ShouldBe(["User.Impersonation", "Annotation.Read"]);
     }
 
     [Fact]
@@ -261,6 +261,70 @@ public class AuthKitRegistrationTests
         exception.Message.ShouldContain("Auth:AuthKit:AuthKitDomain");
     }
 
+    [Fact]
+    public async Task AddAuthKitMachineAccess_OnePermissionPerScope_Starts()
+    {
+        // User.Impersonation serves users only, so two permissions may give it; values are trimmed.
+        using var host = BuildHost(
+            MachineSettings(new()
+            {
+                ["storyteller:annotation-read"] = "Annotation.Read",
+                ["storyteller:annotation-write"] = "Annotation.Write",
+                ["storyteller:configuration-read"] = "Configuration.Read",
+                ["storyteller:configuration-write"] = "Configuration.Write",
+                ["storyteller:secrets-read"] = "Secrets.Read",
+                ["storyteller:secrets-write"] = "Secrets.Write",
+                ["storyteller:configuration-transfer"] = "Configuration.Transfer",
+                ["storyteller:schema-write"] = "Schema.Write",
+                ["storyteller:template-write"] = "Template.Write",
+                ["storyteller:annotation-manage"] = "Annotation.Manage",
+                ["storyteller:keyvalue-manage"] = " KeyValue.Manage ",
+                ["storyteller:impersonate"] = "User.Impersonation",
+                ["storyteller:sign-in"] = "User.Impersonation",
+            }),
+            withMachineAccess: true);
+
+        await host.StartAsync();
+
+        host.Services.GetRequiredService<IOptions<UserAuthenticationOptions>>().Value.AuthKit.PermissionMap.Count.ShouldBe(13);
+
+        await host.StopAsync();
+    }
+
+    [Theory]
+    [InlineData("Annotation.Read Configuration.Read")]
+    [InlineData("Annotation.Read,Configuration.Read")]
+    [InlineData("Default.ReadWrite")]
+    [InlineData("Annotation.ReadWrite")]
+    [InlineData("Configuration.Secrets")]
+    [InlineData("annotation.read")]
+    [InlineData("AnnotationRead")]
+    public async Task AddAuthKitMachineAccess_PermissionNotExactlyOneScope_FailsWhenTheHostStarts(string value)
+    {
+        using var host = BuildHost(
+            MachineSettings(new() { ["storyteller:annotation-read"] = "Annotation.Read", ["storyteller:admin"] = value }),
+            withMachineAccess: true);
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
+        exception.Message.ShouldContain(
+            $"Auth:AuthKit:PermissionMap maps storyteller:admin to '{value}', which is not exactly one of Annotation.Read, Annotation.Write, "
+            + "Configuration.Read, Configuration.Write, Secrets.Read, Secrets.Write, Configuration.Transfer, Schema.Write, Template.Write, "
+            + "Annotation.Manage, KeyValue.Manage or User.Impersonation.");
+        exception.Message.ShouldNotContain("storyteller:annotation-read");
+    }
+
+    [Fact]
+    public async Task AddAuthKitMachineAccess_TwoPermissionsForOneMachineScope_FailsWhenTheHostStarts()
+    {
+        using var host = BuildHost(
+            MachineSettings(new() { ["storyteller:reader"] = "Annotation.Read", ["storyteller:annotation-read"] = "Annotation.Read" }),
+            withMachineAccess: true);
+
+        var exception = await Should.ThrowAsync<OptionsValidationException>(() => host.StartAsync());
+        exception.Message.ShouldContain(
+            "Auth:AuthKit:PermissionMap maps both storyteller:annotation-read and storyteller:reader to Annotation.Read; a machine scope needs exactly one WorkOS permission.");
+    }
+
     private static UserAuthenticationOptions AuthKitOptions(Action<AuthKitOptions> configure)
     {
         var authKit = new AuthKitOptions { ClientId = "client_123" };
@@ -290,5 +354,25 @@ public class AuthKitRegistrationTests
         }
 
         return builder.Build();
+    }
+
+    // Machine settings that pass the startup validation, plus the given PermissionMap.
+    private static Dictionary<string, string?> MachineSettings(Dictionary<string, string> permissionMap)
+    {
+        var values = new Dictionary<string, string?>
+        {
+            ["Auth:Provider"] = "AuthKit",
+            ["Auth:AuthKit:ClientId"] = "client_123",
+            ["Auth:AuthKit:ApiKey"] = "sk_test",
+            ["Auth:AuthKit:AuthKitDomain"] = "https://example.authkit.app",
+            ["Auth:AuthKit:MachineOrganizationId"] = "org_machines",
+        };
+
+        foreach (var (slug, scope) in permissionMap)
+        {
+            values[$"Auth:AuthKit:PermissionMap:{slug}"] = scope;
+        }
+
+        return values;
     }
 }

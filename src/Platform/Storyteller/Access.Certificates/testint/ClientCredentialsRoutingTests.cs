@@ -36,7 +36,7 @@ public class ClientCredentialsRoutingTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = Project,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
         });
 
         created.CredentialKind.ShouldBe(MachineCredentialKind.ClientCredentials);

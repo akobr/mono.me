@@ -22,8 +22,8 @@ public class AuthKitBearerTokenValidatorTests
     {
         using var fixture = new TokenFixture(configure: authKit =>
         {
-            authKit.DefaultUserScopes = ["User.Impersonation", "Default.Read"];
-            authKit.PermissionMap = new Dictionary<string, string> { ["storyteller:configuration-secrets"] = "Configuration.Secrets" };
+            authKit.DefaultUserScopes = ["User.Impersonation", "Annotation.Read"];
+            authKit.PermissionMap = new Dictionary<string, string> { ["storyteller:secrets-read"] = "Secrets.Read" };
         });
         var rawToken = fixture.CreateToken(new Dictionary<string, object>
         {
@@ -32,7 +32,7 @@ public class AuthKitBearerTokenValidatorTests
             ["org_id"] = "org_01",
             ["email"] = "ada@example.com",
             ["name"] = "Ada Lovelace",
-            ["permissions"] = new[] { "storyteller:configuration-secrets", "unmapped" },
+            ["permissions"] = new[] { "storyteller:secrets-read", "unmapped" },
         });
 
         var result = await fixture.Validator.ValidateAsync(rawToken);
@@ -44,7 +44,7 @@ public class AuthKitBearerTokenValidatorTests
         Value(result, "org_id").ShouldBe("org_01");
         Value(result, "name").ShouldBe("Ada Lovelace");
         Value(result, "preferred_username").ShouldBe("ada@example.com");
-        Value(result, "scp").ShouldBe("User.Impersonation Default.Read Configuration.Secrets");
+        Value(result, "scp").ShouldBe("User.Impersonation Annotation.Read Secrets.Read");
     }
 
     [Theory]

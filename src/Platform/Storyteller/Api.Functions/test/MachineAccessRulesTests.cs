@@ -31,34 +31,42 @@ public class MachineAccessRulesTests
         MachineIds.IsValid(id).ShouldBe(expected);
     }
 
+    // One role claim per scope, the scope string of MachineScopes; the checks of the API use these constants.
     [Theory]
-    [InlineData(MachineAccessScope.AnnotationRead, new[] { Scopes.Annotation.Read })]
-    [InlineData(MachineAccessScope.ConfigurationReadWrite, new[] { Scopes.Configuration.Read, Scopes.Configuration.Write })]
-    [InlineData(MachineAccessScope.DefaultReadWrite, new[] { Scopes.Default.Read, Scopes.Default.Write, Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Configuration.Read, Scopes.Configuration.Write })]
-    [InlineData(MachineAccessScope.SecretsRead, new[] { Scopes.Configuration.Read, Scopes.Configuration.Secrets })]
-    [InlineData(MachineAccessScope.SecretsReadWrite, new[] { Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Configuration.Secrets })]
-    public void MachineScopeRoles_MatchTheApiScopeNames(MachineAccessScope scope, string[] expected)
+    [InlineData(MachineScope.AnnotationRead, Scopes.Annotation.Read)]
+    [InlineData(MachineScope.AnnotationWrite, Scopes.Annotation.Write)]
+    [InlineData(MachineScope.ConfigurationRead, Scopes.Configuration.Read)]
+    [InlineData(MachineScope.ConfigurationWrite, Scopes.Configuration.Write)]
+    [InlineData(MachineScope.SecretsRead, Scopes.Secrets.Read)]
+    [InlineData(MachineScope.SecretsWrite, Scopes.Secrets.Write)]
+    [InlineData(MachineScope.ConfigurationTransfer, Scopes.Configuration.Transfer)]
+    [InlineData(MachineScope.SchemaWrite, Scopes.Schema.Write)]
+    [InlineData(MachineScope.TemplateWrite, Scopes.Template.Write)]
+    [InlineData(MachineScope.AnnotationManage, Scopes.Annotation.Manage)]
+    [InlineData(MachineScope.KeyValueManage, Scopes.KeyValue.Manage)]
+    public void MachineScopeRoles_MatchTheApiScopeNames(MachineScope scope, string expected)
     {
-        MachineScopeClaims.GetRoleClaimsForScope(scope).ShouldBe(expected);
+        MachineScopes.ToScopeString(scope).ShouldBe(expected);
+        MachineScopeClaims.GetRoleClaims([scope]).ShouldBe([expected]);
     }
 
-    // MachineAccessScopes keeps its own literals; the checks of the API use these constants.
+    // MachineScopes keeps its own literals; the checks of the API use these constants.
     [Fact]
     public void ManagementScopes_MatchTheApiScopeNames()
     {
-        Enum.GetValues<MachineManagementScope>().Select(scope => MachineAccessScopes.Get(scope)).ShouldBe(
+        MachineScopes.Management.Select(scope => MachineScopes.ToScopeString(scope)).ShouldBe(
             [Scopes.Configuration.Transfer, Scopes.Schema.Write, Scopes.Template.Write, Scopes.Annotation.Manage, Scopes.KeyValue.Manage]);
     }
 
     [Fact]
-    public void MachineScopeRoles_WithManagementScopes_AreTheUnion()
+    public void MachineScopeRoles_AreTheStoredScopesInTheirOrder()
     {
-        var roles = MachineScopeClaims.GetRoleClaimsForScope(
-            MachineAccessScope.ConfigurationReadWrite,
-            [MachineManagementScope.TemplateWrite, MachineManagementScope.SchemaWrite]);
+        var roles = MachineScopeClaims.GetRoleClaims(
+            [MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite, MachineScope.SchemaWrite, MachineScope.TemplateWrite]);
 
         roles.ShouldBe([Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Schema.Write, Scopes.Template.Write]);
-        MachineScopeClaims.GetRoleClaimsForScope(MachineAccessScope.ConfigurationReadWrite, null).ShouldBe([Scopes.Configuration.Read, Scopes.Configuration.Write]);
+        MachineScopeClaims.GetRoleClaims([]).ShouldBeEmpty();
+        MachineScopeClaims.GetRoleClaims(null).ShouldBeEmpty();
     }
 
     [Fact]
@@ -176,8 +184,8 @@ public class MachineAccessRulesTests
     public async Task Federated_MachineOfTheTokensProjectWithinItsScope_IsAllowedWithOneRead()
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead));
-        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read, Scopes.Annotation.Read, Scopes.Configuration.Read);
+        access.Add("org1", "proj1", FederatedMachine());
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read);
 
         await FederatedMachineAccess.EnsureAllowedAsync(request, access, "org1", "proj1", FederatedMachineId);
 
@@ -188,9 +196,9 @@ public class MachineAccessRulesTests
     public async Task Federated_ProjectNames_CompareIgnoringCase()
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead));
+        access.Add("org1", "proj1", FederatedMachine());
 
-        await FederatedMachineAccess.EnsureAllowedAsync(FederatedRequest("ORG1", "Proj1", Scopes.Default.Read), access, "org1", "proj1", FederatedMachineId);
+        await FederatedMachineAccess.EnsureAllowedAsync(FederatedRequest("ORG1", "Proj1", Scopes.Annotation.Read, Scopes.Configuration.Read), access, "org1", "proj1", FederatedMachineId);
     }
 
     [Theory]
@@ -199,8 +207,8 @@ public class MachineAccessRulesTests
     public async Task Federated_TokenOfAnotherProject_IsRejectedWithoutARead(string organization, string project)
     {
         var access = new FederationAccessService();
-        access.Add(organization, project, FederatedMachine(MachineAccessScope.DefaultRead));
-        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read);
+        access.Add(organization, project, FederatedMachine());
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read);
 
         var exception = await Should.ThrowAsync<SecurityTokenException>(
             () => FederatedMachineAccess.EnsureAllowedAsync(request, access, organization, project, FederatedMachineId));
@@ -213,8 +221,8 @@ public class MachineAccessRulesTests
     public async Task Federated_TokenWithoutAProject_IsRejected()
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead));
-        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read);
+        access.Add("org1", "proj1", FederatedMachine());
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read);
         request.FunctionContext.Items.Remove(FunctionContextItemKeys.MachineProject);
 
         await Should.ThrowAsync<SecurityTokenException>(() => FederatedMachineAccess.EnsureAllowedAsync(request, access, "org1", "proj1", FederatedMachineId));
@@ -226,7 +234,7 @@ public class MachineAccessRulesTests
         var access = new FederationAccessService();
 
         var exception = await Should.ThrowAsync<SecurityTokenException>(
-            () => FederatedMachineAccess.EnsureAllowedAsync(FederatedRequest("org1", "proj1", Scopes.Default.Read), access, "org1", "proj1", FederatedMachineId));
+            () => FederatedMachineAccess.EnsureAllowedAsync(FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read), access, "org1", "proj1", FederatedMachineId));
 
         exception.Message.ShouldBe($"The machine {FederatedMachineId} doesn't exist in the project org1.proj1.");
     }
@@ -240,72 +248,110 @@ public class MachineAccessRulesTests
     public async Task Federated_StoredMachineOfAnotherKind_IsRejected(MachineCredentialKind kind)
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead) with { CredentialKind = kind });
+        access.Add("org1", "proj1", FederatedMachine() with { CredentialKind = kind });
 
         var exception = await Should.ThrowAsync<SecurityTokenException>(
-            () => FederatedMachineAccess.EnsureAllowedAsync(FederatedRequest("org1", "proj1", Scopes.Default.Read), access, "org1", "proj1", FederatedMachineId));
+            () => FederatedMachineAccess.EnsureAllowedAsync(FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read), access, "org1", "proj1", FederatedMachineId));
 
         exception.Message.ShouldContain("not Federated");
     }
 
-    // Nor exceed the scope stored with the machine, in any form CheckScope reads.
+    // The excess check is gone (424-79): a token that carries more than the stored machine, in any form GetScopes reads,
+    // still passes an operation that does not need the extra scope. The extra scope grants nothing (the next test).
     [Theory]
-    [InlineData("roles", Scopes.Configuration.Secrets)]
-    [InlineData("roles", Scopes.Default.Write)]
-    [InlineData("roles", "App.Default.ReadWrite")]
+    [InlineData("roles", Scopes.Secrets.Read)]
+    [InlineData("roles", Scopes.Annotation.Write)]
+    [InlineData("roles", "App.Annotation.Write")]
     [InlineData("roles", Scopes.User.Impersonation)]
-    [InlineData("scp", "Default.Read Configuration.ReadWrite")]
-    public async Task Federated_ScopeBeyondTheStoredMachine_IsRejected(string claimType, string value)
+    [InlineData("roles", Scopes.Configuration.Transfer)]
+    [InlineData("roles", "Default.ReadWrite")]
+    [InlineData("scp", "Annotation.Read Configuration.Write")]
+    [InlineData(ClaimTypes.Role, Scopes.Schema.Write)]
+    public async Task Federated_ScopeBeyondTheStoredMachine_StillPassesAnOperationThatDoesNotNeedIt(string claimType, string value)
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead));
-        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read);
-        ((List<Claim>)request.FunctionContext.Items[FunctionContextItemKeys.CachedClaims]).Add(new Claim(claimType, value));
+        access.Add("org1", "proj1", FederatedMachine());
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read);
+        Carry(request, claimType, value);
 
-        var exception = await Should.ThrowAsync<SecurityTokenException>(
-            () => FederatedMachineAccess.EnsureAllowedAsync(request, access, "org1", "proj1", FederatedMachineId));
+        var machine = await FederatedMachineAccess.EnsureAllowedAsync(request, access, "org1", "proj1", FederatedMachineId);
+        await request.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Reader, MachineScope.ConfigurationRead);
+        await request.CheckAccessToProjectMetadataAsync(access, "org1", "proj1", AccountRole.Reader, MachineScope.AnnotationRead, MachineScope.ConfigurationRead);
 
-        exception.Message.ShouldContain("scopes the machine doesn't have");
+        machine.Scopes.ShouldBe([MachineScope.AnnotationRead, MachineScope.ConfigurationRead]);
     }
 
-    // The exchange puts the stored management scopes into the token, so the check of each call accepts them.
+    // A carried scope that is not stored is 403 at the operation that needs it, and passes once the machine has it.
+    [Theory]
+    [InlineData("roles", Scopes.Annotation.Write, MachineScope.AnnotationWrite)]
+    [InlineData("roles", "App.Annotation.Write", MachineScope.AnnotationWrite)]
+    [InlineData("scp", "Annotation.Read Configuration.Write", MachineScope.ConfigurationWrite)]
+    [InlineData(ClaimTypes.Role, Scopes.Secrets.Read, MachineScope.SecretsRead)]
+    [InlineData("roles", Scopes.Configuration.Transfer, MachineScope.ConfigurationTransfer)]
+    [InlineData("roles", Scopes.Schema.Write, MachineScope.SchemaWrite)]
+    public async Task Federated_CarriedScopeTheStoredMachineDoesNotHave_IsAccessDeniedAtItsOperation(string claimType, string value, MachineScope scope)
+    {
+        var access = new FederationAccessService();
+        access.Add("org1", "proj1", FederatedMachine());
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read);
+        Carry(request, claimType, value);
+        var check = () => request.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Reader, MachineScope.ConfigurationRead, scope);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(check);
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe($"This operation needs the scope {MachineScopes.ToScopeString(scope)}, which the machine was not created with.");
+
+        access.Add("org1", "proj1", FederatedMachine(scope));
+        await check();
+    }
+
+    // The exchange puts the stored scopes into the token, so each call finds them stored and carried.
     [Fact]
     public async Task Federated_ManagementScopeOfTheStoredMachine_IsAllowed()
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead, MachineManagementScope.ConfigurationTransfer));
-        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read, Scopes.Configuration.Transfer);
+        access.Add("org1", "proj1", FederatedMachine(MachineScope.ConfigurationTransfer));
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Configuration.Transfer);
 
         var machine = await FederatedMachineAccess.EnsureAllowedAsync(request, access, "org1", "proj1", FederatedMachineId);
+        await request.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Reader, MachineScope.ConfigurationRead, MachineScope.ConfigurationTransfer);
 
-        machine.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer]);
+        machine.Scopes.ShouldBe([MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.ConfigurationTransfer]);
     }
 
-    [Theory]
-    [InlineData(Scopes.Schema.Write, new[] { MachineManagementScope.ConfigurationTransfer })]
-    [InlineData(Scopes.Configuration.Transfer, new MachineManagementScope[0])]
-    public async Task Federated_ManagementScopeTheStoredMachineDoesNotHave_IsRejected(string scope, MachineManagementScope[] stored)
+    // User.Impersonation in a Storyteller token does not make the machine a user: the routes for users refuse it in
+    // every build, before any read.
+    [Fact]
+    public async Task Federated_UserImpersonation_DoesNotOpenARouteForUsers()
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead, stored));
-        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read, scope);
+        access.Add("org1", "proj1", FederatedMachine());
+        var request = FederatedRequest("org1", "proj1", Scopes.User.Impersonation, Scopes.Annotation.Read, Scopes.Configuration.Read);
 
-        var exception = await Should.ThrowAsync<SecurityTokenException>(
-            () => FederatedMachineAccess.EnsureAllowedAsync(request, access, "org1", "proj1", FederatedMachineId));
+        var exceptions = new List<AccessDeniedException>
+        {
+            Should.Throw<AccessDeniedException>(() => request.EnsureUser()),
+            await Should.ThrowAsync<AccessDeniedException>(() => request.CheckUserAccessToAsync(access, "org1.proj1", AccountRole.Reader)),
+            await Should.ThrowAsync<AccessDeniedException>(() => request.CheckUserAccessToOrganizationAsync(access, "org1", AccountRole.Reader)),
+            await Should.ThrowAsync<AccessDeniedException>(() => request.CheckUserAccessToProjectAsync(access, "org1", "proj1", AccountRole.Reader)),
+        };
 
-        exception.Message.ShouldContain($"scopes the machine doesn't have ({scope})");
+        exceptions.ShouldAllBe(exception => exception.ErrorCode == ErrorCodes.AccessDenied
+            && exception.Message == "Only users may call this operation; machines cannot.");
+        access.Calls.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task CheckAccessTo_FederatedIdentity_ReadsTheMachineInsteadOfVerifyingIt()
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead));
-        var allowed = FederatedRequest("org1", "proj1", Scopes.Default.Read);
-        var otherProject = FederatedRequest("org1", "proj2", Scopes.Default.Read);
+        access.Add("org1", "proj1", FederatedMachine());
+        var allowed = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read);
+        var otherProject = FederatedRequest("org1", "proj2", Scopes.Annotation.Read, Scopes.Configuration.Read);
 
-        await allowed.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Contributor);
-        var check = () => otherProject.CheckAccessToProjectAsync(access, "org1", "proj1");
+        await allowed.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Contributor, MachineScope.ConfigurationRead);
+        var check = () => otherProject.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Reader, MachineScope.ConfigurationRead);
 
         // The checks of machines run in every build, also in Debug (DEV_AUTH).
         await Should.ThrowAsync<SecurityTokenException>(check);
@@ -316,28 +362,44 @@ public class MachineAccessRulesTests
     public async Task CheckAccessTo_FederatedIdentityOfAProjectWithoutFederated_IsRejected()
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead));
-        var request = FederatedRequest("org1", "proj1", new FixedPolicyStore(MachineCredentialKind.ClientCredentials), Scopes.Default.Read);
+        access.Add("org1", "proj1", FederatedMachine());
+        var request = FederatedRequest("org1", "proj1", new FixedPolicyStore(MachineCredentialKind.ClientCredentials), Scopes.Annotation.Read, Scopes.Configuration.Read);
 
-        var check = () => request.CheckAccessToProjectAsync(access, "org1", "proj1");
+        var check = () => request.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Reader, MachineScope.ConfigurationRead);
 
         var exception = await Should.ThrowAsync<SecurityTokenException>(check);
         exception.Message.ShouldContain("workload identity federation");
     }
 
-    // A federated machine reaches its document on its own branch (424-57); the management scope of the operation is still
-    // checked on that document and on the token of the exchange.
+    // A federated machine reaches its document on its own branch (424-57); the scopes of the operation are still checked
+    // on that document and on the token of the exchange.
     [Theory]
     [MemberData(nameof(MachineAccessCheckTests.EveryManagementReach), MemberType = typeof(MachineAccessCheckTests))]
     public async Task CheckAccessTo_FederatedMachineWithTheManagementScopeStoredAndCarried_Passes(MachineAccessCheckTests.Reach reach)
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead, MachineManagementScope.ConfigurationTransfer));
-        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read, Scopes.Configuration.Transfer);
+        access.Add("org1", "proj1", FederatedMachine(MachineScope.ConfigurationTransfer));
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read, Scopes.Configuration.Transfer);
 
-        await CheckManagement(reach, request, access, MachineManagementScope.ConfigurationTransfer);
+        await CheckManagement(reach, request, access, MachineScope.ConfigurationTransfer);
 
         access.Calls.ShouldBe([$"get:org1/proj1/{FederatedMachineId}"]);
+    }
+
+    // A token that asked for a subset of the machine's scopes stays within it, for the runtime scopes too.
+    [Fact]
+    public async Task CheckAccessTo_FederatedTokenOfASubset_IsAccessDeniedOutsideIt()
+    {
+        var access = new FederationAccessService();
+        access.Add("org1", "proj1", FederatedMachine());
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read);
+
+        await request.CheckAccessToAnnotationAsync(access, "org1", "proj1", "exe.S.R.C", AccountRole.Reader, MachineScope.AnnotationRead);
+        var exception = await Should.ThrowAsync<AccessDeniedException>(
+            () => request.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Reader, MachineScope.ConfigurationRead));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the scope Configuration.Read, which the credentials of the machine do not carry.");
     }
 
     // A token that asked for a subset of the machine's scopes leaves the management scope out.
@@ -346,14 +408,14 @@ public class MachineAccessRulesTests
     public async Task CheckAccessTo_FederatedMachineWithoutTheCarriedManagementScope_IsAccessDenied(MachineAccessCheckTests.Reach reach)
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead, MachineManagementScope.ConfigurationTransfer));
-        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read);
+        access.Add("org1", "proj1", FederatedMachine(MachineScope.ConfigurationTransfer));
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read);
 
         var exception = await Should.ThrowAsync<AccessDeniedException>(
-            () => CheckManagement(reach, request, access, MachineManagementScope.ConfigurationTransfer));
+            () => CheckManagement(reach, request, access, MachineScope.ConfigurationTransfer));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
-        exception.Message.ShouldBe("This operation needs the management scope Configuration.Transfer, which the credentials of the machine do not carry.");
+        exception.Message.ShouldBe("This operation needs the scope Configuration.Transfer, which the credentials of the machine do not carry.");
     }
 
     [Theory]
@@ -361,30 +423,37 @@ public class MachineAccessRulesTests
     public async Task CheckAccessTo_FederatedMachineWithoutTheStoredManagementScope_IsAccessDenied(MachineAccessCheckTests.Reach reach)
     {
         var access = new FederationAccessService();
-        access.Add("org1", "proj1", FederatedMachine(MachineAccessScope.DefaultRead));
-        var request = FederatedRequest("org1", "proj1", Scopes.Default.Read);
+        access.Add("org1", "proj1", FederatedMachine());
+        var request = FederatedRequest("org1", "proj1", Scopes.Annotation.Read, Scopes.Configuration.Read);
 
         var exception = await Should.ThrowAsync<AccessDeniedException>(
-            () => CheckManagement(reach, request, access, MachineManagementScope.ConfigurationTransfer));
+            () => CheckManagement(reach, request, access, MachineScope.ConfigurationTransfer));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
-        exception.Message.ShouldBe("This operation needs the management scope Configuration.Transfer, which the machine was not created with.");
+        exception.Message.ShouldBe("This operation needs the scope Configuration.Transfer, which the machine was not created with.");
     }
 
-    // The entry points that take a management scope, in org1.proj1: the project, one annotation and several.
+    // The entry points of a management operation, in org1.proj1: the project, one annotation and several, with the runtime
+    // scope Configuration.Read first and then the management scope.
     private static Task CheckManagement(
         MachineAccessCheckTests.Reach reach,
         TestHttpRequestData request,
         IAccessService access,
-        MachineManagementScope managementScope)
+        MachineScope managementScope)
     {
         return reach switch
         {
-            MachineAccessCheckTests.Reach.Project => request.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Contributor, managementScope),
-            MachineAccessCheckTests.Reach.Annotation => request.CheckAccessToAnnotationAsync(access, "org1", "proj1", "exe.S.R.C", AccountRole.Contributor, managementScope),
-            MachineAccessCheckTests.Reach.Annotations => request.CheckAccessToAnnotationsAsync(access, "org1", "proj1", ["exe.S.R.C", "uxe.S.R.C.U"], AccountRole.Contributor, managementScope),
+            MachineAccessCheckTests.Reach.Project => request.CheckAccessToProjectAsync(access, "org1", "proj1", AccountRole.Contributor, MachineScope.ConfigurationRead, managementScope),
+            MachineAccessCheckTests.Reach.Annotation => request.CheckAccessToAnnotationAsync(access, "org1", "proj1", "exe.S.R.C", AccountRole.Contributor, MachineScope.ConfigurationRead, managementScope),
+            MachineAccessCheckTests.Reach.Annotations => request.CheckAccessToAnnotationsAsync(access, "org1", "proj1", ["exe.S.R.C", "uxe.S.R.C.U"], AccountRole.Contributor, MachineScope.ConfigurationRead, managementScope),
             _ => throw new ArgumentOutOfRangeException(nameof(reach), reach, null),
         };
+    }
+
+    // One more claim in the token, next to its roles.
+    private static void Carry(TestHttpRequestData request, string claimType, string value)
+    {
+        ((List<Claim>)request.FunctionContext.Items[FunctionContextItemKeys.CachedClaims]).Add(new Claim(claimType, value));
     }
 
     private static TestHttpRequestData FederatedRequest(string organization, string project, params string[] roles)
@@ -410,16 +479,16 @@ public class MachineAccessRulesTests
         return request;
     }
 
-    private static MachineAccess FederatedMachine(MachineAccessScope scope, params MachineManagementScope[] managementScopes)
+    // A reader of the project (Annotation.Read and Configuration.Read), with the given scopes on top.
+    private static MachineAccess FederatedMachine(params MachineScope[] moreScopes)
     {
         return new MachineAccess
         {
             Id = FederatedMachineId,
             ObjectId = FederatedMachineId,
             AccessKey = string.Empty,
-            Scope = scope,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead, .. moreScopes],
             CredentialKind = MachineCredentialKind.Federated,
-            ManagementScopes = managementScopes.Length > 0 ? managementScopes : null,
         };
     }
 

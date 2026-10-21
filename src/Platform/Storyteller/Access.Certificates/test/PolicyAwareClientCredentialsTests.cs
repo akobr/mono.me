@@ -76,7 +76,7 @@ public class PolicyAwareClientCredentialsTests
 
     private static MachineAccessCreate Model()
     {
-        return new MachineAccessCreate { Organization = "org1", Project = "proj1", Scope = MachineAccessScope.DefaultRead };
+        return new MachineAccessCreate { Organization = "org1", Project = "proj1", Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead] };
     }
 
     private static MachineAccess Access(MachineCredentialKind kind)
@@ -86,7 +86,7 @@ public class PolicyAwareClientCredentialsTests
             Id = "client_m2m01",
             ObjectId = "conn_app_01",
             AccessKey = "secret",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = kind,
         };
     }

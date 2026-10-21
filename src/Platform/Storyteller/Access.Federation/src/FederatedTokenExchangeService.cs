@@ -129,8 +129,9 @@ public class FederatedTokenExchangeService : IFederatedTokenExchange
             return FederatedTokenExchangeResult.NotAccepted();
         }
 
-        // The management scopes count as the machine's: a request may name them, and without scope the token gets them too.
-        var machineScopes = MachineAccessScopes.Get(machine.Scope, machine.ManagementScopes);
+        // The machine is its stored scopes, management ones included: a request may name any of them, and without scope
+        // the token gets all of them, in enum order. Old strings such as Default.Read are no scopes of any machine.
+        var machineScopes = MachineScopes.ToScopeStrings(MachineScopes.Normalize(machine.Scopes));
         var requestedScopes = request.Scopes is { Count: > 0 } scopes ? scopes.Distinct(StringComparer.Ordinal).ToList() : machineScopes;
 
         // Least privilege for a single job: the token gets the requested subset only.

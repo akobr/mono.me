@@ -147,7 +147,7 @@ public class PolicyAwareFederatedTests
         {
             Organization = "org1",
             Project = "proj1",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = kind,
             FederationRules = rules,
         };
@@ -160,7 +160,7 @@ public class PolicyAwareFederatedTests
             Id = "3b0f9d3e-8f43-4a8e-9a0c-2f7d3c1e5b6a",
             ObjectId = "3b0f9d3e-8f43-4a8e-9a0c-2f7d3c1e5b6a",
             AccessKey = string.Empty,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = kind,
             FederationRules = [Rule()],
         };

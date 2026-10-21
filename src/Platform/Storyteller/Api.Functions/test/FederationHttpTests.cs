@@ -59,7 +59,7 @@ public class FederationHttpTests
         body.GetProperty("issued_token_type").GetString().ShouldBe(OAuthTokenExchange.TokenTypes.AccessToken);
         body.GetProperty("token_type").GetString().ShouldBe("Bearer");
         body.GetProperty("expires_in").GetInt32().ShouldBe(900);
-        body.GetProperty("scope").GetString().ShouldBe("Default.Read Annotation.Read");
+        body.GetProperty("scope").GetString().ShouldBe("Annotation.Read Configuration.Read");
         body.EnumerateObject().Select(property => property.Name).ShouldBe(["access_token", "issued_token_type", "token_type", "expires_in", "scope"], ignoreOrder: true);
         Header(response, "Content-Type").ShouldBe("application/json; charset=utf-8");
         Header(response, "Cache-Control").ShouldBe("no-store");
@@ -79,13 +79,13 @@ public class FederationHttpTests
     [Fact]
     public async Task Token_ScopeAndRequestedTokenType_AreHandedOver()
     {
-        var body = Form(TokenParameters(("requested_token_type", OAuthTokenExchange.TokenTypes.Jwt))) + "&scope=Default.Read+Annotation.Read";
+        var body = Form(TokenParameters(("requested_token_type", OAuthTokenExchange.TokenTypes.Jwt))) + "&scope=Annotation.Read+Configuration.Read";
 
         var response = await Http.PostMachineToken(TokenRequest(body), Org, Project);
 
         (await ReadAsync(response)).Status.ShouldBe(HttpStatusCode.OK);
         var request = _exchange.Requests.ShouldHaveSingleItem();
-        request.Scopes.ShouldBe(["Default.Read", "Annotation.Read"]);
+        request.Scopes.ShouldBe(["Annotation.Read", "Configuration.Read"]);
         request.RequestedTokenType.ShouldBe(OAuthTokenExchange.TokenTypes.Jwt);
     }
 
@@ -220,6 +220,37 @@ public class FederationHttpTests
         await ShouldBeOAuthErrorAsync(response, "unsupported_grant_type", "Only the token exchange grant type is supported.");
     }
 
+    // The scope parameter carries scope strings (spec 1.2). The endpoint hands them over as they are; the exchange
+    // decides which of them the machine was created with.
+    [Theory]
+    [InlineData("Annotation.Write")]
+    [InlineData("Secrets.Read Secrets.Write")]
+    [InlineData("Configuration.Transfer Schema.Write Template.Write Annotation.Manage KeyValue.Manage")]
+    public async Task Token_ScopeStrings_AreHandedOverAsTheyAre(string scope)
+    {
+        var response = await Http.PostMachineToken(TokenRequest(Form(TokenParameters(("scope", scope)))), Org, Project);
+
+        (await ReadAsync(response)).Status.ShouldBe(HttpStatusCode.OK);
+        _exchange.Requests.ShouldHaveSingleItem().Scopes.ShouldBe(scope.Split(' '));
+    }
+
+    // The token answers with the scope strings the exchange granted: all 11 for a machine created with every scope.
+    [Fact]
+    public async Task Token_Response_NamesTheGrantedScopeStrings()
+    {
+        _exchange.Result = FederatedTokenExchangeResult.Success(
+            "storyteller-token",
+            OAuthTokenExchange.TokenTypes.AccessToken,
+            900,
+            string.Join(' ', MachineScopes.ToScopeStrings(MachineScopes.All)));
+
+        var response = await Http.PostMachineToken(TokenRequest(Form(TokenParameters())), Org, Project);
+
+        (await ReadAsync(response)).Body.GetProperty("scope").GetString().ShouldBe(
+            "Annotation.Read Annotation.Write Configuration.Read Configuration.Write Secrets.Read Secrets.Write "
+            + "Configuration.Transfer Schema.Write Template.Write Annotation.Manage KeyValue.Manage");
+    }
+
     [Theory]
     [InlineData(OAuthTokenExchange.TokenTypes.Jwt)]
     [InlineData(OAuthTokenExchange.TokenTypes.IdToken)]
@@ -265,11 +296,11 @@ public class FederationHttpTests
     }
 
     [Theory]
-    [InlineData("Default.Read  Annotation.Read")]
-    [InlineData(" Default.Read")]
-    [InlineData("Default.Read\"")]
-    [InlineData("Default\\Read")]
-    [InlineData("Default.Read\tAnnotation.Read")]
+    [InlineData("Annotation.Read  Configuration.Read")]
+    [InlineData(" Annotation.Read")]
+    [InlineData("Annotation.Read\"")]
+    [InlineData("Annotation\\Read")]
+    [InlineData("Annotation.Read\tConfiguration.Read")]
     public async Task Token_MalformedScope_IsInvalidScope(string scope)
     {
         var response = await Http.PostMachineToken(TokenRequest(Form(TokenParameters(("scope", scope)))), Org, Project);
@@ -306,7 +337,7 @@ public class FederationHttpTests
     {
         _exchange.Result = FederatedTokenExchangeResult.Failure(OAuthTokenExchange.Errors.InvalidScope, "The requested scope exceeds the scopes of the machine.");
 
-        var response = await Http.PostMachineToken(TokenRequest(Form(TokenParameters(("scope", "Configuration.Secrets")))), Org, Project);
+        var response = await Http.PostMachineToken(TokenRequest(Form(TokenParameters(("scope", "Secrets.Read")))), Org, Project);
 
         await ShouldBeOAuthErrorAsync(response, "invalid_scope", "The requested scope exceeds the scopes of the machine.");
     }
@@ -550,18 +581,39 @@ public class FederationHttpTests
         await ShouldBeAllowedAsync(() => Http.DeleteFederatedIssuer(UserRequest(), Org, Project, "github"), canWrite);
     }
 
+    // The issuers and the rules are managed by users (spec 7.4): a machine is refused in every build, also a federated
+    // one whose token carries every scope and User.Impersonation, before a role, a machine or an issuer is read.
     [Fact]
-    public async Task IssuerRoutes_MachineCredentials_AreUnauthorized()
+    public async Task IssuerAndRulesRoutes_Machine_IsAccessDeniedInEveryBuild()
+    {
+        await _issuers.SetAsync(Org, Project, GitHub());
+        _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = MachineScopes.All });
+
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => Http.GetFederatedIssuers(MachineRequest(), Org, Project));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => Http.GetFederatedIssuer(MachineRequest(), Org, Project, "github"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => Http.PutFederatedIssuer(MachineRequest(GitHub() with { Description = "x" }), Org, Project, "github"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => Http.DeleteFederatedIssuer(MachineRequest(), Org, Project, "github"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => Http.PutMachineFederationRules(MachineRequest(new[] { Rule("repo:acme/app:environment:prod") }), Org, Project, MachineId));
+
+        _access.Calls.ShouldBeEmpty();
+        (await _issuers.GetAsync(Org, Project, "github")).ShouldBe(GitHub());
+        _access.Find(Org, Project, MachineId)!.FederationRules.ShouldBe([Rule()]);
+    }
+
+    // Data scopes in a user token do not stand in for User.Impersonation: 401 in Release builds. Debug builds (DEV_AUTH)
+    // skip the check.
+    [Fact]
+    public async Task IssuerRoutes_TokenThatDoesNotActForAUser_IsUnauthorized()
     {
         if (DevAuth)
         {
-            // Debug builds skip the scope check (DEV_AUTH).
             return;
         }
 
-        await Should.ThrowAsync<SecurityTokenException>(() => Http.GetFederatedIssuers(MachineRequest(), Org, Project));
-        await Should.ThrowAsync<SecurityTokenException>(() => Http.PutFederatedIssuer(MachineRequest(), Org, Project, "github"));
-        await Should.ThrowAsync<SecurityTokenException>(() => Http.PutMachineFederationRules(MachineRequest(), Org, Project, MachineId));
+        var exception = await Should.ThrowAsync<SecurityTokenException>(() => Http.GetFederatedIssuers(UserOnlyRoutes.NotActingForAUser(), Org, Project));
+
+        exception.Message.ShouldBe(UserOnlyRoutes.NotActingForAUserMessage);
+        _access.Calls.ShouldBeEmpty();
     }
 
     // Federation rules
@@ -676,33 +728,42 @@ public class FederationHttpTests
         result.ShouldBeOfType<BadRequestObjectResult>().Value.ShouldBeOfType<ErrorResponse>().Message.ShouldBe(Definitions.Errors.InvalidMachineId);
     }
 
+    // The rules decide which workload gets the tokens of the machine, and with them its scopes, so replacing them needs
+    // the role the stored scopes need (spec 4): Contributor for runtime scopes, ContributorWithSecrets for a secrets
+    // scope, Administrator for a management scope. Below Contributor the route itself refuses. The scopes stay as they
+    // are. Debug builds (DEV_AUTH) skip the role checks of users, so there every replacement passes.
     [Theory]
-    [InlineData(AccountRole.Reader, false)]
-    [InlineData(AccountRole.Contributor, true)]
-    public async Task PutRules_IsForContributors(AccountRole role, bool allowed)
+    [InlineData(new[] { MachineScope.AnnotationRead, MachineScope.ConfigurationRead }, AccountRole.Reader, AccountRole.Contributor)]
+    [InlineData(new[] { MachineScope.AnnotationRead, MachineScope.ConfigurationRead }, AccountRole.Contributor, AccountRole.Contributor)]
+    [InlineData(new[] { MachineScope.ConfigurationRead, MachineScope.SecretsRead }, AccountRole.Contributor, AccountRole.ContributorWithSecrets)]
+    [InlineData(new[] { MachineScope.ConfigurationRead, MachineScope.SecretsRead }, AccountRole.ContributorWithSecrets, AccountRole.ContributorWithSecrets)]
+    [InlineData(new[] { MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.ConfigurationTransfer }, AccountRole.ContributorWithSecrets, AccountRole.Administrator)]
+    [InlineData(new[] { MachineScope.AnnotationRead, MachineScope.ConfigurationRead, MachineScope.ConfigurationTransfer }, AccountRole.Administrator, AccountRole.Administrator)]
+    [InlineData(new[] { MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.SecretsRead, MachineScope.SecretsWrite, MachineScope.AnnotationManage }, AccountRole.ContributorWithSecrets, AccountRole.Administrator)]
+    [InlineData(new[] { MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.SecretsRead, MachineScope.SecretsWrite, MachineScope.AnnotationManage }, AccountRole.Owner, AccountRole.Administrator)]
+    public async Task PutRules_TheStoredScopes_NeedTheRoleOfTheirHighestGroup(MachineScope[] stored, AccountRole role, AccountRole needed)
     {
         await _issuers.SetAsync(Org, Project, GitHub());
-        _access.Add(Org, Project, FederatedMachine(Rule()));
+        _access.Add(Org, Project, FederatedMachine(Rule()) with { Scopes = stored });
         _access.Role = role;
+        var replace = () => Http.PutMachineFederationRules(RulesRequest([Rule("repo:acme/app:environment:prod")]), Org, Project, MachineId);
 
-        await ShouldBeAllowedAsync(() => Http.PutMachineFederationRules(RulesRequest([Rule()]), Org, Project, MachineId), allowed);
-    }
+        if (role >= needed || DevAuth)
+        {
+            (await replace()).ShouldBeOfType<OkObjectResult>();
+            _access.Find(Org, Project, MachineId)!.FederationRules!.Single().Subject.ShouldBe("repo:acme/app:environment:prod");
+        }
+        else
+        {
+            var exception = await Should.ThrowAsync<AccessDeniedException>(replace);
 
-    // The rules decide which workload gets the tokens of the machine, so its management scopes need an Administrator.
-    [Theory]
-    [InlineData(AccountRole.Contributor, false)]
-    [InlineData(AccountRole.Administrator, true)]
-    public async Task PutRules_OfAMachineWithManagementScopes_IsForAdministrators(AccountRole role, bool allowed)
-    {
-        await _issuers.SetAsync(Org, Project, GitHub());
-        _access.Add(Org, Project, FederatedMachine(Rule()) with { ManagementScopes = [MachineManagementScope.ConfigurationTransfer] });
-        _access.Role = role;
+            exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+            exception.Message.ShouldBe($"No {(role < AccountRole.Contributor ? AccountRole.Contributor : needed):G} access to 'org1.proj1'.");
+            _access.Find(Org, Project, MachineId)!.FederationRules!.Single().Subject.ShouldBe(Rule().Subject);
+            _access.Calls.ShouldNotContain(call => call.StartsWith("rules:", StringComparison.Ordinal));
+        }
 
-        await ShouldBeAllowedAsync(() => Http.PutMachineFederationRules(RulesRequest([Rule("repo:acme/app:environment:prod")]), Org, Project, MachineId), allowed);
-
-        _access.Find(Org, Project, MachineId)!.FederationRules!.Single().Subject
-            .ShouldBe(allowed || DevAuth ? "repo:acme/app:environment:prod" : Rule().Subject);
-        _access.Find(Org, Project, MachineId)!.ManagementScopes.ShouldBe([MachineManagementScope.ConfigurationTransfer]);
+        _access.Find(Org, Project, MachineId)!.Scopes.ShouldBe(stored);
     }
 
     // Token endpoint URL
@@ -733,7 +794,7 @@ public class FederationHttpTests
         _access.Created = FederatedMachine(Rule());
         var http = new AccessHttp(_access, FunctionTestDoubles.ApiJsonOptions, NullLogger<AccessHttp>.Instance, federationOptions: Options.Create(_options));
         const string expected = "https://api.example/api/v1/org1/proj1/access/token";
-        var create = FunctionTestDoubles.ToJsonBody(new MachineAccessCreate { Organization = Org, Project = Project, Scope = MachineAccessScope.DefaultRead });
+        var create = FunctionTestDoubles.ToJsonBody(new MachineAccessCreate { Organization = Org, Project = Project, Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead] });
 
         var created = await http.PostMachines(UserRequest(headers: FunctionTestDoubles.JsonContentType(), method: "POST", body: create), Org, Project);
         var federated = await http.GetMachine(UserRequest(), Org, Project, MachineId);
@@ -817,14 +878,17 @@ public class FederationHttpTests
         JsonSerializer.Serialize(issuer).ShouldBe(JsonSerializer.Serialize(expected));
     }
 
-    private static TestHttpRequestData MachineRequest()
+    // A federated machine whose Storyteller token carries every scope and User.Impersonation, one roles claim each, as
+    // the token validator emits them; a body goes as a PUT of the API's JSON.
+    private static TestHttpRequestData MachineRequest(object? body = null)
     {
-        var request = CreateRequest("https://api.example/api/v1/org1/proj1/access/issuers", null, "GET", null);
-        request.FunctionContext.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
-        {
-            new("sub", MachineId),
-            new("roles", Scopes.Default.Read),
-        };
+        var json = body is null ? null : Encoding.UTF8.GetBytes(FunctionTestDoubles.ToJsonBody(body));
+        var request = json is null
+            ? CreateRequest("https://api.example/api/v1/org1/proj1/access/issuers", null, "GET", null)
+            : CreateRequest("https://api.example/api/v1/org1/proj1/access/issuers", FunctionTestDoubles.JsonContentType(), "PUT", json);
+        var claims = new List<Claim> { new("sub", MachineId), new("roles", Scopes.User.Impersonation) };
+        claims.AddRange(MachineScopes.ToScopeStrings(MachineScopes.All).Select(scope => new Claim("roles", scope)));
+        request.FunctionContext.Items[FunctionContextItemKeys.CachedClaims] = claims;
         request.FunctionContext.Items[FunctionContextItemKeys.MachineIdentity] = MachineId;
         request.FunctionContext.Items[FunctionContextItemKeys.MachineCredentialKind] = MachineCredentialKind.Federated;
         return request;
@@ -901,7 +965,7 @@ public class FederationHttpTests
             Id = MachineId,
             ObjectId = MachineId,
             AccessKey = string.Empty,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = rules,
         };

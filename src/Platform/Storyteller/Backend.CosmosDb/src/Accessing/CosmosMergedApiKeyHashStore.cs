@@ -27,8 +27,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
         string project,
         string machineAccessId,
         string hashedSecret,
-        MachineAccessScope scope,
-        IReadOnlyList<MachineManagementScope>? managementScopes = null)
+        IReadOnlyList<MachineScope> scopes)
     {
         var repository = _repositoryProvider.GetOrganizationContainer(organization);
         var partitionKeyValue = $"{project}.access";
@@ -41,7 +40,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
 
         if (existing is not null)
         {
-            var updated = existing with { HashedSecret = hashedSecret, Scope = scope, ManagementScopes = managementScopes?.ToList() };
+            var updated = existing with { HashedSecret = hashedSecret, Scopes = scopes.ToList() };
             await repository.Container.UpsertItemAsync(updated, partitionKey);
         }
         else
@@ -55,8 +54,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
                 Id = machineAccessId,
                 ObjectId = machineAccessId,
                 AccessKey = "***",
-                Scope = scope,
-                ManagementScopes = managementScopes?.ToList(),
+                Scopes = scopes.ToList(),
                 HashedSecret = hashedSecret,
             };
 
@@ -76,7 +74,7 @@ public class CosmosMergedApiKeyHashStore : IApiKeyHashStore
 
         if (machineAccess?.HashedSecret is not null)
         {
-            return new ApiKeyHashEntry(machineAccess.HashedSecret, machineAccess.Scope, machineAccess.CredentialKind, machineAccess.ManagementScopes);
+            return new ApiKeyHashEntry(machineAccess.HashedSecret, machineAccess.Scopes ?? [], machineAccess.CredentialKind);
         }
 
         return null;

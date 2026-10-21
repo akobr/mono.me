@@ -82,23 +82,18 @@ public class OAuthFlows : OpenApiOAuthSecurityFlows
 
     private void ConfigureEntraId(string? tenantId, string? clientId)
     {
+        // Users sign in with User.Impersonation only: their role decides what they may do, not delegated scopes.
         Implicit = new OpenApiOAuthFlow
         {
             AuthorizationUrl = new Uri(string.Format(AUTHORIZATION_URL, tenantId)),
             RefreshUrl = new Uri(string.Format(TOKEN_URL, tenantId)),
             Scopes =
             {
-                { $"api://{clientId}/{Scopes.Annotation.Read}", "Allows the app to read annotations" },
-                { $"api://{clientId}/{Scopes.Annotation.Write}", "Allows the app to modify or create annotations" },
-                { $"api://{clientId}/{Scopes.Configuration.Read}", "Allows the app to read configuration" },
-                { $"api://{clientId}/{Scopes.Configuration.Write}", "Allows the app to modify or create configuration" },
-                { $"api://{clientId}/{Scopes.Configuration.Secrets}", "Allows the app to see secrets in configuration" },
-                { $"api://{clientId}/{Scopes.Default.Read}", "Allows the app to read commons" },
-                { $"api://{clientId}/{Scopes.Default.Write}", "Allows the app to modify or create commons" },
                 { $"api://{clientId}/{Scopes.User.Impersonation}", "Allows the app to access the web API on your behalf" },
             },
         };
 
+        // Machines get the app roles of their scopes.
         ClientCredentials = new OpenApiOAuthFlow
         {
             TokenUrl = new Uri(string.Format(TOKEN_URL, tenantId)),

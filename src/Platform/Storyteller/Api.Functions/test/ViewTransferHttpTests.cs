@@ -22,15 +22,21 @@ using Microsoft.IdentityModel.Tokens;
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // The routes of the export and import of a view: the options and their defaults, the role, the scopes per included kind
-// (on requests and on reading jobs), and the background functions. Debug builds skip the scope checks (DEV_AUTH), so
-// the tests of the scopes turn them on (ChecksScopes). Users need the Administrator role on every route (424-66): the
-// access double gives an Owner unless a test names the role, and as Debug builds skip the role checks of users, the tests
-// of a refused role return early there.
+// (on requests and on reading jobs), and the background functions. Users need the Administrator role on every route
+// (424-66) and no scope: the access double gives an Owner unless a test names the role, user tokens carry only
+// User.Impersonation, and as Debug builds skip the role checks of users (DEV_AUTH), the tests of a refused role return
+// early there. Machines have no role: every route needs Configuration.Transfer first, then the scope of every included
+// kind, each stored on the machine and carried by its credentials, in every build.
 public class ViewTransferHttpTests
 {
-    private const string AllScopes = "Default.ReadWrite";
+    // The scopes of the four kinds in both directions, as the credentials of a machine carry them.
+    private const string KindScopes = $"{Scopes.Annotation.Read} {Scopes.Annotation.Write} {Scopes.Configuration.Read} {Scopes.Configuration.Write}";
+
+    private const string RuntimeScopes = $"{KindScopes} {Scopes.Secrets.Read} {Scopes.Secrets.Write}";
 
     private static readonly DateTimeOffset Now = new(2026, 10, 16, 1, 30, 12, TimeSpan.Zero);
+
+    private static readonly string EveryScope = string.Join(' ', MachineScopes.ToScopeStrings(MachineScopes.All));
 
     private readonly RecordingTransfers _transfers = new();
 
@@ -256,81 +262,116 @@ public class ViewTransferHttpTests
 
     // Scopes per kind: the rule of each kind, for an export and reading it, and for an import and reading it.
     [Theory]
-    [InlineData(ViewArchiveContent.Annotations, ViewTransferKind.Export, new[] { Scopes.Annotation.Read, Scopes.Annotation.Write, Scopes.Default.Read, Scopes.Default.Write })]
-    [InlineData(ViewArchiveContent.Schemas, ViewTransferKind.Export, new[] { Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write })]
-    [InlineData(ViewArchiveContent.Templates, ViewTransferKind.Export, new[] { Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write })]
-    [InlineData(ViewArchiveContent.Configurations, ViewTransferKind.Export, new[] { Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Default.Read, Scopes.Default.Write })]
-    [InlineData(ViewArchiveContent.Annotations, ViewTransferKind.Import, new[] { Scopes.Annotation.Write, Scopes.Default.Write })]
-    [InlineData(ViewArchiveContent.Schemas, ViewTransferKind.Import, new[] { Scopes.Configuration.Write, Scopes.Default.Write })]
-    [InlineData(ViewArchiveContent.Templates, ViewTransferKind.Import, new[] { Scopes.Configuration.Write, Scopes.Default.Write })]
-    [InlineData(ViewArchiveContent.Configurations, ViewTransferKind.Import, new[] { Scopes.Configuration.Write, Scopes.Default.Write })]
-    public void Scopes_OfEachKind(ViewArchiveContent content, ViewTransferKind kind, string[] expected)
+    [InlineData(ViewArchiveContent.Annotations, ViewTransferKind.Export, MachineScope.AnnotationRead)]
+    [InlineData(ViewArchiveContent.Schemas, ViewTransferKind.Export, MachineScope.ConfigurationRead)]
+    [InlineData(ViewArchiveContent.Templates, ViewTransferKind.Export, MachineScope.ConfigurationRead)]
+    [InlineData(ViewArchiveContent.Configurations, ViewTransferKind.Export, MachineScope.ConfigurationRead)]
+    [InlineData(ViewArchiveContent.Annotations, ViewTransferKind.Import, MachineScope.AnnotationWrite)]
+    [InlineData(ViewArchiveContent.Schemas, ViewTransferKind.Import, MachineScope.ConfigurationWrite)]
+    [InlineData(ViewArchiveContent.Templates, ViewTransferKind.Import, MachineScope.ConfigurationWrite)]
+    [InlineData(ViewArchiveContent.Configurations, ViewTransferKind.Import, MachineScope.ConfigurationWrite)]
+    public void Scopes_OfEachKind(ViewArchiveContent content, ViewTransferKind kind, MachineScope expected)
     {
-        ViewTransferScopes.GetScopes(content, kind).ShouldBe(expected);
+        ViewTransferScopes.GetScope(content, kind).ShouldBe(expected);
     }
 
+    // A machine exports a kind with its read scope: Annotation.Read for annotations, Configuration.Read for schemas,
+    // templates and configurations. A write scope, a secrets scope or User.Impersonation does not stand in for it, the
+    // scope strings must match exactly, and the strings of the removed presets are unknown. Every row runs for a machine
+    // whose credentials carry the scopes and for one created with them.
     [Theory]
-    [InlineData("Default.Read", null, true)]
-    [InlineData("Default.ReadWrite", null, true)]
     [InlineData("Annotation.Read Configuration.Read", null, true)]
-    [InlineData("Annotation.ReadWrite Configuration.ReadWrite", null, true)]
     [InlineData("Configuration.Read", null, false)]
+    [InlineData("Annotation.Write Configuration.Write", null, false)]
     [InlineData("Configuration.Read", "Schemas,Templates,Configurations", true)]
-    [InlineData("Configuration.ReadWrite", "Configurations", true)]
+    [InlineData("Configuration.Read", "Configurations", true)]
+    [InlineData("Configuration.Write", "Configurations", false)]
     [InlineData("Configuration.Read", "Annotations", false)]
     [InlineData("Annotation.Read", "Annotations", true)]
-    [InlineData("Annotation.ReadWrite", "Annotations", true)]
+    [InlineData("Annotation.Write", "Annotations", false)]
     [InlineData("Annotation.Read", "Annotations,Templates", false)]
+    [InlineData("Secrets.Read", "Configurations", false)]
     [InlineData("User.Impersonation", "Configurations", false)]
+    [InlineData("annotation.read configuration.read", null, false)]
+    [InlineData("Default.Read", null, false)]
+    [InlineData("Annotation.ReadWrite Configuration.ReadWrite", null, false)]
     [InlineData("", "Schemas", false)]
-    public async Task StartExport_NeedsTheScopesOfEveryIncludedKind(string scopes, string? include, bool isAllowed)
+    public async Task StartExport_ByAMachine_NeedsTheReadScopeOfEveryIncludedKind(string scopes, string? include, bool isAllowed)
     {
         var body = include is null ? string.Empty : $$"""{ "Include": [ {{string.Join(", ", include.Split(',').Select(kind => $"\"{kind}\""))}} ] }""";
-        var act = () => Http(checksScopes: true).StartViewExport(Request(body, scopes: scopes), "acme", "web", "default");
 
-        await ShouldFollowTheScopes(act, isAllowed);
+        await ShouldFollowTheKindScopes(scopes, isAllowed, (http, carried) => http.StartViewExport(Request(body, scopes: carried, machine: true), "acme", "web", "default"));
     }
 
+    // A machine imports a kind with its write scope: Annotation.Write for annotations, Configuration.Write for schemas,
+    // templates and configurations. Every row runs for a machine whose credentials carry the scopes and for one created
+    // with them.
     [Theory]
-    [InlineData("Default.ReadWrite", null, true)]
-    [InlineData("Annotation.ReadWrite Configuration.ReadWrite", null, true)]
-    [InlineData("Default.Read", null, false)]
-    [InlineData("Configuration.ReadWrite", null, false)]
-    [InlineData("Configuration.ReadWrite", "schemas,templates,configurations", true)]
+    [InlineData("Annotation.Write Configuration.Write", null, true)]
+    [InlineData("Annotation.Read Configuration.Read", null, false)]
+    [InlineData("Configuration.Write", null, false)]
+    [InlineData("Configuration.Write", "schemas,templates,configurations", true)]
     [InlineData("Configuration.Read", "configurations", false)]
-    [InlineData("Configuration.ReadWrite", "annotations", false)]
-    [InlineData("Annotation.ReadWrite", "annotations", true)]
-    [InlineData("Annotation.Read Configuration.ReadWrite", "annotations,configurations", false)]
-    [InlineData("Annotation.ReadWrite", "annotations,templates", false)]
-    public async Task StartImport_NeedsTheScopesOfEveryIncludedKind(string scopes, string? include, bool isAllowed)
+    [InlineData("Configuration.Write", "annotations", false)]
+    [InlineData("Annotation.Write", "annotations", true)]
+    [InlineData("Annotation.Read Configuration.Write", "annotations,configurations", false)]
+    [InlineData("Annotation.Write", "annotations,templates", false)]
+    [InlineData("Secrets.Write", "configurations", false)]
+    [InlineData("Default.ReadWrite", null, false)]
+    [InlineData("Annotation.ReadWrite", "annotations", false)]
+    public async Task StartImport_ByAMachine_NeedsTheWriteScopeOfEveryIncludedKind(string scopes, string? include, bool isAllowed)
     {
-        var act = () => Http(checksScopes: true).StartViewImport(Request(EmptyZip(), scopes: scopes, query: include is null ? null : $"include={include}"), "acme", "web", "default");
+        var query = include is null ? null : $"include={include}";
 
-        await ShouldFollowTheScopes(act, isAllowed);
+        await ShouldFollowTheKindScopes(scopes, isAllowed, (http, carried) => http.StartViewImport(Request(EmptyZip(), scopes: carried, machine: true, query: query), "acme", "web", "default"));
+    }
+
+    // Users need no scope of an included kind: the Administrator role decides, and their tokens carry only
+    // User.Impersonation.
+    [Theory]
+    [InlineData(null)]
+    [InlineData(new[] { ViewArchiveContent.Annotations })]
+    [InlineData(new[] { ViewArchiveContent.Schemas, ViewArchiveContent.Templates, ViewArchiveContent.Configurations })]
+    public async Task EveryRoute_ByAnAdministrator_NeedsNoScopeOfAnIncludedKind(ViewArchiveContent[]? include)
+    {
+        var http = Http(role: AccountRole.Administrator);
+        var kinds = include?.Select(kind => kind.ToString()).ToList() ?? [];
+        var body = $$"""{ "Include": [ {{string.Join(", ", kinds.Select(kind => $"\"{kind}\""))}} ] }""";
+
+        var export = (await http.StartViewExport(Request(body), "acme", "web", "default"))
+            .ShouldBeOfType<AcceptedResult>().Value.ShouldBeOfType<ViewExport>();
+        (await http.GetViewExport(Request(), "acme", "web", "default", export.Id)).ShouldBeOfType<OkObjectResult>();
+        (await http.GetViewExportArchive(Request(), "acme", "web", "default", export.Id)).ShouldBeOfType<FileStreamResult>();
+        var import = (await http.StartViewImport(Request(EmptyZip(), query: kinds.Count == 0 ? null : $"include={string.Join(',', kinds)}"), "acme", "web", "default"))
+            .ShouldBeOfType<AcceptedResult>().Value.ShouldBeOfType<ViewImport>();
+        (await http.GetViewImport(Request(), "acme", "web", "default", import.Id)).ShouldBeOfType<OkObjectResult>();
+
+        export.Include.ShouldBe(ViewArchiveInclude.Resolve(include));
+        import.Include.ShouldBe(ViewArchiveInclude.Resolve(include));
     }
 
     [Fact]
-    public async Task StartImport_ByAMachineWithOnlyConfigurationReadWrite_NamesTheMissingScopeAndInclude()
+    public async Task StartImport_ByAMachineWithOnlyConfigurationWrite_NamesTheMissingScopeAndInclude()
     {
-        var act = () => Http(checksScopes: true).StartViewImport(Request(EmptyZip(), scopes: Scopes.Configuration.Write, machine: true), "acme", "web", "default");
+        var act = () => Http().StartViewImport(Request(EmptyZip(), scopes: Scopes.Configuration.Write, machine: true), "acme", "web", "default");
 
         var exception = await act.ShouldThrowAsync<AccessDeniedException>();
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
-        exception.Message.ShouldBe("Missing scope for annotations: importing them needs Annotation.ReadWrite or Default.ReadWrite. Without include, all four kinds are included; name the kinds to import in include.");
+        exception.Message.ShouldBe("Missing scope for annotations: importing them needs Annotation.Write. Without include, all four kinds are included; name the kinds to import in include.");
         _transfers.Calls.ShouldBeEmpty();
 
-        await Http(checksScopes: true).StartViewImport(Request(EmptyZip(), scopes: Scopes.Configuration.Write, machine: true, query: "include=schemas,templates,configurations"), "acme", "web", "default");
+        await Http().StartViewImport(Request(EmptyZip(), scopes: Scopes.Configuration.Write, machine: true, query: "include=schemas,templates,configurations"), "acme", "web", "default");
         _transfers.Calls.ShouldHaveSingleItem().ShouldContain("Schemas,Templates,Configurations Overwrite");
     }
 
     [Fact]
     public async Task Start_ByAMachineRestrictedToAnAnnotation_IsRefused()
     {
-        var http = Http(checksScopes: true, machineAnnotationKey: "rst.payments");
+        var http = Http(machineAnnotationKey: "rst.payments");
 
         // an export or an import spans the whole view, so a machine restricted to one annotation reaches neither
-        var export = await Should.ThrowAsync<AccessDeniedException>(() => http.StartViewExport(Request(Encoding.UTF8.GetBytes("{}"), scopes: Scopes.Default.Write, machine: true), "acme", "web", "default"));
-        var import = await Should.ThrowAsync<AccessDeniedException>(() => http.StartViewImport(Request(EmptyZip(), scopes: Scopes.Default.Write, machine: true), "acme", "web", "default"));
+        var export = await Should.ThrowAsync<AccessDeniedException>(() => http.StartViewExport(Request(Encoding.UTF8.GetBytes("{}"), machine: true), "acme", "web", "default"));
+        var import = await Should.ThrowAsync<AccessDeniedException>(() => http.StartViewImport(Request(EmptyZip(), machine: true), "acme", "web", "default"));
 
         export.ErrorCode.ShouldBe(ErrorCodes.AnnotationRestricted);
         import.ErrorCode.ShouldBe(ErrorCodes.AnnotationRestricted);
@@ -338,74 +379,85 @@ public class ViewTransferHttpTests
     }
 
     [Fact]
-    public async Task StartExport_WithAnIncludedKindWithoutItsScope_NamesTheScopeAndInclude()
+    public async Task StartExport_ByAMachineWithAnIncludedKindWithoutItsScope_NamesTheScopeAndInclude()
     {
-        var act = () => Http(checksScopes: true).StartViewExport(Request("""{ "Include": [ "Annotations", "Templates" ] }""", scopes: Scopes.Annotation.Read), "acme", "web", "default");
+        var act = () => Http().StartViewExport(Request("""{ "Include": [ "Annotations", "Templates" ] }""", scopes: Scopes.Annotation.Read, machine: true), "acme", "web", "default");
 
         var exception = await act.ShouldThrowAsync<AccessDeniedException>();
-        exception.Message.ShouldBe("Missing scope for templates in include: exporting them needs Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("Missing scope for templates in include: exporting them needs Configuration.Read.");
+        _transfers.Calls.ShouldBeEmpty();
     }
 
-    [Fact]
-    public void Scopes_WithoutAnyKind_NameEveryMissingRule()
+    // Kinds that share a scope share its sentence. The management and secrets scopes stand in for no kind.
+    [Theory]
+    [InlineData(ViewTransferKind.Export, "Missing scope for annotations: exporting them needs Annotation.Read. Missing scope for schemas, templates and configurations: exporting them needs Configuration.Read. Without include, all four kinds are included; name the kinds to export in include.")]
+    [InlineData(ViewTransferKind.Import, "Missing scope for annotations: importing them needs Annotation.Write. Missing scope for schemas, templates and configurations: importing them needs Configuration.Write. Without include, all four kinds are included; name the kinds to import in include.")]
+    public void Scopes_WithoutAnyKind_NameEveryMissingRule(ViewTransferKind kind, string message)
     {
-        var exception = Should.Throw<AccessDeniedException>(() => ViewTransferScopes.Ensure(new HashSet<string> { Scopes.User.Impersonation }, null, ViewTransferKind.Export));
+        var others = MachineScopes.All.Where(scope => scope is not (MachineScope.AnnotationRead or MachineScope.AnnotationWrite or MachineScope.ConfigurationRead or MachineScope.ConfigurationWrite)).ToHashSet();
 
-        exception.Message.ShouldBe(
-            "Missing scope for annotations: exporting them needs Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite. "
-            + "Missing scope for schemas, templates and configurations: exporting them needs Configuration.Read, Configuration.ReadWrite, Default.Read or Default.ReadWrite. "
-            + "Without include, all four kinds are included; name the kinds to export in include.");
+        Should.Throw<AccessDeniedException>(() => ViewTransferScopes.Ensure(new HashSet<MachineScope>(), null, kind)).Message.ShouldBe(message);
+        Should.Throw<AccessDeniedException>(() => ViewTransferScopes.Ensure(others, null, kind)).Message.ShouldBe(message);
     }
 
-    // Reading a job checks the scopes of the include stored with it, not those of the request.
+    // Reading a job checks the read scopes of the include stored with it, not those of the request. Every row runs for
+    // a machine whose credentials carry the scopes and for one created with them.
     [Theory]
     [InlineData("Configuration.Read", new[] { ViewArchiveContent.Configurations }, true)]
     [InlineData("Configuration.Read", new[] { ViewArchiveContent.Annotations, ViewArchiveContent.Configurations }, false)]
     [InlineData("Annotation.Read", new[] { ViewArchiveContent.Annotations }, true)]
-    [InlineData("Default.Read", new[] { ViewArchiveContent.Annotations, ViewArchiveContent.Schemas, ViewArchiveContent.Templates, ViewArchiveContent.Configurations }, true)]
-    public async Task GetExport_NeedsTheScopesOfTheKindsTheExportIncludes(string scopes, ViewArchiveContent[] include, bool isAllowed)
+    [InlineData("Annotation.Write", new[] { ViewArchiveContent.Annotations }, false)]
+    [InlineData("Annotation.Read Configuration.Read", new[] { ViewArchiveContent.Annotations, ViewArchiveContent.Schemas, ViewArchiveContent.Templates, ViewArchiveContent.Configurations }, true)]
+    [InlineData("Default.Read", new[] { ViewArchiveContent.Annotations, ViewArchiveContent.Schemas, ViewArchiveContent.Templates, ViewArchiveContent.Configurations }, false)]
+    public async Task GetExport_ByAMachine_NeedsTheReadScopesOfTheKindsTheExportIncludes(string scopes, ViewArchiveContent[] include, bool isAllowed)
     {
         var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, include, AuditActor.System);
         _transfers.Calls.Clear();
 
-        await ShouldFollowTheScopes(() => Http(checksScopes: true).GetViewExport(Request(scopes: scopes), "acme", "web", "default", export.Id), isAllowed);
-        await ShouldFollowTheScopes(() => Http(checksScopes: true).GetViewExportArchive(Request(scopes: scopes), "acme", "web", "default", export.Id), isAllowed);
+        await ShouldFollowTheKindScopes(scopes, isAllowed, (http, carried) => http.GetViewExport(Request(scopes: carried, machine: true), "acme", "web", "default", export.Id));
+        await ShouldFollowTheKindScopes(scopes, isAllowed, (http, carried) => http.GetViewExportArchive(Request(scopes: carried, machine: true), "acme", "web", "default", export.Id));
 
-        string[] expected = isAllowed ? [$"open {export.Id}"] : [];
+        // opened once for the carried scopes and once for the stored ones
+        string[] expected = isAllowed ? [$"open {export.Id}", $"open {export.Id}"] : [];
         _transfers.Calls.ShouldBe(expected, ignoreOrder: false, "a denied download never opens the archive");
     }
 
     [Fact]
-    public async Task GetExport_WithoutTheScopeOfAnIncludedKind_NamesItAndTheJobsInclude()
+    public async Task GetExport_ByAMachineWithoutTheScopeOfAnIncludedKind_NamesItAndTheJobsInclude()
     {
         var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Git, [ViewArchiveContent.Annotations], AuditActor.System);
 
-        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Http(checksScopes: true).GetViewExport(Request(scopes: Scopes.Configuration.Read), "acme", "web", "default", export.Id));
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Http().GetViewExport(Request(scopes: Scopes.Configuration.Read, machine: true), "acme", "web", "default", export.Id));
 
-        exception.Message.ShouldBe("Missing scope for annotations in the include of this export: reading it needs Annotation.Read, Annotation.ReadWrite, Default.Read or Default.ReadWrite.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("Missing scope for annotations in the include of this export: reading it needs Annotation.Read.");
     }
 
+    // And reading an import its write scopes.
     [Theory]
-    [InlineData("Configuration.ReadWrite", new[] { ViewArchiveContent.Schemas, ViewArchiveContent.Configurations }, true)]
-    [InlineData("Configuration.ReadWrite", new[] { ViewArchiveContent.Annotations, ViewArchiveContent.Configurations }, false)]
+    [InlineData("Configuration.Write", new[] { ViewArchiveContent.Schemas, ViewArchiveContent.Configurations }, true)]
+    [InlineData("Configuration.Write", new[] { ViewArchiveContent.Annotations, ViewArchiveContent.Configurations }, false)]
     [InlineData("Configuration.Read", new[] { ViewArchiveContent.Configurations }, false)]
-    [InlineData("Annotation.ReadWrite", new[] { ViewArchiveContent.Annotations }, true)]
-    [InlineData("Default.ReadWrite", new[] { ViewArchiveContent.Annotations, ViewArchiveContent.Schemas, ViewArchiveContent.Templates, ViewArchiveContent.Configurations }, true)]
-    public async Task GetImport_NeedsTheScopesOfTheKindsTheImportIncludes(string scopes, ViewArchiveContent[] include, bool isAllowed)
+    [InlineData("Annotation.Write", new[] { ViewArchiveContent.Annotations }, true)]
+    [InlineData("Annotation.Write Configuration.Write", new[] { ViewArchiveContent.Annotations, ViewArchiveContent.Schemas, ViewArchiveContent.Templates, ViewArchiveContent.Configurations }, true)]
+    [InlineData("Default.ReadWrite", new[] { ViewArchiveContent.Annotations, ViewArchiveContent.Schemas, ViewArchiveContent.Templates, ViewArchiveContent.Configurations }, false)]
+    public async Task GetImport_ByAMachine_NeedsTheWriteScopesOfTheKindsTheImportIncludes(string scopes, ViewArchiveContent[] include, bool isAllowed)
     {
         var import = _transfers.AddImport("acme", "web", "default", include);
 
-        await ShouldFollowTheScopes(() => Http(checksScopes: true).GetViewImport(Request(scopes: scopes), "acme", "web", "default", import.Id), isAllowed);
+        await ShouldFollowTheKindScopes(scopes, isAllowed, (http, carried) => http.GetViewImport(Request(scopes: carried, machine: true), "acme", "web", "default", import.Id));
     }
 
     [Fact]
-    public async Task GetImport_OfAJobWithoutInclude_NeedsTheScopesOfAllFourKinds()
+    public async Task GetImport_ByAMachine_OfAJobWithoutInclude_NeedsTheWriteScopesOfAllFourKinds()
     {
         var import = _transfers.AddImport("acme", "web", "default", null);
 
-        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Http(checksScopes: true).GetViewImport(Request(scopes: Scopes.Configuration.Write), "acme", "web", "default", import.Id));
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => Http().GetViewImport(Request(scopes: Scopes.Configuration.Write, machine: true), "acme", "web", "default", import.Id));
 
-        exception.Message.ShouldBe("Missing scope for annotations in the include of this import: reading it needs Annotation.ReadWrite or Default.ReadWrite.");
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("Missing scope for annotations in the include of this import: reading it needs Annotation.Write.");
     }
 
     // Without credentials there are no scopes to check: 401 (SecurityTokenException), as on every route and as in the
@@ -417,7 +469,7 @@ public class ViewTransferHttpTests
     {
         var request = body is null ? Request(isAnonymous: true) : Request(body, isAnonymous: true);
 
-        await Should.ThrowAsync<SecurityTokenException>(() => Http(checksScopes: true).StartViewExport(request, "acme", "web", "default"));
+        await Should.ThrowAsync<SecurityTokenException>(() => Http().StartViewExport(request, "acme", "web", "default"));
 
         _transfers.Calls.ShouldBeEmpty();
     }
@@ -429,7 +481,7 @@ public class ViewTransferHttpTests
     {
         var request = Request(EmptyZip(), query: query, isAnonymous: true);
 
-        await Should.ThrowAsync<SecurityTokenException>(() => Http(checksScopes: true).StartViewImport(request, "acme", "web", "default"));
+        await Should.ThrowAsync<SecurityTokenException>(() => Http().StartViewImport(request, "acme", "web", "default"));
 
         _transfers.Calls.ShouldBeEmpty();
     }
@@ -440,7 +492,7 @@ public class ViewTransferHttpTests
         var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, [ViewArchiveContent.Configurations], AuditActor.System);
         var import = _transfers.AddImport("acme", "web", "default", [ViewArchiveContent.Configurations]);
         _transfers.Calls.Clear();
-        var http = Http(checksScopes: true);
+        var http = Http();
 
         await Should.ThrowAsync<SecurityTokenException>(() => http.GetViewExport(Request(isAnonymous: true), "acme", "web", "default", export.Id));
         await Should.ThrowAsync<SecurityTokenException>(() => http.GetViewExportArchive(Request(isAnonymous: true), "acme", "web", "default", export.Id));
@@ -449,28 +501,9 @@ public class ViewTransferHttpTests
         _transfers.Calls.ShouldBeEmpty("an anonymous download never opens the archive");
     }
 
-    // Debug builds (DEV_AUTH) skip the scope checks like every other route; a Release build enforces them.
-    [Fact]
-    public async Task Scopes_AreCheckedUnlessDevelopmentAuthentication()
-    {
-        var http = Http();
-        http.ChecksScopes.ShouldBe(!DevAuth);
-
-        var act = () => http.StartViewExport(Request(scopes: Scopes.User.Impersonation), "acme", "web", "default");
-
-        if (DevAuth)
-        {
-            (await act()).ShouldBeOfType<AcceptedResult>();
-        }
-        else
-        {
-            await act.ShouldThrowAsync<AccessDeniedException>();
-        }
-    }
-
     // Users need the Administrator role on the project on every route, also to read a job (424-66); a Debug build
-    // (DEV_AUTH) skips the role checks of users. The starts check the scopes first, so the requests carry all of them, and
-    // the reads check the role before the job, so a refused user learns nothing about it.
+    // (DEV_AUTH) skips the role checks of users. Every scope in the token changes nothing, as users need none, and the
+    // reads check the role before the job, so a refused user learns nothing about it.
     [Theory]
     [InlineData(AccountRole.None)]
     [InlineData(AccountRole.Reader)]
@@ -486,15 +519,15 @@ public class ViewTransferHttpTests
         var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, null, AuditActor.System);
         var import = _transfers.AddImport("acme", "web", "default", null);
         _transfers.Calls.Clear();
-        var http = Http(checksScopes: true, role: role);
+        var http = Http(role: role);
 
         (string Route, Func<Task<IActionResult>> Act)[] routes =
         [
-            (nameof(ViewTransferHttp.StartViewExport), () => http.StartViewExport(Request("{}"), "acme", "web", "default")),
-            (nameof(ViewTransferHttp.GetViewExport), () => http.GetViewExport(Request(), "acme", "web", "default", export.Id)),
-            (nameof(ViewTransferHttp.GetViewExportArchive), () => http.GetViewExportArchive(Request(), "acme", "web", "default", export.Id)),
-            (nameof(ViewTransferHttp.StartViewImport), () => http.StartViewImport(Request(EmptyZip()), "acme", "web", "default")),
-            (nameof(ViewTransferHttp.GetViewImport), () => http.GetViewImport(Request(), "acme", "web", "default", import.Id)),
+            (nameof(ViewTransferHttp.StartViewExport), () => http.StartViewExport(Request("{}", scopes: EveryScope), "acme", "web", "default")),
+            (nameof(ViewTransferHttp.GetViewExport), () => http.GetViewExport(Request(scopes: EveryScope), "acme", "web", "default", export.Id)),
+            (nameof(ViewTransferHttp.GetViewExportArchive), () => http.GetViewExportArchive(Request(scopes: EveryScope), "acme", "web", "default", export.Id)),
+            (nameof(ViewTransferHttp.StartViewImport), () => http.StartViewImport(Request(EmptyZip(), scopes: EveryScope), "acme", "web", "default")),
+            (nameof(ViewTransferHttp.GetViewImport), () => http.GetViewImport(Request(scopes: EveryScope), "acme", "web", "default", import.Id)),
         ];
 
         foreach (var (route, act) in routes)
@@ -508,35 +541,35 @@ public class ViewTransferHttpTests
         _transfers.Reads.ShouldBeEmpty("a refused user never reads a job");
     }
 
-    // Only a Release build checks the role; a Debug build passes every user.
+    // Only a Release build checks the role; a Debug build passes every user. The tokens carry only User.Impersonation.
     [Theory]
     [InlineData(AccountRole.Administrator)]
     [InlineData(AccountRole.Owner)]
     public async Task EveryRoute_ByAnAdministratorOrAnOwner_Succeeds(AccountRole role)
     {
-        await ShouldPassEveryRoute(Http(checksScopes: true, role: role), machine: false);
+        await ShouldPassEveryRoute(Http(role: role), machine: false);
     }
 
-    // A machine has no role, and the double has none for it either: the scopes of the included kinds and the management
-    // scope Configuration.Transfer decide.
+    // A machine has no role, and the double has none for it either: Configuration.Transfer and the scopes of the
+    // included kinds decide, and the machine needs no other scope.
     [Fact]
-    public async Task EveryRoute_ByAMachineWithTheFullScopes_SucceedsWithoutARole()
+    public async Task EveryRoute_ByAMachineWithTheKindScopesAndConfigurationTransfer_SucceedsWithoutARole()
     {
-        await ShouldPassEveryRoute(Http(checksScopes: true, role: AccountRole.None), machine: true);
+        MachineScope[] scopes = [MachineScope.AnnotationRead, MachineScope.AnnotationWrite, MachineScope.ConfigurationRead, MachineScope.ConfigurationWrite, MachineScope.ConfigurationTransfer];
+
+        await ShouldPassEveryRoute(Http(role: AccountRole.None, scopes: scopes), machine: true);
     }
 
-    // The management scope is checked with the machine document in every build, also where the scopes of the kinds are
-    // not (ChecksScopes off). The reads check it before the job, so a refused machine learns nothing about it.
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task EveryRoute_ByAMachineWithTheRuntimeScopesOnly_IsAccessDenied(bool checksScopes)
+    // The management scope is checked with the machine document in every build. The reads check it before the job, so a
+    // refused machine learns nothing about it.
+    [Fact]
+    public async Task EveryRoute_ByAMachineWithTheRuntimeScopesOnly_IsAccessDenied()
     {
         await ShouldRefuseEveryRouteToAMachine(
-            Http(checksScopes: checksScopes, role: AccountRole.None, managementScopes: []),
+            Http(role: AccountRole.None, managementScopes: []),
             machineManagementScopes: string.Empty,
             ErrorCodes.AccessDenied,
-            "This operation needs the management scope Configuration.Transfer, which the machine was not created with.");
+            "This operation needs the scope Configuration.Transfer, which the machine was not created with.");
     }
 
     // A federated token that asked for a subset of the machine's scopes, without Configuration.Transfer.
@@ -544,47 +577,57 @@ public class ViewTransferHttpTests
     public async Task EveryRoute_ByAMachineWhoseCredentialsDoNotCarryConfigurationTransfer_IsAccessDenied()
     {
         await ShouldRefuseEveryRouteToAMachine(
-            Http(checksScopes: true, role: AccountRole.None),
+            Http(role: AccountRole.None),
             machineManagementScopes: string.Empty,
             ErrorCodes.AccessDenied,
-            "This operation needs the management scope Configuration.Transfer, which the credentials of the machine do not carry.");
+            "This operation needs the scope Configuration.Transfer, which the credentials of the machine do not carry.");
     }
 
     // Another management scope does not stand in for the transfer scope.
     [Fact]
     public async Task EveryRoute_ByAMachineWithOtherManagementScopes_IsAccessDenied()
     {
-        MachineManagementScope[] others = [MachineManagementScope.SchemaWrite, MachineManagementScope.TemplateWrite, MachineManagementScope.AnnotationManage];
+        MachineScope[] others = [MachineScope.SchemaWrite, MachineScope.TemplateWrite, MachineScope.AnnotationManage, MachineScope.KeyValueManage];
 
         await ShouldRefuseEveryRouteToAMachine(
-            Http(checksScopes: true, role: AccountRole.None, managementScopes: others),
-            machineManagementScopes: $"{Scopes.Schema.Write} {Scopes.Template.Write} {Scopes.Annotation.Manage}",
+            Http(role: AccountRole.None, managementScopes: others),
+            machineManagementScopes: $"{Scopes.Schema.Write} {Scopes.Template.Write} {Scopes.Annotation.Manage} {Scopes.KeyValue.Manage}",
             ErrorCodes.AccessDenied,
-            "This operation needs the management scope Configuration.Transfer, which the machine was not created with.");
+            "This operation needs the scope Configuration.Transfer, which the machine was not created with.");
     }
 
-    // The restriction comes first: a machine restricted to an annotation learns that a transfer is out of its reach.
+    // The restriction comes first: a machine restricted to an annotation learns that a transfer is out of its reach,
+    // not which scope it lacks.
     [Fact]
-    public async Task EveryRoute_ByARestrictedMachineWithoutConfigurationTransfer_IsRestrictedFirst()
+    public async Task EveryRoute_ByARestrictedMachineWithoutAnyScope_IsRestrictedFirst()
     {
         await ShouldRefuseEveryRouteToAMachine(
-            Http(checksScopes: true, machineAnnotationKey: "rst.payments", role: AccountRole.None, managementScopes: []),
+            Http(machineAnnotationKey: "rst.payments", role: AccountRole.None, scopes: []),
             machineManagementScopes: string.Empty,
             ErrorCodes.AnnotationRestricted,
-            message: null);
+            message: null,
+            scopes: string.Empty);
     }
 
-    // The starts check the scopes of the included kinds before the access check, so a machine without either learns
-    // first which kinds it may include.
+    // Configuration.Transfer comes before the kinds on every route, the starts too: the kinds are checked with the
+    // machine of the access check. A machine without either learns first that it is not a transfer machine, and a read
+    // never reads the job. Once for a machine created without both, once for credentials that carry neither.
     [Fact]
-    public async Task Start_ByAMachineWithoutTheScopeOfAKindOrConfigurationTransfer_NamesTheKindFirst()
+    public async Task EveryRoute_ByAMachineWithoutConfigurationTransferOrTheScopeOfAKind_NamesConfigurationTransferFirst()
     {
-        var http = Http(checksScopes: true, role: AccountRole.None, managementScopes: []);
+        await ShouldRefuseEveryRouteToAMachine(
+            Http(role: AccountRole.None, scopes: [MachineScope.ConfigurationWrite]),
+            machineManagementScopes: string.Empty,
+            ErrorCodes.AccessDenied,
+            "This operation needs the scope Configuration.Transfer, which the machine was not created with.",
+            scopes: Scopes.Configuration.Write);
 
-        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.StartViewImport(Request(EmptyZip(), scopes: Scopes.Configuration.Write, machine: true, machineManagementScopes: string.Empty), "acme", "web", "default"));
-
-        exception.Message.ShouldStartWith("Missing scope for annotations: ");
-        _transfers.Calls.ShouldBeEmpty();
+        await ShouldRefuseEveryRouteToAMachine(
+            Http(role: AccountRole.None),
+            machineManagementScopes: string.Empty,
+            ErrorCodes.AccessDenied,
+            "This operation needs the scope Configuration.Transfer, which the credentials of the machine do not carry.",
+            scopes: Scopes.Configuration.Write);
     }
 
     // The routes of the first spec below configurations/ were never released and are gone.
@@ -629,10 +672,11 @@ public class ViewTransferHttpTests
             ignoreOrder: true);
     }
 
-    // The 403 of every route names the role users need, beside the scopes and the restriction of machines (424-66), and
-    // the management scope Configuration.Transfer machines need (424-57).
+    // The 403 of every route names the role users need and that they need no data scope (424-66), the restriction of
+    // machines, and what a machine needs: Configuration.Transfer, then the read scope of every included kind to export
+    // and the write scope to import.
     [Fact]
-    public async Task Document_TheForbiddenOfEveryRoute_NamesTheAdministratorRole()
+    public async Task Document_TheForbiddenOfEveryRoute_NamesTheAdministratorRoleAndTheScopesOfMachines()
     {
         var json = await OpenApiExportTests.RenderAsync();
         using var document = JsonDocument.Parse(json);
@@ -648,11 +692,47 @@ public class ViewTransferHttpTests
 
         foreach (var (operationId, expected) in forbidden)
         {
-            var description = ForbiddenOf(document, operationId);
+            var isExport = expected == Definitions.Descriptions.ResponseTransferForbiddenExport;
+            var kindScopes = isExport
+                ? "the read scope of every included kind (Annotation.Read for annotations, Configuration.Read for schemas, templates and configurations); reading an export needs the scopes of the kinds it includes."
+                : "the write scope of every included kind (Annotation.Write for annotations, Configuration.Write for schemas, templates and configurations); reading an import needs the scopes of the kinds it includes.";
+
+            var description = DescriptionOf(document, operationId, "403");
             description.ShouldBe(expected, operationId);
-            description.ShouldStartWith("The user's role on the project is below Administrator, or a scope of an included kind is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine also needs the management scope Configuration.Transfer (AccessDenied).", Case.Sensitive, operationId);
-            description.ShouldEndWith("The message names the missing role or scope.", Case.Sensitive, operationId);
+            description.ShouldStartWith("The user's role on the project is below Administrator, or a scope of the machine is missing (AccessDenied), or the machine is restricted to an annotation (AnnotationRestricted). A machine needs no role but the scope Configuration.Transfer and ", Case.Sensitive, operationId);
+            description.ShouldContain(kindScopes, Case.Sensitive, operationId);
+            description.ShouldEndWith("Users need no data scopes, only the Administrator role. The message names the missing role or scope.", Case.Sensitive, operationId);
+
+            // the scope strings of the removed presets are gone
+            description.ShouldNotContain("Default.", Case.Sensitive, operationId);
+            description.ShouldNotContain("ReadWrite", Case.Sensitive, operationId);
+            description.ShouldNotContain("Configuration.Secrets", Case.Sensitive, operationId);
         }
+    }
+
+    // The 401 of every route is the one of the routes machines and users call: besides missing or invalid credentials, a
+    // user token without User.Impersonation, a machine the project does not know, and a credential kind it does not enable.
+    [Fact]
+    public async Task Document_TheUnauthorizedOfEveryRoute_NamesEveryAuthenticationIssue()
+    {
+        var json = await OpenApiExportTests.RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        string[] operationIds =
+        [
+            Definitions.RouteIds.Transfers.StartViewExport,
+            Definitions.RouteIds.Transfers.GetViewExport,
+            Definitions.RouteIds.Transfers.GetViewExportArchive,
+            Definitions.RouteIds.Transfers.StartViewImport,
+            Definitions.RouteIds.Transfers.GetViewImport,
+        ];
+
+        foreach (var operationId in operationIds)
+        {
+            DescriptionOf(document, operationId, "401").ShouldBe(Definitions.Descriptions.ResponseUnauthorized, operationId);
+        }
+
+        Definitions.Descriptions.ResponseUnauthorized.ShouldStartWith("Authentication issues: missing or invalid credentials, ", Case.Sensitive);
     }
 
     [Fact]
@@ -723,13 +803,13 @@ public class ViewTransferHttpTests
         _transfers.Calls.ShouldBe(["purge"]);
     }
 
-    private static string? ForbiddenOf(JsonDocument document, string operationId)
+    private static string? DescriptionOf(JsonDocument document, string operationId, string status)
     {
         return document.RootElement.GetProperty("paths").EnumerateObject()
             .SelectMany(path => path.Value.EnumerateObject())
             .Select(entry => entry.Value)
             .Single(entry => entry.GetProperty("operationId").GetString() == operationId)
-            .GetProperty("responses").GetProperty("403").GetProperty("description").GetString();
+            .GetProperty("responses").GetProperty(status).GetProperty("description").GetString();
     }
 
     private static async Task ShouldFollowTheScopes(Func<Task<IActionResult>> act, bool isAllowed)
@@ -744,6 +824,21 @@ public class ViewTransferHttpTests
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
         exception.Message.ShouldStartWith("Missing scope for ");
         exception.Message.ShouldContain("include");
+    }
+
+    // The kinds are checked on what a machine may use: its stored scopes that its credentials carry. Runs the request of
+    // a machine twice: with the given scopes carried by the credentials of a machine created with every runtime scope,
+    // and with them stored on a machine whose credentials carry every runtime scope. Configuration.Transfer is stored and
+    // carried both times; a string that names no machine scope cannot be stored.
+    private async Task ShouldFollowTheKindScopes(string scopes, bool isAllowed, Func<ViewTransferHttp, string, Task<IActionResult>> act)
+    {
+        await ShouldFollowTheScopes(() => act(Http(role: AccountRole.None), scopes), isAllowed);
+
+        var stored = scopes
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Select(name => MachineScopes.TryParseScopeString(name, out var scope) ? scope : (MachineScope?)null)
+            .OfType<MachineScope>();
+        await ShouldFollowTheScopes(() => act(Http(role: AccountRole.None, scopes: [.. stored, MachineScope.ConfigurationTransfer]), RuntimeScopes), isAllowed);
     }
 
     // Starts an export, reads it and downloads its archive, then starts an import and reads it, as a user or a machine.
@@ -772,7 +867,8 @@ public class ViewTransferHttpTests
     }
 
     // Every route refuses the machine with the code (and the message, when given) before it starts, reads or opens a job.
-    private async Task ShouldRefuseEveryRouteToAMachine(ViewTransferHttp http, string machineManagementScopes, string errorCode, string? message)
+    // Its credentials carry the given scopes (the kind scopes by default) and the given management scopes.
+    private async Task ShouldRefuseEveryRouteToAMachine(ViewTransferHttp http, string machineManagementScopes, string errorCode, string? message, string? scopes = null)
     {
         var export = await _transfers.StartExportAsync("acme", "web", "default", ViewArchiveFormat.Folder, null, AuditActor.System);
         var import = _transfers.AddImport("acme", "web", "default", null);
@@ -781,11 +877,11 @@ public class ViewTransferHttpTests
 
         (string Route, Func<Task<IActionResult>> Act)[] routes =
         [
-            (nameof(ViewTransferHttp.StartViewExport), () => http.StartViewExport(Request(Encoding.UTF8.GetBytes("{}"), machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default")),
-            (nameof(ViewTransferHttp.GetViewExport), () => http.GetViewExport(Request(machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default", export.Id)),
-            (nameof(ViewTransferHttp.GetViewExportArchive), () => http.GetViewExportArchive(Request(machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default", export.Id)),
-            (nameof(ViewTransferHttp.StartViewImport), () => http.StartViewImport(Request(EmptyZip(), machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default")),
-            (nameof(ViewTransferHttp.GetViewImport), () => http.GetViewImport(Request(machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default", import.Id)),
+            (nameof(ViewTransferHttp.StartViewExport), () => http.StartViewExport(Request(Encoding.UTF8.GetBytes("{}"), scopes: scopes, machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default")),
+            (nameof(ViewTransferHttp.GetViewExport), () => http.GetViewExport(Request(scopes: scopes, machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default", export.Id)),
+            (nameof(ViewTransferHttp.GetViewExportArchive), () => http.GetViewExportArchive(Request(scopes: scopes, machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default", export.Id)),
+            (nameof(ViewTransferHttp.StartViewImport), () => http.StartViewImport(Request(EmptyZip(), scopes: scopes, machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default")),
+            (nameof(ViewTransferHttp.GetViewImport), () => http.GetViewImport(Request(scopes: scopes, machine: true, machineManagementScopes: machineManagementScopes), "acme", "web", "default", import.Id)),
         ];
 
         foreach (var (route, act) in routes)
@@ -813,20 +909,21 @@ public class ViewTransferHttpTests
         return stream.ToArray();
     }
 
-    private static TestHttpRequestData Request(string body, string? url = null, string scopes = AllScopes, bool isAnonymous = false)
+    private static TestHttpRequestData Request(string body, string? url = null, string? scopes = null, bool machine = false, bool isAnonymous = false)
     {
-        return Request(Encoding.UTF8.GetBytes(body), url, scopes: scopes, isAnonymous: isAnonymous);
+        return Request(Encoding.UTF8.GetBytes(body), url, scopes: scopes, machine: machine, isAnonymous: isAnonymous);
     }
 
-    // A user with the given scp; a machine carries them as roles, like the machine validators, and its management scopes
-    // too (Configuration.Transfer unless the test names others). The query is parsed as HttpRequestData.Query parses it,
-    // so a repeated parameter is joined by commas. An anonymous request has no claims, as one without credentials leaves
-    // the authentication middlewares.
+    // A user acts for a user (User.Impersonation), with the given scopes in scp beside it (none by default: users need
+    // none). A machine carries the given scopes as roles (the kind scopes by default), like the machine validators, and
+    // its management scopes too (Configuration.Transfer unless the test names others). The query is parsed as
+    // HttpRequestData.Query parses it, so a repeated parameter is joined by commas. An anonymous request has no claims,
+    // as one without credentials leaves the authentication middlewares.
     private static TestHttpRequestData Request(
         byte[]? body = null,
         string? url = null,
         Dictionary<string, string>? headers = null,
-        string scopes = AllScopes,
+        string? scopes = null,
         bool machine = false,
         string? query = null,
         bool isAnonymous = false,
@@ -845,8 +942,8 @@ public class ViewTransferHttpTests
 
         var claims = new List<Claim> { new("sub", machine ? "machine_01" : "user_01") };
         claims.AddRange(machine
-            ? $"{scopes} {machineManagementScopes}".Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(scope => new Claim("roles", scope))
-            : [new Claim("scp", scopes)]);
+            ? $"{scopes ?? KindScopes} {machineManagementScopes}".Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(scope => new Claim("roles", scope))
+            : [new Claim("scp", $"{Scopes.User.Impersonation} {scopes}".TrimEnd())]);
         context.Items[FunctionContextItemKeys.CachedClaims] = claims;
 
         if (machine)
@@ -857,20 +954,18 @@ public class ViewTransferHttpTests
         return request;
     }
 
-    // Without checksScopes, the class default: no scope checks in a Debug build. Without role, the user is an Owner.
-    // Without managementScopes, the machine has Configuration.Transfer, as a machine that transfers views needs.
+    // Without role, the user is an Owner. The machine is created with the six runtime scopes and, without
+    // managementScopes, Configuration.Transfer, as a machine that transfers views needs; or with exactly the given scopes.
     private ViewTransferHttp Http(
         ViewTransferOptions? options = null,
-        bool? checksScopes = null,
         string? machineAnnotationKey = null,
         AccountRole role = AccountRole.Owner,
-        IReadOnlyList<MachineManagementScope>? managementScopes = null)
+        IReadOnlyList<MachineScope>? managementScopes = null,
+        IReadOnlyList<MachineScope>? scopes = null)
     {
-        var access = ProjectAccess.Create(role, machineAnnotationKey, managementScopes ?? [MachineManagementScope.ConfigurationTransfer]);
+        var access = new RoleAccess(role, machineAnnotationKey, managementScopes ?? [MachineScope.ConfigurationTransfer], scopes);
         var resolved = Options.Create(options ?? new ViewTransferOptions());
-        return checksScopes is { } checks
-            ? new ViewTransferHttp(_transfers, access, resolved) { ChecksScopes = checks }
-            : new ViewTransferHttp(_transfers, access, resolved);
+        return new ViewTransferHttp(_transfers, access, resolved);
     }
 
     // Records the calls and the reads of jobs, and keeps the jobs, with their include resolved as the service stores it.
@@ -977,48 +1072,6 @@ public class ViewTransferHttpTests
         private static string Describe(IReadOnlyList<ViewArchiveContent>? include)
         {
             return include is null ? "all" : string.Join(',', include);
-        }
-    }
-
-    // A user has the given role on every project (an Owner by default), and a machine has access to it, restricted to an
-    // annotation when one is given, with the given management scopes; the role checks themselves are the shared helpers'
-    // (skipped for users in a Debug build).
-    public class ProjectAccess : DispatchProxy
-    {
-        private AccountRole _role;
-        private string? _machineAnnotationKey;
-        private IReadOnlyList<MachineManagementScope>? _managementScopes;
-
-        public static IAccessService Create(
-            AccountRole role = AccountRole.Owner,
-            string? machineAnnotationKey = null,
-            IReadOnlyList<MachineManagementScope>? managementScopes = null)
-        {
-            var access = Create<IAccessService, ProjectAccess>();
-            var proxy = (ProjectAccess)(object)access;
-            proxy._role = role;
-            proxy._machineAnnotationKey = machineAnnotationKey;
-            proxy._managementScopes = managementScopes;
-            return access;
-        }
-
-        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
-        {
-            return targetMethod?.Name switch
-            {
-                nameof(IAccessService.GetAccountRoleAsync) => Task.FromResult(_role),
-                nameof(IAccessService.VerifyAccessForMachineAsync) => Task.FromResult(true),
-                nameof(IAccessService.GetMachineAccessAsync) => Task.FromResult<MachineAccess?>(new MachineAccess
-                {
-                    Id = (string)args![2]!,
-                    ObjectId = (string)args[2]!,
-                    AccessKey = "***",
-                    Scope = MachineAccessScope.DefaultReadWrite,
-                    AnnotationKey = _machineAnnotationKey,
-                    ManagementScopes = _managementScopes,
-                }),
-                _ => throw new NotSupportedException(targetMethod?.Name),
-            };
         }
     }
 }

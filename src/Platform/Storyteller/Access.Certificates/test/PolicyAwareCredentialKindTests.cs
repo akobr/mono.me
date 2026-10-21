@@ -21,8 +21,8 @@ public class PolicyAwareCredentialKindTests
     public PolicyAwareCredentialKindTests()
     {
         _authority
-            .Setup(authority => authority.IssueCertificateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<MachineAccessScope>(), It.IsAny<int>()))
-            .Callback((string _, string _, string _, MachineAccessScope _, int days) => _lifetimes.Add(days))
+            .Setup(authority => authority.IssueCertificateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
+            .Callback((string _, string _, string _, int days) => _lifetimes.Add(days))
             .ReturnsAsync(new IssuedCertificate([1, 2, 3], "password", "THUMBPRINT", "01", NotAfter.AddDays(-90), NotAfter));
         _certificateStore
             .Setup(store => store.StoreAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CertificateRecord>()))
@@ -184,7 +184,7 @@ public class PolicyAwareCredentialKindTests
         {
             Organization = "org1",
             Project = "proj1",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             CredentialKind = kind,
             CertificateLifetimeDays = lifetimeDays,
             UseSharedCertificate = useSharedCertificate,

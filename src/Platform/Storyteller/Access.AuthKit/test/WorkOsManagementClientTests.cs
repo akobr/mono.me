@@ -20,7 +20,7 @@ public class WorkOsManagementClientTests
             """);
 
         var application = await CreateClient().CreateM2MApplicationAsync(
-            new WorkOsM2MApplicationCreate("42.sform.o.p.x", "organization=o|project=p|scope=DefaultRead", "org_machines", ["storyteller:annotation-read"]));
+            new WorkOsM2MApplicationCreate("42.sform.o.p.x", "organization=o|project=p|scopes=AnnotationRead", "org_machines", ["storyteller:annotation-read"]));
 
         application.Id.ShouldBe("conn_app_01");
         application.ClientId.ShouldBe("client_01");
@@ -34,7 +34,7 @@ public class WorkOsManagementClientTests
         body.RootElement.GetProperty("application_type").GetString().ShouldBe("m2m");
         body.RootElement.GetProperty("is_first_party").GetBoolean().ShouldBeFalse();
         body.RootElement.GetProperty("organization_id").GetString().ShouldBe("org_machines");
-        body.RootElement.GetProperty("description").GetString().ShouldBe("organization=o|project=p|scope=DefaultRead");
+        body.RootElement.GetProperty("description").GetString().ShouldBe("organization=o|project=p|scopes=AnnotationRead");
         body.RootElement.GetProperty("scopes").EnumerateArray().Select(scope => scope.GetString()).ShouldBe(["storyteller:annotation-read"]);
     }
 

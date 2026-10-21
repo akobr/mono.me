@@ -37,7 +37,7 @@ public sealed class EntraIdMachineTokenValidatorTests : IDisposable
     [Fact]
     public async Task MachineToken_IsAccepted()
     {
-        var result = await _validator.ValidateAsync(Token([new Claim("sub", "sp-1"), new Claim("azp", "machine-app"), new Claim("roles", "App.Default.Read")]));
+        var result = await _validator.ValidateAsync(Token([new Claim("sub", "sp-1"), new Claim("azp", "machine-app"), new Claim("roles", "App.Annotation.Read")]));
 
         result.ShouldNotBeNull();
         result.IsMachine.ShouldBeTrue();

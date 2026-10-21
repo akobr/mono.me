@@ -11,7 +11,9 @@ public record class MachineAccess : IMachineAccess
 
     public required string AccessKey { get; init; }
 
-    public required MachineAccessScope Scope { get; init; }
+    // Defined, distinct and in enum order, completed at creation: write implies read, so every X.Write comes with
+    // its X.Read and a check needs one scope.
+    public required IReadOnlyList<MachineScope> Scopes { get; init; }
 
     public string? AnnotationKey { get; init; }
 
@@ -44,7 +46,4 @@ public record class MachineAccess : IMachineAccess
 
     // Federated only: the rules a platform token must match. Returned by create, get and list.
     public IReadOnlyList<FederationRule>? FederationRules { get; init; }
-
-    // Granted on top of Scope at creation, distinct and in enum order. Null (or empty): none.
-    public IReadOnlyList<MachineManagementScope>? ManagementScopes { get; init; }
 }

@@ -40,7 +40,7 @@ public class FederatedRoutingTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = Project,
-            Scope = MachineAccessScope.ConfigurationRead,
+            Scopes = [MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = [rule],
         });
@@ -75,7 +75,7 @@ public class FederatedRoutingTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = Project,
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = [MachineScope.AnnotationRead, MachineScope.ConfigurationRead],
             FederationRules = [new FederationRule { Issuer = "nobody", Audience = "urn:storyteller:test.platform:api", Subject = "sub" }],
         }));
 

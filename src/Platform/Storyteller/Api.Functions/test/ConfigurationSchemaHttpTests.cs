@@ -135,7 +135,7 @@ public class ConfigurationSchemaHttpTests
         {
             new("sub", "user-1"),
             new("name", "Ada"),
-            new("scp", $"User.Impersonation {Scopes.Configuration.Write}"),
+            new("scp", Scopes.User.Impersonation),
         };
 
         if (force)

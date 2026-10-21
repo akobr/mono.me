@@ -128,7 +128,6 @@ public class CosmosCertificateRenewalService : ICertificateRenewalService
             organization,
             project,
             machineAccessId,
-            entity.Scope,
             lifetimeDays);
 
         // Compute PreviousValidUntil: min(old NotAfter, now + RenewalOverlapDays).

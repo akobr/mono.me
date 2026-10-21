@@ -8,11 +8,20 @@ using Moq;
 namespace _42.Platform.Storyteller.Access.Certificates.UnitTests;
 
 // The access service stores the machine the router returns, and the credentials carry what they recorded at creation:
-// every kind passes the management scopes on, and every credential record keeps them.
-public class PolicyAwareManagementScopesTests
+// every kind returns exactly the requested scopes, and every credential record keeps them.
+public class PolicyAwareScopesTests
 {
     private static readonly DateTimeOffset NotAfter = new(2027, 1, 12, 0, 0, 0, TimeSpan.Zero);
-    private static readonly MachineManagementScope[] Granted = [MachineManagementScope.ConfigurationTransfer, MachineManagementScope.KeyValueManage];
+
+    // Runtime and management scopes in one list, as the API completed it: nothing on the way adds or drops one.
+    private static readonly MachineScope[] Granted =
+    [
+        MachineScope.ConfigurationRead,
+        MachineScope.ConfigurationWrite,
+        MachineScope.SecretsRead,
+        MachineScope.ConfigurationTransfer,
+        MachineScope.KeyValueManage,
+    ];
 
     private readonly Mock<IMachineAuthenticationPolicyStore> _policyStore = new();
     private readonly InMemoryApiKeyHashStore _hashStore = new();
@@ -23,7 +32,7 @@ public class PolicyAwareManagementScopesTests
     private readonly List<CertificateRecord> _records = [];
     private readonly List<MachineAccessCreate> _forwarded = [];
 
-    public PolicyAwareManagementScopesTests()
+    public PolicyAwareScopesTests()
     {
         _policyStore.Setup(store => store.GetAsync("org1", "proj1")).ReturnsAsync(new MachineAuthenticationPolicy
         {
@@ -37,7 +46,7 @@ public class PolicyAwareManagementScopesTests
             ],
         });
         _authority
-            .Setup(authority => authority.IssueCertificateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<MachineAccessScope>(), It.IsAny<int>()))
+            .Setup(authority => authority.IssueCertificateAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
             .ReturnsAsync(new IssuedCertificate([1, 2, 3], "password", "THUMBPRINT", "01", NotAfter.AddDays(-90), NotAfter));
         _certificateStore
             .Setup(store => store.StoreAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CertificateRecord>()))
@@ -59,65 +68,66 @@ public class PolicyAwareManagementScopesTests
     [InlineData(MachineCredentialKind.CertificateAndApiKey)]
     [InlineData(MachineCredentialKind.ClientCredentials)]
     [InlineData(MachineCredentialKind.Federated)]
-    public async Task Create_EveryKind_ReturnsTheManagementScopes(MachineCredentialKind kind)
+    public async Task Create_EveryKind_ReturnsTheRequestedScopes(MachineCredentialKind kind)
     {
         var access = await CreateService().CreateMachineAccessAsync(Model(kind, Granted));
 
         access.CredentialKind.ShouldBe(kind);
-        access.ManagementScopes.ShouldBe(Granted);
+        access.Scopes.ShouldBe(Granted);
     }
 
     [Theory]
     [InlineData(MachineCredentialKind.ClientCredentials)]
     [InlineData(MachineCredentialKind.Federated)]
-    public async Task Create_TheServiceOfTheKind_GetsTheManagementScopes(MachineCredentialKind kind)
+    public async Task Create_TheServiceOfTheKind_GetsTheScopes(MachineCredentialKind kind)
     {
         await CreateService().CreateMachineAccessAsync(Model(kind, Granted));
 
-        _forwarded.ShouldHaveSingleItem().ManagementScopes.ShouldBe(Granted);
+        _forwarded.ShouldHaveSingleItem().Scopes.ShouldBe(Granted);
     }
 
     [Theory]
     [InlineData(MachineCredentialKind.Certificate)]
     [InlineData(MachineCredentialKind.CertificateAndApiKey)]
-    public async Task Create_TheCertificateRecord_CarriesTheManagementScopes(MachineCredentialKind kind)
+    public async Task Create_TheCertificateRecord_CarriesTheScopes(MachineCredentialKind kind)
     {
         await CreateService().CreateMachineAccessAsync(Model(kind, Granted));
 
         var record = _records.ShouldHaveSingleItem();
         record.CredentialKind.ShouldBe(kind);
-        record.ManagementScopes.ShouldBe(Granted);
+        record.Scopes.ShouldBe(Granted);
     }
 
     [Theory]
     [InlineData(MachineCredentialKind.ApiKey, false)]
     [InlineData(MachineCredentialKind.CertificateAndApiKey, false)]
     [InlineData(MachineCredentialKind.CertificateAndApiKey, true)]
-    public async Task Create_TheApiKey_CarriesTheManagementScopes(MachineCredentialKind kind, bool useSharedCertificate)
+    public async Task Create_TheApiKey_CarriesTheScopes(MachineCredentialKind kind, bool useSharedCertificate)
     {
         var access = await CreateService().CreateMachineAccessAsync(Model(kind, Granted) with { UseSharedCertificate = useSharedCertificate });
 
-        access.ManagementScopes.ShouldBe(Granted);
-        _hashStore.Entries.ShouldHaveSingleItem().Value.ManagementScopes.ShouldBe(Granted);
-        (await _hashStore.Validator.ValidateAsync(access.AccessKey)).ShouldNotBeNull().ManagementScopes.ShouldBe(Granted);
+        access.Scopes.ShouldBe(Granted);
+        _hashStore.Entries.ShouldHaveSingleItem().Value.Scopes.ShouldBe(Granted);
+        (await _hashStore.Validator.ValidateAsync(access.AccessKey)).ShouldNotBeNull().Scopes.ShouldBe(Granted);
     }
 
+    // The API refuses a machine without a runtime scope; a missing list still reaches no record as null.
     [Theory]
     [InlineData(MachineCredentialKind.ApiKey)]
     [InlineData(MachineCredentialKind.Certificate)]
     [InlineData(MachineCredentialKind.CertificateAndApiKey)]
-    public async Task Create_WithoutManagementScopes_RecordsNone(MachineCredentialKind kind)
+    public async Task Create_WithoutScopes_RecordsAnEmptyList(MachineCredentialKind kind)
     {
         var access = await CreateService().CreateMachineAccessAsync(Model(kind, null));
 
-        access.ManagementScopes.ShouldBeNull();
-        _records.ShouldAllBe(record => record.ManagementScopes == null);
-        _hashStore.Entries.Values.ShouldAllBe(entry => entry.ManagementScopes == null);
+        access.Scopes.ShouldBeEmpty();
+        _records.ShouldAllBe(record => record.Scopes.Count == 0);
+        _hashStore.Entries.Values.ShouldAllBe(entry => entry.Scopes.Count == 0);
     }
 
     // A new secret keeps what the machine was granted, and the new key carries it.
     [Fact]
-    public async Task Reset_TheApiKey_KeepsTheManagementScopes()
+    public async Task Reset_TheApiKey_KeepsTheScopes()
     {
         var service = CreateService();
         var access = await service.CreateMachineAccessAsync(Model(MachineCredentialKind.ApiKey, Granted));
@@ -127,22 +137,21 @@ public class PolicyAwareManagementScopesTests
         newKey.ShouldNotBeNull();
         var validated = await _hashStore.Validator.ValidateAsync(newKey);
         validated.ShouldNotBeNull();
-        validated.ManagementScopes.ShouldBe(Granted);
+        validated.Scopes.ShouldBe(Granted);
         (await _hashStore.Validator.ValidateAsync(access.AccessKey)).ShouldBeNull();
     }
 
-    private static MachineAccessCreate Model(MachineCredentialKind kind, IReadOnlyList<MachineManagementScope>? managementScopes)
+    private static MachineAccessCreate Model(MachineCredentialKind kind, IReadOnlyList<MachineScope>? scopes)
     {
         return new MachineAccessCreate
         {
             Organization = "org1",
             Project = "proj1",
-            Scope = MachineAccessScope.DefaultRead,
+            Scopes = scopes,
             CredentialKind = kind,
             FederationRules = kind == MachineCredentialKind.Federated
                 ? [new FederationRule { Issuer = "github", Audience = "urn:test:storyteller", Subject = "repo:acme/app:ref:refs/heads/main" }]
                 : null,
-            ManagementScopes = managementScopes,
         };
     }
 
@@ -153,8 +162,7 @@ public class PolicyAwareManagementScopesTests
             Id = "3b0f9d3e-8f43-4a8e-9a0c-2f7d3c1e5b6a",
             ObjectId = "3b0f9d3e-8f43-4a8e-9a0c-2f7d3c1e5b6a",
             AccessKey = string.Empty,
-            Scope = model.Scope,
-            ManagementScopes = model.ManagementScopes,
+            Scopes = model.Scopes ?? [],
         };
     }
 
@@ -183,10 +191,9 @@ public class PolicyAwareManagementScopesTests
             string project,
             string machineAccessId,
             string hashedSecret,
-            MachineAccessScope scope,
-            IReadOnlyList<MachineManagementScope>? managementScopes = null)
+            IReadOnlyList<MachineScope> scopes)
         {
-            Entries[$"{organization}.{project}.{machineAccessId}"] = new ApiKeyHashEntry(hashedSecret, scope, ManagementScopes: managementScopes);
+            Entries[$"{organization}.{project}.{machineAccessId}"] = new ApiKeyHashEntry(hashedSecret, scopes);
             return Task.CompletedTask;
         }
 

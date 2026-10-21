@@ -41,6 +41,29 @@ public class BindingsHttpTests
         catalog.Sources.ShouldBeEmpty();
     }
 
+    // For a machine the catalog is a configuration read, also for one restricted to an annotation: Configuration.Read,
+    // stored and carried. Unlike the views, Annotation.Read does not stand in for it.
+    [Fact]
+    public async Task GetBindingCatalog_ByARestrictedConfigurationReader_ReturnsTheCatalog()
+    {
+        var http = new BindingsHttp(new RoleAccess(AccountRole.None, "exe.northwind.invoicing.prod", scopes: [MachineScope.ConfigurationRead]));
+
+        var result = await http.GetBindingCatalog(TestRequests.Machine([MachineScope.ConfigurationRead]), "acme", "billing");
+
+        result.ShouldBeOfType<OkObjectResult>().Value.ShouldBeOfType<BindingCatalog>();
+    }
+
+    [Fact]
+    public async Task GetBindingCatalog_ByAMachineForAnnotationsOnly_IsAccessDenied()
+    {
+        var http = new BindingsHttp(new RoleAccess(AccountRole.None, scopes: [MachineScope.AnnotationRead, MachineScope.AnnotationWrite]));
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => http.GetBindingCatalog(TestRequests.Machine(), "acme", "billing"));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the scope Configuration.Read, which the machine was not created with.");
+    }
+
     [Fact]
     public void AddConfigurationBindings_RegistersTheExecutorAsTheCatalog()
     {
@@ -59,7 +82,7 @@ public class BindingsHttpTests
     {
         using var services = new ServiceCollection().BuildServiceProvider();
         var (context, request) = FunctionTestDoubles.CreateRequest(services);
-        context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim> { new("sub", "user-1"), new("scp", Scopes.Configuration.Read) };
+        context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim> { new("sub", "user-1"), new("scp", Scopes.User.Impersonation) };
         return request;
     }
 

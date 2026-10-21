@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Security.Claims;
-using System.Text;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.KeyValues;
@@ -13,14 +12,17 @@ using HttpRequestData = Microsoft.Azure.Functions.Worker.Http.HttpRequestData;
 
 namespace _42.Platform.Storyteller.Api.Security;
 
-// The outcome of GetSecretRightsAsync: the caller, and whether secrets were withheld because the machine has no mTLS.
-public sealed record SecretRights(KeyValueCaller Caller, bool IsWithheldByMtls)
+// The outcome of GetSecretRightsAsync: the caller, and per direction whether a right of the machine was withheld
+// because the request has no mTLS. A refusal names mTLS only for a right the machine has, where mTLS would help.
+public sealed record SecretRights(KeyValueCaller Caller, bool IsReadWithheldByMtls, bool IsWriteWithheldByMtls)
 {
     public const string WithheldHeader = "X-2S-Secrets-Withheld";
 
     public const string WithheldByMtls = "mtls-required";
 
     public bool CanReadSecrets => Caller.CanReadSecrets;
+
+    public bool CanWriteSecrets => Caller.CanWriteSecrets;
 
     // Makes the caller the ambient one of the request, for the paths without a caller parameter (binding reads).
     // Called by the handler itself: an AsyncLocal set inside an awaited method would not reach the handler's later calls.
@@ -33,7 +35,8 @@ public sealed record SecretRights(KeyValueCaller Caller, bool IsWithheldByMtls)
 
 public static class HttpRequestDataExtensions
 {
-    // Debug builds skip the scope and role checks (DEV_AUTH); tests of those checks look at this.
+    // Debug builds (DEV_AUTH) skip only the checks of users: User.Impersonation and the role. Machines are checked in
+    // every build. Tests of those checks look at this.
 #if DEV_AUTH
     public const bool IsDevelopmentAuthentication = true;
 #else
@@ -65,8 +68,8 @@ public static class HttpRequestDataExtensions
         return claims;
     }
 
-    // The scopes of the caller: scp, roles and the scope claims, without an App. prefix. Not skipped in Debug builds;
-    // CheckScope and TryCheckScope skip the check itself (DEV_AUTH).
+    // The scopes the credentials carry: scp, roles and the scope claims, without an App. prefix. For a machine they are
+    // the carried half of every scope check; for a user only User.Impersonation counts. Not skipped in Debug builds.
     public static IReadOnlySet<string> GetScopes(this HttpRequestData @this)
     {
         return @this.GetClaims()
@@ -74,34 +77,6 @@ public static class HttpRequestDataExtensions
             .SelectMany(c => c.Value.Split(' '))
             .Select(scope => scope.StartsWith("App.", StringComparison.OrdinalIgnoreCase) ? scope[4..] : scope)
             .ToHashSet();
-    }
-
-    public static void CheckScope(this HttpRequestData @this, params string[] scopes)
-    {
-#if DEV_AUTH
-        return;
-#endif
-        var claims = @this.GetClaims();
-        var allScopes = @this.GetScopes();
-
-        if (!scopes.Any(scope => allScopes.Contains(scope)))
-        {
-            // TODO: [P2] remove details from the exception message
-            var allInfo = new StringBuilder();
-            allInfo.AppendLine($"all available scopes: {string.Join(", ", allScopes)}");
-            allInfo.AppendLine($"all claims: {string.Join("; ", claims.Select(c => $"{c.Type}={c.Value}"))}");
-            allInfo.AppendLine($"identities: {string.Join("; ", @this.Identities.Select(i => $"{i.Name}|{i.IsAuthenticated}|{i.AuthenticationType}"))}");
-            allInfo.AppendLine("Missing scope(s): " + string.Join(", ", scopes));
-            throw new SecurityTokenException(allInfo.ToString());
-        }
-    }
-
-    public static bool TryCheckScope(this HttpRequestData @this, string scope)
-    {
-#if DEV_AUTH
-        return true;
-#endif
-        return @this.GetScopes().Contains(scope);
     }
 
     // Who makes the request, for every audit stamp: the machine, or the account (its sub) with a display name from
@@ -128,9 +103,12 @@ public static class HttpRequestDataExtensions
             string.IsNullOrEmpty(name) ? (string.IsNullOrEmpty(userName) ? null : userName) : name);
     }
 
-    // Who the caller is for key/value secrets, and whether it may receive secret values: a user needs
-    // ContributorWithSecrets (or the Configuration.Secrets scope), a machine needs the scope and, when the project
-    // says so, an mTLS certificate. Handlers call AsAmbient() on the result before they resolve bindings.
+    // Who the caller is for key/value secrets, and what it may do with secret values. A machine reads them with
+    // Secrets.Read and writes them with Secrets.Write, each stored on the machine and carried by its credentials, in
+    // every build; when the project delivers secrets only over mTLS and the request has none, both are withheld, and
+    // each is reported withheld only when the machine has it. A user needs ContributorWithSecrets for both, and no scope
+    // gives them; Debug builds (DEV_AUTH) skip that role check. Handlers call AsAmbient() on the result before they
+    // resolve bindings.
     public static async Task<SecretRights> GetSecretRightsAsync(
         this HttpRequestData @this,
         IAccessService accessService,
@@ -140,31 +118,48 @@ public static class HttpRequestDataExtensions
     {
         var actor = @this.GetAuditActor();
         var correlationId = @this.FunctionContext.InvocationId;
-        var hasSecretScope = @this.TryCheckScope(Scopes.Configuration.Secrets);
 
-        if (@this.TryGetApplicationIdentity(out _))
+        if (@this.TryGetApplicationIdentity(out var appId))
         {
+            // The machine of the access check of this request, or one point read when there was none.
+            var machine = GetStoredMachine(@this) ?? await accessService.GetMachineAccessAsync(organization, project, appId);
+            var granted = machine is null ? new HashSet<MachineScope>() : GetGrantedScopes(@this, machine);
+            var canRead = granted.Contains(MachineScope.SecretsRead);
+            var canWrite = granted.Contains(MachineScope.SecretsWrite);
             var channel = @this.FunctionContext.Items.ContainsKey(FunctionContextItemKeys.PresentingCertificateThumbprint)
                 ? KeyValueChannel.MachineMtls
                 : KeyValueChannel.MachineToken;
             var policy = await policies.GetAsync(organization, project);
-            var withheld = hasSecretScope && policy.RequireMtlsForSecretDelivery && channel != KeyValueChannel.MachineMtls;
-            var allowed = hasSecretScope && !withheld;
-            var machine = new KeyValueCaller(actor, allowed, allowed, channel) { CorrelationId = correlationId };
-            return new SecretRights(machine, withheld);
+            var withheld = policy.RequireMtlsForSecretDelivery && channel != KeyValueChannel.MachineMtls;
+            var machineCaller = new KeyValueCaller(actor, canRead && !withheld, canWrite && !withheld, channel) { CorrelationId = correlationId };
+            return new SecretRights(machineCaller, IsReadWithheldByMtls: canRead && withheld, IsWriteWithheldByMtls: canWrite && withheld);
         }
 
-        var canUseSecrets = hasSecretScope;
+#if DEV_AUTH
+        var canUseSecrets = true;
+#else
+        var canUseSecrets = false;
 
-        if (!canUseSecrets && @this.TryCheckScope(Scopes.User.Impersonation))
+        // A token that does not act for a user has no account to look up; the access check refused it already.
+        if (@this.GetScopes().Contains(Scopes.User.Impersonation))
         {
             var accountId = @this.GetIdentityUniqueId();
             var accessRole = await accessService.GetAccountRoleAsync(accountId, $"{organization}.{project}");
             canUseSecrets = accessRole >= AccountRole.ContributorWithSecrets;
         }
+#endif
 
         var user = new KeyValueCaller(actor, canUseSecrets, canUseSecrets, KeyValueChannel.User) { CorrelationId = correlationId };
-        return new SecretRights(user, IsWithheldByMtls: false);
+        return new SecretRights(user, IsReadWithheldByMtls: false, IsWriteWithheldByMtls: false);
+    }
+
+    // The scopes a machine may use in this request: stored on the machine and carried by its credentials. It reads the
+    // machine of the access check (the view transfer checks its kinds with it), so it is called after one, for machines.
+    public static IReadOnlySet<MachineScope> GetGrantedMachineScopes(this HttpRequestData @this)
+    {
+        var machine = GetStoredMachine(@this)
+            ?? throw new InvalidOperationException("The scopes of a machine are known only after the access check of the machine.");
+        return GetGrantedScopes(@this, machine);
     }
 
     // Response headers through the ASP.NET Core integration; a test context without it is left alone.
@@ -184,12 +179,6 @@ public static class HttpRequestDataExtensions
         @this.SetResponseHeader("Cache-Control", "no-store");
     }
 
-    // An operation of the whole access point. A machine restricted to an annotation is refused (403 AnnotationRestricted).
-    public static Task CheckAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole = AccountRole.Reader)
-    {
-        return CheckAccessAsync(@this, accessService, accessPointKey, minimalRole, static restriction => restriction.EnsureUnrestricted());
-    }
-
     // An authenticated user without the role gets 403, never 401, so clients do not sign in again for nothing.
     public static void EnsureRole(AccountRole actualRole, AccountRole minimalRole, string accessPointKey)
     {
@@ -199,68 +188,106 @@ public static class HttpRequestDataExtensions
         }
     }
 
-    public static Task CheckAccessToOrganizationAsync(
+    // The guard of a route for users only: a machine is refused in every build (403, whatever its credentials carry),
+    // with the route's own message when it has one. Then the token must act for a user (User.Impersonation, 401),
+    // which Debug builds (DEV_AUTH) skip.
+    public static void EnsureUser(this HttpRequestData @this, string? machineMessage = null)
+    {
+        if (@this.IsApplicationIdentity())
+        {
+            throw new AccessDeniedException(machineMessage ?? "Only users may call this operation; machines cannot.");
+        }
+
+#if !DEV_AUTH
+        EnsureActsForUser(@this);
+#endif
+    }
+
+    // A route for users only, on an access point (an organization, or organization.project): EnsureUser, then the role
+    // (403), which Debug builds (DEV_AUTH) skip.
+    public static async Task CheckUserAccessToAsync(this HttpRequestData @this, IAccessService accessService, string accessPointKey, AccountRole minimalRole)
+    {
+        await CheckUserAccessAsync(@this, accessService, accessPointKey, minimalRole);
+    }
+
+    public static async Task CheckUserAccessToOrganizationAsync(
         this HttpRequestData @this,
         IAccessService accessService,
         string organization,
-        AccountRole minimalRole = AccountRole.Reader)
+        AccountRole minimalRole)
     {
-        return CheckAccessToAsync(@this, accessService, organization, minimalRole);
+        await CheckUserAccessAsync(@this, accessService, organization, minimalRole);
+    }
+
+    public static async Task CheckUserAccessToProjectAsync(
+        this HttpRequestData @this,
+        IAccessService accessService,
+        string organization,
+        string project,
+        AccountRole minimalRole)
+    {
+        await CheckUserAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole);
     }
 
     // An operation of the whole project (lists, key/values, templates, type-level schemas, transfers). A machine
-    // restricted to an annotation is refused. A management operation names its management scope, which a machine
-    // needs on top of its runtime scopes (403 AccessDenied); users are not affected by it.
+    // restricted to an annotation is refused. A machine needs every scope, in the order given: the runtime scope
+    // first, then the management scope of a management operation. Users need the role, never a scope.
     public static Task CheckAccessToProjectAsync(
         this HttpRequestData @this,
         IAccessService accessService,
         string organization,
         string project,
-        AccountRole minimalRole = AccountRole.Reader,
-        MachineManagementScope? managementScope = null)
+        AccountRole minimalRole,
+        MachineScope scope,
+        params MachineScope[] moreScopes)
     {
-        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, static restriction => restriction.EnsureUnrestricted(), managementScope);
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, static restriction => restriction.EnsureUnrestricted(), [scope, .. moreScopes], needsAnyScope: false);
     }
 
     // Project metadata without annotation data (the views, the binding catalog): every machine of the project reads it,
-    // also one restricted to an annotation.
+    // also one restricted to an annotation. A machine needs one of the scopes, any one.
     public static Task CheckAccessToProjectMetadataAsync(
         this HttpRequestData @this,
         IAccessService accessService,
         string organization,
         string project,
-        AccountRole minimalRole = AccountRole.Reader)
+        AccountRole minimalRole,
+        MachineScope scope,
+        params MachineScope[] orScopes)
     {
-        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, static _ => { });
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, static _ => { }, [scope, .. orScopes], needsAnyScope: true);
     }
 
     // An operation on one annotation and what lies below it. A machine restricted to an annotation passes for that
     // annotation and its descendants. The key is the raw text of the request, parsed the way the handler parses it
-    // afterwards; a key that does not parse is outside of every restriction.
+    // afterwards; a key that does not parse is outside of every restriction. A machine needs every scope, in order.
     public static Task CheckAccessToAnnotationAsync(
         this HttpRequestData @this,
         IAccessService accessService,
         string organization,
         string project,
         string annotationKey,
-        AccountRole minimalRole = AccountRole.Reader,
-        MachineManagementScope? managementScope = null)
+        AccountRole minimalRole,
+        MachineScope scope,
+        params MachineScope[] moreScopes)
     {
-        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows([annotationKey]), managementScope);
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows([annotationKey]), [scope, .. moreScopes], needsAnyScope: false);
     }
 
     // An operation on several annotations (the keys of a bulk body): a restricted machine needs every key in its scope.
-    // Returns the restriction (None for users) for handlers that also filter what the operation answers.
+    // Returns the restriction (None for users) for handlers that also filter what the operation answers. A machine
+    // needs every scope, in order.
     public static Task<MachineAnnotationRestriction> CheckAccessToAnnotationsAsync(
         this HttpRequestData @this,
         IAccessService accessService,
         string organization,
         string project,
         IEnumerable<string?> annotationKeys,
-        AccountRole minimalRole = AccountRole.Reader,
-        MachineManagementScope? managementScope = null)
+        AccountRole minimalRole,
+        MachineScope scope,
+        params MachineScope[] moreScopes)
     {
-        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows(annotationKeys), managementScope);
+        return CheckAccessAsync(@this, accessService, $"{organization}.{project}", minimalRole, restriction => restriction.EnsureAllows(annotationKeys), [scope, .. moreScopes], needsAnyScope: false);
     }
 
     public static string GetIdentityUniqueName(this HttpRequestData @this)
@@ -350,17 +377,18 @@ public static class HttpRequestDataExtensions
         throw new SecurityTokenException($"Missing {claimTypes[0]} claim.");
     }
 
-    // Machines: the machine document of the project (401 without it), the credential policy, what the operation reaches
-    // against the annotation restriction of the machine (403 AnnotationRestricted), and then the management scope of a
-    // management operation (403 AccessDenied). Machine credentials are checked for real in every build, so this runs in
-    // Debug (DEV_AUTH) too; Debug builds skip only the role check of users, who never need a management scope.
+    // Machines: the machine document of the project (401 without it; a federated machine also gets its project and
+    // kind checked), the credential policy (401), what the operation reaches against the annotation restriction of the
+    // machine (403 AnnotationRestricted), and then the scopes of the operation (403 AccessDenied). Machines have no
+    // role and are checked in every build, Debug (DEV_AUTH) too. Users: the checks of CheckUserAccessAsync.
     private static async Task<MachineAnnotationRestriction> CheckAccessAsync(
         HttpRequestData request,
         IAccessService accessService,
         string accessPointKey,
         AccountRole minimalRole,
         Action<MachineAnnotationRestriction> ensureReach,
-        MachineManagementScope? managementScope = null)
+        IReadOnlyList<MachineScope> scopes,
+        bool needsAnyScope)
     {
         if (request.TryGetApplicationIdentity(out var appId))
         {
@@ -371,48 +399,127 @@ public static class HttpRequestDataExtensions
                 throw new SecurityTokenException("An application can never access an organization.");
             }
 
-            // A federated machine: one point read checks the kind and the scopes of its token too.
+            // A federated machine: one point read checks the project and the kind of its token too.
             var machine = FederatedMachineAccess.IsFederated(request.FunctionContext)
                 ? await FederatedMachineAccess.EnsureAllowedAsync(request, accessService, segments[0], segments[1], appId)
                 : await accessService.GetMachineAccessAsync(segments[0], segments[1], appId)
                     ?? throw new SecurityTokenException($"The application {appId} doesn't has access to the project {accessPointKey}.");
 
+            // Kept for the secret rights and the view transfer of this request, so they need no second read.
+            request.FunctionContext.Items[FunctionContextItemKeys.StoredMachine] = machine;
+
             await MachineCredentialPolicy.EnsureAllowedAsync(request.FunctionContext, segments[0], segments[1]);
             var restriction = MachineAnnotationRestriction.From(machine.AnnotationKey);
             ensureReach(restriction);
 
-            if (managementScope is { } required)
+            if (needsAnyScope)
             {
-                EnsureManagementScope(request, machine, required);
+                EnsureAnyMachineScope(request, machine, scopes);
+            }
+            else
+            {
+                EnsureMachineScopes(request, machine, scopes);
             }
 
             return restriction;
         }
 
-#if !DEV_AUTH
-        var accountId = request.GetIdentityUniqueId();
-        var accessRole = await accessService.GetAccountRoleAsync(accountId, accessPointKey);
-        EnsureRole(accessRole, minimalRole, accessPointKey);
-#endif
+        await CheckUserAccessAsync(request, accessService, accessPointKey, minimalRole);
         return MachineAnnotationRestriction.None;
     }
 
-    // The machine document is the source of truth and the credentials can only narrow it: the scope must be stored on the
-    // machine, so an app role or a provider permission added outside Storyteller grants nothing, and carried by the
-    // request, so a federated token that asked for a subset stays within it.
-    private static void EnsureManagementScope(HttpRequestData request, IMachineAccess machine, MachineManagementScope managementScope)
+    // Users: EnsureUser, then the role on the access point (403). Debug builds (DEV_AUTH) skip User.Impersonation and
+    // the role, so they also serve requests without an identity. Called by async methods only, so what EnsureUser
+    // throws ends in their task.
+    private static Task CheckUserAccessAsync(HttpRequestData request, IAccessService accessService, string accessPointKey, AccountRole minimalRole)
     {
-        var scope = MachineAccessScopes.Get(managementScope)
-            ?? throw new ArgumentOutOfRangeException(nameof(managementScope), managementScope, "Not a management scope.");
+        request.EnsureUser();
+#if DEV_AUTH
+        return Task.CompletedTask;
+#else
+        return EnsureUserRoleAsync(request, accessService, accessPointKey, minimalRole);
+#endif
+    }
 
-        if (machine.ManagementScopes?.Contains(managementScope) != true)
+    private static async Task EnsureUserRoleAsync(HttpRequestData request, IAccessService accessService, string accessPointKey, AccountRole minimalRole)
+    {
+        var accountId = request.GetIdentityUniqueId();
+        var accessRole = await accessService.GetAccountRoleAsync(accountId, accessPointKey);
+        EnsureRole(accessRole, minimalRole, accessPointKey);
+    }
+
+    // A user token carries User.Impersonation; data scopes in it are ignored, the role decides.
+    private static void EnsureActsForUser(HttpRequestData request)
+    {
+        if (!request.GetScopes().Contains(Scopes.User.Impersonation))
         {
-            throw new AccessDeniedException($"This operation needs the management scope {scope}, which the machine was not created with.");
+            throw new SecurityTokenException($"The token does not act for a user: the scope {Scopes.User.Impersonation} is missing.");
+        }
+    }
+
+    // The machine document is the source of truth and the credentials can only narrow it: each scope must be stored on
+    // the machine, so an app role or a provider permission added outside Storyteller grants nothing, and carried by the
+    // request, so a federated token that asked for a subset stays within it.
+    private static void EnsureMachineScopes(HttpRequestData request, IMachineAccess machine, IReadOnlyList<MachineScope> scopes)
+    {
+        var carried = request.GetScopes();
+
+        foreach (var scope in scopes)
+        {
+            var name = ToScopeString(scope);
+
+            if (!machine.Scopes.Contains(scope))
+            {
+                throw new AccessDeniedException($"This operation needs the scope {name}, which the machine was not created with.");
+            }
+
+            if (!carried.Contains(name))
+            {
+                throw new AccessDeniedException($"This operation needs the scope {name}, which the credentials of the machine do not carry.");
+            }
+        }
+    }
+
+    // One of the scopes is enough. Without any of them stored the machine was not created for the operation; with
+    // some stored but none of those carried, its credentials narrowed it out.
+    private static void EnsureAnyMachineScope(HttpRequestData request, IMachineAccess machine, IReadOnlyList<MachineScope> scopes)
+    {
+        var carried = request.GetScopes();
+        var stored = scopes.Where(scope => machine.Scopes.Contains(scope)).ToList();
+
+        if (stored.Any(scope => carried.Contains(ToScopeString(scope))))
+        {
+            return;
         }
 
-        if (!request.GetScopes().Contains(scope))
-        {
-            throw new AccessDeniedException($"This operation needs the management scope {scope}, which the credentials of the machine do not carry.");
-        }
+        var names = scopes.Select(ToScopeString).Distinct().ToList();
+        var needs = names.Count < 2
+            ? $"the scope {names[0]}"
+            : $"one of the scopes {string.Join(", ", names.Take(names.Count - 1))} or {names[^1]}";
+
+        throw new AccessDeniedException(stored.Count == 0
+            ? $"This operation needs {needs}, which the machine was not created with."
+            : $"This operation needs {needs}, which the credentials of the machine do not carry.");
+    }
+
+    private static string ToScopeString(MachineScope scope)
+    {
+        return MachineScopes.ToScopeString(scope)
+            ?? throw new ArgumentOutOfRangeException(nameof(scope), scope, "Not a machine scope.");
+    }
+
+    private static IMachineAccess? GetStoredMachine(HttpRequestData request)
+    {
+        return request.FunctionContext.Items.TryGetValue(FunctionContextItemKeys.StoredMachine, out var value)
+            ? value as IMachineAccess
+            : null;
+    }
+
+    private static HashSet<MachineScope> GetGrantedScopes(HttpRequestData request, IMachineAccess machine)
+    {
+        var carried = request.GetScopes();
+        return machine.Scopes
+            .Where(scope => MachineScopes.ToScopeString(scope) is { } name && carried.Contains(name))
+            .ToHashSet();
     }
 }

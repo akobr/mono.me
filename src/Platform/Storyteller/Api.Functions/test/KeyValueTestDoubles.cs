@@ -1,5 +1,4 @@
 using System.Collections.Specialized;
-using System.Security.Claims;
 
 using _42.Platform.Storyteller.Accessing;
 using _42.Platform.Storyteller.Accessing.Model;
@@ -10,59 +9,44 @@ using _42.Platform.Storyteller.KeyValues.Audit;
 using _42.Platform.Storyteller.KeyValues.Policy;
 using _42.Platform.Storyteller.KeyValues.Usage;
 
-using Microsoft.Extensions.DependencyInjection;
-
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
-// Requests of the key/value tests: a user with a project role, or a machine with roles and an optional mTLS certificate.
-// A machine's credentials carry its management scopes as roles too, as the machine validators put them. A body goes as
-// JSON, with its content type.
+// Requests of the key/value tests: a user with a project role, or a machine with scopes and an optional mTLS
+// certificate. A user token carries only User.Impersonation: user secret rights come from the role. A machine's
+// credentials carry scope strings as roles, as the machine validators put them. A body goes as JSON, with its content
+// type.
 internal static class KeyValueRequests
 {
-    public const string UserScopes = "User.Impersonation Default.Read Default.ReadWrite";
+    public const string UserScopes = Scopes.User.Impersonation;
 
-    public static TestHttpRequestData User(string method = "GET", bool secretsScope = false, Action<NameValueCollection>? query = null, string? body = null)
+    // The runtime scopes of a key/value machine: the configuration and its secrets.
+    public static IReadOnlyList<string> MachineRoles { get; } =
+        [Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Secrets.Read, Scopes.Secrets.Write];
+
+    public static TestHttpRequestData User(string method = "GET", Action<NameValueCollection>? query = null, string? body = null)
     {
-        var (context, request) = CreateRequest(method, body);
-        context.Items[FunctionContextItemKeys.CachedClaims] = new List<Claim>
-        {
-            new("sub", "user-1"),
-            new("preferred_username", "ada@example.com"),
-            new("name", "Ada"),
-            new("scp", secretsScope ? $"{UserScopes} {Scopes.Configuration.Secrets}" : UserScopes),
-        };
+        var request = TestRequests.User(method, body);
         query?.Invoke(request.Query);
         return request;
     }
 
+    // roles replaces the default runtime scope strings; managementScopes adds scopes on top of them.
     public static TestHttpRequestData Machine(
         bool mtls,
         string method = "GET",
         Action<NameValueCollection>? query = null,
         string? body = null,
-        IReadOnlyList<MachineManagementScope>? managementScopes = null,
+        IReadOnlyList<MachineScope>? managementScopes = null,
         params string[] roles)
     {
-        var (context, request) = CreateRequest(method, body);
-        var claims = new List<Claim> { new("sub", "machine-1") };
-        claims.AddRange((roles.Length == 0 ? [Scopes.Configuration.Read, Scopes.Configuration.Write, Scopes.Configuration.Secrets] : roles).Select(role => new Claim("roles", role)));
-        claims.AddRange((managementScopes ?? []).Select(scope => new Claim("roles", MachineAccessScopes.Get(scope)!)));
-        context.Items[FunctionContextItemKeys.CachedClaims] = claims;
-        context.Items[FunctionContextItemKeys.MachineIdentity] = "machine-1";
-
-        if (mtls)
-        {
-            context.Items[FunctionContextItemKeys.PresentingCertificateThumbprint] = "ABCD";
-        }
-
+        IEnumerable<string> carried = roles.Length == 0 ? MachineRoles : roles;
+        var request = TestRequests.MachineCarrying(
+            [.. carried, .. MachineScopes.ToScopeStrings(managementScopes ?? [])],
+            method,
+            body,
+            mtls: mtls);
         query?.Invoke(request.Query);
         return request;
-    }
-
-    private static (TestFunctionContext Context, TestHttpRequestData Request) CreateRequest(string method, string? body)
-    {
-        var headers = body is null ? null : FunctionTestDoubles.JsonContentType();
-        return FunctionTestDoubles.CreateRequest(new ServiceCollection().BuildServiceProvider(), headers, method, body);
     }
 }
 
@@ -79,11 +63,13 @@ internal sealed class FixedKeyValuePolicies(bool requireMtls = true, KeyValuePol
 }
 
 // Every user has the given role on every access point; every machine has access to every project, restricted to the
-// given annotation when there is one, and with the given management scopes (none by default).
+// given annotation when there is one. It stores the six runtime scopes plus the given management scopes (none by
+// default), or exactly the given scopes, for the tests of a scope the machine was not created with.
 internal sealed class RoleAccess(
     AccountRole role,
     string? machineAnnotationKey = null,
-    IReadOnlyList<MachineManagementScope>? managementScopes = null) : IAccessService
+    IReadOnlyList<MachineScope>? managementScopes = null,
+    IReadOnlyList<MachineScope>? scopes = null) : IAccessService
 {
     public Task<AccountRole> GetAccountRoleAsync(string accountId, string accessPointKey) => Task.FromResult(role);
 
@@ -119,9 +105,8 @@ internal sealed class RoleAccess(
             Id = id,
             ObjectId = id,
             AccessKey = "***",
-            Scope = MachineAccessScope.SecretsReadWrite,
+            Scopes = scopes ?? MachineScopes.Normalize([.. MachineScopes.Runtime, .. managementScopes ?? []]),
             AnnotationKey = machineAnnotationKey,
-            ManagementScopes = managementScopes,
         });
 
     public Task<MachineAccess> CreateMachineAccessAsync(MachineAccessCreate model) => throw new NotSupportedException();
@@ -222,6 +207,12 @@ internal sealed class RecordingKeyValueService : IKeyValueService
     {
         Calls.Add($"version:{key}:{version}");
         LastCaller = caller;
+
+        if (Pair is { IsSecret: true } && reveal && !caller.CanReadSecrets)
+        {
+            throw KeyValueErrors.SecretRightsRequired(key);
+        }
+
         return Task.FromResult(Pair is null ? null : Pair with { Version = version, Value = reveal || !Pair.IsSecret ? Pair.Value : null });
     }
 

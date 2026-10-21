@@ -16,6 +16,8 @@ namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 public class CertificatesHttpTests
 {
+    private static bool DevAuth => HttpRequestDataExtensions.IsDevelopmentAuthentication;
+
     // Without the shared certificate service, the body is never read.
     [Theory]
     [InlineData("")]
@@ -67,12 +69,87 @@ public class CertificatesHttpTests
         backend.Calls.ShouldBe(["policy:acme.billing", "label:acme.billing:build-agent", "issue:acme.billing:build-agent:30", "store:acme.billing:THUMBPRINT"]);
     }
 
-    private static CertificatesHttp CreateHttp(SharedCertificateService? sharedCertService)
+    // Shared certificates are managed by users (spec 7.4): a machine is refused in every build, also one whose
+    // credentials carry every scope and User.Impersonation, before the body is read or a certificate is listed, issued or
+    // revoked.
+    [Fact]
+    public async Task SharedCertificateRoutes_Machine_IsAccessDeniedInEveryBuild()
+    {
+        var backend = new SharedCertificateBackend();
+        var http = CreateHttp(backend.CreateService());
+        var body = FunctionTestDoubles.ToJsonBody(new SharedCertificateCreate { Label = "build-agent", LifetimeDays = 30 });
+
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.GetSharedCertificates(UserOnlyRoutes.Machine(), "acme", "billing"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.PostSharedCertificate(UserOnlyRoutes.Machine("POST", body), "acme", "billing"));
+        await UserOnlyRoutes.ShouldRefuseMachineAsync(() => http.DeleteSharedCertificate(UserOnlyRoutes.Machine("DELETE"), "acme", "billing", "THUMBPRINT"));
+
+        backend.Calls.ShouldBeEmpty();
+    }
+
+    // They need an Administrator; a user role check, so Debug builds (DEV_AUTH) skip it.
+    [Fact]
+    public async Task SharedCertificateRoutes_ByAContributor_AreAccessDenied()
+    {
+        if (DevAuth)
+        {
+            return;
+        }
+
+        var backend = new SharedCertificateBackend();
+        var http = CreateHttp(backend.CreateService(), role: AccountRole.ContributorWithSecrets);
+        var body = FunctionTestDoubles.ToJsonBody(new SharedCertificateCreate { Label = "build-agent", LifetimeDays = 30 });
+
+        foreach (var call in new Func<Task>[]
+                 {
+                     () => http.GetSharedCertificates(TestRequests.User(), "acme", "billing"),
+                     () => http.PostSharedCertificate(UserRequest(body), "acme", "billing"),
+                     () => http.DeleteSharedCertificate(TestRequests.User("DELETE"), "acme", "billing", "THUMBPRINT"),
+                 })
+        {
+            (await Should.ThrowAsync<AccessDeniedException>(call)).Message.ShouldBe("No Administrator access to 'acme.billing'.");
+        }
+
+        backend.Calls.ShouldBeEmpty();
+    }
+
+    // A machine renews its own certificate: the presented certificate identifies it, and it needs no scope.
+    [Fact]
+    public async Task PostRenewCertificate_TheMachineOfTheRoute_RenewsWithoutAScope()
+    {
+        var renewal = new RecordingRenewal();
+        var http = CreateHttp(sharedCertService: null, renewal: renewal);
+
+        var result = await http.PostRenewCertificate(TestRequests.Machine([], "POST", mtls: true), "acme", "billing", TestRequests.MachineId);
+
+        result.ShouldBeOfType<OkObjectResult>();
+        renewal.Calls.ShouldBe([$"acme.billing:{TestRequests.MachineId}:ABCD"]);
+    }
+
+    // The renewal stays machine-only by identity (spec 7.4): a user, another machine and a machine without its
+    // certificate are 401, in every build.
+    [Fact]
+    public async Task PostRenewCertificate_ByAUserAnotherMachineOrWithoutTheCertificate_IsUnauthorized()
+    {
+        var renewal = new RecordingRenewal();
+        var http = CreateHttp(sharedCertService: null, renewal: renewal);
+
+        (await http.PostRenewCertificate(TestRequests.User("POST"), "acme", "billing", TestRequests.MachineId)).ShouldBeOfType<UnauthorizedResult>();
+        (await http.PostRenewCertificate(TestRequests.Machine(method: "POST", machineId: "machine-2", mtls: true), "acme", "billing", TestRequests.MachineId)).ShouldBeOfType<UnauthorizedResult>();
+        (await http.PostRenewCertificate(TestRequests.Machine(method: "POST"), "acme", "billing", TestRequests.MachineId)).ShouldBeOfType<UnauthorizedResult>();
+
+        renewal.Calls.ShouldBeEmpty();
+    }
+
+    private static CertificatesHttp CreateHttp(
+        SharedCertificateService? sharedCertService,
+        AccountRole role = AccountRole.Administrator,
+        ICertificateRenewalService? renewal = null)
     {
         return new CertificatesHttp(
-            new RoleAccess(AccountRole.Administrator),
+            new RoleAccess(role),
             FunctionTestDoubles.ApiJsonOptions,
             NullLogger<CertificatesHttp>.Instance,
+            renewalService: renewal,
             sharedCertService: sharedCertService);
     }
 
@@ -142,7 +219,18 @@ public class CertificatesHttpTests
 
         public Task<bool> RevokeAsync(string organization, string project, string thumbprint) => throw new NotSupportedException();
 
-        public Task<IssuedCertificate> IssueCertificateAsync(string organization, string project, string machineAccessId, MachineAccessScope scope, int lifetimeDays)
+        public Task<IssuedCertificate> IssueCertificateAsync(string organization, string project, string machineAccessId, int lifetimeDays)
             => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingRenewal : ICertificateRenewalService
+    {
+        public List<string> Calls { get; } = [];
+
+        public Task<CertificateRenewalResult> RenewAsync(string organization, string project, string machineAccessId, string presentingThumbprint)
+        {
+            Calls.Add($"{organization}.{project}:{machineAccessId}:{presentingThumbprint}");
+            return Task.FromResult(new CertificateRenewalResult { Outcome = CertificateRenewalOutcome.Success, Thumbprint = "RENEWED" });
+        }
     }
 }

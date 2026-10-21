@@ -45,7 +45,7 @@ public sealed class StorytellerTokenIssuerAndValidatorTests
         token.Audiences.ShouldBe([Audience]);
         token.Subject.ShouldBe(MachineId);
         token.GetPayloadValue<string>("client_id").ShouldBe(MachineId);
-        token.GetPayloadValue<string>("scope").ShouldBe("Default.Read Annotation.Read");
+        token.GetPayloadValue<string>("scope").ShouldBe("Annotation.Read Configuration.Read");
         token.GetPayloadValue<string>("organization").ShouldBe("org1");
         token.GetPayloadValue<string>("project").ShouldBe("proj1");
         token.GetPayloadValue<string>("annotation_key").ShouldBe("unit.service");
@@ -81,8 +81,8 @@ public sealed class StorytellerTokenIssuerAndValidatorTests
         [
             ("azp", MachineId),
             ("sub", MachineId),
-            ("roles", "Default.Read"),
             ("roles", "Annotation.Read"),
+            ("roles", "Configuration.Read"),
             ("annotationKey", "unit.service"),
         ]);
     }
@@ -153,7 +153,7 @@ public sealed class StorytellerTokenIssuerAndValidatorTests
         var issued = await _issuer.IssueAsync(Request());
         var parts = issued.AccessToken.Split('.');
         var payload = JsonSerializer.Deserialize<Dictionary<string, object>>(Base64UrlEncoder.Decode(parts[1]))!;
-        payload["scope"] = "Default.Read Default.ReadWrite Configuration.Secrets";
+        payload["scope"] = "Annotation.Read Annotation.Write Secrets.Read Secrets.Write";
         var tampered = $"{parts[0]}.{Base64UrlEncoder.Encode(JsonSerializer.Serialize(payload))}.{parts[2]}";
 
         (await _validator.ValidateAsync(tampered)).ShouldBeNull();
@@ -229,7 +229,7 @@ public sealed class StorytellerTokenIssuerAndValidatorTests
             Organization = "org1",
             Project = "proj1",
             MachineId = MachineId,
-            Scopes = ["Default.Read", "Annotation.Read"],
+            Scopes = ["Annotation.Read", "Configuration.Read"],
             AnnotationKey = "unit.service",
             FederationIssuer = "github",
             FederationSubject = "repo:acme/app:ref:refs/heads/main",
@@ -255,7 +255,7 @@ public sealed class StorytellerTokenIssuerAndValidatorTests
             ["aud"] = Audience,
             ["sub"] = MachineId,
             ["client_id"] = MachineId,
-            ["scope"] = "Default.Read",
+            ["scope"] = "Annotation.Read",
             ["organization"] = "org1",
             ["project"] = "proj1",
             ["iat"] = now,

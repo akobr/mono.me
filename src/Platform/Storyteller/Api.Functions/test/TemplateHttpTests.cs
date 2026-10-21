@@ -11,10 +11,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace _42.Platform.Storyteller.Api.Functions.UnitTests;
 
 // The template writes: a template is merged into every configuration of its type in the view, so a machine needs the
-// management scope Template.Write for them on top of its runtime write scopes (424-57). The check reads the machine
-// document in every build: a machine without it is refused (403 AccessDenied) before the body is read and before any
-// service call. Users need no management scope; their role decides, as before (the role check runs in Release builds
-// only).
+// management scope Template.Write for them on top of the runtime scope Configuration.Write (424-57), checked in that
+// order. The check reads the machine document in every build: a machine without either is refused (403 AccessDenied)
+// before the body is read and before any service call. Users need no scope; their role decides, as before (the role
+// check runs in Release builds only).
 public class TemplateHttpTests
 {
     private const string Org = "acme";
@@ -48,7 +48,7 @@ public class TemplateHttpTests
         var exception = await Should.ThrowAsync<AccessDeniedException>(() => write.Invoke(http, MachineRequest(write)));
 
         exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
-        exception.Message.ShouldBe("This operation needs the management scope Template.Write, which the machine was not created with.");
+        exception.Message.ShouldBe("This operation needs the scope Template.Write, which the machine was not created with.");
     }
 
     // The other management scopes do not stand in for it, Schema.Write included.
@@ -57,7 +57,7 @@ public class TemplateHttpTests
     public async Task Write_ByAMachineWithEveryOtherManagementScope_IsAccessDenied(string name)
     {
         var write = Write(name);
-        var others = Enum.GetValues<MachineManagementScope>().Where(scope => scope != MachineManagementScope.TemplateWrite).ToList();
+        var others = MachineScopes.Management.Where(scope => scope != MachineScope.TemplateWrite).ToList();
         var http = Http(Untouched<IConfigurationTemplateService>(), new RoleAccess(AccountRole.None, managementScopes: others));
 
         var exception = await Should.ThrowAsync<AccessDeniedException>(() => write.Invoke(http, MachineRequest(write, others)));
@@ -71,12 +71,27 @@ public class TemplateHttpTests
     {
         var write = Write(name);
         var (templates, recorder) = Recording<IConfigurationTemplateService>();
-        var http = Http(templates, new RoleAccess(AccountRole.None, managementScopes: [MachineManagementScope.TemplateWrite]));
+        var http = Http(templates, new RoleAccess(AccountRole.None, managementScopes: [MachineScope.TemplateWrite]));
 
-        var result = await write.Invoke(http, MachineRequest(write, [MachineManagementScope.TemplateWrite]));
+        var result = await write.Invoke(http, MachineRequest(write, [MachineScope.TemplateWrite]));
 
         result.ShouldNotBeOfType<BadRequestObjectResult>();
         recorder.Calls.ShouldHaveSingleItem().Method.ShouldBe(write.Method);
+    }
+
+    // Template.Write grants nothing without the runtime scope Configuration.Write, which is checked first.
+    [Theory]
+    [MemberData(nameof(WriteNames))]
+    public async Task Write_ByAMachineWithTemplateWriteButWithoutConfigurationWrite_IsAccessDenied(string name)
+    {
+        var write = Write(name);
+        var http = Http(Untouched<IConfigurationTemplateService>(), new RoleAccess(AccountRole.None, scopes: [MachineScope.ConfigurationRead, MachineScope.TemplateWrite]));
+        var request = KeyValueRequests.Machine(mtls: false, write.HttpMethod, body: write.Body, roles: [Scopes.Configuration.Read, Scopes.Template.Write]);
+
+        var exception = await Should.ThrowAsync<AccessDeniedException>(() => write.Invoke(http, request));
+
+        exception.ErrorCode.ShouldBe(ErrorCodes.AccessDenied);
+        exception.Message.ShouldBe("This operation needs the scope Configuration.Write, which the machine was not created with.");
     }
 
     [Theory]
@@ -120,7 +135,7 @@ public class TemplateHttpTests
     }
 
     // A machine with the runtime write scopes of configurations, and the given management scopes in its credentials.
-    private static TestHttpRequestData MachineRequest(TemplateWrite write, IReadOnlyList<MachineManagementScope>? managementScopes = null)
+    private static TestHttpRequestData MachineRequest(TemplateWrite write, IReadOnlyList<MachineScope>? managementScopes = null)
     {
         return KeyValueRequests.Machine(mtls: false, write.HttpMethod, body: write.Body, managementScopes: managementScopes, roles: [Scopes.Configuration.Read, Scopes.Configuration.Write]);
     }

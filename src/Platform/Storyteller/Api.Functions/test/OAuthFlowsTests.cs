@@ -29,8 +29,7 @@ public class OAuthFlowsTests
 
         flows.Implicit.ShouldNotBeNull();
         flows.Implicit.AuthorizationUrl.ShouldBe(new Uri("https://login.microsoftonline.com/tenant-id/oauth2/v2.0/authorize"));
-        flows.Implicit.Scopes.Keys.ShouldContain("api://client-id/User.Impersonation");
-        flows.Implicit.Scopes.Count.ShouldBe(8);
+        flows.Implicit.Scopes.Keys.ShouldBe(["api://client-id/User.Impersonation"]);
         flows.ClientCredentials.ShouldNotBeNull();
         flows.ClientCredentials.TokenUrl.ShouldBe(new Uri("https://login.microsoftonline.com/tenant-id/oauth2/v2.0/token"));
         flows.ClientCredentials.Scopes.Keys.ShouldBe(["api://client-id/.default"]);

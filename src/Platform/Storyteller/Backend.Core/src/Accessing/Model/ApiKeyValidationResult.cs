@@ -4,6 +4,5 @@ public record ApiKeyValidationResult(
     string Organization,
     string Project,
     string MachineAccessId,
-    MachineAccessScope Scope,
-    MachineCredentialKind? CredentialKind = null,
-    IReadOnlyList<MachineManagementScope>? ManagementScopes = null);
+    IReadOnlyList<MachineScope> Scopes,
+    MachineCredentialKind? CredentialKind = null);

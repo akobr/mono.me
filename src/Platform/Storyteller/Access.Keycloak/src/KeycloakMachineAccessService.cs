@@ -11,8 +11,7 @@ namespace _42.Platform.Storyteller;
 
 // Machine access as Keycloak confidential clients with a service account. MachineAccess.Id is the
 // clientId (the token azp), ObjectId the client's internal ID. Two protocol mappers make the tokens
-// self-describing: the API audience and the machine's Storyteller scopes (storyteller_scope), the
-// management scopes included.
+// self-describing: the API audience and the scope strings of the machine's scopes (storyteller_scope).
 public class KeycloakMachineAccessService(
     IHttpClientFactory httpClientFactory,
     IOptions<KeycloakOptions> options,
@@ -51,10 +50,11 @@ public class KeycloakMachineAccessService(
                 ObjectId = internalId,
                 AccessKey = clientSecret,
                 AnnotationKey = model.AnnotationKey,
-                Scope = model.Scope,
+
+                // Exactly the scopes the token claims.
+                Scopes = MachineScopes.Normalize(model.Scopes),
                 CredentialKind = MachineCredentialKind.ClientCredentials,
                 TokenEndpoint = _options.GetTokenEndpoint(),
-                ManagementScopes = MachineAccessScopes.Normalize(model.ManagementScopes),
             };
         }
         catch
@@ -118,12 +118,12 @@ public class KeycloakMachineAccessService(
 
     internal JsonObject BuildClient(string clientId, MachineAccessCreate model)
     {
-        var managementScopes = MachineAccessScopes.Normalize(model.ManagementScopes);
+        var scopes = MachineScopes.Normalize(model.Scopes);
         var attributes = new JsonObject
         {
             ["42.organization"] = model.Organization,
             ["42.project"] = model.Project,
-            ["42.scope"] = model.Scope.ToString("G"),
+            ["42.scopes"] = string.Join(',', scopes),
         };
 
         if (model.AnnotationKey != null)
@@ -135,8 +135,7 @@ public class KeycloakMachineAccessService(
         {
             ["clientId"] = clientId,
             ["name"] = clientId,
-            ["description"] = $"organization={model.Organization}|project={model.Project}|scope={model.Scope:G}"
-                + (managementScopes is not null ? $"|manage={string.Join(',', managementScopes)}" : string.Empty)
+            ["description"] = $"organization={model.Organization}|project={model.Project}|scopes={string.Join(',', scopes)}"
                 + (model.AnnotationKey != null ? $"|annotation={model.AnnotationKey}" : string.Empty),
             ["enabled"] = true,
             ["serviceAccountsEnabled"] = true,
@@ -154,7 +153,7 @@ public class KeycloakMachineAccessService(
                 AccessTokenMapper("storyteller-scope", "oidc-hardcoded-claim-mapper", new JsonObject
                 {
                     ["claim.name"] = ScopeClaimType,
-                    ["claim.value"] = string.Join(' ', MachineAccessScopes.Get(model.Scope, managementScopes)),
+                    ["claim.value"] = string.Join(' ', MachineScopes.ToScopeStrings(scopes)),
                     ["jsonType.label"] = "String",
                     ["userinfo.token.claim"] = "false",
                 }),

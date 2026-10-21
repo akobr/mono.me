@@ -41,7 +41,7 @@ public class FederatedExchangeTests(CosmosFixture fixture)
         {
             Organization = Organization,
             Project = Project,
-            Scope = MachineAccessScope.ConfigurationRead,
+            Scopes = [MachineScope.ConfigurationRead],
             CredentialKind = MachineCredentialKind.Federated,
             FederationRules = [new FederationRule { Issuer = "ci", Audience = PlatformAudience, Subject = "ci:job:deploy" }],
         });
