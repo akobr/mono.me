@@ -34,11 +34,11 @@ const seed = createSeed('default')
 const accessMap = seed.account!.AccessMap as Record<string, string>
 const seeded = (key: string) => seed.accessPoints[key]!.Description!
 
-async function mountSettings(org = 'acme', project = 'billing', hash = '') {
+async function mountSettings(org = 'acme', project = 'billing', hash = '', map = accessMap) {
   const view = await mountScreen(
     SettingsPage,
     {},
-    { path: `/${org}/${project}/settings${hash}`, scope: { org, project, view: 'default' }, accessMap },
+    { path: `/${org}/${project}/settings${hash}`, scope: { org, project, view: 'default' }, accessMap: map },
   )
   mounted.push(view)
   // a project page has no view (the context guard sets it from the route)
@@ -96,8 +96,8 @@ describe('the description in Settings', () => {
 
     expect(updates).toEqual([{ Description: 'Invoices and payments of Acme.' }])
     expect(loadDb().accessPoints['acme.billing']?.Description).toBe('Invoices and payments of Acme.')
-    // The reloaded list does not replace the text, and the saved text is no change.
-    expect(descriptionField()!.value).toBe('  Invoices and payments of Acme.  ')
+    // The text shows the stored description, and the saved text is no change.
+    expect(descriptionField()!.value).toBe('Invoices and payments of Acme.')
     expect(saveButton()!.disabled).toBe(true)
 
     await type('   ')
@@ -107,6 +107,50 @@ describe('the description in Settings', () => {
 
     expect(updates[1]).toEqual({})
     expect(loadDb().accessPoints['acme.billing']).not.toHaveProperty('Description')
+    expect(descriptionField()!.value).toBe('')
+    expect(saveButton()!.disabled).toBe(true)
+  })
+
+  it('keeps the text typed during the save', async () => {
+    let answer = () => {}
+    server.use(
+      http.put('*/api/v1/access/points/:key', async () => {
+        await new Promise<void>((resolve) => (answer = resolve))
+      }),
+    )
+    await mountSettings()
+
+    await type('  Invoices of Acme.  ')
+    saveButton()!.click()
+    await settle()
+    await type('Invoices of Acme, and more.')
+    answer()
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Description saved'))
+    await settle()
+
+    expect(descriptionField()!.value).toBe('Invoices of Acme, and more.')
+  })
+
+  // The context switcher keeps the section (utils/context-paths.ts), so the same page shows the other project.
+  it('fills the text of the other project when the project changes', async () => {
+    const db = loadDb()
+    db.accessPoints['acme.returns'] = {
+      Key: 'acme.returns',
+      AccessMap: { [db.account!.Id!]: 'Owner' },
+      Description: 'Returns of Acme.',
+    }
+    db.account!.AccessMap = { ...db.account!.AccessMap, 'acme.returns': 'Owner' }
+    saveDb(db)
+    const view = await mountSettings('acme', 'billing', '', { ...accessMap, 'acme.returns': 'Owner' })
+
+    await type('A draft for billing.')
+    expect(saveButton()!.disabled).toBe(false)
+
+    await view.router.push('/acme/returns/settings')
+    useContextStore().set({ org: 'acme', project: 'returns' })
+    await settle(6)
+
+    expect(descriptionField()!.value).toBe('Returns of Acme.')
     expect(saveButton()!.disabled).toBe(true)
   })
 
