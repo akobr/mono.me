@@ -264,6 +264,52 @@ public class OpenApiExportTests
             .ShouldBe("The annotation key is not valid (ErrorCode InvalidKey), a management scope doesn't exist, or the credential kind is not supported.");
     }
 
+    // The description of a project (424-78): its update and the caller's projects, under the Access tag, for users, with
+    // the 403 of the document filter. The list carries the key, the role and the description, not the members.
+    [Fact]
+    public async Task Document_ProjectOperations_ArePublished()
+    {
+        var json = await RenderAsync();
+        using var document = JsonDocument.Parse(json);
+
+        var operations = document.RootElement.GetProperty("paths").EnumerateObject()
+            .SelectMany(path => path.Value.EnumerateObject().Select(operation => (Path: path.Name, Method: operation.Name, Operation: operation.Value)))
+            .Where(operation => operation.Operation.GetProperty("operationId").GetString() is Definitions.RouteIds.Access.UpdateAccessPoint or Definitions.RouteIds.Access.GetProjects)
+            .ToList();
+
+        operations.Select(operation => $"{operation.Method.ToUpperInvariant()} {operation.Path} {operation.Operation.GetProperty("operationId").GetString()}").ShouldBe(
+            [
+                "PUT /v1/access/points/{key} UpdateAccessPoint",
+                "GET /v1/access/projects GetProjects",
+            ],
+            ignoreOrder: true);
+
+        foreach (var (_, _, operation) in operations)
+        {
+            operation.GetProperty("tags").EnumerateArray().Select(tag => tag.GetString()).ShouldBe([Definitions.Tags.Access]);
+            operation.GetProperty("security").GetArrayLength().ShouldBeGreaterThan(0);
+            operation.GetProperty("responses").GetProperty("403").GetProperty("description").GetString().ShouldBe(Definitions.Descriptions.ResponseForbidden);
+        }
+
+        var update = Operation(document, Definitions.RouteIds.Access.UpdateAccessPoint);
+        update.GetProperty("responses").EnumerateObject().Select(response => response.Name).ShouldBe(["200", "400", "401", "403", "404", "409", "500"], ignoreOrder: true);
+        update.GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty(Definitions.ContentTypes.Json)
+            .GetProperty("schema").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/AccessPoint");
+
+        var projects = Operation(document, Definitions.RouteIds.Access.GetProjects);
+        projects.GetProperty("responses").EnumerateObject().Select(response => response.Name).ShouldBe(["200", "401", "403", "404", "500"], ignoreOrder: true);
+        var list = projects.GetProperty("responses").GetProperty("200").GetProperty("content").GetProperty(Definitions.ContentTypes.Json).GetProperty("schema");
+        list.GetProperty("type").GetString().ShouldBe("array");
+        list.GetProperty("items").GetProperty("$ref").GetString().ShouldBe("#/components/schemas/ProjectSummary");
+
+        var schemas = document.RootElement.GetProperty("components").GetProperty("schemas");
+        PropertyNames(schemas, "ProjectSummary").ShouldBe(["Key", "Role", "Description"], ignoreOrder: true);
+        PropertyNames(schemas, "AccessPointUpdate").ShouldBe(["Description"]);
+        PropertyNames(schemas, "AccessPoint").ShouldContain("Description");
+        PropertyNames(schemas, "AccessPointCreate").ShouldContain("ProjectDescription");
+        PropertyNames(schemas, "AccountCreate").ShouldContain("ProjectDescription");
+    }
+
     // These handlers read their JSON bodies themselves, not through [FromBody], so [OpenApiRequestBody] alone documents
     // them: each keeps its application/json body, its schema and its required flag, and the SDKs do not change. The
     // generator writes "required" only when it is true; ExportKeyValues sets Required = false and the others nothing.
@@ -277,6 +323,7 @@ public class OpenApiExportTests
         {
             (Definitions.RouteIds.Access.CreateAccount, Reference("AccountCreate"), false),
             (Definitions.RouteIds.Access.CreateAccessPoint, Reference("AccessPointCreate"), false),
+            (Definitions.RouteIds.Access.UpdateAccessPoint, Reference("AccessPointUpdate"), false),
             (Definitions.RouteIds.Access.GrantUserAccess, Reference("Permission"), false),
             (Definitions.RouteIds.Access.RevokeUserAccess, Reference("Permission"), false),
             (Definitions.RouteIds.Access.CreateMachineAccess, Reference("MachineAccessCreate"), false),

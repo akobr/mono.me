@@ -130,6 +130,22 @@ public partial class RouteTableTests
         routes.ShouldContain(expected);
     }
 
+    // "projects" is a literal segment under v1/access/; "access" is a reserved organization name.
+    [Theory]
+    [InlineData("PUT v1/access/points/{}")]
+    [InlineData("GET v1/access/projects")]
+    public void ProjectRoutes_AreRegistered(string expected)
+    {
+        var routes = typeof(AccessHttp).Assembly
+            .GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
+            .SelectMany(method => method.GetParameters().Select(parameter => parameter.GetCustomAttribute<HttpTriggerAttribute>()))
+            .Where(trigger => trigger?.Route is not null)
+            .SelectMany(trigger => trigger!.Methods!.Select(verb => $"{verb.ToUpperInvariant()} {Parameter().Replace(trigger.Route!, "{}")}"));
+
+        routes.ShouldContain(expected);
+    }
+
     [Theory]
     [InlineData("GET v1/{}/{}/access/issuers")]
     [InlineData("GET v1/{}/{}/access/issuers/{}")]
