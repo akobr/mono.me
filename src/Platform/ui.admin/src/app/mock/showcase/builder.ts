@@ -145,7 +145,8 @@ export class ScopeBuilder {
   readonly editors: readonly PersonaId[]
   /** Seeded by project and view, so a build gives the same content every time. */
   readonly rng: Rng
-  private readonly now = Date.now()
+  /** The build's clock: every date of the scope is relative to it. */
+  readonly now = Date.now()
   private readonly annotations = new Map<string, Annotation>()
   private readonly documents = new Map<DocumentId, DocumentSpec>()
   private readonly deletions: { key: string; daysAgo: number; by: PersonaId }[] = []

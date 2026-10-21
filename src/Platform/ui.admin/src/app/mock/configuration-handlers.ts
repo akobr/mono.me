@@ -483,8 +483,11 @@ export const configurationHandlers: HttpHandler[] = [
         return denied
       }
       const scope = scopeOf(params)
-      if (!latest(getDocument(db, scope, `configuration:${params.key}`))) {
-        return errorResponse(404, `There is no configuration for ${params.key}.`, 'NotFound')
+      // Like the raw read: 404 only for an unknown or deleted annotation; without an own document the inherited
+      // content is resolved.
+      const missing = missingOrDeleted(db, params, 404)
+      if (missing) {
+        return missing
       }
       try {
         const resolved = resolveBindings(effectiveContent(db, scope, params.key), db, scope, params.key) as Record<
