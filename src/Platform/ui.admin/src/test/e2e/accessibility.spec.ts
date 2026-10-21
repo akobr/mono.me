@@ -136,7 +136,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expectAccessible(page)
     })
 
-    // The management scopes of a new machine (424-57): picked by an Owner, disabled for a Contributor.
+    // The scopes of a new machine (424-79): a preset with a management scope picked by an Owner; for a Contributor the
+    // management scopes, the secrets scopes and their presets disabled.
     for (const [role, path] of [
       ['an Owner', '/acme/billing/machines'],
       ['a Contributor', '/acme/shipping/machines'],
@@ -144,13 +145,15 @@ for (const colorScheme of ['light', 'dark'] as const) {
       test(`the new machine dialog of ${role} has no serious accessibility violations`, async ({ page }) => {
         await openApp(page, path)
         await page.getByRole('button', { name: 'New machine' }).first().click()
-        const transfer = page
-          .getByRole('dialog', { name: 'New machine access' })
-          .getByRole('checkbox', { name: 'Configuration.Transfer' })
+        const dialog = page.getByRole('dialog', { name: 'New machine access' })
+        const transfer = dialog.getByRole('checkbox', { name: 'Configuration.Transfer' })
         if (role === 'an Owner') {
-          await transfer.check()
+          await dialog.getByRole('button', { name: 'Git sync' }).click()
+          await expect(transfer).toBeChecked()
         } else {
           await expect(transfer).toBeDisabled()
+          await expect(dialog.getByRole('checkbox', { name: 'Secrets.Read' })).toBeDisabled()
+          await expect(dialog.getByRole('button', { name: 'Runtime with secrets' })).toBeDisabled()
         }
         await expectAccessible(page)
       })

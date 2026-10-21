@@ -279,7 +279,7 @@ describe('trusted issuers against the mock API', () => {
 describe('federated machines against the mock API', () => {
   it('creates a machine without a secret, with its rules and the token endpoint', async () => {
     const machine = await createMachineAccess('acme', 'billing', {
-      Scope: 'DefaultRead',
+      Scopes: ['AnnotationRead', 'ConfigurationRead'],
       CredentialKind: 'Federated',
       FederationRules: [githubRule()],
     })
@@ -301,7 +301,7 @@ describe('federated machines against the mock API', () => {
   })
 
   it('validates the rules of a Federated machine and refuses them on other kinds', async () => {
-    const create = (body: MachineAccessCreate) => createMachineAccess('acme', 'billing', { Scope: 'DefaultRead', ...body })
+    const create = (body: MachineAccessCreate) => createMachineAccess('acme', 'billing', { Scopes: ['AnnotationRead'], ...body })
 
     await expect(create({ CredentialKind: 'Federated' })).rejects.toMatchObject({
       status: 400,

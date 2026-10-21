@@ -7,11 +7,12 @@ import {
   getMachineAccess,
   getMachineAuthentication,
   issueSharedCertificate,
-  MachineManagementScope,
+  MachineScope,
   resetMachineAccess,
   setMachineAuthentication,
   setMachineFederationRules,
   type AccessPointMember,
+  type AccountRole,
   type FederationRule,
   type MachineAccessCreate,
   type MachineAuthenticationPolicy,
@@ -20,12 +21,19 @@ import { memberRules } from '@/utils/roles'
 import {
   allowsSharedCertificates,
   certificateDaysLeft,
+  inApiOrder,
+  isManagementScope,
+  isSecretsScope,
   issuesCertificates,
+  machineScopes,
   machineSecret,
-  managementScopeDescriptions,
-  managementScopeLabels,
   managementScopes,
-  needsAdministrator,
+  requiredRoleFor,
+  runtimeScopes,
+  scopeDescriptions,
+  scopeLabels,
+  scopePresets,
+  withImpliedReads,
 } from '@/utils/machines'
 import MachineCreateDialog from '@/components/access/MachineCreateDialog.vue'
 import OneTimeSecretDialog from '@/components/access/OneTimeSecretDialog.vue'
@@ -133,112 +141,227 @@ describe('machines', () => {
     expect(allowsSharedCertificates(undefined)).toBe(false)
   })
 
-  it('lists every management scope in the order of the API, with its scope string and what it opens', () => {
-    expect(managementScopes).toEqual(Object.values(MachineManagementScope))
-    expect(managementScopes.map((scope) => managementScopeLabels[scope])).toEqual([
+  it('lists every machine scope in the order of the API, in two groups, with its scope string and what it allows', () => {
+    expect(machineScopes).toEqual(Object.values(MachineScope))
+    expect(runtimeScopes.map((scope) => scopeLabels[scope])).toEqual([
+      'Annotation.Read',
+      'Annotation.Write',
+      'Configuration.Read',
+      'Configuration.Write',
+      'Secrets.Read',
+      'Secrets.Write',
+    ])
+    expect(managementScopes.map((scope) => scopeLabels[scope])).toEqual([
       'Configuration.Transfer',
       'Schema.Write',
       'Template.Write',
       'Annotation.Manage',
       'KeyValue.Manage',
     ])
-    expect(managementScopes.every((scope) => managementScopeDescriptions[scope].length > 0)).toBe(true)
+    expect(machineScopes.filter(isManagementScope)).toEqual(managementScopes)
+    expect(machineScopes.filter(isSecretsScope)).toEqual(['SecretsRead', 'SecretsWrite'])
+    expect(machineScopes.every((scope) => scopeDescriptions[scope].length > 0)).toBe(true)
+    // The secrets scopes include no configuration scope, so they name the one they need.
+    expect(scopeDescriptions.SecretsRead).toContain('Needs Configuration.Read as well.')
+    expect(scopeDescriptions.SecretsWrite).toContain('Needs Configuration.Write as well.')
   })
 
-  it('leaves the reset and the federation rules of a machine with management scopes to Administrators', () => {
-    expect(needsAdministrator({ Scope: 'DefaultRead', ManagementScopes: ['ConfigurationTransfer'] })).toBe(true)
-    expect(needsAdministrator({ Scope: 'DefaultRead', ManagementScopes: [] })).toBe(false)
-    expect(needsAdministrator({ Scope: 'DefaultRead' })).toBe(false)
-    expect(needsAdministrator(undefined)).toBe(false)
+  it('completes the write scopes with their read scopes, distinct and in the order of the API', () => {
+    expect(withImpliedReads(['SecretsWrite', 'ConfigurationTransfer', 'AnnotationWrite', 'AnnotationWrite'])).toEqual([
+      'AnnotationRead',
+      'AnnotationWrite',
+      'SecretsRead',
+      'SecretsWrite',
+      'ConfigurationTransfer',
+    ])
+    // Secrets scopes imply no configuration scope, and management scopes imply nothing.
+    expect(withImpliedReads(['SchemaWrite', 'SecretsRead'])).toEqual(['SecretsRead', 'SchemaWrite'])
+    expect(inApiOrder(['KeyValueManage', 'ConfigurationRead', 'KeyValueManage'])).toEqual([
+      'ConfigurationRead',
+      'KeyValueManage',
+    ])
+  })
+
+  it('offers presets of typical machines, each as the API stores it', () => {
+    expect(scopePresets.map((preset) => [preset.name, preset.scopes.map((scope) => scopeLabels[scope])])).toEqual([
+      ['Runtime reader', ['Annotation.Read', 'Configuration.Read']],
+      ['Runtime with secrets', ['Annotation.Read', 'Configuration.Read', 'Secrets.Read']],
+      ['CI writer', ['Annotation.Read', 'Annotation.Write', 'Configuration.Read', 'Configuration.Write']],
+      [
+        'Git sync',
+        ['Annotation.Read', 'Annotation.Write', 'Configuration.Read', 'Configuration.Write', 'Configuration.Transfer'],
+      ],
+      ['Backup', ['Annotation.Read', 'Configuration.Read', 'Configuration.Transfer']],
+      ['Schema deployer', ['Configuration.Read', 'Configuration.Write', 'Schema.Write', 'Template.Write']],
+    ])
+    for (const preset of scopePresets) {
+      expect(withImpliedReads(preset.scopes)).toEqual(preset.scopes)
+    }
+  })
+
+  it('names the role that gives the scopes of a machine, and with them its reset and its federation rules', () => {
+    expect(requiredRoleFor(['AnnotationRead', 'AnnotationWrite', 'ConfigurationWrite'])).toBe('Contributor')
+    expect(requiredRoleFor(['ConfigurationRead', 'SecretsRead'])).toBe('ContributorWithSecrets')
+    expect(requiredRoleFor({ Scopes: ['AnnotationRead', 'AnnotationManage'] })).toBe('Administrator')
+    expect(requiredRoleFor({ Scopes: ['SecretsWrite', 'KeyValueManage'] })).toBe('Administrator')
+    // A machine without scopes (stored before 424-79) needs no more than the routes.
+    expect(requiredRoleFor({})).toBe('Contributor')
+    expect(requiredRoleFor(undefined)).toBe('Contributor')
   })
 })
 
-describe('management scopes against the mock API', () => {
+describe('machine scopes against the mock API', () => {
   const rule: FederationRule = {
     Issuer: 'github',
     Audience: 'http://api.test/api/v1/acme/billing/access/token',
     Subject: 'repo:acme/billing:ref:refs/heads/main',
   }
+  const noRuntimeScope =
+    'A machine needs at least one runtime scope: AnnotationRead, AnnotationWrite, ConfigurationRead, ConfigurationWrite, SecretsRead or SecretsWrite.'
 
   /** Changes the user's role in acme.billing, which is Owner in the seed. */
-  function setRole(role: 'Contributor' | 'Owner') {
+  function setRole(role: AccountRole) {
     const db = loadDb()
     db.account!.AccessMap!['acme.billing'] = role
     saveDb(db)
   }
 
-  it('stores the management scopes of a new machine, distinct and in the order of the API', async () => {
+  it('stores the scopes of a new machine with the read scope of each write scope, distinct and in the order of the API', async () => {
     const machine = await createMachineAccess('acme', 'billing', {
-      Scope: 'DefaultReadWrite',
-      ManagementScopes: ['SchemaWrite', 'ConfigurationTransfer', 'SchemaWrite'],
+      Scopes: ['SchemaWrite', 'ConfigurationWrite', 'AnnotationRead', 'SchemaWrite', 'SecretsWrite'],
     })
-
-    expect(machine.ManagementScopes).toEqual(['ConfigurationTransfer', 'SchemaWrite'])
-    expect((await getMachineAccess('acme', 'billing', machine.Id!)).ManagementScopes).toEqual([
-      'ConfigurationTransfer',
+    const stored: MachineScope[] = [
+      'AnnotationRead',
+      'ConfigurationRead',
+      'ConfigurationWrite',
+      'SecretsRead',
+      'SecretsWrite',
       'SchemaWrite',
-    ])
-    // None, or an empty list, stores none.
-    expect((await createMachineAccess('acme', 'billing', { Scope: 'DefaultRead' })).ManagementScopes).toBeUndefined()
+    ]
+
+    expect(machine.Scopes).toEqual(stored)
+    expect((await getMachineAccess('acme', 'billing', machine.Id!)).Scopes).toEqual(stored)
+    // The API reads integers as enum values.
     expect(
-      (await createMachineAccess('acme', 'billing', { Scope: 'DefaultRead', ManagementScopes: [] })).ManagementScopes,
-    ).toBeUndefined()
+      (await createMachineAccess('acme', 'billing', { Scopes: [6, 1] as unknown as MachineScope[] })).Scopes,
+    ).toEqual(['AnnotationRead', 'AnnotationWrite', 'ConfigurationTransfer'])
+    // And names in any case, and integers in strings.
+    const lenient = ['configurationread', ' 4 '] as unknown as MachineScope[]
+    expect((await createMachineAccess('acme', 'billing', { Scopes: lenient })).Scopes).toEqual([
+      'ConfigurationRead',
+      'SecretsRead',
+    ])
   })
 
-  it('refuses an unknown management scope', async () => {
+  it('refuses an undefined or unknown scope, and a machine without a runtime scope, as the API does', async () => {
     await expect(
-      createMachineAccess('acme', 'billing', {
-        Scope: 'DefaultRead',
-        ManagementScopes: ['ConfigurationTransfer', 'Everything' as MachineManagementScope],
-      }),
-    ).rejects.toMatchObject({ status: 400, message: "The machine management scope Everything doesn't exist." })
+      createMachineAccess('acme', 'billing', { Scopes: ['AnnotationRead', 99 as unknown as MachineScope] }),
+    ).rejects.toMatchObject({ status: 400, message: "The machine scope 99 doesn't exist." })
+    // Scope strings are not enum names.
+    await expect(
+      createMachineAccess('acme', 'billing', { Scopes: ['AnnotationRead', 'Annotation.Write' as MachineScope] }),
+    ).rejects.toMatchObject({ status: 400, message: 'The request body is not a machine (at $.Scopes[1]).' })
+    // The API reads the whole body before it looks for an undefined value.
+    await expect(
+      createMachineAccess('acme', 'billing', { Scopes: [99, 'Bogus'] as unknown as MachineScope[] }),
+    ).rejects.toMatchObject({ status: 400, message: 'The request body is not a machine (at $.Scopes[1]).' })
+    await expect(
+      createMachineAccess('acme', 'billing', { Scopes: ['AnnotationRead', '99' as MachineScope] }),
+    ).rejects.toMatchObject({ status: 400, message: "The machine scope 99 doesn't exist." })
+    // A missing list, an empty one and management scopes alone.
+    for (const body of [{}, { Scopes: [] }, { Scopes: ['ConfigurationTransfer'] }] as MachineAccessCreate[]) {
+      await expect(createMachineAccess('acme', 'billing', body)).rejects.toMatchObject({
+        status: 400,
+        message: noRuntimeScope,
+      })
+    }
+    expect(loadDb().machines?.['acme.billing']).toHaveLength(3)
   })
 
-  it('lets only Administrators create a machine with management scopes', async () => {
+  it('lets only Administrators give management scopes, and only users with secret rights secrets scopes', async () => {
     // The user contributes to acme.shipping.
     await expect(
-      createMachineAccess('acme', 'shipping', { Scope: 'DefaultRead', ManagementScopes: ['ConfigurationTransfer'] }),
-    ).rejects.toMatchObject({ status: 403, errorCode: 'AccessDenied' })
-    expect(loadDb().machines?.['acme.shipping'] ?? []).toEqual([])
-    await expect(createMachineAccess('acme', 'shipping', { Scope: 'DefaultRead' })).resolves.toMatchObject({
-      Scope: 'DefaultRead',
+      createMachineAccess('acme', 'shipping', { Scopes: ['AnnotationRead', 'ConfigurationTransfer'] }),
+    ).rejects.toMatchObject({
+      status: 403,
+      errorCode: 'AccessDenied',
+      message: "No Administrator access to 'acme.shipping'.",
     })
+    await expect(
+      createMachineAccess('acme', 'shipping', { Scopes: ['ConfigurationRead', 'SecretsRead'] }),
+    ).rejects.toMatchObject({
+      status: 403,
+      errorCode: 'AccessDenied',
+      message: "No ContributorWithSecrets access to 'acme.shipping'.",
+    })
+    expect(loadDb().machines?.['acme.shipping'] ?? []).toEqual([])
+    await expect(
+      createMachineAccess('acme', 'shipping', { Scopes: ['AnnotationWrite', 'ConfigurationWrite'] }),
+    ).resolves.toMatchObject({
+      Scopes: ['AnnotationRead', 'AnnotationWrite', 'ConfigurationRead', 'ConfigurationWrite'],
+    })
+
+    setRole('ContributorWithSecrets')
+    await expect(createMachineAccess('acme', 'billing', { Scopes: ['SecretsWrite'] })).resolves.toMatchObject({
+      Scopes: ['SecretsRead', 'SecretsWrite'],
+    })
+    await expect(
+      createMachineAccess('acme', 'billing', { Scopes: ['ConfigurationRead', 'KeyValueManage'] }),
+    ).rejects.toMatchObject({ status: 403, message: "No Administrator access to 'acme.billing'." })
   })
 
-  it('lets only Administrators reset a machine with management scopes or replace its federation rules', async () => {
+  it('resets a machine or replaces its federation rules only for users with the role its scopes need', async () => {
     const managed = await createMachineAccess('acme', 'billing', {
-      Scope: 'DefaultRead',
+      Scopes: ['ConfigurationRead', 'KeyValueManage'],
       CredentialKind: 'ApiKey',
-      ManagementScopes: ['KeyValueManage'],
     })
     const federated = await createMachineAccess('acme', 'billing', {
-      Scope: 'DefaultReadWrite',
+      Scopes: ['AnnotationWrite', 'ConfigurationTransfer'],
       CredentialKind: 'Federated',
       FederationRules: [rule],
-      ManagementScopes: ['ConfigurationTransfer'],
+    })
+    const withSecrets = await createMachineAccess('acme', 'billing', {
+      Scopes: ['ConfigurationRead', 'SecretsRead'],
+      CredentialKind: 'Federated',
+      FederationRules: [rule],
+    })
+    const denied = (role: string) => ({
+      status: 403,
+      errorCode: 'AccessDenied',
+      message: `No ${role} access to 'acme.billing'.`,
     })
 
     setRole('Contributor')
-    await expect(resetMachineAccess('acme', 'billing', managed.Id!)).rejects.toMatchObject({
-      status: 403,
-      errorCode: 'AccessDenied',
-    })
-    await expect(setMachineFederationRules('acme', 'billing', federated.Id!, [rule])).rejects.toMatchObject({
-      status: 403,
-      errorCode: 'AccessDenied',
-    })
-    // Machines without management scopes stay with Contributors.
+    await expect(resetMachineAccess('acme', 'billing', managed.Id!)).rejects.toMatchObject(denied('Administrator'))
+    await expect(setMachineFederationRules('acme', 'billing', federated.Id!, [rule])).rejects.toMatchObject(
+      denied('Administrator'),
+    )
+    // The seeded mach-billing-sync reads secrets.
+    await expect(resetMachineAccess('acme', 'billing', 'mach-billing-sync')).rejects.toMatchObject(
+      denied('ContributorWithSecrets'),
+    )
+    await expect(setMachineFederationRules('acme', 'billing', withSecrets.Id!, [rule])).rejects.toMatchObject(
+      denied('ContributorWithSecrets'),
+    )
+    // Runtime scopes without secrets stay with Contributors.
     expect((await resetMachineAccess('acme', 'billing', 'mach-invoicing-worker')).AccessKey).toBeDefined()
     await expect(setMachineFederationRules('acme', 'billing', 'mach-release-pipeline', [rule])).resolves.toMatchObject({
       FederationRules: [rule],
     })
 
+    setRole('ContributorWithSecrets')
+    expect((await resetMachineAccess('acme', 'billing', 'mach-billing-sync')).Certificate).toBeDefined()
+    await expect(setMachineFederationRules('acme', 'billing', withSecrets.Id!, [rule])).resolves.toMatchObject({
+      Scopes: ['ConfigurationRead', 'SecretsRead'],
+    })
+    await expect(resetMachineAccess('acme', 'billing', managed.Id!)).rejects.toMatchObject(denied('Administrator'))
+
     setRole('Owner')
     const reset = await resetMachineAccess('acme', 'billing', managed.Id!)
     expect(reset.AccessKey).toBeDefined()
-    expect(reset.ManagementScopes).toEqual(['KeyValueManage'])
+    expect(reset.Scopes).toEqual(['ConfigurationRead', 'KeyValueManage'])
     await expect(setMachineFederationRules('acme', 'billing', federated.Id!, [rule])).resolves.toMatchObject({
-      ManagementScopes: ['ConfigurationTransfer'],
+      Scopes: ['AnnotationRead', 'AnnotationWrite', 'ConfigurationTransfer'],
     })
   })
 })
@@ -257,14 +380,17 @@ describe('machine authentication policy against the mock API', () => {
     })
     expect(await getMachineAuthentication('acme.billing')).toEqual(policy)
 
-    const certificate = await createMachineAccess('acme', 'billing', { Scope: 'DefaultRead' })
+    const certificate = await createMachineAccess('acme', 'billing', { Scopes: ['AnnotationRead'] })
     expect(certificate).toMatchObject({ CredentialKind: 'Certificate', CertificateLifetimeDays: 30 })
     expect(certificate.CertificateNotAfter).toBeDefined()
-    const apiKey = await createMachineAccess('acme', 'billing', { Scope: 'DefaultRead', CredentialKind: 'ApiKey' })
+    const apiKey = await createMachineAccess('acme', 'billing', {
+      Scopes: ['AnnotationRead'],
+      CredentialKind: 'ApiKey',
+    })
     expect(apiKey.CredentialKind).toBe('ApiKey')
     expect(apiKey.CertificateLifetimeDays).toBeUndefined()
     await expect(
-      createMachineAccess('acme', 'billing', { Scope: 'DefaultRead', CredentialKind: 'ClientCredentials' }),
+      createMachineAccess('acme', 'billing', { Scopes: ['AnnotationRead'], CredentialKind: 'ClientCredentials' }),
     ).rejects.toMatchObject({
       status: 400,
       message: 'The credential kind ClientCredentials is not enabled in the project acme.billing.',
@@ -278,13 +404,13 @@ describe('machine authentication policy against the mock API', () => {
       message: 'The project acme.billing does not enable CertificateAndApiKey, which shared certificates belong to.',
     })
     await expect(
-      createMachineAccess('acme', 'billing', { Scope: 'DefaultRead', UseSharedCertificate: true }),
+      createMachineAccess('acme', 'billing', { Scopes: ['AnnotationRead'], UseSharedCertificate: true }),
     ).rejects.toMatchObject({ status: 400 })
 
     await setMachineAuthentication('acme.billing', { EnabledCredentialKinds: ['ApiKey', 'CertificateAndApiKey'] })
     expect((await issueSharedCertificate('acme', 'billing', { Label: 'edge' })).Label).toBe('edge')
     const machine = await createMachineAccess('acme', 'billing', {
-      Scope: 'DefaultRead',
+      Scopes: ['AnnotationRead'],
       CredentialKind: 'CertificateAndApiKey',
       UseSharedCertificate: true,
       CertificateLifetimeDays: 30,
@@ -437,36 +563,104 @@ describe('MachineCreateDialog', () => {
     })
   })
 
-  describe('management scopes', () => {
+  describe('scopes', () => {
     const policy: MachineAuthenticationPolicy = { EnabledCredentialKinds: ['ApiKey'], CredentialKind: 'ApiKey' }
+    const checked = (label: string) => checkbox(label).getAttribute('aria-checked') === 'true'
+    /** The scope strings of the picked scopes, in the order of the dialog. */
+    const picked = () => machineScopes.map((scope) => scopeLabels[scope]).filter(checked)
 
-    it('picks none by default and then sends none', async () => {
+    /** The button of the dialog with this label. */
+    function button(label: string) {
+      return [...document.body.querySelectorAll('button')].find((entry) => entry.textContent?.trim() === label)!
+    }
+
+    async function click(element: HTMLElement) {
+      element.click()
+      await settle(4)
+    }
+
+    it('starts from Runtime reader, offers every scope and preset to an Owner, and sends only the scopes', async () => {
       const { body, text } = await create(policy, async () => {
-        for (const scope of managementScopes) {
-          expect(checkbox(managementScopeLabels[scope]).disabled).toBe(false)
-          expect(checkbox(managementScopeLabels[scope]).getAttribute('aria-checked')).toBe('false')
-        }
+        expect(picked()).toEqual(['Annotation.Read', 'Configuration.Read'])
+        expect(machineScopes.every((scope) => !checkbox(scopeLabels[scope]).disabled)).toBe(true)
+        expect(scopePresets.every((preset) => !button(preset.name).disabled)).toBe(true)
       })
 
+      expect(text).toContain('Runtime scopes')
       expect(text).toContain('Management scopes')
-      expect(text).toContain('Bulk and structural operations. They are never part of the scope above')
+      expect(text).toContain('Bulk and structural operations. Each also needs the runtime scope of its operation')
       expect(text).not.toContain('Only Administrators give management scopes.')
-      expect(body).toBeDefined()
+      expect(text).not.toContain('Only users with secret rights give secrets scopes.')
+      expect(body?.Scopes).toEqual(['AnnotationRead', 'ConfigurationRead'])
+      expect(body).not.toHaveProperty('Scope')
       expect(body).not.toHaveProperty('ManagementScopes')
     })
 
-    it('sends the picked management scopes in the order of the API', async () => {
+    it('replaces the picked scopes with a preset, and sends them in the order of the API', async () => {
       const { body } = await create(policy, async () => {
-        checkbox('Schema.Write').click()
-        await settle(4)
-        checkbox('Configuration.Transfer').click()
-        await settle(4)
+        await click(checkbox('Secrets.Read'))
+        await click(button('Git sync'))
+        expect(picked()).toEqual([
+          'Annotation.Read',
+          'Annotation.Write',
+          'Configuration.Read',
+          'Configuration.Write',
+          'Configuration.Transfer',
+        ])
+        await click(checkbox('KeyValue.Manage'))
+        await click(checkbox('Schema.Write'))
       })
 
-      expect(body).toMatchObject({ Scope: 'DefaultRead', ManagementScopes: ['ConfigurationTransfer', 'SchemaWrite'] })
+      expect(body?.Scopes).toEqual([
+        'AnnotationRead',
+        'AnnotationWrite',
+        'ConfigurationRead',
+        'ConfigurationWrite',
+        'ConfigurationTransfer',
+        'SchemaWrite',
+        'KeyValueManage',
+      ])
+      // Nothing about the preset.
+      expect(JSON.stringify(body)).not.toContain('Git sync')
     })
 
-    it('forgets the picked management scopes when the dialog opens again', async () => {
+    it('picks the read scope with a write scope, and drops the write scope with its read scope', async () => {
+      const { body } = await create(policy, async () => {
+        await click(checkbox('Secrets.Write'))
+        await click(checkbox('Annotation.Write'))
+        expect(picked()).toEqual([
+          'Annotation.Read',
+          'Annotation.Write',
+          'Configuration.Read',
+          'Secrets.Read',
+          'Secrets.Write',
+        ])
+        await click(checkbox('Annotation.Read'))
+        expect(picked()).toEqual(['Configuration.Read', 'Secrets.Read', 'Secrets.Write'])
+        // A write scope goes alone.
+        await click(checkbox('Secrets.Write'))
+      })
+
+      expect(body?.Scopes).toEqual(['ConfigurationRead', 'SecretsRead'])
+    })
+
+    it('creates no machine without a runtime scope', async () => {
+      const screen = await openDialog(ref(policy))
+      await click(checkbox('Annotation.Read'))
+      await click(checkbox('Configuration.Read'))
+      expect(document.body.textContent).toContain('Pick at least one runtime scope.')
+      expect(button('Create').disabled).toBe(true)
+
+      // Management scopes alone are not enough.
+      await click(checkbox('Configuration.Transfer'))
+      expect(button('Create').disabled).toBe(true)
+      await click(checkbox('Configuration.Read'))
+      expect(document.body.textContent).not.toContain('Pick at least one runtime scope.')
+      expect(button('Create').disabled).toBe(false)
+      screen.host.unmount()
+    })
+
+    it('starts from Runtime reader again when the dialog opens again', async () => {
       const bodies: MachineAccessCreate[] = []
       server.use(
         http.post('*/api/v1/:org/:project/access/machines', async ({ request }) => {
@@ -475,36 +669,65 @@ describe('MachineCreateDialog', () => {
         }),
       )
       const screen = await openDialog(ref(policy))
-      checkbox('Template.Write').click()
-      await settle(4)
-      expect(checkbox('Template.Write').getAttribute('aria-checked')).toBe('true')
+      await click(button('Schema deployer'))
+      expect(checked('Template.Write')).toBe(true)
 
       screen.open.value = false
       await settle(4)
       screen.open.value = true
       await settle(6)
-      expect(checkbox('Template.Write').getAttribute('aria-checked')).toBe('false')
-      ;[...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Create')!.click()
+      expect(picked()).toEqual(['Annotation.Read', 'Configuration.Read'])
+      button('Create').click()
       await settle(6)
-      expect(bodies[0]).not.toHaveProperty('ManagementScopes')
+      expect(bodies[0]?.Scopes).toEqual(['AnnotationRead', 'ConfigurationRead'])
       screen.host.unmount()
     })
 
-    it('disables the management scopes below Administrator', async () => {
+    it('disables the management scopes and the presets with one below Administrator', async () => {
       const { body, text } = await create(
         policy,
         async () => {
-          // A click on a disabled checkbox picks nothing.
-          checkbox('Annotation.Manage').click()
-          await settle(4)
-          expect(managementScopes.every((scope) => checkbox(managementScopeLabels[scope]).disabled)).toBe(true)
+          // A click on a disabled checkbox or button picks nothing.
+          await click(checkbox('Annotation.Manage'))
+          await click(button('Backup'))
+          expect(picked()).toEqual(['Annotation.Read', 'Configuration.Read'])
+          expect(managementScopes.every((scope) => checkbox(scopeLabels[scope]).disabled)).toBe(true)
+          expect(runtimeScopes.every((scope) => !checkbox(scopeLabels[scope]).disabled)).toBe(true)
+          expect(scopePresets.filter((preset) => button(preset.name).disabled).map((preset) => preset.name)).toEqual([
+            'Git sync',
+            'Backup',
+            'Schema deployer',
+          ])
+          await click(button('Runtime with secrets'))
+        },
+        'ContributorWithSecrets',
+      )
+
+      expect(text).toContain('Only Administrators give management scopes.')
+      expect(text).not.toContain('Only users with secret rights give secrets scopes.')
+      expect(body?.Scopes).toEqual(['AnnotationRead', 'ConfigurationRead', 'SecretsRead'])
+    })
+
+    it('disables the secrets scopes and their preset without secret rights', async () => {
+      const { body, text } = await create(
+        policy,
+        async () => {
+          // A click on a disabled checkbox or button picks nothing.
+          await click(checkbox('Secrets.Read'))
+          await click(button('Runtime with secrets'))
+          expect(picked()).toEqual(['Annotation.Read', 'Configuration.Read'])
+          expect(checkbox('Secrets.Read').disabled).toBe(true)
+          expect(checkbox('Secrets.Write').disabled).toBe(true)
+          expect(checkbox('Configuration.Write').disabled).toBe(false)
+          expect(button('Runtime with secrets').disabled).toBe(true)
+          await click(button('CI writer'))
         },
         'Contributor',
       )
 
+      expect(text).toContain('Only users with secret rights give secrets scopes.')
       expect(text).toContain('Only Administrators give management scopes.')
-      expect(body).toBeDefined()
-      expect(body).not.toHaveProperty('ManagementScopes')
+      expect(body?.Scopes).toEqual(['AnnotationRead', 'AnnotationWrite', 'ConfigurationRead', 'ConfigurationWrite'])
     })
   })
 })

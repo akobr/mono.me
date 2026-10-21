@@ -8,23 +8,23 @@ import { audienceDiffers } from '@/utils/federation'
 import {
   credentialKindLabel,
   isFederated,
-  managementScopeDescriptions,
-  managementScopeLabels,
-  needsAdministrator,
+  isManagementScope,
+  requiredRoleFor,
   scopeDescriptions,
+  scopeLabel,
 } from '@/utils/machines'
 
-// One machine access: scope, management scopes (424-57), restriction, credential kind and certificate (with its
-// lifetime and expiry). Reset and delete live in the list. A Federated machine (424-46) shows its token endpoint and
+// One machine access: its runtime and management scopes (424-79), restriction, credential kind and certificate (with
+// its lifetime and expiry). Reset and delete live in the list. A Federated machine (424-46) shows its token endpoint and
 // federation rules instead of a certificate; Contributors edit the rules here (FederationRulesDialog) and can show the
-// setup again, but only Administrators edit the rules of a machine with management scopes, as the API refuses them
-// otherwise (424-57). A rule whose issuer was deleted, or whose audience is not the token endpoint (the UI presets it
-// from the address it calls the API at, which a proxy or the API's public base URL can change), is flagged.
+// setup again, but only users with the role the scopes of the machine need (an Administrator for management scopes,
+// ContributorWithSecrets for secrets scopes) edit its rules, as the API refuses them otherwise (424-79). A rule whose
+// issuer was deleted, or whose audience is not the token endpoint (the UI presets it from the address it calls the API
+// at, which a proxy or the API's public base URL can change), is flagged.
 const route = useRoute()
 const router = useRouter()
 const context = useContextStore()
 const canManage = useCan('machines')
-const canAdmin = useCan('manageAccess')
 
 const id = computed(() => String((route.params as { id: string }).id))
 const machine = useGetMachineAccess(
@@ -34,7 +34,10 @@ const machine = useGetMachineAccess(
   { query: { meta: { silent: true } } },
 )
 const federated = computed(() => isFederated(machine.data.value?.CredentialKind))
-const canEditRules = computed(() => canManage.value && (canAdmin.value || !needsAdministrator(machine.data.value)))
+const canGiveScopes = useCan(() => requiredRoleFor(machine.data.value))
+const canEditRules = computed(() => canManage.value && canGiveScopes.value)
+const runtime = computed(() => machine.data.value?.Scopes?.filter((scope) => !isManagementScope(scope)) ?? [])
+const management = computed(() => machine.data.value?.Scopes?.filter(isManagementScope) ?? [])
 
 // The trusted issuers tell which rules name an issuer that was deleted (those rules match no token), and the platform
 // of the others: all but Azure's request their tokens for the token endpoint.
@@ -71,24 +74,22 @@ function close() {
       <ErrorState v-else-if="machine.isError.value" :error="machine.error.value" @retry="machine.refetch()" />
       <template v-else>
         <dl class="grid grid-cols-[10rem_minmax(0,1fr)] gap-x-4 gap-y-3 text-sm">
-          <dt class="text-muted">Scope</dt>
-          <dd>
-            <UBadge :label="machine.data.value?.Scope" color="neutral" variant="outline" size="sm" />
-            <p class="mt-1 text-xs text-muted">
-              {{ machine.data.value?.Scope ? scopeDescriptions[machine.data.value.Scope] : '' }}
-            </p>
-          </dd>
-          <dt class="text-muted">Management scopes</dt>
-          <dd v-if="machine.data.value?.ManagementScopes?.length">
+          <dt class="text-muted">Runtime scopes</dt>
+          <dd v-if="runtime.length">
             <ul class="space-y-2">
-              <li v-for="managementScope in machine.data.value.ManagementScopes" :key="managementScope">
-                <UBadge
-                  :label="managementScopeLabels[managementScope] ?? managementScope"
-                  color="neutral"
-                  variant="subtle"
-                  size="sm"
-                />
-                <p class="mt-1 text-xs text-muted">{{ managementScopeDescriptions[managementScope] }}</p>
+              <li v-for="scope in runtime" :key="scope">
+                <UBadge :label="scopeLabel(scope)" color="neutral" variant="outline" size="sm" />
+                <p class="mt-1 text-xs text-muted">{{ scopeDescriptions[scope] }}</p>
+              </li>
+            </ul>
+          </dd>
+          <dd v-else>None</dd>
+          <dt class="text-muted">Management scopes</dt>
+          <dd v-if="management.length">
+            <ul class="space-y-2">
+              <li v-for="scope in management" :key="scope">
+                <UBadge :label="scopeLabel(scope)" color="neutral" variant="subtle" size="sm" />
+                <p class="mt-1 text-xs text-muted">{{ scopeDescriptions[scope] }}</p>
               </li>
             </ul>
           </dd>

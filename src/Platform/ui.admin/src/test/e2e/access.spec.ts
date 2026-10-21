@@ -145,8 +145,9 @@ test('shared certificates follow CertificateAndApiKey, and a machine can use one
   await expect(page.getByText('shared', { exact: true })).toBeVisible()
 })
 
-// Management scopes (424-57): bulk and structural operations that only Administrators give a machine, shown after its
-// scope in the list and with what they open on the detail.
+// Machine scopes (424-79): runtime and management scopes, picked one by one or from a preset, one badge per scope in
+// the list and with what they allow on the detail. Only Administrators give management scopes and only users with
+// secret rights secrets scopes; below that role a machine with them has no Reset and no Edit rules.
 test('an Owner creates a machine with a management scope and sees it on its detail', async ({ page }) => {
   await openApp(page, '/acme/billing/machines')
   // The seeded machines have none.
@@ -155,10 +156,18 @@ test('an Owner creates a machine with a management scope and sees it on its deta
   await page.getByRole('button', { name: 'New machine' }).first().click()
   const dialog = page.getByRole('dialog', { name: 'New machine access' })
   await expect(dialog.getByText('Bulk and structural operations.')).toBeVisible()
+  // Every open starts from Runtime reader.
+  await expect(dialog.getByRole('checkbox', { name: 'Annotation.Read' })).toBeChecked()
+  await expect(dialog.getByRole('checkbox', { name: 'Configuration.Read' })).toBeChecked()
   const transfer = dialog.getByRole('checkbox', { name: 'Configuration.Transfer' })
   await expect(transfer).toBeEnabled()
   await expect(transfer).not.toBeChecked()
-  await transfer.check()
+  // A preset replaces the pick: Backup reads and transfers.
+  await dialog.getByRole('button', { name: 'Backup' }).click()
+  await expect(transfer).toBeChecked()
+  // A write scope comes with its read scope.
+  await dialog.getByRole('checkbox', { name: 'Secrets.Write' }).check()
+  await expect(dialog.getByRole('checkbox', { name: 'Secrets.Read' })).toBeChecked()
   await dialog.getByRole('button', { name: 'Create' }).click()
 
   const secret = page.getByRole('dialog').filter({ hasText: 'Shown only once' })
@@ -168,49 +177,76 @@ test('an Owner creates a machine with a management scope and sees it on its deta
 
   const row = page.getByRole('row').filter({ hasText: 'Configuration.Transfer' })
   await expect(row).toHaveCount(1)
-  await expect(row).toContainText('DefaultRead')
+  for (const scope of ['Annotation.Read', 'Configuration.Read', 'Secrets.Read', 'Secrets.Write']) {
+    await expect(row.getByText(scope, { exact: true })).toBeVisible()
+  }
   await row.getByRole('link').click()
   const detail = page.locator('#machine-detail')
+  await expect(detail).toContainText('Runtime scopes')
+  await expect(detail.getByText('Secrets.Write', { exact: true })).toBeVisible()
+  await expect(detail.getByText('Writes key/value secrets. Needs Configuration.Write as well.')).toBeVisible()
   await expect(detail).toContainText('Management scopes')
   await expect(detail.getByText('Configuration.Transfer', { exact: true })).toBeVisible()
   await expect(detail.getByText('Exports and imports the views and the key/values of the project.')).toBeVisible()
 })
 
-test('a Contributor cannot give a machine management scopes', async ({ page }) => {
-  // The user contributes to acme.shipping.
+test('a Contributor gives a machine neither management scopes nor secrets scopes', async ({ page }) => {
+  // The user contributes to acme.shipping, without secret rights.
   await openApp(page, '/acme/shipping/machines')
   await page.getByRole('button', { name: 'New machine' }).first().click()
   const dialog = page.getByRole('dialog', { name: 'New machine access' })
   await expect(dialog.getByText('Only Administrators give management scopes.')).toBeVisible()
+  await expect(dialog.getByText('Only users with secret rights give secrets scopes.')).toBeVisible()
   await expect(dialog.getByRole('checkbox', { name: 'Configuration.Transfer' })).toBeDisabled()
+  await expect(dialog.getByRole('checkbox', { name: 'Secrets.Read' })).toBeDisabled()
+  await expect(dialog.getByRole('checkbox', { name: 'Secrets.Write' })).toBeDisabled()
+  for (const preset of ['Runtime with secrets', 'Git sync', 'Backup', 'Schema deployer']) {
+    await expect(dialog.getByRole('button', { name: preset })).toBeDisabled()
+  }
+
+  await dialog.getByRole('button', { name: 'CI writer' }).click()
+  await expect(dialog.getByRole('checkbox', { name: 'Annotation.Write' })).toBeChecked()
+  await dialog.getByRole('button', { name: 'Create' }).click()
+  const secret = page.getByRole('dialog').filter({ hasText: 'Shown only once' })
+  await secret.getByRole('checkbox', { name: 'I have stored these credentials' }).check()
+  await secret.getByRole('button', { name: 'Done' }).click()
+
+  const row = page.getByRole('row').filter({ hasText: 'Configuration.Write' })
+  await expect(row).toHaveCount(1)
+  await expect(row.getByRole('button', { name: 'Reset' })).toBeVisible()
 })
 
-test('a Contributor neither resets a machine with management scopes nor edits its rules, but deletes it', async ({
+test('a Contributor neither resets a machine with management or secrets scopes nor edits its rules, but deletes it', async ({
   page,
 }) => {
   // The user contributes to acme.shipping, whose Owner created these machines; the API refuses a Contributor the reset
-  // and new federation rules of a machine with management scopes.
+  // and new federation rules of a machine with management or secrets scopes.
   await openApp(page, '/acme/shipping/machines')
   await page.evaluate(() => {
     const mock = window.storytellerMock!
     mock.addMachine('acme.shipping', {
       Id: 'mach-shipping-worker',
       ObjectId: 'obj_11',
-      Scope: 'DefaultRead',
+      Scopes: ['AnnotationRead', 'ConfigurationRead'],
       CredentialKind: 'ApiKey',
     })
     mock.addMachine('acme.shipping', {
       Id: 'mach-shipping-export',
       ObjectId: 'obj_12',
-      Scope: 'DefaultRead',
+      Scopes: ['AnnotationRead', 'ConfigurationRead', 'ConfigurationTransfer'],
       CredentialKind: 'ApiKey',
-      ManagementScopes: ['ConfigurationTransfer'],
+    })
+    mock.addMachine('acme.shipping', {
+      Id: 'mach-shipping-secrets',
+      ObjectId: 'obj_13',
+      Scopes: ['ConfigurationRead', 'SecretsRead'],
+      CredentialKind: 'ApiKey',
     })
     mock.addMachine('acme.shipping', {
       Id: 'mach-shipping-sync',
       ObjectId: 'mach-shipping-sync',
       AccessKey: '',
-      Scope: 'DefaultReadWrite',
+      Scopes: ['AnnotationRead', 'AnnotationWrite', 'ConfigurationRead', 'ConfigurationWrite', 'ConfigurationTransfer'],
       CredentialKind: 'Federated',
       FederationRules: [
         {
@@ -219,7 +255,20 @@ test('a Contributor neither resets a machine with management scopes nor edits it
           Subject: 'repo:acme/shipping:ref:refs/heads/main',
         },
       ],
-      ManagementScopes: ['ConfigurationTransfer'],
+    })
+    mock.addMachine('acme.shipping', {
+      Id: 'mach-shipping-vault',
+      ObjectId: 'mach-shipping-vault',
+      AccessKey: '',
+      Scopes: ['ConfigurationRead', 'SecretsRead'],
+      CredentialKind: 'Federated',
+      FederationRules: [
+        {
+          Issuer: 'github',
+          Audience: `${location.origin}/api/v1/acme/shipping/access/token`,
+          Subject: 'repo:acme/shipping:environment:production',
+        },
+      ],
     })
   })
   await goto(page, '/acme/shipping/machines')
@@ -230,12 +279,18 @@ test('a Contributor neither resets a machine with management scopes nor edits it
   const managed = page.getByRole('row').filter({ hasText: 'mach-shipping-export' })
   await expect(managed).toContainText('Configuration.Transfer')
   await expect(managed.getByRole('button', { name: 'Reset' })).toHaveCount(0)
+  const secrets = page.getByRole('row').filter({ hasText: 'mach-shipping-secrets' })
+  await expect(secrets).toContainText('Secrets.Read')
+  await expect(secrets.getByRole('button', { name: 'Reset' })).toHaveCount(0)
 
-  await page.getByRole('link', { name: 'mach-shipping-sync' }).click()
-  const rules = page.getByRole('region', { name: 'Federation rules' })
-  await expect(rules.getByRole('button', { name: 'Setup' })).toBeVisible()
-  await expect(rules.getByRole('button', { name: 'Edit rules' })).toHaveCount(0)
-  await page.locator('#machine-detail').getByRole('button', { name: 'Close' }).click()
+  // A management scope on the one Federated machine, a secrets scope on the other.
+  for (const id of ['mach-shipping-sync', 'mach-shipping-vault']) {
+    await page.getByRole('link', { name: id }).click()
+    const rules = page.getByRole('region', { name: 'Federation rules' })
+    await expect(rules.getByRole('button', { name: 'Setup' })).toBeVisible()
+    await expect(rules.getByRole('button', { name: 'Edit rules' })).toHaveCount(0)
+    await page.locator('#machine-detail').getByRole('button', { name: 'Close' }).click()
+  }
 
   await managed.getByRole('button', { name: 'Delete mach-shipping-export' }).click()
   const confirm = page.getByRole('dialog', { name: 'Delete mach-shipping-export?' })
