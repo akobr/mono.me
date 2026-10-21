@@ -34,7 +34,7 @@ describe('invalidation', () => {
     expect(queryKeyStartsWith(getGetConfigurationQueryKey('acme', 'billing', 'default', 'exe.a.b.d'), path)).toBe(false)
   })
 
-  it('matches the access point of a project update and the projects list, but not the access point listing', () => {
+  it('matches the access point of a project update, not the access point listing or the projects list', () => {
     const path = getUpdateAccessPointUrl('acme.billing')
 
     expect(queryKeyStartsWith(getGetAccessPointQueryKey('acme.billing'), path)).toBe(true)
