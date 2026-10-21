@@ -7,7 +7,7 @@ import OrganizationForm from '@/components/orgs/OrganizationForm.vue'
 function mountForm(submit = vi.fn(async () => {})) {
   const wrapper = mount(OrganizationForm, { props: { submit }, global: { plugins: [ui] }, attachTo: document.body })
   const [organization, project] = wrapper.findAll('input')
-  return { wrapper, organization: organization!, project: project!, submit }
+  return { wrapper, organization: organization!, project: project!, description: wrapper.find('textarea'), submit }
 }
 
 // VeeValidate validates asynchronously, so the assertions wait for the outcome instead of counting ticks.
@@ -31,7 +31,34 @@ describe('OrganizationForm (VeeValidate + Zod)', () => {
     await project.setValue('billing')
     await wrapper.find('form').trigger('submit')
 
-    await vi.waitFor(() => expect(submit).toHaveBeenCalledWith({ organization: 'acme', project: 'billing' }))
+    await vi.waitFor(() =>
+      expect(submit).toHaveBeenCalledWith({ organization: 'acme', project: 'billing', description: '' }),
+    )
+    wrapper.unmount()
+  })
+
+  it('submits the description of the first project, at most 500 characters', async () => {
+    const { wrapper, organization, project, description, submit } = mountForm()
+
+    await organization.setValue('acme')
+    await project.setValue('billing')
+    await description.setValue('x'.repeat(501))
+    await wrapper.find('form').trigger('submit')
+
+    await vi.waitFor(() => expect(wrapper.text()).toContain('At most 500 characters.'))
+    expect(submit).not.toHaveBeenCalled()
+
+    // The dialogs trim it before they send it.
+    await description.setValue(' Invoices of Acme. ')
+    await wrapper.find('form').trigger('submit')
+
+    await vi.waitFor(() =>
+      expect(submit).toHaveBeenCalledWith({
+        organization: 'acme',
+        project: 'billing',
+        description: ' Invoices of Acme. ',
+      }),
+    )
     wrapper.unmount()
   })
 

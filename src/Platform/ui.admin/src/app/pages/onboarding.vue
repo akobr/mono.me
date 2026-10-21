@@ -11,7 +11,13 @@ const session = useSessionStore()
 
 // CreateAccount makes the caller Owner of the new organization and its first project.
 async function submit(values: OrganizationForm) {
-  session.setAccount(await createAccount({ Organization: values.organization, Project: values.project }))
+  session.setAccount(
+    await createAccount({
+      Organization: values.organization,
+      Project: values.project,
+      ProjectDescription: values.description?.trim() || undefined,
+    }),
+  )
   await router.replace(`/${values.organization}/${values.project}/default/annotations`)
 }
 </script>
